@@ -79,11 +79,11 @@ const std::vector<LakeSpec>& specs() {
                                    surfaceRelativeThresholdFilter(HeightmapType::OceanFloor,
                                                                   std::numeric_limits<std::int32_t>::min(), -5)},
                      .biomes = &lavaLakeBiomes()});
-        list.push_back(LakeSpec{
-            .name = "lake_lava_surface",
-            .index = 1,
-            .modifiers = {rarityFilter(200), inSquarePlacement(), heightmapPlacement(HeightmapType::WorldSurface)},
-            .biomes = &lavaLakeBiomes()});
+        list.push_back(LakeSpec{.name = "lake_lava_surface",
+                                .index = 1,
+                                .modifiers = {rarityFilter(200), inSquarePlacement(),
+                                              worldgenHeightmapPlacement(HeightmapType::WorldSurface)},
+                                .biomes = &lavaLakeBiomes()});
         list.push_back(LakeSpec{.name = "rooted_sulfur_spring",
                                 .index = 2,
                                 .modifiers = {countPlacement(IntProvider::uniform(1, 2)), inSquarePlacement(),

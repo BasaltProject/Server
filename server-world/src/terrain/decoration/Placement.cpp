@@ -121,7 +121,10 @@ PlacementModifier surfaceRelativeThresholdFilter(HeightmapType heightmap, std::i
                                                  std::int32_t maxInclusive) {
     return filter([heightmap, minInclusive, maxInclusive](const PlacementContext& context, random::RandomSource&,
                                                           const DecorationPos& origin) {
-        const auto surfaceY = static_cast<std::int64_t>(context.height(origin.x & 15, origin.z & 15, heightmap));
+        // parity: the three features that use this filter, glow_lichen, lake_lava_underground and
+        // underwater_magma, all name `OCEAN_FLOOR_WG`, which stops moving after the carvers.
+        const auto surfaceY =
+            static_cast<std::int64_t>(context.worldgenHeight(origin.x & 15, origin.z & 15, heightmap));
         const auto y = static_cast<std::int64_t>(origin.y);
         return y >= surfaceY + minInclusive && y <= surfaceY + maxInclusive;
     });
@@ -135,6 +138,13 @@ PlacementModifier surfaceWaterDepthFilter(std::int32_t maxWaterDepth) {
         const std::int32_t worldSurfaceY = context.height(x, z, HeightmapType::WorldSurface);
         return worldSurfaceY - oceanFloorY <= maxWaterDepth;
     });
+}
+
+PlacementModifier worldgenHeightmapPlacement(HeightmapType type) {
+    return [type](const PlacementContext& context, random::RandomSource&,
+                  const DecorationPos& origin) -> std::vector<DecorationPos> {
+        return {DecorationPos{origin.x, context.worldgenHeight(origin.x & 15, origin.z & 15, type), origin.z}};
+    };
 }
 
 PlacementModifier heightmapPlacement(HeightmapType type) {

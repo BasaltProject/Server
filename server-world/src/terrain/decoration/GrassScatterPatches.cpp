@@ -83,7 +83,8 @@ void decorateBerrySpecs(Chunk& chunk, std::int64_t seed, const surface::SurfaceR
         }
         const std::int32_t x = chunk.chunkX() * 16 + random.nextInt(16);
         const std::int32_t z = chunk.chunkZ() * 16 + random.nextInt(16);
-        const std::int32_t y = context.height(x & 15, z & 15, HeightmapType::WorldSurface);
+        // parity: both berry patches name `WORLD_SURFACE_WG`.
+        const std::int32_t y = context.worldgenHeight(x & 15, z & 15, HeightmapType::WorldSurface);
         if (std::ranges::find(spec->biomes, biomePath(environment.biomeAt(x, y, z))) == spec->biomes.end()) {
             continue;
         }

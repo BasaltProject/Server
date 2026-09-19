@@ -237,7 +237,7 @@ TEST_CASE("the pipelines generate what the jar generates") {
 
     SUBCASE("desert") { check(runOverworld(1234, 1), 126919, 6144, -6765849239462433688LL); }
 
-    SUBCASE("otherSeed") { check(runOverworld(77, 0), 116474, 6144, -3674811653623309167LL); }
+    SUBCASE("otherSeed") { check(runOverworld(77, 0), 116477, 6144, -4215622627912708396LL); }
 
     SUBCASE("nether") { check(runNether(1234, 0.0, 0.0), 33082, 4096, -4176307358586819173LL); }
 

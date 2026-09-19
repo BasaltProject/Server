@@ -266,7 +266,8 @@ void decorateSpecs(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEn
         for (std::int32_t outer = 0; outer < outerCount; ++outer) {
             const std::int32_t x = chunk.chunkX() * 16 + random.nextInt(16);
             const std::int32_t z = chunk.chunkZ() * 16 + random.nextInt(16);
-            const std::int32_t y = context.height(x & 15, z & 15, HeightmapType::OceanFloor);
+            // parity: every seagrass, kelp and sea pickle patch names `OCEAN_FLOOR_WG`.
+            const std::int32_t y = context.worldgenHeight(x & 15, z & 15, HeightmapType::OceanFloor);
             if (std::ranges::find(spec->biomes, biomePath(environment.biomeAt(x, y, z))) == spec->biomes.end()) {
                 continue;
             }

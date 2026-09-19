@@ -196,7 +196,10 @@ void grassPatchDecoration::decorateFeature(std::int32_t index, Chunk& chunk, std
     for (std::int32_t outer = 0; outer < outerCount; ++outer) {
         const std::int32_t x = chunk.chunkX() * 16 + random.nextInt(16);
         const std::int32_t z = chunk.chunkZ() * 16 + random.nextInt(16);
-        const DecorationPos origin{x, context.height(x & 15, z & 15, HeightmapType::WorldSurface), z};
+        // parity: every `patch_grass_*` names `WORLD_SURFACE_WG`, which stops moving after the
+        // carvers. Read live it lands on the canopy of a tree the same step placed earlier, and the
+        // whole patch then falls in the air.
+        const DecorationPos origin{x, chunk.worldgenHeightAt(x & 15, z & 15, HeightmapType::WorldSurface), z};
         if (std::ranges::find(spec->biomes, biomePath(environment.biomeAt(origin.x, origin.y, origin.z))) !=
             spec->biomes.end()) {
             placePatch(region, random, origin, *spec, bounds);
