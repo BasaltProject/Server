@@ -695,29 +695,6 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                 return options_.blockTags != nullptr &&
                        world::realBlockTags::contains(*options_.blockTags, "minecraft:beacon_base_blocks", block);
             },
-        // parity: `BeaconBlockEntity.tick` hands the criterion to every player in a box ten blocks
-        // out and five up from the beacon, four deep under it.
-        .beaconLit =
-            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                           const std::int32_t levels) {
-                world::AdvancementTriggers* triggers = options_.advancementTriggers;
-                if (triggers == nullptr) {
-                    return;
-                }
-                constexpr double kReach = 10.0;
-                constexpr double kUp = 5.0;
-                constexpr double kUnder = 4.0;
-                for (const player::PlayerSession* watcher : players_->snapshot()) {
-                    if (watcher->worldName != world.name()) {
-                        continue;
-                    }
-                    if (std::abs(watcher->x - x) > kReach || std::abs(watcher->z - z) > kReach ||
-                        watcher->y > y + kUp || watcher->y < y - kUnder - kUp) {
-                        continue;
-                    }
-                    triggers->onConstructedBeacon(watcher->name(), watcher->uuid().toString(), levels);
-                }
-            },
         // parity: `BeaconBlockEntity.applyEffects`: everybody inside the square it reaches, at any
         // height, gets the effect again for as long as the pyramid is worth.
         .beaconPulse =
@@ -746,6 +723,29 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                     if (levels >= world::beacons::kMaxLevels && second.has_value()) {
                         player->connection().addEffect(*second, beam.durationTicks, 0);
                     }
+                }
+            },
+        // parity: `BeaconBlockEntity.tick` hands the criterion to every player in a box ten blocks
+        // out and five up from the beacon, four deep under it.
+        .beaconLit =
+            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                           const std::int32_t levels) {
+                world::AdvancementTriggers* triggers = options_.advancementTriggers;
+                if (triggers == nullptr) {
+                    return;
+                }
+                constexpr double kReach = 10.0;
+                constexpr double kUp = 5.0;
+                constexpr double kUnder = 4.0;
+                for (const player::PlayerSession* watcher : players_->snapshot()) {
+                    if (watcher->worldName != world.name()) {
+                        continue;
+                    }
+                    if (std::abs(watcher->x - x) > kReach || std::abs(watcher->z - z) > kReach ||
+                        watcher->y > y + kUp || watcher->y < y - kUnder - kUp) {
+                        continue;
+                    }
+                    triggers->onConstructedBeacon(watcher->name(), watcher->uuid().toString(), levels);
                 }
             },
         .songStopped =
