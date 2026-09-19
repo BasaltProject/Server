@@ -139,6 +139,9 @@ std::int32_t NeighbourTerrainCache::oceanFloorAt(const std::int32_t neighbourX, 
     return withChunk(keyOf(neighbourX, neighbourZ), neighbourX, neighbourZ, [&](const Chunk& chunk) {
         // The frozen one: whoever asks a neighbour for its floor is standing in for a `_WG` read,
         // and the live map already has that neighbour's own structures piled on it.
+        // parity: the jar answers decorated in a few percent of cases, and not because of the order.
+        // A save at `CARVERS` or later drops the `_WG` maps, so a neighbour that went through disk
+        // has none and the first `getHeight` primes it from whatever is there by then.
         return chunk.worldgenHeightAt(worldX & 15, worldZ & 15, HeightmapType::OceanFloor);
     });
 }
