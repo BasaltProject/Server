@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
+#include <basalt/server/world/terrain/decoration/BushSurvival.hpp>
 #include <basalt/server/world/terrain/decoration/tree/LeafDistances.hpp>
 
 #include <algorithm>
@@ -384,6 +385,13 @@ Chunk& WorldState::installLocked(Chunk chunk) {
             server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldBlockAt);
         }
     }
+    // parity: the same post-processing takes back a bush the finished light leaves too bright. The
+    // features cannot know it while they run, because nothing has lit the chunk yet.
+    const server::world::terrain::decoration::bushSurvival::NeighbourAt neighbourAt =
+        [&chunkAtPos](std::int32_t otherX, std::int32_t otherZ) -> const server::world::Chunk* {
+        return chunkAtPos(otherX, otherZ);
+    };
+    server::world::terrain::decoration::bushSurvival::settle(installed, neighbourAt, hasSkylight_);
     // parity: `LevelChunk.postProcessGeneration` ticks every fluid the aquifer marked, which is what
     // starts a lake running. Scheduling is this world's way of saying the same thing.
     for (const server::world::ChunkShapeUpdate& mark : installed.fluidUpdates()) {
