@@ -261,6 +261,13 @@ std::array<double, 3> LoadedWorld::spawnBlock(std::int32_t chunkX, std::int32_t 
 }
 
 void LoadedWorld::warmSpawnArea(std::int32_t spawnRadiusChunks) {
+    // parity: `MinecraftServer.prepareLevels` prepares the overworld and nothing else, so no other
+    // dimension has a chunk generated before whatever asks for one first. Its spawn is the recorded
+    // one, which needs no chunk to answer.
+    if (declaration_.dimension != config::WorldDimension::Overworld) {
+        spawn_ = {metadata_.spawnX + 0.5, static_cast<double>(metadata_.spawnY), metadata_.spawnZ + 0.5};
+        return;
+    }
     const bool fixedSpawn = declaration_.type == config::WorldType::Void || movedSpawn_;
     const std::pair<std::int32_t, std::int32_t> centre = fixedSpawn ? std::pair{0, 0} : climateSpawnChunk();
     std::vector<std::pair<std::int32_t, std::int32_t>> positions;

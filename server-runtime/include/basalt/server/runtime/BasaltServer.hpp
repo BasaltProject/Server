@@ -65,10 +65,10 @@ namespace basalt::server::runtime {
 /// `server.jar`.
 class BasaltServer {
 public:
-    /// parity: three chunks around spawn is what keeps a real client's "loading terrain" screen
-    /// short without generating a world at startup. One declared a view distance a client handles
-    /// badly; forty-nine is a freeze.
-    static constexpr std::int32_t kSpawnRadiusChunks = 3;
+    /// parity: the jar decorates the spawn 3x3 first and everything after it in plain raster,
+    /// measured on seed 11. Preparing more than that square puts chunks in front of the ones that
+    /// asked for them, and their neighbours then read a world the jar had not built yet.
+    static constexpr std::int32_t kSpawnRadiusChunks = 1;
 
     struct Options {
         /// The operator's own jar. Null in a test that never breaks a block in survival.
