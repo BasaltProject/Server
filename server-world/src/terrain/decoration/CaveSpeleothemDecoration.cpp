@@ -594,6 +594,30 @@ const std::set<std::string, std::less<>>& caveSpeleothemDecoration::placedIds() 
     return ids;
 }
 
+/// parity: `ChunkGenerator.applyBiomeDecoration` gathers the biomes of the 3x3 of chunks and only
+/// runs the features some biome there lists. A feature nobody lists never draws, which matters for
+/// the gaussian: its spare outlives a `setFeatureSeed`.
+[[nodiscard]] bool biomeInRange(const surface::SurfaceRuleEnvironment& environment, const Chunk& chunk,
+                                std::string_view biome) {
+    const ChunkHeight bounds = chunk.verticalBounds();
+    for (std::int32_t dx = -1; dx <= 1; ++dx) {
+        for (std::int32_t dz = -1; dz <= 1; ++dz) {
+            const std::int32_t baseX = (chunk.chunkX() + dx) * 16;
+            const std::int32_t baseZ = (chunk.chunkZ() + dz) * 16;
+            for (std::int32_t x = 2; x < 16; x += 4) {
+                for (std::int32_t z = 2; z < 16; z += 4) {
+                    for (std::int32_t y = bounds.minY() + 2; y <= bounds.maxY(); y += 4) {
+                        if (biomePath(environment.biomeAt(baseX + x, y, baseZ + z)) == biome) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
 void caveSpeleothemDecoration::decorateFeatures(Chunk& chunk, const std::int64_t seed,
                                                 const surface::SurfaceRuleEnvironment& environment,
                                                 const std::int32_t firstIndex, const std::int32_t lastIndex,
@@ -602,7 +626,13 @@ void caveSpeleothemDecoration::decorateFeatures(Chunk& chunk, const std::int64_t
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed =
         random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
+    const bool anySulfur = biomeInRange(environment, chunk, sulfurSpike().biome);
+    const bool anyDripstone = biomeInRange(environment, chunk, pointedDripstone().biome);
     for (std::int32_t globalIndex = firstIndex; globalIndex <= lastIndex; ++globalIndex) {
+        const bool sulfur = globalIndex == kSulfurClusterIndex || globalIndex == kSulfurSpikeIndex;
+        if (sulfur ? !anySulfur : !anyDripstone) {
+            continue;
+        }
         random::setFeatureSeed(random, decorationSeed, globalIndex, kUndergroundDecorationStep);
         if (globalIndex == kSulfurClusterIndex) {
             placeClusters(region, random, environment, sulfurCluster());
