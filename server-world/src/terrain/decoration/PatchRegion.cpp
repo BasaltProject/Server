@@ -18,6 +18,12 @@ std::int32_t PatchRegion::get(const DecorationPos& position) const {
             return stateId;
         }
     }
+    // parity: what this chunk already queued for the neighbour is in the neighbour's proto chunk as
+    // far as vanilla is concerned, so it beats whatever the neighbour view still reports.
+    if (const std::optional<std::int32_t> queued = chunk_->queuedDecorationStateId(position.x, position.y, position.z);
+        queued.has_value()) {
+        return *queued;
+    }
     if (externalBlockState_) {
         if (const std::optional<std::int32_t> observed = externalBlockState_(position.x, position.y, position.z);
             observed.has_value()) {

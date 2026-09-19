@@ -173,6 +173,12 @@ public:
         if ((position.x >> 4) == chunk_->chunkX() && (position.z >> 4) == chunk_->chunkZ()) {
             return chunk_->blockStateId(position.x & 15, position.y, position.z & 15);
         }
+        // parity: same as every other region, the chunk's own queue for the neighbour comes first.
+        if (const std::optional<std::int32_t> queued =
+                chunk_->queuedDecorationStateId(position.x, position.y, position.z);
+            queued.has_value()) {
+            return queued;
+        }
         if (external_) {
             return external_(position.x, position.y, position.z);
         }
