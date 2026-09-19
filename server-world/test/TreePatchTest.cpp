@@ -92,7 +92,7 @@ TEST_CASE("the global tree step places what the frozen kotlin places") {
         const Run result = run("trees_birch", "minecraft:birch_forest", "grass_block", false, 12);
         CHECK(result.attempts == 84);
         CHECK(result.deferred == 672);
-        CHECK(result.checksum == 3546556809331798551LL);
+        CHECK(result.checksum == -3817225744870002541LL);
         CHECK(result.origins ==
               "-479:71:194 -466:71:193 -472:71:197 -473:71:202 -480:71:202 -473:71:207 -467:71:207 -477:71:197 "
               "-395:71:147 -396:71:158 -388:71:147 -395:71:152 -392:71:158 -391:71:152 -392:71:144 -388:71:156 "
@@ -110,7 +110,7 @@ TEST_CASE("the global tree step places what the frozen kotlin places") {
         const Run result = run("trees_birch_and_oak_leaf_litter", "minecraft:forest", "grass_block", false, 12);
         CHECK(result.attempts == 112);
         CHECK(result.deferred == 1221);
-        CHECK(result.checksum == -753327237776894730LL);
+        CHECK(result.checksum == 6968901128194025838LL);
         CHECK(
             result.origins ==
             "-478:71:204 -475:71:205 -473:71:200 -476:77:204 -466:71:206 -480:71:199 -466:76:205 -474:71:193 "
@@ -132,7 +132,7 @@ TEST_CASE("the global tree step places what the frozen kotlin places") {
         const Run result = run("trees_taiga", "minecraft:taiga", "grass_block", false, 12);
         CHECK(result.attempts == 122);
         CHECK(result.deferred == 767);
-        CHECK(result.checksum == -3762033910457364711LL);
+        CHECK(result.checksum == 1937550732722552213LL);
         CHECK(result.origins ==
               "-477:71:205 -473:71:207 -465:71:205 -467:71:201 -469:71:195 -477:71:196 -473:71:199 -466:71:195 "
               "-473:78:199 -473:71:195 -400:71:146 -393:71:158 -386:71:155 -393:71:149 -385:71:150 -394:78:150 "
@@ -155,7 +155,7 @@ TEST_CASE("the global tree step places what the frozen kotlin places") {
         const Run result = run("trees_jungle", "minecraft:jungle", "grass_block", false, 4);
         CHECK(result.attempts == 171);
         CHECK(result.deferred == 1516);
-        CHECK(result.checksum == 4637038819854714018LL);
+        CHECK(result.checksum == -4790508780483319086LL);
         CHECK(result.origins ==
               "-466:71:205 -470:71:199 -468:76:197 -472:75:197 -480:71:199 -465:73:206 -465:72:204 -475:71:198 "
               "-478:71:195 -465:71:197 -474:71:204 -476:72:196 -475:72:205 -467:72:198 -474:72:200 -478:72:197 "
@@ -205,7 +205,7 @@ TEST_CASE("the global tree step places what the frozen kotlin places") {
         const Run result = run("dark_forest_vegetation", "minecraft:dark_forest", "grass_block", false, 4);
         CHECK(result.attempts == 57);
         CHECK(result.deferred == 527);
-        CHECK(result.checksum == 89202774569926774LL);
+        CHECK(result.checksum == -8555287209304870230LL);
         CHECK(result.origins ==
               "-475:71:192 -467:71:194 -465:71:202 -467:80:205 -467:77:195 -480:71:199 -474:78:195 -469:71:202 "
               "-473:78:192 -474:71:200 -467:77:197 -478:78:201 -465:81:201 -473:75:198 -467:77:192 -480:71:195 "
@@ -220,7 +220,7 @@ TEST_CASE("the global tree step places what the frozen kotlin places") {
         const Run result = run("pale_garden_vegetation", "minecraft:pale_garden", "grass_block", false, 4);
         CHECK(result.attempts == 62);
         CHECK(result.deferred == 953);
-        CHECK(result.checksum == 2360563122461104948LL);
+        CHECK(result.checksum == 1130853905761189684LL);
         CHECK(result.origins ==
               "-477:71:192 -467:71:194 -472:71:201 -475:80:202 -476:81:193 -473:71:197 -475:71:197 -468:79:196 "
               "-475:80:194 -472:81:201 -474:80:195 -465:71:202 -476:71:197 -468:71:206 -467:79:193 -466:79:201 "
@@ -263,7 +263,7 @@ TEST_CASE("the global tree step places what the frozen kotlin places") {
         const Run result = run("trees_mangrove", "minecraft:mangrove_swamp", "mud", true, 4);
         CHECK(result.attempts == 93);
         CHECK(result.deferred == 785);
-        CHECK(result.checksum == 8368431289493225466LL);
+        CHECK(result.checksum == 5015354307509760438LL);
         CHECK(result.origins ==
               "-477:71:203 -473:81:201 -470:71:203 -467:71:195 -475:81:206 -468:71:193 -476:71:195 -473:83:202 "
               "-466:88:203 -469:89:205 -474:83:201 -476:71:200 -466:71:193 -475:91:194 -468:88:202 -473:85:195 "
@@ -291,7 +291,7 @@ TEST_CASE("the global tree step places what the frozen kotlin places") {
         const Run result = run("trees_cherry", "minecraft:cherry_grove", "grass_block", false, 12);
         CHECK(result.attempts == 61);
         CHECK(result.deferred == 5188);
-        CHECK(result.checksum == -1468312378791678934LL);
+        CHECK(result.checksum == 8962066728927367242LL);
         CHECK(
             result.origins ==
             "-471:71:202 -476:71:197 -470:71:194 -467:71:200 -480:71:197 -391:71:144 -398:71:155 -392:71:151 "

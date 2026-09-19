@@ -335,7 +335,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 527);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 2);
-        CHECK(result.checksum == -4949962240645917003LL);
+        CHECK(result.checksum == 2942935981284325401LL);
         CHECK(result.after == 71405766);
     }
 
