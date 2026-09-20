@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/RedstoneWire.hpp>
 #include <basalt/wire/protocol/play/BlockPos.hpp>
 
 #include <algorithm>
@@ -77,13 +78,13 @@ using Properties = std::map<std::string, std::string>;
 
 /// parity: `RedStoneWireBlock.getSignal`, whose three cases are all here: nothing downwards,
 /// everything upwards (the block the dust sits on), and sideways only where it is connected.
-[[nodiscard]] std::int32_t wireSignal(const Properties& properties, BlockFace from) {
+[[nodiscard]] std::int32_t wireSignal(const Properties& drawn, std::int32_t stateId, BlockFace from) {
     // Dust has no `up` property, so asking from below would answer nothing anyway; the case is
     // written out because it is a rule and not an accident of the state names.
     if (from == BlockFace::Down) {
         return 0;
     }
-    const std::int32_t power = numberOf(properties, "power").value_or(0);
+    const std::int32_t power = numberOf(registry::blockStateDefinitions::propertiesOf(stateId), "power").value_or(0);
     if (power == 0) {
         return 0;
     }
@@ -91,7 +92,7 @@ using Properties = std::map<std::string, std::string>;
         return power;
     }
     // The side facing whoever is asking, which is the opposite of the way they asked from.
-    const std::string_view side = valueOf(properties, nameOf(registry::opposite(from)));
+    const std::string_view side = valueOf(drawn, nameOf(registry::opposite(from)));
     return side.empty() || side == "none" ? 0 : power;
 }
 
@@ -257,7 +258,7 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     // the block underneath it. Feeding every side lit whatever happened to be next to a line of dust
     // running past it.
     if (path == "redstone_wire") {
-        return mutedWire ? 0 : wireSignal(properties, from);
+        return mutedWire ? 0 : wireSignal(properties, stateId, from);
     }
     // parity: `DaylightDetectorBlock`, which feeds every side with what it reads off the sky.
     if (path == "daylight_detector") {
@@ -321,7 +322,7 @@ std::int32_t directSignalOf(std::int32_t stateId, BlockFace from, std::int32_t o
     // parity: `RedStoneWireBlock.getDirectSignal`, which is its `getSignal` again: dust powers what
     // it points at strongly, and that is what a repeater behind it reads.
     if (path == "redstone_wire") {
-        return mutedWire ? 0 : wireSignal(properties, from);
+        return mutedWire ? 0 : wireSignal(properties, stateId, from);
     }
     // parity: an observer and a diode power the block they feed strongly.
     if (path == "repeater" || path == "comparator" || path == "observer") {
@@ -390,9 +391,17 @@ std::int32_t signalFrom(const WorldState& world, std::string_view worldName, std
     if (!stateId.has_value()) {
         return 0;
     }
+    // parity: `RedStoneWireBlock.getSignal` does **not** read the drawn shape it has stored. It runs
+    // `getConnectionState(level, state, pos)`, which works the connection out from the world every
+    // time it is asked and takes only the power and the was-a-dot answer off the state. That is why
+    // vanilla can leave a dust drawn loose that still carries: the drawing goes stale and the signal
+    // does not. Reading the property instead was right only for as long as our own drawing was kept
+    // fresher than the jar keeps its own.
     const std::int32_t own =
-        signalOf(*stateId, from, containerOpeners::count(worldName, x, y, z), comparatorOutputAt(world, x, y, z),
-                 mutedWire, jukeboxPlayingAt(world, x, y, z), testBlockPoweredAt(world, x, y, z));
+        isWire(*stateId)
+            ? (mutedWire ? 0 : wireSignal(redstoneWire::connectionsFor(world, x, y, z, *stateId), *stateId, from))
+            : signalOf(*stateId, from, containerOpeners::count(worldName, x, y, z), comparatorOutputAt(world, x, y, z),
+                       mutedWire, jukeboxPlayingAt(world, x, y, z), testBlockPoweredAt(world, x, y, z));
     if (!registry::blockSupport::conductsRedstone(*stateId)) {
         return own;
     }
