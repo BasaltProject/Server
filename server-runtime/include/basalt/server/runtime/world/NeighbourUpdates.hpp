@@ -125,14 +125,26 @@ struct Context {
     bool railArrivalTells = true;
 };
 
+/// What the caller has already done with the shape of the block that arrived.
+///
+/// parity: the block's own `updateShape` is `BlockInput.place`'s pre-shape, which the jar runs
+/// before the write.
+enum class ArrivedShape : std::uint8_t {
+    /// Run the pre-shape here, which is what a placement with nothing settled beforehand wants.
+    Reshape,
+    /// The caller settled the shape before writing, as `BlockInput.place` does.
+    AlreadyShaped,
+    /// Nothing arrived: a command writing half a door, where reshaping it would undo the write.
+    NotPlaced,
+};
+
 /// Breaks whatever `x`, `y`, `z` stopped holding up, and whatever that in turn stopped holding.
 ///
-/// parity: `updateNeighbourShapes` reshapes the neighbours, never the block, so `reshapeSelf` is
-/// false for a command writing half a door. `removed` has no default on purpose. `afterShapes` runs
-/// after the shapes and before anything reacts: a command's own properties beat the shape update.
+/// `removed` has no default on purpose. `afterShapes` runs after the shapes and before anything
+/// reacts.
 void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::optional<std::int32_t> removed, std::vector<BlockChange>& effects, const OnBroken& onBroken,
-                 const OnReshaped& onReshaped = {}, bool reshapeSelf = true,
+                 const OnReshaped& onReshaped = {}, ArrivedShape arrivedShape = ArrivedShape::Reshape,
                  const std::function<void()>& afterShapes = {});
 
 /// Redraws the six squares around a change and drops whatever they no longer hold up, and nothing

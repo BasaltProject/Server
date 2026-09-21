@@ -766,7 +766,7 @@ constexpr double kGolemFootroom = 0.05;
 
 void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::optional<std::int32_t> removed, std::vector<BlockChange>& effects, const OnBroken& onBroken,
-                 const OnReshaped& onReshaped, bool reshapeSelf, const std::function<void()>& afterShapes) {
+                 const OnReshaped& onReshaped, ArrivedShape arrivedShape, const std::function<void()>& afterShapes) {
     WorldState& world = context.world;
     const OnReshaped reshaped = onReshaped ? onReshaped : OnReshaped{noop};
     const OnBroken broken = onBroken ? onBroken : OnBroken{noop};
@@ -875,9 +875,14 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // `updateShape`. parity: `CreakingHeartBlock` has no `onPlace`, only `updateShape`, so its turn
     // belongs here: booked outside, a heart re-booked itself every time its own turn changed its
     // state and the chain took three ticks to die down.
-    if (reshapeSelf) {
-        if (const std::optional<std::int32_t> moved = reshape(context, x, y, z); moved.has_value()) {
-            reshaped(*moved, x, y, z);
+    if (arrivedShape != ArrivedShape::NotPlaced) {
+        // parity: `BlockInput.place` settles the pre-shape **before** the write, so a caller that has
+        // already done it says so and this one is skipped. Redoing it here overwrote what the command
+        // had named, and the undo that put it back was a one-shot the wire settle could spend.
+        if (arrivedShape == ArrivedShape::Reshape) {
+            if (const std::optional<std::int32_t> moved = reshape(context, x, y, z); moved.has_value()) {
+                reshaped(*moved, x, y, z);
+            }
         }
         // parity: the fifteen blocks of `booksItsOwnBreak` and `CoralBlock` have no `onPlace`: their
         // turn comes out of `updateShape`, so a placement books it and a plain write does not. Only
@@ -941,7 +946,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                   at[2] + registry::stepZ(face), registry::opposite(face));
         }
     }
-    const std::vector<BlockChange> settled = redstone::settle(world, context.worldName, x, y, z);
+    // parity: this is the tail of an ordinary write, `updateNeighboursOnBlockSet`, which tells the six
+    // squares around the one that changed and never the square itself. The dust that the write put
+    // there keeps whatever strength it was given until something tells it.
+    const std::vector<BlockChange> settled =
+        redstone::settle(world, context.worldName, x, y, z, {}, redstone::Asked::NeighboursOnly);
     for (const BlockChange& change : settled) {
         reshaped(change.stateId, change.x, change.y, change.z);
     }

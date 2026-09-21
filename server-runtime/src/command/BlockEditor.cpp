@@ -232,14 +232,37 @@ void BlockEditor::notifyNeighbours() {
         // that left gets no `affectNeighborsAfterRemoval`.
         .railArrivalTells = false};
     for (const std::array<std::int32_t, 3>& at : positions) {
-        const std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
-        // parity: `onPlace` runs inside the write, and everything `Level.setBlock` does afterwards is
-        // behind `newState == blockState`: if what ended up there is not what was asked for, the
-        // neighbours are never told at all. A target put down with `power=15` zeroes itself as it
-        // lands, so the dust beside it stays the dot it was instead of drawing a line to it.
-        // The state this command replaced, so the four guarded arrivals can ask whether the block
-        // really changed. A position the command has not touched before is not in `replaced_`, and
-        // then they all run, which is what `Level.setBlock` does when there is nothing to compare.
+        std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
+        // parity: `BlockInput.place` settles the state before it writes it, so the pre-shape runs
+        // here and not after the write, where undoing it was a one-shot the wire settle could spend.
+        if (written.has_value() && *written != reg::blocks::air().stateId) {
+            // The pre-shape belongs to the write, so `replaced_` has to keep what was there before
+            // it: `set` would rewrite it and the arrival gates would read a dust replacing a dust.
+            const auto beforeShaping = replaced_.find(at);
+            const bool hadEntry = beforeShaping != replaced_.end();
+            const std::optional<std::int32_t> wasThere = hadEntry ? beforeShaping->second : std::nullopt;
+            if (const std::optional<std::int32_t> shaped = neighbourUpdates::reshape(context, at[0], at[1], at[2]);
+                shaped.has_value()) {
+                if (*shaped == reg::blocks::air().stateId) {
+                    static_cast<void>(world_->state().setBlockState(at[0], at[1], at[2], *written));
+                } else {
+                    static_cast<void>(set(at[0], at[1], at[2], *shaped));
+                }
+            }
+            keepNamedProperties(at);
+            written_properties_.erase(at);
+            if (hadEntry) {
+                replaced_.insert_or_assign(at, wasThere);
+            } else {
+                replaced_.erase(at);
+            }
+            // The pre-shape is part of what the command asks for, so what lands is measured against
+            // the shaped state: `Level.setBlock` is handed the state `updateFromNeighbourShapes`
+            // already settled. Comparing against the unshaped one skipped the whole tail of the
+            // write for every block the pre-shape moved, and a dust then never told the dust beside
+            // it to draw a line. Measured in `vibraorden`.
+            written = world_->state().blockState(at[0], at[1], at[2]);
+        }
         const auto replacedHere = replaced_.find(at);
         neighbourUpdates::settleArrivedSignal(
             context, at[0], at[1], at[2], replacedHere == replaced_.end() ? std::nullopt : replacedHere->second,
@@ -287,7 +310,7 @@ void BlockEditor::notifyNeighbours() {
                     written_properties_.erase(at);
                 }
             },
-            true,
+            neighbourUpdates::ArrivedShape::AlreadyShaped,
             // parity: `BlockInput.place` settles the state it is going to write, shaping and named
             // properties both, and only then does the block land and set off whatever it sets off.
             // Doing this after the reactions instead undid them: a hopper written `enabled=true`

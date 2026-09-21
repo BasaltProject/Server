@@ -280,7 +280,7 @@ TEST_CASE("reshaping the block that was written is the caller's choice") {
         loaded.put(8, 64, 8, fence);
         Report report;
         neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
-                                      report.onReshaped(), true);
+                                      report.onReshaped(), neighbourUpdates::ArrivedShape::Reshape);
         CHECK(propertyAt(loaded.state, 8, 64, 8, "south") == "true");
         CHECK_FALSE(report.reshaped.empty());
     }
@@ -291,7 +291,7 @@ TEST_CASE("reshaping the block that was written is the caller's choice") {
         loaded.put(8, 64, 8, fence);
         Report report;
         neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
-                                      report.onReshaped(), false);
+                                      report.onReshaped(), neighbourUpdates::ArrivedShape::NotPlaced);
         CHECK(propertyAt(loaded.state, 8, 64, 8, "south") == "false");
     }
 }
@@ -591,7 +591,7 @@ TEST_CASE("a coral books its own death only where the jar books it") {
     written.put(8, 64, 8, stateOf("fire_coral_block"));
     Report quiet;
     neighbourUpdates::afterChange(written.context(), 8, 64, 8, std::nullopt, quiet.effects, quiet.onBroken(),
-                                  quiet.onReshaped(), false);
+                                  quiet.onReshaped(), neighbourUpdates::ArrivedShape::NotPlaced);
 
     CHECK_FALSE(written.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("fire_coral_block")));
 }

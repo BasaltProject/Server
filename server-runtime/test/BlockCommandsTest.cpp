@@ -224,6 +224,37 @@ TEST_CASE("setblock of the state that is already there changes nothing") {
     CHECK(fixture.dispatcher.execute(fixture.source, "setblock 1 40 1 minecraft:stone destroy") == 1);
 }
 
+TEST_CASE("a dust the command drew as a dot stays a dot when its strength settles") {
+    // parity: `BlockInput.place` shapes the state **before** `setBlock`, so what the command names is
+    // what lands. Neither dust is a shape neighbour of the other, and a state drawn to `none` on every
+    // side closes the step `updateIndirectNeighbourShapes` would cross. Worth pinning because the undo
+    // that used to put the named shape back was a one-shot, and the settle spent it on the power.
+    Fixture fixture{scratch("block-commands-named-dot")};
+    static_cast<void>(fixture.world->state().getOrGenerateChunk(0, 0));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::SetBlockCommand>());
+    const auto drawn = [&fixture](std::int32_t x, std::int32_t y, std::int32_t z, const std::string& side) {
+        const std::optional<std::int32_t> at = fixture.world->state().blockState(x, y, z);
+        REQUIRE(at.has_value());
+        return reg::blockStateDefinitions::propertiesOf(*at).at(side);
+    };
+    const std::string dot{"minecraft:redstone_wire[north=none,south=none,east=none,west=none,power=0]"};
+
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 2 40 1 minecraft:stone") == 1);
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 2 41 1 " + dot) == 1);
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 2 42 1 minecraft:redstone_block") == 1);
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 1 39 1 minecraft:stone") == 1);
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 1 40 1 " + dot) == 1);
+
+    // The one over the block is fed from above and the one the command just wrote reads it across the
+    // step, so both carry a strength and neither is drawn towards anything.
+    CHECK(drawn(2, 41, 1, "power") == "15");
+    CHECK(drawn(2, 41, 1, "east") == "none");
+    CHECK(drawn(2, 41, 1, "west") == "none");
+    CHECK(drawn(1, 40, 1, "power") == "14");
+    CHECK(drawn(1, 40, 1, "east") == "none");
+    CHECK(drawn(1, 40, 1, "west") == "none");
+}
+
 TEST_CASE("a dust written over a dust keeps the strength the command handed it") {
     // parity: `RedStoneWireBlock.onPlace` is gated on `!oldState.is(state.getBlock())`, so only a
     // dust that really arrives settles its own strength. Nothing else asks the square in the middle:
