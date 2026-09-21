@@ -17,8 +17,10 @@ public final class BasaltSlf4jProvider implements SLF4JServiceProvider {
     private final ConcurrentHashMap<String, Logger> loggers = new ConcurrentHashMap<>();
     private final IMarkerFactory markers = new BasicMarkerFactory();
     private final MDCAdapter mdc = new BasicMDCAdapter();
-    private final ILoggerFactory factory = name -> org.basaltmc.bukkit.facade.Memo.get(loggers, name,
-        key -> new Slf4jLogger(key, LogTags.ofCaller(key.substring(key.lastIndexOf('.') + 1))));
+    private final ILoggerFactory factory = name -> {
+        String tag = LogTags.ofCaller(name.substring(name.lastIndexOf('.') + 1));
+        return org.basaltmc.bukkit.facade.Memo.get(loggers, tag + "/" + name, key -> new Slf4jLogger(name, tag));
+    };
 
     @Override
     public ILoggerFactory getLoggerFactory() {
