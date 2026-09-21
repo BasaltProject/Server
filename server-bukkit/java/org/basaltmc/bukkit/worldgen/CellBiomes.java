@@ -30,8 +30,19 @@ public final class CellBiomes implements ChunkGenerator.BiomeGrid {
         return (((y - minY) >> 2) * 4 + ((z & 15) >> 2)) * 4 + ((x & 15) >> 2);
     }
 
+    private static volatile java.util.Map<String, Integer> kIds;
+
     private static int idOf(Biome biome) {
-        return java.util.Arrays.asList(Registries.biomeIds()).indexOf(biome.getKey().toString());
+        java.util.Map<String, Integer> ids = kIds;
+        if (ids == null) {
+            String[] all = Registries.biomeIds();
+            ids = new java.util.HashMap<>();
+            for (int at = all.length - 1; at >= 0; at--) {
+                ids.put(all[at], at);
+            }
+            kIds = ids;
+        }
+        return ids.getOrDefault(biome.getKey().toString(), -1);
     }
 
     Biome get(int x, int y, int z) {
