@@ -429,6 +429,7 @@ void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int
     // parity: `LootContextParams.BLOCK_STATE`, which is what a door, a slab or a bed drops by, and
     // `DecoratedPotBlock.getDrops`, which hands the roll the pot's own four sherds.
     server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(destroyedState),
+                                             .block = state->block,
                                              .hasEntity = byEntity};
     if (world::decoratedPots::isPot(state->block.path())) {
         const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);

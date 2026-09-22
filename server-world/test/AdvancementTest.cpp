@@ -30,9 +30,9 @@ namespace {
         // An explicit OR: either of the two grants it.
         {"either", R"({"parent":"minecraft:story/root",
                    "criteria":{"stone":{"trigger":"minecraft:recipe_unlocked",
-                     "conditions":{"recipe":"minecraft:stone_bricks"}},
+                     "conditions":{"recipes":"minecraft:stone_bricks"}},
                     "brick":{"trigger":"minecraft:recipe_unlocked",
-                     "conditions":{"recipe":"minecraft:bricks"}}},
+                     "conditions":{"recipes":["minecraft:bricks"]}}},
                    "requirements":[["stone","brick"]],
                    "rewards":{"experience":40,"loot":["minecraft:chests/end_city_treasure"],
                               "recipes":["minecraft:elytra"]}})"},
@@ -204,4 +204,52 @@ TEST_CASE("the advancements parse and complete the way the frozen kotlin does") 
 TEST_CASE("the parser refuses what the frozen kotlin refuses") {
     CHECK_FALSE(advancementJson::parse(R"({"display":{"title":"x"}})").has_value());
     CHECK_FALSE(advancementJson::parse(R"({"criteria":{"a":{}}})").has_value());
+}
+
+TEST_CASE("a criterion reads its conditions as the one predicate 26.3 writes") {
+    const auto conditionOf = [](std::string_view trigger, std::string_view conditions) {
+        const std::string json = R"({"criteria":{"a":{"trigger":")" + std::string{trigger} + R"(","conditions":)" +
+                                 std::string{conditions} + "}}}";
+        const std::expected<Advancement, AdvancementParseError> parsed = advancementJson::parse(json);
+        REQUIRE(parsed.has_value());
+        return parsed->criteria.front().second.condition;
+    };
+    const CriterionCondition killed =
+        conditionOf("minecraft:player_killed_entity", R"({"entity":{"type":"minecraft:entity_properties",
+            "entity":"this","predicate":{"minecraft:entity_type":"minecraft:breeze"}}})");
+    CHECK(killed.kind == ConditionKind::KilledEntity);
+    CHECK(killed.entityTypes == std::vector<std::string>{"minecraft:breeze"});
+
+    const CriterionCondition bred =
+        conditionOf("minecraft:bred_animals", R"({"parent":{"type":"entity_properties","entity":"this",
+            "predicate":{"minecraft:entity_type":"minecraft:frog"}},"partner":{"type":"minecraft:all_of","terms":[
+            {"type":"minecraft:entity_properties","entity":"this",
+             "predicate":{"minecraft:entity_type":"minecraft:frog"}}]}})");
+    CHECK(bred.kind == ConditionKind::BredAnimals);
+    CHECK(bred.parentTypes == std::vector<std::string>{"minecraft:frog"});
+    CHECK(bred.partnerTypes == std::vector<std::string>{"minecraft:frog"});
+
+    const CriterionCondition placed = conditionOf(
+        "minecraft:placed_block", R"({"location":{"type":"minecraft:match_block","blocks":"minecraft:creaking_heart",
+            "state":{"creaking_heart_state":"awake"}}})");
+    REQUIRE(placed.blockMatcher.has_value());
+    CHECK(placed.blockMatcher->blocks.front().path() == "creaking_heart");
+    CHECK(placed.blockMatcher->properties.front().second == "awake");
+
+    const CriterionCondition used =
+        conditionOf("minecraft:item_used_on_block", R"({"location":{"type":"minecraft:all_of","terms":[
+            {"type":"minecraft:location_check","predicate":{"block":{"blocks":["minecraft:oak_log"]}}},
+            {"type":"minecraft:match_tool","predicate":{"items":"#minecraft:axes"}}]}})");
+    CHECK(used.kind == ConditionKind::ItemUsedOnBlock);
+    REQUIRE(used.blockMatcher.has_value());
+    CHECK(used.blockMatcher->blocks.front().path() == "oak_log");
+    REQUIRE(used.matchers.size() == 1);
+    CHECK(used.matchers.front().tag->path() == "axes");
+
+    // A named predicate, a tag of blocks and a neighbour check are questions this build leaves alone.
+    CHECK(conditionOf("minecraft:player_killed_entity", R"({"entity":"minecraft:some/predicate"})").kind ==
+          ConditionKind::Unsupported);
+    CHECK(conditionOf("minecraft:placed_block",
+                      R"({"location":{"type":"minecraft:match_block","blocks":"#minecraft:logs"}})")
+              .kind == ConditionKind::Unsupported);
 }

@@ -87,6 +87,21 @@ namespace {
     return found == kTrades.end() ? 0 : found->second;
 }
 
+/// A boat or a raft, which that edition draws as one kind with its wood as a variant, and one more
+/// for those carrying a chest. Anything else is left as it is.
+void boatFrom(const std::string_view path, Seen& line) {
+    /// parity: the other edition's own numbering of the woods, which is also the order it added them.
+    static constexpr std::array<std::string_view, 11> kWoods{
+        "oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "bamboo", "cherry", "pale_oak", "poplar"};
+    for (const std::string_view hull : {"_chest_boat", "_chest_raft", "_boat", "_raft"}) {
+        if (path.ends_with(hull)) {
+            line.type = hull.starts_with("_chest") ? "minecraft:chest_boat" : "minecraft:boat";
+            line.look.variant = placeOf(kWoods, path.substr(0, path.size() - hull.size()));
+            return;
+        }
+    }
+}
+
 /// What a mob saved with a structure or read back from disk looks like. parity: the other door
 /// reads the same tags in `generatedEntityMetadata`; only the numbers they come out as differ.
 void lookFrom(const wire::nbt::NbtCompound& data, const std::string_view path, Seen& line) {
@@ -117,6 +132,14 @@ void lookFrom(const wire::nbt::NbtCompound& data, const std::string_view path, S
         line.flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Chested);
     }
 
+    if (path == "cushion") {
+        // parity: Geyser's reading. The other edition counts the sixteen dyes from the far end.
+        static constexpr std::array<std::string_view, 16> kDyes{
+            "white",      "orange", "magenta", "light_blue", "yellow", "lime",  "pink", "gray",
+            "light_gray", "cyan",   "purple",  "blue",       "brown",  "green", "red",  "black"};
+        line.look.variant = 15 - placeOf(kDyes, data.getString("color", "white"));
+        return;
+    }
     if (path == "sheep") {
         // The dye is numbered the same on both editions; being shorn is a flag here and a bit of
         // the same byte over there.
@@ -319,6 +342,10 @@ Seen seenOf(const entity::ServerEntity& entity) {
               .flags = flagsOf(entity)};
 
     const std::string_view path = entity.type().path();
+    boatFrom(path, line);
+    if (path == "cushion") {
+        line.look.variant = 15; // White until the saved data says otherwise.
+    }
     if (path == "villager" || path == "zombie_villager") {
         line.look.variant = villagerVariantOf(entity.profession);
     }

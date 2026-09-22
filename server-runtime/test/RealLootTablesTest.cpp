@@ -157,3 +157,16 @@ TEST_CASE("a wall-mounted block drops what the standing one drops") {
     CHECK(tables.forBlock(Identifier::vanilla("cobblestone_wall")) == nullptr);
     CHECK(jar.requested.back() == "data/minecraft/loot_table/blocks/cobblestone_wall.json");
 }
+
+TEST_CASE("the registry entries a table names are read beside it in the jar") {
+    FakeJar jar;
+    jar.files["data/minecraft/loot_table/blocks/glass.json"] =
+        R"({"pools":[{"rolls":"minecraft:glass/panes","entries":[{"type":"minecraft:item","name":"minecraft:glass"}]}]})";
+    jar.files["data/minecraft/context_int_provider/glass/panes.json"] = "3";
+    RealLootTables tables{jar.handle()};
+
+    const LootTable* glass = tables.forBlock(Identifier::vanilla("glass"));
+    REQUIRE(glass != nullptr);
+    CHECK(roll(*glass).size() == 3);
+    CHECK(jar.requested.back() == "data/minecraft/context_int_provider/glass/panes.json");
+}

@@ -42,17 +42,21 @@ using wire::nbt::NbtTag;
         if (test == nullptr) {
             continue;
         }
-        const NbtTag* id = test->find("id");
-        const std::string* name = id == nullptr ? nullptr : id->get<std::string>();
+        const NbtTag* written = test->find("id");
+        const std::string* name = written == nullptr ? nullptr : written->get<std::string>();
         if (name == nullptr) {
             continue;
         }
-        // A name that is not an identifier at all names no tag, so it tests nothing.
-        const std::expected<Identifier, wire::common::IdentifierError> tag = Identifier::parse(*name);
-        if (!tag.has_value()) {
+        // parity: 26.3 `TagPredicate` reads a holder set, so `id` is a `#tag` or one damage type.
+        const bool isTag = name->starts_with('#');
+        const std::expected<Identifier, wire::common::IdentifierError> id =
+            Identifier::parse(isTag ? std::string_view{*name}.substr(1) : std::string_view{*name});
+        // A name that is not an identifier at all names nothing, so it tests nothing.
+        if (!id.has_value()) {
             continue;
         }
-        if (sources.isDamageTypeIn(*tag, *damageType) != test->getBoolean("expected")) {
+        const bool held = isTag ? sources.isDamageTypeIn(*id, *damageType) : *id == *damageType;
+        if (held != test->getBoolean("expected")) {
             return false;
         }
     }
@@ -93,7 +97,9 @@ bool matches(const NbtCompound* requirements, const Identifier* damageType, cons
     if (requirements == nullptr) {
         return true;
     }
-    const std::string_view condition = requirements->getString("condition");
+    // parity: 26.3 dispatches a condition on `type`, and a term may be a named predicate, which is
+    // a string here and so no compound: counted as unmet below.
+    const std::string_view condition = requirements->getString("type");
     if (condition == "minecraft:all_of") {
         return allTermsMatch(*requirements, damageType, sources);
     }

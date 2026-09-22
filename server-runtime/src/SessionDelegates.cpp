@@ -112,7 +112,7 @@ play::SpawnInfo ClientSession::spawnInfo(play::Gamemode gamemode) const {
         .dimensionName = currentWorld_ == nullptr ? "minecraft:overworld" : currentWorld_->levelKey(),
         .hashedSeed = 0,
         .gamemode = gamemode,
-        .previousGamemode = 255,
+        .previousGamemode = -1,
         .isDebug = false,
         .isFlat = currentWorld_ != nullptr && currentWorld_->declaration().type == config::WorldType::Flat,
         .death = std::nullopt,

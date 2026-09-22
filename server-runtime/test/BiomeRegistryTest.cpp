@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/registry/VanillaBiomes.hpp>
 #include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/registry/VanillaOverworldBiomes.hpp>
@@ -17,14 +18,6 @@ namespace nbt = basalt::wire::nbt;
 
 namespace {
 
-[[nodiscard]] std::int64_t checksumOf(std::string_view text) {
-    std::uint64_t checksum = 14695981039346656037ULL;
-    for (const char character : text) {
-        checksum = (checksum ^ static_cast<std::uint64_t>(static_cast<unsigned char>(character))) * 1099511628211ULL;
-    }
-    return static_cast<std::int64_t>(checksum);
-}
-
 [[nodiscard]] std::string textAt(const nbt::NbtCompound& value, std::string_view key) {
     const nbt::NbtTag* found = value.find(key);
     if (found == nullptr) {
@@ -36,84 +29,15 @@ namespace {
 
 } // namespace
 
-/// This module's frozen Kotlin cannot be run, so the numbers below are derived from the same source
-/// text the entries were transcribed from: the order, the counts of each attribute kind, and the
-/// counts of each optional field.
-TEST_CASE("the biome table is the one the frozen kotlin source spells out") {
+TEST_CASE("the synced biomes go out in the biome registry's own order") {
+    // A chunk's biome palette names the client's ids, which it numbers in the order they arrive.
     const std::vector<vanillaBiomes::Entry>& all = vanillaBiomes::all();
-    CHECK(all.size() == 66);
-    CHECK(vanillaBiomes::overworldBiomesA().size() == 29);
-    CHECK(vanillaBiomes::overworldBiomesB().size() == 27);
-    CHECK(vanillaBiomes::netherBiomes().size() == 5);
-    CHECK(vanillaBiomes::endBiomes().size() == 5);
-
-    std::string joined;
-    for (const vanillaBiomes::Entry& entry : all) {
-        if (!joined.empty()) {
-            joined += ',';
-        }
-        joined += entry.path;
+    const auto& registry = basalt::server::registry::biomes::registry();
+    REQUIRE(all.size() == registry.size());
+    for (std::size_t id = 0; id < all.size(); ++id) {
+        CAPTURE(id);
+        CHECK(registry.idOf(basalt::wire::common::Identifier::vanilla(all[id].path)) == static_cast<std::int32_t>(id));
     }
-    // The order is the network id a chunk's biome palette references, so it is pinned rather than
-    // sorted: the two halves join at `wooded_badlands` into `meadow`, then the nether, then the end.
-    CHECK(checksumOf(joined) == 9160950417039270003LL);
-    CHECK(all.front().path == "plains");
-    CHECK(all[28].path == "wooded_badlands");
-    CHECK(all[29].path == "meadow");
-    CHECK(all[56].path == "nether_wastes");
-    CHECK(all[61].path == "the_end");
-    CHECK(all.back().path == "end_barrens");
-
-    // No two biomes answer to the same name, which is what makes the index an address.
-    std::map<std::string, std::int32_t> byPath;
-    for (const vanillaBiomes::Entry& entry : all) {
-        ++byPath[entry.path];
-    }
-    CHECK(byPath.size() == 66);
-}
-
-TEST_CASE("every attribute kind and optional field appears as often as the source has it") {
-    std::map<vanillaBiomes::BiomeAttributeKind, std::int32_t> kinds;
-    std::int32_t withAttributes = 0;
-    std::map<std::string, std::int32_t> optional;
-    for (const vanillaBiomes::Entry& entry : vanillaBiomes::all()) {
-        if (!entry.attributes.empty()) {
-            ++withAttributes;
-        }
-        for (const auto& [key, attribute] : entry.attributes) {
-            ++kinds[attribute.kind];
-        }
-        if (entry.temperatureModifier.has_value()) {
-            ++optional["temperatureModifier"];
-        }
-        if (entry.grassColor.has_value()) {
-            ++optional["grassColor"];
-        }
-        if (entry.foliageColor.has_value()) {
-            ++optional["foliageColor"];
-        }
-        if (entry.dryFoliageColor.has_value()) {
-            ++optional["dryFoliageColor"];
-        }
-        if (entry.grassColorModifier.has_value()) {
-            ++optional["grassColorModifier"];
-        }
-    }
-
-    CHECK(withAttributes == 61);
-    CHECK(kinds[vanillaBiomes::BiomeAttributeKind::Color] == 72);
-    CHECK(kinds[vanillaBiomes::BiomeAttributeKind::Flag] == 16);
-    CHECK(kinds[vanillaBiomes::BiomeAttributeKind::Number] == 1);
-    CHECK(kinds[vanillaBiomes::BiomeAttributeKind::Modifier] == 2);
-    CHECK(kinds[vanillaBiomes::BiomeAttributeKind::Music] == 42);
-    CHECK(kinds[vanillaBiomes::BiomeAttributeKind::Particles] == 4);
-    CHECK(kinds[vanillaBiomes::BiomeAttributeKind::Sounds] == 5);
-
-    CHECK(optional["temperatureModifier"] == 2);
-    CHECK(optional["grassColor"] == 6);
-    CHECK(optional["foliageColor"] == 7);
-    CHECK(optional["dryFoliageColor"] == 4);
-    CHECK(optional["grassColorModifier"] == 3);
 }
 
 TEST_CASE("one biome serializes to the exact nbt a vanilla server sends") {

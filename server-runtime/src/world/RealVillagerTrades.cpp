@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/RealVillagerTrades.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
+#include <algorithm>
 #include <cstdint>
 
 namespace basalt::server::runtime::world {
@@ -105,9 +106,11 @@ std::optional<VillagerTrade> RealVillagerTrades::parse(const Identifier& id, std
         .alsoWantsCount = alsoWanted.has_value() ? countOf(extra, 1) : 0,
         .gives = *given,
         .givesCount = countOf(gives, 1),
-        .maxUses = static_cast<std::int32_t>(numberOf(root->find("max_uses")).value_or(kDefaultMaxUses)),
-        .experience = static_cast<std::int32_t>(numberOf(root->find("xp")).value_or(0.0)),
-        .priceMultiplier = static_cast<float>(numberOf(root->find("reputation_discount")).value_or(0.0)),
+        // parity: `getOffer` floors each: at least one use, no negative experience or discount.
+        .maxUses = std::max(static_cast<std::int32_t>(numberOf(root->find("max_uses")).value_or(kDefaultMaxUses)), 1),
+        .experience = std::max(static_cast<std::int32_t>(numberOf(root->find("xp")).value_or(kDefaultExperience)), 0),
+        .priceMultiplier =
+            std::max(static_cast<float>(numberOf(root->find("reputation_discount")).value_or(0.0)), 0.0F),
     };
 }
 

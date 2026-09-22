@@ -136,7 +136,8 @@ public:
 
     void handleUseItem(const wire::protocol::play::ServerboundUseItemPacket& useItem);
 
-    void handleSwing(std::int32_t hand);
+    /// parity: `handlePunch`, an arm swung at the air or a block.
+    void handlePunch();
 
     /// One tick of whatever the player is breaking.
     void tickDigging(player::PlayerSession& session);

@@ -1,4 +1,4 @@
-// Generated from the real 26.2 server jar. Regenerate rather than edit: every number here is a
+// Generated from the real 26.3 server jar. Regenerate rather than edit: every number here is a
 // fact about the game, not a decision.
 
 #include <basalt/server/registry/VanillaEntries.hpp>
@@ -8,7 +8,7 @@
 namespace basalt::server::registry {
 namespace {
 
-constexpr std::array<BlockMovementEntry, 23> kBlockMovementTable = {{
+constexpr std::array<BlockMovementEntry, 24> kBlockMovementTable = {{
     {"black_bed", 0.6F, 1.0F, 1.0F, 0.75F},      {"blue_bed", 0.6F, 1.0F, 1.0F, 0.75F},
     {"blue_ice", 0.989F, 1.0F, 1.0F, 0.0F},      {"brown_bed", 0.6F, 1.0F, 1.0F, 0.75F},
     {"cyan_bed", 0.6F, 1.0F, 1.0F, 0.75F},       {"frosted_ice", 0.98F, 1.0F, 1.0F, 0.0F},
@@ -18,9 +18,9 @@ constexpr std::array<BlockMovementEntry, 23> kBlockMovementTable = {{
     {"lime_bed", 0.6F, 1.0F, 1.0F, 0.75F},       {"magenta_bed", 0.6F, 1.0F, 1.0F, 0.75F},
     {"orange_bed", 0.6F, 1.0F, 1.0F, 0.75F},     {"packed_ice", 0.98F, 1.0F, 1.0F, 0.0F},
     {"pink_bed", 0.6F, 1.0F, 1.0F, 0.75F},       {"purple_bed", 0.6F, 1.0F, 1.0F, 0.75F},
-    {"red_bed", 0.6F, 1.0F, 1.0F, 0.75F},        {"slime_block", 0.8F, 1.0F, 1.0F, 1.0F},
-    {"soul_sand", 0.6F, 0.4F, 1.0F, 0.0F},       {"white_bed", 0.6F, 1.0F, 1.0F, 0.75F},
-    {"yellow_bed", 0.6F, 1.0F, 1.0F, 0.75F},
+    {"red_bed", 0.6F, 1.0F, 1.0F, 0.75F},        {"shelf_mushroom", 0.6F, 1.0F, 1.0F, 0.75F},
+    {"slime_block", 0.8F, 1.0F, 1.0F, 1.0F},     {"soul_sand", 0.6F, 0.4F, 1.0F, 0.0F},
+    {"white_bed", 0.6F, 1.0F, 1.0F, 0.75F},      {"yellow_bed", 0.6F, 1.0F, 1.0F, 0.75F},
 }};
 
 constexpr std::array<EntityAttributeEntry, 2619> kEntityAttributesTable = {{
@@ -2732,7 +2732,7 @@ constexpr std::array<ItemDurabilityEntry, 84> kItemDurabilityTable = {{
     {"wooden_sword", 59, 2, 1},
 }};
 
-constexpr std::array<EntityTypeShape, 158> kEntityTypeShapesTable = {{
+constexpr std::array<EntityTypeShape, 161> kEntityTypeShapesTable = {{
     {"acacia_boat", 1.375F, 0.5625F, "misc", 10, 3, false, true},
     {"acacia_chest_boat", 1.375F, 0.5625F, "misc", 10, 3, false, true},
     {"allay", 0.35F, 0.6F, "creature", 8, 2, false, true},
@@ -2766,6 +2766,7 @@ constexpr std::array<EntityTypeShape, 158> kEntityTypeShapesTable = {{
     {"cow", 0.9F, 1.4F, "creature", 10, 3, false, true},
     {"creaking", 0.9F, 2.7F, "monster", 8, 3, false, false},
     {"creeper", 0.6F, 1.7F, "monster", 8, 3, false, false},
+    {"cushion", 1.0F, 0.25F, "misc", 10, 2147483647, false, true},
     {"dark_oak_boat", 1.375F, 0.5625F, "misc", 10, 3, false, true},
     {"dark_oak_chest_boat", 1.375F, 0.5625F, "misc", 10, 3, false, true},
     {"dolphin", 0.9F, 0.6F, "water_creature", 5, 3, false, false},
@@ -2841,6 +2842,8 @@ constexpr std::array<EntityTypeShape, 158> kEntityTypeShapesTable = {{
     {"pillager", 0.6F, 1.95F, "monster", 8, 3, false, true},
     {"player", 0.6F, 1.8F, "misc", 32, 2, false, true},
     {"polar_bear", 1.4F, 1.4F, "creature", 10, 3, false, true},
+    {"poplar_boat", 1.375F, 0.5625F, "misc", 10, 3, false, true},
+    {"poplar_chest_boat", 1.375F, 0.5625F, "misc", 10, 3, false, true},
     {"pufferfish", 0.7F, 0.7F, "water_ambient", 4, 3, false, false},
     {"rabbit", 0.49F, 0.6F, "creature", 8, 3, false, true},
     {"ravager", 1.95F, 2.2F, "monster", 10, 3, false, false},

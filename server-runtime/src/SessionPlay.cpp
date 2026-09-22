@@ -53,10 +53,9 @@ using wire::common::Identifier;
 
 /// parity: `ServerboundMovePlayerPacket`'s three shapes beyond the full one, which carry a
 /// rotation, a status byte, or both.
-constexpr std::int32_t kMovePlayerRotId = 0x1f;
-constexpr std::int32_t kMovePlayerStatusOnlyId = 0x20;
-constexpr std::int32_t kSwingPacketId = 0x40;
-constexpr std::int32_t kServerboundClientInformationId = 0x0d;
+constexpr std::int32_t kMovePlayerRotId = 0x20;
+constexpr std::int32_t kMovePlayerStatusOnlyId = 0x21;
+constexpr std::int32_t kServerboundClientInformationId = 0x0e;
 constexpr std::int32_t kServerboundPlayerInputId = 0x2b;
 
 // parity: `Input`'s own bit order.
@@ -870,8 +869,8 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
-    if (packetId == kSwingPacketId) {
-        blockInteraction_->handleSwing(wire::protocol::varInt::read(body));
+    if (packetId == play::kPunchId) {
+        blockInteraction_->handlePunch();
         return;
     }
     if (packetId == play::ServerboundUseItemOnPacket::kId) {

@@ -93,10 +93,9 @@ TEST_CASE("the numbers a trade file leaves out take their own defaults") {
     REQUIRE(trade.has_value());
     CHECK(trade->wantsCount == 1);
     CHECK(trade->givesCount == 1);
-    // parity: twelve uses, no experience and no discount.
-    CHECK(trade->maxUses == RealVillagerTrades::kDefaultMaxUses);
-    CHECK(trade->maxUses == 12);
-    CHECK(trade->experience == 0);
+    // parity: `VillagerTrade.CODEC`: four uses, one experience and no discount.
+    CHECK(trade->maxUses == 4);
+    CHECK(trade->experience == 1);
     CHECK(trade->priceMultiplier == doctest::Approx(0.0F));
     // An additional_wants that is not there is not a count of one.
     CHECK(trade->alsoWantsCount == 0);

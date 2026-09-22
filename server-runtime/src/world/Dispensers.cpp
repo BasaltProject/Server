@@ -721,7 +721,7 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
         return Special{.handled = true, .left = wornOnce(stack, context.random), .change = change};
     }
     // parity: the potion entry, which only knows one potion: a **water** bottle turns the block in
-    // front into mud when it is in `convertable_to_mud`, and leaves the empty glass. Anything else,
+    // front into mud when it is in `convertible_to_mud`, and leaves the empty glass. Anything else,
     // any other potion included, falls through to being thrown. Its `FLUID_PLACE` also comes from the
     // dispenser's own square.
     if (stack.item == potion() && isWaterBottle(stack)) {

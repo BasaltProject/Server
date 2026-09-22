@@ -815,7 +815,7 @@ void BedrockListener::onReady(Session& session) {
     // The cameras a client may be put behind. Named once and never again: an instruction that
     // points at a preset the client was not told about is dropped.
     body.clear();
-    wire::bedrock::writeCameraPresets(body);
+    wire::bedrock::writeCameraPresets(body, session.connection.protocolVersion());
     session.connection.sendPacket(BedrockPacket::CameraPresets, body.readable());
     note("camera presets", body.readableBytes());
 

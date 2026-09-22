@@ -46,6 +46,19 @@ constexpr std::string_view kJsonSuffix = ".json";
 
 } // namespace
 
+// parity: 26.3 loot data names `predicate`, `item_modifier` and the two `context_*_provider`
+// registries by id, and those live beside the tables in the same jar.
+RealLootTables::RealLootTables(Jar jar, wire::common::Logger logger)
+    : jar_(std::move(jar)), logger_(std::move(logger)),
+      references_(
+          [read = jar_.readText](std::string_view registry, const Identifier& id) -> std::optional<std::string> {
+              if (!read) {
+                  return std::nullopt;
+              }
+              return read("data/" + std::string{id.namespaceName()} + "/" + std::string{registry} + "/" + id.path() +
+                          ".json");
+          }) {}
+
 const LootTable* RealLootTables::byId(const Identifier& id) {
     return read(id, std::string{kPrefix} + id.path() + std::string{kJsonSuffix}, "rolls nothing");
 }
@@ -121,7 +134,7 @@ const LootTable* RealLootTables::read(const Identifier& key, const std::string& 
     if (!json.has_value()) {
         logger_.debug([&] { return key.toString() + " " + std::string{verb} + ": no such loot table"; });
     } else if (std::expected<LootTable, server::world::loot::LootTableParseError> parsed =
-                   server::world::loot::lootTableJson::parse(*json);
+                   server::world::loot::lootTableJson::parse(*json, &references_);
                parsed.has_value()) {
         resolved = std::move(*parsed);
     } else {

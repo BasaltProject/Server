@@ -22,8 +22,8 @@ struct VillagerTrade {
     std::int32_t alsoWantsCount = 0;
     wire::common::Identifier gives;
     std::int32_t givesCount = 1;
-    std::int32_t maxUses = 12;
-    std::int32_t experience = 0;
+    std::int32_t maxUses = 4;
+    std::int32_t experience = 1;
     float priceMultiplier = 0.0F;
 };
 
@@ -35,8 +35,10 @@ struct VillagerTrade {
 /// Datapack content, so it is read from the operator's download rather than committed here.
 class RealVillagerTrades {
 public:
-    /// parity: `MerchantOffer`'s own default when a trade file does not say.
-    static constexpr std::int32_t kDefaultMaxUses = 12;
+    /// parity: `VillagerTrade.CODEC`'s own defaults when a trade file does not say: `max_uses` 4
+    /// and `xp` 1, not `MerchantOffer`'s.
+    static constexpr std::int32_t kDefaultMaxUses = 4;
+    static constexpr std::int32_t kDefaultExperience = 1;
 
     /// One jar entry as text, or nothing when the jar has no such entry.
     using ReadText = std::function<std::optional<std::string>(std::string_view name)>;

@@ -204,8 +204,16 @@ bool mobPersistence::requiresCustomPersistence(const ServerEntity& entity) {
         return data != nullptr && data->getBoolean("FromBucket");
     }
     if (path == "enderman") {
-        const wire::nbt::NbtCompound* carried = data == nullptr ? nullptr : data->getCompound("carriedBlockState");
-        return carried != nullptr && carried->size() != 0;
+        // parity: `BlockState.CODEC`, a bare id for a default state and a compound otherwise.
+        const wire::nbt::NbtTag* carried = data == nullptr ? nullptr : data->find("carriedBlockState");
+        if (carried == nullptr) {
+            return false;
+        }
+        if (const std::string* bare = carried->get<std::string>(); bare != nullptr) {
+            return !bare->empty() && *bare != "minecraft:air";
+        }
+        const wire::nbt::NbtCompound* compound = carried->get<wire::nbt::NbtCompound>();
+        return compound != nullptr && compound->size() != 0;
     }
     if (path == "sulfur_cube") {
         return (data != nullptr && data->getBoolean("from_bucket")) || hasBodyItem(data);

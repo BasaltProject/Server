@@ -1055,10 +1055,9 @@ void BasaltServer::startBedrockListener() {
                     continue;
                 }
                 if (other->connection().sendPlayPacket) {
-                    const wire::protocol::play::AnimatePacket packet{
-                        .entityId = who, .action = wire::protocol::play::AnimatePacket::kSwingMainHand};
+                    const wire::protocol::play::SwingAnimationPacket packet{.entityId = who};
                     other->connection().sendPlayPacket(
-                        wire::protocol::play::AnimatePacket::kId,
+                        wire::protocol::play::SwingAnimationPacket::kId,
                         [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
                 }
             }

@@ -222,8 +222,8 @@ TEST_CASE("version says what this build is and which clients it lets in") {
     REQUIRE(fixture.source.said.size() == 2);
     const std::string first = RecordingSource::flatten(fixture.source.said[0]);
     CHECK(first.find("Basalt") != std::string::npos);
-    CHECK(first.find("26.2") != std::string::npos);
-    CHECK(first.find("776") != std::string::npos);
+    CHECK(first.find("26.3") != std::string::npos);
+    CHECK(first.find("777") != std::string::npos);
     CHECK(fixture.source.lastAsText().find("Clients accepted") != std::string::npos);
 }
 

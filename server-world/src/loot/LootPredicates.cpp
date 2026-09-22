@@ -1,6 +1,8 @@
 #include <basalt/server/world/loot/LootPredicates.hpp>
 
 #include <algorithm>
+#include <charconv>
+#include <cstdint>
 
 namespace basalt::server::world::loot {
 
@@ -14,6 +16,45 @@ bool matchesIdsOrTag(const std::vector<std::string>& wanted, std::string_view re
     }
     const std::string name = id.toString();
     return std::ranges::find(wanted, name) != wanted.end();
+}
+
+namespace {
+
+/// A state value as the property orders it: a whole number, or a flag with `false` first.
+[[nodiscard]] std::optional<std::int64_t> ordinalOf(std::string_view value) {
+    if (value == "false") {
+        return 0;
+    }
+    if (value == "true") {
+        return 1;
+    }
+    std::int64_t parsed = 0;
+    const char* last = value.data() + value.size();
+    const std::from_chars_result result = std::from_chars(value.data(), last, parsed);
+    return result.ec == std::errc{} && result.ptr == last ? std::optional{parsed} : std::nullopt;
+}
+
+} // namespace
+
+bool StateMatcher::test(const std::map<std::string, std::string>& state) const {
+    return std::ranges::all_of(properties, [&state](const Property& property) {
+        const auto found = state.find(property.name);
+        if (found == state.end()) {
+            return false;
+        }
+        if (property.exact.has_value()) {
+            return found->second == *property.exact;
+        }
+        const std::optional<std::int64_t> value = ordinalOf(found->second);
+        if (!value.has_value()) {
+            return !property.min.has_value() && !property.max.has_value();
+        }
+        const auto bound = [](const std::optional<std::string>& text) { return ordinalOf(text.value_or("")); };
+        if (property.min.has_value() && (!bound(property.min).has_value() || *value < *bound(property.min))) {
+            return false;
+        }
+        return !property.max.has_value() || (bound(property.max).has_value() && *value <= *bound(property.max));
+    });
 }
 
 bool ItemPredicate::test(const std::optional<wire::common::Identifier>& item,
@@ -76,10 +117,7 @@ bool LocationPredicate::test(const PlaceFacts& place, const TagLookup& tags) con
     if (!place.block.has_value() || !matchesIdsOrTag(blocks, "block", *place.block, tags)) {
         return false;
     }
-    return std::ranges::all_of(state, [&place](const auto& wanted) {
-        const auto found = place.properties.find(wanted.first);
-        return found != place.properties.end() && found->second == wanted.second;
-    });
+    return state.test(place.properties);
 }
 
 } // namespace basalt::server::world::loot

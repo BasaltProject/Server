@@ -21,7 +21,8 @@ struct Carried {
 [[nodiscard]] std::vector<Carried> carriedBlocks(const Context& context, std::int32_t pistonX, std::int32_t pistonY,
                                                  std::int32_t pistonZ, registry::BlockFace direction);
 
-/// parity: `PistonBaseBlock.triggerEvent`'s own check for a head that is still on its way out.
+/// parity: `PistonBaseBlock.checkIfExtend`'s check for a head still on its way out: the square two along
+/// is a `moving_piston` facing our way that is still extending.
 [[nodiscard]] bool isRetractingOntoSlide(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                                          registry::BlockFace direction);
 

@@ -173,10 +173,8 @@ void MobActionSystem::swing(ServerEntity& mob) {
             continue;
         }
         player->connection().sendPlayPacket(
-            wire::protocol::play::AnimatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
-                wire::protocol::play::AnimatePacket{.entityId = mob.entityId(),
-                                                    .action = wire::protocol::play::AnimatePacket::kSwingMainHand}
-                    .write(buffer);
+            wire::protocol::play::SwingAnimationPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                wire::protocol::play::SwingAnimationPacket{.entityId = mob.entityId()}.write(buffer);
             });
     }
 }

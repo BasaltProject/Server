@@ -404,9 +404,8 @@ void SwingCommand::build(const CommandNodeBuilder& root) const {
             caller.emplace_back(**self);
         }
         const std::vector<CommandTarget>& targets = named == nullptr ? caller : *named;
-        const std::uint8_t action = offhand ? play::AnimatePacket::kSwingOffHand : play::AnimatePacket::kSwingMainHand;
         for (const CommandTarget& target : targets) {
-            const play::AnimatePacket packet{.entityId = target.entityId(), .action = action};
+            const play::SwingAnimationPacket packet{.entityId = target.entityId(), .hand = offhand ? 1 : 0};
             const Parsed<world::LoadedWorld*> world = context.world();
             if (!world.has_value()) {
                 continue;
@@ -418,7 +417,8 @@ void SwingCommand::build(const CommandNodeBuilder& root) const {
                 }
                 if (player->connection().sendPlayPacket) {
                     player->connection().sendPlayPacket(
-                        play::AnimatePacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                        play::SwingAnimationPacket::kId,
+                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
                 }
             }
         }

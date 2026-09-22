@@ -438,7 +438,9 @@ void FishingSystem::bob(world::LoadedWorld& world, const std::vector<PlayerSessi
                                                 .offsetX = static_cast<float>(dx),
                                                 .offsetY = static_cast<float>(dy),
                                                 .offsetZ = static_cast<float>(dz),
-                                                .maxSpeed = static_cast<float>(speed),
+                                                .maxSpeedX = static_cast<float>(speed),
+                                                .maxSpeedY = static_cast<float>(speed),
+                                                .maxSpeedZ = static_cast<float>(speed),
                                                 .count = count};
         const std::string full = type->id.toString();
         for (const PlayerSession* player : watchers) {

@@ -66,6 +66,33 @@ std::optional<bool> asBool(const JsonValue* value) {
     return std::nullopt;
 }
 
+std::optional<std::string> typeOf(const JsonObject& object) {
+    std::optional<std::string> type = asString(object.find("type"));
+    if (type.has_value() && type->find(':') == std::string::npos) {
+        type = "minecraft:" + *type;
+    }
+    return type;
+}
+
+StateMatcher parseStateMatcher(const JsonObject* object) {
+    StateMatcher matcher;
+    if (object == nullptr) {
+        return matcher;
+    }
+    for (std::size_t index = 0; index < object->names().size(); ++index) {
+        StateMatcher::Property property{.name = object->names()[index]};
+        const JsonValue& value = object->values()[index];
+        if (const std::optional<std::string> exact = asString(&value); exact.has_value()) {
+            property.exact = exact;
+        } else if (const JsonObject* range = value.get<JsonObject>(); range != nullptr) {
+            property.min = asString(range->find("min"));
+            property.max = asString(range->find("max"));
+        }
+        matcher.properties.push_back(std::move(property));
+    }
+    return matcher;
+}
+
 /// An id list, a single id, or a `#tag`, as a registry holder set is written.
 std::vector<std::string> idsOrTag(const JsonValue* value) {
     std::vector<std::string> ids;
@@ -198,9 +225,8 @@ LevelBasedValue parseLevelBased(const JsonValue* value) {
 }
 
 /// The functions that only write components: `set_components` as given, `set_name` into the name
-/// it targets, and `set_potion`/`set_ominous_bottle_amplifier` into their own.
-Parsed<LootFunction> parseComponentSetter(const JsonObject& function) {
-    const std::optional<std::string> type = asString(function.find("function"));
+/// it targets, and `set_potion` into its own.
+Parsed<LootFunction> parseComponentSetter(std::string_view type, const JsonObject& function) {
     wire::nbt::NbtCompound components;
     std::vector<std::string> removed;
     const auto put = [&components](std::string_view key, const JsonValue* value) {
@@ -215,18 +241,16 @@ Parsed<LootFunction> parseComponentSetter(const JsonObject& function) {
         return true;
     };
     bool ok = true;
-    if (type == std::optional<std::string>{"minecraft:set_name"}) {
+    if (type == "minecraft:set_name") {
         const std::optional<std::string> target = asString(function.find("target"));
         ok = put(target == std::optional<std::string>{"item_name"} ? "minecraft:item_name" : "minecraft:custom_name",
                  function.find("name"));
-    } else if (type == std::optional<std::string>{"minecraft:set_potion"}) {
+    } else if (type == "minecraft:set_potion") {
         wire::nbt::NbtCompound contents;
         if (const std::optional<std::string> potion = asString(function.find("id")); potion.has_value()) {
             contents.putString("potion", *potion);
         }
         components.set("minecraft:potion_contents", wire::nbt::NbtTag::ofCompound(std::move(contents)));
-    } else if (type == std::optional<std::string>{"minecraft:set_ominous_bottle_amplifier"}) {
-        return LootFunction::copyFromBlock();
     } else if (const JsonObject* given = asObject(function.find("components")); given != nullptr) {
         for (std::size_t index = 0; index < given->names().size() && ok; ++index) {
             const std::string& name = given->names()[index];

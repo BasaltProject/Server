@@ -160,7 +160,7 @@ template <typename ToNbt>
                              // state nobody named. The state definitions know all of them.
                              NbtCompound entry;
                              const Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-                             entry.putString("Name", block == nullptr ? "minecraft:air" : block->toString());
+                             entry.putString("id", block == nullptr ? "minecraft:air" : block->toString());
                              const std::map<std::string, std::string> properties =
                                  registry::blockStateDefinitions::propertiesOf(stateId);
                              if (!properties.empty()) {
@@ -168,7 +168,7 @@ template <typename ToNbt>
                                  for (const auto& [property, value] : properties) {
                                      propertiesTag.putString(property, value);
                                  }
-                                 entry.set("Properties", NbtTag::ofCompound(std::move(propertiesTag)));
+                                 entry.set("properties", NbtTag::ofCompound(std::move(propertiesTag)));
                              }
                              return NbtTag::ofCompound(std::move(entry));
                          });
@@ -323,13 +323,26 @@ namespace {
     std::vector<std::int32_t> paletteIds;
     paletteIds.reserve(paletteList->size());
     for (const NbtTag& entry : *paletteList) {
+        // parity: `BlockState.CODEC`, a bare id for a default state and `{id, properties}` otherwise;
+        // a mixed list wraps the bare ones as `{"": id}`. `Name`/`Properties` is 26.2's spelling.
         const NbtCompound* entryTag = entry.get<NbtCompound>();
-        if (entryTag == nullptr || entryTag->getString("Name").empty()) {
+        const std::string* bare = entry.get<std::string>();
+        if (entryTag != nullptr && entryTag->size() == 1 && entryTag->names()[0].empty()) {
+            bare = entryTag->values()[0].get<std::string>();
+            entryTag = nullptr;
+        }
+        std::string name = bare != nullptr ? *bare : std::string{};
+        const NbtCompound* propertiesTag = nullptr;
+        if (entryTag != nullptr) {
+            const bool legacy = entryTag->contains("Name");
+            name = std::string{entryTag->getString(legacy ? "Name" : "id")};
+            propertiesTag = entryTag->getCompound(legacy ? "Properties" : "properties");
+        }
+        if (name.empty()) {
             return std::unexpected(ChunkNbtError{"invalid block palette entry"});
         }
-        const std::string name{entryTag->getString("Name")};
         std::map<std::string, std::string> properties;
-        if (const NbtCompound* propertiesTag = entryTag->getCompound("Properties")) {
+        if (propertiesTag != nullptr) {
             for (std::size_t i = 0; i < propertiesTag->size(); ++i) {
                 const auto* value = propertiesTag->values()[i].get<std::string>();
                 if (value == nullptr) {

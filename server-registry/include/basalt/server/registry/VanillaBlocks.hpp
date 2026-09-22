@@ -15,7 +15,7 @@ struct BlockHardnessEntry {
     float explosionResistance;
 };
 
-/// Every block's default state id, straight from the real 26.2 server jar's own data generator
+/// Every block's default state id, straight from the real 26.3 server jar's own data generator
 /// (`net.minecraft.data.Main --reports`, the `blocks.json` report): authoritative, not decompiled
 /// or guessed.
 [[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> defaultBlockStatesTable();
@@ -34,12 +34,9 @@ struct BlockHardnessEntry {
 /// arithmetic instead of a table of thirty thousand entries.
 [[nodiscard]] std::span<const std::string_view> blockStatePropertiesTable();
 
-/// Every block's destroy time and whether it needs the correct tool to drop anything, extracted
-/// from the real server jar's own block definitions.
-///
-/// The vanilla data generator does not report these, so unlike the id tables beside this one they
-/// come from a harness run against the real classes. A destroy time of -1 means unbreakable, which
-/// is how bedrock and the portal frames are marked.
+/// Every block's destroy time and whether it needs the correct tool to drop anything. The data
+/// generator does not report these, so they come from a harness run against the jar's own classes.
+/// A destroy time of -1 means unbreakable (bedrock, portal frames).
 [[nodiscard]] std::span<const BlockHardnessEntry> blockHardnessTable();
 
 } // namespace basalt::server::registry

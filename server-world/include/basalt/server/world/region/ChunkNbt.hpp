@@ -14,21 +14,16 @@ struct ChunkNbtError {
     std::string message;
 };
 
-/// parity: `SerializableChunkData`, the on-disk chunk NBT. Sections carry the wire format's
-/// palette-plus-optional-data-longs shape with no explicit bits-per-entry: both sides recompute it
-/// from the palette size.
-///
-/// Light data and heightmaps stay out of scope: both are derived, and reading them back would be
-/// trusting a file over the blocks it came with.
+/// parity: `SerializableChunkData`, the on-disk chunk NBT. Sections keep the palette and optional data
+/// longs, with bits per entry recomputed from the palette size. Light and heightmaps are derived, so
+/// they are not read back.
 namespace chunkNbt {
 
-/// The world version this build writes. parity: the `DataVersion` of 26.2.
-inline constexpr std::int32_t kDataVersion = 4903;
+/// The world version this build writes. parity: the `DataVersion` of 26.3.
+inline constexpr std::int32_t kDataVersion = 5023;
 
-/// Where the entities standing in this chunk are kept.
-///
-/// Vanilla moved them to a region folder of their own in 1.17; here they ride with the chunk, which
-/// is one file to read and one lock to take, and nothing outside this server reads it.
+/// Where the entities standing in this chunk are kept. Vanilla uses a separate `entities` region
+/// folder; here they ride with the chunk, one file and one lock.
 inline constexpr std::string_view kEntitiesKey = "basalt_entities";
 inline constexpr std::string_view kGeneratedEntitiesKey = "basalt_generated_entities";
 

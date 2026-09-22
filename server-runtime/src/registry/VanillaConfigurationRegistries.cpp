@@ -4,6 +4,10 @@
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 
 #include <functional>
+#include <initializer_list>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::runtime::registry::vanillaConfigurationRegistries {
@@ -33,6 +37,18 @@ using wire::protocol::configuration::RegistryEntry;
     RegistryDataPacket packet{.registryId = std::move(registryId), .entries = {}};
     for (const auto& [path, value] : entries) {
         packet.entries.push_back(entryOf(path, value));
+    }
+    return packet;
+}
+
+/// A registry whose entries the client reads from its own copy of the vanilla pack.
+///
+/// parity: `RegistrySynchronization.packRegistry` leaves out the data of an entry from a pack both
+/// ends know, and these three are only ever the vanilla ones. Sorted, as data pack loading is.
+[[nodiscard]] RegistryDataPacket known(std::string registryId, std::initializer_list<std::string_view> paths) {
+    RegistryDataPacket packet{.registryId = std::move(registryId), .entries = {}};
+    for (const std::string_view path : paths) {
+        packet.entries.push_back(RegistryEntry{.key = "minecraft:" + std::string{path}, .value = std::nullopt});
     }
     return packet;
 }
@@ -93,6 +109,14 @@ std::vector<RegistryDataPacket> packets() {
     all.push_back(built("minecraft:damage_type", vanillaRegistryData::damageTypes()));
     all.push_back(built("minecraft:jukebox_song", vanillaRegistryData::jukeboxSongs()));
     all.push_back(built("minecraft:instrument", vanillaRegistryData::instruments()));
+    all.push_back(known("minecraft:decorated_pot_pattern",
+                        {"angler", "archer", "arms_up", "blade", "brewer",     "burn",  "danger", "explorer",
+                         "flow",   "friend", "guster",  "heart", "heartbreak", "howl",  "miner",  "mourner",
+                         "plenty", "prize",  "scrape",  "sheaf", "shelter",    "skull", "snort"}));
+    all.push_back(known("minecraft:block_transformer", {"axe", "hoe", "shovel"}));
+    all.push_back(known("minecraft:worldgen/block_state_provider",
+                        {"cave_vines_body", "cave_vines_head", "flower_flower_forest", "flower_meadow", "flower_plain",
+                         "mangrove_propagule", "podzol_beneath_tree", "soil_beneath_tree"}));
     return all;
 }
 

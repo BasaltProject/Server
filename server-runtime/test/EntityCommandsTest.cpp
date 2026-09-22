@@ -321,7 +321,7 @@ TEST_CASE("swing tells everyone in the world which arm moved") {
     fixture.dispatcher.registerCommand(std::make_shared<commands::SwingCommand>());
 
     CHECK(fixture.dispatcher.execute(fixture.source, "swing Steve offhand") == 1);
-    CHECK(fixture.clients[0]->sent(play::AnimatePacket::kId));
+    CHECK(fixture.clients[0]->sent(play::SwingAnimationPacket::kId));
     CHECK(fixture.source.lastAsText().find("commands.swing.success.single") != std::string::npos);
 }
 

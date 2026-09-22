@@ -198,8 +198,8 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
     // parity: `LootContextParams.BLOCK_STATE`: the lower half of a door is what carries the drop,
     // and `THIS_ENTITY`, which a block broken by hand always has.
-    server::world::loot::LootContext lootContext{.blockState = reg::blockStateDefinitions::propertiesOf(stateId),
-                                                 .hasEntity = true};
+    server::world::loot::LootContext lootContext{
+        .blockState = reg::blockStateDefinitions::propertiesOf(stateId), .block = block, .hasEntity = true};
     // parity: `LootContextParams.TOOL`, which is what silk touch, shears and fortune are read from.
     if (tool != nullptr) {
         lootContext.tool = parsedOrNothing(tool->id);

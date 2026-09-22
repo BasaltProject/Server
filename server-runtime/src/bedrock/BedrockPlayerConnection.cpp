@@ -838,14 +838,14 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             if (!drawn) {
                 return;
             }
-            wire::bedrock::writeBossEvent(body, bossId, wire::bedrock::BedrockBossAction::Remove, "", 0.0F);
+            wire::bedrock::writeBossEvent(body, bossId, wire::bedrock::BedrockBossAction::Remove, "", 0.0F, protocol_);
             shownBars_.erase(bossId);
         } else {
             const std::string text = wire::text::toLegacyText(wire::text::resolveComponent(title, context_.lang));
             wire::bedrock::writeBossEvent(body, bossId,
                                           drawn ? wire::bedrock::BedrockBossAction::UpdatePercentage
                                                 : wire::bedrock::BedrockBossAction::Create,
-                                          text, progress);
+                                          text, progress, protocol_);
             shownBars_.insert(bossId);
         }
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BossEvent), body.toVector());

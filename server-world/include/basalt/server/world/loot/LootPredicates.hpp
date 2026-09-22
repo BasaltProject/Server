@@ -72,6 +72,23 @@ struct EntityPredicate {
     [[nodiscard]] bool test(const std::optional<EntityFacts>& entity, const TagLookup& tags) const;
 };
 
+/// parity: `StatePropertiesPredicate`: each named property one exact value, or within a range.
+///
+/// A range compares the property's own values; this build knows them only as text, so it orders
+/// whole numbers numerically and `false` before `true`, and an enum range is a gap that never matches.
+struct StateMatcher {
+    struct Property {
+        std::string name;
+        std::optional<std::string> exact;
+        std::optional<std::string> min;
+        std::optional<std::string> max;
+    };
+
+    std::vector<Property> properties;
+
+    [[nodiscard]] bool test(const std::map<std::string, std::string>& state) const;
+};
+
 /// What a location predicate can see of one square.
 struct PlaceFacts {
     std::optional<wire::common::Identifier> biome;
@@ -85,7 +102,7 @@ struct LocationPredicate {
     std::vector<std::string> biomes;
     bool hasBlock = false;
     std::vector<std::string> blocks;
-    std::map<std::string, std::string, std::less<>> state;
+    StateMatcher state;
     bool unsupported = false;
 
     [[nodiscard]] bool test(const PlaceFacts& place, const TagLookup& tags) const;

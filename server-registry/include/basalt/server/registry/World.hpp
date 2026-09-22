@@ -60,8 +60,8 @@ struct InstrumentEntry {
 [[nodiscard]] std::span<const InstrumentEntry> instrumentsTable();
 [[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> poiBlocksTable();
 
-/// Every vanilla 26.2 biome. The original 55 overworld entries keep their existing ids so saved
-/// chunks go on decoding after the nether, the end and the void were added.
+/// Every vanilla biome, in `BiomeData.bootstrap` order with the overworld ones first. Saved chunks
+/// name their biomes, so an id that moves when a version inserts one breaks nothing.
 ///
 /// Biome network ids are dynamic and synced to each client at login, so only internal consistency
 /// between this registry, the synced definitions and chunk palettes is observable on the wire.

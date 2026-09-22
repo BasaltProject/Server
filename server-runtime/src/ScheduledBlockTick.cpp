@@ -336,7 +336,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                  .convertsToMud =
                      [this](const wire::common::Identifier& block) {
                          return options_.blockTags != nullptr &&
-                                world::realBlockTags::contains(*options_.blockTags, "minecraft:convertable_to_mud",
+                                world::realBlockTags::contains(*options_.blockTags, "minecraft:convertible_to_mud",
                                                                block);
                      }});
             if (!result.effects.empty()) {

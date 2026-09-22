@@ -351,7 +351,8 @@ using Encoder = std::function<bool(ByteBuffer&, const NbtTag&)>;
             }
             return true;
         });
-        table.emplace("minecraft:swing_animation", [](ByteBuffer& buffer, const NbtTag& value) {
+        // parity: 26.3 split `swing_animation` into these two, with the same shape.
+        const auto swing = [](ByteBuffer& buffer, const NbtTag& value) {
             const NbtCompound* compound = value.get<NbtCompound>();
             if (compound == nullptr) {
                 return false;
@@ -365,7 +366,9 @@ using Encoder = std::function<bool(ByteBuffer&, const NbtTag&)>;
             wire::protocol::varInt::write(buffer, static_cast<std::int32_t>(found - kSwingAnimations.begin()));
             wire::protocol::varInt::write(buffer, intField(value, "duration").value_or(kDefaultSwingDuration));
             return true;
-        });
+        };
+        table.emplace("minecraft:attack_animation", swing);
+        table.emplace("minecraft:interact_animation", swing);
         table.emplace("minecraft:repairable", [](ByteBuffer& buffer, const NbtTag& value) {
             const NbtCompound* compound = value.get<NbtCompound>();
             if (compound == nullptr) {

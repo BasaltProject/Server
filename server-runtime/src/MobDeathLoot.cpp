@@ -102,6 +102,7 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
     // parity: `damage_source_properties` reads the source of the killing blow, by its damage type.
     if (!dead.lastDamageCause.empty() && options_.damageTypeTags != nullptr) {
         const Identifier type = damageTypeOf(dead.lastDamageCause);
+        context.damageType = type;
         context.damageTagged = [tags = options_.damageTypeTags, type](std::string_view tag) {
             const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(tag);
             return id.has_value() && world::realDamageTypeTags::isIn(*tags, *id, type);

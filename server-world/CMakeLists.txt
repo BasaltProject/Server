@@ -177,7 +177,13 @@ basalt_module(server-world
     src/crafting/Crafting.cpp
     src/crafting/RecipeJson.cpp
     src/crafting/SpecialCrafting.cpp
+    src/loot/ContextNumbers.cpp
     src/loot/Loot.cpp
+    src/loot/LootCondition.cpp
+    src/loot/LootConditionJson.cpp
+    src/loot/LootFunction.cpp
+    src/loot/LootFunctionJson.cpp
+    src/loot/LootNumberJson.cpp
     src/loot/LootTableJson.cpp
     src/loot/LootPredicates.cpp
     src/loot/LootItemFunctions.cpp
