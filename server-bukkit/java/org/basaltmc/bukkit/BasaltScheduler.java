@@ -19,6 +19,7 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
     private static final java.util.concurrent.ScheduledThreadPoolExecutor kWorkers = workers();
 
     private final Map<Long, Task> tasks = new ConcurrentHashMap<>();
+    private final Map<Task, Thread> active = new ConcurrentHashMap<>();
     private long nextId = 1;
 
     private static java.util.concurrent.ScheduledThreadPoolExecutor workers() {
@@ -136,6 +137,9 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
             tasks.remove(id);
         }
         task.running = true;
+        if (!task.sync) {
+            active.put(task, Thread.currentThread());
+        }
         Blocks.begin();
         try {
             task.body.accept(task);
@@ -145,6 +149,7 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
                     + " generated an exception", t);
         } finally {
             Blocks.end();
+            active.remove(task);
             task.running = false;
         }
     }
@@ -238,7 +243,27 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
 
     @Override
     public List<BukkitWorker> getActiveWorkers() {
-        return List.of();
+        List<BukkitWorker> workers = new ArrayList<>();
+        for (Map.Entry<Task, Thread> entry : active.entrySet()) {
+            Plugin owner = entry.getKey().owner;
+            workers.add(new BukkitWorker() {
+                @Override
+                public int getTaskId() {
+                    return entry.getKey().getTaskId();
+                }
+
+                @Override
+                public Plugin getOwner() {
+                    return owner;
+                }
+
+                @Override
+                public Thread getThread() {
+                    return entry.getValue();
+                }
+            });
+        }
+        return workers;
     }
 
     @Override
