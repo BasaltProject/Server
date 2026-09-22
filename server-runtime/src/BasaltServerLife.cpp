@@ -938,7 +938,7 @@ void BasaltServer::startBedrockListener() {
                 return std::nullopt;
             }
             std::vector<world::trades::Offer> offers =
-                entity::villagers::offersFor(vanillaData_.villagerTrades, target->profession, target->villagerLevel);
+                entity::villagers::offersOf(vanillaData_.villagerTrades, *target, *found->second);
             if (offers.empty()) {
                 return std::nullopt;
             }

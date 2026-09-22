@@ -163,6 +163,9 @@ public:
     /// Scoreboard tags, as `/tag` sets them. On the live session only: vanilla keeps them with the
     /// saved entity, which here needs a column in `players.db`.
     std::set<std::string, std::less<>> tags;
+    /// parity: 26.3 `ServerPlayer.postEffects`, the shaders `/posteffect` puts on this player's
+    /// screen. Kept for the session only: `players.db` has no column for them yet.
+    std::vector<std::string> postEffects;
 
     /// Counters, incremented as this server notices things happening.
     PlayerStats stats;

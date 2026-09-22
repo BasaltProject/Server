@@ -1,12 +1,15 @@
 #pragma once
 
 #include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/protocol/play/BlockPos.hpp>
 
 #include <cstdint>
 #include <optional>
 
 namespace basalt::server::runtime::world {
 class LoadedWorld;
+class RealBlockTransformers;
 class RealRecipes;
 } // namespace basalt::server::runtime::world
 
@@ -40,6 +43,13 @@ void igniteFor(const BreakContext& context, PlayerSession& player, world::Loaded
 /// An axe stripping a log, scraping oxidation off copper or taking the wax back off it.
 bool useAxeFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, std::int32_t x,
                std::int32_t y, std::int32_t z, std::int32_t heldSlot, const storage::StoredItemStack& held);
+
+/// parity: `BlockTransformer.transformBlock`: a hoe tilling, a shovel flattening a path, whatever
+/// the item's transformer turns the clicked block into. Answers whether one applied.
+bool transformBlockFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
+                       world::RealBlockTransformers& transformers, const wire::common::Identifier& transformer,
+                       std::int32_t x, std::int32_t y, std::int32_t z, wire::protocol::play::Direction face,
+                       std::int32_t heldSlot, const storage::StoredItemStack& held);
 
 /// A composter: bone meal out of a ready one, or one item into one with room. Answers whether the
 /// click was spent, which for a composter is true even when the item did not raise the level.

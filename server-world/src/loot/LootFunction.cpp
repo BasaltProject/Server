@@ -252,7 +252,7 @@ ItemStack LootFunction::run(ItemStack stack, random::RandomSource& random, std::
         }
         return stack;
     case Kind::Filtered: {
-        const bool passes = part.filter.test(stack.item, enchantmentsOf(stack), context.tags);
+        const bool passes = part.filter.test(stack.item, stack.components, context.tags);
         for (const LootFunction& function : passes ? part.onPass : part.onFail) {
             stack = function.apply(std::move(stack), random, std::nullopt, context);
         }

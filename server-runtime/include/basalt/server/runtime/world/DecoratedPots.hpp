@@ -42,11 +42,15 @@ inline constexpr std::string_view kSherds = "minecraft:sherds";
 /// parity: `DecoratedPotBlock.useWithoutItem`, which is a wobble and a thud and nothing else.
 [[nodiscard]] std::vector<BlockEffect> rebuff();
 
-/// The four sherds a broken pot leaves, back, left, right and front in that order.
+/// The sherds a broken pot leaves: left, back, front and right, and nothing for a bare side.
 ///
-/// parity: `PotDecorations.ordered`, which answers a brick for every side nobody decorated, and
-/// `DecoratedPotBlock.getDrops`, which hands them to the `sherds` dynamic drop of its loot table.
+/// parity: 26.3 `DecoratedPotBlock.getDrops`, which hands them to the `sherds` dynamic drop of its
+/// loot table. A 26.2 save's list of four reads as those four, brick included.
 [[nodiscard]] std::vector<server::world::loot::ItemStack> sherds(const wire::nbt::NbtCompound& data);
+
+/// parity: `DecoratedPotBlockEntity.applyImplicitComponents`: the item's `pot_decorations` become
+/// the pot's `sherds`, side by side.
+void decorate(wire::nbt::NbtCompound& data, const wire::nbt::NbtCompound& components);
 
 /// parity: `RandomizableContainer`, which a hopper empties one item at a time like any other.
 [[nodiscard]] std::optional<server::world::loot::ItemStack> takeOne(wire::nbt::NbtCompound& data);

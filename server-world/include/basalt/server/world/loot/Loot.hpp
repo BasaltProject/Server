@@ -92,6 +92,10 @@ public:
 
     [[nodiscard]] Kind kind() const noexcept { return kind_; }
 
+    /// parity: `include_additional_cost_component` on the two enchanting functions, which prices the
+    /// enchantment into a trade when the roll allows it.
+    void includeAdditionalCost(bool include) noexcept { additionalCost_ = include; }
+
     /// parity: `LootItemConditionalFunction.condition`. 26.3 carries one; several are `all_of`.
     std::vector<LootCondition> conditions;
 
@@ -111,6 +115,7 @@ private:
     std::int32_t bonusNumber_ = 0;
     float probability_ = 0.0F;
     bool onlyCompatible_ = true;
+    bool additionalCost_ = false;
     std::shared_ptr<const Parts> parts_;
 
     [[nodiscard]] const Parts& parts() const;

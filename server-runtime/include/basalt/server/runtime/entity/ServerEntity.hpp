@@ -29,6 +29,10 @@ namespace witherBoss {
 struct WitherState;
 }
 
+namespace villagers {
+struct Offers;
+}
+
 namespace wardenBrain {
 struct WardenState;
 }
@@ -113,6 +117,8 @@ public:
     /// parity: `VillagerData.level` and `Villager.villagerXp`, which unlocks the next tier.
     std::int32_t villagerLevel = 1;
     std::int32_t villagerExperience = 0;
+    /// parity: `AbstractVillager.offers`, rolled a level at a time and kept.
+    std::shared_ptr<villagers::Offers> offers;
 
     /// Ticks before it goes off, or `kNoFuse` for anything that is not primed. parity:
     /// `PrimedTnt.fuse`.

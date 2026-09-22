@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 
+#include <array>
 #include <cstdint>
 
 namespace basalt::server::runtime::world::decoratedPots {
@@ -48,24 +49,42 @@ std::optional<std::vector<BlockEffect>> insert(wire::nbt::NbtCompound& data, con
 }
 
 std::vector<server::world::loot::ItemStack> sherds(const wire::nbt::NbtCompound& data) {
-    static const wire::common::Identifier brick = wire::common::Identifier::vanilla("brick");
-    const wire::nbt::NbtList* stored = data.getList("sherds");
     std::vector<server::world::loot::ItemStack> out;
-    out.reserve(kSides);
-    for (std::size_t index = 0; index < kSides; ++index) {
-        wire::common::Identifier side = brick;
-        if (stored != nullptr && index < stored->size()) {
-            if (const std::string* name = (*stored)[index].get<std::string>(); name != nullptr) {
-                if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
-                        wire::common::Identifier::parse(*name);
-                    parsed.has_value()) {
-                    side = *parsed;
-                }
+    const auto add = [&out](std::string_view name) {
+        if (const auto parsed = wire::common::Identifier::parse(name); parsed.has_value()) {
+            out.push_back(server::world::loot::ItemStack{.item = *parsed, .count = 1});
+        }
+    };
+    if (const wire::nbt::NbtCompound* sides = data.getCompound("sherds"); sides != nullptr) {
+        for (const std::string_view side : {"left", "back", "front", "right"}) {
+            if (const wire::nbt::NbtCompound* template_ = sides->getCompound(side); template_ != nullptr) {
+                add(template_->getString("id"));
+            } else if (const std::string_view name = sides->getString(side); !name.empty()) {
+                add(name);
             }
         }
-        out.push_back(server::world::loot::ItemStack{.item = side, .count = 1});
+        return out;
+    }
+    const wire::nbt::NbtList* stored = data.getList("sherds");
+    if (stored == nullptr) {
+        return out;
+    }
+    // A 26.2 list is back, left, right, front; 26.3 drops in the order left, back, front, right.
+    static constexpr std::array<std::size_t, kSides> kNewOrder{1, 0, 3, 2};
+    for (const std::size_t index : kNewOrder) {
+        if (index < stored->size()) {
+            if (const std::string* name = (*stored)[index].get<std::string>(); name != nullptr) {
+                add(*name);
+            }
+        }
     }
     return out;
+}
+
+void decorate(wire::nbt::NbtCompound& data, const wire::nbt::NbtCompound& components) {
+    if (const wire::nbt::NbtTag* decorations = components.find("minecraft:pot_decorations"); decorations != nullptr) {
+        data.set("sherds", *decorations);
+    }
 }
 
 std::vector<BlockEffect> rebuff() {

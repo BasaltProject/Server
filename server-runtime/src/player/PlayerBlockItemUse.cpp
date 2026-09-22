@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/BlockTransformers.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -17,12 +18,15 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NetherPortals.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Waxing.hpp>
 #include <basalt/server/world/Chunk.hpp>
 
+#include <algorithm>
 #include <optional>
 #include <vector>
 
@@ -90,6 +94,52 @@ constexpr double kPopJitter = 0.25;
 [[nodiscard]] double popJitter(const BreakContext& context) {
     const double roll = context.nextDouble ? context.nextDouble() : 0.5;
     return (roll * 2 * kPopJitter) - kPopJitter;
+}
+
+/// parity: `Block.dropFromBlockInteractLootTable` into the transform's `drop_strategy`.
+void dropTransformLoot(const BreakContext& context, world::LoadedWorld& world, const wire::common::Identifier& table,
+                       const std::int32_t stateId, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                       const wire::protocol::play::Direction face, const bool fromFace,
+                       const storage::StoredItemStack& held) {
+    const server::world::loot::LootTable* rolled =
+        context.lootTables == nullptr ? nullptr : context.lootTables->byId(table);
+    if (rolled == nullptr || !world.gameRules().get(world::gameRules::kBlockDrops)) {
+        return;
+    }
+    random::RandomSource scratch = random::RandomSource::legacy(seedOf(context));
+    random::RandomSource& random =
+        rolled->randomSequence.has_value() ? world.randomSequences().of(*rolled->randomSequence) : scratch;
+    server::world::loot::LootContext loot{.blockState = reg::blockStateDefinitions::propertiesOf(stateId),
+                                          .block = reg::blockStateDefinitions::blockOf(stateId) == nullptr
+                                                       ? std::nullopt
+                                                       : std::optional{*reg::blockStateDefinitions::blockOf(stateId)},
+                                          .hasEntity = true,
+                                          .tool = parsedOrNothing(held.id)};
+    context.lootTables->prepareAt(loot, world, x + 0.5, y + 0.5, z + 0.5);
+    const std::int32_t stepX = wire::protocol::play::normalX(face);
+    const std::int32_t stepY = wire::protocol::play::normalY(face);
+    const std::int32_t stepZ = wire::protocol::play::normalZ(face);
+    const auto between = [&context](double least, double most) {
+        return least + ((context.nextDouble ? context.nextDouble() : 0.5) * (most - least));
+    };
+    for (const server::world::loot::ItemStack& stack : rolled->generate(random, 0.0F, std::nullopt, loot)) {
+        constexpr double kHalf = 0.125;
+        // parity: `Block.popResource`, from the middle, with the jitter a broken block drops with.
+        if (!fromFace) {
+            spawnDroppedItem(context, world, stack.item, stack.count, x + 0.5 + popJitter(context),
+                             y + 0.5 + popJitter(context) - kHalf, z + 0.5 + popJitter(context), between(-0.1, 0.1),
+                             0.2, between(-0.1, 0.1), 10, stack.components);
+            continue;
+        }
+        // parity: `Block.popResourceFromFace`, just outside the face that was clicked.
+        const double px = x + 0.5 + (stepX == 0 ? between(-0.25, 0.25) : stepX * (0.5 + kHalf));
+        const double py = y + 0.5 + (stepY == 0 ? between(-0.25, 0.25) : stepY * (0.5 + kHalf)) - kHalf;
+        const double pz = z + 0.5 + (stepZ == 0 ? between(-0.25, 0.25) : stepZ * (0.5 + kHalf));
+        const double vx = stepX == 0 ? between(-0.1, 0.1) : stepX * 0.1;
+        const double vy = stepY == 0 ? between(0.0, 0.1) : (stepY * 0.1) + 0.1;
+        const double vz = stepZ == 0 ? between(-0.1, 0.1) : stepZ * 0.1;
+        spawnDroppedItem(context, world, stack.item, stack.count, px, py, pz, vx, vy, vz, 10, stack.components);
+    }
 }
 
 /// The comparators beside a block whose reading just changed.
@@ -231,6 +281,62 @@ bool useAxeFor(const BreakContext& context, PlayerSession& player, world::Loaded
     // parity: `hurtAndBreak(1, ...)`, one point off the axe whichever of the three it did.
     wearOne(context, player, heldSlot, held);
     return true;
+}
+
+bool transformBlockFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
+                       world::RealBlockTransformers& transformers, const wire::common::Identifier& transformer,
+                       const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                       const wire::protocol::play::Direction face, const std::int32_t heldSlot,
+                       const storage::StoredItemStack& held) {
+    // parity: `playerHasBlockingItemUseIntent`: a shield in the other hand wins unless sneaking.
+    const std::optional<storage::StoredItemStack>& offhand = player.inventory.at(PlayerInventory::kOffhandSlot);
+    if (offhand.has_value() && offhand->id == "minecraft:shield" && !player.sneaking) {
+        return false;
+    }
+    const world::RealBlockTransformers::Tagged tagged = [&context](std::string_view tag,
+                                                                   const wire::common::Identifier& block) {
+        return context.blockTags != nullptr && world::realBlockTags::contains(*context.blockTags, tag, block);
+    };
+    const std::optional<std::int32_t> was = world.state().blockState(x, y, z);
+    if (!was.has_value()) {
+        return false;
+    }
+    for (const world::RealBlockTransformers::Transform& transform : transformers.of(transformer)) {
+        if (std::ranges::find(transform.disallowedFaces, face) != transform.disallowedFaces.end()) {
+            continue;
+        }
+        const std::optional<std::int32_t> turned =
+            world::RealBlockTransformers::stateFor(transform, world.state(), x, y, z, tagged);
+        if (!turned.has_value()) {
+            continue;
+        }
+        if (transform.loot.has_value()) {
+            dropTransformLoot(context, world, *transform.loot, *was, x, y, z, face,
+                              transform.drop == world::RealBlockTransformers::Drop::ClickedFace, held);
+        }
+        if (player.gamemode != Gamemode::Creative && transform.itemDamagePerUse > 0) {
+            wearHeldItem(context, player, transform.itemDamagePerUse);
+        }
+        const std::int32_t effect =
+            transform.particle == world::RealBlockTransformers::Particle::Scrape
+                ? world::blockEffect::Effect::kCopperScrape
+            : transform.particle == world::RealBlockTransformers::Particle::WaxOff ? world::blockEffect::Effect::kWaxOff
+            : transform.particle == world::RealBlockTransformers::Particle::WaxOn  ? world::blockEffect::Effect::kWaxOn
+                                                                                   : 0;
+        reshapeBlock(context, world, x, y, z, *turned, effect);
+        // parity: `level.playSound(player, ...)`: everyone but the one who used it, who heard it already.
+        if (!transform.sound.empty() && context.blocks != nullptr) {
+            std::vector<PlayerSession*> others = playersIn(context, world.name());
+            std::erase(others, &player);
+            const std::string_view sound = std::string_view{transform.sound}.starts_with("minecraft:")
+                                               ? std::string_view{transform.sound}.substr(10)
+                                               : std::string_view{transform.sound};
+            context.blocks->sendEffects(others, x, y, z, *turned,
+                                        {world::blockEffect::Sound{.name = std::string{sound}}});
+        }
+        return true;
+    }
+    return false;
 }
 
 bool useComposterFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,

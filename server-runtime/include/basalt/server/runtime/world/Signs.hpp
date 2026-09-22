@@ -42,6 +42,18 @@ inline constexpr std::size_t kMaxLineLength = 384;
 /// Whether this sign refuses to be edited. parity: `SignBlockEntity.isWaxed`.
 [[nodiscard]] bool isWaxed(const wire::nbt::NbtCompound& data);
 
+/// parity: `SignBlockEntity.applyImplicitComponents`: 26.3's `sign_text_front`, `sign_text_back`
+/// and `waxed` components of the item that placed it.
+[[nodiscard]] wire::nbt::NbtCompound withComponents(const wire::nbt::NbtCompound& data,
+                                                    const wire::nbt::NbtCompound& components);
+
+/// parity: `SignText.hasEditableText`: every line empty or plain text, nothing a player could not type.
+[[nodiscard]] bool hasEditableText(const wire::nbt::NbtCompound& data, bool front);
+
+/// parity: `SignBlockEntity.getSlotPlayerIsFacing`: whether the player looks at the front, from
+/// where they stand against the sign's hitbox centre.
+[[nodiscard]] bool facesFront(std::int32_t stateId, std::int32_t x, std::int32_t z, double playerX, double playerZ);
+
 [[nodiscard]] server::world::ChunkBlockEntity blockEntity(std::int32_t localX, std::int32_t y, std::int32_t localZ,
                                                           const wire::common::Identifier& type,
                                                           wire::nbt::NbtCompound data = emptyData());

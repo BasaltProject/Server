@@ -334,6 +334,21 @@ void BlockInteractionHandler::tickDigging(PlayerSession& session) {
         return;
     }
     diggingTicks_++;
+    // parity: 26.3 `ServerPlayerGameMode.tick`: every tick of mining shows its dust off the face, and
+    // every fourth one its sound, to everyone around including the one mining.
+    constexpr std::int32_t kDestroyDust = 2019;
+    constexpr std::int32_t kDestroyDustAndSound = 2020;
+    constexpr double kLevelEventRange = 64.0;
+    const std::int32_t event = diggingTicks_ % 4 == 0 ? kDestroyDustAndSound : kDestroyDust;
+    for (const PlayerSession* watcher : owner_->playersInSameWorld()) {
+        const double dx = watcher->x - (pos.x + 0.5);
+        const double dy = watcher->y - (pos.y + 0.5);
+        const double dz = watcher->z - (pos.z + 0.5);
+        if (watcher->connection().sendLevelEvent &&
+            (dx * dx) + (dy * dy) + (dz * dz) < kLevelEventRange * kLevelEventRange) {
+            watcher->connection().sendLevelEvent(event, pos.x, pos.y, pos.z, diggingDirection_);
+        }
+    }
     // The same progress the break itself uses, so the cracks run at the speed the tool really mines
     // at rather than a guess.
     const float perTick = destroyProgressPerTick(*block, reg::blocks::hardnessOf(*block));
@@ -412,6 +427,10 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
             }
         }
         startDigging(action.pos);
+        diggingDirection_ = static_cast<std::int32_t>(action.direction);
+    } else if (action.action == Action::ChangeDestroyDirection) {
+        // parity: 26.3 `handleBlockBreakAction`, which only turns the face the dust flies off.
+        diggingDirection_ = static_cast<std::int32_t>(action.direction);
     } else if (action.action == Action::AbortDestroyBlock || action.action == Action::StopDestroyBlock) {
         stopDigging();
     }

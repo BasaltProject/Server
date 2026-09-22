@@ -34,7 +34,7 @@ VanillaGameData::Jar VanillaGameData::jarOf(const assets::ServerJarAssets* asset
 
 VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
     : lootTables({.readText = jar.readText, .entriesUnder = jar.entriesUnder}), biomeSpawns({.readText = jar.readText}),
-      villagerTrades({.readText = jar.readText}), jukeboxSongs(jar.readText),
+      villagerTrades({.readText = jar.readText}), blockTransformers(jar.readText), jukeboxSongs(jar.readText),
       recipes({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       blockTags(world::realBlockTags::load(readerOf<world::realBlockTags::JarReader>(jar), logger)),
       itemTags(world::realItemTags::load(readerOf<world::realItemTags::JarReader>(jar), logger)),
@@ -54,6 +54,7 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       testInstances({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       structureTemplates({.readEntry = jar.readEntry, .dataIds = jar.dataIds}) {
     lootTables.useRegistries(&lootRegistries);
+    villagerTrades.useLootTables(&lootTables);
     // Loud on purpose: a client whose overworld timeline tag is empty renders a sky that never
     // moves, and nothing else in the log would say why.
     const std::set<Identifier>& overworld =

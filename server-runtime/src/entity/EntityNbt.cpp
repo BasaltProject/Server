@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
 
 #include <algorithm>
@@ -426,6 +427,7 @@ NbtCompound encode(const ServerEntity& entity) {
         villagerData.putInt("level", entity.villagerLevel);
         tag.set("VillagerData", NbtTag::ofCompound(std::move(villagerData)));
         tag.putInt("Xp", entity.villagerExperience);
+        villagers::writeOffers(entity, tag);
     }
     if (path == "villager") {
         writeVillagerGolemMemories(tag, entity);
@@ -590,6 +592,7 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     }
     if (path == "villager") {
         readVillagerGolemMemories(tag, *entity);
+        villagers::readOffers(tag, *entity);
     }
     if (const std::string_view owner = tag.getString("Owner"); !owner.empty()) {
         entity->owner = std::string{owner};

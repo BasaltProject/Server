@@ -295,6 +295,8 @@ private:
     std::optional<wire::protocol::play::BlockPos> diggingAt_;
     std::int32_t diggingTicks_ = 0;
     std::int32_t diggingStage_ = -1;
+    /// parity: 26.3 `ServerPlayerGameMode.destroyDirection`, the face being mined, as its ordinal.
+    std::int32_t diggingDirection_ = 0;
 };
 
 } // namespace basalt::server::runtime

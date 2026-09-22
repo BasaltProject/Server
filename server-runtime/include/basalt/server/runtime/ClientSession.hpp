@@ -73,6 +73,7 @@ class ChunkGenerationQueue;
 class RealLootTables;
 class RealRecipes;
 class RealVillagerTrades;
+class RealBlockTransformers;
 class RealEnchantments;
 class PlayerProgress;
 class AdvancementTriggers;
@@ -207,6 +208,7 @@ public:
         world::RealLootTables* lootTables = nullptr;
         world::RealRecipes* recipes = nullptr;
         world::RealVillagerTrades* villagerTrades = nullptr;
+        world::RealBlockTransformers* blockTransformers = nullptr;
         world::jukeboxes::SongOutputs* jukeboxes = nullptr;
         std::function<bool()> whitelistEnforced;
         world::RealEnchantments* enchantments = nullptr;
