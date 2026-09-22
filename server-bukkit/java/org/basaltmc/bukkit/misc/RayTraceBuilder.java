@@ -50,6 +50,10 @@ public final class RayTraceBuilder implements PositionedRayTraceConfigurationBui
 
     @Override
     public PositionedRayTraceConfigurationBuilder blockCollisionMode(BlockCollisionMode blockCollisionMode) {
+        if (blockCollisionMode != BlockCollisionMode.COLLIDER) {
+            throw org.basaltmc.bukkit.Unsupported.hit("RayTrace block collision mode " + blockCollisionMode
+                + ": only COLLIDER shapes are available");
+        }
         return this;
     }
 
