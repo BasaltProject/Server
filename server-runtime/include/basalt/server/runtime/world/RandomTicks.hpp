@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
+#include <basalt/server/runtime/world/SaplingGrowth.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -67,6 +68,8 @@ struct Context {
     std::function<std::int32_t()> allocateEntityId;
     /// Unset, every change goes through, which is what a server with no plugins does.
     MayChange mayChange;
+    /// `#minecraft:flowers`, which a growing sapling looks for. Unset, there are none.
+    saplingGrowth::Flowering flowering;
 };
 
 /// parity: `CropBlock.getGrowthSpeed`, farmland underneath and the neighbours' rows and all.

@@ -158,7 +158,8 @@ void RedstoneTickSystem::tickFluids(world::LoadedWorld& world, const sched::Regi
                                                 .gameRules = world.gameRules(),
                                                 .random = random,
                                                 .ultrawarm =
-                                                    world.declaration().dimension == config::WorldDimension::Nether};
+                                                    world.declaration().dimension == config::WorldDimension::Nether,
+                                                .blockTags = options_.blockTags};
         for (const world::FluidChange& change :
              world::fluidFlow::tick(context, position[0], position[1], position[2])) {
             const BlockPos pos{change.x, change.y, change.z};
@@ -641,7 +642,12 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
                                               .evaporates = !facts.hasSkylight,
                                               .spawnsPortalPiglins = facts.spawnsPortalPiglins,
                                               .allocateEntityId = [this] { return players_->allocateEntityId(); },
-                                              .mayChange = hooks_.mayChange};
+                                              .mayChange = hooks_.mayChange,
+                                              .flowering =
+                                                  [tags = options_.blockTags](const wire::common::Identifier& block) {
+                                                      return tags != nullptr && world::realBlockTags::contains(
+                                                                                    *tags, "minecraft:flowers", block);
+                                                  }};
     random::RandomSource random = freshRandom();
     const std::vector<world::BlockChange> changes = randomTicks_.tick(context, chunks, speed, random);
     if (changes.empty()) {

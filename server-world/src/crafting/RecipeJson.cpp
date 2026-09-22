@@ -1,5 +1,6 @@
 #include <basalt/server/world/crafting/RecipeJson.hpp>
 #include <basalt/wire/common/json/Json.hpp>
+#include <basalt/wire/nbt/JsonToNbt.hpp>
 
 #include <charconv>
 #include <cstdint>
@@ -206,7 +207,7 @@ using Parsed = std::expected<Value, RecipeParseError>;
 }
 
 [[nodiscard]] Parsed<Recipe> parseCooking(const JsonObject& root, Recipe built, Cooker cooker,
-                                          std::int32_t defaultCookingTime, const TagResolver& resolveTag) {
+                                          const TagResolver& resolveTag) {
     Parsed<Ingredient> ingredient = requiredIngredient(root, "ingredient", resolveTag);
     if (!ingredient.has_value()) {
         return std::unexpected(ingredient.error());
@@ -215,7 +216,75 @@ using Parsed = std::expected<Value, RecipeParseError>;
     built.cooker = cooker;
     built.ingredient = std::move(*ingredient);
     built.experience = static_cast<float>(asNumber(root.find("experience")).value_or(0.0));
-    built.cookingTime = static_cast<std::int32_t>(asNumber(root.find("cookingtime")).value_or(defaultCookingTime));
+    // parity: 26.3 `cookingMapCodec` requires `cookingtime`; the per-type defaults are gone.
+    const std::optional<double> cookingTime = asNumber(root.find("cookingtime"));
+    if (!cookingTime.has_value()) {
+        return std::unexpected(missing("cookingtime"));
+    }
+    built.cookingTime = static_cast<std::int32_t>(*cookingTime);
+    return built;
+}
+
+/// parity: 26.3 `BrewingRecipe`: a `PotionIngredient` bottle and reagent, and an `output` stack.
+[[nodiscard]] Parsed<Recipe> parseBrewing(const JsonObject& root, Recipe built, const TagResolver& resolveTag) {
+    const JsonValue* inputValue = root.find("input");
+    const JsonValue* reagentValue = root.find("reagent");
+    const JsonValue* outputValue = root.find("output");
+    const JsonObject* input = inputValue == nullptr ? nullptr : inputValue->get<JsonObject>();
+    const JsonObject* reagent = reagentValue == nullptr ? nullptr : reagentValue->get<JsonObject>();
+    const JsonObject* output = outputValue == nullptr ? nullptr : outputValue->get<JsonObject>();
+    if (input == nullptr || reagent == nullptr || output == nullptr) {
+        return std::unexpected(missing("brewing input, reagent or output"));
+    }
+    Parsed<Ingredient> bottle = requiredIngredient(*input, "item", resolveTag);
+    if (!bottle.has_value()) {
+        return std::unexpected(bottle.error());
+    }
+    Parsed<Ingredient> made = requiredIngredient(*reagent, "item", resolveTag);
+    if (!made.has_value()) {
+        return std::unexpected(made.error());
+    }
+    // A reagent may carry potions too in the codec; none in the jar does, and matching them would
+    // need its contents, so such a recipe is refused rather than matched loosely.
+    if (reagent->find("potion_contents") != nullptr) {
+        return std::unexpected(RecipeParseError{"Unsupported brewing reagent potion_contents"});
+    }
+    if (const JsonValue* contents = input->find("potion_contents"); contents != nullptr) {
+        const JsonObject* predicate = contents->get<JsonObject>();
+        const JsonValue* potions = predicate == nullptr ? nullptr : predicate->find("potions");
+        if (potions == nullptr) {
+            return std::unexpected(missing("brewing potion_contents potions"));
+        }
+        if (const std::optional<std::string> one = asString(potions); one.has_value()) {
+            built.potions.push_back(*one);
+        } else if (const std::vector<JsonValue>* many = potions->get<std::vector<JsonValue>>(); many != nullptr) {
+            for (const JsonValue& each : *many) {
+                if (const std::optional<std::string> id = asString(&each); id.has_value()) {
+                    built.potions.push_back(*id);
+                }
+            }
+        }
+    }
+    const std::optional<std::string> id = asString(output->find("id"));
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
+        id.has_value() ? wire::common::Identifier::parse(*id)
+                       : std::unexpected(wire::common::IdentifierError::EmptyPart);
+    if (!item.has_value()) {
+        return std::unexpected(missing("brewing output id"));
+    }
+    built.result = loot::ItemStack{.item = *item,
+                                   .count = static_cast<std::int32_t>(asNumber(output->find("count")).value_or(1.0))};
+    if (const JsonValue* components = output->find("components"); components != nullptr) {
+        std::expected<wire::nbt::NbtTag, wire::nbt::JsonToNbtError> tag = wire::nbt::jsonToNbt(*components);
+        const wire::nbt::NbtCompound* compound = tag.has_value() ? tag->get<wire::nbt::NbtCompound>() : nullptr;
+        if (compound == nullptr) {
+            return std::unexpected(missing("brewing output components"));
+        }
+        built.result.components = *compound;
+    }
+    built.kind = RecipeKind::Brewing;
+    built.base = std::move(*bottle);
+    built.ingredient = std::move(*made);
     return built;
 }
 
@@ -324,19 +393,20 @@ std::expected<Recipe, RecipeParseError> parse(std::string_view json, const TagRe
         }
         return built;
     }
-    // parity: each cooking type's own default in `cookingMapCodec`, which is what a recipe file
-    // leaving `cookingtime` out gets.
+    if (*type == "minecraft:brewing") {
+        return parseBrewing(*root, std::move(built), resolveTag);
+    }
     if (*type == "minecraft:smelting") {
-        return parseCooking(*root, std::move(built), Cooker::Smelting, 200, resolveTag);
+        return parseCooking(*root, std::move(built), Cooker::Smelting, resolveTag);
     }
     if (*type == "minecraft:blasting") {
-        return parseCooking(*root, std::move(built), Cooker::Blasting, 100, resolveTag);
+        return parseCooking(*root, std::move(built), Cooker::Blasting, resolveTag);
     }
     if (*type == "minecraft:smoking") {
-        return parseCooking(*root, std::move(built), Cooker::Smoking, 100, resolveTag);
+        return parseCooking(*root, std::move(built), Cooker::Smoking, resolveTag);
     }
     if (*type == "minecraft:campfire_cooking") {
-        return parseCooking(*root, std::move(built), Cooker::Campfire, 100, resolveTag);
+        return parseCooking(*root, std::move(built), Cooker::Campfire, resolveTag);
     }
     // parity: `TransmuteRecipe`: two ingredients in any arrangement, one of which decides what comes
     // out. The result keeps the input's components in vanilla; nothing here carries components

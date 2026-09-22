@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 
 #include <array>
@@ -277,6 +278,16 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
 
     if (type == "item_frame" || type == "glow_item_frame") {
         addItemFrameMetadata(entries, data);
+    }
+    // parity: `Cushion.DATA_COLOR`, sent only when it is not the default white.
+    if (type == "cushion") {
+        const std::optional<std::int32_t> colour = world::cushions::dyeIdOf(data.getString("color"));
+        if (colour.has_value() && *colour != 0) {
+            entries.push_back(Entry{
+                .index = world::cushions::kColorDataIndex,
+                .value = SetEntityDataPacket::RegistryIdValue{
+                    .value = *colour, .registry = static_cast<RegistryHolder>(world::cushions::kDyeColorSerializer)}});
+        }
     }
     // parity: `Painting.DATA_PAINTING_VARIANT_ID`, right after the direction a hanging entity
     // carries. The id is the entry's place in the registry we sent at login.

@@ -304,8 +304,9 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             const world::fluidFlow::Context context{.world = world.state(),
                                                     .gameRules = world.gameRules(),
                                                     .random = random,
-                                                    .ultrawarm = world.declaration().dimension ==
-                                                                 config::WorldDimension::Nether};
+                                                    .ultrawarm =
+                                                        world.declaration().dimension == config::WorldDimension::Nether,
+                                                    .blockTags = options_.blockTags};
             const world::dispensers::Result result = world::dispensers::fire(
                 context, x, y, z,
                 {.allocateEntityId = [this] { return players_->allocateEntityId(); },

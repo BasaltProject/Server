@@ -23,6 +23,7 @@
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
@@ -126,6 +127,10 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     // frame or takes it off the wall.
     if (world::itemFrames::isFrame(target->type())) {
         breakFrame(*session, *target);
+        return;
+    }
+    if (world::cushions::isCushion(target->type())) {
+        breakCushion(*session, *target);
         return;
     }
     if (world::endCrystals::isCrystal(target->type())) {
@@ -274,6 +279,15 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     // parity: `AbstractMinecart.interact`, which seats whoever clicked it.
     if (world::detectorRails::isMinecart(entity->type())) {
         mount(*session, *entity);
+        return;
+    }
+    // parity: `Cushion.interact`: a player not sneaking sits on one nobody is on.
+    if (world::cushions::isCushion(entity->type())) {
+        if (!session->sneaking && entity->passengerIds.empty() && !session->vehicleId.has_value()) {
+            mount(*session, *entity);
+            owner_->broadcastSound("minecraft:entity.cushion.sit", entity->x, entity->y, entity->z,
+                                   SoundSource::Neutral);
+        }
         return;
     }
     if (tameOrSit(*session, *entity)) {
@@ -484,6 +498,38 @@ void CombatHandler::breakVehicle(PlayerSession& session, ServerEntity& vehicle) 
         }
     }
     vehicle.removed = true;
+}
+
+void CombatHandler::breakCushion(PlayerSession& session, ServerEntity& cushion) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr) {
+        return;
+    }
+    // parity: `BlockAttachedEntity.hurtServer` kills it and `Cushion.dropItem` follows: the sound
+    // always, the item only outside creative and with `entity_drops` on.
+    for (const std::int32_t passenger : cushion.passengerIds) {
+        for (PlayerSession* rider : owner_->playersInSameWorld()) {
+            if (rider->entityId() == passenger) {
+                dismount(*rider);
+                break;
+            }
+        }
+    }
+    cushion.removed = true;
+    world::vibrations::emit(world->state(), "entity_die", cushion.x, cushion.y, cushion.z, world->gameTime(),
+                            {.entity = session.uuid()});
+    owner_->broadcastSound("minecraft:entity.cushion.break", cushion.x, cushion.y, cushion.z, SoundSource::Neutral);
+    if (session.gamemode == Gamemode::Creative || !world->gameRules().get(world::gameRules::kEntityDrops)) {
+        return;
+    }
+    wire::nbt::NbtCompound components;
+    if (cushion.sourceNbt.has_value()) {
+        if (const wire::nbt::NbtTag* name = cushion.sourceNbt->find("CustomName"); name != nullptr) {
+            components.set("minecraft:custom_name", *name);
+        }
+    }
+    owner_->blockInteraction().spawnDroppedItem(world::cushions::itemOf(cushion), 1, cushion.x, cushion.y, cushion.z,
+                                                0.0, 0.0, 0.0, 10, std::move(components));
 }
 
 void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {

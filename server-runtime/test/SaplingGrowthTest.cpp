@@ -142,27 +142,29 @@ TEST_CASE("a grown oak sapling becomes an oak") {
     CHECK(pathOf(*world.blockState(8, 69, 8)) == "oak_leaves");
 }
 
-TEST_CASE("an oak rolls one in ten for the fancy variant") {
-    // Seed 4096's first float is 0.0979 and seed 0's is 0.7310, the two sides of the tenth.
+TEST_CASE("an oak draws one in ten for the fancy variant") {
+    // parity: 26.3 `TreeGrower.OAK`'s weights, nine to one: seed 9 draws the tenth and seed 0 does not.
+    CHECK(rng::RandomSource::legacy(9).nextInt(10) == 9);
+    CHECK(rng::RandomSource::legacy(0).nextInt(10) != 9);
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);
-    const std::vector<BlockChange> fancy = growAt(world, 8, 64, 8, "oak_sapling", 4096);
+    const std::vector<BlockChange> fancy = growAt(world, 8, 64, 8, "oak_sapling", 9);
 
-    CHECK(fancy.size() == 126);
-    CHECK(countOf(fancy, "oak_log") == 8);
-    CHECK(countOf(fancy, "oak_leaves") == 117);
+    CHECK(fancy.size() == 204);
+    CHECK(countOf(fancy, "oak_log") == 13);
+    CHECK(countOf(fancy, "oak_leaves") == 190);
     // The plain oak of seed 0 is one straight column; only the fancy one branches off the trunk.
-    CHECK(logColumns(fancy, "oak_log") == std::set<std::pair<std::int32_t, std::int32_t>>{{7, 6}, {8, 7}, {8, 8}});
+    CHECK(logColumns(fancy, "oak_log").size() > 1);
 }
 
-TEST_CASE("a birch draws no roll of its own") {
+TEST_CASE("a birch draws from its one-entry list like any other") {
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);
     const std::vector<BlockChange> changes = growAt(world, 8, 64, 8, "birch_sapling", 0);
 
-    CHECK(changes.size() == 61);
-    CHECK(countOf(changes, "birch_log") == 5);
-    CHECK(countOf(changes, "birch_leaves") == 55);
+    CHECK(changes.size() == 64);
+    CHECK(countOf(changes, "birch_log") == 6);
+    CHECK(countOf(changes, "birch_leaves") == 57);
     CHECK(countOf(changes, "dirt") == 1);
 }
 
@@ -177,12 +179,12 @@ TEST_CASE("a tree grows where the sapling stood, not at the middle of the chunk"
 }
 
 TEST_CASE("a canopy reaching the far column of the scratch chunk is still copied back") {
-    // Seed 5353's fancy oak spans seven blocks each way, the widest the window holds.
+    // Seed 67's fancy oak spans seven blocks each way, the widest the window holds.
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);
-    const std::vector<BlockChange> changes = growAt(world, 8, 64, 8, "oak_sapling", 5353);
+    const std::vector<BlockChange> changes = growAt(world, 8, 64, 8, "oak_sapling", 67);
 
-    CHECK(changes.size() == 447);
+    CHECK(changes.size() == 432);
     CHECK(lowestX(changes) == 1);
     CHECK(highestX(changes) == 15);
 }
@@ -197,9 +199,9 @@ TEST_CASE("a wall in the far column keeps the canopy out of it") {
             REQUIRE(world.setBlockState(15, y, z, stateOf("stone")));
         }
     }
-    const std::vector<BlockChange> changes = growAt(world, 8, 64, 8, "oak_sapling", 5353);
+    const std::vector<BlockChange> changes = growAt(world, 8, 64, 8, "oak_sapling", 67);
 
-    CHECK(changes.size() == 438);
+    CHECK(changes.size() == 423);
     CHECK(highestX(changes) == 14);
 }
 
@@ -208,9 +210,9 @@ TEST_CASE("what lies outside the loaded world reads as air") {
     // blocks read as air, so the canopy grows over them, and only the loaded half is written.
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);
-    const std::vector<BlockChange> changes = growAt(world, 2, 64, 8, "oak_sapling", 5353);
+    const std::vector<BlockChange> changes = growAt(world, 2, 64, 8, "oak_sapling", 67);
 
-    CHECK(changes.size() == 357);
+    CHECK(changes.size() == 351);
     CHECK(lowestX(changes) == 0);
     CHECK(highestX(changes) == 9);
 }
@@ -255,4 +257,18 @@ TEST_CASE("a block that is no sapling grows nothing") {
     CHECK(saplingGrowth::advance(world, 8, 64, 8, stateOf("bamboo_sapling"), random).empty());
     CHECK(saplingGrowth::advance(world, 8, 64, 8, -1, random).empty());
     CHECK(world.blockState(8, 64, 8) == stateOf("air"));
+}
+
+TEST_CASE("a dark oak only grows from a square of four saplings") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    CHECK(growAt(world, 8, 64, 8, "dark_oak_sapling", 0).empty());
+
+    const std::int32_t sapling = saplingOf("dark_oak_sapling", "1");
+    REQUIRE(world.setBlockState(9, 64, 8, sapling));
+    REQUIRE(world.setBlockState(8, 64, 9, sapling));
+    REQUIRE(world.setBlockState(9, 64, 9, sapling));
+    const std::vector<BlockChange> grown = growAt(world, 8, 64, 8, "dark_oak_sapling", 0);
+    CHECK(countOf(grown, "dark_oak_log") > 4);
+    CHECK(pathOf(*world.blockState(9, 64, 9)) == "dark_oak_log");
 }

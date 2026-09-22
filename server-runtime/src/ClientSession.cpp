@@ -173,7 +173,8 @@ void ClientSession::startOutboundLoop() {
                     entityTracker_->syncSummonedEntities();
                     entityTracker_->syncGeneratedEntities();
                     uiState_->tickUi();
-                    if (menus_->openBlock.has_value() && menus_->openBlockSize == world::furnaces::kSize) {
+                    if (menus_->openBlock.has_value() && (menus_->openBlockSize == world::furnaces::kSize ||
+                                                          menus_->openBlockSize == world::brewingStands::kSize)) {
                         menus_->syncOpenContainer();
                     }
                     tickTaskPending_.store(false);

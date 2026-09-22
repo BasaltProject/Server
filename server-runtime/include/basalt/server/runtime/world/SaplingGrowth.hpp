@@ -5,18 +5,15 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace basalt::server::runtime::world {
 
 /// A sapling becoming a tree.
 ///
-/// parity: `SaplingBlock.advanceTree` over `TreeGrower.growTree`, using the very features worldgen
-/// plants, so a grown tree has the same shape as one the world came with.
-///
-/// Grown on a scratch chunk with the sapling at its middle and only then copied into the world: the
-/// decoration features mask their X/Z with `& 15`, so a canopy reaching the next chunk would wrap
-/// back into this one. Centred at local 8, nothing vanilla plants is wide enough to reach an edge.
+/// parity: `SaplingBlock.advanceTree` over `TreeGrower.growTree` with worldgen's own features. Grown
+/// on a scratch chunk centred at local 8 and then copied in: the features mask X/Z with `& 15`.
 namespace saplingGrowth {
 
 /// parity: `SaplingBlock.randomTick`, which needs light nine above it and rolls one in seven.
@@ -25,12 +22,16 @@ inline constexpr std::int32_t kGrowthOdds = 7;
 
 [[nodiscard]] bool isSapling(std::int32_t stateId);
 
+/// Whether a block is in `#minecraft:flowers`, which grows a sapling its bee nest variant.
+using Flowering = std::function<bool(const wire::common::Identifier& block)>;
+
 /// One sapling's turn: it grows a stage, or becomes a tree. Answers every block that changed.
 ///
 /// parity: `SaplingBlock.advanceTree`: stage zero only advances the stage, and a sapling that has
 /// no room stays where it is rather than half a tree appearing.
 [[nodiscard]] std::vector<BlockChange> advance(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                               std::int32_t stateId, random::RandomSource& random);
+                                               std::int32_t stateId, random::RandomSource& random,
+                                               const Flowering& flowering = {});
 
 } // namespace saplingGrowth
 

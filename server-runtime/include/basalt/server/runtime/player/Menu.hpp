@@ -171,6 +171,9 @@ public:
     /// hotbar. parity: `AbstractFurnaceMenu`'s own slot order.
     [[nodiscard]] static Menu furnace(std::int32_t containerId);
 
+    /// parity: `BrewingStandMenu`: three bottles, the ingredient and the fuel, then the player's 36.
+    [[nodiscard]] static Menu brewingStand(std::int32_t containerId);
+
     /// A crafting table: result, 3x3 grid, then the player's storage and hotbar. No armour and no
     /// offhand, which is exactly why its numbering cannot be shared with the player's own window.
     [[nodiscard]] static Menu craftingTable(std::int32_t containerId);

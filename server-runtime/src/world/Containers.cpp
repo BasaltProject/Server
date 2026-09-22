@@ -250,7 +250,7 @@ bool givesThroughFace(const std::string_view path, const std::int32_t slot, cons
         return false;
     }
     // parity: `AbstractFurnaceBlockEntity.canTakeItemThroughFace`: what comes out of the fuel slot
-    // downwards is the bucket the lava came in, and never the fuel itself.
+    // downwards is `#furnace_fuel_bottom_takeable`, the two buckets, and never the fuel itself.
     if (furnaces::cookerFor(path).has_value() && from == registry::BlockFace::Down && slot == furnaces::kFuelSlot) {
         return item.path() == "bucket" || item.path() == "water_bucket";
     }

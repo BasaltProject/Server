@@ -19,14 +19,9 @@ class RandomSource;
 namespace basalt::server::runtime::world {
 
 /// The three blocks that smelt, one tick at a time.
-///
-/// parity: `AbstractFurnaceBlockEntity.serverTick`, followed line by line. The fire burns down
-/// whether or not anything is cooking, the fuel is only eaten when there is something to cook and
-/// room for the result, and a furnace whose fire went out loses its progress two ticks at a time
-/// rather than all at once.
-///
-/// The counters live in the block entity's own NBT under vanilla's keys, so a furnace survives a
-/// save and reload mid-smelt.
+/// parity: `AbstractFurnaceBlockEntity.serverTick`: the fire burns down regardless, fuel is eaten
+/// only with something to cook and room for the result, and an unlit furnace loses progress two ticks
+/// at a time. The counters live in the block entity's NBT under vanilla's keys.
 namespace furnaces {
 
 /// parity: `AbstractFurnaceMenu`'s slot order, which the window and the NBT share.
@@ -62,6 +57,8 @@ struct State {
     std::int32_t litTotalTime = 0;
     std::int32_t cookingTimer = 0;
     std::int32_t cookingTotalTime = 0;
+    /// parity: 26.3's `speedMultiplier`, set from the fuel last lit and dividing every cook time.
+    float speedMultiplier = 1.0F;
     blockInventory::Slots items = blockInventory::Slots(kSize);
     /// parity: `AbstractFurnaceBlockEntity.recipesUsed`.
     RecipesUsed recipesUsed;
@@ -78,11 +75,26 @@ struct Ticked {
     bool changed = false;
 };
 
-/// One tick of the furnace.
-[[nodiscard]] Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize = kDefaultStackSize);
+/// Where a fuel's remainder goes when the fuel slot still holds more of it. parity:
+/// `Containers.dropItemStack` at the furnace, which only the caller can do.
+using DropRemainder = std::function<void(const server::world::loot::ItemStack&)>;
 
-/// What the next item will take, which vanilla asks for whenever the input slot changes rather than
-/// every tick. parity: `AbstractFurnaceBlockEntity.getTotalCookTime`.
+/// One tick of the furnace. `cooker` says which of the three it is, which the fuel reads.
+[[nodiscard]] Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize = kDefaultStackSize,
+                          server::world::crafting::Cooker cooker = server::world::crafting::Cooker::Smelting,
+                          const DropRemainder& drop = {});
+
+/// How long a fuel keeps this cooker lit, and how fast it cooks while it does. parity: the
+/// `minecraft:cooking_fuel` component's two providers.
+struct FuelEffect {
+    std::int32_t burnTicks = 0;
+    float speedMultiplier = 1.0F;
+};
+
+[[nodiscard]] FuelEffect fuelEffect(const wire::common::Identifier& fuel, server::world::crafting::Cooker cooker);
+
+/// What the next item will take at the furnace's own speed, which vanilla asks for whenever the
+/// input slot changes rather than every tick. parity: `AbstractFurnaceBlockEntity.getTotalCookTime`.
 [[nodiscard]] std::int32_t cookTimeFor(const State& state, const RecipeFor& recipeFor);
 
 /// What a cooker owes whoever writes its input slot: the time comes from what is in there now and

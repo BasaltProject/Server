@@ -228,6 +228,7 @@ bool Recipe::matches(const CraftingInput& input) const {
         }
         return hasPerfectMatching(occupied(input), ingredients);
     }
+    case RecipeKind::Brewing:
     case RecipeKind::Cooking:
     case RecipeKind::Stonecutting:
         // A cooking recipe or a stonecutter holds one item, so the grid form is one non-empty slot.

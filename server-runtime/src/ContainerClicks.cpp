@@ -161,6 +161,13 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
             return;
         }
         const MenuSlot hotbar = player::menuSlot::Inventory{PlayerInventory::kHotbarStart + button};
+        // parity: `AbstractContainerMenu.doClick`'s swap asks the slot's `mayPlace` and its size.
+        if (const std::optional<storage::StoredItemStack> incoming = readSlot(*session, hotbar);
+            incoming.has_value() && brewingStandOpen() &&
+            (!accepts(*slot, *incoming) || incoming->count > slotCapacity(*slot))) {
+            sendInventory();
+            return;
+        }
         const std::optional<storage::StoredItemStack> fromSlot = readSlot(*session, *slot);
         writeSlot(*session, *slot, readSlot(*session, hotbar));
         writeSlot(*session, hotbar, fromSlot);
@@ -393,15 +400,20 @@ void ContainerMenuController::pickupClick(PlayerSession& session, const MenuSlot
         return;
     }
     const storage::StoredItemStack carried = *carriedItem_;
+    // parity: `Slot.mayPlace` and `getMaxStackSize`, which only the brewing stand's slots narrow here.
+    const std::int32_t capacity = slotCapacity(slot);
+    if (brewingStandOpen() && !accepts(slot, carried)) {
+        return;
+    }
     if (!inSlot.has_value()) {
-        const std::int32_t placed = half ? 1 : carried.count;
+        const std::int32_t placed = std::min(half ? 1 : carried.count, capacity);
         writeSlot(session, slot, withCount(carried, placed));
         const std::int32_t left = carried.count - placed;
         carriedItem_ = left <= 0 ? std::nullopt : std::optional{withCount(carried, left)};
         return;
     }
     if (sameItem(*inSlot, carried)) {
-        const std::int32_t room = PlayerInventory::kMaxStack - inSlot->count;
+        const std::int32_t room = capacity - inSlot->count;
         if (room <= 0) {
             return;
         }
@@ -412,6 +424,9 @@ void ContainerMenuController::pickupClick(PlayerSession& session, const MenuSlot
         return;
     }
     // Two different items: they trade places, cursor for slot.
+    if (carried.count > capacity) {
+        return;
+    }
     writeSlot(session, slot, carried);
     carriedItem_ = inSlot;
 }
@@ -443,6 +458,10 @@ void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& 
     // with a block open, the inventory sends to the block and the block sends to the inventory.
     // Without a block open the two halves of the inventory swap, hotbar to storage and back.
     const auto* fromInventory = std::get_if<player::menuSlot::Inventory>(&slot);
+    if (fromInventory != nullptr && brewingStandOpen()) {
+        quickMoveIntoBrewingStand(session, slot, *stack);
+        return;
+    }
     std::vector<MenuSlot> targets;
     if (fromInventory != nullptr && hasBlockSlots()) {
         for (std::int32_t index = 0; index < openBlockSize; index++) {

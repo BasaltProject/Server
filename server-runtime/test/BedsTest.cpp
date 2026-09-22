@@ -98,10 +98,21 @@ TEST_CASE("the pillow is one block along the way the bed faces") {
     CHECK(beds::headOffset(stateOf("stone")) == std::array<std::int32_t, 3>{0, 0, 0});
 }
 
-TEST_CASE("a bed works in the overworld and blows up anywhere else") {
-    CHECK_FALSE(beds::explodesIn(WorldDimension::Overworld));
-    CHECK(beds::explodesIn(WorldDimension::Nether));
-    CHECK(beds::explodesIn(WorldDimension::End));
+TEST_CASE("a bed works in the overworld and goes on use anywhere else") {
+    CHECK_FALSE(beds::ruleFor(WorldDimension::Overworld, false).destroyOnUse);
+    CHECK(beds::ruleFor(WorldDimension::Nether, false).destroyOnUse);
+    CHECK(beds::ruleFor(WorldDimension::End, true).destroyOnUse);
+}
+
+TEST_CASE("a straw bed sleeps the night without setting a spawn and goes when left") {
+    const beds::Rule straw = beds::ruleFor(WorldDimension::Overworld, true);
+    CHECK(straw.destroyOnLeave);
+    CHECK_FALSE(beds::holds(straw.canSetSpawn, true));
+    CHECK(beds::holds(straw.canSleep, true));
+    CHECK_FALSE(beds::holds(straw.canSleep, false));
+    CHECK(beds::isStrawBed(stateOf("straw_bed")));
+    CHECK(beds::isBed(stateOf("straw_bed")));
+    CHECK_FALSE(beds::isStrawBed(stateOf("red_bed")));
 }
 
 TEST_CASE("night is the window a bed takes anyone in, and it comes round every day") {

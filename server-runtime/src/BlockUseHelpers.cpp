@@ -386,7 +386,8 @@ void BlockInteractionHandler::useBucketOn(PlayerSession& session, const Identifi
                                             .gameRules = world->gameRules(),
                                             .random = random,
                                             .ultrawarm =
-                                                world->declaration().dimension == config::WorldDimension::Nether};
+                                                world->declaration().dimension == config::WorldDimension::Nether,
+                                            .blockTags = owner_->options().blockTags};
     const std::optional<world::buckets::Result> result = world::buckets::useOn(
         context, item, hit.pos.x, hit.pos.y, hit.pos.z, hit.direction, session.gamemode == Gamemode::Creative);
     if (!result.has_value()) {

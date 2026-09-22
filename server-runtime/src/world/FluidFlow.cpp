@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 
@@ -127,8 +128,23 @@ struct SolidStates {
     return !registry::blocks::isAir(stateId) && !isLiquidBlock(stateId) && registry::blockShapes::blocksMotion(stateId);
 }
 
-[[nodiscard]] bool canHoldAnyFluid(std::int32_t stateId) {
-    return !blocksMotion(stateId) && !neverFlooded().contains(stateId);
+/// parity: `LiquidBlockContainer`, which no flowing liquid ever enters: every waterloggable block and
+/// the four underwater plants.
+[[nodiscard]] bool isLiquidContainer(std::int32_t stateId, const wire::common::Identifier& block) {
+    const std::string_view path = block.path();
+    return path == "kelp" || path == "kelp_plant" || path == "seagrass" || path == "tall_seagrass" ||
+           registry::blockStateDefinitions::propertiesOf(stateId).contains("waterlogged");
+}
+
+/// parity: 26.3 `FlowingFluid.canHoldFluid` for a flowing liquid: a liquid container takes none, and
+/// anything else only what `washed_away_by_fluids` lists.
+[[nodiscard]] bool canHoldAnyFluid(std::int32_t stateId, const realBlockTags::TagMembers* tags) {
+    if (tags == nullptr) {
+        return !blocksMotion(stateId) && !neverFlooded().contains(stateId);
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && !isLiquidContainer(stateId, *block) &&
+           realBlockTags::contains(*tags, "minecraft:washed_away_by_fluids", *block);
 }
 
 [[nodiscard]] std::int64_t packed(std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -302,7 +318,8 @@ private:
 
         if (sources >= 2 && canConvertToSource(kind)) {
             const std::int32_t below = at(x, y - 1, z);
-            if (blocksMotion(below) || (fluidFlow::kindOf(below) == kind && isSource(below))) {
+            // parity: `getNewLiquid` asks `isSolid`, which 26.3's `blocks_motion` tag no longer matches.
+            if (registry::blockShapes::isSolidState(below) || (fluidFlow::kindOf(below) == kind && isSource(below))) {
                 return stateFor(kind, kMaxAmount, false);
             }
         }
@@ -417,7 +434,7 @@ private:
         if (!canPassThroughWall(at(x, y, z), below, registry::BlockFace::Down)) {
             return false;
         }
-        return fluidFlow::kindOf(below) == kind || canHoldAnyFluid(below);
+        return fluidFlow::kindOf(below) == kind || canHoldAnyFluid(below, context_.blockTags);
     }
 
     [[nodiscard]] std::int32_t sourceNeighbourCount(std::int32_t x, std::int32_t y, std::int32_t z, FluidKind kind) {
@@ -433,12 +450,12 @@ private:
     }
 
     /// parity: `canMaybePassThrough`: a source of the same fluid is never overwritten.
-    [[nodiscard]] static bool canMaybePassThrough(FluidKind kind, std::int32_t source, std::int32_t target,
-                                                  registry::BlockFace face) {
+    [[nodiscard]] bool canMaybePassThrough(FluidKind kind, std::int32_t source, std::int32_t target,
+                                           registry::BlockFace face) const {
         if (fluidFlow::kindOf(target) == kind && isSource(target)) {
             return false;
         }
-        return canHoldAnyFluid(target) && canPassThroughWall(source, target, face);
+        return canHoldAnyFluid(target, context_.blockTags) && canPassThroughWall(source, target, face);
     }
 
     /// parity: `FlowingFluid.canPassThroughWall`: the two shapes are merged before asking, so a slab

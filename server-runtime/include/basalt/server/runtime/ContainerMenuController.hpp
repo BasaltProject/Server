@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/player/Menu.hpp>
 #include <basalt/server/runtime/world/Beacons.hpp>
+#include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/protocol/play/InventoryPackets.hpp>
@@ -112,6 +113,11 @@ public:
 
     void openLoomMenu(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
+    void openBrewingStand(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    /// Whether the open window is a brewing stand's, which is read off the block it belongs to.
+    [[nodiscard]] bool brewingStandOpen() const;
+
     /// parity: `BeaconMenu.updateEffects`, which takes the payment and writes both choices onto the
     /// block. Either effect is the mob effect's registry id, or nothing for "none".
     void setBeaconEffects(const std::optional<std::int32_t>& primary, const std::optional<std::int32_t>& secondary);
@@ -147,6 +153,12 @@ public:
 
     /// The two progress bars a furnace window draws.
     void sendFurnaceBars();
+
+    /// parity: `BrewingStandBlockEntity.dataAccess`'s four: brew time, fuel, and their two totals.
+    void sendBrewingBars();
+
+    /// The brewing stand's own `syncOpenContainer`: its bars and whichever slots moved.
+    void syncBrewingStand();
 
     /// Empties the crafting grid back into the player.
     void returnCraftingGrid(player::PlayerSession& session);
@@ -263,6 +275,16 @@ private:
 
     [[nodiscard]] std::optional<world::furnaces::State> furnaceState() const;
 
+    [[nodiscard]] std::optional<world::brewingStands::State> brewingState() const;
+
+    /// parity: `BrewingStandMenu.quickMoveStack` from the player's side: fuel first, then the
+    /// ingredient, then one bottle into the first free bottle slot.
+    void quickMoveIntoBrewingStand(player::PlayerSession& session, const player::MenuSlot& from,
+                                   const storage::StoredItemStack& stack);
+
+    /// The most a slot holds. parity: `PotionSlot.getMaxStackSize`, one, and every other slot's 64.
+    [[nodiscard]] std::int32_t slotCapacity(const player::MenuSlot& slot) const;
+
     /// Gives the taker the experience a furnace has banked. parity:
     /// `AbstractFurnaceBlockEntity.awardUsedRecipesAndPopExperience`.
     void payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity);
@@ -337,7 +359,7 @@ private:
     bool anvilOnlyRenaming_ = false;
 
     std::array<std::int32_t, 4> openBlockData_{-1, -1, -1, -1};
-    std::array<std::optional<storage::StoredItemStack>, 3> shownBlockSlots_;
+    std::array<std::optional<storage::StoredItemStack>, 5> shownBlockSlots_;
 
     /// The click-and-drag gesture in progress, if any.
     bool quickCraftActive_ = false;

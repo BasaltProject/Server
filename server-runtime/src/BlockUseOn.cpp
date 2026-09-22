@@ -32,6 +32,7 @@
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/EndPortals.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
@@ -227,6 +228,11 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         }
         if (!path.empty() && world::furnaces::cookerFor(path).has_value()) {
             owner_->menus().openFurnace(*session, hit.pos, path);
+            ack();
+            return;
+        }
+        if (path == "brewing_stand") {
+            owner_->menus().openBrewingStand(*session, hit.pos);
             ack();
             return;
         }
@@ -475,6 +481,21 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     const bool isBoat = heldBlock->path().ends_with("_boat") || heldBlock->path() == "bamboo_raft" ||
                         heldBlock->path() == "bamboo_chest_raft";
     if (isBoat && placeBoat(*session, *heldBlock, heldSlot, *held, hit)) {
+        ack();
+        return;
+    }
+    // parity: `CushionItem.useOn`, which answers `FAIL` rather than placing anything on a miss.
+    if (const std::optional<std::string_view> colour = world::cushions::colourOfItem(*heldBlock); colour.has_value()) {
+        if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+            static_cast<void>(player::placeCushionFor(breakContext(), *session, *world, *colour, heldSlot, *held,
+                                                      player::BlockHit{.x = hit.pos.x,
+                                                                       .y = hit.pos.y,
+                                                                       .z = hit.pos.z,
+                                                                       .direction = hit.direction,
+                                                                       .clickX = hit.clickX,
+                                                                       .clickY = hit.clickY,
+                                                                       .clickZ = hit.clickZ}));
+        }
         ack();
         return;
     }

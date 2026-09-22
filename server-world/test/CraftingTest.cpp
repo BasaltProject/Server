@@ -58,19 +58,17 @@ namespace {
                    "material":"minecraft:red_dye","result":{"id":"minecraft:red_shulker_box","count":1}})"},
         {"smelting", R"({"type":"minecraft:smelting","ingredient":"minecraft:iron_ore","experience":0.7,
                    "cookingtime":180,"result":{"id":"minecraft:iron_ingot","count":1}})"},
-        // No cookingtime, so the type's own default is what it gets.
-        {"blasting", R"({"type":"minecraft:blasting","ingredient":"minecraft:iron_ore",
+        {"blasting", R"({"type":"minecraft:blasting","ingredient":"minecraft:iron_ore","cookingtime":100,
                    "result":{"id":"minecraft:iron_ingot","count":1}})"},
         {"smoking", R"({"type":"minecraft:smoking","ingredient":"minecraft:beef","experience":0.35,
-                   "result":{"id":"minecraft:cooked_beef","count":1}})"},
-        {"campfire", R"({"type":"minecraft:campfire_cooking","ingredient":"minecraft:beef",
+                   "cookingtime":100,"result":{"id":"minecraft:cooked_beef","count":1}})"},
+        {"campfire", R"({"type":"minecraft:campfire_cooking","ingredient":"minecraft:beef","cookingtime":100,
                    "result":{"id":"minecraft:cooked_beef","count":1}})"},
         // A blank first row, which only the shrink's own leading-row counter removes.
         {"leading", R"({"type":"minecraft:crafting_shaped","pattern":["  ","CC","S "],
                    "key":{"C":"minecraft:coal","S":"minecraft:stick"},
                    "result":{"id":"minecraft:torch","count":4}})"},
-        // No cookingtime, and smelting's default is not the one the other three share.
-        {"smeltingDefault", R"({"type":"minecraft:smelting","ingredient":"minecraft:iron_ore",
+        {"smeltingDefault", R"({"type":"minecraft:smelting","ingredient":"minecraft:iron_ore","cookingtime":200,
                    "result":{"id":"minecraft:iron_ingot","count":1}})"},
         {"stonecutting", R"({"type":"minecraft:stonecutting","ingredient":"minecraft:stone",
                    "result":{"id":"minecraft:stone_brick_slab","count":2}})"},
@@ -791,9 +789,29 @@ TEST_CASE("the parser refuses what the frozen kotlin refuses") {
         CHECK(refusal(R"({"type":"minecraft:crafting_shaped","pattern":["AB"],"key":{"AB":"minecraft:stone"},
                "result":{"id":"minecraft:stone"}})") == "Invalid_pattern_key_symbol_'AB':_must_be_1_character");
     }
+    // parity: 26.3 dropped the per-type default, so a cooking recipe must say how long it takes.
+    SUBCASE("noCookingTime") {
+        CHECK(refusal(R"({"type":"minecraft:blasting","ingredient":"minecraft:iron_ore",
+               "result":{"id":"minecraft:iron_ingot"}})") == "missing_or_malformed_cookingtime");
+    }
     SUBCASE("undefinedSymbol") {
         CHECK(refusal(R"({"type":"minecraft:crafting_shaped","pattern":["AB"],"key":{"A":"minecraft:stone"},
                "result":{"id":"minecraft:stone"}})") ==
               "Pattern_references_symbol_'B'_but_it's_not_defined_in_the_key");
     }
+}
+
+TEST_CASE("a brewing recipe reads its bottle, the potion in it, the reagent and what comes out") {
+    const std::expected<Recipe, RecipeParseError> parsed = recipeJson::parse(
+        R"({"type":"minecraft:brewing","input":{"item":"minecraft:potion","potion_contents":{"potions":
+           "minecraft:water"}},"reagent":{"item":"minecraft:nether_wart"},"output":{"id":"minecraft:potion",
+           "components":{"minecraft:potion_contents":{"potion":"minecraft:awkward"}}}})",
+        resolveTag);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->kind == RecipeKind::Brewing);
+    CHECK(parsed->potions == std::vector<std::string>{"minecraft:water"});
+    CHECK(parsed->result.item == Identifier::vanilla("potion"));
+    const nbt::NbtCompound* contents = parsed->result.components.getCompound("minecraft:potion_contents");
+    REQUIRE(contents != nullptr);
+    CHECK(contents->getString("potion") == "minecraft:awkward");
 }

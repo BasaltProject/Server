@@ -23,9 +23,9 @@ inline constexpr std::int32_t kReadyDelay = 20;
 
 [[nodiscard]] bool isComposter(std::int32_t stateId);
 
-/// What this item is worth to a composter, or nothing when it composts nothing. parity:
-/// `ComposterBlock.COMPOSTABLES`, which the jar builds in code rather than in data.
-[[nodiscard]] std::optional<float> chanceOf(const wire::common::Identifier& item);
+/// The chance in percent that this item adds a layer, or nothing when it composts nothing. parity:
+/// the `minecraft:compostable` component and the provider it names.
+[[nodiscard]] std::optional<std::int32_t> chanceOf(const wire::common::Identifier& item);
 
 /// How full it is, or nothing when this is not a composter.
 [[nodiscard]] std::optional<std::int32_t> levelAt(const WorldState& world, std::int32_t x, std::int32_t y,
@@ -33,7 +33,7 @@ inline constexpr std::int32_t kReadyDelay = 20;
 
 /// Puts one item in, answering the change when the level moved and nothing when the roll failed.
 ///
-/// parity: `ComposterBlock.addItem`. The first layer always goes in for anything compostable at all;
+/// parity: `ComposterBlock.addLayer`. The first layer always goes in for anything compostable at all;
 /// every one after it is a roll. The seventh books the turn that makes it ready.
 [[nodiscard]] std::optional<BlockChange> addItem(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                  const wire::common::Identifier& item, random::RandomSource& random);

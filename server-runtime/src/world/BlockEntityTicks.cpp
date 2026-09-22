@@ -295,7 +295,11 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             // block itself.
             if (path == "brewing_stand") {
                 brewingStands::State stand = brewingStands::read(entity->data());
-                if (brewingStands::tick(stand)) {
+                if (brewingStands::tick(stand, [&hooks, x, y, z](const server::world::loot::ItemStack& remainder) {
+                        if (hooks.onDropped) {
+                            hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = remainder});
+                        }
+                    })) {
                     brewingStands::write(stand, entity->data());
                     chunk->markDirty();
                     redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z,
@@ -319,9 +323,16 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 !hooks.allowSmelt(worldName, x, y, z, nameOf(*cooker), slotOf(state, 0), slotOf(state, 2))) {
                 continue;
             }
-            const furnaces::Ticked turn =
-                furnaces::tick(state, [&hooks, cooker](const server::world::loot::ItemStack& stack) {
+            const furnaces::Ticked turn = furnaces::tick(
+                state,
+                [&hooks, cooker](const server::world::loot::ItemStack& stack) {
                     return hooks.recipeFor ? hooks.recipeFor(*cooker, stack) : nullptr;
+                },
+                furnaces::kDefaultStackSize, *cooker,
+                [&hooks, x, y, z](const server::world::loot::ItemStack& remainder) {
+                    if (hooks.onDropped) {
+                        hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = remainder});
+                    }
                 });
             if (!turn.moved) {
                 continue;

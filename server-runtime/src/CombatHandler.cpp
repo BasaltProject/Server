@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -72,6 +73,11 @@ void CombatHandler::dismount(PlayerSession& session) {
         return;
     }
     std::erase(vehicle->passengerIds, session.entityId());
+    // parity: `Cushion.removePassenger`, whose sound is only for a cushion still standing.
+    if (world::cushions::isCushion(vehicle->type()) && !vehicle->removed) {
+        owner_->broadcastSound("minecraft:entity.cushion.get_up", vehicle->x, vehicle->y, vehicle->z,
+                               wire::protocol::play::SoundSource::Neutral);
+    }
     const wire::protocol::play::SetPassengersPacket packet{.vehicleId = vehicle->entityId(),
                                                            .passengerIds = vehicle->passengerIds};
     for (PlayerSession* player : owner_->playersInSameWorld()) {

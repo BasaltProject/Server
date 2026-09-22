@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/decoration/tree/TreeFeature.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -24,31 +25,120 @@ constexpr std::int32_t kCentre = 8;
 /// How far above the sapling a tree may reach, which bounds what is copied back.
 constexpr std::int32_t kHeight = 32;
 
-/// parity: `TreeGrower`, the pairs each sapling picks between and how often it picks the second.
-struct Grower {
+/// One weighted entry. A null tree is a feature this build does not have yet: it is drawn like any
+/// other and then grows nothing, which is what vanilla does with a feature it cannot find.
+struct Weighted {
     const trees::TreeConfiguration* tree = nullptr;
-    const trees::TreeConfiguration* secondary = nullptr;
-    float secondaryChance = 0.0F;
+    std::int32_t weight = 1;
 };
 
+using WeightedTrees = std::vector<Weighted>;
+
+/// parity: 26.3 `TreeGrower`: weighted lists for the single tree, the 2x2 one and the one grown
+/// beside flowers.
+struct Grower {
+    WeightedTrees trees;
+    WeightedTrees megaTrees;
+    WeightedTrees flowerTrees;
+};
+
+/// parity: `TreeFeatures.BIRCH_BEES_005`, the birch a sapling grows beside flowers.
+[[nodiscard]] const trees::TreeConfiguration& birchBees005() {
+    static const trees::TreeConfiguration config = [] {
+        trees::TreeConfiguration birch = trees::treeConfigs::birch();
+        birch.decorators = {trees::decorator::Beehive{.probability = 0.05F}};
+        return birch;
+    }();
+    return config;
+}
+
 [[nodiscard]] const std::map<std::string, Grower, std::less<>>& growers() {
+    namespace configs = trees::treeConfigs;
     static const std::map<std::string, Grower, std::less<>> byPath{
-        {"oak_sapling", Grower{&trees::treeConfigs::oak(), &trees::treeConfigs::fancyOak(), 0.1F}},
-        {"birch_sapling", Grower{&trees::treeConfigs::birch()}},
-        {"spruce_sapling", Grower{&trees::treeConfigs::spruce()}},
-        {"jungle_sapling", Grower{&trees::treeConfigs::jungleTree()}},
-        {"acacia_sapling", Grower{&trees::treeConfigs::acacia()}},
-        {"dark_oak_sapling", Grower{&trees::treeConfigs::darkOak()}},
-        {"pale_oak_sapling", Grower{&trees::treeConfigs::paleOak()}},
-        {"cherry_sapling", Grower{&trees::treeConfigs::cherry()}},
-        {"mangrove_propagule", Grower{&trees::treeConfigs::mangrove()}},
+        {"oak_sapling", Grower{.trees = {{&configs::oak(), 9}, {&configs::fancyOak(), 1}},
+                               .flowerTrees = {{&configs::oakBees005(), 9}, {&configs::fancyOakBees005(), 1}}}},
+        {"spruce_sapling",
+         Grower{.trees = {{&configs::spruce()}}, .megaTrees = {{&configs::megaSpruce()}, {&configs::megaPine()}}}},
+        {"mangrove_propagule", Grower{.trees = {{&configs::mangrove(), 15}, {&configs::tallMangrove(), 85}}}},
+        {"birch_sapling", Grower{.trees = {{&configs::birch()}}, .flowerTrees = {{&birchBees005()}}}},
+        {"jungle_sapling", Grower{.trees = {{&configs::jungleTree()}}, .megaTrees = {{&configs::megaJungle()}}}},
+        {"acacia_sapling", Grower{.trees = {{&configs::acacia()}}}},
+        {"cherry_sapling", Grower{.trees = {{&configs::cherry()}}, .flowerTrees = {{&configs::cherryBees005()}}}},
+        {"dark_oak_sapling", Grower{.megaTrees = {{&configs::darkOak()}}}},
+        {"pale_oak_sapling", Grower{.megaTrees = {{&configs::paleOak()}}}},
+        // The red, orange and yellow poplars are worldgen features not built yet: the draw is kept.
+        {"poplar_sapling", Grower{.trees = {{nullptr}, {nullptr}, {nullptr}}}},
     };
     return byPath;
 }
 
+/// parity: `WeightedList.getRandom`, one `nextInt` over the total even for a single entry, and no
+/// roll at all for an empty list.
+[[nodiscard]] std::optional<const trees::TreeConfiguration*> pick(const WeightedTrees& list,
+                                                                  random::RandomSource& random) {
+    std::int32_t total = 0;
+    for (const Weighted& entry : list) {
+        total += entry.weight;
+    }
+    if (total <= 0) {
+        return std::nullopt;
+    }
+    std::int32_t selection = random.nextInt(total);
+    for (const Weighted& entry : list) {
+        if (selection < entry.weight) {
+            return entry.tree;
+        }
+        selection -= entry.weight;
+    }
+    return std::nullopt;
+}
+
+/// parity: `TreeGrower.hasFlowers`, the box two out and one up or down.
+[[nodiscard]] bool hasFlowers(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                              const Flowering& flowering) {
+    if (!flowering) {
+        return false;
+    }
+    for (std::int32_t dx = -2; dx <= 2; ++dx) {
+        for (std::int32_t dy = -1; dy <= 1; ++dy) {
+            for (std::int32_t dz = -2; dz <= 2; ++dz) {
+                const std::optional<std::int32_t> state = world.blockState(x + dx, y + dy, z + dz);
+                const wire::common::Identifier* block =
+                    state.has_value() ? registry::blockStateDefinitions::blockOf(*state) : nullptr;
+                if (block != nullptr && flowering(*block)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+/// parity: `TreeGrower.findTwoByTwoSaplingPos`: the corner whose square of four is all this sapling.
+[[nodiscard]] std::optional<std::array<std::int32_t, 2>> twoByTwo(const WorldState& world, std::int32_t x,
+                                                                  std::int32_t y, std::int32_t z,
+                                                                  const wire::common::Identifier& block) {
+    const auto same = [&](std::int32_t atX, std::int32_t atZ) {
+        const std::optional<std::int32_t> state = world.blockState(atX, y, atZ);
+        const wire::common::Identifier* here =
+            state.has_value() ? registry::blockStateDefinitions::blockOf(*state) : nullptr;
+        return here != nullptr && *here == block;
+    };
+    for (std::int32_t dx = 0; dx >= -1; --dx) {
+        for (std::int32_t dz = 0; dz >= -1; --dz) {
+            if (same(x + dx, z + dz) && same(x + dx + 1, z + dz) && same(x + dx, z + dz + 1) &&
+                same(x + dx + 1, z + dz + 1)) {
+                return std::array<std::int32_t, 2>{dx, dz};
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 /// Grows `config` on a scratch chunk and copies what it made into the world.
 [[nodiscard]] std::vector<BlockChange> plant(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                             const trees::TreeConfiguration& config, random::RandomSource& random) {
+                                             const trees::TreeConfiguration& config, random::RandomSource& random,
+                                             bool square) {
     const server::world::Chunk* here = world.chunkIfLoaded(x >> 4, z >> 4);
     if (here == nullptr) {
         return {};
@@ -70,8 +160,13 @@ struct Grower {
             }
         }
     }
-    // The sapling itself goes first, as vanilla clears it before placing.
+    // The sapling itself goes first, as vanilla clears it before placing; a 2x2 clears all four.
     scratch.setBlockStateId(kCentre, y, kCentre, registry::blocks::air().stateId);
+    if (square) {
+        scratch.setBlockStateId(kCentre + 1, y, kCentre, registry::blocks::air().stateId);
+        scratch.setBlockStateId(kCentre, y, kCentre + 1, registry::blocks::air().stateId);
+        scratch.setBlockStateId(kCentre + 1, y, kCentre + 1, registry::blocks::air().stateId);
+    }
 
     random::RandomSource worldgen = random::RandomSource::worldgen(random::RandomSource::legacy(random.nextLong()));
     if (!trees::treeFeature::place(scratch, worldgen, kCentre, y, kCentre, config)) {
@@ -103,7 +198,7 @@ bool isSapling(std::int32_t stateId) {
 }
 
 std::vector<BlockChange> advance(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                 std::int32_t stateId, random::RandomSource& random) {
+                                 std::int32_t stateId, random::RandomSource& random, const Flowering& flowering) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
         return {};
@@ -127,11 +222,21 @@ std::vector<BlockChange> advance(WorldState& world, std::int32_t x, std::int32_t
         return changes;
     }
 
-    const trees::TreeConfiguration* config = grower.tree;
-    if (grower.secondary != nullptr && random.nextFloat() < grower.secondaryChance) {
-        config = grower.secondary;
+    // parity: `TreeGrower.growTree`: the 2x2 tree is drawn first, and grown only on a full square.
+    if (const std::optional<const trees::TreeConfiguration*> mega = pick(grower.megaTrees, random);
+        mega.has_value() && *mega != nullptr) {
+        if (const std::optional<std::array<std::int32_t, 2>> corner = twoByTwo(world, x, y, z, *block);
+            corner.has_value()) {
+            return plant(world, x + (*corner)[0], y, z + (*corner)[1], **mega, random, true);
+        }
     }
-    return plant(world, x, y, z, *config, random);
+    const bool flowers = !grower.flowerTrees.empty() && hasFlowers(world, x, y, z, flowering);
+    const std::optional<const trees::TreeConfiguration*> config =
+        pick(flowers ? grower.flowerTrees : grower.trees, random);
+    if (!config.has_value() || *config == nullptr) {
+        return {};
+    }
+    return plant(world, x, y, z, **config, random, false);
 }
 
 } // namespace basalt::server::runtime::world::saplingGrowth

@@ -44,13 +44,13 @@ struct Loaded {
 } // namespace
 
 TEST_CASE("what a composter takes, and what it is worth") {
-    // parity: `ComposterBlock.bootStrap`, five chances over a hundred and fifteen items. Spot checks
-    // at each of the five, plus the shape of the table: everything else composts nothing.
-    CHECK(composters::chanceOf(Identifier::vanilla("oak_leaves")) == 0.3F);
-    CHECK(composters::chanceOf(Identifier::vanilla("tall_grass")) == 0.5F);
-    CHECK(composters::chanceOf(Identifier::vanilla("apple")) == 0.65F);
-    CHECK(composters::chanceOf(Identifier::vanilla("hay_block")) == 0.85F);
-    CHECK(composters::chanceOf(Identifier::vanilla("cake")) == 1.0F);
+    // parity: the five `compostable/*` providers the items name. Spot checks at each of the five,
+    // plus the shape of the table: everything else composts nothing.
+    CHECK(composters::chanceOf(Identifier::vanilla("oak_leaves")) == 30);
+    CHECK(composters::chanceOf(Identifier::vanilla("tall_grass")) == 50);
+    CHECK(composters::chanceOf(Identifier::vanilla("apple")) == 65);
+    CHECK(composters::chanceOf(Identifier::vanilla("hay_block")) == 85);
+    CHECK(composters::chanceOf(Identifier::vanilla("cake")) == 100);
     CHECK_FALSE(composters::chanceOf(Identifier::vanilla("stone")).has_value());
     CHECK_FALSE(composters::chanceOf(Identifier::vanilla("bone_meal")).has_value());
 }
@@ -82,6 +82,23 @@ TEST_CASE("the first layer always goes in and the rest are a roll") {
     REQUIRE(composters::empty(loaded.state, 8, 64, 8).has_value());
     CHECK(levelOf(loaded.state, 8, 64, 8) == 0);
     CHECK_FALSE(composters::empty(loaded.state, 8, 64, 8).has_value());
+}
+
+TEST_CASE("a layer past the first is one draw of a hundred, and a sure one draws nothing") {
+    Loaded loaded;
+    REQUIRE(loaded.state.setBlockState(8, 64, 8, composterAt(3)));
+    loaded.random = rng::RandomSource::legacy(99);
+    // Vector from the jar's own `compostable/low` provider at seed 99: 0 0 1 1 1 0, then this int.
+    const bool expected[] = {false, false, true, true, true, false};
+    for (const bool filled : expected) {
+        CHECK(
+            composters::addItem(loaded.state, 8, 64, 8, Identifier::vanilla("oak_leaves"), loaded.random).has_value() ==
+            filled);
+    }
+    CHECK(levelOf(loaded.state, 8, 64, 8) == 6);
+    // parity: `always_add_one` is a constant, so the cake takes nothing from the random.
+    REQUIRE(composters::addItem(loaded.state, 8, 64, 8, Identifier::vanilla("cake"), loaded.random).has_value());
+    CHECK(loaded.random.nextInt() == -571055948);
 }
 
 TEST_CASE("nothing that is not a composter answers any of this") {

@@ -2,6 +2,7 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
@@ -51,6 +52,9 @@ struct Context {
     const GameRuleValues& gameRules;
     random::RandomSource& random;
     bool ultrawarm = false;
+    /// The server's block tags, which decide since 26.3 what a flow washes away. Without them the
+    /// flow falls back to the shape-based rule of earlier versions.
+    const realBlockTags::TagMembers* blockTags = nullptr;
 };
 
 [[nodiscard]] std::optional<FluidKind> kindOf(std::int32_t stateId);
