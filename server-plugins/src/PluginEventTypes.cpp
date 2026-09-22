@@ -447,7 +447,9 @@ const PluginEventType& inventoryTrade() {
 
 const PluginEventType& blockDamage() {
     static const PluginEventType type{
-        "block.damage", true, {"player_name", "player_uuid", "world", "x", "y", "z", "block", "face", "insta_break"}};
+        "block.damage",
+        true,
+        {"player_name", "player_uuid", "world", "x", "y", "z", "block", "face", "insta_break", "item"}};
     return type;
 }
 
@@ -538,7 +540,8 @@ const PluginEventType& entityPotionEffect() {
 }
 
 const PluginEventType& entityCombust() {
-    static const PluginEventType type{"entity.combust", true, {"entity_id", "entity_type", "world", "ticks", "cause"}};
+    static const PluginEventType type{
+        "entity.combust", true, {"entity_id", "entity_type", "world", "ticks", "cause"}, {"ticks"}};
     return type;
 }
 

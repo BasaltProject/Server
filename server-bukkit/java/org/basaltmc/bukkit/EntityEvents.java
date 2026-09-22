@@ -251,7 +251,7 @@ final class EntityEvents {
         EventBridge.map("entity.combust", EntityCombustEvent.class, f -> {
             Entity burning = f.entity();
             return burning == null ? null : new EntityCombustEvent(burning, f.whole("ticks") / 20.0f);
-        });
+        }, (e, f) -> f.put("ticks", (long) Math.max(0, Math.round(((EntityCombustEvent) e).getDuration() * 20.0f))));
         EventBridge.map("entity.potion_effect", EntityPotionEffectEvent.class, f -> {
             Entity affected = f.entity();
             if (!(affected instanceof LivingEntity living)) {
