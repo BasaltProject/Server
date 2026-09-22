@@ -12,6 +12,10 @@ public final class TagSets {
 
     private TagSets() {}
 
+    public static synchronized void invalidate() {
+        cache.clear();
+    }
+
     public static synchronized Set<String> members(String registry, String tag) {
         Map<String, Set<String>> byTag = cache.get(registry);
         if (byTag == null) {
