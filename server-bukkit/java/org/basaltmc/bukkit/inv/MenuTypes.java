@@ -62,8 +62,12 @@ public final class MenuTypes {
     }
 
     public static BasaltMenuType of(InventoryType type) {
+        return of(type, type == InventoryType.CHEST ? 27 : -1);
+    }
+
+    public static BasaltMenuType of(InventoryType type, int size) {
         for (BasaltMenuType menu : all.values()) {
-            if (menu.type == type) {
+            if (menu.type == type && (size < 0 || menu.size == size)) {
                 return menu;
             }
         }
