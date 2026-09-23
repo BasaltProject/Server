@@ -255,7 +255,8 @@ void decorateWith(Chunk& chunk, BambooRegion& region, random::RandomSource& rand
 } // namespace
 
 const std::set<std::string, std::less<>>& bambooDecoration::placedIds() {
-    static const std::set<std::string, std::less<>> ids = {"bamboo", "bamboo_light", "bamboo_vegetation"};
+    static const std::set<std::string, std::less<>> ids = {"bamboo", "bamboo_in_structure", "bamboo_light",
+                                                           "bamboo_vegetation"};
     return ids;
 }
 
@@ -266,9 +267,14 @@ BiomeVegetalDecoration bambooDecoration::dense() { return feature(0.2F, denseMod
 bool bambooDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin,
                                const std::string_view placedFeature) {
     // parity: `bamboo_light` places no podzol under it, the dense one a fifth of the time.
-    const float podzol = placedFeature == "bamboo_light" ? 0.0F : 0.2F;
+    const float podzol = placedFeature == "bamboo_light" || placedFeature == "bamboo_in_structure" ? 0.0F : 0.2F;
     if (!placedIds().contains(placedFeature)) {
         return false;
+    }
+    // parity: 26.3's `bamboo_in_structure`, `bamboo_no_podzol` behind an air filter.
+    if (placedFeature == "bamboo_in_structure" &&
+        !registry::blocks::isAir(chunk.decorationBlockStateId(origin.x, origin.y, origin.z))) {
+        return true;
     }
     BambooRegion region{chunk, nullptr};
     place(region, random, origin, podzol, chunk.verticalBounds());

@@ -114,23 +114,23 @@ struct Run {
 TEST_CASE("the nether underground step places what the frozen kotlin places") {
     SUBCASE("deltasStep") {
         const Run result = run("minecraft:basalt_deltas", -1, 4);
-        CHECK(result.placed == 66968);
-        CHECK(result.deferred == 9);
-        CHECK(result.checksum == -7326737063796521387LL);
+        CHECK(result.placed == 66951);
+        CHECK(result.deferred == 13);
+        CHECK(result.checksum == 4357847094915599607LL);
     }
 
     SUBCASE("wastesStep") {
         const Run result = run("minecraft:nether_wastes", -1, 4);
-        CHECK(result.placed == 2359);
-        CHECK(result.deferred == 9);
-        CHECK(result.checksum == 8169650840488443513LL);
+        CHECK(result.placed == 2342);
+        CHECK(result.deferred == 13);
+        CHECK(result.checksum == 4277194794539030359LL);
     }
 
     SUBCASE("valleyStep") {
         const Run result = run("minecraft:soul_sand_valley", -1, 4);
-        CHECK(result.placed == 2729);
-        CHECK(result.deferred == 9);
-        CHECK(result.checksum == -425546198287909661LL);
+        CHECK(result.placed == 2712);
+        CHECK(result.deferred == 13);
+        CHECK(result.checksum == 7244018284313949305LL);
     }
 
     SUBCASE("index_0") {
@@ -177,16 +177,16 @@ TEST_CASE("the nether underground step places what the frozen kotlin places") {
 
     SUBCASE("index_6") {
         const Run result = run("minecraft:nether_wastes", 6, 24);
-        CHECK(result.placed == 12);
-        CHECK(result.deferred == 0);
-        CHECK(result.checksum == 6666634375374003653LL);
+        CHECK(result.placed == 11);
+        CHECK(result.deferred == 7);
+        CHECK(result.checksum == 142391015871793907LL);
     }
 
     SUBCASE("index_7") {
         const Run result = run("minecraft:nether_wastes", 7, 4);
-        CHECK(result.placed == 41);
-        CHECK(result.deferred == 9);
-        CHECK(result.checksum == 5223721517893083215LL);
+        CHECK(result.placed == 24);
+        CHECK(result.deferred == 13);
+        CHECK(result.checksum == -485682811949497947LL);
     }
 
     SUBCASE("index_8") {

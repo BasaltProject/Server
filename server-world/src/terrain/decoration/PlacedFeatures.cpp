@@ -6,7 +6,6 @@
 #include <basalt/server/world/terrain/decoration/CaveLocalModificationDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/CaveSpeleothemDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/CoralDecoration.hpp>
-#include <basalt/server/world/terrain/decoration/DesertWellDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/DoublePlantPatchDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/FlowerFeatures.hpp>
 #include <basalt/server/world/terrain/decoration/FlowerVegetation.hpp>
@@ -138,7 +137,13 @@ void putTrees(Registry& registry) {
         {"fancy_oak_bees_002", configs::fancyOakBees002()},
         {"fancy_oak_bees_0002_leaf_litter", configs::fancyOakBees0002LeafLitter()},
         {"super_birch_bees_0002", configs::superBirchBees0002()},
-        {"cherry_bees_005", configs::cherryBees005()}};
+        {"cherry_bees_005", configs::cherryBees005()},
+        {"red_poplar", configs::redPoplar()},
+        {"orange_poplar", configs::orangePoplar()},
+        {"yellow_poplar", configs::yellowPoplar()},
+        {"red_poplar_leaf_litter", configs::redPoplarLeafLitter()},
+        {"orange_poplar_leaf_litter", configs::orangePoplarLeafLitter()},
+        {"yellow_poplar_leaf_litter", configs::yellowPoplarLeafLitter()}};
     for (const auto& [name, config] : trees) {
         put(registry, name, treePlacement(config));
     }
@@ -149,7 +154,8 @@ void putTrees(Registry& registry) {
         {"fallen_birch_tree", fallen::birch()},
         {"fallen_super_birch_tree", fallen::superBirch()},
         {"fallen_spruce_tree", fallen::spruce()},
-        {"fallen_jungle_tree", fallen::jungle()}};
+        {"fallen_jungle_tree", fallen::jungle()},
+        {"fallen_poplar_tree", fallen::poplar()}};
     for (const auto& [name, config] : fallenTrees) {
         put(registry, name, fallenPlacement(config));
     }
@@ -342,10 +348,6 @@ void putStandalone(Registry& registry) {
     put(registry, "forest_rock",
         [](Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z) {
             forestRockDecoration::placeAt(chunk, random, x, y, z);
-        });
-    put(registry, "desert_well",
-        [](Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z) {
-            desertWellDecoration::placeAt(chunk, random, x, y, z);
         });
 }
 

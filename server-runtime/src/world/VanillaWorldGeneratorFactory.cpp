@@ -35,12 +35,16 @@
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 #include <basalt/server/world/terrain/WoodlandMansionStructureGenerator.hpp>
 
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <map>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 namespace basalt::server::runtime::world {
 namespace {
@@ -56,6 +60,48 @@ using wire::common::Identifier;
 [[nodiscard]] std::set<std::string, std::less<>> biomesOf(BiomeTagLoader& tags, const std::string& name) {
     const std::set<std::string>& members = tags.biomesIn(name);
     return {members.begin(), members.end()};
+}
+
+/// parity: the 26.3 `abandoned_camp` structure set's eighteen entries in file order, each an
+/// `abandoned_camp_<biome>` jigsaw with its own start pool and `has_structure` tag. Their index in
+/// `surface_structures` is their registry position, alphabetical and ahead of every other structure.
+[[nodiscard]] std::vector<terrain::VillageStructureGenerator::Variant> campVariants(BiomeTagLoader& tags) {
+    static constexpr std::array<std::string_view, 18> kFileOrder{"bamboo_jungle",
+                                                                 "birch_forest",
+                                                                 "cherry_grove",
+                                                                 "dappled_forest",
+                                                                 "flower_forest",
+                                                                 "forest",
+                                                                 "meadow",
+                                                                 "old_growth_pine_taiga",
+                                                                 "old_growth_birch_forest",
+                                                                 "old_growth_spruce_taiga",
+                                                                 "pale_garden",
+                                                                 "savanna",
+                                                                 "snowy_taiga",
+                                                                 "sparse_jungle",
+                                                                 "swamp",
+                                                                 "taiga",
+                                                                 "windswept_forest",
+                                                                 "wooded_badlands"};
+    std::vector<std::string_view> registryOrder{kFileOrder.begin(), kFileOrder.end()};
+    std::ranges::sort(registryOrder);
+    std::vector<terrain::VillageStructureGenerator::Variant> variants;
+    for (const std::string_view biome : kFileOrder) {
+        const std::string name = "abandoned_camp_" + std::string{biome};
+        std::set<std::string, std::less<>> biomes;
+        for (const std::string& member : tags.biomesIn("minecraft:has_structure/" + name)) {
+            const std::size_t colon = member.find(':');
+            biomes.insert(colon == std::string::npos ? member : member.substr(colon + 1));
+        }
+        variants.push_back(terrain::VillageStructureGenerator::Variant{
+            .id = Identifier::vanilla(name),
+            .startPool = "minecraft:abandoned_camp/tent/" + std::string{biome},
+            .biomes = std::move(biomes),
+            .structureIndex =
+                static_cast<std::int32_t>(std::ranges::find(registryOrder, biome) - registryOrder.begin())});
+    }
+    return variants;
 }
 
 // The settings live in `server-world` beside the generator that reads them, and the tests exercise
@@ -96,6 +142,7 @@ struct VanillaWorldGeneratorFactory::Built {
     std::unique_ptr<NetherSurfaceEnvironment> netherSurface;
     std::unique_ptr<terrain::NoiseColumnHeights> columns;
     std::unique_ptr<terrain::VillageStructureGenerator> village;
+    std::unique_ptr<terrain::VillageStructureGenerator> camps;
     std::unique_ptr<terrain::MineshaftStructureGenerator> mineshafts;
     std::unique_ptr<terrain::RuinedPortalStructureGenerator> ruinedPortals;
     std::unique_ptr<terrain::SwampHutStructureGenerator> swampHuts;
@@ -226,6 +273,9 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     built->columns = std::make_unique<terrain::NoiseColumnHeights>(*built->overworldRouter);
 
     BiomeTagLoader& tags = *built->tags;
+    built->camps = std::make_unique<terrain::VillageStructureGenerator>(
+        *built->overworldRouter, structure::StructurePlacementGrid{37, 8, 91231127}, quartBiome, 2, 80, poolLookup,
+        templateOf, campVariants(tags));
     const terrain::NoiseColumnHeights& columns = *built->columns;
     const auto surfaceHeight = [&columns](std::int32_t x, std::int32_t z) { return columns.surfaceHeight(x, z); };
     const auto oceanFloor = [&columns](std::int32_t x, std::int32_t z) { return columns.oceanFloorHeight(x, z); };
@@ -294,6 +344,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         blockBiome, biomesOf(tags, "minecraft:has_structure/trial_chambers"), poolLookup, templateOf);
 
     built->generators = terrain::TerrainStructureGenerators{.village = built->village.get(),
+                                                            .camp = built->camps.get(),
                                                             .mineshaft = built->mineshafts.get(),
                                                             .ruinedPortal = built->ruinedPortals.get(),
                                                             .swampHut = built->swampHuts.get(),

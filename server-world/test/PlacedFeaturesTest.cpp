@@ -23,13 +23,15 @@ namespace {
 
 /// Every placed feature the registry answers to, in the order the frozen Kotlin lists them.
 /// The features that need more than a chunk, which answer to `contextual` instead.
-constexpr std::array<std::string_view, 6> kContextualIds{"chorus_plant", "end_spike",        "fossil_lower",
-                                                         "fossil_upper", "freeze_top_layer", "rooted_sulfur_spring"};
+constexpr std::array<std::string_view, 7> kContextualIds{"chorus_plant",        "desert_well",  "end_spike",
+                                                         "fossil_lower",        "fossil_upper", "freeze_top_layer",
+                                                         "rooted_sulfur_spring"};
 
-constexpr std::array<std::string_view, 262> kIds{"acacia",
+constexpr std::array<std::string_view, 269> kIds{"acacia",
                                                  "acacia_checked",
                                                  "amethyst_geode",
                                                  "bamboo",
+                                                 "bamboo_in_structure",
                                                  "bamboo_light",
                                                  "bamboo_vegetation",
                                                  "basalt_blobs",
@@ -58,7 +60,6 @@ constexpr std::array<std::string_view, 262> kIds{"acacia",
                                                  "dark_oak_checked",
                                                  "dark_oak_leaf_litter",
                                                  "delta",
-                                                 "desert_well",
                                                  "disk_clay",
                                                  "disk_grass",
                                                  "disk_gravel",
@@ -70,6 +71,7 @@ constexpr std::array<std::string_view, 262> kIds{"acacia",
                                                  "fallen_birch_tree",
                                                  "fallen_jungle_tree",
                                                  "fallen_oak_tree",
+                                                 "fallen_poplar_tree",
                                                  "fallen_spruce_tree",
                                                  "fallen_super_birch_tree",
                                                  "fancy_oak_bees",
@@ -123,6 +125,8 @@ constexpr std::array<std::string_view, 262> kIds{"acacia",
                                                  "oak_bees_002",
                                                  "oak_checked",
                                                  "oak_leaf_litter",
+                                                 "orange_poplar",
+                                                 "orange_poplar_leaf_litter",
                                                  "ore_ancient_debris_large",
                                                  "ore_andesite_lower",
                                                  "ore_andesite_upper",
@@ -224,6 +228,8 @@ constexpr std::array<std::string_view, 262> kIds{"acacia",
                                                  "red_mushroom_old_growth",
                                                  "red_mushroom_swamp",
                                                  "red_mushroom_taiga",
+                                                 "red_poplar",
+                                                 "red_poplar_leaf_litter",
                                                  "rooted_azalea_tree",
                                                  "sculk_patch_ancient_city",
                                                  "sculk_patch_deep_dark",
@@ -287,7 +293,9 @@ constexpr std::array<std::string_view, 262> kIds{"acacia",
                                                  "warped_fungi",
                                                  "weeping_vines",
                                                  "wildflowers_birch_forest",
-                                                 "wildflowers_meadow"};
+                                                 "wildflowers_meadow",
+                                                 "yellow_poplar",
+                                                 "yellow_poplar_leaf_litter"};
 
 [[nodiscard]] std::int32_t floorMod(std::int32_t value, std::int32_t modulus) {
     const std::int32_t rest = value % modulus;
@@ -388,7 +396,7 @@ TEST_CASE("every placed feature places what the jar places") {
         deferred += chunk.takeGeneratedBlockWrites().size();
         after = random.nextInt();
     }
-    CHECK(deferred == 72);
-    CHECK(static_cast<std::int64_t>(checksum) == -6491510908410152360LL);
-    CHECK(after == 1531331155);
+    CHECK(deferred == 53);
+    CHECK(static_cast<std::int64_t>(checksum) == 3825584282172770931LL);
+    CHECK(after == 1740841542);
 }

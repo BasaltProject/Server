@@ -277,9 +277,10 @@ struct Run {
         // Alternating chunk columns get the other biome when one is given, so two variants stand
         // near each other and the order they are written in is observable.
         [seed, biomeName, mixName](std::int32_t x, std::int32_t y, std::int32_t z) -> std::string {
+            // Only at the surface, so the height a biome is read at stays observable. parity: the
+            // column is the start piece's centre, which is where vanilla puts the generation stub.
             const std::string& here = (!mixName.empty() && ((x >> 4) & 1) == 1) ? mixName : biomeName;
-            const bool centred = (x & 15) == 8 && (z & 15) == 8;
-            return centred && y == surfaceOf(seed, x, z) ? here : std::string{"minecraft:ocean"};
+            return y == surfaceOf(seed, x, z) ? here : std::string{"minecraft:ocean"};
         },
         6, 80, poolLookup, loader};
 
@@ -398,8 +399,8 @@ TEST_CASE("the villages settle where the frozen kotlin settles them") {
     // A tight grid puts several villages in one sweep, two variants among them, which is the only
     // shape in which the order they are written in can be seen.
     SUBCASE("dense") {
-        check(run(1234, "minecraft:plains", "minecraft:desert", true), 5863, 592, "20", 1, "village_desert,1,2",
-              "null,null", 9, 133, 5566494675979386468LL);
+        check(run(1234, "minecraft:plains", "minecraft:desert", true), 5863, 592, "20", 1, "village_plains,1,2",
+              "null,null", 9, 133, 6467505898491498425LL);
     }
 
     SUBCASE("denseOther") {

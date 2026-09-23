@@ -45,6 +45,12 @@ const std::set<std::string, std::less<>>& randomizableContainerBlocks() {
         for (const std::string& color : dyeColors()) {
             built.insert(color + "_shulker_box");
         }
+        // The copper chests are chests too, which the 26.3 camps bury with a loot table.
+        for (const std::string_view waxed : {"", "waxed_"}) {
+            for (const std::string_view age : {"", "exposed_", "weathered_", "oxidized_"}) {
+                built.insert(std::string{waxed} + std::string{age} + "copper_chest");
+            }
+        }
         return built;
     }();
     return blocks;

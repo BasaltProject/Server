@@ -25,14 +25,18 @@ const PathSet& vegetationSupport() {
     return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
+/// parity: the 26.3 placement's `count` 64 and trapezoid `offset`, then an air filter before the
+/// `simple_block` draws its weighted state and checks that it survives.
 void scatterVegetation(Chunk& chunk, random::RandomSource& random, const Pos& origin, ForestVegetation config) {
     for (std::int32_t attempt = 0; attempt < 64; ++attempt) {
         const std::int32_t x = origin.x + random.nextInt(8) - random.nextInt(8);
         const std::int32_t y = origin.y + random.nextInt(4) - random.nextInt(4);
         const std::int32_t z = origin.z + random.nextInt(8) - random.nextInt(8);
+        if (!isAir(chunk, x, y, z)) {
+            continue;
+        }
         const std::string_view state = sampleForestState(config, random);
-        if (isAir(chunk, x, y, z) && y > chunk.verticalBounds().minY() &&
-            vegetationSupport().contains(blockPathAt(chunk, x, y - 1, z))) {
+        if (vegetationSupport().contains(blockPathAt(chunk, x, y - 1, z))) {
             setBlock(chunk, x, y, z, stateId(state));
         }
     }
@@ -83,15 +87,11 @@ void placeVegetationAt(Chunk& chunk, random::RandomSource& random, const Pos& or
 
 void placeForestVegetation(Chunk& chunk, random::RandomSource& random, const NetherBiomeLookup& biomeSource,
                            const ForestVegetation config) {
-    const ChunkHeight bounds = chunk.verticalBounds();
     for (const Pos& origin : positionsOnEveryLayer(chunk, random, forestLayerCount(config))) {
         if (biomePath(biomeSource(origin.x, origin.y, origin.z, nullptr)) != forestBiome(config)) {
             continue;
         }
         if (!nylium().contains(blockPathAt(chunk, origin.x, origin.y - 1, origin.z))) {
-            continue;
-        }
-        if (origin.y < bounds.minY() + 1 || origin.y + 1 > bounds.maxY()) {
             continue;
         }
         scatterVegetation(chunk, random, origin, config);

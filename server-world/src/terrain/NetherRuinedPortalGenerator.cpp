@@ -24,7 +24,6 @@ using structure::StructureRotation;
 constexpr std::int32_t kNetherGenerationDepth = 128;
 constexpr std::int32_t kMinProjectedY = 15;
 constexpr std::int32_t kSpreadRadius = 14;
-constexpr float kAirPocketProbability = 0.5F;
 constexpr float kGiantPortalProbability = 0.05F;
 constexpr float kMagmaProbability = 0.07F;
 constexpr std::int32_t kRuinedPortalStructureIndex = 32;
@@ -395,7 +394,8 @@ NetherRuinedPortalGenerator::createStart(std::int64_t seed, std::int32_t candida
                                          std::int32_t candidateChunkZ) const {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
-    const bool airPocket = random.nextFloat() < kAirPocketProbability;
+    // parity: 26.3 sets the Nether portal's `air_pocket_probability` to 0, and a zero draws nothing.
+    const bool airPocket = false;
     const std::string templateName =
         random.nextFloat() < kGiantPortalProbability
             ? giantPortals()[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(giantPortals().size())))]

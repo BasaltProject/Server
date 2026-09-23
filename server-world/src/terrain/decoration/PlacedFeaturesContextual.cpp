@@ -1,4 +1,5 @@
 #include <basalt/server/world/structure/StructureTemplate.hpp>
+#include <basalt/server/world/terrain/decoration/DesertWellDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/PlacedFeatures.hpp>
 #include <basalt/server/world/terrain/decoration/RootedSulfurSpringFeature.hpp>
 #include <basalt/server/world/terrain/decoration/SurfaceFreezingDecoration.hpp>
@@ -74,6 +75,16 @@ const std::map<wire::common::Identifier, placedFeatures::ContextualPlacement>& c
                                  return false;
                              }
                              surfaceFreezingDecoration::placeAt(chunk, *context.surface, localX, localZ);
+                             return true;
+                         });
+        registry.emplace(wire::common::Identifier::vanilla("desert_well"),
+                         [](Chunk& chunk, random::RandomSource& random, std::int32_t localX, std::int32_t y,
+                            std::int32_t localZ, const placedFeatures::FeatureContext& context) {
+                             if (!context.templates) {
+                                 return false;
+                             }
+                             desertWellDecoration::placeAt(chunk, random, chunk.chunkX() * 16 + (localX & 15), y,
+                                                           chunk.chunkZ() * 16 + (localZ & 15), context.templates);
                              return true;
                          });
         registry.emplace(wire::common::Identifier::vanilla("fossil_lower"), fossil(kFossilLower));
