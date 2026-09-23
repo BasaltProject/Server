@@ -414,7 +414,11 @@ std::optional<Value> misc(Context& context, const Verb verb, const std::string_v
     if (name == "hurt_animation") {
         const play::HurtAnimationPacket packet{.entityId = session.entityId(),
                                                .yaw = static_cast<float>(asReal(first))};
+        const std::string only = asText(arg(args, 1));
         for (const player::PlayerSession* viewer : context.registry.snapshot()) {
+            if (!only.empty() && only.find(viewer->uuid().toString()) == std::string::npos) {
+                continue;
+            }
             if (viewer->worldName == session.worldName && viewer->connection().sendPlayPacket) {
                 viewer->connection().sendPlayPacket(play::HurtAnimationPacket::kId,
                                                     [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
