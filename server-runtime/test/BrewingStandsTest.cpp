@@ -281,3 +281,34 @@ TEST_CASE("a potion taken out of a bottle is taken out of the tag too") {
 
     CHECK_FALSE(brewingStands::read(data).potions[1].has_value());
 }
+
+TEST_CASE("with the jar's recipes a stand brews only what they list") {
+    namespace crafting = basalt::server::world::crafting;
+    // parity: 26.3 `potion_<potion>_gunpowder` recipes exist per potion, and none for `luck`.
+    ItemStack splash = stack("splash_potion");
+    nbt::NbtCompound contents;
+    contents.putString("potion", "minecraft:water");
+    splash.components.set("minecraft:potion_contents", nbt::NbtTag::ofCompound(std::move(contents)));
+    crafting::Recipe recipe{.kind = crafting::RecipeKind::Brewing, .result = splash};
+    recipe.base.items = {"minecraft:potion"};
+    recipe.ingredient.items = {"minecraft:gunpowder"};
+    recipe.potions = {"minecraft:water"};
+    brewingStands::useRecipes({recipe});
+
+    brewingStands::State state = loaded(2);
+    state.potions[1] = "luck";
+    state.items[brewingStands::kIngredientSlot] = stack("gunpowder");
+    state.items[brewingStands::kFuelSlot] = stack("blaze_powder");
+    CHECK(brewingStands::isReagent(item("gunpowder")));
+    CHECK_FALSE(brewingStands::isReagent(item("nether_wart")));
+    REQUIRE(brewingStands::tick(state));
+    while (state.brewTime > 0) {
+        brewingStands::tick(state);
+    }
+    CHECK(state.items[0]->item == item("splash_potion"));
+    CHECK(state.potions[0] == "water");
+    CHECK(state.items[1]->item == item("potion"));
+    CHECK(state.potions[1] == "luck");
+
+    brewingStands::useRecipes({});
+}

@@ -46,6 +46,7 @@ struct LoadedWorldOptions {
     const server::world::terrain::NoiseRouter* overworldRouter = nullptr;
     const server::world::terrain::surface::SurfaceRuleEnvironment* surfaceEnvironment = nullptr;
     server::world::terrain::VillageStructureGenerator* villageGenerator = nullptr;
+    server::world::terrain::VillageStructureGenerator* campGenerator = nullptr;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator = nullptr;
     /// Where the climate search says this world's spawn chunk is; the origin without one.
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder;
@@ -210,6 +211,13 @@ public:
         return villageGenerator_;
     }
 
+    /// The jigsaw set generator (villages or abandoned camps) that makes `structure`, or null.
+    [[nodiscard]] server::world::terrain::VillageStructureGenerator*
+    structureSetGenerator(const wire::common::Identifier& structure) const;
+
+    /// Every structure the jigsaw set generators make, which is what `/locate` and `/place` accept.
+    [[nodiscard]] std::vector<wire::common::Identifier> structureSetIds() const;
+
     [[nodiscard]] server::world::terrain::StrongholdStructureGenerator* strongholdGenerator() const noexcept {
         return strongholdGenerator_;
     }
@@ -297,6 +305,7 @@ private:
     const server::world::terrain::NoiseRouter* overworldRouter_ = nullptr;
     const server::world::terrain::surface::SurfaceRuleEnvironment* surfaceEnvironment_ = nullptr;
     server::world::terrain::VillageStructureGenerator* villageGenerator_ = nullptr;
+    server::world::terrain::VillageStructureGenerator* campGenerator_ = nullptr;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator_ = nullptr;
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder_;
     std::function<server::world::Chunk(std::int32_t, std::int32_t, std::int64_t, std::string_view,

@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
@@ -9,6 +10,7 @@
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
+#include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
@@ -79,6 +81,9 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     // parity: `ServerLevel.explode`'s own packet, which is the flash, the smoke thrown off the
     // blocks and the bang. The blocks themselves go out as ordinary updates below, so without this
     // an explosion was a wall of stone silently turning into air.
+    // parity: 26.3 `ServerLevel.explode`, whose bang is off only for a silent source.
+    const entity::ServerEntity* source = sourceEntityId == 0 ? nullptr : world.state().entity(sourceEntityId);
+    const bool silent = source != nullptr && source->sourceNbt.has_value() && source->sourceNbt->getBoolean("Silent");
     const play::ExplodePacket explode{
         .x = x,
         .y = y,
@@ -87,11 +92,13 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         .blockCount = static_cast<std::int32_t>(broken.size()),
         .particleId = particleId(power < kLargeExplosion ? "explosion" : "explosion_emitter"),
         .sound = "entity.generic.explode",
-        .blockParticles = {
-            play::ExplosionParticle{
-                .particleId = particleId("poof"), .scaling = play::ExplodePacket::kPoofScaling, .speed = 1.0F},
-            play::ExplosionParticle{
-                .particleId = particleId("smoke"), .scaling = play::ExplodePacket::kSmokeScaling, .speed = 1.0F}}};
+        .blockParticles = {play::ExplosionParticle{.particleId = particleId("poof"),
+                                                   .scaling = play::ExplodePacket::kPoofScaling,
+                                                   .speed = 1.0F},
+                           play::ExplosionParticle{.particleId = particleId("smoke"),
+                                                   .scaling = play::ExplodePacket::kSmokeScaling,
+                                                   .speed = 1.0F}},
+        .playSound = !silent};
     for (const player::PlayerSession* player : watchers) {
         if (player->connection().sendExplosion) {
             player->connection().sendExplosion(x, y, z);

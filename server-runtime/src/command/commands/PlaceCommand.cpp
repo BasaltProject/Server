@@ -227,15 +227,15 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
         if (!world.has_value()) {
             return std::unexpected{world.error()};
         }
-        terrain::VillageStructureGenerator* villages = (*world)->villageGenerator();
-        if (villages == nullptr) {
+        const std::vector<Identifier> known = (*world)->structureSetIds();
+        if (known.empty()) {
             return std::unexpected{CommandSyntaxError{
                 .component =
                     Component::translatable("commands.place.structure.invalid",
                                             {Component::text(id == nullptr ? std::string{} : id->toString())})}};
         }
-        const std::vector<Identifier>& known = terrain::VillageStructureGenerator::structureIds();
-        if (id == nullptr || std::ranges::find(known, *id) == known.end()) {
+        terrain::VillageStructureGenerator* villages = id == nullptr ? nullptr : (*world)->structureSetGenerator(*id);
+        if (villages == nullptr) {
             return std::unexpected{CommandSyntaxError{
                 .component = Component::text("'" + (id == nullptr ? std::string{} : id->toString()) +
                                              "' is not a structure this build generates. Available: " + joined(known) +
@@ -313,7 +313,10 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
         form.argument("structure", resourceKeyArgument("minecraft:worldgen/structure"),
                       [placeStructure](const CommandNodeBuilder& named) {
                           named.suggestsFromServer([](const SuggestionContext& context) {
-                              return context.matchingIds(terrain::VillageStructureGenerator::structureIds());
+                              const world::LoadedWorld* world = context.world();
+                              return context.matchingIds(world == nullptr
+                                                             ? terrain::VillageStructureGenerator::structureIds()
+                                                             : world->structureSetIds());
                           });
                           named.executes([placeStructure](const CommandContext& context) {
                               return placeStructure(context, false);

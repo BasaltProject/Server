@@ -228,14 +228,12 @@ bool acceptsThroughFace(const std::string_view path, const std::int32_t slot, co
     // parity: `BrewingStandBlockEntity.canPlaceItem`, slot by slot.
     if (path == "brewing_stand") {
         if (slot == brewingStands::kIngredientSlot) {
-            return registry::brewing::isIngredient(item);
+            return brewingStands::isReagent(item);
         }
         if (slot == brewingStands::kFuelSlot) {
             return item == registry::brewing::fuel();
         }
-        static constexpr std::array<std::string_view, 4> kBottles{"potion", "splash_potion", "lingering_potion",
-                                                                  "glass_bottle"};
-        return slotIsEmpty && std::ranges::find(kBottles, item.path()) != kBottles.end();
+        return slotIsEmpty && brewingStands::isPotionInput(item);
     }
     // parity: `ShulkerBoxBlockEntity.canPlaceItemThroughFace`, the one thing a box will not hold.
     if (shulkers::isShulkerBox(path)) {

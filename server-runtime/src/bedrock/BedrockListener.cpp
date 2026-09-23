@@ -773,7 +773,7 @@ void BedrockListener::onReady(Session& session) {
     // anything that could carry an item, which is everything after this point.
     body.clear();
     if (!dropping("items")) {
-        wire::bedrock::writeItemComponent(body);
+        wire::bedrock::writeItemComponent(body, session.connection.protocolVersion());
         session.connection.sendPacket(BedrockPacket::ItemComponent, body.readable());
         note("items", body.readableBytes());
     }
