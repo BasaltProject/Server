@@ -58,7 +58,7 @@ namespace {
 }
 
 [[nodiscard]] terrain::NetherBiomeLookup fixedBiome(std::string_view biome) {
-    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::DensityCache*) { return biome; };
+    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::SamplerContext*) { return biome; };
 }
 
 struct Run {
@@ -96,91 +96,91 @@ TEST_CASE("the nether ores place what the frozen kotlin places") {
         const Run result = run("minecraft:nether_wastes", -1);
         CHECK(result.ores == 15400);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -3528777164792077182LL);
+        CHECK(result.checksum == 5633885919295166592LL);
     }
 
     SUBCASE("deltasStep") {
         const Run result = run("minecraft:basalt_deltas", -1);
         CHECK(result.ores == 13897);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -645677922084069711LL);
+        CHECK(result.checksum == 5610227775375956760LL);
     }
 
     SUBCASE("valleyStep") {
         const Run result = run("minecraft:soul_sand_valley", -1);
         CHECK(result.ores == 17139);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -4883567176600809472LL);
+        CHECK(result.checksum == 8935924819677121528LL);
     }
 
     SUBCASE("feature_ore_magma") {
         const Run result = run("minecraft:nether_wastes", 11);
         CHECK(result.ores == 5875);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -740294980501719859LL);
+        CHECK(result.checksum == -5945141373388217390LL);
     }
 
     SUBCASE("feature_ore_gold_deltas") {
         const Run result = run("minecraft:basalt_deltas", 13);
         CHECK(result.ores == 2320);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7388038226068500589LL);
+        CHECK(result.checksum == -6906282183104394367LL);
     }
 
     SUBCASE("feature_ore_quartz_deltas") {
         const Run result = run("minecraft:basalt_deltas", 14);
         CHECK(result.ores == 6491);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -742585879398821896LL);
+        CHECK(result.checksum == -7229661945940144687LL);
     }
 
     SUBCASE("feature_ore_soul_sand") {
         const Run result = run("minecraft:soul_sand_valley", 16);
         CHECK(result.ores == 1953);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8293216203304191856LL);
+        CHECK(result.checksum == -7523478457456584196LL);
     }
 
     SUBCASE("feature_ore_gravel_nether") {
         const Run result = run("minecraft:nether_wastes", 17);
         CHECK(result.ores == 3052);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7181531276100549191LL);
+        CHECK(result.checksum == -1146763406075752339LL);
     }
 
     SUBCASE("feature_ore_blackstone") {
         const Run result = run("minecraft:nether_wastes", 18);
         CHECK(result.ores == 3035);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8376579408986995457LL);
+        CHECK(result.checksum == -7101798105624700642LL);
     }
 
     SUBCASE("feature_ore_gold_nether") {
         const Run result = run("minecraft:nether_wastes", 19);
         CHECK(result.ores == 1125);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -7246356463703054429LL);
+        CHECK(result.checksum == 1459259452646051212LL);
     }
 
     SUBCASE("feature_ore_quartz_nether") {
         const Run result = run("minecraft:nether_wastes", 20);
         CHECK(result.ores == 3306);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8000506675921932907LL);
+        CHECK(result.checksum == -1622531430782250779LL);
     }
 
     SUBCASE("feature_ore_ancient_debris_large") {
         const Run result = run("minecraft:nether_wastes", 21);
         CHECK(result.ores == 13);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -3932677524833922369LL);
+        CHECK(result.checksum == -1517337849913115378LL);
     }
 
     SUBCASE("feature_ore_debris_small") {
         const Run result = run("minecraft:nether_wastes", 22);
         CHECK(result.ores == 9);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 5600451575871802823LL);
+        CHECK(result.checksum == -2780260854113537014LL);
     }
 }
 
@@ -209,6 +209,6 @@ TEST_CASE("one nether ore at one position matches the frozen kotlin") {
     known += netherOreDecoration::placeAt(chunk, random, 8, 60, 8, "not_an_ore") ? "1" : "0";
     CHECK(known == "11111111111111111111111111111111111111110");
     CHECK(ores == 1540);
-    CHECK(static_cast<std::int64_t>(checksum) == -5781486380936471959LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -6927862987991074372LL);
     CHECK(after == -2093014969);
 }

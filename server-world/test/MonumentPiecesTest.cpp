@@ -131,7 +131,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
                                    static_cast<void>(random);
                                    monumentShell::place(brush, 40);
                                });
-        check(result, 1424, 0, 0, 282211139613034558LL, 185365340);
+        check(result, 1424, 0, 0, 8046015927167620368LL, 185365340);
     }
 
     SUBCASE("entry") {
@@ -139,7 +139,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentSingleRooms::entry(brush, *roomOf(MonumentRoomKind::Entry));
         });
-        check(result, 620, 0, 0, 8601135836817901317LL, 185365340);
+        check(result, 620, 0, 0, 4027648566380795693LL, 185365340);
     }
 
     SUBCASE("core") {
@@ -147,7 +147,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentSingleRooms::core(brush);
         });
-        check(result, 1154, 0, 0, -3478349731768133381LL, 185365340);
+        check(result, 1154, 0, 0, -2391992880893800953LL, 185365340);
     }
 
     SUBCASE("simple0") {
@@ -155,7 +155,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentSingleRooms::simple(brush, *roomOf(MonumentRoomKind::Simple), 0, random);
         });
-        check(result, 640, 0, 0, -8575988169863344355LL, 185365340);
+        check(result, 640, 0, 0, -4815082219343645563LL, 185365340);
     }
 
     SUBCASE("simple1") {
@@ -163,7 +163,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentSingleRooms::simple(brush, *roomOf(MonumentRoomKind::Simple), 1, random);
         });
-        check(result, 596, 0, 0, 2972192659192782865LL, 1091621030);
+        check(result, 596, 0, 0, -2650606400975282775LL, 1091621030);
     }
 
     SUBCASE("simple2") {
@@ -171,7 +171,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentSingleRooms::simple(brush, *roomOf(MonumentRoomKind::Simple), 2, random);
         });
-        check(result, 592, 0, 0, -2646480743706562327LL, 1091621030);
+        check(result, 592, 0, 0, 1230362543047553841LL, 1091621030);
     }
 
     SUBCASE("simpleTop") {
@@ -179,7 +179,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentSingleRooms::simpleTop(brush, *roomOf(MonumentRoomKind::SimpleTop), random);
         });
-        check(result, 722, 0, 0, -8102553233407410897LL, -437567476);
+        check(result, 722, 0, 0, 8265808800738315259LL, -437567476);
     }
 
     SUBCASE("doubleX") {
@@ -187,7 +187,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentDoubleRooms::doubleX(brush, *roomOf(MonumentRoomKind::DoubleX));
         });
-        check(result, 858, 0, 0, 50128185368124327LL, 185365340);
+        check(result, 858, 0, 0, 5087381730340241459LL, 185365340);
     }
 
     SUBCASE("doubleXy") {
@@ -195,7 +195,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentDoubleRooms::doubleXy(brush, *roomOf(MonumentRoomKind::DoubleXY));
         });
-        check(result, 990, 0, 0, -6659558238869378049LL, 185365340);
+        check(result, 990, 0, 0, 2578441631325336187LL, 185365340);
     }
 
     SUBCASE("doubleY") {
@@ -203,7 +203,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentDoubleRooms::doubleY(brush, *roomOf(MonumentRoomKind::DoubleY));
         });
-        check(result, 810, 0, 0, -1062634173799989367LL, 185365340);
+        check(result, 810, 0, 0, 8642414345260455729LL, 185365340);
     }
 
     SUBCASE("doubleYz") {
@@ -211,7 +211,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentDoubleRooms::doubleYz(brush, *roomOf(MonumentRoomKind::DoubleYZ));
         });
-        check(result, 906, 0, 0, -4326701232003723923LL, 185365340);
+        check(result, 906, 0, 0, -3370281530483490899LL, 185365340);
     }
 
     SUBCASE("doubleZ") {
@@ -219,7 +219,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentDoubleRooms::doubleZ(brush, *roomOf(MonumentRoomKind::DoubleZ));
         });
-        check(result, 688, 0, 0, -6550567596729114791LL, 185365340);
+        check(result, 688, 0, 0, -8433678566451819823LL, 185365340);
     }
 
     SUBCASE("wingHall") {
@@ -227,7 +227,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentWings::wing(brush, 0);
         });
-        check(result, 690, 0, 0, 3989476804243640846LL, 185365340);
+        check(result, 690, 0, 0, -5605110002191888600LL, 185365340);
     }
 
     SUBCASE("wingGallery") {
@@ -235,7 +235,7 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentWings::wing(brush, 1);
         });
-        check(result, 620, 1, 0, -3687816549073905291LL, 185365340);
+        check(result, 620, 1, 0, -2736078192357195363LL, 185365340);
     }
 
     SUBCASE("penthouse") {
@@ -243,6 +243,6 @@ TEST_CASE("every monument piece draws what the frozen kotlin draws") {
             static_cast<void>(random);
             monumentWings::penthouse(brush);
         });
-        check(result, 828, 1, 0, 5217880263428071059LL, 185365340);
+        check(result, 828, 1, 0, 8504074545653886635LL, 185365340);
     }
 }

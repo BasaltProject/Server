@@ -1,8 +1,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/SyntheticRouter.hpp"
 
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/Chunk.hpp>
-#include <basalt/server/world/noise/NormalNoise.hpp>
+#include <basalt/server/world/densityfunction/SamplerContext.hpp>
 #include <basalt/server/world/terrain/JigsawStructureGenerator.hpp>
 
 #include <doctest.h>
@@ -178,36 +179,14 @@ single(std::string location, structure::StructureProjection projection = structu
 }
 
 /// A rolling surface around y 60, so which column a height is read from is observable.
-[[nodiscard]] OverworldNoiseRouter router(std::int64_t seed) {
-    const df::Function zero = df::functions::zero();
-    basalt::server::random::RandomSource source = basalt::server::random::RandomSource::xoroshiro(seed);
-    static constexpr std::array<double, 2> kAmplitudes{1.0, 1.0};
-    auto built = std::make_shared<const noise::NormalNoise>(noise::NormalNoise::create(source, -6, kAmplitudes));
-    const df::Function density =
-        df::functions::add(df::functions::yClampedGradient(50, 78, 1.0, -1.0),
-                           df::functions::mul(df::functions::constant(2.0), df::functions::noise(built, 1.0, 0.0)));
-    return OverworldNoiseRouter{.barrierNoise = zero,
-                                .fluidLevelFloodednessNoise = zero,
-                                .fluidLevelSpreadNoise = zero,
-                                .lavaNoise = zero,
-                                .shiftX = zero,
-                                .shiftZ = zero,
-                                .temperature = zero,
-                                .vegetation = zero,
-                                .continents = zero,
-                                .erosion = zero,
-                                .depth = zero,
-                                .ridges = zero,
-                                .preliminarySurfaceLevel = zero,
-                                .finalDensity = density,
-                                .veinToggle = zero,
-                                .veinRidged = zero,
-                                .veinGap = zero};
+[[nodiscard]] NoiseRouter router(std::int64_t seed) {
+    return basalt::server::world::testsupport::syntheticRouter(
+        seed, basalt::server::world::testsupport::rollingFloor(50, 78, 1.0, 0.0));
 }
 
 /// The same surface walk the generators do, so a biome can be pinned to it.
 [[nodiscard]] std::int32_t surfaceOf(std::int64_t seed, std::int32_t x, std::int32_t z) {
-    DensityChunkSampler sampler{router(seed).finalDensity, x >> 4, z >> 4, -64, 384, 4, 8};
+    DensityChunkSampler sampler{router(seed), x >> 4, z >> 4};
     std::int32_t y = 319;
     while (y >= -64 && sampler.sample(x & 15, y, z & 15) <= 0.0) {
         --y;
@@ -328,12 +307,17 @@ struct Case {
         result.written += written;
         result.starts += chunk.structures().starts().size();
     }
-    const df::Function beard = generator.beardified(df::functions::zero(), centre.first, centre.second, seed);
+    StructureBeard beard;
+    generator.addBeard(beard, centre.first, centre.second, seed);
+    const df::Sampler bearded = structureBeardifier(std::move(beard));
+    df::SamplerContext context{df::SamplerContext::Options{}};
     for (std::int32_t y = shape.lowY; y <= shape.highY; y += 4) {
         for (std::int32_t x = 0; x < 16; x += 4) {
             for (std::int32_t z = 0; z < 16; z += 4) {
-                df::FunctionContext context{centre.first * 16 + x, y, centre.second * 16 + z};
-                checksum = (checksum ^ std::bit_cast<std::uint64_t>(beard->compute(context))) * 1099511628211ULL;
+                // A chunk no structure reaches has no beardifier at all, which samples as zero.
+                const float value =
+                    bearded ? bearded->sampleValue(context, centre.first * 16 + x, y, centre.second * 16 + z) : 0.0F;
+                checksum = (checksum ^ std::bit_cast<std::uint32_t>(value)) * 1099511628211ULL;
             }
         }
     }
@@ -411,16 +395,16 @@ void check(const Run& result, std::int32_t written, std::size_t starts, std::int
 } // namespace
 
 TEST_CASE("the deep jigsaw structures assemble where the frozen kotlin assembles them") {
-    SUBCASE("ruins") { check(runRuins(1234, "minecraft:jungle"), 5022, 11, 6646192249432615265LL, "19,23", 1, 22); }
+    SUBCASE("ruins") { check(runRuins(1234, "minecraft:jungle"), 5015, 11, -7331212771159821030LL, "19,23", 1, 22); }
 
-    SUBCASE("ruinsElsewhere") { check(runRuins(77, "minecraft:taiga"), 3899, 9, 4192801240433696798LL, "9,23", 1, 19); }
+    SUBCASE("ruinsElsewhere") { check(runRuins(77, "minecraft:taiga"), 3899, 9, 1519182072589599786LL, "9,23", 1, 19); }
 
     SUBCASE("noRuins") { check(runRuins(1234, "minecraft:ocean"), 0, 0, -1045953369363326287LL, "null,null", 10, 0); }
 
-    SUBCASE("city") { check(runCity(1234, "minecraft:deep_dark"), 2860, 7, -7098982429302431984LL, "none", 1, 14); }
+    SUBCASE("city") { check(runCity(1234, "minecraft:deep_dark"), 2860, 7, -4094997393579356085LL, "none", 1, 14); }
 
     SUBCASE("cityElsewhere") {
-        check(runCity(77, "minecraft:deep_dark"), 3951, 12, 6839323969532419222LL, "none", 1, 18);
+        check(runCity(77, "minecraft:deep_dark"), 3951, 12, 5617865775838100732LL, "none", 1, 18);
     }
 
     SUBCASE("noCity") { check(runCity(1234, "minecraft:ocean"), 0, 0, -6294788893584798351LL, "none", 1, 0); }
@@ -429,11 +413,11 @@ TEST_CASE("the deep jigsaw structures assemble where the frozen kotlin assembles
     // what the server has always done. The zero these two used to expect came from a settings object
     // that only the tests ever read.
     SUBCASE("chamber") {
-        check(runChamber(1234, "minecraft:dripstone_caves"), 2976, 8, -7428120839514114081LL, "none", 1, 15);
+        check(runChamber(1234, "minecraft:dripstone_caves"), 2976, 8, -1913264750680107390LL, "none", 1, 15);
     }
 
     SUBCASE("chamberElsewhere") {
-        check(runChamber(77, "minecraft:lush_caves"), 3460, 7, 5873367261463590498LL, "none", 1, 19);
+        check(runChamber(77, "minecraft:lush_caves"), 3460, 7, -4291540633380724643LL, "none", 1, 19);
     }
 
     SUBCASE("noChamber") { check(runChamber(1234, "minecraft:ocean"), 0, 0, -3883247817186501711LL, "none", 1, 0); }

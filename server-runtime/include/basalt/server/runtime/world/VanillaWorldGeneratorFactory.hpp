@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/StructureTemplates.hpp>
 #include <basalt/server/runtime/world/WorldMetadata.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/densityfunction/DensityFunctionJson.hpp>
 #include <basalt/server/world/terrain/NeighbourTerrain.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
@@ -83,6 +84,8 @@ private:
     struct Built;
 
     [[nodiscard]] Generators overworld(std::int64_t seed, bool spawnMobs);
+    /// The jar's `data/` as the worldgen loaders read it.
+    [[nodiscard]] server::world::densityfunction::WorldgenReader worldgenReader() const;
     [[nodiscard]] Generators nether(std::int64_t seed, bool spawnMobs);
     [[nodiscard]] Generators end(std::int64_t seed);
 

@@ -110,7 +110,7 @@ TEST_CASE("the top-layer freeze matches the frozen kotlin") {
         CHECK(snow == 6120);
         CHECK(ice == 4120);
         CHECK(snowy == 4080);
-        CHECK(checksum == -1283577860500779859LL);
+        CHECK(checksum == 9144327271147553349LL);
     }
 
     SUBCASE("frozenOcean") {
@@ -118,7 +118,7 @@ TEST_CASE("the top-layer freeze matches the frozen kotlin") {
         CHECK(snow == 2149);
         CHECK(ice == 2784);
         CHECK(snowy == 1423);
-        CHECK(checksum == -4846886339566156235LL);
+        CHECK(checksum == 8833340223888369363LL);
     }
 
     SUBCASE("taiga") {
@@ -126,7 +126,7 @@ TEST_CASE("the top-layer freeze matches the frozen kotlin") {
         CHECK(snow == 0);
         CHECK(ice == 2040);
         CHECK(snowy == 0);
-        CHECK(checksum == -8385240389407724571LL);
+        CHECK(checksum == 8234706347766953965LL);
     }
 
     SUBCASE("plains") {
@@ -134,7 +134,7 @@ TEST_CASE("the top-layer freeze matches the frozen kotlin") {
         CHECK(snow == 0);
         CHECK(ice == 2040);
         CHECK(snowy == 0);
-        CHECK(checksum == -8385240389407724571LL);
+        CHECK(checksum == 8234706347766953965LL);
     }
 
     SUBCASE("desert") {
@@ -144,7 +144,7 @@ TEST_CASE("the top-layer freeze matches the frozen kotlin") {
         CHECK(snow == 0);
         CHECK(ice == 2040);
         CHECK(snowy == 0);
-        CHECK(checksum == -8385240389407724571LL);
+        CHECK(checksum == 8234706347766953965LL);
     }
 
     SUBCASE("only a cold biome adds ice to what the fixture already had") {

@@ -20,8 +20,8 @@ public:
     using OceanFloorAt = std::function<std::int32_t(std::int32_t, std::int32_t)>;
 
     static constexpr std::string_view kName = "monument";
-    /// Seventh of the 26 structures of `surface_structures`, in registry order.
-    static constexpr std::int32_t kStructureIndex = 6;
+    /// Position among the 44 structures of `surface_structures`, in registry order.
+    static constexpr std::int32_t kStructureIndex = 24;
 
     OceanMonumentStructureGenerator(NoiseBiomeAt noiseBiomeAt, std::set<std::string, std::less<>> monumentBiomes,
                                     std::set<std::string, std::less<>> surroundingBiomes, OceanFloorAt oceanFloorAt,

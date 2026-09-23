@@ -126,6 +126,9 @@ public:
     /// What the mob holds changed, so everyone watching has to see it.
     virtual void heldItemChanged(ServerEntity& /*mob*/) {}
 
+    /// A pet's sitting or lying pose changed, so everyone watching has to see it.
+    virtual void poseChanged(ServerEntity& /*mob*/) {}
+
     /// parity: `Container.setChanged`: the chunk is saved and a comparator reads it again.
     virtual void containerChanged(ServerEntity& /*mob*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/) {}
 

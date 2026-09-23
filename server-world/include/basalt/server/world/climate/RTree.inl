@@ -9,7 +9,7 @@
 namespace basalt::server::world::climate {
 namespace detail {
 
-inline constexpr std::size_t kChildrenPerNode = 6;
+inline constexpr std::size_t kChildrenPerNode = 19;
 
 /// The previous leaf each tree found, per thread.
 ///
@@ -125,7 +125,7 @@ template <typename Node>
     return result;
 }
 
-[[nodiscard]] inline std::size_t pow6(int exponent) {
+[[nodiscard]] inline std::size_t powChildren(int exponent) {
     std::size_t result = 1;
     for (int i = 0; i < std::max(exponent, 0); ++i) {
         result *= kChildrenPerNode;
@@ -147,7 +147,7 @@ std::unique_ptr<RTree<T>> RTree<T>::create(std::vector<std::pair<ParameterPoint,
         leaves.push_back(std::make_unique<Leaf>(point, std::move(value)));
     }
 
-    // Grouped into buckets of `6^floor(log6(n - 0.01))`, matching vanilla's own sizing exactly, and
+    // Grouped into buckets of `19^floor(log19(n - 0.01))` (six before 26.3), matching vanilla's own sizing exactly, and
     // rebuilt from their own children so the tree keeps splitting until every node fits.
     const auto build = [](auto&& self, std::vector<std::unique_ptr<Node>> children) -> std::unique_ptr<Node> {
         if (children.size() == 1) {
@@ -160,8 +160,9 @@ std::unique_ptr<RTree<T>> RTree<T>::create(std::vector<std::pair<ParameterPoint,
             return std::make_unique<SubTree>(std::move(children));
         }
 
-        const std::size_t expected = detail::pow6(
-            static_cast<int>(std::floor(std::log(static_cast<double>(children.size()) - 0.01) / std::log(6.0))));
+        const std::size_t expected =
+            detail::powChildren(static_cast<int>(std::floor(std::log(static_cast<double>(children.size()) - 0.01) /
+                                                            std::log(static_cast<double>(detail::kChildrenPerNode)))));
         std::int64_t minCost = std::numeric_limits<std::int64_t>::max();
         std::size_t minDimension = 0;
         // parity: `Climate.RTree.build` keeps the buckets it made while trying the winning axis rather than

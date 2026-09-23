@@ -14,7 +14,7 @@ namespace basalt::server::world::terrain::decoration {
 namespace {
 
 constexpr std::int32_t kBambooIndex = 2;
-constexpr std::int32_t kBambooLightIndex = 6;
+constexpr std::int32_t kBambooLightIndex = 9;
 constexpr std::int32_t kVegetalDecorationStep = 9;
 
 using PathSet = std::set<std::string, std::less<>>;

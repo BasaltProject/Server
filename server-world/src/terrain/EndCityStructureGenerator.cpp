@@ -20,7 +20,7 @@ using structure::StructureRotation;
 constexpr std::int32_t kEndGenerationHeight = 128;
 constexpr std::int32_t kMinStartY = 60;
 constexpr std::int32_t kStructureReferenceRange = 8;
-constexpr std::int32_t kEndCityStructureIndex = 2;
+constexpr std::int32_t kEndCityStructureIndex = 20;
 constexpr std::int32_t kSurfaceStructuresStep = 4;
 constexpr std::string_view kEndCityLootTable = "minecraft:chests/end_city_treasure";
 constexpr std::string_view kName = "end_city";
@@ -73,7 +73,7 @@ constexpr std::array<StructureRotation, 4> kRotations{StructureRotation::None, S
 
 } // namespace
 
-EndCityStructureGenerator::EndCityStructureGenerator(EndNoiseRouter router, const TheEndBiomeSource& biomeSource,
+EndCityStructureGenerator::EndCityStructureGenerator(NoiseRouter router, const TheEndBiomeSource& biomeSource,
                                                      structure::TemplateLoader templateLoader,
                                                      SurfaceHeightOverride surfaceHeightOverride)
     : router_(std::move(router)), biomeSource_(&biomeSource), templateLoader_(std::move(templateLoader)),
@@ -90,8 +90,7 @@ DensityChunkSampler& EndCityStructureGenerator::samplerAt(std::int32_t x, std::i
     if (found != samplers_.end()) {
         return *found->second;
     }
-    auto created = std::make_unique<DensityChunkSampler>(router_.finalDensity, key.first, key.second, 0,
-                                                         kEndGenerationHeight, 8, 4);
+    auto created = std::make_unique<DensityChunkSampler>(router_, key.first, key.second);
     return *samplers_.emplace(key, std::move(created)).first->second;
 }
 

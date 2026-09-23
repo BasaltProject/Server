@@ -80,7 +80,7 @@ namespace {
 }
 
 [[nodiscard]] terrain::NetherBiomeLookup fixedBiome(std::string_view biome) {
-    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::DensityCache*) { return biome; };
+    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::SamplerContext*) { return biome; };
 }
 
 struct Run {
@@ -116,133 +116,133 @@ TEST_CASE("the nether underground step places what the frozen kotlin places") {
         const Run result = run("minecraft:basalt_deltas", -1, 4);
         CHECK(result.placed == 66968);
         CHECK(result.deferred == 9);
-        CHECK(result.checksum == -6616901302331720368LL);
+        CHECK(result.checksum == -7326737063796521387LL);
     }
 
     SUBCASE("wastesStep") {
         const Run result = run("minecraft:nether_wastes", -1, 4);
         CHECK(result.placed == 2359);
         CHECK(result.deferred == 9);
-        CHECK(result.checksum == -3360507228709155986LL);
+        CHECK(result.checksum == 8169650840488443513LL);
     }
 
     SUBCASE("valleyStep") {
         const Run result = run("minecraft:soul_sand_valley", -1, 4);
         CHECK(result.placed == 2729);
         CHECK(result.deferred == 9);
-        CHECK(result.checksum == 6974368551250462788LL);
+        CHECK(result.checksum == -425546198287909661LL);
     }
 
     SUBCASE("index_0") {
         const Run result = run("minecraft:basalt_deltas", 0, 4);
         CHECK(result.placed == 55857);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -3536509833262563935LL);
+        CHECK(result.checksum == 9123271427915410529LL);
     }
 
     SUBCASE("index_1") {
         const Run result = run("minecraft:basalt_deltas", 1, 4);
         CHECK(result.placed == 21558);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7407097046079931013LL);
+        CHECK(result.checksum == 9039154727421142233LL);
     }
 
     SUBCASE("index_2") {
         const Run result = run("minecraft:basalt_deltas", 2, 4);
         CHECK(result.placed == 11);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7024972290900274668LL);
+        CHECK(result.checksum == -5203559143053819521LL);
     }
 
     SUBCASE("index_3") {
         const Run result = run("minecraft:nether_wastes", 3, 4);
         CHECK(result.placed == 5);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -3600823487218636842LL);
+        CHECK(result.checksum == 4760275231012293755LL);
     }
 
     SUBCASE("index_4") {
         const Run result = run("minecraft:nether_wastes", 4, 4);
         CHECK(result.placed == 37);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -7767027590939168945LL);
+        CHECK(result.checksum == 4401916948601189811LL);
     }
 
     SUBCASE("index_5") {
         const Run result = run("minecraft:nether_wastes", 5, 24);
         CHECK(result.placed == 36);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 355257120996722155LL);
+        CHECK(result.checksum == 4895132042921661623LL);
     }
 
     SUBCASE("index_6") {
         const Run result = run("minecraft:nether_wastes", 6, 24);
         CHECK(result.placed == 12);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2815245592675481611LL);
+        CHECK(result.checksum == 6666634375374003653LL);
     }
 
     SUBCASE("index_7") {
         const Run result = run("minecraft:nether_wastes", 7, 4);
         CHECK(result.placed == 41);
         CHECK(result.deferred == 9);
-        CHECK(result.checksum == -533791245686742611LL);
+        CHECK(result.checksum == 5223721517893083215LL);
     }
 
     SUBCASE("index_8") {
         const Run result = run("minecraft:soul_sand_valley", 8, 44);
         CHECK(result.placed == 14);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8027682777876237121LL);
+        CHECK(result.checksum == 1684957282491554789LL);
     }
 
     SUBCASE("index_9") {
         const Run result = run("minecraft:nether_wastes", 9, 24);
         CHECK(result.placed == 74);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8685968852403317339LL);
+        CHECK(result.checksum == -3704005770157574099LL);
     }
 
     SUBCASE("index_10") {
         const Run result = run("minecraft:nether_wastes", 10, 24);
         CHECK(result.placed == 43);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 9034100442582826010LL);
+        CHECK(result.checksum == 6852077373945172930LL);
     }
 
     SUBCASE("index_11") {
         const Run result = run("minecraft:nether_wastes", 11, 4);
         CHECK(result.placed == 1021);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1218822257788054643LL);
+        CHECK(result.checksum == 2291315583008544232LL);
     }
 
     SUBCASE("index_12") {
         const Run result = run("minecraft:basalt_deltas", 12, 4);
         CHECK(result.placed == 59);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 3168572092440956520LL);
+        CHECK(result.checksum == 4054833701347967299LL);
     }
 
     SUBCASE("index_13") {
         const Run result = run("minecraft:basalt_deltas", 13, 4);
         CHECK(result.placed == 421);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 4197329621403570751LL);
+        CHECK(result.checksum == -623973389227857458LL);
     }
 
     SUBCASE("index_14") {
         const Run result = run("minecraft:basalt_deltas", 14, 4);
         CHECK(result.placed == 1218);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 549308592400050409LL);
+        CHECK(result.checksum == -5901315234951077051LL);
     }
 
     SUBCASE("index_15") {
         const Run result = run("minecraft:nether_wastes", 15, 4);
         CHECK(result.placed == 29);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 2149719905075186658LL);
+        CHECK(result.checksum == -6545015968820562153LL);
     }
 }
 
@@ -272,6 +272,6 @@ TEST_CASE("one nether underground feature at one position matches the frozen kot
     }
     CHECK(known == "111111111111111111111111111111111000");
     CHECK(placed == 1609);
-    CHECK(static_cast<std::int64_t>(checksum) == 7329483418435072554LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -507344150987603351LL);
     CHECK(after == 525483368);
 }

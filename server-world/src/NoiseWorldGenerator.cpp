@@ -1,7 +1,10 @@
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
 #include <basalt/server/world/WorldHeight.hpp>
 #include <basalt/server/world/densityfunction/DensityFunction.hpp>
+#include <basalt/server/world/densityfunction/SamplerContext.hpp>
+#include <basalt/server/world/noise/Noise.hpp>
 #include <basalt/server/world/noise/NormalNoise.hpp>
 
 #include <array>
@@ -31,26 +34,29 @@ constexpr std::int32_t kMaxTreesPerChunk = 2;
 constexpr std::int32_t kMinTrunkHeight = 4;
 constexpr std::int32_t kTrunkHeightVariation = 2;
 
-[[nodiscard]] const densityfunction::Function& base3d() {
-    static const densityfunction::Function noise =
-        densityfunction::functions::blendedNoiseUnseeded(0.25, 0.125, 80.0, 160.0, 8.0);
-    return noise;
+/// The terrain noise seeded with xoroshiro zero, as vanilla's unseeded blended noise is.
+[[nodiscard]] const densityfunction::DensitySampler& base3d() {
+    static const densityfunction::Sampler noise = [] {
+        random::RandomSource source = random::RandomSource::xoroshiro(0);
+        return densityfunction::functions::compileBlendedNoise(source, 0.25, 0.125, 80.0, 160.0, 8.0);
+    }();
+    return *noise;
 }
 
-[[nodiscard]] const noise::NormalNoise& heightNoise() {
-    static const noise::NormalNoise built = [] {
+[[nodiscard]] const noise::Noise& heightNoise() {
+    static const std::shared_ptr<const noise::NoiseStack> built = [] {
         random::RandomSource source = random::RandomSource::legacy(kSeed);
         static constexpr std::array<double, 5> kAmplitudes{1.0, 1.0, 1.0, 1.0, 1.0};
-        return noise::NormalNoise::create(source, -5, kAmplitudes);
+        return noise::NormalNoise::createParity(-5, kAmplitudes).create(source);
     }();
-    return built;
+    return *built;
 }
 
 void generateColumn(Chunk& chunk, std::int32_t x, std::int32_t z, std::int32_t worldX, std::int32_t worldZ) {
     const std::int32_t surfaceY =
-        kSeaLevel +
-        static_cast<std::int32_t>(heightNoise().getValue(worldX * kHeightNoiseScale, 0.0, worldZ * kHeightNoiseScale) *
-                                  kHeightVariation);
+        kSeaLevel + static_cast<std::int32_t>(static_cast<double>(heightNoise().get(worldX * kHeightNoiseScale, 0.0,
+                                                                                    worldZ * kHeightNoiseScale)) *
+                                              kHeightVariation);
     double cellBase3d = 0.0;
     for (std::int32_t y = worldHeight::kMinY; y <= worldHeight::kMaxY; ++y) {
         const double depthTerm = (surfaceY - y) * kDensitySlope;
@@ -63,8 +69,8 @@ void generateColumn(Chunk& chunk, std::int32_t x, std::int32_t z, std::int32_t w
             solid = false;
         } else {
             if ((y - worldHeight::kMinY) % kCellHeight == 0) {
-                densityfunction::FunctionContext context{worldX, y, worldZ};
-                cellBase3d = base3d()->compute(context);
+                densityfunction::SamplerContext context{densityfunction::SamplerContext::Options{}};
+                cellBase3d = static_cast<double>(base3d().sampleValue(context, worldX, y, worldZ));
             }
             solid = (cellBase3d + depthTerm) > 0.0;
         }

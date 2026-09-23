@@ -118,7 +118,7 @@ TEST_CASE("the trunk placers build what the frozen kotlin builds") {
         CHECK(result.heights == "4,6,6,6,5,6,6,4,");
         CHECK(result.logs == 43);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2729273688631067024LL);
+        CHECK(result.checksum == -863838436125299575LL);
         CHECK(result.deferredChecksum == -3750763034362895579LL);
         CHECK(result.after == 1644477171);
         CHECK(result.attached ==
@@ -130,7 +130,7 @@ TEST_CASE("the trunk placers build what the frozen kotlin builds") {
         CHECK(result.heights == "6,7,8,8,7,8,8,6,");
         CHECK(result.logs == 58);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8131705518449180375LL);
+        CHECK(result.checksum == 1714283367023660589LL);
         CHECK(result.deferredChecksum == -3750763034362895579LL);
         CHECK(result.after == 1644477171);
         CHECK(result.attached ==
@@ -142,7 +142,7 @@ TEST_CASE("the trunk placers build what the frozen kotlin builds") {
         CHECK(result.heights == "1,1,1,1,1,1,1,1,");
         CHECK(result.logs == 27);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8255199171814904508LL);
+        CHECK(result.checksum == 6409529655866334361LL);
         CHECK(result.deferredChecksum == -3750763034362895579LL);
         CHECK(result.after == 146845651);
         CHECK(result.attached == "1:1:0:0:0 2:1:0:0:0 3:1:0:0:0 |0:1:-1:0:0 0:1:-2:0:0 0:1:-3:0:0 |-1:1:0:0:0 "
@@ -155,7 +155,7 @@ TEST_CASE("the trunk placers build what the frozen kotlin builds") {
         CHECK(result.heights == "9,8,8,14,10,5,11,12,");
         CHECK(result.logs == 107);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -5314623474414642154LL);
+        CHECK(result.checksum == -8259884583829730501LL);
         CHECK(result.deferredChecksum == -3750763034362895579LL);
         CHECK(result.after == -1227943783);
         CHECK(result.attached ==
@@ -170,8 +170,8 @@ TEST_CASE("the trunk placers build what the frozen kotlin builds") {
         CHECK(result.heights == "9,8,8,14,10,5,11,12,");
         CHECK(result.logs == 105);
         CHECK(result.deferred == 2);
-        CHECK(result.checksum == 3946096834178202928LL);
-        CHECK(result.deferredChecksum == 6250050844250502832LL);
+        CHECK(result.checksum == 3162301722209195321LL);
+        CHECK(result.deferredChecksum == 7779543117856543228LL);
         CHECK(result.after == -1227943783);
         CHECK(result.attached ==
               "0:6:0:0:0 2:5:0:0:0 |0:5:0:0:0 -1:4:0:0:0 0:3:-2:0:0 |0:5:0:0:0 -3:4:-2:0:0 0:3:-1:0:0 |0:11:0:0:0 "
@@ -185,7 +185,7 @@ TEST_CASE("the trunk placers build what the frozen kotlin builds") {
         CHECK(result.heights == "7,9,7,7,6,9,8,5,");
         CHECK(result.logs == 72);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -5999124108274866315LL);
+        CHECK(result.checksum == -4465941523136580587LL);
         CHECK(result.deferredChecksum == -3750763034362895579LL);
         CHECK(result.after == 383312261);
         CHECK(result.attached == "1:7:0:1:0 |0:9:-3:1:0 1:5:0:0:0 |-3:7:0:1:0 3:6:0:0:0 |0:7:-1:1:0 0:4:2:0:0 "
@@ -197,7 +197,7 @@ TEST_CASE("the trunk placers build what the frozen kotlin builds") {
         CHECK(result.heights == "7,8,9,9,8,9,9,7,");
         CHECK(result.logs == 354);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2363414994762777845LL);
+        CHECK(result.checksum == 5127673652410377253LL);
         CHECK(result.deferredChecksum == -3750763034362895579LL);
         CHECK(result.after == 918253638);
         CHECK(result.attached ==
@@ -213,7 +213,7 @@ TEST_CASE("the trunk placers build what the frozen kotlin builds") {
         CHECK(result.heights == "21,29,18,18,17,17,22,13,");
         CHECK(result.logs == 596);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8180639631677552633LL);
+        CHECK(result.checksum == -3026569303513337059LL);
         CHECK(result.deferredChecksum == -3750763034362895579LL);
         CHECK(result.after == 1644477171);
         CHECK(result.attached ==
@@ -225,7 +225,7 @@ TEST_CASE("the trunk placers build what the frozen kotlin builds") {
         CHECK(result.heights == "18,21,25,15,19,14,19,20,");
         CHECK(result.logs == 643);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 5899721898345236534LL);
+        CHECK(result.checksum == -4353357584460495535LL);
         CHECK(result.deferredChecksum == -3750763034362895579LL);
         CHECK(result.after == 1159570266);
         CHECK(result.attached ==

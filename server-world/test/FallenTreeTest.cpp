@@ -125,7 +125,7 @@ TEST_CASE("the fallen trees match the frozen kotlin") {
         CHECK(result.vines == 21);
         CHECK(result.mushrooms == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -3234382624305973141LL);
+        CHECK(result.checksum == 2111772478845633770LL);
         CHECK(result.after == 1159570266);
     }
 
@@ -136,7 +136,7 @@ TEST_CASE("the fallen trees match the frozen kotlin") {
         CHECK(result.vines == 21);
         CHECK(result.mushrooms == 1);
         CHECK(result.deferred == 4);
-        CHECK(result.checksum == -7482635089775666175LL);
+        CHECK(result.checksum == 7496204343525691519LL);
         CHECK(result.after == -1227943783);
     }
 
@@ -147,7 +147,7 @@ TEST_CASE("the fallen trees match the frozen kotlin") {
         CHECK(result.vines == 21);
         CHECK(result.mushrooms == 1);
         CHECK(result.deferred == 2);
-        CHECK(result.checksum == 8326271424227522099LL);
+        CHECK(result.checksum == -5740173150310113087LL);
         CHECK(result.after == -1227943783);
     }
 
@@ -158,7 +158,7 @@ TEST_CASE("the fallen trees match the frozen kotlin") {
         CHECK(result.vines == 0);
         CHECK(result.mushrooms == 2);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -197894503810220077LL);
+        CHECK(result.checksum == -3404177732952074049LL);
         CHECK(result.after == 346492119);
     }
 
@@ -169,7 +169,7 @@ TEST_CASE("the fallen trees match the frozen kotlin") {
         CHECK(result.vines == 0);
         CHECK(result.mushrooms == 1);
         CHECK(result.deferred == 5);
-        CHECK(result.checksum == -4314168846162319068LL);
+        CHECK(result.checksum == 3702491620171566242LL);
         CHECK(result.after == 1809951391);
     }
 
@@ -180,7 +180,7 @@ TEST_CASE("the fallen trees match the frozen kotlin") {
         CHECK(result.vines == 0);
         CHECK(result.mushrooms == 2);
         CHECK(result.deferred == 4);
-        CHECK(result.checksum == 1451031959472135638LL);
+        CHECK(result.checksum == 8816767382954606931LL);
         CHECK(result.after == 1809951391);
     }
 
@@ -191,7 +191,7 @@ TEST_CASE("the fallen trees match the frozen kotlin") {
         CHECK(result.vines == 21);
         CHECK(result.mushrooms == 4);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1251417845718184077LL);
+        CHECK(result.checksum == -3612031838299561239LL);
         CHECK(result.after == 1159570266);
     }
 
@@ -202,7 +202,7 @@ TEST_CASE("the fallen trees match the frozen kotlin") {
         CHECK(result.vines == 0);
         CHECK(result.mushrooms == 3);
         CHECK(result.deferred == 4);
-        CHECK(result.checksum == -6471427007400619165LL);
+        CHECK(result.checksum == -4042438977124248495LL);
         CHECK(result.after == 1809951391);
     }
 }

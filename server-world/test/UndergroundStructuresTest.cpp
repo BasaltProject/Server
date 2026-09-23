@@ -135,21 +135,21 @@ TEST_CASE("the underground structures step places what the frozen kotlin places"
         const Run result = run("minecraft:desert", true);
         CHECK(result.placed == 251);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -6458666922197831264LL);
+        CHECK(result.checksum == 6081400787217114224LL);
     }
 
     SUBCASE("noTemplates") {
         const Run result = run("minecraft:desert", false);
         CHECK(result.placed == 168);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7272390968881047553LL);
+        CHECK(result.checksum == 2269218341021994694LL);
     }
 
     SUBCASE("plains") {
         const Run result = run("minecraft:plains", true);
         CHECK(result.placed == 168);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7272390968881047553LL);
+        CHECK(result.checksum == 2269218341021994694LL);
     }
 
     SUBCASE("nether") {

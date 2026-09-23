@@ -100,26 +100,26 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 
 TEST_CASE("the stronghold brush draws what the frozen kotlin draws") {
     SUBCASE("opening") {
-        check(run(StrongholdDoor::Opening, false, true), 729, 4, 0, 374317734422466963LL, 1556979993);
+        check(run(StrongholdDoor::Opening, false, true), 729, 4, 0, -2624076757958891870LL, 1556979993);
     }
 
     SUBCASE("woodDoor") {
-        check(run(StrongholdDoor::WoodDoor, false, true), 729, 4, 0, -2130769668714880324LL, 1556979993);
+        check(run(StrongholdDoor::WoodDoor, false, true), 729, 4, 0, 6643705451712105828LL, 1556979993);
     }
 
     SUBCASE("grates") {
-        check(run(StrongholdDoor::Grates, false, true), 729, 4, 0, -3739463078296862090LL, 1556979993);
+        check(run(StrongholdDoor::Grates, false, true), 729, 4, 0, -3544116545930813238LL, 1556979993);
     }
 
     SUBCASE("ironDoor") {
-        check(run(StrongholdDoor::IronDoor, false, true), 730, 4, 0, -2759895567937183918LL, 1556979993);
+        check(run(StrongholdDoor::IronDoor, false, true), 730, 4, 0, 4697349433113267847LL, 1556979993);
     }
 
     SUBCASE("hollow") {
-        check(run(StrongholdDoor::Opening, true, true), 334, 4, 0, -3128848843180299488LL, -484170814);
+        check(run(StrongholdDoor::Opening, true, true), 334, 4, 0, -6586438986939183967LL, -484170814);
     }
 
     SUBCASE("hollowFilled") {
-        check(run(StrongholdDoor::Opening, true, false), 729, 4, 0, 7268136418783640560LL, 1556979993);
+        check(run(StrongholdDoor::Opening, true, false), 729, 4, 0, 3784531274785053889LL, 1556979993);
     }
 }

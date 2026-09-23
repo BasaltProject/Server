@@ -17,7 +17,7 @@ namespace basalt::server::world::terrain::decoration {
 namespace {
 
 constexpr std::int32_t kVegetalDecorationStep = 9;
-constexpr std::int32_t kMushroomIslandIndex = 79;
+constexpr std::int32_t kMushroomIslandIndex = 82;
 
 [[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
     const registry::BlockState* found = registry::blocks::named(path);
@@ -168,14 +168,14 @@ struct PatchSpec {
 
 const std::vector<PatchSpec>& specs() {
     static const std::vector<PatchSpec> built = {
-        {"brown_mushroom_old_growth", 63, "brown_mushroom", 4, 3, &oldGrowthBiomes()},
-        {"red_mushroom_old_growth", 64, "red_mushroom", 171, 1, &oldGrowthBiomes()},
-        {"brown_mushroom_swamp", 66, "brown_mushroom", 0, 2, &swampBiomes()},
-        {"red_mushroom_swamp", 67, "red_mushroom", 64, 1, &swampBiomes()},
-        {"brown_mushroom_normal", 73, "brown_mushroom", 256, 1, &normalBiomes()},
-        {"red_mushroom_normal", 74, "red_mushroom", 512, 1, &normalBiomes()},
-        {"brown_mushroom_taiga", 80, "brown_mushroom", 4, 1, &taigaBiomes()},
-        {"red_mushroom_taiga", 81, "red_mushroom", 256, 1, &taigaBiomes()}};
+        {"brown_mushroom_old_growth", 66, "brown_mushroom", 4, 3, &oldGrowthBiomes()},
+        {"red_mushroom_old_growth", 67, "red_mushroom", 171, 1, &oldGrowthBiomes()},
+        {"brown_mushroom_swamp", 69, "brown_mushroom", 0, 2, &swampBiomes()},
+        {"red_mushroom_swamp", 70, "red_mushroom", 64, 1, &swampBiomes()},
+        {"brown_mushroom_normal", 76, "brown_mushroom", 256, 1, &normalBiomes()},
+        {"red_mushroom_normal", 77, "red_mushroom", 512, 1, &normalBiomes()},
+        {"brown_mushroom_taiga", 83, "brown_mushroom", 4, 1, &taigaBiomes()},
+        {"red_mushroom_taiga", 84, "red_mushroom", 256, 1, &taigaBiomes()}};
     return built;
 }
 

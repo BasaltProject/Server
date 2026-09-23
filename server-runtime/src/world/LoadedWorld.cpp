@@ -243,9 +243,10 @@ std::pair<std::int32_t, std::int32_t> LoadedWorld::climateSpawnChunk() {
     if (overworldRouter_ == nullptr) {
         return {0, 0};
     }
-    const server::world::climate::Sampler sampler{overworldRouter_->temperature, overworldRouter_->vegetation,
-                                                  overworldRouter_->continents,  overworldRouter_->erosion,
-                                                  overworldRouter_->depth,       overworldRouter_->ridges};
+    const server::world::climate::Sampler sampler{*overworldRouter_->state,     overworldRouter_->temperature,
+                                                  overworldRouter_->vegetation, overworldRouter_->continents,
+                                                  overworldRouter_->erosion,    overworldRouter_->depth,
+                                                  overworldRouter_->ridges};
     const std::pair<std::int32_t, std::int32_t> found = server::world::climate::spawnFinder::findSpawnPosition(sampler);
     return {found.first >> 4, found.second >> 4};
 }

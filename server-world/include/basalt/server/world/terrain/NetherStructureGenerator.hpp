@@ -29,14 +29,14 @@ class NetherStructureGenerator {
 public:
     using PoolLookup = std::function<const structure::StructureTemplatePool*(std::string_view)>;
 
-    NetherStructureGenerator(NetherNoiseRouter router, const NetherBiomeSource& biomeSource,
+    NetherStructureGenerator(NoiseRouter router, const NetherBiomeSource& biomeSource,
                              structure::TemplateLoader templateLoader, PoolLookup poolLookup = nullptr);
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
-    /// parity: `NoiseChunk` adds referenced structure terrain adaptation before cell interpolation.
-    [[nodiscard]] densityfunction::Function finalDensityForChunk(std::int32_t chunkX, std::int32_t chunkZ,
-                                                                 std::int64_t seed);
+    /// parity: `Beardifier.forStructuresInChunk`, the sampler the chunk's context binds.
+    [[nodiscard]] densityfunction::Sampler beardifierForChunk(std::int32_t chunkX, std::int32_t chunkZ,
+                                                              std::int64_t seed);
 
 private:
     struct FossilStart {
@@ -91,7 +91,7 @@ private:
     void placeDriedGhast(Chunk& chunk, std::int64_t seed, const structure::StructureBoundingBox& fossilBox,
                          const structure::StructureBoundingBox& clip) const;
 
-    NetherNoiseRouter router_;
+    NoiseRouter router_;
     const NetherBiomeSource* biomeSource_;
     structure::TemplateLoader templateLoader_;
     PoolLookup poolLookup_;

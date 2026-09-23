@@ -1,5 +1,7 @@
 #include <basalt/server/world/climate/Climate.hpp>
 #include <basalt/server/world/climate/Sampler.hpp>
+#include <basalt/server/world/densityfunction/RandomState.hpp>
+#include <basalt/server/world/densityfunction/SamplerContext.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -62,14 +64,29 @@ ParameterPoint parameters(float temperature, float humidity, float continentalne
             quantizeCoord(offset)};
 }
 
+Sampler::Sampler(densityfunction::RandomState& state, const densityfunction::Function& temperature,
+                 const densityfunction::Function& humidity, const densityfunction::Function& continentalness,
+                 const densityfunction::Function& erosion, const densityfunction::Function& depth,
+                 const densityfunction::Function& weirdness)
+    : temperature_(state.sampler(temperature)), humidity_(state.sampler(humidity)),
+      continentalness_(state.sampler(continentalness)), erosion_(state.sampler(erosion)), depth_(state.sampler(depth)),
+      weirdness_(state.sampler(weirdness)) {}
+
 TargetPoint Sampler::sample(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ,
-                            densityfunction::DensityCache* cache) const {
+                            densityfunction::SamplerContext* context) const {
+    densityfunction::SamplerContext uncached{densityfunction::SamplerContext::Options{}};
+    densityfunction::SamplerContext& active = context == nullptr ? uncached : *context;
     // parity: QuartPos.toBlock. A quart is four blocks, which is vanilla's biome grid resolution.
-    densityfunction::FunctionContext context{quartX << 2, quartY << 2, quartZ << 2, cache};
-    return target(static_cast<float>(temperature_->compute(context)), static_cast<float>(humidity_->compute(context)),
-                  static_cast<float>(continentalness_->compute(context)),
-                  static_cast<float>(erosion_->compute(context)), static_cast<float>(depth_->compute(context)),
-                  static_cast<float>(weirdness_->compute(context)));
+    const std::int32_t x = quartX << 2;
+    const std::int32_t y = quartY << 2;
+    const std::int32_t z = quartZ << 2;
+    const float temperature = temperature_->sampleValue(active, x, y, z);
+    const float humidity = humidity_->sampleValue(active, x, y, z);
+    const float continentalness = continentalness_->sampleValue(active, x, y, z);
+    const float erosion = erosion_->sampleValue(active, x, y, z);
+    const float depth = depth_->sampleValue(active, x, y, z);
+    const float weirdness = weirdness_->sampleValue(active, x, y, z);
+    return target(temperature, humidity, continentalness, erosion, depth, weirdness);
 }
 
 } // namespace basalt::server::world::climate

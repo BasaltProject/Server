@@ -171,7 +171,7 @@ struct Run {
                            std::int32_t foldFrom = kFloorY, std::int32_t foldTo = 64) {
     Run result;
     std::uint64_t checksum = 14695981039346656037ULL;
-    const FixedBiomeEnvironment environment{std::string{biome}, 60};
+    const FixedBiomeEnvironment environment{std::string{biome}};
     for (std::int32_t chunkIndex = 0; chunkIndex < count; ++chunkIndex) {
         Chunk chunk = terrainChunk(chunkIndex * 3 - 8, chunkIndex * -2 + 5, false, foldFrom);
         const std::int64_t seed = 77LL + chunkIndex;
@@ -241,49 +241,49 @@ TEST_CASE("the lakes step and the sulfur spring place what the frozen kotlin pla
         const Run result = runLakes("minecraft:plains", 150, "lake_lava_underground");
         CHECK(result.placed == 38780);
         CHECK(result.deferred == 381);
-        CHECK(result.checksum == 3558387114336136191LL);
+        CHECK(result.checksum == 4272562641936543490LL);
     }
 
     SUBCASE("lakeSurface") {
         const Run result = runLakes("minecraft:plains", 900, "lake_lava_surface", 50);
         CHECK(result.placed == 230399);
         CHECK(result.deferred == 128);
-        CHECK(result.checksum == 5547863478653367697LL);
+        CHECK(result.checksum == 7261584562030715561LL);
     }
 
     SUBCASE("sulfurPool") {
         const Run result = runLakes("minecraft:sulfur_caves", 30, "sulfur_pool");
         CHECK(result.placed == 17442);
         CHECK(result.deferred == 23584);
-        CHECK(result.checksum == -7907385953580034484LL);
+        CHECK(result.checksum == 7258998429875258203LL);
     }
 
     SUBCASE("springNode") {
         const Run result = runLakes("minecraft:sulfur_caves", 30, "rooted_sulfur_spring");
         CHECK(result.placed == 7680);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8209810274020937965LL);
+        CHECK(result.checksum == 3036780461455879443LL);
     }
 
     SUBCASE("lakesPlains") {
         const Run result = runLakes("minecraft:plains", 60);
         CHECK(result.placed == 15424);
         CHECK(result.deferred == 29);
-        CHECK(result.checksum == 3861486950185679071LL);
+        CHECK(result.checksum == -7473059217675198841LL);
     }
 
     SUBCASE("lakesSulfur") {
         const Run result = runLakes("minecraft:sulfur_caves", 60);
         CHECK(result.placed == 35544);
         CHECK(result.deferred == 45835);
-        CHECK(result.checksum == -9050247876026515114LL);
+        CHECK(result.checksum == -8526133637202311476LL);
     }
 
     SUBCASE("lakesDeepDark") {
         const Run result = runLakes("minecraft:deep_dark", 60);
         CHECK(result.placed == 15360);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8612147341153761111LL);
+        CHECK(result.checksum == -3531853649559082839LL);
     }
 
     SUBCASE("spring") {
@@ -291,7 +291,7 @@ TEST_CASE("the lakes step and the sulfur spring place what the frozen kotlin pla
         CHECK(result.placed == 11919);
         CHECK(result.deferred == 65);
         CHECK(result.draws == -655195496);
-        CHECK(result.checksum == 5167521170705936864LL);
+        CHECK(result.checksum == -8105106595843827433LL);
     }
 
     SUBCASE("springNoTemplates") {
@@ -299,6 +299,6 @@ TEST_CASE("the lakes step and the sulfur spring place what the frozen kotlin pla
         CHECK(result.placed == 6144);
         CHECK(result.deferred == 0);
         CHECK(result.draws == -1946882916);
-        CHECK(result.checksum == -2547046802072790747LL);
+        CHECK(result.checksum == -8948362395136162523LL);
     }
 }

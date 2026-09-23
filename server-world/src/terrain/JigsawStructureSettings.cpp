@@ -5,8 +5,8 @@ namespace basalt::server::world::terrain::jigsawStructures {
 const JigsawStructureSettings& pillagerOutpost() {
     static const JigsawStructureSettings built{
         .name = "pillager_outpost",
-        // Tenth of the 26 structures of `surface_structures`, in registry order.
-        .structureIndex = 9,
+        // Position among the 44 structures of `surface_structures`, in registry order.
+        .structureIndex = 27,
         .step = 4,
         .startPool = "minecraft:pillager_outpost/base_plates",
         .maxDepth = 7,

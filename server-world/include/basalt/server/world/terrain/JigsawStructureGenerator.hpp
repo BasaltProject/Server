@@ -85,7 +85,7 @@ public:
 
     static constexpr std::int32_t kDefaultSearchCells = 64;
 
-    JigsawStructureGenerator(JigsawStructureSettings settings, OverworldNoiseRouter router,
+    JigsawStructureGenerator(JigsawStructureSettings settings, NoiseRouter router,
                              structure::StructurePlacementGrid grid, BiomeAt biomeAt,
                              std::set<std::string, std::less<>> biomes, PoolLookup poolLookup,
                              structure::PoolTemplateLoader templateLoader);
@@ -95,10 +95,8 @@ public:
 
     void generateInto(Chunk& chunk, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
-    /// `base` plus this chunk's beard, or `base` unchanged when no start reaches it. Takes the
-    /// density so a chunk with a village too gets one beardifier, not two bases.
-    [[nodiscard]] densityfunction::Function beardified(densityfunction::Function base, std::int32_t chunkX,
-                                                       std::int32_t chunkZ, std::int64_t seed);
+    /// Adds this chunk's pieces and junctions to the chunk's one beardifier.
+    void addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
     /// The nearest chunk holding a start, searched outward over the grid's own cells.
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>>
@@ -140,7 +138,7 @@ private:
                      const std::vector<structure::PlacedStructurePiece>& pieces) const;
 
     JigsawStructureSettings settings_;
-    OverworldNoiseRouter router_;
+    NoiseRouter router_;
     structure::StructurePlacementGrid grid_;
     BiomeAt biomeAt_;
     std::set<std::string, std::less<>> biomes_;

@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <basalt/server/world/densityfunction/DensityFunction.hpp>
+#include "support/SyntheticRouter.hpp"
+
 #include <basalt/server/world/terrain/NetherBiomeSource.hpp>
 
 #include <doctest.h>
@@ -10,9 +11,23 @@
 
 using namespace basalt::server::world;
 using basalt::server::world::terrain::NetherBiomeSource;
-namespace functions = basalt::server::world::densityfunction::functions;
+using basalt::server::world::testsupport::syntheticRouter;
 
 namespace {
+
+[[nodiscard]] terrain::NoiseRouter climateRouter(const std::string& temperature, const std::string& vegetation) {
+    return syntheticRouter(0, "0.0",
+                           {.minY = 0,
+                            .height = 128,
+                            .defaultBlock = "minecraft:netherrack",
+                            .fields = {{"temperature", temperature}, {"vegetation", vegetation}}});
+}
+
+[[nodiscard]] std::string gradient(std::int32_t from, std::int32_t to, double fromValue, double toValue) {
+    return R"({"type": "minecraft:gradient", "axis": "y", "from_coordinate": )" + std::to_string(from) +
+           R"(, "to_coordinate": )" + std::to_string(to) + R"(, "from_value": )" + std::to_string(fromValue) +
+           R"(, "to_value": )" + std::to_string(toValue) + "}";
+}
 
 /// The biome's own initial, which is enough to tell the five Nether biomes apart.
 [[nodiscard]] char initial(std::string_view biome) {
@@ -22,14 +37,15 @@ namespace {
 
 } // namespace
 
-TEST_CASE("the nether biome source resolves what the frozen kotlin resolves") {
+TEST_CASE("the nether biome source resolves what the parameter list resolves") {
     // Sweeping the two axes the Nether actually uses walks the whole parameter tree, including the
     // offsets that bias warped forest and basalt deltas.
     std::string grid;
     for (std::int32_t temperatureStep = -10; temperatureStep <= 10; ++temperatureStep) {
         for (std::int32_t vegetationStep = -10; vegetationStep <= 10; ++vegetationStep) {
-            const NetherBiomeSource source{functions::constant(temperatureStep / 10.0),
-                                           functions::constant(vegetationStep / 10.0)};
+            const terrain::NoiseRouter router =
+                climateRouter(std::to_string(temperatureStep / 10.0), std::to_string(vegetationStep / 10.0));
+            const NetherBiomeSource source{router};
             grid += initial(source.biomeAt(0, 64, 0));
         }
         grid += "|";
@@ -43,11 +59,11 @@ TEST_CASE("the nether biome source resolves what the frozen kotlin resolves") {
         "ssccccccccccccccccccc|");
 }
 
-TEST_CASE("the zoomed nether lookup answers what the frozen kotlin answers") {
+TEST_CASE("the zoomed nether lookup answers from the quart the zoom picks") {
     // A y gradient makes the answer depend on which quart the Voronoi lands on, which a constant
     // noise would hide. Which quart it picks is pinned by the zoomer's own test.
-    const NetherBiomeSource zoomed{functions::yClampedGradient(0, 128, -1.0, 1.0),
-                                   functions::yClampedGradient(0, 40, 1.0, -1.0), 987654321LL};
+    const terrain::NoiseRouter router = climateRouter(gradient(0, 128, -1.0, 1.0), gradient(0, 40, 1.0, -1.0));
+    const NetherBiomeSource zoomed{router, 987654321LL};
     std::string walk;
     for (std::int32_t index = 0; index < 96; ++index) {
         walk += initial(zoomed.blockBiomeAt(index * 37 - 900, 20 + index / 4, index * -53 + 400));

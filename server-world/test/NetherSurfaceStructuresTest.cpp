@@ -75,7 +75,7 @@ struct Fold {
 }
 
 [[nodiscard]] terrain::NetherBiomeLookup fixedBiome(std::string_view biome) {
-    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::DensityCache*) { return biome; };
+    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::SamplerContext*) { return biome; };
 }
 
 [[nodiscard]] Fold run(std::string_view biome, std::int32_t index) {
@@ -105,35 +105,35 @@ TEST_CASE("the basalt deltas surface features build what the frozen kotlin build
         const Fold result = run("minecraft:basalt_deltas", -1);
         CHECK(result.basalt == 8737);
         CHECK(result.magma == 119);
-        CHECK(result.checksum == -3000954630696362016LL);
+        CHECK(result.checksum == 1235169816087752258LL);
     }
 
     SUBCASE("wastesStep") {
         const Fold result = run("minecraft:nether_wastes", -1);
         CHECK(result.basalt == 0);
         CHECK(result.magma == 0);
-        CHECK(result.checksum == 7868481725456217217LL);
+        CHECK(result.checksum == -6986608601789298375LL);
     }
 
     SUBCASE("delta") {
         const Fold result = run("minecraft:basalt_deltas", 0);
         CHECK(result.basalt == 0);
         CHECK(result.magma == 119);
-        CHECK(result.checksum == 3538581714467077477LL);
+        CHECK(result.checksum == -8266426757087647590LL);
     }
 
     SUBCASE("smallColumns") {
         const Fold result = run("minecraft:basalt_deltas", 1);
         CHECK(result.basalt == 724);
         CHECK(result.magma == 0);
-        CHECK(result.checksum == 1399069255947750473LL);
+        CHECK(result.checksum == -4976229355345546838LL);
     }
 
     SUBCASE("largeColumns") {
         const Fold result = run("minecraft:basalt_deltas", 2);
         CHECK(result.basalt == 8563);
         CHECK(result.magma == 0);
-        CHECK(result.checksum == 6706969506979995744LL);
+        CHECK(result.checksum == 786788147257213029LL);
     }
 }
 
@@ -165,6 +165,6 @@ TEST_CASE("one basalt deltas feature at one position matches the frozen kotlin")
     CHECK(known == "111111111111111111000000");
     CHECK(basalt == 4565);
     CHECK(magma == 28);
-    CHECK(static_cast<std::int64_t>(checksum) == 6862765596178118547LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -1121765575159930483LL);
     CHECK(after == -1601777976);
 }

@@ -235,22 +235,22 @@ void checkFill(const FillRun& result, std::int32_t placed, std::size_t entities,
 } // namespace
 
 TEST_CASE("the piece fill writes what the frozen kotlin writes") {
-    SUBCASE("fillFree") { checkFill(runFill(std::nullopt), 576, 1, true, 3978, 0, -4585442089900045651LL, 1440546838); }
+    SUBCASE("fillFree") { checkFill(runFill(std::nullopt), 576, 1, true, 5534, 0, -6444704322193895759LL, 1440546838); }
 
     SUBCASE("fillNORTH") {
-        checkFill(runFill(StructureDirection::North), 576, 1, true, 3978, 0, 8327279442081478337LL, 1440546838);
+        checkFill(runFill(StructureDirection::North), 576, 1, true, 5534, 0, -930856494192412647LL, 1440546838);
     }
 
     SUBCASE("fillSOUTH") {
-        checkFill(runFill(StructureDirection::South), 576, 1, true, 3978, 0, 6176489849520537063LL, 1440546838);
+        checkFill(runFill(StructureDirection::South), 576, 1, true, 5534, 0, -5968762878409764285LL, 1440546838);
     }
 
     SUBCASE("fillWEST") {
-        checkFill(runFill(StructureDirection::West), 576, 1, true, 3938, 0, 5585959790461109351LL, 1440546838);
+        checkFill(runFill(StructureDirection::West), 576, 1, true, 5494, 0, 6793382901108192167LL, 1440546838);
     }
 
     SUBCASE("fillEAST") {
-        checkFill(runFill(StructureDirection::East), 576, 1, true, 3938, 0, -8590703105063170555LL, 1440546838);
+        checkFill(runFill(StructureDirection::East), 576, 1, true, 5494, 0, 3909241527507872429LL, 1440546838);
     }
 }
 
@@ -296,7 +296,7 @@ TEST_CASE("the pool json parses into what the frozen kotlin parses") {
         REQUIRE(!processors.capped().empty());
         CHECK(processors.capped().front().limit == 3);
         REQUIRE(!processors.rules().empty());
-        CHECK(processors.rules().front().outputStateId == 3368);
+        CHECK(processors.rules().front().outputStateId == 4924);
         REQUIRE(!processors.capped().front().delegate.empty());
         CHECK(processors.capped().front().delegate.front().appendLootTable.value_or("null") ==
               "minecraft:chests/village/village_house");

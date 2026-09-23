@@ -171,12 +171,21 @@ struct Palette {
     palette.frontFacing.reserve(paletteList.size());
     palette.topFacing.reserve(paletteList.size());
     for (std::size_t index = 0; index < paletteList.size(); ++index) {
+        // parity: `BlockState.CODEC` since 26.3: `{id, properties}`, a bare id (wrapped as `{"": id}`
+        // in a mixed list), or 26.2's `{Name, Properties}`.
         const NbtCompound* entry = paletteList[index].get<NbtCompound>();
+        const std::string* bare = paletteList[index].get<std::string>();
+        if (entry != nullptr && entry->size() == 1 && entry->names()[0].empty()) {
+            bare = entry->values()[0].get<std::string>();
+            entry = nullptr;
+        }
         std::map<std::string, std::string> properties;
-        std::string name;
+        std::string name = bare != nullptr ? *bare : std::string{};
         if (entry != nullptr) {
-            name = std::string{entry->getString("Name")};
-            if (const NbtCompound* propertyTag = entry->getCompound("Properties"); propertyTag != nullptr) {
+            const bool legacy = entry->contains("Name");
+            name = std::string{entry->getString(legacy ? "Name" : "id")};
+            if (const NbtCompound* propertyTag = entry->getCompound(legacy ? "Properties" : "properties");
+                propertyTag != nullptr) {
                 for (std::size_t at = 0; at < propertyTag->size(); ++at) {
                     const std::string* value = propertyTag->values()[at].get<std::string>();
                     if (value != nullptr) {

@@ -105,6 +105,15 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                         .write(buffer);
                 });
             }
+            if (entity->lying) {
+                // parity: `Cat.IS_LYING`, for a cat already lying when it comes into view.
+                owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                    SetEntityDataPacket{.entityId = entity->entityId(),
+                                        .entries = {SetEntityDataPacket::Entry{
+                                            .index = 21, .value = SetEntityDataPacket::BoolValue{.value = true}}}}
+                        .write(buffer);
+                });
+            }
             owner_->sendPlayPacket(SpawnEntityPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                 SpawnEntityPacket{.entityId = entity->entityId(),
                                   .uuid = entity->uuid(),

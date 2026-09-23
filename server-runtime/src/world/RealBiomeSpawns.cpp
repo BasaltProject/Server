@@ -44,8 +44,18 @@ using wire::common::JsonValue;
         const JsonValue* type = fields->find("type");
         const std::string* named = type == nullptr ? nullptr : type->get<std::string>();
         const std::optional<std::int64_t> weight = integerOf(fields->find("weight"));
-        const std::optional<std::int64_t> minCount = integerOf(fields->find("minCount"));
-        const std::optional<std::int64_t> maxCount = integerOf(fields->find("maxCount"));
+        std::optional<std::int64_t> minCount = integerOf(fields->find("minCount"));
+        std::optional<std::int64_t> maxCount = integerOf(fields->find("maxCount"));
+        // Since 26.3 the pack size is an int provider: a constant or a uniform range.
+        if (const JsonValue* count = fields->find("count"); count != nullptr) {
+            if (const std::optional<std::int64_t> constant = integerOf(count); constant.has_value()) {
+                minCount = constant;
+                maxCount = constant;
+            } else if (const JsonObject* range = count->get<JsonObject>(); range != nullptr) {
+                minCount = integerOf(range->find("min_inclusive"));
+                maxCount = integerOf(range->find("max_inclusive"));
+            }
+        }
         if (named == nullptr || !weight.has_value() || !minCount.has_value() || !maxCount.has_value()) {
             continue;
         }
@@ -77,7 +87,30 @@ RealBiomeSpawns::Settings RealBiomeSpawns::parse(std::string_view json) {
         return settings;
     }
 
-    if (const JsonValue* spawners = root->find("spawners"); spawners != nullptr) {
+    // Since 26.3 the spawn settings are environment attributes of the biome.
+    if (const JsonValue* attributesField = root->find("attributes"); attributesField != nullptr) {
+        if (const JsonObject* attributes = attributesField->get<JsonObject>(); attributes != nullptr) {
+            if (const JsonValue* spawns = attributes->find("minecraft:gameplay/natural_mob_spawns");
+                spawns != nullptr) {
+                const JsonObject* modifier = spawns->get<JsonObject>();
+                const JsonValue* argument = modifier == nullptr ? nullptr : modifier->find("argument");
+                const JsonObject* body = argument == nullptr ? nullptr : argument->get<JsonObject>();
+                if (body != nullptr) {
+                    root = body;
+                }
+            }
+            if (const std::optional<double> probability =
+                    realOf(attributes->find("minecraft:gameplay/creature_world_gen_spawn_probability"));
+                probability.has_value()) {
+                settings.creatureProbability = static_cast<float>(*probability);
+            }
+        }
+    }
+    const JsonValue* spawnersField = root->find("spawns_by_category");
+    if (spawnersField == nullptr) {
+        spawnersField = root->find("spawners");
+    }
+    if (const JsonValue* spawners = spawnersField; spawners != nullptr) {
         if (const JsonObject* lists = spawners->get<JsonObject>(); lists != nullptr) {
             for (std::size_t index = 0; index < lists->names().size(); index++) {
                 const std::vector<JsonValue>* list = lists->values()[index].get<std::vector<JsonValue>>();

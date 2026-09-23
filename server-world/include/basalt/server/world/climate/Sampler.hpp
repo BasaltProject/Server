@@ -5,29 +5,33 @@
 
 #include <cstdint>
 
+namespace basalt::server::world::densityfunction {
+class RandomState;
+class SamplerContext;
+} // namespace basalt::server::world::densityfunction
+
 namespace basalt::server::world::climate {
 
 /// parity: `Climate.Sampler`. Samples the six axes at a position given in quart coordinates,
 /// vanilla's four-block biome grid, and quantises the result.
 class Sampler {
 public:
-    Sampler(densityfunction::Function temperature, densityfunction::Function humidity,
-            densityfunction::Function continentalness, densityfunction::Function erosion,
-            densityfunction::Function depth, densityfunction::Function weirdness)
-        : temperature_(std::move(temperature)), humidity_(std::move(humidity)),
-          continentalness_(std::move(continentalness)), erosion_(std::move(erosion)), depth_(std::move(depth)),
-          weirdness_(std::move(weirdness)) {}
+    Sampler(densityfunction::RandomState& state, const densityfunction::Function& temperature,
+            const densityfunction::Function& humidity, const densityfunction::Function& continentalness,
+            const densityfunction::Function& erosion, const densityfunction::Function& depth,
+            const densityfunction::Function& weirdness);
 
+    /// Through `context` when given, otherwise uncached, the way `createUncachedResolver` samples.
     [[nodiscard]] TargetPoint sample(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ,
-                                     densityfunction::DensityCache* cache = nullptr) const;
+                                     densityfunction::SamplerContext* context = nullptr) const;
 
 private:
-    densityfunction::Function temperature_;
-    densityfunction::Function humidity_;
-    densityfunction::Function continentalness_;
-    densityfunction::Function erosion_;
-    densityfunction::Function depth_;
-    densityfunction::Function weirdness_;
+    densityfunction::Sampler temperature_;
+    densityfunction::Sampler humidity_;
+    densityfunction::Sampler continentalness_;
+    densityfunction::Sampler erosion_;
+    densityfunction::Sampler depth_;
+    densityfunction::Sampler weirdness_;
 };
 
 } // namespace basalt::server::world::climate

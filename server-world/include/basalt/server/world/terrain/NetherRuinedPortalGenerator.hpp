@@ -33,9 +33,11 @@ class NetherRuinedPortalGenerator {
 public:
     using BaseStateAt = std::function<std::int32_t(std::int32_t, std::int32_t, std::int32_t)>;
     using PlaceEarlierBastions = std::function<void(Chunk&, std::int64_t)>;
+    using CarveBase = std::function<void(Chunk&)>;
 
     NetherRuinedPortalGenerator(const NetherBiomeSource& biomeSource, structure::TemplateLoader templateLoader,
-                                BaseStateAt baseStateAt, PlaceEarlierBastions placeEarlierBastions);
+                                BaseStateAt baseStateAt, PlaceEarlierBastions placeEarlierBastions,
+                                CarveBase carveBase);
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
@@ -97,6 +99,7 @@ private:
     const NetherBiomeSource* biomeSource_;
     structure::TemplateLoader templateLoader_;
     BaseStateAt baseStateAt_;
+    CarveBase carveBase_;
     PlaceEarlierBastions placeEarlierBastions_;
     std::mutex mutex_;
     std::map<PortalCacheKey, PortalReplay> replays_;

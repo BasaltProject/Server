@@ -143,7 +143,7 @@ bool taming::tamedBy(const Identifier& type, const Identifier& item) {
 
 std::int32_t taming::flagsOf(const ServerEntity& entity) {
     std::int32_t flags = 0;
-    if (entity.sitting) {
+    if (entity.sitting || entity.sittingPose) {
         flags |= kFlagSitting;
     }
     if (entity.owner.has_value()) {

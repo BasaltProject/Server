@@ -4,7 +4,6 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/server/world/terrain/NetherRuinedPortalGenerator.hpp>
-#include <basalt/server/world/terrain/carver/NetherCaveCarver.hpp>
 
 #include <algorithm>
 #include <array>
@@ -28,7 +27,7 @@ constexpr std::int32_t kSpreadRadius = 14;
 constexpr float kAirPocketProbability = 0.5F;
 constexpr float kGiantPortalProbability = 0.05F;
 constexpr float kMagmaProbability = 0.07F;
-constexpr std::int32_t kRuinedPortalStructureIndex = 14;
+constexpr std::int32_t kRuinedPortalStructureIndex = 32;
 constexpr std::int32_t kSurfaceStructuresStep = 4;
 
 constexpr std::array<StructureRotation, 4> kRotations{StructureRotation::None, StructureRotation::Clockwise90,
@@ -361,9 +360,9 @@ struct NetherRuinedPortalGenerator::PortalWorld {
 NetherRuinedPortalGenerator::NetherRuinedPortalGenerator(const NetherBiomeSource& biomeSource,
                                                          structure::TemplateLoader templateLoader,
                                                          BaseStateAt baseStateAt,
-                                                         PlaceEarlierBastions placeEarlierBastions)
+                                                         PlaceEarlierBastions placeEarlierBastions, CarveBase carveBase)
     : biomeSource_(&biomeSource), templateLoader_(std::move(templateLoader)), baseStateAt_(std::move(baseStateAt)),
-      placeEarlierBastions_(std::move(placeEarlierBastions)) {}
+      carveBase_(std::move(carveBase)), placeEarlierBastions_(std::move(placeEarlierBastions)) {}
 
 std::int32_t NetherRuinedPortalGenerator::findSuitableY(random::RandomSource& random, bool airPocket,
                                                         const StructureBoundingBox& boundingBox) const {
@@ -600,7 +599,7 @@ NetherRuinedPortalGenerator::PortalReplay NetherRuinedPortalGenerator::createRep
         for (std::int32_t chunkZ = minChunkZ; chunkZ <= maxChunkZ; ++chunkZ) {
             Chunk chunk{chunkX, chunkZ, kNetherHeight};
             fillBaseTerrain(chunk);
-            carver::carveNether(chunk, seed);
+            carveBase_(chunk);
             placeEarlierBastions_(chunk, seed);
             chunks.emplace(std::pair{chunkX, chunkZ}, std::move(chunk));
         }

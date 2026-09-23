@@ -169,6 +169,10 @@ public:
     std::optional<std::string> owner;
     bool sitting = false;
     bool begging = false;
+    /// parity: `TamableAnimal.setInSittingPose` without an order, and `Cat.IS_LYING`, both from the
+    /// cat's block goals.
+    bool sittingPose = false;
+    bool lying = false;
     std::optional<std::int32_t> ownerHurtBy;
     std::optional<std::int32_t> ownerHurt;
 

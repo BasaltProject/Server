@@ -242,18 +242,18 @@ void check(const Run& result, std::int32_t written, std::size_t starts, std::siz
 /// then matched it on air, ice, mossy, cracked and snow exactly and on water to one block. The old
 /// numbers came from the retired Kotlin tree, which stopped being the oracle with ADR-008.
 TEST_CASE("the ocean ruins rot the way the jar rots them") {
-    SUBCASE("cold") { check(run(1234, true, false), 132, 2, 6, 1866715353195390021LL); }
+    SUBCASE("cold") { check(run(1234, true, false), 132, 2, 6, 8791274311959848104LL); }
 
-    SUBCASE("warm") { check(run(1234, false, true), 137, 2, 2, 952536064983659329LL); }
+    SUBCASE("warm") { check(run(1234, false, true), 137, 2, 2, -7864891432115701310LL); }
 
-    SUBCASE("both") { check(run(1234, true, true), 132, 2, 6, 1866715353195390021LL); }
+    SUBCASE("both") { check(run(1234, true, true), 132, 2, 6, 8791274311959848104LL); }
 
-    SUBCASE("neither") { check(run(1234, false, false), 0, 0, 0, -9113849115773802060LL); }
+    SUBCASE("neither") { check(run(1234, false, false), 0, 0, 0, 6986290699710860445LL); }
 
     // A seed whose ruin drew large and then drew its cluster of small ones around it.
-    SUBCASE("cluster") { check(run(7, true, true), 1599, 11, 40, -2284153736936210576LL); }
+    SUBCASE("cluster") { check(run(7, true, true), 1599, 11, 40, -3727370127536866208LL); }
 
-    SUBCASE("clusterWarm") { check(run(7, false, true), 825, 9, 11, 429754515008186462LL); }
+    SUBCASE("clusterWarm") { check(run(7, false, true), 825, 9, 11, -5706101381413589266LL); }
 
-    SUBCASE("otherSeed") { check(run(3, true, true), 248, 4, 12, -3108741486969595655LL); }
+    SUBCASE("otherSeed") { check(run(3, true, true), 248, 4, 12, -7626126316526268949LL); }
 }

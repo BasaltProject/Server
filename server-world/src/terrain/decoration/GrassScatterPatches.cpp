@@ -14,7 +14,7 @@ namespace basalt::server::world::terrain::decoration {
 namespace {
 
 constexpr std::int32_t kVegetalDecorationStep = 9;
-constexpr std::int32_t kPumpkinIndex = 82;
+constexpr std::int32_t kPumpkinIndex = 85;
 
 [[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
     const registry::BlockState* found = registry::blocks::named(path);
@@ -60,8 +60,8 @@ struct PatchSpec {
 
 const std::vector<PatchSpec>& berrySpecs() {
     static const std::vector<PatchSpec> built = {
-        {"patch_berry_common", 94, 32, {"old_growth_pine_taiga", "old_growth_spruce_taiga", "taiga"}},
-        {"patch_berry_rare", 95, 384, {"snowy_taiga"}}};
+        {"patch_berry_common", 97, 32, {"old_growth_pine_taiga", "old_growth_spruce_taiga", "taiga"}},
+        {"patch_berry_rare", 98, 384, {"snowy_taiga"}}};
     return built;
 }
 

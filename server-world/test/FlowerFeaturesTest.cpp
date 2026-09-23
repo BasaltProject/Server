@@ -93,7 +93,7 @@ TEST_CASE("the pale garden and cherry petal features match the frozen kotlin") {
         CHECK(eyeblossom == 114);
         CHECK(petals == 0);
         CHECK(ticks == 114);
-        CHECK(checksum == -6631655323367291439LL);
+        CHECK(checksum == -4416132494589271269LL);
     }
 
     SUBCASE("paleRareFlower") {
@@ -106,7 +106,7 @@ TEST_CASE("the pale garden and cherry petal features match the frozen kotlin") {
         CHECK(eyeblossom == 2);
         CHECK(petals == 0);
         CHECK(ticks == 2);
-        CHECK(checksum == -573311641727884055LL);
+        CHECK(checksum == -784523944120819583LL);
     }
 
     SUBCASE("paleAt") {
@@ -119,7 +119,7 @@ TEST_CASE("the pale garden and cherry petal features match the frozen kotlin") {
         CHECK(eyeblossom == 1330);
         CHECK(petals == 0);
         CHECK(ticks == 1330);
-        CHECK(checksum == -43465349220930415LL);
+        CHECK(checksum == -722162944543720909LL);
     }
 
     SUBCASE("paleSingleAt") {
@@ -132,7 +132,7 @@ TEST_CASE("the pale garden and cherry petal features match the frozen kotlin") {
         CHECK(eyeblossom == 60);
         CHECK(petals == 0);
         CHECK(ticks == 60);
-        CHECK(checksum == -934020570696224583LL);
+        CHECK(checksum == 5137246141034389541LL);
     }
 
     SUBCASE("cherryFlowers") {
@@ -144,7 +144,7 @@ TEST_CASE("the pale garden and cherry petal features match the frozen kotlin") {
         CHECK(eyeblossom == 0);
         CHECK(petals == 4642);
         CHECK(ticks == 0);
-        CHECK(checksum == 8611934684162717064LL);
+        CHECK(checksum == -8914866753487136574LL);
     }
 
     SUBCASE("cherryAt") {
@@ -156,7 +156,7 @@ TEST_CASE("the pale garden and cherry petal features match the frozen kotlin") {
         CHECK(eyeblossom == 0);
         CHECK(petals == 1672);
         CHECK(ticks == 0);
-        CHECK(checksum == -2759389312408167190LL);
+        CHECK(checksum == -3367253199818710012LL);
     }
 }
 
@@ -190,5 +190,5 @@ TEST_CASE("the petal patch produces all sixteen packed states") {
         rendered.append(std::to_string(id));
     }
     CHECK(rendered ==
-          "30307,30308,30309,30310,30311,30312,30313,30314,30315,30316,30317,30318,30319,30320,30321,30322");
+          "33664,33665,33666,33667,33668,33669,33670,33671,33672,33673,33674,33675,33676,33677,33678,33679");
 }

@@ -65,7 +65,8 @@ constexpr std::string_view kSmelting = R"({
     "type": "minecraft:smelting",
     "ingredient": "minecraft:iron_ore",
     "result": {"id": "minecraft:iron_ingot"},
-    "experience": 0.7
+    "experience": 0.7,
+    "cookingtime": 200
 })";
 
 constexpr std::string_view kStonecutting = R"({
@@ -117,7 +118,8 @@ TEST_CASE("each of the four cookers only sees its own recipes") {
     FakeJar jar{.files = {{recipe("iron_ingot"), std::string{kSmelting}}, {recipe("iron_ingot_from_blasting"), R"({
                                "type": "minecraft:blasting",
                                "ingredient": "minecraft:iron_ore",
-                               "result": {"id": "minecraft:iron_nugget"}
+                               "result": {"id": "minecraft:iron_nugget"},
+                               "cookingtime": 100
                            })"}}};
     const RealRecipes recipes{jar.handle()};
 

@@ -75,35 +75,35 @@ struct GrassSpec {
 
 const std::vector<GrassSpec>& specs() {
     static const std::vector<GrassSpec> built = {
-        {.index = 11,
+        {.index = 14,
          .outerCount = 25,
          .innerCount = 32,
          .biomes = {"bamboo_jungle", "jungle", "sparse_jungle"},
          .provider = Provider::Jungle,
          .rejectPodzol = true},
-        {.index = 12, .outerCount = 20, .innerCount = 32, .biomes = {"savanna", "savanna_plateau"}},
-        {.index = 35, .outerCount = 0, .innerCount = 16, .biomes = {"meadow"}, .noise = NoiseCount{-0.8, 5, 10}},
-        {.index = 54,
+        {.index = 15, .outerCount = 20, .innerCount = 32, .biomes = {"savanna", "savanna_plateau"}},
+        {.index = 38, .outerCount = 0, .innerCount = 16, .biomes = {"meadow"}, .noise = NoiseCount{-0.8, 5, 10}},
+        {.index = 57,
          .outerCount = 0,
          .innerCount = 32,
          .biomes = {"cherry_grove", "deep_dark", "dripstone_caves", "plains", "sunflower_plains"},
          .noise = NoiseCount{-0.8, 5, 10}},
-        {.index = 58,
+        {.index = 61,
          .outerCount = 7,
          .innerCount = 32,
          .biomes = {"old_growth_pine_taiga", "old_growth_spruce_taiga"},
          .provider = Provider::Taiga},
-        {.index = 59,
+        {.index = 62,
          .outerCount = 2,
          .innerCount = 32,
          .biomes = {"birch_forest", "dark_forest", "forest", "old_growth_birch_forest", "pale_garden"}},
-        {.index = 60,
+        {.index = 63,
          .outerCount = 1,
          .innerCount = 32,
          .biomes = {"snowy_taiga", "taiga"},
          .provider = Provider::Taiga},
-        {.index = 61, .outerCount = 5, .innerCount = 32, .biomes = {"mangrove_swamp", "swamp", "windswept_savanna"}},
-        {.index = 68,
+        {.index = 64, .outerCount = 5, .innerCount = 32, .biomes = {"mangrove_swamp", "swamp", "windswept_savanna"}},
+        {.index = 71,
          .outerCount = 1,
          .innerCount = 32,
          .biomes = {"badlands",
@@ -218,17 +218,17 @@ void grassPatchDecoration::decorate(Chunk& chunk, std::int64_t seed, const surfa
 
 const std::map<std::string, std::int32_t, std::less<>>& grassPatchDecoration::placedGrassIds() {
     static const std::map<std::string, std::int32_t, std::less<>> ids = {
-        {"patch_grass_jungle", 11},
-        {"patch_grass_savanna", 12},
-        {"patch_grass_meadow", 35},
-        {"patch_grass_plain", 54},
-        {"patch_grass_taiga", 58},
+        {"patch_grass_jungle", 14},
+        {"patch_grass_savanna", 15},
+        {"patch_grass_meadow", 38},
+        {"patch_grass_plain", 57},
+        {"patch_grass_taiga", 61},
         // The village feature of this name is a different placement over the same body.
-        {"patch_taiga_grass", 58},
-        {"patch_grass_forest", 59},
-        {"patch_grass_taiga_2", 60},
-        {"patch_grass_normal", 61},
-        {"patch_grass_badlands", 68}};
+        {"patch_taiga_grass", 61},
+        {"patch_grass_forest", 62},
+        {"patch_grass_taiga_2", 63},
+        {"patch_grass_normal", 64},
+        {"patch_grass_badlands", 71}};
     return ids;
 }
 

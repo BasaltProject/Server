@@ -43,9 +43,6 @@ TEST_CASE("the metrics report matches the frozen kotlin") {
     }
     metrics::countHeightmapScan(11);
     metrics::countHeightmapScan(5);
-    metrics::countMarker(densityfunction::MarkerType::FlatCache);
-    metrics::countMarker(densityfunction::MarkerType::FlatCache);
-    metrics::countMarker(densityfunction::MarkerType::Interpolated);
     // Nanoseconds fed straight in, so the report is exact rather than a timing.
     metrics::addPhaseNanos(metrics::Phase::TerrainFill, 12345678LL);
     metrics::addPhaseNanos(metrics::Phase::Decoration, 4000000LL);
@@ -54,8 +51,7 @@ TEST_CASE("the metrics report matches the frozen kotlin") {
                       "  SURFACE_RULES  0.000 ms|  CARVERS        0.000 ms|  STRUCTURES     0.000 ms|"
                       "  DECORATION     1.000 ms|  SURFACE_FREEZE 0.000 ms|  BIOME_FILL     0.000 ms|"
                       "  NEIGHBOURS     0.000 ms|  NormalNoise evaluations  2|  Biome lookups            0|"
-                      "  Climate comparisons      4|  Heightmap column scans   0|  Heightmap scan steps     4|"
-                      "  Cache markers reached:|    INTERPOLATED       0|    FLAT_CACHE         0");
+                      "  Climate comparisons      4|  Heightmap column scans   0|  Heightmap scan steps     4");
 
     int ran = 0;
     metrics::measure(metrics::Phase::Carvers, [&ran] { ++ran; });

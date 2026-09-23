@@ -124,35 +124,35 @@ TEST_CASE("the sculk steps place what the frozen kotlin places") {
         const Run result = run("minecraft:deep_dark", -1, false);
         CHECK(result.placed == 4951);
         CHECK(result.deferred == 2818);
-        CHECK(result.checksum == -6492857735299813194LL);
+        CHECK(result.checksum == -516144905955945596LL);
     }
 
     SUBCASE("veinIndex") {
         const Run result = run("minecraft:deep_dark", 0, false);
         CHECK(result.placed == 45);
         CHECK(result.deferred == 3);
-        CHECK(result.checksum == 8444179288895066844LL);
+        CHECK(result.checksum == 6945546664361316480LL);
     }
 
     SUBCASE("patchIndex") {
         const Run result = run("minecraft:deep_dark", 1, false);
         CHECK(result.placed == 3848);
         CHECK(result.deferred == 2413);
-        CHECK(result.checksum == 528712234429032955LL);
+        CHECK(result.checksum == -5946907034118352061LL);
     }
 
     SUBCASE("patchOutside") {
         const Run result = run("minecraft:deep_dark", 1, true);
         CHECK(result.placed == 2734);
         CHECK(result.deferred == 4662);
-        CHECK(result.checksum == -8603868603317952065LL);
+        CHECK(result.checksum == -3886463770496195884LL);
     }
 
     SUBCASE("plainsStep") {
         const Run result = run("minecraft:plains", -1, false);
         CHECK(result.placed == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1155287872633369129LL);
+        CHECK(result.checksum == -7512420601755606978LL);
     }
 }
 
@@ -181,6 +181,6 @@ TEST_CASE("one sculk feature at one position matches the frozen kotlin") {
     }
     CHECK(known == "111111111000");
     CHECK(placed == 1344);
-    CHECK(static_cast<std::int64_t>(checksum) == -3801488731580343875LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -4591172945431988541LL);
     CHECK(after == 1004880498);
 }

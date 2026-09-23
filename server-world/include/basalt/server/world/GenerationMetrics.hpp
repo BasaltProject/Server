@@ -1,7 +1,5 @@
 #pragma once
 
-#include <basalt/server/world/densityfunction/DensityFunction.hpp>
-
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -9,11 +7,9 @@
 namespace basalt::server::world {
 
 /// Opt-in counters and per-phase timings for chunk generation, off by default, read through
-/// `[performance] generation-metrics`.
-///
-/// Deliberately not thread safe: enabling it also forces single-threaded generation, because an
-/// atomic per noise evaluation would cost more than the operations being counted and distort the very
-/// numbers this exists to produce. Call sites guard on `enabled` so a disabled build pays a branch.
+/// `[performance] generation-metrics`. Not thread safe: enabling it forces single-threaded
+/// generation, since an atomic per noise evaluation would distort the numbers. Call sites guard on
+/// `enabled` so a disabled build pays a branch.
 namespace generationMetrics {
 
 /// One measured step of the terrain generator.
@@ -46,8 +42,6 @@ void countBiomeLookup() noexcept;
 
 /// One climate-region distance computation, whether from the index or a full scan.
 void countClimateComparison() noexcept;
-
-void countMarker(densityfunction::MarkerType type) noexcept;
 
 void addPhaseNanos(Phase phase, std::int64_t nanos) noexcept;
 

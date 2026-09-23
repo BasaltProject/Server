@@ -14,7 +14,7 @@ namespace basalt::server::world::terrain::decoration {
 namespace {
 
 constexpr std::int32_t kVegetalDecorationStep = 9;
-constexpr std::int32_t kBushIndex = 51;
+constexpr std::int32_t kBushIndex = 54;
 
 [[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
     const registry::BlockState* found = registry::blocks::named(path);

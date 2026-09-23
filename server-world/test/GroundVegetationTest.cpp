@@ -64,7 +64,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             forestGroundDecoration::bush()(chunk, random);
         });
         CHECK(plants == 1);
-        CHECK(checksum == 6234365582392740622LL);
+        CHECK(checksum == -6194738784296023493LL);
         CHECK(after == -2089434289);
     }
 
@@ -73,7 +73,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             forestGroundDecoration::grass()(chunk, random);
         });
         CHECK(plants == 7);
-        CHECK(checksum == 6077125487700302035LL);
+        CHECK(checksum == -656582735457885276LL);
         CHECK(after == -390521746);
     }
 
@@ -82,7 +82,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             savannaGroundDecoration::tallGrass()(chunk, random);
         });
         CHECK(plants == 16);
-        CHECK(checksum == 2326681359912142449LL);
+        CHECK(checksum == -5288643383730319965LL);
         CHECK(after == -1994544725);
     }
 
@@ -91,7 +91,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             savannaGroundDecoration::savanna()(chunk, random);
         });
         CHECK(plants == 58);
-        CHECK(checksum == -1399207164749253813LL);
+        CHECK(checksum == 8679370285724193271LL);
         CHECK(after == -925154373);
     }
 
@@ -100,7 +100,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             savannaGroundDecoration::windswept()(chunk, random);
         });
         CHECK(plants == 15);
-        CHECK(checksum == 2428019299068112531LL);
+        CHECK(checksum == -6818548606421785704LL);
         CHECK(after == -1419191976);
     }
 
@@ -109,7 +109,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             dryGrassDecoration::desert()(chunk, random);
         });
         CHECK(plants == 7);
-        CHECK(checksum == 8463449763078446664LL);
+        CHECK(checksum == -1362928009301372546LL);
         CHECK(after == -789243648);
     }
 
@@ -118,7 +118,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             dryGrassDecoration::badlands()(chunk, random);
         });
         CHECK(plants == 7);
-        CHECK(checksum == 8463449763078446664LL);
+        CHECK(checksum == -1362928009301372546LL);
         CHECK(after == -789243648);
     }
 
@@ -127,7 +127,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             desertDecoration::decoration()(chunk, random);
         });
         CHECK(plants == 9);
-        CHECK(checksum == -425545100770606844LL);
+        CHECK(checksum == 8676467410112802782LL);
         CHECK(after == -324137968);
     }
 
@@ -136,7 +136,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             desertDecoration::placeAt(chunk, random, DecorationPos{40, 70, -40});
         });
         CHECK(plants == 2);
-        CHECK(checksum == 4952213802481860123LL);
+        CHECK(checksum == 5198843829751982057LL);
         CHECK(after == 103831914);
     }
 
@@ -145,7 +145,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             badlandsDecoration::decoration()(chunk, random);
         });
         CHECK(plants == 19);
-        CHECK(checksum == 4256125519418871696LL);
+        CHECK(checksum == 2734857429457616872LL);
         CHECK(after == -1211575327);
     }
 
@@ -154,7 +154,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             dryGrassDecoration::placeAt(chunk, random, DecorationPos{40, 72, -40});
         });
         CHECK(plants == 10);
-        CHECK(checksum == 3381691767254480082LL);
+        CHECK(checksum == -8133483880726661172LL);
         CHECK(after == -1896342407);
     }
 
@@ -163,7 +163,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
             defaultVegetationDecoration::placeDefaultPatchAt(chunk, random, DecorationPos{40, 72, -40});
         });
         CHECK(plants == 6);
-        CHECK(checksum == -4790080528751471068LL);
+        CHECK(checksum == 722590663403837614LL);
         CHECK(after == 201145552);
     }
 
@@ -173,7 +173,7 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
                 chunk, random);
         });
         CHECK(plants == 6);
-        CHECK(checksum == -2385321072418939418LL);
+        CHECK(checksum == 1492654978500713240LL);
         CHECK(after == -1786003220);
     }
 }

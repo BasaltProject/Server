@@ -82,7 +82,7 @@ const std::set<std::string, std::less<>>& chorusDownConnections() {
 /// is out there has to be sampled from the router rather than read.
 class ChorusWorld {
 public:
-    ChorusWorld(Chunk& chunk, const EndNoiseRouter& router) : chunk_(&chunk), router_(&router) {}
+    ChorusWorld(Chunk& chunk, const NoiseRouter& router) : chunk_(&chunk), router_(&router) {}
 
     [[nodiscard]] bool isEmpty(const EndPos& position) { return registry::blocks::isAir(stateAt(position)); }
 
@@ -146,9 +146,7 @@ private:
         auto sampler = samplers_.find(key);
         if (sampler == samplers_.end()) {
             sampler =
-                samplers_
-                    .emplace(key, std::make_unique<DensityChunkSampler>(router_->finalDensity, sampleChunkX,
-                                                                        sampleChunkZ, 0, kEndGenerationDepth, 8, 4))
+                samplers_.emplace(key, std::make_unique<DensityChunkSampler>(*router_, sampleChunkX, sampleChunkZ))
                     .first;
         }
         const double density = sampler->second->sample(position.x & 15, position.y, position.z & 15);
@@ -156,7 +154,7 @@ private:
     }
 
     Chunk* chunk_;
-    const EndNoiseRouter* router_;
+    const NoiseRouter* router_;
     std::map<EndPos, std::int32_t> outsideWrites_;
     std::map<std::pair<std::int32_t, std::int32_t>, std::unique_ptr<DensityChunkSampler>> samplers_;
 };
@@ -272,7 +270,7 @@ void endTopLayerDecoration::decorate(Chunk& chunk, const TheEndBiomeSource& biom
     }
 }
 
-bool endVegetalDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const EndNoiseRouter& router,
+bool endVegetalDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const NoiseRouter& router,
                                    const std::int32_t x, const std::int32_t y, const std::int32_t z) {
     ChorusWorld world{chunk, router};
     const EndPos origin{.x = x, .y = y, .z = z};
@@ -283,7 +281,7 @@ bool endVegetalDecoration::placeAt(Chunk& chunk, random::RandomSource& random, c
     return true;
 }
 
-void endVegetalDecoration::decorate(Chunk& chunk, const std::int64_t seed, const EndNoiseRouter& router,
+void endVegetalDecoration::decorate(Chunk& chunk, const std::int64_t seed, const NoiseRouter& router,
                                     const TheEndBiomeSource& biomeSource) {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed =

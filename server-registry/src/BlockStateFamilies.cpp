@@ -118,7 +118,10 @@ std::optional<std::int32_t> withLeafDistance(std::int32_t stateId, std::int32_t 
     if (!isLeavesState(stateId)) {
         return std::nullopt;
     }
-    return leafStateRangeStart(stateId) + (distance - 1) * 4 + (stateId & 3);
+    // The four persistent/waterlogged states sit in order under each distance, counted from the
+    // block's own first state: the range is not aligned to four since 26.3.
+    const std::int32_t start = leafStateRangeStart(stateId);
+    return start + (distance - 1) * 4 + (stateId - start) % 4;
 }
 
 bool isDoublePlantState(std::int32_t stateId) {

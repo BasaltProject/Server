@@ -98,7 +98,7 @@ TEST_CASE("the biome flower patches place what the frozen kotlin places") {
             });
         CHECK(flowers == 1713);
         CHECK(distinct == 9);
-        CHECK(checksum == 1197947340440142942LL);
+        CHECK(checksum == 8683029161971021722LL);
     }
 
     SUBCASE("swamp") {
@@ -109,7 +109,7 @@ TEST_CASE("the biome flower patches place what the frozen kotlin places") {
             });
         CHECK(flowers == 1196);
         CHECK(distinct == 1);
-        CHECK(checksum == 725010371060891749LL);
+        CHECK(checksum == -8512129039128432699LL);
     }
 
     SUBCASE("meadow") {
@@ -119,7 +119,7 @@ TEST_CASE("the biome flower patches place what the frozen kotlin places") {
             });
         CHECK(flowers == 1713);
         CHECK(distinct == 7);
-        CHECK(checksum == 2104764462321656270LL);
+        CHECK(checksum == -4691808911209455124LL);
     }
 }
 
@@ -135,8 +135,10 @@ TEST_CASE("the noise selectors pick the same species as the frozen kotlin") {
         forest.append(std::to_string(flowerForestDecoration::flowerAt(x, y, z))).push_back(',');
         meadow.append(std::to_string(meadowDecoration::flowerStateAt(DecorationPos{x, y, z}))).push_back(',');
     }
-    CHECK(forest == "2330,2330,2327,2327,2328,2326,2329,2326,2332,2326,2327,2330,2326,2328,2329,2329,2327,2331,2331,"
-                    "2329,2335,2331,2328,2329,");
-    CHECK(meadow == "2333,2333,2321,2321,2321,2321,2333,2333,2321,2327,2324,2321,2321,2327,2327,2321,2333,2333,2333,"
-                    "2333,2333,2327,2327,2324,");
+    CHECK(forest ==
+          "3822,3822,3819,3819,3820,3818,3821,3818,3824,3818,3819,3822,3818,3820,3821,3821,3819,3823,3823,3821,"
+          "3827,3823,3820,3821,");
+    CHECK(meadow ==
+          "3825,3825,3813,3813,3813,3813,3825,3825,3813,3819,3816,3813,3813,3819,3819,3813,3825,3825,3825,3825,"
+          "3825,3819,3819,3816,");
 }

@@ -1,8 +1,10 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/ai/CatGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TameGoals.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -60,7 +62,21 @@ public:
 
     void shootArrow(ServerEntity&, double, double, double, float) override {}
 
+    void poseChanged(ServerEntity&) override { poseChanges++; }
+
+    [[nodiscard]] std::optional<bool> blockTagged(std::string_view tag, const Identifier& block) const override {
+        const std::string_view path = block.path();
+        if (tag == "minecraft:cats_can_sit_on") {
+            return path == "furnace" || path == "chest" || path == "red_bed";
+        }
+        if (tag == "minecraft:cats_can_lie_on" || tag == "minecraft:beds") {
+            return path == "red_bed";
+        }
+        return false;
+    }
+
     std::int32_t swings = 0;
+    std::int32_t poseChanges = 0;
     float dealt = 0.0F;
 };
 
@@ -197,4 +213,49 @@ TEST_CASE("a wolf begs at whoever is holding a bone and stops when they put it a
     beg.stop(context);
     CHECK_FALSE(wolf.begging);
     CHECK_FALSE(beg.canUse(context));
+}
+
+TEST_CASE("a tame cat sits on a lit furnace and lies on the foot of a bed") {
+    namespace states = basalt::server::registry::blockStateDefinitions;
+    Fixture fixture;
+    ServerEntity& cat = fixture.add("cat", 8.5, 8.5);
+    const auto furnace = [](bool lit) {
+        return *states::stateIdOf(Identifier::vanilla("furnace"), {{"lit", lit ? "true" : "false"}}, std::nullopt);
+    };
+    REQUIRE(fixture.world.setBlockState(8, 64, 9, furnace(false)));
+    REQUIRE(fixture.world.setBlockState(11, 64, 8, furnace(true)));
+
+    ai::MobContext context = fixture.context(cat);
+    ai::CatSitOnBlockGoal sit{0.8};
+    CHECK_FALSE(sit.canUse(context));
+
+    // Tame, it passes over the cold furnace next to it for the lit one further off.
+    cat.owner = "owner-uuid";
+    ai::CatSitOnBlockGoal tameSit{0.8};
+    REQUIRE(tameSit.canUse(context));
+    tameSit.start(context);
+    cat.x = 11.5;
+    cat.y = 65.0;
+    cat.z = 8.5;
+    tameSit.tick(context);
+    CHECK(cat.sittingPose);
+    CHECK(tameSit.canContinueToUse(context));
+    tameSit.stop(context);
+    CHECK_FALSE(cat.sittingPose);
+
+    REQUIRE(fixture.world.setBlockState(
+        4, 64, 4, *states::stateIdOf(Identifier::vanilla("red_bed"), {{"part", "foot"}}, std::nullopt)));
+    ai::CatLieOnBlockGoal lie{1.1, 8};
+    cat.x = 4.5;
+    cat.y = 67.0;
+    cat.z = 4.5;
+    // parity: the lie search starts two below and then jumps to three above, so its own level is skipped.
+    REQUIRE(lie.canUse(context));
+    lie.start(context);
+    cat.y = 65.0;
+    lie.tick(context);
+    CHECK(cat.lying);
+    lie.stop(context);
+    CHECK_FALSE(cat.lying);
+    CHECK(fixture.actions.poseChanges == 4);
 }

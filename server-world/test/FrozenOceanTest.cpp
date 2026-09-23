@@ -113,25 +113,25 @@ TEST_CASE("the frozen ocean steps place what the frozen kotlin places") {
     SUBCASE("icebergs") {
         const Run result = run("minecraft:frozen_ocean", false, 64);
         CHECK(result.placed == 29627);
-        CHECK(result.checksum == -8550590560125964618LL);
+        CHECK(result.checksum == 8809923354053289130LL);
     }
 
     SUBCASE("blueIce") {
         const Run result = run("minecraft:deep_frozen_ocean", true, 8);
         CHECK(result.placed == 3569);
-        CHECK(result.checksum == -5558463948169881532LL);
+        CHECK(result.checksum == 3593068149887185125LL);
     }
 
     SUBCASE("warmIcebergs") {
         const Run result = run("minecraft:warm_ocean", false, 64);
         CHECK(result.placed == 25408);
-        CHECK(result.checksum == 2189136624440984401LL);
+        CHECK(result.checksum == -7987618479336093159LL);
     }
 
     SUBCASE("warmBlueIce") {
         const Run result = run("minecraft:warm_ocean", true, 8);
         CHECK(result.placed == 3200);
-        CHECK(result.checksum == -5388121389223860632LL);
+        CHECK(result.checksum == 7382046346536781290LL);
     }
 }
 
@@ -157,6 +157,6 @@ TEST_CASE("one frozen ocean feature at one position matches the frozen kotlin") 
     }
     CHECK(known == "111111111000");
     CHECK(placed == 13988);
-    CHECK(static_cast<std::int64_t>(checksum) == 6406737624144408858LL);
+    CHECK(static_cast<std::int64_t>(checksum) == 8533082990884414232LL);
     CHECK(after == 661684479);
 }

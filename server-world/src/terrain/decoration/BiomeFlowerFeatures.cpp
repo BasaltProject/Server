@@ -1,5 +1,6 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/noise/Noise.hpp>
 #include <basalt/server/world/noise/NormalNoise.hpp>
 #include <basalt/server/world/terrain/decoration/BiomeFlowerFeatures.hpp>
 #include <basalt/server/world/terrain/decoration/PlainsFlowerFeatures.hpp>
@@ -34,18 +35,18 @@ namespace {
     return ids;
 }
 
-/// A fixed-seed noise built off the legacy source, the way `Biome`'s own static fields are.
-[[nodiscard]] noise::NormalNoise fixedNoise(std::int64_t seed, std::int32_t firstOctave) {
+/// parity: the providers' noise, a one-octave parity noise seeded off the legacy source.
+[[nodiscard]] std::shared_ptr<const noise::NoiseStack> fixedNoise(std::int64_t seed, std::int32_t firstOctave) {
     random::RandomSource source = random::RandomSource::legacy(seed);
     const std::array<double, 1> amplitudes = {1.0};
-    return noise::NormalNoise::create(source, firstOctave, amplitudes);
+    return noise::NormalNoise::createParity(firstOctave, amplitudes).create(source);
 }
 
-/// parity: the index is taken from the noise mapped into [0, 0.9999], so the list order decides
-/// which flower a position gets and reordering it silently changes the world.
-[[nodiscard]] std::int32_t stateFromNoise(const std::vector<std::int32_t>& states, double noiseValue) {
-    const double placement = std::clamp((1.0 + noiseValue) / 2.0, 0.0, 0.9999);
-    return states[static_cast<std::size_t>(placement * static_cast<double>(states.size()))];
+/// parity: `NoiseProvider.getRandomState`, in float since 26.3. The list order decides which flower
+/// a position gets, so reordering it silently changes the world.
+[[nodiscard]] std::int32_t stateFromNoise(const std::vector<std::int32_t>& states, float noiseValue) {
+    const float placement = std::clamp((1.0F + noiseValue) / 2.0F, 0.0F, 0.9999F);
+    return states[static_cast<std::size_t>(placement * static_cast<float>(states.size()))];
 }
 
 const std::vector<std::int32_t>& forestFlowerStates() {
@@ -55,12 +56,13 @@ const std::vector<std::int32_t>& forestFlowerStates() {
     return ids;
 }
 
-const noise::NormalNoise& forestFlowerNoise() {
-    static const noise::NormalNoise built = fixedNoise(2345LL, 0);
-    return built;
+const noise::Noise& forestFlowerNoise() {
+    static const std::shared_ptr<const noise::NoiseStack> built = fixedNoise(2345LL, 0);
+    return *built;
 }
 
-constexpr double kForestFlowerScale = 0.020833334;
+// parity: the provider's float scale, widened.
+constexpr auto kForestFlowerScale = static_cast<double>(0.020833334F);
 
 const std::vector<std::int32_t>& meadowFlowerStates() {
     static const std::vector<std::int32_t> ids = stateIdsOf(
@@ -68,14 +70,14 @@ const std::vector<std::int32_t>& meadowFlowerStates() {
     return ids;
 }
 
-const noise::NormalNoise& meadowFastNoise() {
-    static const noise::NormalNoise built = fixedNoise(2345LL, -3);
-    return built;
+const noise::Noise& meadowFastNoise() {
+    static const std::shared_ptr<const noise::NoiseStack> built = fixedNoise(2345LL, -3);
+    return *built;
 }
 
-const noise::NormalNoise& meadowSlowNoise() {
-    static const noise::NormalNoise built = fixedNoise(2345LL, -10);
-    return built;
+const noise::Noise& meadowSlowNoise() {
+    static const std::shared_ptr<const noise::NoiseStack> built = fixedNoise(2345LL, -10);
+    return *built;
 }
 
 [[nodiscard]] double clampedMap(double value, double outputMin, double outputMax) {
@@ -85,8 +87,8 @@ const noise::NormalNoise& meadowSlowNoise() {
 } // namespace
 
 std::int32_t flowerForestDecoration::flowerAt(std::int32_t x, std::int32_t y, std::int32_t z) {
-    const double noiseValue =
-        forestFlowerNoise().getValue(x * kForestFlowerScale, y * kForestFlowerScale, z * kForestFlowerScale);
+    const float noiseValue =
+        forestFlowerNoise().get(x * kForestFlowerScale, y * kForestFlowerScale, z * kForestFlowerScale);
     return stateFromNoise(forestFlowerStates(), noiseValue);
 }
 
@@ -106,18 +108,17 @@ void swampDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const 
 }
 
 std::int32_t meadowDecoration::flowerStateAt(const DecorationPos& position) {
-    const double slowValue = meadowSlowNoise().getValue(position.x, position.y, position.z);
+    const auto slowValue = static_cast<double>(meadowSlowNoise().get(position.x, position.y, position.z));
     const auto localVariety = static_cast<std::int32_t>(clampedMap(slowValue, 1.0, 4.0));
     std::vector<std::int32_t> possible;
     possible.reserve(static_cast<std::size_t>(localVariety));
     for (std::int32_t index = 0; index < localVariety; ++index) {
         // parity: the slow noise is resampled at a large fixed stride per index, which is what gives
         // one meadow a handful of species rather than all eight everywhere.
-        const double value =
-            meadowSlowNoise().getValue(position.x + index * 54545, position.y, position.z + index * 34234);
+        const float value = meadowSlowNoise().get(position.x + index * 54545, position.y, position.z + index * 34234);
         possible.push_back(stateFromNoise(meadowFlowerStates(), value));
     }
-    return stateFromNoise(possible, meadowFastNoise().getValue(position.x, position.y, position.z));
+    return stateFromNoise(possible, meadowFastNoise().get(position.x, position.y, position.z));
 }
 
 void meadowDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {

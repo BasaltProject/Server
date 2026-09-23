@@ -1,6 +1,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
-#include <basalt/server/world/noise/SimplexNoise.hpp>
+#include <basalt/server/world/noise/Noise.hpp>
+#include <basalt/server/world/noise/NormalNoise.hpp>
 #include <basalt/server/world/terrain/decoration/PlainsFlowerFeatures.hpp>
 #include <basalt/server/world/terrain/decoration/SimpleBlockFeature.hpp>
 
@@ -41,24 +42,28 @@ const std::vector<std::int32_t>& lowFlowerStates() {
     return ids;
 }
 
-/// parity: `Biome`'s own fixed-seed simplex, not the world seed and not a position hash.
-const noise::SimplexNoise& flowerNoise() {
-    static const noise::SimplexNoise built = [] {
+/// parity: the `flower_plain` provider's own noise: one parity octave off the legacy seed 2345.
+const noise::Noise& flowerNoise() {
+    static const std::shared_ptr<const noise::NoiseStack> built = [] {
         random::RandomSource source = random::RandomSource::legacy(2345LL);
-        return noise::SimplexNoise{source};
+        const std::array<double, 1> amplitudes = {1.0};
+        return noise::NormalNoise::createParity(0, amplitudes).create(source);
     }();
-    return built;
+    return *built;
 }
 
 } // namespace
 
 std::int32_t plainsDecoration::flowerStateId(random::RandomSource& random, const DecorationPos& origin) {
-    const double noiseValue = flowerNoise().getValue(origin.x * 0.005, origin.z * 0.005);
-    if (noiseValue < -0.8) {
+    // parity: `NoiseThresholdProvider`, whose float scale and threshold are widened to double.
+    constexpr auto kScale = static_cast<double>(0.005F);
+    const auto noiseValue =
+        static_cast<double>(flowerNoise().get(origin.x * kScale, origin.y * kScale, origin.z * kScale));
+    if (noiseValue < static_cast<double>(-0.8F)) {
         return lowFlowerStates()[static_cast<std::size_t>(
             random.nextInt(static_cast<std::int32_t>(lowFlowerStates().size())))];
     }
-    if (random.nextFloat() < 1.0F / 3.0F) {
+    if (random.nextFloat() < 0.33333334F) {
         return highFlowerStates()[static_cast<std::size_t>(
             random.nextInt(static_cast<std::int32_t>(highFlowerStates().size())))];
     }

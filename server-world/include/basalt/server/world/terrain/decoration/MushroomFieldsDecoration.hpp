@@ -15,7 +15,7 @@ namespace basalt::server::world::terrain::decoration {
 /// mushrooms, then the two taiga mushroom patches.
 namespace mushroomFieldsDecoration {
 
-inline constexpr std::int32_t kMushroomIslandVegetationIndex = 79;
+inline constexpr std::int32_t kMushroomIslandVegetationIndex = 82;
 
 void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment);
 

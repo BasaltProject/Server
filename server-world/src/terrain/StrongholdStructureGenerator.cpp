@@ -201,10 +201,10 @@ std::optional<std::pair<std::int32_t, std::int32_t>> StrongholdStructureGenerato
     return best;
 }
 
-densityfunction::Function StrongholdStructureGenerator::beardified(densityfunction::Function base, std::int32_t chunkX,
-                                                                   std::int32_t chunkZ, std::int64_t seed) {
+void StrongholdStructureGenerator::addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ,
+                                            std::int64_t seed) {
     const structure::StructureBoundingBox nearClip = chunkClip(chunkX, chunkZ, kBeardRadius);
-    std::vector<BeardifierRigid> rigids;
+    std::vector<BeardifierRigid>& rigids = beard.pieces;
     for (const auto& [startX, startZ] : nearbyStarts(chunkX, chunkZ)) {
         for (const structure::StrongholdPiece& piece : layoutFor(startX, startZ, seed)) {
             if (!piece.box.intersects(nearClip)) {
@@ -214,10 +214,6 @@ densityfunction::Function StrongholdStructureGenerator::beardified(densityfuncti
                 BeardifierRigid{.box = piece.box, .groundLevelDelta = 0, .adjustment = TerrainAdjustment::Bury});
         }
     }
-    if (rigids.empty()) {
-        return base;
-    }
-    return densityfunction::functions::add(std::move(base), structureBeardifier(std::move(rigids)));
 }
 
 } // namespace basalt::server::world::terrain

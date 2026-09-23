@@ -6,6 +6,7 @@
 #include <basalt/server/world/structure/StructurePlacementGrid.hpp>
 #include <basalt/server/world/terrain/DensityChunkSampler.hpp>
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
+#include <basalt/server/world/terrain/StructureBeardifier.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
@@ -42,7 +43,7 @@ public:
     /// Vanilla searches 100 cells for a village, which at spacing 34 is a long way out.
     static constexpr std::int32_t kDefaultSearchCells = 100;
 
-    VillageStructureGenerator(OverworldNoiseRouter router, structure::StructurePlacementGrid grid, BiomeAt biomeAt,
+    VillageStructureGenerator(NoiseRouter router, structure::StructurePlacementGrid grid, BiomeAt biomeAt,
                               std::int32_t maxDepth, std::int32_t maxDistanceFromCenter, PoolLookup poolLookup,
                               structure::PoolTemplateLoader templateLoader);
 
@@ -90,9 +91,8 @@ public:
     /// Writes the part of `pieces` that lands in `chunk`. The caller repeats it per chunk they cover.
     void placeInto(Chunk& chunk, const std::vector<structure::PlacedStructurePiece>& pieces, std::int64_t seed) const;
 
-    /// parity: `NoiseChunk` adds `Beardifier.forStructuresInChunk` to the router's final density.
-    [[nodiscard]] densityfunction::Function finalDensityForChunk(std::int32_t chunkX, std::int32_t chunkZ,
-                                                                 std::int64_t seed);
+    /// parity: `Beardifier.forStructuresInChunk`, this structure's share of it.
+    void addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
 private:
     /// parity: `villages.json`'s five entries in file order, all weight one, each with its own real
@@ -159,7 +159,7 @@ private:
                                                                         std::int64_t seed, Samplers& samplers,
                                                                         random::RandomSource& random) const;
 
-    OverworldNoiseRouter router_;
+    NoiseRouter router_;
     structure::StructurePlacementGrid grid_;
     BiomeAt biomeAt_;
     std::int32_t maxDepth_;

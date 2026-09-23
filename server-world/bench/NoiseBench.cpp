@@ -1,8 +1,9 @@
 // Samples a dense grid of NormalNoise, the shape a density function evaluates during world
 // generation, and reports nanoseconds per sample. The number it prints is meant to be read next to
-// the same measurement taken on the frozen Kotlin server.
+// earlier runs of this same bench.
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/world/noise/Noise.hpp>
 #include <basalt/server/world/noise/NormalNoise.hpp>
 
 #include <chrono>
@@ -19,12 +20,12 @@ constexpr int kSide = 64;
 constexpr int kWarmupPasses = 2;
 constexpr auto kMeasureFor = std::chrono::seconds{3};
 
-double sweep(const NormalNoise& noise) {
+double sweep(const Noise& noise) {
     double sink = 0.0;
     for (int x = 0; x < kSide; ++x) {
         for (int y = 0; y < kSide; ++y) {
             for (int z = 0; z < kSide; ++z) {
-                sink += noise.getValue(x * 0.31, y * 0.31, z * 0.31);
+                sink += static_cast<double>(noise.get(x * 0.31, y * 0.31, z * 0.31));
             }
         }
     }
@@ -36,7 +37,8 @@ double sweep(const NormalNoise& noise) {
 int main() {
     RandomSource source = RandomSource::xoroshiro(1);
     const std::vector<double> amplitudes(8, 1.0);
-    const NormalNoise noise = NormalNoise::create(source, -7, amplitudes);
+    const auto stack = NormalNoise::createParity(-7, amplitudes).create(source);
+    const Noise& noise = *stack;
 
     double sink = 0.0;
     for (int i = 0; i < kWarmupPasses; ++i) {

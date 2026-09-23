@@ -18,6 +18,7 @@ const std::map<std::string_view, BiomeClimate>& table() {
         {"flower_forest", BiomeClimate{0.7F, false, true}},
         {"birch_forest", BiomeClimate{0.6F, false, true}},
         {"dark_forest", BiomeClimate{0.7F, false, true}},
+        {"dappled_forest", BiomeClimate{0.6F, false, true}},
         {"pale_garden", BiomeClimate{0.7F, false, true}},
         {"old_growth_birch_forest", BiomeClimate{0.6F, false, true}},
         {"old_growth_pine_taiga", BiomeClimate{0.3F, false, true}},

@@ -24,7 +24,7 @@ using structure::StructureRotation;
 
 constexpr std::int32_t kSalt = 34222645;
 constexpr std::int32_t kSurfaceStructuresStep = 4;
-constexpr std::int32_t kDefaultStructureIndex = 10;
+constexpr std::int32_t kDefaultStructureIndex = 28;
 constexpr float kGiantChance = 0.05F;
 constexpr std::int32_t kMinYIndex = 15;
 constexpr std::int32_t kMaxYDifference = 3;
@@ -114,13 +114,13 @@ constexpr std::array<float, 14> kNetherrackByDistance{1.0F, 1.0F, 1.0F, 1.0F, 1.
     return built.contains(colon == std::string_view::npos ? biome : biome.substr(colon + 1));
 }
 
-/// parity: the position of each variant among the 26 structures of `surface_structures`, in registry
+/// parity: the position of each variant among the 44 structures of `surface_structures`, in registry
 /// order. They share a structure set but not an index, so they do not share a stream.
 [[nodiscard]] std::int32_t structureIndexOf(std::string_view name) {
     static const std::map<std::string, std::int32_t, std::less<>> built{
-        {"ruined_portal", 10},          {"ruined_portal_desert", 11}, {"ruined_portal_jungle", 12},
-        {"ruined_portal_mountain", 13}, {"ruined_portal_nether", 14}, {"ruined_portal_ocean", 15},
-        {"ruined_portal_swamp", 16}};
+        {"ruined_portal", 28},          {"ruined_portal_desert", 29}, {"ruined_portal_jungle", 30},
+        {"ruined_portal_mountain", 31}, {"ruined_portal_nether", 32}, {"ruined_portal_ocean", 33},
+        {"ruined_portal_swamp", 34}};
     const auto found = built.find(name);
     return found == built.end() ? kDefaultStructureIndex : found->second;
 }

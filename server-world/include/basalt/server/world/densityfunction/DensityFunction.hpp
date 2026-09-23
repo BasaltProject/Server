@@ -1,52 +1,112 @@
 #pragma once
 
-#include <basalt/server/world/spline/CubicSpline.hpp>
+#include <basalt/server/world/densityfunction/DensityVolume.hpp>
+#include <basalt/server/world/noise/Interval.hpp>
 
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace basalt::server::random {
 class RandomSource;
 }
 
-namespace basalt::server::world {
-namespace noise {
+namespace basalt::server::world::noise {
+class Noise;
 class NormalNoise;
+} // namespace basalt::server::world::noise
+
+namespace basalt::server::world::densityfunction {
+
+class SamplerContext;
+class DensityFunction;
+class DensitySampler;
+
+using Function = std::shared_ptr<const DensityFunction>;
+using Sampler = std::shared_ptr<const DensitySampler>;
+
+/// parity: `DensityFunction.AXIS_*`, the axes a function depends on.
+inline constexpr std::int32_t kAxisX = 1;
+inline constexpr std::int32_t kAxisY = 2;
+inline constexpr std::int32_t kAxisZ = 4;
+inline constexpr std::int32_t kAllAxes = 7;
+
+enum class Axis : std::uint8_t { X, Y, Z };
+
+[[nodiscard]] constexpr std::int32_t axesFrom(Axis axis) noexcept {
+    return axis == Axis::X ? kAxisX : (axis == Axis::Y ? kAxisY : kAxisZ);
 }
 
-namespace densityfunction {
+/// parity: `DensityFunction.CompileContext`, what a function needs from the world to sample.
+class CompileContext {
+public:
+    virtual ~CompileContext() = default;
 
-class DensityCache;
+    /// The sampler for a named noise, or the legacy-seeded one the Nether's climate asks for.
+    [[nodiscard]] virtual std::shared_ptr<const noise::Noise> createNoise(const std::string& noiseId) = 0;
 
-/// parity: `DensityFunction.FunctionContext`, the single-point variant.
-///
-/// The cache is what vanilla gets by rewriting the tree per chunk instead. Null means no chunk
-/// scope, and every marker then evaluates straight through.
-struct FunctionContext {
-    std::int32_t blockX = 0;
-    std::int32_t blockY = 0;
-    std::int32_t blockZ = 0;
-    DensityCache* cache = nullptr;
+    [[nodiscard]] virtual random::RandomSource createRandom(std::string_view seedName) = 0;
 
-    /// Moves this context to another block, so a caller sampling a whole chunk reuses one instead of
-    /// building one per block. Safe only because no node keeps a context past its own `compute`:
-    /// they read the three coordinates and pass the same instance down.
-    void moveTo(std::int32_t x, std::int32_t y, std::int32_t z) noexcept {
-        blockX = x;
-        blockY = y;
-        blockZ = z;
-    }
+    [[nodiscard]] virtual random::RandomSource createEndIslandRandom() = 0;
 };
 
-/// parity: `DensityFunction`, the expression tree vanilla's noise router builds terrain shape from.
-///
-/// Only single-point evaluation and the declared bounds are modelled. The bounds are not
-/// decoration: several node types fold constants and short-circuit on them, so a wrong bound is a
-/// silent terrain difference. `fillArray` (a bulk fast path), the tree-rewriting visitors and the
-/// data-driven codec are not here.
+/// parity: `DfRewriteRule`.
+class RewriteRule {
+public:
+    virtual ~RewriteRule() = default;
+    [[nodiscard]] virtual Function rewrite(const Function& function) const = 0;
+};
+
+/// parity: `DensitySampler`, a compiled function. The point path and the volume path are both
+/// part of the contract: vanilla uses each where it does, and they do not always round alike.
+class DensitySampler {
+public:
+    virtual ~DensitySampler() = default;
+    DensitySampler(const DensitySampler&) = delete;
+    DensitySampler& operator=(const DensitySampler&) = delete;
+    DensitySampler(DensitySampler&&) = delete;
+    DensitySampler& operator=(DensitySampler&&) = delete;
+
+    [[nodiscard]] virtual float sampleValue(SamplerContext& context, std::int32_t x, std::int32_t y,
+                                            std::int32_t z) const = 0;
+
+    virtual void sampleVolume(SamplerContext& context, DensityBuffer& output, const DensityVolume& volume) const = 0;
+
+protected:
+    DensitySampler() = default;
+};
+
+/// The node kinds, which rewrite rules and constant folding switch on.
+enum class Kind : std::uint8_t {
+    Constant,
+    Reference,
+    Simple,
+    Noise,
+    EndIslands,
+    DistanceToPoint,
+    Gradient,
+    Shift,
+    Unary,
+    Binary,
+    Spline,
+    Lerp,
+    Clamp,
+    RangeChoice,
+    IntervalSelect,
+    Cache,
+    PreparedCache,
+    BlendDensity,
+    Interpolated,
+    Slice,
+    FindTopSurface,
+    BlendedNoise,
+};
+
+/// parity: `DensityFunction`, an immutable expression node. Structural equality matters: vanilla
+/// shares one cache between every `cache` node whose input compares equal.
 class DensityFunction {
 public:
     virtual ~DensityFunction() = default;
@@ -55,113 +115,120 @@ public:
     DensityFunction(DensityFunction&&) = delete;
     DensityFunction& operator=(DensityFunction&&) = delete;
 
-    [[nodiscard]] virtual double compute(FunctionContext& context) const = 0;
-    [[nodiscard]] virtual double minValue() const = 0;
-    [[nodiscard]] virtual double maxValue() const = 0;
+    [[nodiscard]] virtual Kind kind() const noexcept = 0;
+    [[nodiscard]] virtual noise::Interval range() const = 0;
+    [[nodiscard]] virtual std::int32_t domainAxes() const = 0;
+    [[nodiscard]] virtual Sampler compile(CompileContext& context) const = 0;
 
-    /// The value this node always takes, when it always takes one.
-    ///
-    /// parity: vanilla asks `instanceof Constant` where it folds one; this asks the node instead,
-    /// which is the same question and does not need the type back at runtime.
-    [[nodiscard]] virtual std::optional<double> constantValue() const { return std::nullopt; }
+    /// `self` is this node's own handle, returned when no child changed.
+    [[nodiscard]] virtual Function rewriteChildren(const Function& self, const RewriteRule& rule) const = 0;
+
+    [[nodiscard]] virtual bool equals(const DensityFunction& other) const = 0;
+    [[nodiscard]] virtual std::size_t hash() const = 0;
+
+    /// The value of a `constant` node, and nothing for any other.
+    [[nodiscard]] virtual std::optional<float> constantValue() const { return std::nullopt; }
 
 protected:
     DensityFunction() = default;
 };
 
-using Function = std::shared_ptr<const DensityFunction>;
+[[nodiscard]] bool equal(const Function& left, const Function& right);
 
-/// parity: `DensityFunctions.Mapped.Type`.
-enum class MappedType : std::uint8_t { Abs, Square, Cube, HalfNegative, QuarterNegative, Invert, Squeeze };
+/// parity: `SimpleDensityFunction`.
+enum class SimpleType : std::uint8_t { BlendAlpha, BlendOffset, Beardifier };
 
-/// parity: `DensityFunctions.TwoArgumentSimpleFunction.Type`.
-enum class Ap2Type : std::uint8_t { Add, Mul, Min, Max };
+/// parity: `UnaryFunction.Type`.
+enum class UnaryType : std::uint8_t {
+    Abs,
+    Square,
+    Cube,
+    Sqrt,
+    HalfNegative,
+    QuarterNegative,
+    Reciprocal,
+    Negate,
+    Squeeze,
+    Log,
+    Sign
+};
 
-/// parity: `DensityFunctions.Marker.Type`.
-///
-/// The flat cache is not merely an optimisation: vanilla quantises the query to the quart grid and
-/// samples at y zero, so honouring it changes values toward vanilla. The 2D and once caches are
-/// exact memoisation. The cell cache is defined against vanilla's own cell iteration and stays
-/// performance-only here, and blend density only marks where Anvil blending would apply.
-enum class MarkerType : std::uint8_t { Interpolated, FlatCache, Cache2d, CacheOnce, CacheAllInCell, BlendDensity };
+/// parity: `BinaryFunction.Type`.
+enum class BinaryType : std::uint8_t { Add, Sub, Mul, Div, Min, Max };
 
-/// The unary transform itself, which the bounds derivation needs as well as the node.
-[[nodiscard]] double transform(MappedType type, double input);
+/// parity: `TilingMode`.
+enum class Tiling : std::uint8_t { ClampToEdge, Repeat, MirroredRepeat };
 
-/// How many cache slots every marker built so far needs between them.
-[[nodiscard]] std::size_t markerSlotCount();
+/// parity: `DistanceMetric`.
+enum class DistanceMetric : std::uint8_t { Euclidean, EuclideanSquared, Manhattan, Chebyshev };
 
-/// The factories. parity: `DensityFunctions`' own static methods.
+/// parity: `ShiftNoiseFunction`'s three shapes.
+enum class ShiftType : std::uint8_t { ShiftA, ShiftB, Shift };
+
+/// parity: `CubicSpline` over density coordinates, float throughout.
+struct Spline {
+    struct Point {
+        float location;
+        std::shared_ptr<const Spline> value;
+        float derivative;
+    };
+
+    /// A constant spline has no coordinate and no points.
+    std::optional<float> constant;
+    Function coordinate;
+    std::vector<Point> points;
+};
+
 namespace functions {
 
 [[nodiscard]] Function zero();
-[[nodiscard]] Function constant(double value);
-[[nodiscard]] Function add(Function a, Function b);
-[[nodiscard]] Function mul(Function a, Function b);
-[[nodiscard]] Function min(Function a, Function b);
-[[nodiscard]] Function max(Function a, Function b);
-[[nodiscard]] Function clamp(Function input, double minValue, double maxValue);
-[[nodiscard]] Function abs(Function input);
-[[nodiscard]] Function square(Function input);
-[[nodiscard]] Function cube(Function input);
-[[nodiscard]] Function halfNegative(Function input);
-[[nodiscard]] Function quarterNegative(Function input);
-[[nodiscard]] Function invert(Function input);
-[[nodiscard]] Function squeeze(Function input);
-[[nodiscard]] Function interpolated(Function input);
-[[nodiscard]] Function flatCache(Function input);
-[[nodiscard]] Function cache2d(Function input);
-[[nodiscard]] Function cacheOnce(Function input);
-[[nodiscard]] Function cacheAllInCell(Function input);
-[[nodiscard]] Function blendDensity(Function input);
-[[nodiscard]] Function blendAlpha();
-[[nodiscard]] Function blendOffset();
-[[nodiscard]] Function yClampedGradient(std::int32_t fromY, std::int32_t toY, double fromValue, double toValue);
-[[nodiscard]] Function noise(std::shared_ptr<const noise::NormalNoise> noise, double xzScale = 1.0,
-                             double yScale = 1.0);
-[[nodiscard]] Function mappedNoise(std::shared_ptr<const noise::NormalNoise> noise, double xzScale, double yScale,
-                                   double minTarget, double maxTarget);
-[[nodiscard]] Function shiftedNoise2d(Function shiftX, Function shiftZ, double xzScale,
-                                      std::shared_ptr<const noise::NormalNoise> noise);
-[[nodiscard]] Function shiftedNoise(Function shiftX, Function shiftY, Function shiftZ, double xzScale, double yScale,
-                                    std::shared_ptr<const noise::NormalNoise> noise);
-[[nodiscard]] Function shiftA(std::shared_ptr<const noise::NormalNoise> noise);
-[[nodiscard]] Function shiftB(std::shared_ptr<const noise::NormalNoise> noise);
-[[nodiscard]] Function shift(std::shared_ptr<const noise::NormalNoise> noise);
-[[nodiscard]] Function rangeChoice(Function input, double minInclusive, double maxExclusive, Function whenInRange,
+[[nodiscard]] Function constant(float value);
+[[nodiscard]] Function simple(SimpleType type);
+[[nodiscard]] Function reference(std::string id, Function target);
+[[nodiscard]] Function noise(std::string noiseId, std::shared_ptr<const noise::NormalNoise> parameters, double xzScale,
+                             double yScale, Function shiftX, Function shiftY, Function shiftZ);
+[[nodiscard]] Function endIslands();
+[[nodiscard]] Function distanceToPoint(std::int32_t x, std::int32_t y, std::int32_t z, DistanceMetric metric);
+[[nodiscard]] Function gradient(Axis axis, Tiling tiling, std::int32_t fromCoordinate, std::int32_t toCoordinate,
+                                float fromValue, float toValue);
+[[nodiscard]] Function shift(ShiftType type, std::string noiseId, std::shared_ptr<const noise::NormalNoise> parameters);
+[[nodiscard]] Function unary(UnaryType type, Function input);
+[[nodiscard]] Function binary(BinaryType type, Function left, Function right);
+[[nodiscard]] Function spline(std::shared_ptr<const Spline> spline);
+[[nodiscard]] Function lerp(Function alpha, Function first, Function second);
+[[nodiscard]] Function clamp(Function input, float min, float max);
+[[nodiscard]] Function rangeChoice(Function input, float minInclusive, float maxExclusive, Function whenInRange,
                                    Function whenOutOfRange);
-[[nodiscard]] Function intervalSelect(Function input, std::vector<double> thresholds, std::vector<Function> functions);
-[[nodiscard]] Function spline(spline::SplineRef<FunctionContext> curve);
-
-/// parity: `BlendedNoise`, the base 3D terrain noise every dimension samples one of.
-///
-/// Three legacy-seeded Perlin noises blended by how far the main one leans toward its own extremes.
-[[nodiscard]] Function blendedNoise(basalt::server::random::RandomSource& source, double xzScale, double yScale,
-                                    double xzFactor, double yFactor, double smearScaleMultiplier);
-
-/// parity: `BlendedNoise.createUnseeded`, always seeded with xoroshiro zero: the noise routers
-/// register this at bootstrap with a fixed placeholder seed, not the world seed.
-[[nodiscard]] Function blendedNoiseUnseeded(double xzScale, double yScale, double xzFactor, double yFactor,
-                                            double smearScaleMultiplier);
-
-/// parity: `DensityFunctions.EndIslandDensityFunction`, the End's island shape.
-[[nodiscard]] Function endIslands(std::int64_t seed);
-
-/// parity: `DensityFunctions.FindTopSurface`, which scans downward for where the density turns
-/// positive.
+[[nodiscard]] Function intervalSelect(Function input, std::vector<float> thresholds, std::vector<Function> functions);
+[[nodiscard]] Function cache(Function input);
+[[nodiscard]] Function blendDensity(Function input);
+[[nodiscard]] Function interpolated(Function input, std::int32_t cellSizeXz, std::int32_t cellSizeY);
+[[nodiscard]] Function slice(Axis axis, std::int32_t coordinate, Function input);
 [[nodiscard]] Function findTopSurface(Function density, Function upperBound, std::int32_t lowerBound,
                                       std::int32_t cellHeight);
+[[nodiscard]] Function blendedNoise(double xzScale, double yScale, double xzFactor, double yFactor,
+                                    double smearScaleMultiplier);
 
-/// The three-function form, which special-cases a constant first argument.
-[[nodiscard]] Function lerp(Function alpha, Function first, Function second);
+[[nodiscard]] inline Function add(Function left, Function right) {
+    return binary(BinaryType::Add, std::move(left), std::move(right));
+}
 
-/// The form the terrain slides actually call.
-[[nodiscard]] Function lerp(Function factor, double first, Function second);
+[[nodiscard]] inline Function mul(Function left, Function right) {
+    return binary(BinaryType::Mul, std::move(left), std::move(right));
+}
 
-/// Wraps a density function as a spline's x axis.
-[[nodiscard]] spline::BoundedFloatFunction<FunctionContext> splineCoordinate(Function function);
+/// parity: `DensityFunctions.yClampedGradient`.
+[[nodiscard]] inline Function yClampedGradient(std::int32_t fromY, std::int32_t toY, float fromValue, float toValue) {
+    return gradient(Axis::Y, Tiling::ClampToEdge, fromY, toY, fromValue, toValue);
+}
+
+/// parity: `BlendedNoise.compileSampler(RandomSource)`, for a caller seeding it by hand.
+[[nodiscard]] Sampler compileBlendedNoise(random::RandomSource& random, double xzScale, double yScale, double xzFactor,
+                                          double yFactor, double smearScaleMultiplier);
 
 } // namespace functions
 
-} // namespace densityfunction
-} // namespace basalt::server::world
+/// The target of a reference node, or the node itself for any other.
+[[nodiscard]] const Function& inlineReference(const Function& function);
+
+} // namespace basalt::server::world::densityfunction

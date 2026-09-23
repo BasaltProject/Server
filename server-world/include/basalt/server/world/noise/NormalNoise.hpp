@@ -1,51 +1,65 @@
 #pragma once
 
-#include <basalt/server/random/RandomSource.hpp>
-#include <basalt/server/world/noise/PerlinNoise.hpp>
+#include <basalt/server/world/noise/Interval.hpp>
+#include <basalt/server/world/noise/Noise.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <vector>
 
+namespace basalt::server::random {
+class RandomSource;
+}
+
 namespace basalt::server::world::noise {
 
-/// parity: net.minecraft.world.level.levelgen.synth.NormalNoise. Two independent PerlinNoise
-/// instances, the second sampled at a slightly different frequency, summed and rescaled to an
-/// approximately fixed output deviation. This is what vanilla actually samples for biome climate
-/// and density functions, as opposed to raw Perlin noise.
+/// parity: `NormalNoise`, which since 26.3 is a recipe rather than a sampler: the parameters of a
+/// `worldgen/noise` file, turned into a stack of Perlin octaves by `create`.
 class NormalNoise {
 public:
+    /// parity: `NormalNoise.Normalization`.
+    enum class Normalization : std::uint8_t { Disabled, Enabled, Legacy };
+
+    /// parity: `NormalNoise.Parameters`, the fields of a `worldgen/noise` file.
     struct Parameters {
-        std::int32_t firstOctave;
-        std::vector<double> amplitudes;
+        double baseAmplitude = 1.0;
+        std::int32_t baseOctave = 0;
+        std::int32_t octaveCount = 1;
+        Normalization normalize = Normalization::Enabled;
+        std::vector<double> amplitudeModifiers;
     };
 
-    [[nodiscard]] static NormalNoise create(random::RandomSource& source, std::int32_t firstOctave,
-                                            std::span<const double> amplitudes);
+    explicit NormalNoise(Parameters parameters);
 
-    /// parity: NormalNoise.createLegacyNetherBiome.
-    [[nodiscard]] static NormalNoise createLegacyNetherBiome(random::RandomSource& source, std::int32_t firstOctave,
-                                                             std::span<const double> amplitudes);
+    /// parity: `NormalNoise.createParity`, the pre-26.3 `firstOctave` and amplitude list.
+    [[nodiscard]] static NormalNoise createParity(std::int32_t firstOctave, std::span<const double> amplitudes);
 
-    [[nodiscard]] double maxValue() const noexcept { return maxValue_; }
+    /// parity: `NormalNoise.create`. Two Perlin octaves per level, interleaved in the stack.
+    [[nodiscard]] std::shared_ptr<const NoiseStack> create(random::RandomSource& random) const;
 
-    [[nodiscard]] double getValue(double x, double y, double z) const noexcept {
-        return (first_.getValue(x, y, z) + second_.getValue(x * kInputFactor, y * kInputFactor, z * kInputFactor)) *
-               valueFactor_;
-    }
+    /// parity: `NormalNoise.createForLegacyNetherBiome`.
+    [[nodiscard]] std::shared_ptr<const NoiseStack> createForLegacyNetherBiome(random::RandomSource& random) const;
+
+    [[nodiscard]] Interval range() const noexcept { return range_; }
+
+    [[nodiscard]] const Parameters& parameters() const noexcept { return parameters_; }
 
 private:
-    NormalNoise(PerlinNoise first, PerlinNoise second, std::span<const double> amplitudes);
+    struct OctaveInfo {
+        std::int32_t octaveIndex;
+        double frequency;
+        double amplitude;
+    };
 
-    static constexpr double kInputFactor = 1.0181268882175227;
-    // parity: vanilla's own TARGET_DEVIATION field (1/3) is declared but never used here; the
-    // constructor divides by a literal 1/6 instead. Kept as-is, bug and all.
-    static constexpr double kValueFactorNumerator = 0.16666666666666666;
-
-    PerlinNoise first_;
-    PerlinNoise second_;
-    double valueFactor_ = 0.0;
-    double maxValue_ = 0.0;
+    Parameters parameters_;
+    std::vector<OctaveInfo> octaves_;
+    double normalizationFactor_ = 0.0;
+    Interval range_ = Interval::notAnInterval();
 };
+
+/// parity: `LegacyFbmInitializer.createForLegacyNetherBiome`, the old sequential octave seeding.
+[[nodiscard]] std::shared_ptr<const NoiseStack> createLegacyFbm(random::RandomSource& random, std::int32_t firstOctave,
+                                                                std::span<const double> amplitudes);
 
 } // namespace basalt::server::world::noise

@@ -133,7 +133,7 @@ TEST_CASE("the tall grass patches place what the frozen kotlin places") {
     SUBCASE("savannaOnly") {
         const auto [lower, halves, deferred, checksum] =
             run("minecraft:savanna", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
-                tallGrassDecoration::decorateFeature(8, chunk, 24680LL, environment);
+                tallGrassDecoration::decorateFeature(11, chunk, 24680LL, environment);
             });
         CHECK(lower == 208);
         // Both halves always land together, so this pins the upper write as well as the lower.
@@ -145,7 +145,7 @@ TEST_CASE("the tall grass patches place what the frozen kotlin places") {
     SUBCASE("plainOnly") {
         const auto [lower, halves, deferred, checksum] =
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
-                tallGrassDecoration::decorateFeature(26, chunk, 24680LL, environment);
+                tallGrassDecoration::decorateFeature(29, chunk, 24680LL, environment);
             });
         CHECK(lower == 248);
         // Both halves always land together, so this pins the upper write as well as the lower.

@@ -4,6 +4,7 @@
 #include <basalt/server/world/densityfunction/DensityFunction.hpp>
 #include <basalt/server/world/structure/ConcentricRingsPlacement.hpp>
 #include <basalt/server/world/structure/StrongholdLayout.hpp>
+#include <basalt/server/world/terrain/StructureBeardifier.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -25,8 +26,8 @@ public:
     using NoiseBiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;
 
     static constexpr std::string_view kName = "stronghold";
-    /// Twentieth of the 26 structures of `surface_structures`, in registry order.
-    static constexpr std::int32_t kStructureIndex = 19;
+    /// Position among the 44 structures of `surface_structures`, in registry order.
+    static constexpr std::int32_t kStructureIndex = 37;
 
     /// `seed` is the world seed. The ring list is the same for every chunk, so it is held here
     /// rather than recomputed from the one `generateInto` is handed: building it is 128 biome
@@ -46,8 +47,7 @@ public:
                                                                               std::int32_t fromZ) const;
 
     /// parity: `terrain_adaptation: bury`, which hollows the rock the whole maze sits in.
-    [[nodiscard]] densityfunction::Function beardified(densityfunction::Function base, std::int32_t chunkX,
-                                                       std::int32_t chunkZ, std::int64_t seed);
+    void addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
 private:
     /// The ring chunks whose maze can still reach this chunk.

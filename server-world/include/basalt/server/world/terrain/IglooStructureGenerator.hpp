@@ -23,8 +23,8 @@ public:
     using SurfaceHeightAt = std::function<std::int32_t(std::int32_t, std::int32_t)>;
 
     static constexpr std::string_view kName = "igloo";
-    /// Fourth of the 26 of `surface_structures`, in registry order.
-    static constexpr std::int32_t kStructureIndex = 3;
+    /// Position among the 44 structures of `surface_structures`, in registry order.
+    static constexpr std::int32_t kStructureIndex = 21;
     static constexpr std::int32_t kSurfaceStructuresStep = 4;
 
     IglooStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> iglooBiomes, TemplateOf templateOf,

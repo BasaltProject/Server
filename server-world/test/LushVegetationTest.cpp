@@ -125,7 +125,7 @@ TEST_CASE("the lush cave patches place what the frozen kotlin places") {
         CHECK(result.totals.plants == 3632);
         CHECK(result.totals.dripleaf == 0);
         CHECK(result.totals.water == 0);
-        CHECK(result.checksum == -2647819465792394605LL);
+        CHECK(result.checksum == -5866587039414398997LL);
         CHECK(result.after == -2096034089);
     }
 
@@ -139,7 +139,7 @@ TEST_CASE("the lush cave patches place what the frozen kotlin places") {
         CHECK(result.totals.plants == 843);
         CHECK(result.totals.dripleaf == 0);
         CHECK(result.totals.water == 0);
-        CHECK(result.checksum == -7802049353988737018LL);
+        CHECK(result.checksum == 7323986251233314778LL);
         CHECK(result.after == -99318013);
     }
 
@@ -153,7 +153,7 @@ TEST_CASE("the lush cave patches place what the frozen kotlin places") {
         CHECK(result.totals.plants == 0);
         CHECK(result.totals.dripleaf == 464);
         CHECK(result.totals.water == 637);
-        CHECK(result.checksum == 8854811118268897032LL);
+        CHECK(result.checksum == -4225043976259778317LL);
         CHECK(result.after == 1664725639);
     }
 
@@ -167,7 +167,7 @@ TEST_CASE("the lush cave patches place what the frozen kotlin places") {
         CHECK(result.totals.plants == 0);
         CHECK(result.totals.dripleaf == 884);
         CHECK(result.totals.water == 1137);
-        CHECK(result.checksum == -8159288940778800465LL);
+        CHECK(result.checksum == -4049797631118442452LL);
         CHECK(result.after == 1048366848);
     }
 
@@ -181,7 +181,7 @@ TEST_CASE("the lush cave patches place what the frozen kotlin places") {
         CHECK(result.totals.plants == 0);
         CHECK(result.totals.dripleaf == 34);
         CHECK(result.totals.water == 0);
-        CHECK(result.checksum == 3176987768055681799LL);
+        CHECK(result.checksum == -8596654427608215647LL);
         CHECK(result.after == -944496466);
     }
 

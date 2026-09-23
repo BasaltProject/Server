@@ -3,6 +3,7 @@
 
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/densityfunction/SamplerContext.hpp>
 #include <basalt/server/world/terrain/BubbleColumnFormation.hpp>
 #include <basalt/server/world/terrain/StructureBeardifier.hpp>
 
@@ -30,20 +31,21 @@ struct Run {
 };
 
 [[nodiscard]] Run run(TerrainAdjustment adjustment) {
-    const densityfunction::Function beardifier = structureBeardifier(
-        {BeardifierRigid{.box = {-4, 60, -4, 4, 70, 4}, .groundLevelDelta = 2, .adjustment = adjustment},
-         BeardifierRigid{.box = {10, 55, 10, 14, 58, 14}, .groundLevelDelta = 0, .adjustment = adjustment}},
-        {BeardifierJunction{.x = 2, .groundY = 64, .z = -3}, BeardifierJunction{.x = 12, .groundY = 57, .z = 12}});
+    const densityfunction::Sampler beardifier = structureBeardifier(StructureBeard{
+        .pieces = {BeardifierRigid{.box = {-4, 60, -4, 4, 70, 4}, .groundLevelDelta = 2, .adjustment = adjustment},
+                   BeardifierRigid{.box = {10, 55, 10, 14, 58, 14}, .groundLevelDelta = 0, .adjustment = adjustment}},
+        .junctions = {BeardifierJunction{.x = 2, .groundY = 64, .z = -3},
+                      BeardifierJunction{.x = 12, .groundY = 57, .z = 12}}});
+    densityfunction::SamplerContext context{densityfunction::SamplerContext::Options{}};
     Run result;
     std::uint64_t checksum = 14695981039346656037ULL;
     for (std::int32_t index = 0; index < 2048; ++index) {
-        densityfunction::FunctionContext context{floorMod(index * 7, 40) - 12, floorMod(index * 3, 30) + 50,
-                                                 floorMod(index * 11, 40) - 12};
-        const double value = beardifier->compute(context);
-        if (value != 0.0) {
+        const float value = beardifier->sampleValue(context, floorMod(index * 7, 40) - 12, floorMod(index * 3, 30) + 50,
+                                                    floorMod(index * 11, 40) - 12);
+        if (value != 0.0F) {
             ++result.nonZero;
         }
-        checksum = (checksum ^ static_cast<std::uint64_t>(std::bit_cast<std::int64_t>(value))) * 1099511628211ULL;
+        checksum = (checksum ^ std::bit_cast<std::uint32_t>(value)) * 1099511628211ULL;
     }
     result.checksum = static_cast<std::int64_t>(checksum);
     return result;
@@ -51,35 +53,35 @@ struct Run {
 
 } // namespace
 
-TEST_CASE("the beardifier shapes terrain the way the frozen kotlin does") {
+TEST_CASE("the beardifier shapes terrain the same way every time") {
     SUBCASE("NONE") {
         const Run result = run(TerrainAdjustment::None);
         CHECK(result.nonZero == 871);
-        CHECK(result.checksum == 5118871034574638841LL);
+        CHECK(result.checksum == 7341274215419491589LL);
     }
 
     SUBCASE("BURY") {
         const Run result = run(TerrainAdjustment::Bury);
         CHECK(result.nonZero == 871);
-        CHECK(result.checksum == 696922404222346844LL);
+        CHECK(result.checksum == 8840587058693433711LL);
     }
 
     SUBCASE("BEARD_THIN") {
         const Run result = run(TerrainAdjustment::BeardThin);
         CHECK(result.nonZero == 1230);
-        CHECK(result.checksum == -1600321308910127287LL);
+        CHECK(result.checksum == -5044933238332024792LL);
     }
 
     SUBCASE("BEARD_BOX") {
         const Run result = run(TerrainAdjustment::BeardBox);
         CHECK(result.nonZero == 1331);
-        CHECK(result.checksum == 4722775033935175430LL);
+        CHECK(result.checksum == 4686971449662833636LL);
     }
 
     SUBCASE("ENCAPSULATE") {
         const Run result = run(TerrainAdjustment::Encapsulate);
         CHECK(result.nonZero == 1331);
-        CHECK(result.checksum == -7403948792975985499LL);
+        CHECK(result.checksum == 2458410024933397189LL);
     }
 }
 
@@ -127,5 +129,5 @@ TEST_CASE("the bubble columns form the way the frozen kotlin forms them") {
         }
     }
     CHECK(columns == 860);
-    CHECK(static_cast<std::int64_t>(checksum) == 6049347624303994151LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -1118893537038522283LL);
 }

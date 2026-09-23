@@ -103,9 +103,9 @@ void placeSpike(Chunk& chunk, const EndSpike& spike, std::int64_t seed) {
 /// A gateway can be rolled in a neighbouring chunk and still reach into this one, and its height
 /// comes from that chunk's own terrain, so the neighbour has to be generated to ask.
 [[nodiscard]] Chunk generateRawSourceChunk(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed,
-                                           const EndNoiseRouter& router, const TheEndBiomeSource& biomeSource) {
+                                           const NoiseRouter& router, const TheEndBiomeSource& biomeSource) {
     Chunk chunk{chunkX, chunkZ, kEndHeight};
-    DensityChunkSampler sampler{router.finalDensity, chunkX, chunkZ, 0, kEndGenerationDepth, 8, 4};
+    const DensityChunkSampler sampler{router, chunkX, chunkZ};
     const std::int32_t endStone = stateIdOf("end_stone");
     for (std::int32_t y = 0; y < kEndGenerationDepth; ++y) {
         for (std::int32_t z = 0; z < 16; ++z) {
@@ -121,7 +121,7 @@ void placeSpike(Chunk& chunk, const EndSpike& spike, std::int64_t seed) {
 }
 
 void placeReturnGateway(Chunk& target, std::int32_t sourceChunkX, std::int32_t sourceChunkZ, std::int64_t seed,
-                        const EndNoiseRouter& router, const TheEndBiomeSource& biomeSource,
+                        const NoiseRouter& router, const TheEndBiomeSource& biomeSource,
                         std::map<std::pair<std::int32_t, std::int32_t>, Chunk>& sourceChunks) {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed = random::setDecorationSeed(random, seed, sourceChunkX * 16, sourceChunkZ * 16);
@@ -170,7 +170,7 @@ bool endSurfaceStructuresDecoration::placeSpikesIn(Chunk& chunk, const std::int6
     return placed;
 }
 
-void endSurfaceStructuresDecoration::decorate(Chunk& chunk, const std::int64_t seed, const EndNoiseRouter& router,
+void endSurfaceStructuresDecoration::decorate(Chunk& chunk, const std::int64_t seed, const NoiseRouter& router,
                                               const TheEndBiomeSource& biomeSource) {
     std::map<std::pair<std::int32_t, std::int32_t>, Chunk> sourceChunks;
     for (std::int32_t sourceChunkX = chunk.chunkX() - 1; sourceChunkX <= chunk.chunkX() + 1; ++sourceChunkX) {
