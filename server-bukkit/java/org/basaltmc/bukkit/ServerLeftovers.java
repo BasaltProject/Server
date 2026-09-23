@@ -104,7 +104,7 @@ public abstract class ServerLeftovers extends ServerExtras {
         dropDataCaches();
     }
 
-    private static void dropDataCaches() {
+    static void dropDataCaches() {
         org.basaltmc.bukkit.item.TagSets.invalidate();
         org.basaltmc.bukkit.item.ItemData.invalidate();
         org.basaltmc.bukkit.item.ItemDefaults.invalidate();

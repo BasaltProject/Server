@@ -11,6 +11,7 @@ final class ServerEvents {
     private ServerEvents() {}
 
     static void install() {
+        EventBridge.mapAlways("server.data_reload", f -> ServerLeftovers.dropDataCaches());
         EventBridge.map("server.ping", com.destroystokyo.paper.event.server.PaperServerListPingEvent.class, f -> {
             String text = f.text("address");
             int colon = text.lastIndexOf(':');
