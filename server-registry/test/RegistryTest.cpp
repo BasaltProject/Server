@@ -691,6 +691,14 @@ TEST_CASE("food carries what eating it is worth, and what it leaves in the hand"
     CHECK_FALSE(golden->effects.empty());
     CHECK(golden->effects.front().as<ConsumeEffect::Apply>() != nullptr);
 
+    // parity: chorus fruit's `teleport_randomly`, with the codec's default diameter.
+    const FoodValue* chorus = itemFood::of(Identifier::vanilla("chorus_fruit"));
+    REQUIRE(chorus != nullptr);
+    REQUIRE(chorus->effects.size() == 1);
+    const auto* teleport = chorus->effects.front().as<ConsumeEffect::TeleportRandomly>();
+    REQUIRE(teleport != nullptr);
+    CHECK(teleport->diameter == 16.0F);
+
     CHECK(itemFood::of(Identifier::vanilla("stone")) == nullptr);
 }
 

@@ -65,7 +65,7 @@ struct JigsawStructureSettings {
     bool useExpansionHack = false;
     bool projectStartToHeightmap = false;
     JigsawHeightSource heightSource = JigsawHeightSource::Surface;
-    /// The start's own y. For `Drawn` it is the low end of the range, and the biome probe reads it.
+    /// The start's own y. For `Drawn` it is the low end of the range.
     std::int32_t startY = 0;
     std::int32_t startYMax = 0;
     TerrainAdjustment adjustment = TerrainAdjustment::BeardThin;
@@ -126,11 +126,6 @@ private:
     /// would dangle as soon as another worker triggered that mid-read.
     [[nodiscard]] std::shared_ptr<const std::vector<structure::PlacedStructurePiece>>
     assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ, std::int64_t seed);
-
-    /// parity, narrowed the same way the village generator narrows it: the jar tests the biome at
-    /// the centre of the start piece's box, which is only known once the piece is placed. The
-    /// candidate chunk's own centre column stands in for it.
-    [[nodiscard]] bool inBiome(std::int32_t candidateChunkX, std::int32_t candidateChunkZ, Samplers& samplers) const;
 
     [[nodiscard]] std::int32_t surfaceHeightAt(std::int32_t x, std::int32_t z, Samplers& samplers) const;
 

@@ -18,8 +18,11 @@ using wire::common::Identifier;
     for (const structure::structureSpawnOverrides::SpawnEntry& entry : override.spawns) {
         const std::expected<Identifier, wire::common::IdentifierError> type = Identifier::parse(entry.type);
         if (type.has_value()) {
-            entries.push_back(SpawnerEntry{
-                .type = *type, .weight = entry.weight, .minCount = entry.minCount, .maxCount = entry.maxCount});
+            entries.push_back(SpawnerEntry{.type = *type,
+                                           .weight = entry.weight,
+                                           .minCount = entry.minCount,
+                                           .maxCount = entry.maxCount,
+                                           .constantCount = entry.constantCount});
         }
     }
     return entries;

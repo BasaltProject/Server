@@ -359,7 +359,7 @@ bool canSpawnAtDistance(const Identifier& type, MobCategory fallbackCategory, do
 bool containsSpawnData(const std::vector<SpawnerEntry>& entries, const SpawnerEntry& selected) {
     return std::ranges::any_of(entries, [&selected](const SpawnerEntry& candidate) {
         return candidate.type == selected.type && candidate.minCount == selected.minCount &&
-               candidate.maxCount == selected.maxCount;
+               candidate.maxCount == selected.maxCount && candidate.constantCount == selected.constantCount;
     });
 }
 
@@ -403,6 +403,13 @@ const SpawnerEntry* pick(const std::vector<SpawnerEntry>& entries, random::Rando
         }
     }
     return entries.empty() ? nullptr : &entries.back();
+}
+
+std::int32_t packSize(const SpawnerEntry& entry, random::RandomSource& random) {
+    if (entry.constantCount) {
+        return entry.minCount;
+    }
+    return entry.minCount + random.nextInt(std::max(1, 1 + entry.maxCount - entry.minCount));
 }
 
 std::optional<Identifier> biomeAt(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -593,7 +600,7 @@ std::vector<SpawnRequest> spawnForChunk(LoadedWorld& world, std::int32_t chunkX,
                     break;
                 }
                 chosen = *picked;
-                pack = chosen->minCount + random.nextInt(std::max(1, 1 + chosen->maxCount - chosen->minCount));
+                pack = packSize(*chosen, random);
             }
             if (!canSpawnAtDistance(chosen->type, category, *distance)) {
                 continue;

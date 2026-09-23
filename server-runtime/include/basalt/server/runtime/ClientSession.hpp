@@ -34,10 +34,12 @@
 #include <basalt/wire/protocol/login/LoginPackets.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
+#include <basalt/wire/protocol/play/PlayPackets.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 #include <basalt/wire/protocol/status/StatusPackets.hpp>
 #include <basalt/wire/text/LangTable.hpp>
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -344,6 +346,14 @@ public:
     /// them, the statistics and whoever can see them.
     void updatePosition(double x, double y, double z, float yaw, float pitch, bool onGround);
 
+    /// Sends `player_position` under a fresh teleport id and waits for the client to accept it.
+    /// parity: `ServerGamePacketListenerImpl.teleport`, `awaitingTeleport` and `awaitingPositionFromClient`.
+    void sendPlayerPosition(double x, double y, double z, float yaw, float pitch);
+
+    /// parity: 26.3 `handleAcceptTeleportPacket`: only the awaited id counts, and its carried
+    /// position is then a move like any other.
+    void acceptTeleport(const wire::protocol::play::AcceptTeleportationPacket& accept);
+
     /// parity: `ServerPlayer.tick`'s own pickup pass, which is what makes an item fly to a player.
     void tryPickupNearbyItems();
 
@@ -602,6 +612,10 @@ private:
     std::optional<wire::auth::SessionProfile> pendingProfile_;
     std::int8_t pendingSkinParts_ = static_cast<std::int8_t>(0x7F);
     std::optional<wire::auth::forwarding::ForwardingResult> forwardedHandshake_;
+    /// Sent from the tick thread, accepted on the network one.
+    std::mutex teleportMutex_;
+    std::int32_t awaitingTeleport_ = 0;
+    std::optional<std::array<double, 3>> awaitingPosition_;
 };
 
 } // namespace basalt::server::runtime

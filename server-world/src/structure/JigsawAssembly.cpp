@@ -135,6 +135,10 @@ std::vector<PlacedStructurePiece> Assembler::run() {
     const std::int32_t moveY = bottomY - (rawBox.minY + centerElement.groundLevelDelta());
     const StructurePos centerPosition{adjustedPosition.x, adjustedPosition.y + moveY, adjustedPosition.z};
     const StructureBoundingBox centerBox = rawBox.move(StructurePos{0, moveY, 0});
+    const std::int32_t centerY = bottomY + (anchoredPosition.y - request_->startPosition.y);
+    if (request_->acceptStart && !request_->acceptStart(StructurePos{centerX, centerY, centerZ})) {
+        return {};
+    }
 
     pieces_.push_back(PlacedStructurePiece{.element = centerElement,
                                            .position = centerPosition,
@@ -151,9 +155,9 @@ std::vector<PlacedStructurePiece> Assembler::run() {
     // refuses them, and every later collision test then sees a different set of neighbours.
     const bool unbounded = request_->maxVerticalDistanceFromCenter == std::numeric_limits<std::int32_t>::max();
     const std::int32_t reachMinY =
-        unbounded ? std::numeric_limits<std::int32_t>::min() : bottomY - request_->maxVerticalDistanceFromCenter;
+        unbounded ? std::numeric_limits<std::int32_t>::min() : centerY - request_->maxVerticalDistanceFromCenter;
     const std::int32_t reachMaxY =
-        unbounded ? std::numeric_limits<std::int32_t>::max() : bottomY + request_->maxVerticalDistanceFromCenter;
+        unbounded ? std::numeric_limits<std::int32_t>::max() : centerY + request_->maxVerticalDistanceFromCenter;
     const std::int32_t floorY = request_->worldMinY == std::numeric_limits<std::int32_t>::min()
                                     ? reachMinY
                                     : request_->worldMinY + request_->dimensionPaddingBottom;

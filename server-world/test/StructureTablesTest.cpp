@@ -19,7 +19,7 @@ constexpr std::array<std::string_view, 8> kCategories{
 
 } // namespace
 
-TEST_CASE("the structure spawn overrides match the frozen kotlin") {
+TEST_CASE("the structure spawn overrides match the 26.3 jar") {
     std::string structures;
     for (const std::string& structure : overrides::structures()) {
         if (!structures.empty()) {
@@ -27,7 +27,7 @@ TEST_CASE("the structure spawn overrides match the frozen kotlin") {
         }
         structures += structure;
     }
-    CHECK(structures == "ancient_city,fortress,monument,pillager_outpost,swamp_hut");
+    CHECK(structures == "ancient_city,fortress,monument,pillager_outpost,swamp_hut,trial_chambers");
 
     std::string rows;
     for (const std::string& structure : overrides::structures()) {
@@ -44,19 +44,24 @@ TEST_CASE("the structure spawn overrides match the frozen kotlin") {
                     rows += ",";
                 }
                 first = false;
-                rows += entry.type + "/" + std::to_string(entry.weight) + "/" + std::to_string(entry.minCount) + "/" +
-                        std::to_string(entry.maxCount);
+                rows += entry.type + "/" + std::to_string(entry.weight) + "/" + std::to_string(entry.minCount);
+                if (!entry.constantCount) {
+                    rows += "-" + std::to_string(entry.maxCount);
+                }
             }
             rows += ";";
         }
     }
     CHECK(rows == "ancient_city.monster=FULL:;ancient_city.creature=FULL:;ancient_city.ambient=FULL:;ancient_city.axolo"
                   "tls=FULL:;ancient_city.underground_water_creature=FULL:;ancient_city.water_creature=FULL:;ancient_ci"
-                  "ty.water_ambient=FULL:;ancient_city.misc=FULL:;fortress.monster=PIECE:minecraft:blaze/10/2/3,minecra"
-                  "ft:zombified_piglin/5/4/4,minecraft:wither_skeleton/8/5/5,minecraft:skeleton/2/5/5,minecraft:magma_c"
-                  "ube/3/4/4;monument.monster=FULL:minecraft:guardian/1/2/4;monument.axolotls=FULL:;monument.undergroun"
-                  "d_water_creature=FULL:;pillager_outpost.monster=FULL:minecraft:pillager/1/1/1;swamp_hut.monster=PIEC"
-                  "E:minecraft:witch/1/1/1;swamp_hut.creature=PIECE:minecraft:cat/1/1/1;");
+                  "ty.water_ambient=FULL:;ancient_city.misc=FULL:;fortress.monster=PIECE:minecraft:blaze/10/2-3,minecra"
+                  "ft:zombified_piglin/5/4,minecraft:wither_skeleton/8/5,minecraft:skeleton/2/5,minecraft:magma_c"
+                  "ube/3/4;monument.monster=FULL:minecraft:guardian/1/2-4;monument.axolotls=FULL:;monument.undergroun"
+                  "d_water_creature=FULL:;pillager_outpost.monster=FULL:minecraft:pillager/1/1;swamp_hut.monster=PIEC"
+                  "E:minecraft:witch/1/1;swamp_hut.creature=PIECE:minecraft:cat/1/1;trial_chambers.monster=PIECE:;tria"
+                  "l_chambers.creature=PIECE:;trial_chambers.ambient=PIECE:;trial_chambers.axolotls=PIECE:;trial_chamb"
+                  "ers.underground_water_creature=PIECE:;trial_chambers.water_creature=PIECE:;trial_chambers.water_ambi"
+                  "ent=PIECE:;trial_chambers.misc=PIECE:;");
 
     CHECK(overrides::of("igloo", "monster") == nullptr);
     CHECK(overrides::of("fortress", "misc") == nullptr);

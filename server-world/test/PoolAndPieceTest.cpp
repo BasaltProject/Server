@@ -114,7 +114,7 @@ constexpr std::string_view kPoolJson = R"json(
                     "probability": 0.25
                   },
                   "location_predicate": { "predicate_type": "minecraft:always_true" },
-                  "output_state": { "Name": "minecraft:mossy_cobblestone" }
+                  "output_state": "minecraft:mossy_cobblestone"
                 }
               ]
             },
@@ -130,8 +130,8 @@ constexpr std::string_view kPoolJson = R"json(
                       "block": "minecraft:oak_planks"
                     },
                     "output_state": {
-                      "Name": "minecraft:oak_stairs",
-                      "Properties": { "facing": "west", "half": "top" }
+                      "id": "minecraft:oak_stairs",
+                      "properties": { "facing": "west", "half": "top" }
                     },
                     "block_entity_modifier": {
                       "type": "minecraft:append_loot",

@@ -106,6 +106,9 @@ inline constexpr std::int32_t kCapChunks = 289;
 /// parity: `WeightedRandomList.getRandom` over the biome's own weights.
 [[nodiscard]] const SpawnerEntry* pick(const std::vector<SpawnerEntry>& entries, random::RandomSource& random);
 
+/// parity: 26.3 `SpawnerData.count().sample`: a constant draws nothing, a uniform range one `nextInt`.
+[[nodiscard]] std::int32_t packSize(const SpawnerEntry& entry, random::RandomSource& random);
+
 /// parity: the biome at the position, which is what decides the list to pick from.
 [[nodiscard]] std::optional<wire::common::Identifier> biomeAt(LoadedWorld& world, std::int32_t x, std::int32_t y,
                                                               std::int32_t z);
