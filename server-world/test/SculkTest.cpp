@@ -180,7 +180,7 @@ TEST_CASE("one sculk feature at one position matches the frozen kotlin") {
         }
     }
     CHECK(known == "111111111000");
-    CHECK(placed == 1344);
-    CHECK(static_cast<std::int64_t>(checksum) == -4591172945431988541LL);
+    CHECK(placed == 1345);
+    CHECK(static_cast<std::int64_t>(checksum) == 5687767319745567425LL);
     CHECK(after == 1004880498);
 }

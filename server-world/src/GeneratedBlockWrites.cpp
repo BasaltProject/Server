@@ -35,7 +35,8 @@ bool apply(Chunk& chunk, const ChunkGeneratedBlockWrite& write, const bool sourc
     // it. Nothing after an ore targets a geode, a dirt vein or an ore, so those land regardless.
     const bool onTop = sourceGoesOnTop || untouched ||
                        terrain::decoration::oreBlockRules::survivesLaterDecoration(write.policy, write.stateId);
-    const bool loosely = onTop && terrain::decoration::oreBlockRules::canReplaceDeferred(write.policy, current);
+    const bool loosely =
+        onTop && terrain::decoration::oreBlockRules::canReplaceDeferred(write.policy, current, write.y);
     const bool canReplace = write.replaceAnyState || current == write.expectedStateId ||
                             (onTop && write.policy == GeneratedBlockWritePolicy::Tree &&
                              terrain::decoration::tree::treeBlockRules::canReplaceDeferred(current, write.stateId)) ||

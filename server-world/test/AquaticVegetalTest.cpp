@@ -177,10 +177,10 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
 
     SUBCASE("warmOcean") {
         const Run result = run(aquaticDecoration::warmOcean(), 24);
-        CHECK(result.placed == 1002);
-        CHECK(result.deferred == 769);
-        CHECK(result.checksum == 7345160379850984405LL);
-        CHECK(result.after == -1242473187);
+        CHECK(result.placed == 951);
+        CHECK(result.deferred == 979);
+        CHECK(result.checksum == -2723409350642456979LL);
+        CHECK(result.after == 1414199547);
     }
 }
 

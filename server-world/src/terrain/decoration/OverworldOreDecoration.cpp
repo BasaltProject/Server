@@ -108,7 +108,7 @@ void removeContainedSpheres(std::vector<double>& spheres, std::int32_t size) {
     const std::string blockPath = block->block.path();
     const Target* target = nullptr;
     for (const Target& candidate : config.targets) {
-        if (candidate.replaceable->find(blockPath) != candidate.replaceable->end()) {
+        if (targetMatches(candidate, blockPath, y)) {
             target = &candidate;
             break;
         }
