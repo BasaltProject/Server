@@ -40,9 +40,11 @@ const PathSet& mangroveLogGrowThroughPaths() {
 }
 
 const PathSet& leafBlockPaths() {
-    static const PathSet paths = {"oak_leaves",    "birch_leaves",    "spruce_leaves",          "jungle_leaves",
-                                  "acacia_leaves", "dark_oak_leaves", "pale_oak_leaves",        "mangrove_leaves",
-                                  "cherry_leaves", "azalea_leaves",   "flowering_azalea_leaves"};
+    static const PathSet paths = {
+        "oak_leaves",        "birch_leaves",        "spruce_leaves",           "jungle_leaves",
+        "acacia_leaves",     "dark_oak_leaves",     "pale_oak_leaves",         "mangrove_leaves",
+        "cherry_leaves",     "azalea_leaves",       "flowering_azalea_leaves", "orange_poplar_leaves",
+        "red_poplar_leaves", "yellow_poplar_leaves"};
     return paths;
 }
 
@@ -84,6 +86,28 @@ const PathSet& leafBlockPaths() {
         return defaultStateId;
     }
     return xDifference == largest ? defaultStateId - 1 : defaultStateId + 1;
+}
+
+/// parity: `Direction.allShuffled` over the six directions in declaration order (down, up, north,
+/// south, west, east), then only the horizontal ones kept.
+[[nodiscard]] std::vector<HorizontalDirection> shuffledHorizontalDirections(random::RandomSource& random) {
+    struct Direction {
+        HorizontalDirection step;
+        bool horizontal;
+    };
+
+    std::array<Direction, 6> all{Direction{{0, 0}, false}, Direction{{0, 0}, false}, Direction{{0, -1}, true},
+                                 Direction{{0, 1}, true},  Direction{{-1, 0}, true}, Direction{{1, 0}, true}};
+    for (std::int32_t size = static_cast<std::int32_t>(all.size()); size > 1; --size) {
+        std::swap(all[static_cast<std::size_t>(size - 1)], all[static_cast<std::size_t>(random.nextInt(size))]);
+    }
+    std::vector<HorizontalDirection> horizontal;
+    for (const Direction& direction : all) {
+        if (direction.horizontal) {
+            horizontal.push_back(direction.step);
+        }
+    }
+    return horizontal;
 }
 
 struct FancyFoliageCoords {
@@ -171,6 +195,16 @@ TrunkPlacer TrunkPlacer::cherry(const std::int32_t baseHeight, const std::int32_
     placer.branchStartOffsetFromTop_ = IntProvider::uniform(branchStartOffsetMin, branchStartOffsetMax);
     placer.secondBranchStartOffsetFromTop_ = IntProvider::uniform(branchStartOffsetMin, branchStartOffsetMax - 1);
     placer.branchEndOffsetFromTop_ = std::move(branchEndOffsetFromTop);
+    return placer;
+}
+
+TrunkPlacer TrunkPlacer::poplar(const std::int32_t baseHeight, const std::int32_t heightRandA,
+                                const std::int32_t heightRandB, IntProvider trunkHeightAboveBranches,
+                                IntProvider branchAmount) {
+    TrunkPlacer placer = straight(baseHeight, heightRandA, heightRandB);
+    placer.kind_ = Kind::Poplar;
+    placer.trunkHeightAboveBranches_ = std::move(trunkHeightAboveBranches);
+    placer.branchAmount_ = std::move(branchAmount);
     return placer;
 }
 
@@ -473,6 +507,25 @@ std::vector<FoliageAttachment> TrunkPlacer::placeTrunk(Chunk& chunk, random::Ran
         return placeUpwardsBranchingTrunk(chunk, random, treeHeight, originX, originY, originZ, trunkStateId);
     case Kind::Cherry:
         return placeCherryTrunk(chunk, random, treeHeight, originX, originY, originZ, trunkStateId);
+    case Kind::Poplar: {
+        placeBelowTrunkBlock(chunk, originX, originY - 1, originZ);
+        const std::int32_t branchTop = treeHeight - trunkHeightAboveBranches_.sample(random);
+        for (std::int32_t y = 0; y < treeHeight; ++y) {
+            placeLog(chunk, originX, originY + y, originZ, trunkStateId);
+            // parity: `Direction.allShuffled` runs every level, even where no branch grows.
+            const std::vector<HorizontalDirection> directions = shuffledHorizontalDirections(random);
+            if (branchTop - 1 != y) {
+                continue;
+            }
+            const std::int32_t branches = branchAmount_.sample(random);
+            for (std::int32_t index = 0; index < branches; ++index) {
+                const HorizontalDirection direction = directions[static_cast<std::size_t>(index)];
+                placeLog(chunk, originX + direction.dx, originY + y, originZ + direction.dz,
+                         direction.dx != 0 ? trunkStateId - 1 : trunkStateId + 1);
+            }
+        }
+        return {FoliageAttachment{.x = originX, .y = originY + branchTop, .z = originZ}};
+    }
     case Kind::Giant:
         return placeGiant(chunk, treeHeight, originX, originY, originZ, trunkStateId);
     case Kind::MegaJungle: {

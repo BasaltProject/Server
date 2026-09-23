@@ -78,9 +78,9 @@ TEST_CASE("the sugar cane patches place what the frozen kotlin places") {
             run("minecraft:desert", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 sugarCanePatchDecoration::decorate(chunk, 13579LL, environment);
             });
-        CHECK(cane == 560);
+        CHECK(cane == 581);
         CHECK(deferred == 0);
-        CHECK(checksum == -2241159267966534677LL);
+        CHECK(checksum == 8268535421500816346LL);
     }
 
     SUBCASE("badlands") {
@@ -88,9 +88,9 @@ TEST_CASE("the sugar cane patches place what the frozen kotlin places") {
             run("minecraft:badlands", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 sugarCanePatchDecoration::decorate(chunk, 13579LL, environment);
             });
-        CHECK(cane == 143);
+        CHECK(cane == 82);
         CHECK(deferred == 0);
-        CHECK(checksum == -6793943546750051700LL);
+        CHECK(checksum == -6948486299336856581LL);
     }
 
     SUBCASE("swamp") {
@@ -98,9 +98,9 @@ TEST_CASE("the sugar cane patches place what the frozen kotlin places") {
             run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 sugarCanePatchDecoration::decorate(chunk, 13579LL, environment);
             });
-        CHECK(cane == 197);
+        CHECK(cane == 175);
         CHECK(deferred == 0);
-        CHECK(checksum == 6128057495779430292LL);
+        CHECK(checksum == 3826415830987549622LL);
     }
 
     SUBCASE("plains") {
@@ -108,9 +108,9 @@ TEST_CASE("the sugar cane patches place what the frozen kotlin places") {
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 sugarCanePatchDecoration::decorate(chunk, 13579LL, environment);
             });
-        CHECK(cane == 98);
+        CHECK(cane == 90);
         CHECK(deferred == 0);
-        CHECK(checksum == 1021867050187984159LL);
+        CHECK(checksum == 2272187768097205833LL);
     }
 
     SUBCASE("wrong") {
@@ -121,7 +121,7 @@ TEST_CASE("the sugar cane patches place what the frozen kotlin places") {
             });
         CHECK(cane == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 7994375482017995133LL);
+        CHECK(checksum == -2589217215263224963LL);
     }
 
     SUBCASE("desertOnly") {
@@ -129,9 +129,9 @@ TEST_CASE("the sugar cane patches place what the frozen kotlin places") {
             run("minecraft:desert", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 sugarCanePatchDecoration::decorateFeature(chunk, 13579LL, environment, "patch_sugar_cane_desert");
             });
-        CHECK(cane == 560);
+        CHECK(cane == 581);
         CHECK(deferred == 0);
-        CHECK(checksum == -2241159267966534677LL);
+        CHECK(checksum == 8268535421500816346LL);
     }
 
     SUBCASE("regional") {
@@ -150,8 +150,8 @@ TEST_CASE("the sugar cane patches place what the frozen kotlin places") {
                         return registry::blocks::air().stateId;
                     });
             });
-        CHECK(cane == 562);
-        CHECK(deferred == 57);
-        CHECK(checksum == -8940531553218222127LL);
+        CHECK(cane == 572);
+        CHECK(deferred == 82);
+        CHECK(checksum == -1542413757807843201LL);
     }
 }

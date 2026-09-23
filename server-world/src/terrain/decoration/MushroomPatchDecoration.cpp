@@ -151,6 +151,11 @@ const std::vector<std::string>& normalBiomes() {
     return biomes;
 }
 
+const std::vector<std::string>& dappledBiomes() {
+    static const std::vector<std::string> biomes = {"dappled_forest"};
+    return biomes;
+}
+
 const std::vector<std::string>& taigaBiomes() {
     static const std::vector<std::string> biomes = {"mushroom_fields", "snowy_taiga", "taiga"};
     return biomes;
@@ -168,6 +173,7 @@ struct PatchSpec {
 
 const std::vector<PatchSpec>& specs() {
     static const std::vector<PatchSpec> built = {
+        {"brown_mushroom_dappled_forest", 6, "brown_mushroom", 2, 1, &dappledBiomes()},
         {"brown_mushroom_old_growth", 66, "brown_mushroom", 4, 3, &oldGrowthBiomes()},
         {"red_mushroom_old_growth", 67, "red_mushroom", 171, 1, &oldGrowthBiomes()},
         {"brown_mushroom_swamp", 69, "brown_mushroom", 0, 2, &swampBiomes()},

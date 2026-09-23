@@ -62,6 +62,21 @@ const std::vector<Feature>& features() {
             const ExternalStateReader&) {
              treePatchDecoration::decorateFeature(chunk, seed, environment, "trees_sparse_jungle");
          }},
+        {5, "trees_dappled_forest",
+         [](Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
+            const ExternalStateReader&) {
+             treePatchDecoration::decorateFeature(chunk, seed, environment, "trees_dappled_forest");
+         }},
+        {6, "brown_mushroom_dappled_forest",
+         [](Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
+            const ExternalStateReader&) {
+             mushroomPatchDecoration::decorateFeature(chunk, seed, environment, "brown_mushroom_dappled_forest");
+         }},
+        {7, "patch_red_shrub",
+         [](Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
+            const ExternalStateReader&) {
+             groundPlantPatchDecoration::decorateFeature(chunk, seed, environment, "patch_red_shrub");
+         }},
         {8, "trees_badlands",
          [](Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
             const ExternalStateReader&) {

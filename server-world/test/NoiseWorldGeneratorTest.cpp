@@ -50,22 +50,22 @@ TEST_CASE("the chunks the frozen kotlin generated, block for block") {
     // Every number here was printed by the Kotlin generator, not derived from this one.
     const Report origin = reportOf(noiseWorldGenerator::generate(0, 0));
     CHECK(origin.solid == 32901);
-    CHECK(origin.checksum == -3956798941779008098LL);
+    CHECK(origin.checksum == 6294226696645776382LL);
     CHECK(origin.heightSum == 16517);
 
     const Report east = reportOf(noiseWorldGenerator::generate(1, 0));
     CHECK(east.solid == 32543);
-    CHECK(east.checksum == -4505802210673730311LL);
+    CHECK(east.checksum == 7521381607769648945LL);
     CHECK(east.heightSum == 16238);
 
     const Report negative = reportOf(noiseWorldGenerator::generate(-3, 7));
     CHECK(negative.solid == 32756);
-    CHECK(negative.checksum == 396409001423186616LL);
+    CHECK(negative.checksum == -9121355473577638777LL);
     CHECK(negative.heightSum == 16487);
 
     const Report far = reportOf(noiseWorldGenerator::generate(100, -200));
     CHECK(far.solid == 32561);
-    CHECK(far.checksum == 8546029598518933444LL);
+    CHECK(far.checksum == 121605967617762008LL);
     CHECK(far.heightSum == 16307);
 }
 
@@ -87,7 +87,7 @@ TEST_CASE("one column, as the oracle printed it") {
     CHECK(registry::blocks::isAir(chunk.blockStateId(0, 64, 0)));
 
     // parity of shape with vanilla: the floor of the world is bedrock, wherever you stand on it.
-    CHECK(chunk.blockStateId(3, worldHeight::kMinY, 5) == 85);
+    CHECK(chunk.blockStateId(3, worldHeight::kMinY, 5) == 88);
     CHECK(chunk.blockStateId(3, worldHeight::kMinY, 5) == registry::blocks::bedrock().stateId);
 }
 

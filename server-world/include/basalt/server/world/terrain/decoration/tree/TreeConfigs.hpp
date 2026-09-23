@@ -30,6 +30,12 @@ namespace treeConfigs {
 [[nodiscard]] const TreeConfiguration& tallMangrove();
 [[nodiscard]] const TreeConfiguration& cherry();
 
+[[nodiscard]] const TreeConfiguration& redPoplar();
+[[nodiscard]] const TreeConfiguration& orangePoplar();
+[[nodiscard]] const TreeConfiguration& yellowPoplar();
+[[nodiscard]] const TreeConfiguration& redPoplarLeafLitter();
+[[nodiscard]] const TreeConfiguration& orangePoplarLeafLitter();
+[[nodiscard]] const TreeConfiguration& yellowPoplarLeafLitter();
 [[nodiscard]] const TreeConfiguration& oakLeafLitter();
 [[nodiscard]] const TreeConfiguration& birchLeafLitter();
 [[nodiscard]] const TreeConfiguration& fancyOakLeafLitter();

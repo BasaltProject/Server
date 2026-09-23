@@ -260,36 +260,36 @@ void check(const Run& result, std::int32_t written, std::size_t deferred, std::i
 } // namespace
 
 TEST_CASE("the ruined portals settle where the frozen kotlin settles them") {
-    SUBCASE("plains") { check(run(1234, "minecraft:plains"), 91, 0, -5353366049642127048LL); }
+    SUBCASE("plains") { check(run(1234, "minecraft:plains"), 91, 0, -1849529601460509221LL); }
 
-    SUBCASE("desert") { check(run(1234, "minecraft:desert"), 272, 0, 6268340605083905118LL); }
+    SUBCASE("desert") { check(run(1234, "minecraft:desert"), 495, 0, 4431208939951863786LL); }
 
-    SUBCASE("jungle") { check(run(1234, "minecraft:jungle"), 142, 0, 6190134296698152711LL); }
+    SUBCASE("jungle") { check(run(1234, "minecraft:jungle"), 142, 0, 7980324529756585209LL); }
 
-    SUBCASE("mountain") { check(run(1234, "minecraft:snowy_slopes"), 444, 0, -9098698840730127577LL); }
+    SUBCASE("mountain") { check(run(1234, "minecraft:snowy_slopes"), 482, 0, -849259454372517779LL); }
 
-    SUBCASE("nether") { check(run(1234, "minecraft:nether_wastes"), 430, 0, 1523947682084561741LL); }
+    SUBCASE("nether") { check(run(1234, "minecraft:nether_wastes"), 569, 0, 3532260541685522999LL); }
 
-    SUBCASE("ocean") { check(run(1234, "minecraft:ocean"), 297, 0, -1172833535802672086LL); }
+    SUBCASE("ocean") { check(run(1234, "minecraft:ocean"), 469, 0, 1209839066690268657LL); }
 
-    SUBCASE("swamp") { check(run(1234, "minecraft:swamp"), 317, 0, -5526998960708213934LL); }
+    SUBCASE("swamp") { check(run(1234, "minecraft:swamp"), 438, 0, -7902718217016110305LL); }
 
-    SUBCASE("none") { check(run(1234, "minecraft:the_void"), 0, 0, -6940171599639708799LL); }
+    SUBCASE("none") { check(run(1234, "minecraft:the_void"), 0, 0, -5958285190197560555LL); }
 
-    SUBCASE("otherSeed") { check(run(77, "minecraft:jungle"), 128, 0, -677917400889296606LL); }
+    SUBCASE("otherSeed") { check(run(77, "minecraft:jungle"), 128, 0, -1431968368424470049LL); }
 
     // More plains, which is the one variant with two setups to draw between.
-    SUBCASE("plainsOther") { check(run(77, "minecraft:plains"), 83, 0, -6402515342726521637LL); }
+    SUBCASE("plainsOther") { check(run(77, "minecraft:plains"), 83, 0, -831356958042129680LL); }
 
-    SUBCASE("plainsThird") { check(run(9001, "minecraft:plains"), 228, 0, 5120646109316553337LL); }
+    SUBCASE("plainsThird") { check(run(9001, "minecraft:plains"), 307, 0, 8054913983921220340LL); }
 
-    SUBCASE("plainsFourth") { check(run(4321, "minecraft:plains"), 92, 0, 1810545395592424294LL); }
+    SUBCASE("plainsFourth") { check(run(4321, "minecraft:plains"), 92, 0, 7476852746534049710LL); }
 
-    SUBCASE("plainsFifth") { check(run(5, "minecraft:plains"), 48, 0, 3943902589117980866LL); }
+    SUBCASE("plainsFifth") { check(run(5, "minecraft:plains"), 48, 0, 8658573956083329074LL); }
 
-    SUBCASE("plainsSixth") { check(run(13, "minecraft:plains"), 62, 0, 3044532325320702344LL); }
+    SUBCASE("plainsSixth") { check(run(13, "minecraft:plains"), 62, 0, 1180148083502978393LL); }
 
-    SUBCASE("plainsSeventh") { check(run(21, "minecraft:plains"), 88, 0, 1219394395355481428LL); }
+    SUBCASE("plainsSeventh") { check(run(21, "minecraft:plains"), 88, 0, -4622731653932411313LL); }
 
-    SUBCASE("plainsEighth") { check(run(34, "minecraft:plains"), 90, 0, 8185573560323184425LL); }
+    SUBCASE("plainsEighth") { check(run(34, "minecraft:plains"), 90, 0, 4396720642858175575LL); }
 }

@@ -66,7 +66,8 @@ const std::set<std::string, std::less<>>& replaceableBlocks() {
                                                              "nether_sprouts",
                                                              "crimson_roots",
                                                              "leaf_litter",
-                                                             "hanging_roots"};
+                                                             "hanging_roots",
+                                                             "red_shrub"};
     return paths;
 }
 

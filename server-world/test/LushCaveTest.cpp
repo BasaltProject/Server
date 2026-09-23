@@ -104,64 +104,64 @@ struct Run {
 TEST_CASE("the lush cave step places what the frozen kotlin places") {
     SUBCASE("wholeStep") {
         const Run result = run("minecraft:lush_caves", "", 3);
-        CHECK(result.placed == 8832);
+        CHECK(result.placed == 7834);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 2206301739624513804LL);
+        CHECK(result.checksum == -803802717462883622LL);
     }
 
     SUBCASE("plainsStep") {
         const Run result = run("minecraft:plains", "", 3);
         CHECK(result.placed == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 195630881141514078LL);
+        CHECK(result.checksum == 7579939472597073246LL);
     }
 
     SUBCASE("lush_caves_ceiling_vegetation") {
         const Run result = run("minecraft:lush_caves", "lush_caves_ceiling_vegetation", 3);
-        CHECK(result.placed == 3151);
+        CHECK(result.placed == 2866);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -9094470158408238628LL);
+        CHECK(result.checksum == 1367296640044074400LL);
     }
 
     SUBCASE("cave_vines") {
         const Run result = run("minecraft:lush_caves", "cave_vines", 3);
-        CHECK(result.placed == 177);
+        CHECK(result.placed == 157);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7777776524992525772LL);
+        CHECK(result.checksum == -7008501273219692300LL);
     }
 
     SUBCASE("lush_caves_clay") {
         const Run result = run("minecraft:lush_caves", "lush_caves_clay", 3);
-        CHECK(result.placed == 4434);
+        CHECK(result.placed == 3495);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -5297415231206651918LL);
+        CHECK(result.checksum == -4513177456249829448LL);
     }
 
     SUBCASE("lush_caves_vegetation") {
         const Run result = run("minecraft:lush_caves", "lush_caves_vegetation", 3);
-        CHECK(result.placed == 2225);
+        CHECK(result.placed == 2682);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1191217117782258872LL);
+        CHECK(result.checksum == 6851378285784288286LL);
     }
 
     SUBCASE("rooted_azalea_tree") {
         const Run result = run("minecraft:lush_caves", "rooted_azalea_tree", 48);
-        CHECK(result.placed == 542);
-        CHECK(result.deferred == 0);
-        CHECK(result.checksum == -4384970933375955233LL);
+        CHECK(result.placed == 110);
+        CHECK(result.deferred == 28);
+        CHECK(result.checksum == -1731745110740810581LL);
     }
 
     SUBCASE("spore_blossom") {
         const Run result = run("minecraft:lush_caves", "spore_blossom", 3);
-        CHECK(result.placed == 5);
+        CHECK(result.placed == 11);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 9180669688352651443LL);
+        CHECK(result.checksum == -6891034779295920718LL);
     }
 
     SUBCASE("classic_vines_cave_feature") {
         const Run result = run("minecraft:lush_caves", "classic_vines_cave_feature", 3);
-        CHECK(result.placed == 10);
+        CHECK(result.placed == 4);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 9118025491837563198LL);
+        CHECK(result.checksum == 3372412388982845326LL);
     }
 }

@@ -89,11 +89,11 @@ TEST_CASE("the double plant patches place what the frozen kotlin places") {
             run("minecraft:sunflower_plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 doublePlantPatchDecoration::decorate(chunk, 8080LL, environment);
             });
-        CHECK(lower == 515);
+        CHECK(lower == 555);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 1030);
+        CHECK(halves == 1110);
         CHECK(deferred == 0);
-        CHECK(checksum == -6352056353297289416LL);
+        CHECK(checksum == -2115339381872285756LL);
     }
 
     SUBCASE("largeFernTaiga") {
@@ -101,11 +101,11 @@ TEST_CASE("the double plant patches place what the frozen kotlin places") {
             run("minecraft:taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 doublePlantPatchDecoration::decorate(chunk, 8080LL, environment);
             });
-        CHECK(lower == 222);
+        CHECK(lower == 273);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 444);
+        CHECK(halves == 546);
         CHECK(deferred == 0);
-        CHECK(checksum == -2267538228092261259LL);
+        CHECK(checksum == -7910169489238879872LL);
     }
 
     SUBCASE("largeFernSnowy") {
@@ -113,11 +113,11 @@ TEST_CASE("the double plant patches place what the frozen kotlin places") {
             run("minecraft:snowy_taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 doublePlantPatchDecoration::decorate(chunk, 8080LL, environment);
             });
-        CHECK(lower == 222);
+        CHECK(lower == 273);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 444);
+        CHECK(halves == 546);
         CHECK(deferred == 0);
-        CHECK(checksum == -2267538228092261259LL);
+        CHECK(checksum == -7910169489238879872LL);
     }
 
     SUBCASE("wrong") {
@@ -138,11 +138,11 @@ TEST_CASE("the double plant patches place what the frozen kotlin places") {
             run("minecraft:sunflower_plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 doublePlantPatchDecoration::decorateFeature(chunk, 8080LL, environment, "patch_sunflower");
             });
-        CHECK(lower == 515);
+        CHECK(lower == 555);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 1030);
+        CHECK(halves == 1110);
         CHECK(deferred == 0);
-        CHECK(checksum == -6352056353297289416LL);
+        CHECK(checksum == -2115339381872285756LL);
     }
 
     SUBCASE("regional") {
@@ -157,11 +157,11 @@ TEST_CASE("the double plant patches place what the frozen kotlin places") {
                         return y == 70 ? stateIdOf("grass_block") : registry::blocks::air().stateId;
                     });
             });
-        CHECK(lower == 515);
+        CHECK(lower == 555);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 1030);
-        CHECK(deferred == 544);
-        CHECK(checksum == -6352056353297289416LL);
+        CHECK(halves == 1110);
+        CHECK(deferred == 654);
+        CHECK(checksum == -2115339381872285756LL);
     }
 }
 
@@ -174,7 +174,7 @@ TEST_CASE("one double plant patch at an origin matches the frozen kotlin") {
     const auto [checksum, lower, halves] = fold(chunk);
     CHECK(lower == 12);
     CHECK(halves == 24);
-    CHECK(checksum == 3422881316589854433LL);
+    CHECK(checksum == 159503128354547249LL);
     CHECK(random.nextInt() == -930694581);
 }
 

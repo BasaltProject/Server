@@ -6,6 +6,7 @@
 
 #include <doctest.h>
 
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <set>
@@ -271,4 +272,25 @@ TEST_CASE("a dark oak only grows from a square of four saplings") {
     const std::vector<BlockChange> grown = growAt(world, 8, 64, 8, "dark_oak_sapling", 0);
     CHECK(countOf(grown, "dark_oak_log") > 4);
     CHECK(pathOf(*world.blockState(9, 64, 9)) == "dark_oak_log");
+}
+
+TEST_CASE("a poplar sapling grows one of the three poplars, drawn one in three") {
+    // parity: 26.3 `TreeGrower.POPLAR`, red, orange and yellow at one weight each.
+    const std::array<std::string, 3> leaves{"red_poplar_leaves", "orange_poplar_leaves", "yellow_poplar_leaves"};
+    for (std::int64_t seed = 0; seed < 3; ++seed) {
+        CAPTURE(seed);
+        WorldState world = emptyWorld();
+        world.getOrGenerateChunk(0, 0);
+        const std::vector<BlockChange> changes = growAt(world, 8, 64, 8, "poplar_sapling", seed);
+        const std::string& drawn = leaves[static_cast<std::size_t>(rng::RandomSource::legacy(seed).nextInt(3))];
+        CHECK(countOf(changes, drawn) > 0);
+        for (const std::string& other : leaves) {
+            if (other != drawn) {
+                CHECK(countOf(changes, other) == 0);
+            }
+        }
+        CHECK(world.blockState(8, 64, 8) == stateOf("poplar_log"));
+        // The side branches below the crown leave the trunk's own column.
+        CHECK(logColumns(changes, "poplar_log").size() > 1);
+    }
 }

@@ -57,6 +57,10 @@ public:
                                             std::int32_t branchStartOffsetMin, std::int32_t branchStartOffsetMax,
                                             IntProvider branchEndOffsetFromTop);
 
+    /// parity: `PoplarTrunkPlacer`, one column with a ring of side branches below the crown.
+    [[nodiscard]] static TrunkPlacer poplar(std::int32_t baseHeight, std::int32_t heightRandA, std::int32_t heightRandB,
+                                            IntProvider trunkHeightAboveBranches, IntProvider branchAmount);
+
     /// parity: `TrunkPlacer.getTreeHeight`. Two draws even when either bound is zero.
     [[nodiscard]] std::int32_t treeHeight(random::RandomSource& random) const;
 
@@ -79,6 +83,7 @@ private:
         MegaJungle,
         UpwardsBranching,
         Cherry,
+        Poplar,
     };
 
     /// parity: `TrunkPlacer.validTreePos`. Kind-dispatched because specialized placers widen the
@@ -135,6 +140,8 @@ private:
     IntProvider branchStartOffsetFromTop_;
     IntProvider secondBranchStartOffsetFromTop_;
     IntProvider branchEndOffsetFromTop_;
+    IntProvider trunkHeightAboveBranches_;
+    IntProvider branchAmount_;
 };
 
 } // namespace basalt::server::world::terrain::decoration::tree

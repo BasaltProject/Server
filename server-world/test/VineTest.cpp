@@ -86,9 +86,9 @@ TEST_CASE("the jungle vine feature places what the frozen kotlin places") {
             run("minecraft:jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 vinePatchDecoration::decorate(chunk, 191919LL, environment);
             });
-        CHECK(vines == 3173);
+        CHECK(vines == 3179);
         CHECK(deferred == 0);
-        CHECK(checksum == 4563572028276296233LL);
+        CHECK(checksum == -5938702931856289325LL);
     }
 
     SUBCASE("bamboo") {
@@ -96,9 +96,9 @@ TEST_CASE("the jungle vine feature places what the frozen kotlin places") {
             run("minecraft:bamboo_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 vinePatchDecoration::decorate(chunk, 191919LL, environment);
             });
-        CHECK(vines == 3173);
+        CHECK(vines == 3179);
         CHECK(deferred == 0);
-        CHECK(checksum == 4563572028276296233LL);
+        CHECK(checksum == -5938702931856289325LL);
     }
 
     SUBCASE("sparse") {
@@ -106,9 +106,9 @@ TEST_CASE("the jungle vine feature places what the frozen kotlin places") {
             run("minecraft:sparse_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 vinePatchDecoration::decorate(chunk, 191919LL, environment);
             });
-        CHECK(vines == 3173);
+        CHECK(vines == 3179);
         CHECK(deferred == 0);
-        CHECK(checksum == 4563572028276296233LL);
+        CHECK(checksum == -5938702931856289325LL);
     }
 
     SUBCASE("wrong") {
@@ -134,9 +134,9 @@ TEST_CASE("the jungle vine feature places what the frozen kotlin places") {
                                                    : registry::blocks::air().stateId;
                     });
             });
-        CHECK(vines == 3867);
+        CHECK(vines == 3886);
         CHECK(deferred == 0);
-        CHECK(checksum == -3846520374742743887LL);
+        CHECK(checksum == -1801107157960017159LL);
     }
 }
 
@@ -154,5 +154,5 @@ TEST_CASE("each attachment face picks the state the frozen kotlin picks") {
         vinePatchDecoration::placeCaveAt(chunk, DecorationPos{8, 70, 8});
         states.append(std::to_string(chunk.blockStateId(8, 70, 8))).push_back(',');
     }
-    CHECK(states == "8387,0,8373,8388,8385,8381,");
+    CHECK(states == "10121,0,10107,10122,10119,10115,");
 }

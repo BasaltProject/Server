@@ -94,10 +94,10 @@ TEST_CASE("the grass patches place what the frozen kotlin places") {
             run("minecraft:jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 grassPatchDecoration::decorate(chunk, 8642LL, environment);
             });
-        CHECK(grass == 2684);
-        CHECK(fern == 895);
+        CHECK(grass == 2620);
+        CHECK(fern == 909);
         CHECK(deferred == 0);
-        CHECK(checksum == 7987090220193389082LL);
+        CHECK(checksum == 764679214326790831LL);
     }
 
     SUBCASE("taiga") {
@@ -105,10 +105,10 @@ TEST_CASE("the grass patches place what the frozen kotlin places") {
             run("minecraft:taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 grassPatchDecoration::decorate(chunk, 8642LL, environment);
             });
-        CHECK(grass == 72);
-        CHECK(fern == 288);
+        CHECK(grass == 69);
+        CHECK(fern == 292);
         CHECK(deferred == 0);
-        CHECK(checksum == -4201033982068820979LL);
+        CHECK(checksum == 4833870735533166348LL);
     }
 
     SUBCASE("plains") {
@@ -116,10 +116,10 @@ TEST_CASE("the grass patches place what the frozen kotlin places") {
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 grassPatchDecoration::decorate(chunk, 8642LL, environment);
             });
-        CHECK(grass == 3171);
+        CHECK(grass == 3183);
         CHECK(fern == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 9090508517663256889LL);
+        CHECK(checksum == 3005346970195708098LL);
     }
 
     SUBCASE("meadow") {
@@ -127,10 +127,10 @@ TEST_CASE("the grass patches place what the frozen kotlin places") {
             run("minecraft:meadow", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 grassPatchDecoration::decorate(chunk, 8642LL, environment);
             });
-        CHECK(grass == 1659);
+        CHECK(grass == 1708);
         CHECK(fern == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 319151973256264633LL);
+        CHECK(checksum == -6617012965695332907LL);
     }
 
     SUBCASE("savanna") {
@@ -138,10 +138,10 @@ TEST_CASE("the grass patches place what the frozen kotlin places") {
             run("minecraft:savanna", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 grassPatchDecoration::decorate(chunk, 8642LL, environment);
             });
-        CHECK(grass == 5839);
+        CHECK(grass == 5790);
         CHECK(fern == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 7561410202383648921LL);
+        CHECK(checksum == -8185322324726055427LL);
     }
 
     SUBCASE("wrong") {
@@ -161,10 +161,10 @@ TEST_CASE("the grass patches place what the frozen kotlin places") {
             run("minecraft:jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 grassPatchDecoration::decorateFeature(14, chunk, 8642LL, environment);
             });
-        CHECK(grass == 2684);
-        CHECK(fern == 895);
+        CHECK(grass == 2620);
+        CHECK(fern == 909);
         CHECK(deferred == 0);
-        CHECK(checksum == 7987090220193389082LL);
+        CHECK(checksum == 764679214326790831LL);
     }
 
     SUBCASE("regional") {
@@ -179,10 +179,10 @@ TEST_CASE("the grass patches place what the frozen kotlin places") {
                         return y == 70 ? stateIdOf("grass_block") : registry::blocks::air().stateId;
                     });
             });
-        CHECK(grass == 3171);
+        CHECK(grass == 3183);
         CHECK(fern == 0);
-        CHECK(deferred == 2191);
-        CHECK(checksum == 9090508517663256889LL);
+        CHECK(deferred == 2182);
+        CHECK(checksum == 3005346970195708098LL);
     }
 
     SUBCASE("the weighted providers come out at their configured ratios") {
@@ -202,6 +202,6 @@ TEST_CASE("one grass patch at an origin matches the frozen kotlin") {
     const auto [checksum, grass, fern] = fold(chunk);
     CHECK(grass == 1);
     CHECK(fern == 5);
-    CHECK(checksum == -1042881058992142260LL);
+    CHECK(checksum == -7009358522665233248LL);
     CHECK(random.nextInt() == -1188359520);
 }

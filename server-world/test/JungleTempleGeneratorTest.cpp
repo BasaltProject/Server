@@ -137,15 +137,15 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 } // namespace
 
 TEST_CASE("the jungle temples set their traps where the frozen kotlin sets them") {
-    SUBCASE("jungle") { check(run(1234, "minecraft:jungle"), 1413, 4, 1, -3716006206241489328LL); }
+    SUBCASE("jungle") { check(run(1234, "minecraft:jungle"), 1413, 4, 1, -608277595678227988LL); }
 
-    SUBCASE("bamboo") { check(run(1234, "minecraft:bamboo_jungle"), 1413, 4, 1, -3716006206241489328LL); }
+    SUBCASE("bamboo") { check(run(1234, "minecraft:bamboo_jungle"), 1413, 4, 1, -608277595678227988LL); }
 
     SUBCASE("plains") { check(run(1234, "minecraft:plains"), 0, 0, 0, 9030159159144110772LL); }
 
-    SUBCASE("otherSeed") { check(run(77, "minecraft:jungle"), 1411, 4, 1, -5015361976669017528LL); }
+    SUBCASE("otherSeed") { check(run(77, "minecraft:jungle"), 1411, 4, 1, -793589834074112320LL); }
 
-    SUBCASE("thirdSeed") { check(run(9001, "minecraft:jungle"), 1374, 4, 1, -1189639516229676435LL); }
+    SUBCASE("thirdSeed") { check(run(9001, "minecraft:jungle"), 1374, 4, 1, 5164905752539252624LL); }
 
-    SUBCASE("fourthSeed") { check(run(4321, "minecraft:jungle"), 1410, 4, 1, -6979988303925833257LL); }
+    SUBCASE("fourthSeed") { check(run(4321, "minecraft:jungle"), 1410, 4, 1, -4868478338086735254LL); }
 }

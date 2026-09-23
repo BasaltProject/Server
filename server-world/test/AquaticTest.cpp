@@ -84,16 +84,16 @@ run(std::string_view biome, const std::function<void(Chunk&, const testsupport::
 
 } // namespace
 
-TEST_CASE("the aquatic patches place what the frozen kotlin places") {
+TEST_CASE("the aquatic patches place what the 26.3 placements place") {
     SUBCASE("warmOcean") {
         const auto [plants, kelp, deferred, checksum] =
             run("minecraft:warm_ocean", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 aquaticPatchDecoration::decorate(chunk, 5432LL, environment);
             });
-        CHECK(plants == 3613);
+        CHECK(plants == 3602);
         CHECK(kelp == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -5822661650177577907LL);
+        CHECK(checksum == -5335921802559124291LL);
     }
 
     SUBCASE("deepLukewarm") {
@@ -101,10 +101,10 @@ TEST_CASE("the aquatic patches place what the frozen kotlin places") {
             "minecraft:deep_lukewarm_ocean", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 aquaticPatchDecoration::decorate(chunk, 5432LL, environment);
             });
-        CHECK(plants == 5227);
-        CHECK(kelp == 4790);
+        CHECK(plants == 5069);
+        CHECK(kelp == 4146);
         CHECK(deferred == 0);
-        CHECK(checksum == -4662752255197912351LL);
+        CHECK(checksum == 4543588234121041998LL);
     }
 
     SUBCASE("ocean") {
@@ -112,10 +112,10 @@ TEST_CASE("the aquatic patches place what the frozen kotlin places") {
             run("minecraft:ocean", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 aquaticPatchDecoration::decorate(chunk, 5432LL, environment);
             });
-        CHECK(plants == 2374);
-        CHECK(kelp == 7822);
+        CHECK(plants == 2491);
+        CHECK(kelp == 6646);
         CHECK(deferred == 0);
-        CHECK(checksum == 1215890353824292331LL);
+        CHECK(checksum == -6110124866394943965LL);
     }
 
     SUBCASE("river") {
@@ -123,10 +123,10 @@ TEST_CASE("the aquatic patches place what the frozen kotlin places") {
             run("minecraft:river", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 aquaticPatchDecoration::decorate(chunk, 5432LL, environment);
             });
-        CHECK(plants == 2666);
+        CHECK(plants == 2587);
         CHECK(kelp == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -5937825368212698571LL);
+        CHECK(checksum == -8038645478607242791LL);
     }
 
     SUBCASE("swamp") {
@@ -134,10 +134,10 @@ TEST_CASE("the aquatic patches place what the frozen kotlin places") {
             run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 aquaticPatchDecoration::decorate(chunk, 5432LL, environment);
             });
-        CHECK(plants == 3744);
+        CHECK(plants == 3904);
         CHECK(kelp == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 2607566316070104191LL);
+        CHECK(checksum == 5471351756436167371LL);
     }
 
     SUBCASE("wrong") {
@@ -149,7 +149,7 @@ TEST_CASE("the aquatic patches place what the frozen kotlin places") {
         CHECK(plants == 0);
         CHECK(kelp == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -4756575519392030347LL);
+        CHECK(checksum == 5702334402095245557LL);
     }
 
     SUBCASE("kelpColdOnly") {
@@ -160,9 +160,9 @@ TEST_CASE("the aquatic patches place what the frozen kotlin places") {
                 aquaticPatchDecoration::decorateFeature(chunk, 5432LL, environment, "kelp_cold");
             });
         CHECK(plants == 0);
-        CHECK(kelp == 8325);
+        CHECK(kelp == 7503);
         CHECK(deferred == 0);
-        CHECK(checksum == 7532746239982213225LL);
+        CHECK(checksum == -1711302838034676914LL);
     }
 
     SUBCASE("seaPickleOnly") {
@@ -170,10 +170,10 @@ TEST_CASE("the aquatic patches place what the frozen kotlin places") {
             run("minecraft:warm_ocean", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 aquaticPatchDecoration::decorateFeature(chunk, 5432LL, environment, "sea_pickle");
             });
-        CHECK(plants == 68);
+        CHECK(plants == 39);
         CHECK(kelp == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 3929495351022960033LL);
+        CHECK(checksum == -3165663964546459962LL);
     }
 
     SUBCASE("regional") {
@@ -188,9 +188,9 @@ TEST_CASE("the aquatic patches place what the frozen kotlin places") {
                         return y >= 50 && y <= 62 ? registry::blocks::water().stateId : registry::blocks::air().stateId;
                     });
             });
-        CHECK(plants == 2394);
-        CHECK(kelp == 7751);
-        CHECK(deferred == 1377);
-        CHECK(checksum == 5966460307017367667LL);
+        CHECK(plants == 2382);
+        CHECK(kelp == 6586);
+        CHECK(deferred == 1438);
+        CHECK(checksum == -4857871477058609813LL);
     }
 }

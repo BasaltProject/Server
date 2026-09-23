@@ -71,9 +71,9 @@ TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
             run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 waterlilyPatchDecoration::decorate(chunk, 918273LL, environment);
             });
-        CHECK(placed == 44);
+        CHECK(placed == 63);
         CHECK(deferred == 0);
-        CHECK(checksum == -5883585629045972875LL);
+        CHECK(checksum == 3456391628793319675LL);
     }
 
     SUBCASE("waterlilyWrongBiome") {
@@ -83,7 +83,7 @@ TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
             });
         CHECK(placed == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -7911423744619397851LL);
+        CHECK(checksum == -4314771718914469083LL);
     }
 
     SUBCASE("leafLitter") {
@@ -91,9 +91,9 @@ TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
             run("minecraft:dark_forest", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 leafLitterPatchDecoration::decorate(chunk, 918273LL, environment);
             });
-        CHECK(placed == 145);
+        CHECK(placed == 181);
         CHECK(deferred == 0);
-        CHECK(checksum == -3524764549178857153LL);
+        CHECK(checksum == 5867741332831604969LL);
     }
 
     SUBCASE("waterlilyRegional") {
@@ -108,9 +108,9 @@ TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
                         return y == 70 ? registry::blocks::water().stateId : registry::blocks::air().stateId;
                     });
             });
-        CHECK(placed == 44);
-        CHECK(deferred == 76);
-        CHECK(checksum == -5883585629045972875LL);
+        CHECK(placed == 63);
+        CHECK(deferred == 52);
+        CHECK(checksum == 3456391628793319675LL);
     }
 
     SUBCASE("leafLitterRegional") {
@@ -125,9 +125,9 @@ TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
                         return y == 70 ? stateIdOf("grass_block") : registry::blocks::air().stateId;
                     });
             });
-        CHECK(placed == 151);
-        CHECK(deferred == 125);
-        CHECK(checksum == -3303329974070132379LL);
+        CHECK(placed == 180);
+        CHECK(deferred == 99);
+        CHECK(checksum == 42117310107489454LL);
     }
 }
 
@@ -146,6 +146,6 @@ TEST_CASE("one waterlily patch at an origin matches the frozen kotlin") {
             }
         }
     }
-    CHECK(static_cast<std::int64_t>(checksum) == -6559026058476006275LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -2988372208229932421LL);
     CHECK(random.nextInt() == -937986852);
 }

@@ -117,7 +117,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 481);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 5748523697054659266LL);
+        CHECK(result.checksum == 3015017640969685622LL);
         CHECK(result.after == 1501487701);
     }
 
@@ -129,7 +129,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 8161);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 8449835651704502059LL);
+        CHECK(result.checksum == -8635276990260364833LL);
         CHECK(result.after == 1501487701);
     }
 
@@ -141,7 +141,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 7779);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 6754167169355012605LL);
+        CHECK(result.checksum == -3374951737952660815LL);
         CHECK(result.after == -331529504);
     }
 
@@ -153,7 +153,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 7760);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 1859241133720439478LL);
+        CHECK(result.checksum == -1448033722498214410LL);
         CHECK(result.after == -331529504);
     }
 
@@ -165,7 +165,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 1155);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -624417226079304039LL);
+        CHECK(result.checksum == 6513867751577363571LL);
         CHECK(result.after == 2001131377);
     }
 
@@ -177,7 +177,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 24);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -5015826440373626327LL);
+        CHECK(result.checksum == -1013793404078361863LL);
         CHECK(result.after == 1375486844);
     }
 
@@ -189,7 +189,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 133);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 1756174351142879178LL);
+        CHECK(result.checksum == -2725034566552775978LL);
         CHECK(result.after == 1375486844);
     }
 
@@ -201,7 +201,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 41);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 351637424515127219LL);
+        CHECK(result.checksum == 1807402872832646133LL);
         CHECK(result.after == -1187441586);
     }
 
@@ -218,7 +218,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 570);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -4048950556620914349LL);
+        CHECK(result.checksum == -2143252860842785713LL);
         CHECK(result.after == 302298358);
     }
 
@@ -230,7 +230,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 55);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 165416944072738907LL);
+        CHECK(result.checksum == -7958714299179860907LL);
         CHECK(result.after == 1294296077);
     }
 
@@ -239,10 +239,10 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
                                [](Chunk& chunk, rng::RandomSource&, const DecorationPos&,
                                   const testsupport::FixedBiomeEnvironment& environment,
                                   std::int64_t seed) { waterlilyPatchDecoration::decorate(chunk, seed, environment); });
-        CHECK(result.placed == 82);
+        CHECK(result.placed == 90);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 4075513088246505491LL);
+        CHECK(result.checksum == 8221607680703210003LL);
         CHECK(result.after == 302298358);
     }
 
@@ -254,7 +254,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
         CHECK(result.placed == 657);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -1260773656628606153LL);
+        CHECK(result.checksum == -8064671641445176915LL);
         CHECK(result.after == 1793259573);
     }
 
@@ -263,10 +263,10 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
                                [](Chunk& chunk, rng::RandomSource&, const DecorationPos&,
                                   const testsupport::FixedBiomeEnvironment& environment,
                                   std::int64_t seed) { pumpkinPatchDecoration::decorate(chunk, seed, environment); });
-        CHECK(result.placed == 18);
+        CHECK(result.placed == 42);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 1721419733516683945LL);
+        CHECK(result.checksum == 642475953172578749LL);
         CHECK(result.after == -1732597536);
     }
 

@@ -157,7 +157,8 @@ const BlockSet& allBiomes() {
                                     "dripstone_caves",
                                     "lush_caves",
                                     "deep_dark",
-                                    "sulfur_caves"};
+                                    "sulfur_caves",
+                                    "dappled_forest"};
     return blocks;
 }
 

@@ -80,9 +80,9 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
             run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 fireflyBushPatchDecoration::decorate(chunk, 737373LL, environment);
             });
-        CHECK(bushes == 154);
+        CHECK(bushes == 167);
         CHECK(deferred == 0);
-        CHECK(checksum == 7625999647431062251LL);
+        CHECK(checksum == -8802792850872632453LL);
     }
 
     SUBCASE("plains") {
@@ -90,9 +90,9 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 fireflyBushPatchDecoration::decorate(chunk, 737373LL, environment);
             });
-        CHECK(bushes == 77);
+        CHECK(bushes == 114);
         CHECK(deferred == 0);
-        CHECK(checksum == -2291930531195999556LL);
+        CHECK(checksum == 4266164955360695365LL);
     }
 
     SUBCASE("wrong") {
@@ -103,7 +103,7 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
             });
         CHECK(bushes == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -5440262655251532547LL);
+        CHECK(checksum == -2101820156433298563LL);
     }
 
     SUBCASE("swampRarityOnly") {
@@ -111,9 +111,9 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
             run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 fireflyBushPatchDecoration::decorateFeature(chunk, 737373LL, environment, "patch_firefly_bush_swamp");
             });
-        CHECK(bushes == 28);
+        CHECK(bushes == 47);
         CHECK(deferred == 0);
-        CHECK(checksum == 5142116751685418497LL);
+        CHECK(checksum == -2337255631733156381LL);
     }
 
     SUBCASE("nearWaterOnly") {
@@ -122,9 +122,9 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
                 fireflyBushPatchDecoration::decorateFeature(chunk, 737373LL, environment,
                                                             "patch_firefly_bush_near_water_swamp");
             });
-        CHECK(bushes == 126);
+        CHECK(bushes == 120);
         CHECK(deferred == 0);
-        CHECK(checksum == 2260162718174963811LL);
+        CHECK(checksum == -5457354804845418339LL);
     }
 
     SUBCASE("regional") {
@@ -144,9 +144,9 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
                         return registry::blocks::air().stateId;
                     });
             });
-        CHECK(bushes == 77);
-        CHECK(deferred == 6);
-        CHECK(checksum == -2291930531195999556LL);
+        CHECK(bushes == 114);
+        CHECK(deferred == 17);
+        CHECK(checksum == 4266164955360695365LL);
     }
 
     SUBCASE("the two swamp specs account for the whole swamp total") {

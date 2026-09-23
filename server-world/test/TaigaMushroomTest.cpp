@@ -114,7 +114,7 @@ TEST_CASE("the taiga and mushroom field vegetal entries match the frozen kotlin"
         const Run result = run(taigaGroundDecoration::largeFern(), 24);
         CHECK(result.placed == 56);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 4117145717339099187LL);
+        CHECK(result.checksum == -7266825529492433117LL);
         CHECK(result.after == -1028147194);
     }
 
@@ -122,7 +122,7 @@ TEST_CASE("the taiga and mushroom field vegetal entries match the frozen kotlin"
         const Run result = run(taigaGroundDecoration::normal(), 6);
         CHECK(result.placed == 23);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8765024399491825099LL);
+        CHECK(result.checksum == 2424720565467432304LL);
         CHECK(result.after == 1150172841);
     }
 
@@ -130,7 +130,7 @@ TEST_CASE("the taiga and mushroom field vegetal entries match the frozen kotlin"
         const Run result = run(taigaGroundDecoration::oldGrowth(), 6);
         CHECK(result.placed == 156);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 6400288022239800976LL);
+        CHECK(result.checksum == 7298676477525820248LL);
         CHECK(result.after == -1039769469);
     }
 
@@ -138,7 +138,7 @@ TEST_CASE("the taiga and mushroom field vegetal entries match the frozen kotlin"
         const Run result = run(taigaGroundDecoration::oldGrowthDeadBush(), 6);
         CHECK(result.placed == 2);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8773940389563880921LL);
+        CHECK(result.checksum == -1413164977039937323LL);
         CHECK(result.after == -1118636042);
     }
 
@@ -146,7 +146,7 @@ TEST_CASE("the taiga and mushroom field vegetal entries match the frozen kotlin"
         const Run result = run(taigaGroundDecoration::commonBerry(), 128);
         CHECK(result.placed == 15);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 2181579081747790481LL);
+        CHECK(result.checksum == 1934192332380869058LL);
         CHECK(result.after == 609261023);
     }
 
@@ -154,7 +154,7 @@ TEST_CASE("the taiga and mushroom field vegetal entries match the frozen kotlin"
         const Run result = run(taigaGroundDecoration::rareBerry(), 512);
         CHECK(result.placed == 9);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 1323102450633679721LL);
+        CHECK(result.checksum == 2059856785571888128LL);
         CHECK(result.after == 773648398);
     }
 
@@ -162,7 +162,7 @@ TEST_CASE("the taiga and mushroom field vegetal entries match the frozen kotlin"
         const Run result = run(mushroomFieldsDecoration::hugeOnly(), 6);
         CHECK(result.placed == 263);
         CHECK(result.deferred == 26);
-        CHECK(result.checksum == -6922735504046323062LL);
+        CHECK(result.checksum == 8181045599831427112LL);
         CHECK(result.after == 1292384349);
     }
 
@@ -170,7 +170,7 @@ TEST_CASE("the taiga and mushroom field vegetal entries match the frozen kotlin"
         const Run result = run(mushroomFieldsDecoration::vegetalDecoration(), 6);
         CHECK(result.placed == 276);
         CHECK(result.deferred == 26);
-        CHECK(result.checksum == -1336036293090992598LL);
+        CHECK(result.checksum == 9135215667896438164LL);
         CHECK(result.after == -1219156631);
     }
 }
@@ -178,13 +178,13 @@ TEST_CASE("the taiga and mushroom field vegetal entries match the frozen kotlin"
 TEST_CASE("the mushroom island step matches the frozen kotlin") {
     SUBCASE("mushroomStep") {
         const Run result = runStep("minecraft:mushroom_fields");
-        CHECK(result.placed == 242);
-        CHECK(result.checksum == 6521148246434554119LL);
+        CHECK(result.placed == 295);
+        CHECK(result.checksum == 7702891816398270437LL);
     }
 
     SUBCASE("mushroomPlains") {
         const Run result = runStep("minecraft:plains");
         CHECK(result.placed == 0);
-        CHECK(result.checksum == -5949993840180570357LL);
+        CHECK(result.checksum == 2289059197692114875LL);
     }
 }

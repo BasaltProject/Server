@@ -66,8 +66,8 @@ struct Grower {
         {"cherry_sapling", Grower{.trees = {{&configs::cherry()}}, .flowerTrees = {{&configs::cherryBees005()}}}},
         {"dark_oak_sapling", Grower{.megaTrees = {{&configs::darkOak()}}}},
         {"pale_oak_sapling", Grower{.megaTrees = {{&configs::paleOak()}}}},
-        // The red, orange and yellow poplars are worldgen features not built yet: the draw is kept.
-        {"poplar_sapling", Grower{.trees = {{nullptr}, {nullptr}, {nullptr}}}},
+        {"poplar_sapling",
+         Grower{.trees = {{&configs::redPoplar()}, {&configs::orangePoplar()}, {&configs::yellowPoplar()}}}},
     };
     return byPath;
 }

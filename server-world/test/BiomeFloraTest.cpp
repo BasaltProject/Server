@@ -109,7 +109,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 9674);
         CHECK(result.deferred == 3667);
-        CHECK(result.checksum == 6043866111068078616LL);
+        CHECK(result.checksum == -2103043073614402785LL);
         CHECK(result.after == -953260349);
     }
 
@@ -119,7 +119,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 1113);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -7553418535622776388LL);
+        CHECK(result.checksum == -5767798970603857181LL);
         CHECK(result.after == 1651480646);
     }
 
@@ -129,7 +129,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 250);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 2455571490673551476LL);
+        CHECK(result.checksum == -7714447027440845940LL);
         CHECK(result.after == -759981502);
     }
 
@@ -138,7 +138,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
             "grass_block", [](Chunk& chunk, rng::RandomSource& random) { meadowDecoration::decorate(chunk, random); });
         CHECK(result.placed == 307);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2415157409987665524LL);
+        CHECK(result.checksum == -7706914434836335144LL);
         CHECK(result.after == 37078178);
     }
 
@@ -148,7 +148,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 307);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8945786533924849926LL);
+        CHECK(result.checksum == -3260134467446952516LL);
         CHECK(result.after == 2118066002);
     }
 
@@ -157,7 +157,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
             "grass_block", [](Chunk& chunk, rng::RandomSource& random) { meadowDecoration::grass()(chunk, random); });
         CHECK(result.placed == 222);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7504538955792236109LL);
+        CHECK(result.checksum == -663035367565798367LL);
         CHECK(result.after == -233599858);
     }
 
@@ -167,7 +167,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 245);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 650297213759933874LL);
+        CHECK(result.checksum == -6757180176895559730LL);
         CHECK(result.after == -1965818250);
     }
 
@@ -177,7 +177,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 2990);
         CHECK(result.deferred == 497);
-        CHECK(result.checksum == -5266849429694132823LL);
+        CHECK(result.checksum == 4835393107311342314LL);
         CHECK(result.after == 1134608129);
     }
 
@@ -187,7 +187,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 251);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -3361674207766894234LL);
+        CHECK(result.checksum == -2251153884218405454LL);
         CHECK(result.after == -1390898867);
     }
 
@@ -197,7 +197,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 173);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -5727417360229542913LL);
+        CHECK(result.checksum == 7530405977308637112LL);
         CHECK(result.after == -1872713568);
     }
 
@@ -207,7 +207,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 167);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -3798254689443214587LL);
+        CHECK(result.checksum == 8043252926208154628LL);
         CHECK(result.after == -1866735801);
     }
 
@@ -217,7 +217,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 103);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1771595825668374332LL);
+        CHECK(result.checksum == 2030522379845439205LL);
         CHECK(result.after == -1722221598);
     }
 
@@ -242,9 +242,9 @@ TEST_CASE("the noise flower providers match the frozen kotlin position by positi
         meadow += std::to_string(meadowDecoration::flowerStateAt(DecorationPos{.x = x, .y = 71, .z = z})) + ",";
     }
     CHECK(flowerForest ==
-          "2329,2331,2332,2329,2329,2329,2327,2328,2329,2329,2330,2330,2330,2330,2328,2330,2328,2329,2331,2327,2328,"
-          "2330,2331,2329,2324,2324,2329,2331,2329,2329,2327,2324,2326,2331,2328,2330,2331,2327,2329,2331,");
+          "3821,3823,3824,3821,3821,3821,3819,3820,3821,3821,3822,3822,3822,3822,3820,3822,3820,3821,3823,3819,"
+          "3820,3822,3823,3821,3816,3816,3821,3823,3821,3821,3819,3816,3818,3823,3820,3822,3823,3819,3821,3823,");
     CHECK(meadow ==
-          "2333,2333,2321,2333,2333,2333,2321,2321,2333,2333,2321,2332,2332,2332,2327,2332,2332,2332,2332,2332,2326,"
-          "2332,2333,2333,2333,2333,2321,2321,2333,2333,2321,2321,2321,2332,2321,2321,2332,2333,2332,2333,");
+          "3825,3825,3813,3825,3825,3825,3813,3813,3825,3825,3813,3824,3824,3824,3819,3824,3824,3824,3824,3824,"
+          "3818,3824,3825,3825,3825,3825,3813,3813,3825,3825,3813,3813,3813,3824,3813,3813,3824,3825,3824,3825,");
 }

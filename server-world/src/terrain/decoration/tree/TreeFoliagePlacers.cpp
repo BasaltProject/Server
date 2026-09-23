@@ -119,6 +119,15 @@ FoliagePlacer FoliagePlacer::cherry(IntProvider radius, IntProvider offset, IntP
     return placer;
 }
 
+FoliagePlacer FoliagePlacer::poplar(IntProvider radius, IntProvider offset, IntProvider height,
+                                    const float sideHoleChance) {
+    FoliagePlacer placer = blob(std::move(radius), std::move(offset), 0);
+    placer.kind_ = Kind::Poplar;
+    placer.heightProvider_ = std::move(height);
+    placer.sideHoleChance_ = sideHoleChance;
+    return placer;
+}
+
 std::int32_t FoliagePlacer::foliageRadius(random::RandomSource& random, const std::int32_t trunkHeight) const {
     const std::int32_t base = radius_.sample(random);
     if (kind_ == Kind::Pine) {
@@ -145,6 +154,7 @@ std::int32_t FoliagePlacer::foliageHeight(random::RandomSource& random, const st
     case Kind::RandomSpread:
     case Kind::WeightedRandomSpread:
     case Kind::Cherry:
+    case Kind::Poplar:
         return heightProvider_.sample(random);
     }
     return 0;
@@ -183,6 +193,7 @@ bool FoliagePlacer::shouldSkipLocation(random::RandomSource& random, const std::
         return y == 1 && dx + dz > currentRadius * 2 - 2;
     case Kind::RandomSpread:
     case Kind::WeightedRandomSpread:
+    case Kind::Poplar:
         return false;
     case Kind::Cherry: {
         if (y == -1 && (dx == currentRadius || dz == currentRadius) &&
@@ -285,8 +296,12 @@ void FoliagePlacer::placeLeavesRowWithHangingLeavesBelow(Chunk& chunk, random::R
 void FoliagePlacer::createFoliage(Chunk& chunk, random::RandomSource& random, const std::int32_t foliageStateId,
                                   const FoliageAttachment& attachment, const std::int32_t foliageHeight,
                                   const std::int32_t leafRadius, const std::int32_t offset,
-                                  FoliagePositions& foliagePositions) const {
+                                  FoliagePositions& foliagePositions, const std::int32_t trunkStateId) const {
     switch (kind_) {
+    case Kind::Poplar:
+        createPoplarFoliage(chunk, random, foliageStateId, trunkStateId, attachment, foliageHeight, leafRadius, offset,
+                            foliagePositions);
+        return;
     case Kind::Blob:
         for (std::int32_t yo = offset; yo >= offset - foliageHeight; --yo) {
             const std::int32_t currentRadius = std::max(leafRadius + attachment.radiusOffset - 1 - yo / 2, 0);

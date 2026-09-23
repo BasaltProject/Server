@@ -109,7 +109,11 @@ const PathSet& replaceablePaths() {
                                   "short_dry_grass",
                                   "tall_dry_grass",
                                   "bush",
-                                  "firefly_bush"};
+                                  "firefly_bush",
+                                  "orange_poplar_leaves",
+                                  "red_poplar_leaves",
+                                  "yellow_poplar_leaves",
+                                  "red_shrub"};
     return paths;
 }
 

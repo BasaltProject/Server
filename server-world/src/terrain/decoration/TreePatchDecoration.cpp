@@ -84,6 +84,8 @@ const std::vector<treePatchDecoration::FeatureSpec>& treePatchDecoration::featur
                          .index = 4,
                          .frequency = countExtra(2, 0.1F, 1),
                          .biomes = {"sparse_jungle"}});
+        built.push_back(
+            {.name = "trees_dappled_forest", .index = 5, .frequency = countPlacement(6), .biomes = {"dappled_forest"}});
         built.push_back({.name = "trees_badlands",
                          .index = 8,
                          .frequency = countExtra(5, 0.1F, 1),

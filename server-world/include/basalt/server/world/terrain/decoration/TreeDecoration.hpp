@@ -33,6 +33,9 @@ using Candidate = std::function<void(Chunk&, random::RandomSource&, const Decora
 struct Selector {
     std::vector<std::pair<float, Candidate>> entries;
     Candidate defaultCandidate;
+    /// parity: `weighted_random_selector`, one `nextInt` over the summed weights. Used instead of
+    /// the chance entries when present.
+    std::vector<std::pair<std::int32_t, Candidate>> weighted;
 };
 
 /// The configuration is held by reference: every caller passes one of the `treeConfigs` singletons,

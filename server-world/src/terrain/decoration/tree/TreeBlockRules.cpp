@@ -70,7 +70,11 @@ const PathSet& replaceableByTreesPaths() {
                                   "crimson_roots",
                                   "leaf_litter",
                                   "short_dry_grass",
-                                  "tall_dry_grass"};
+                                  "tall_dry_grass",
+                                  "orange_poplar_leaves",
+                                  "red_poplar_leaves",
+                                  "yellow_poplar_leaves",
+                                  "shelf_mushroom"};
     return paths;
 }
 
@@ -98,7 +102,7 @@ const PathSet& treeBlockRules::logBlockPaths() {
     static const PathSet paths = [] {
         PathSet built;
         for (const std::string_view wood :
-             {"dark_oak", "pale_oak", "oak", "acacia", "birch", "jungle", "spruce", "mangrove", "cherry"}) {
+             {"dark_oak", "pale_oak", "oak", "acacia", "birch", "jungle", "spruce", "mangrove", "cherry", "poplar"}) {
             built.emplace(std::string{wood} + "_log");
             built.emplace(std::string{wood} + "_wood");
             built.emplace("stripped_" + std::string{wood} + "_log");

@@ -81,6 +81,26 @@ constexpr std::int32_t kGroveScanSteps = 8;
 }
 
 [[nodiscard]] const treeDecoration::Candidate*
+pickWeighted(random::RandomSource& random,
+             const std::vector<std::pair<std::int32_t, treeDecoration::Candidate>>& entries) {
+    std::int32_t total = 0;
+    for (const auto& [weight, candidate] : entries) {
+        total += weight;
+    }
+    std::int32_t roll = random.nextInt(total);
+    for (const auto& [weight, candidate] : entries) {
+        if (roll < weight) {
+            return &candidate;
+        }
+        roll -= weight;
+    }
+    return &entries.back().second;
+}
+
+[[nodiscard]] const treeDecoration::Candidate* pick(random::RandomSource& random,
+                                                    const treeDecoration::Selector& selector);
+
+[[nodiscard]] const treeDecoration::Candidate*
 pickSequence(random::RandomSource& random, const std::vector<std::pair<float, treeDecoration::Candidate>>& entries,
              const treeDecoration::Candidate& defaultCandidate) {
     for (const auto& [chance, candidate] : entries) {
@@ -89,6 +109,14 @@ pickSequence(random::RandomSource& random, const std::vector<std::pair<float, tr
         }
     }
     return &defaultCandidate;
+}
+
+[[nodiscard]] const treeDecoration::Candidate* pick(random::RandomSource& random,
+                                                    const treeDecoration::Selector& selector) {
+    if (!selector.weighted.empty()) {
+        return pickWeighted(random, selector.weighted);
+    }
+    return pickSequence(random, selector.entries, selector.defaultCandidate);
 }
 
 /// parity: the shared tree placement pipeline, in square, above water, on the ocean floor.
@@ -230,6 +258,15 @@ const std::map<std::string, treeDecoration::Selector, std::less<>>& treeDecorati
         selectors.emplace("trees_mangrove",
                           Selector{.entries = {{0.85F, checkedTree(treeConfigs::tallMangrove(), "mangrove_propagule")}},
                                    .defaultCandidate = checkedTree(treeConfigs::mangrove(), "mangrove_propagule")});
+        // parity: `trees_dappled_forest`, the only weighted tree selector. Every entry carries its own
+        // would_survive filter, checked after the pick.
+        selectors.emplace(
+            "trees_dappled_forest",
+            Selector{.weighted = {{200, checkedTree(treeConfigs::redPoplarLeafLitter(), "poplar_sapling")},
+                                  {240, checkedTree(treeConfigs::orangePoplarLeafLitter(), "poplar_sapling")},
+                                  {90, checkedTree(treeConfigs::yellowPoplarLeafLitter(), "poplar_sapling")},
+                                  {27, checkedTree(treeConfigs::spruce(), "spruce_sapling")},
+                                  {120, checkedFallen(fallenTreeConfigs::poplar(), "poplar_sapling")}}});
         selectors.emplace("trees_cherry", Selector{.defaultCandidate = tree(treeConfigs::cherryBees005())});
         selectors.emplace("trees_swamp", Selector{.defaultCandidate = tree(treeConfigs::swampOak())});
         selectors.emplace("pale_garden_vegetation",
@@ -265,7 +302,7 @@ bool treeDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const D
     if (found == selectors().end()) {
         return false;
     }
-    const Candidate* candidate = pickSequence(random, found->second.entries, found->second.defaultCandidate);
+    const Candidate* candidate = pick(random, found->second);
     if (candidate != nullptr && *candidate) {
         (*candidate)(chunk, random, origin, mossyCarpetRandom);
     }
@@ -294,8 +331,7 @@ BiomeVegetalDecoration treeDecoration::countExtra(const Selector& selector, cons
 
 BiomeVegetalDecoration treeDecoration::sequenceOf(const Selector& selector, const std::int32_t frequency) {
     return [&selector, frequency](Chunk& chunk, random::RandomSource& random) {
-        place(chunk, random, countPlacement(frequency),
-              [&](random::RandomSource& r) { return pickSequence(r, selector.entries, selector.defaultCandidate); });
+        place(chunk, random, countPlacement(frequency), [&](random::RandomSource& r) { return pick(r, selector); });
     };
 }
 

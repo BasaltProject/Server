@@ -96,10 +96,10 @@ TEST_CASE("the ground plant patches place what the frozen kotlin places") {
             run("minecraft:desert", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 groundPlantPatchDecoration::decorate(chunk, 616161LL, environment);
             });
-        CHECK(bushes == 110);
-        CHECK(grass == 307);
+        CHECK(bushes == 113);
+        CHECK(grass == 261);
         CHECK(deferred == 0);
-        CHECK(checksum == -3588267572106639072LL);
+        CHECK(checksum == -3271646247102243927LL);
     }
 
     SUBCASE("badlands") {
@@ -107,10 +107,10 @@ TEST_CASE("the ground plant patches place what the frozen kotlin places") {
             run("minecraft:badlands", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 groundPlantPatchDecoration::decorate(chunk, 616161LL, environment);
             });
-        CHECK(bushes == 1116);
-        CHECK(grass == 68);
+        CHECK(bushes == 1073);
+        CHECK(grass == 236);
         CHECK(deferred == 0);
-        CHECK(checksum == -2694618612001337679LL);
+        CHECK(checksum == 4358255894475176663LL);
     }
 
     SUBCASE("swamp") {
@@ -118,10 +118,10 @@ TEST_CASE("the ground plant patches place what the frozen kotlin places") {
             run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 groundPlantPatchDecoration::decorate(chunk, 616161LL, environment);
             });
-        CHECK(bushes == 54);
+        CHECK(bushes == 65);
         CHECK(grass == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -5159584310846922111LL);
+        CHECK(checksum == 4794854426727590118LL);
     }
 
     SUBCASE("wrong") {
@@ -133,7 +133,7 @@ TEST_CASE("the ground plant patches place what the frozen kotlin places") {
         CHECK(bushes == 0);
         CHECK(grass == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 5749869740183830661LL);
+        CHECK(checksum == 3362677712408939469LL);
     }
 
     SUBCASE("desertGrassOnly") {
@@ -142,9 +142,9 @@ TEST_CASE("the ground plant patches place what the frozen kotlin places") {
                 groundPlantPatchDecoration::decorateFeature(chunk, 616161LL, environment, "patch_dry_grass_desert");
             });
         CHECK(bushes == 0);
-        CHECK(grass == 307);
+        CHECK(grass == 261);
         CHECK(deferred == 0);
-        CHECK(checksum == -5174908784148061912LL);
+        CHECK(checksum == -7983627183548856998LL);
     }
 
     SUBCASE("regional") {
@@ -159,10 +159,10 @@ TEST_CASE("the ground plant patches place what the frozen kotlin places") {
                         return y == 70 ? stateIdOf("sand") : registry::blocks::air().stateId;
                     });
             });
-        CHECK(bushes == 106);
-        CHECK(grass == 283);
-        CHECK(deferred == 248);
-        CHECK(checksum == 9144217095294114810LL);
+        CHECK(bushes == 116);
+        CHECK(grass == 296);
+        CHECK(deferred == 271);
+        CHECK(checksum == 4598241712887836066LL);
     }
 }
 
@@ -176,7 +176,7 @@ TEST_CASE("one ground plant patch at an origin matches the frozen kotlin") {
     const auto [checksum, bushes, grass] = fold(chunk);
     CHECK(bushes == 0);
     CHECK(grass == 9);
-    CHECK(checksum == 1502195142540237216LL);
+    CHECK(checksum == 989881841838401559LL);
     CHECK(random.nextInt() == -848215966);
 }
 
@@ -189,5 +189,6 @@ TEST_CASE("the placed feature names match the frozen kotlin") {
         rendered.append(id);
     }
     CHECK(rendered ==
-          "patch_dead_bush,patch_dead_bush_2,patch_dead_bush_badlands,patch_dry_grass_badlands,patch_dry_grass_desert");
+          "patch_dead_bush,patch_dead_bush_2,patch_dead_bush_badlands,patch_dry_grass_badlands,patch_dry_grass_desert,"
+          "patch_red_shrub");
 }

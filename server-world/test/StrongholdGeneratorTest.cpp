@@ -99,7 +99,7 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 } // namespace
 
 TEST_CASE("the strongholds sit where the frozen kotlin puts them") {
-    SUBCASE("plains") { check(run(4242, "minecraft:plains", 100), 29475, 9, 39, "8,-1", -2617520323831189796LL); }
+    SUBCASE("plains") { check(run(4242, "minecraft:plains", 100), 29475, 9, 39, "8,-1", 6246228992901621009LL); }
 
-    SUBCASE("otherSeed") { check(run(99, "minecraft:plains", 100), 34306, 11, 41, "6,-2", -405377356648808888LL); }
+    SUBCASE("otherSeed") { check(run(99, "minecraft:plains", 100), 34306, 11, 41, "6,-2", 4172462710798090406LL); }
 }
