@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/command/Coordinates.hpp>
+#include <basalt/server/runtime/command/DataArguments.hpp>
 #include <basalt/server/runtime/command/ExecuteArguments.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
@@ -392,7 +393,17 @@ void RotateCommand::build(const CommandNodeBuilder& root) const {
 SwingCommand::SwingCommand() : Command("swing", permissionLevel::kGamemasters) {}
 
 void SwingCommand::build(const CommandNodeBuilder& root) const {
+    // parity: 26.3 `SwingCommand`: `SwingAnimation.DEFAULT`, a whack of six ticks, unless named.
     const auto swing = [](const CommandContext& context, bool offhand) -> Parsed<std::int32_t> {
+        play::SwingAnimation animation;
+        if (const auto* type = context.get<std::string>("animation"); type != nullptr) {
+            animation.type = *type == "none"   ? play::SwingAnimationType::None
+                             : *type == "stab" ? play::SwingAnimationType::Stab
+                                               : play::SwingAnimationType::Whack;
+        }
+        if (const auto* duration = context.get<std::int32_t>("duration"); duration != nullptr) {
+            animation.duration = *duration;
+        }
         // parity: the bare form swings whoever ran it, and needs that to be an entity.
         std::vector<CommandTarget> caller;
         const auto* named = context.get<std::vector<CommandTarget>>("targets");
@@ -405,7 +416,8 @@ void SwingCommand::build(const CommandNodeBuilder& root) const {
         }
         const std::vector<CommandTarget>& targets = named == nullptr ? caller : *named;
         for (const CommandTarget& target : targets) {
-            const play::SwingAnimationPacket packet{.entityId = target.entityId(), .hand = offhand ? 1 : 0};
+            const play::SwingAnimationPacket packet{
+                .entityId = target.entityId(), .hand = offhand ? 1 : 0, .animation = animation};
             const Parsed<world::LoadedWorld*> world = context.world();
             if (!world.has_value()) {
                 continue;
@@ -435,7 +447,13 @@ void SwingCommand::build(const CommandNodeBuilder& root) const {
         targets.executes([swing](const CommandContext& context) { return swing(context, false); });
         for (const bool offhand : {false, true}) {
             targets.literal(offhand ? "offhand" : "mainhand", [swing, offhand](const CommandNodeBuilder& hand) {
-                hand.executes([swing, offhand](const CommandContext& context) { return swing(context, offhand); });
+                const auto run = [swing, offhand](const CommandContext& context) { return swing(context, offhand); };
+                hand.executes(run);
+                hand.argument("animation", swingAnimationArgument(), [run](const CommandNodeBuilder& animation) {
+                    animation.executes(run);
+                    animation.argument("duration", timeArgument(1),
+                                       [run](const CommandNodeBuilder& duration) { duration.executes(run); });
+                });
             });
         }
     });

@@ -97,6 +97,7 @@ basalt_module(server-runtime-core
         src/command/commands/StopwatchCommand.cpp
         src/command/commands/TagCommand.cpp
         src/command/commands/PostEffectCommand.cpp
+        src/command/commands/ComputeCommand.cpp
         src/command/commands/TestCommand.cpp
         src/command/commands/TeamCommand.cpp
         src/command/commands/TeleportCommand.cpp
@@ -113,6 +114,7 @@ basalt_module(server-runtime-core
         src/command/commands/WorldBorderCommand.cpp
         src/command/commands/WorldCommands.cpp
         src/command/CommandTree.cpp
+        src/command/DataArguments.cpp
         src/command/EntitySelector.cpp
         src/command/SelectorParser.cpp
         src/command/SelectorOptions.cpp
@@ -379,6 +381,8 @@ basalt_module(server-runtime-core
         src/world/DetectorRails.cpp
         src/world/Crafters.cpp
         src/world/Cushions.cpp
+        src/world/AttachedEntities.cpp
+        src/world/FallLanding.cpp
         src/world/DaylightDetectors.cpp
         src/world/DoubleChests.cpp
         src/world/DripstoneGrowth.cpp

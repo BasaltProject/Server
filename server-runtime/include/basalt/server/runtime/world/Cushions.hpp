@@ -26,9 +26,6 @@ inline constexpr double kHeight = 0.25;
 /// parity: `Cushion.DATA_COLOR`, right after `Entity`'s eight fields; `DyeColor` goes as its id.
 inline constexpr std::uint8_t kColorDataIndex = 8;
 
-/// parity: `EntityDataSerializers.DYE_COLOR`'s place in the serializer list.
-inline constexpr std::int32_t kDyeColorSerializer = 43;
-
 [[nodiscard]] const wire::common::Identifier& type();
 
 [[nodiscard]] bool isCushion(const wire::common::Identifier& type);

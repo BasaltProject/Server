@@ -76,7 +76,7 @@ private:
 
     void die(std::string_view deathMessageId, const std::optional<wire::text::Component>& killer);
 
-    void applyFallDamage(player::PlayerSession& session);
+    void applyFallDamage(player::PlayerSession& session, double landingY);
 
     /// parity: `Player.attack`'s sweep, which hits what is standing beside what was hit.
     void sweepAround(player::PlayerSession& session, const entity::ServerEntity& target, world::LoadedWorld& world,

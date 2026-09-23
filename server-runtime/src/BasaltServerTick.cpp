@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/entity/PrimedTnt.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/SwimPath.hpp>
+#include <basalt/server/runtime/world/AttachedEntities.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/ContainerLoot.hpp>
@@ -27,6 +28,7 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -532,6 +534,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     }
 
     random::RandomSource random = random::RandomSource::legacy(scratchSeed());
+    const world::cushions::Tagged attachedTags = [this](std::string_view tag, const wire::common::Identifier& block) {
+        return world::realBlockTags::contains(vanillaData_.blockTags, tag, block);
+    };
     // Worked out on the first entity and not before, so a world with nothing alive never builds it.
     // The plain radius here: entities stop one chunk sooner than blocks (`ChunkLevel.byStatus`).
     std::optional<std::unordered_set<std::int64_t>> entityTicking;
@@ -736,6 +741,13 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             }
             std::set<std::int32_t> visited;
             mobTicks_->tickPassengers(world, *entity, watchers, views, living, random, visited);
+            continue;
+        }
+        // parity: `BlockAttachedEntity.tick`, the hundred-tick check that something still holds it.
+        if (world::attachedEntities::isAttached(entity->type()) && world::attachedEntities::dueForCheck(*entity) &&
+            !world::attachedEntities::survives(world.state(), *entity, attachedTags)) {
+            world::attachedEntities::comeOff(world, *entity, watchers, random,
+                                             [this] { return playerRegistry_.allocateEntityId(); });
             continue;
         }
         // parity: `Mob.aiStep`, which is what makes an animal wander rather than stand there.

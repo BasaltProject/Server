@@ -162,8 +162,11 @@ std::vector<std::pair<std::int32_t, storage::StoredItemStack>> containerItems(co
         const auto* name = id == nullptr ? nullptr : id->get<std::string>();
         const auto* amount = count == nullptr ? nullptr : count->get<std::int32_t>();
         if (name != nullptr) {
-            held.emplace_back(slotIn(entry),
-                              storage::StoredItemStack{.id = *name, .count = amount == nullptr ? 1 : *amount});
+            const NbtCompound* components = entry.getCompound("components");
+            held.emplace_back(slotIn(entry), storage::StoredItemStack{
+                                                 .id = *name,
+                                                 .count = amount == nullptr ? 1 : *amount,
+                                                 .components = components == nullptr ? NbtCompound{} : *components});
         }
     }
     return held;
@@ -198,6 +201,10 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
         }
     }
     for (const auto& [slot, stack] : written) {
+        // A write of nothing empties the slot, which dropping it above already did.
+        if (stack.count <= 0 || stack.id.empty()) {
+            continue;
+        }
         NbtCompound entry;
         entry.putByte("Slot", static_cast<std::int8_t>(slot));
         entry.set("id", NbtTag::ofString(stack.id));

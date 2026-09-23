@@ -473,7 +473,17 @@ std::expected<Recipe, RecipeParseError> parse(std::string_view json, const TagRe
         return parseSpecial(*root, std::move(built), SpecialKind::Imbue, "source", "material", resolveTag);
     }
     if (*type == "minecraft:crafting_decorated_pot") {
-        return parseSpecial(*root, std::move(built), SpecialKind::DecoratedPot, "", "back", resolveTag);
+        // parity: 26.3 `DecoratedPotRecipe`, one ingredient per side: back, left, right, front.
+        built.kind = RecipeKind::Special;
+        built.specialKind = SpecialKind::DecoratedPot;
+        for (const std::string_view side : {"back", "left", "right", "front"}) {
+            Parsed<Ingredient> ingredient = requiredIngredient(*root, side, resolveTag);
+            if (!ingredient.has_value()) {
+                return std::unexpected(ingredient.error());
+            }
+            built.ingredients.push_back(std::move(*ingredient));
+        }
+        return built;
     }
     if (*type == "minecraft:crafting_special_bookcloning") {
         return parseSpecial(*root, std::move(built), SpecialKind::BookCloning, "source", "material", resolveTag);

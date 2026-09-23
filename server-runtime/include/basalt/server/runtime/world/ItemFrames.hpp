@@ -24,6 +24,10 @@ namespace itemFrames {
 [[nodiscard]] bool canHang(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            server::registry::BlockFace facing);
 
+/// parity: `ItemFrame.survives` for a frame already hung: fixed ones always do; otherwise its square
+/// is clear, the block behind is solid (or a diode on a wall), and no other frame there faces its way.
+[[nodiscard]] bool survives(const WorldState& world, const entity::ServerEntity& frame);
+
 /// parity: the tag `addAdditionalSaveData` writes for a frame nobody has touched yet.
 [[nodiscard]] wire::nbt::NbtCompound freshTag(server::registry::BlockFace facing);
 

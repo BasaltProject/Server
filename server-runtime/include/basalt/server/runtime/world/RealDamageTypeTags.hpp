@@ -65,6 +65,8 @@ inline const wire::common::Identifier kWither = wire::common::Identifier::vanill
 inline const wire::common::Identifier kWitherSkull = wire::common::Identifier::vanilla("wither_skull");
 inline const wire::common::Identifier kStarve = wire::common::Identifier::vanilla("starve");
 inline const wire::common::Identifier kFall = wire::common::Identifier::vanilla("fall");
+/// parity: `DamageTypes.STALAGMITE`, a fall onto the point of pointed dripstone.
+inline const wire::common::Identifier kStalagmite = wire::common::Identifier::vanilla("stalagmite");
 
 /// parity: `DamageTypes.BAD_RESPAWN_POINT`, what a bed in the wrong dimension kills you with.
 inline const wire::common::Identifier kBadRespawnPoint = wire::common::Identifier::vanilla("bad_respawn_point");

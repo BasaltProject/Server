@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
+#include <basalt/server/runtime/command/commands/ComputeCommand.hpp>
 #include <basalt/server/runtime/command/commands/ItemCommands.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
@@ -311,11 +312,11 @@ TEST_CASE("item replace writes into a player's slot by its vanilla name") {
     REQUIRE(held.has_value());
     CHECK(held->id == "minecraft:stone");
     CHECK(held->count == 5);
-    CHECK(fixture.source.lastAsText().find("commands.item.entity.set.success.single") != std::string::npos);
+    CHECK(fixture.source.lastAsText().find("commands.item.entity.replace.success.single") != std::string::npos);
 
-    // `weapon` moves with the held slot rather than being a slot of its own, so it is refused.
-    CHECK(fixture.dispatcher.execute(fixture.source, "item replace entity Steve weapon with minecraft:stone") == 0);
-    CHECK(fixture.source.lastAsText().find("slot.unknown") != std::string::npos);
+    // `weapon` is the held slot, which is hotbar.0 here.
+    CHECK(fixture.dispatcher.execute(fixture.source, "item replace entity Steve weapon with minecraft:dirt") == 1);
+    CHECK(steve.inventory.at(basalt::server::runtime::player::PlayerInventory::kHotbarStart)->id == "minecraft:dirt");
 }
 
 TEST_CASE("item copies a stack from one player into another") {
@@ -333,19 +334,38 @@ TEST_CASE("item copies a stack from one player into another") {
     REQUIRE(copied.has_value());
     CHECK(copied->id == "minecraft:diamond");
 
-    // An empty source slot is named rather than copied as nothing.
+    // An empty source slot is copied as nothing, clearing the target.
     CHECK(fixture.dispatcher.execute(fixture.source,
-                                     "item replace entity Alex hotbar.2 from entity Steve inventory.5") == 0);
-    CHECK(fixture.source.lastAsText().find("commands.item.source.no_such_slot") != std::string::npos);
+                                     "item replace entity Alex hotbar.1 from entity Steve inventory.5") == 1);
+    CHECK_FALSE(fixture.players[1]
+                    ->inventory.at(basalt::server::runtime::player::PlayerInventory::kHotbarStart + 1)
+                    .has_value());
 }
 
-TEST_CASE("item modify refuses by name, since no item modifier is loaded") {
+TEST_CASE("item modify applies an inline modifier and refuses an unknown one") {
     Fixture fixture{scratch("item-modify")};
-    fixture.add("Steve");
+    PlayerSession& steve = fixture.add("Steve");
+    steve.inventory.set(basalt::server::runtime::player::PlayerInventory::kHotbarStart,
+                        basalt::server::storage::StoredItemStack{.id = "minecraft:diamond", .count = 3});
     fixture.dispatcher.registerCommand(std::make_shared<commands::ItemCommand>());
 
+    CHECK(fixture.dispatcher.execute(fixture.source,
+                                     R"(item modify entity Steve hotbar.0 {type:"minecraft:set_count",count:7})") == 1);
+    CHECK(steve.inventory.at(basalt::server::runtime::player::PlayerInventory::kHotbarStart)->count == 7);
     CHECK(fixture.dispatcher.execute(fixture.source, "item modify entity Steve hotbar.0 minecraft:sharpen") == 0);
-    CHECK(fixture.source.lastAsText().find("Item modifiers are not loaded") != std::string::npos);
+}
+
+TEST_CASE("compute works a provider out, flooring a scaled float") {
+    Fixture fixture{scratch("compute")};
+    fixture.dispatcher.registerCommand(std::make_shared<commands::ComputeCommand>(nullptr));
+
+    CHECK(fixture.dispatcher.execute(fixture.source,
+                                     R"(compute default integer {type:"minecraft:constant",value:4})") == 4);
+    CHECK(fixture.source.lastAsText().find("command.compute.result.unnamed.exact") != std::string::npos);
+    CHECK(fixture.dispatcher.execute(fixture.source,
+                                     R"(compute default float {type:"minecraft:constant",value:2.5f} 3)") == 7);
+    CHECK(fixture.source.lastAsText().find("command.compute.result.unnamed.rounded") != std::string::npos);
+    CHECK(fixture.dispatcher.execute(fixture.source, "compute default integer minecraft:missing") == 0);
 }
 
 TEST_CASE("loot give rolls the named table into an inventory") {

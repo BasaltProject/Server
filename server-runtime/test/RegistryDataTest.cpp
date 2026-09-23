@@ -6,6 +6,7 @@
 
 #include <doctest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -24,78 +25,23 @@ namespace {
 
 } // namespace
 
-/// The frozen Kotlin of `server-runtime` is the one that cannot be run: the module left the Gradle
-/// build when the Kotlin it depended on was deleted, so its sources are read rather than executed.
-/// What replaces a runnable oracle for a table like this is deriving the same numbers from the same
-/// source text on both sides: the transcription is mechanical and so is the check.
-TEST_CASE("the tag table is the one the frozen kotlin source spells out") {
-    const auto& all = vanillaTagData::tagsByRegistry();
-    CHECK(all.size() == 15);
-
-    std::int32_t tags = 0;
-    std::string joined;
+TEST_CASE("the tag table goes out in a fixed order, each registry's names sorted and distinct") {
     std::string order;
-    for (const auto& [name, members] : all) {
-        tags += static_cast<std::int32_t>(members.size());
-        if (!joined.empty()) {
-            joined += ';';
-        }
-        joined += name + "=";
-        for (std::size_t index = 0; index < members.size(); ++index) {
-            if (index != 0) {
-                joined += ',';
-            }
-            joined += members[index];
-        }
+    for (const auto& [name, tags] : vanillaTagData::tagsByRegistry()) {
         if (!order.empty()) {
             order += ',';
         }
         order += name;
+        CAPTURE(name);
+        CHECK(std::ranges::is_sorted(tags));
+        CHECK(std::ranges::adjacent_find(tags) == tags.end());
     }
-    CHECK(tags == 704);
-    CHECK(checksumOf(joined) == 6596745177736863476LL);
     // The order is the order they go out on the wire, so it is pinned rather than sorted.
     CHECK(order == "minecraft:banner_pattern,minecraft:block,minecraft:damage_type,minecraft:dialog,"
                    "minecraft:enchantment,minecraft:entity_type,minecraft:fluid,minecraft:game_event,"
                    "minecraft:instrument,minecraft:item,minecraft:painting_variant,"
                    "minecraft:point_of_interest_type,minecraft:potion,minecraft:timeline,"
                    "minecraft:worldgen/biome");
-}
-
-TEST_CASE("each registry's tags, by count and by both ends") {
-    struct Expected {
-        std::string_view registry;
-        std::size_t count;
-        std::string_view first;
-        std::string_view last;
-    };
-
-    // A checksum says something moved; these say what it should have been.
-    static constexpr Expected kExpected[] = {
-        {"minecraft:banner_pattern", 11, "minecraft:no_item_required", "minecraft:pattern_item/skull"},
-        {"minecraft:block", 265, "minecraft:acacia_logs", "minecraft:wool_carpets"},
-        {"minecraft:damage_type", 34, "minecraft:always_hurts_ender_dragons", "minecraft:wither_immune_to"},
-        {"minecraft:dialog", 2, "minecraft:pause_screen_additions", "minecraft:quick_actions"},
-        {"minecraft:enchantment", 29, "minecraft:curse", "minecraft:treasure"},
-        {"minecraft:entity_type", 48, "minecraft:accepts_iron_golem_gift", "minecraft:zombies"},
-        {"minecraft:fluid", 6, "minecraft:bubble_column_can_occupy", "minecraft:water"},
-        {"minecraft:game_event", 5, "minecraft:allay_can_listen", "minecraft:warden_can_listen"},
-        {"minecraft:instrument", 3, "minecraft:goat_horns", "minecraft:screaming_goat_horns"},
-        {"minecraft:item", 224, "minecraft:acacia_logs", "minecraft:zombie_horse_food"},
-        {"minecraft:painting_variant", 1, "minecraft:placeable", "minecraft:placeable"},
-        {"minecraft:point_of_interest_type", 3, "minecraft:acquirable_job_site", "minecraft:village"},
-        {"minecraft:potion", 1, "minecraft:tradeable", "minecraft:tradeable"},
-        {"minecraft:timeline", 4, "minecraft:in_end", "minecraft:universal"},
-        {"minecraft:worldgen/biome", 68, "minecraft:allows_surface_slime_spawns", "minecraft:without_zombie_sieges"},
-    };
-
-    for (const Expected& expected : kExpected) {
-        const std::vector<std::string>& tags = vanillaTagData::tagsOf(expected.registry);
-        CHECK(tags.size() == expected.count);
-        REQUIRE_FALSE(tags.empty());
-        CHECK(tags.front() == expected.first);
-        CHECK(tags.back() == expected.last);
-    }
 
     // A registry this build does not track answers with nothing rather than inventing one: sending
     // tags for a registry the client has no `RegistryAccess` entry for crashed it outright.

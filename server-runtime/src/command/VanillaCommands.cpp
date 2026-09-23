@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/server/runtime/command/commands/BlockCommands.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
+#include <basalt/server/runtime/command/commands/ComputeCommand.hpp>
 #include <basalt/server/runtime/command/commands/EffectCommand.hpp>
 #include <basalt/server/runtime/command/commands/EntityCommands.hpp>
 #include <basalt/server/runtime/command/commands/GroupCommands.hpp>
@@ -13,6 +14,7 @@
 #include <basalt/server/runtime/command/commands/ParticleCommand.hpp>
 #include <basalt/server/runtime/command/commands/PlaceholderCommand.hpp>
 #include <basalt/server/runtime/command/commands/PlayerCommands.hpp>
+#include <basalt/server/runtime/command/commands/PostEffectCommand.hpp>
 #include <basalt/server/runtime/command/commands/ProgressCommands.hpp>
 #include <basalt/server/runtime/command/commands/RandomCommand.hpp>
 #include <basalt/server/runtime/command/commands/RegionCommands.hpp>
@@ -20,7 +22,6 @@
 #include <basalt/server/runtime/command/commands/ScoreCommands.hpp>
 #include <basalt/server/runtime/command/commands/ScoreboardCommand.hpp>
 #include <basalt/server/runtime/command/commands/SessionCommands.hpp>
-#include <basalt/server/runtime/command/commands/PostEffectCommand.hpp>
 #include <basalt/server/runtime/command/commands/StopwatchCommand.hpp>
 #include <basalt/server/runtime/command/commands/TagCommand.hpp>
 #include <basalt/server/runtime/command/commands/TeamCommand.hpp>
@@ -124,7 +125,8 @@ std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommand
         add(std::make_shared<commands::RecipeCommand>(*hooks.progress, *hooks.recipes));
     }
     add(std::make_shared<commands::WaypointCommand>());
-    add(std::make_shared<commands::ItemCommand>(hooks.recipes));
+    add(std::make_shared<commands::ItemCommand>(hooks.recipes, hooks.lootTables));
+    add(std::make_shared<commands::ComputeCommand>(hooks.lootTables));
     if (hooks.lootTables != nullptr && hooks.worldSeed) {
         add(std::make_shared<commands::LootCommand>(*hooks.lootTables, hooks.worldSeed));
     }
