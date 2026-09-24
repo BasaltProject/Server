@@ -186,6 +186,9 @@ public:
             writeBookPage;
         std::function<void(player::PlayerSession&, std::int32_t slot, const std::string& title)> signBook;
 
+        /// A map sent whole to this player, colours and markers.
+        std::function<void(player::PlayerSession&, std::int64_t mapId)> mapInfo;
+
         /// An arm swung at nothing, told to everybody else where the world is.
         std::function<void(player::PlayerSession&)> swing;
 
@@ -348,6 +351,8 @@ public:
 
     void signBook(std::int32_t slot, const std::string& title) override;
 
+    void requestMap(std::int64_t mapId) override;
+
     void swing() override;
 
     void pickBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t hotbarSlot) override;
@@ -428,11 +433,6 @@ private:
     /// The line, said to everyone and written to the log, once nobody has objected to it.
     void say(std::string message);
 
-    /// A window of items a plugin drew, as the list of buttons a Bedrock client can actually use.
-    ///
-    /// A menu is a grid with holes and a form is a list, so what a Bedrock player sees is the items
-    /// in slot order and nothing where the holes were. The plugin is told the slot it meant, never
-    /// the button number, so it never learns which edition is looking.
     /// Puts this player's camera behind another entity, or back behind their own eyes when the id
     /// is their own. parity: that edition has no spectating of its own, so Geyser moves a free
     /// camera by hand every turn and this does the same.
@@ -443,6 +443,8 @@ private:
     /// player; anything else is a line they are shown and can act on themselves.
     void showDialog(const world::dialogs::Dialog& dialog);
 
+    /// A plugin's window of items as a Bedrock form: the items in slot order, holes skipped. The
+    /// plugin is told the slot it meant, never the button number, so it cannot tell the editions apart.
     void showMenu(const std::string& title, const std::map<std::int32_t, server::plugins::PluginItem>& items,
                   std::function<void(std::int32_t)> onClick);
 

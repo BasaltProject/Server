@@ -114,6 +114,12 @@ struct Recipe {
     /// the reagent in `ingredient`. parity: 26.3 `BrewingRecipe`, whose output is `result`.
     std::vector<std::string> potions;
 
+    /// Transmute: a shapeless pair whose result keeps the input's components. parity: `TransmuteRecipe`,
+    /// with `ingredients` as input then material, and an air result standing for the input's own item.
+    bool transmute = false;
+    std::int32_t materialMin = 1;
+    std::int32_t materialMax = 1;
+    bool addMaterialCount = false;
     /// Special: the rule, plus whichever of its ingredient fields the file carries.
     SpecialKind specialKind = SpecialKind::RepairItem;
     std::optional<Ingredient> target;

@@ -113,6 +113,8 @@ public:
 
     void openLoomMenu(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
+    void openCartographyTable(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
     void openBrewingStand(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
     /// Whether the open window is a brewing stand's, which is read off the block it belongs to.
@@ -229,6 +231,16 @@ private:
 
     void takeLoomResult();
 
+    /// parity: `CartographyTableMenu.setupResultSlot`.
+    void recomputeCartographyResult();
+
+    /// parity: the result slot's `onTake`, both inputs spent and the table's sound.
+    void takeCartographyResult();
+
+    /// parity: `MapItem.onCraftedPostProcess` for whatever just left a result slot: a map carrying
+    /// `map_post_processing`, on the cursor or already moved into the inventory, becomes its new map.
+    void settleCraftedMaps(player::PlayerSession& session);
+
     void sendLoomNumbers();
 
     /// What the beacon this window belongs to has on it right now.
@@ -341,6 +353,10 @@ private:
     /// them is picked. parity: `selectablePatterns` and `selectedBannerPatternIndex`.
     std::vector<std::string> loomPatterns_;
     std::int32_t loomPattern_ = -1;
+
+    bool openCartography_ = false;
+    std::array<std::optional<storage::StoredItemStack>, 3> cartographySlots_;
+    std::int64_t cartographySoundTime_ = -1;
 
     bool openGrindstone_ = false;
     std::array<std::optional<storage::StoredItemStack>, 3> grindstoneSlots_;

@@ -206,6 +206,16 @@ bool OceanMonumentStructureGenerator::surroundingIsOcean(std::int32_t chunkX, st
     return true;
 }
 
+bool OceanMonumentStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+    if (!grid().isStructureChunk(seed, chunkX, chunkZ) || !surroundingIsOcean(chunkX, chunkZ)) {
+        return false;
+    }
+    const std::int32_t centreX = chunkX * 16 + 8;
+    const std::int32_t centreZ = chunkZ * 16 + 8;
+    const std::int32_t groundY = oceanFloorAt_(centreX, centreZ) - 1;
+    return monumentBiomes_.contains(noiseBiomeAt_(centreX >> 2, groundY >> 2, centreZ >> 2));
+}
+
 void OceanMonumentStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
                                                 std::int32_t chunkZ) {
     if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {

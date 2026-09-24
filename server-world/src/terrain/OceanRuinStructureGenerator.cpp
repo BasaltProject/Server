@@ -299,6 +299,15 @@ OceanRuinStructureGenerator::addCluster(Chunk& chunk, std::int64_t seed, const S
     return boxes;
 }
 
+bool OceanRuinStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                           bool warm) const {
+    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
+        return false;
+    }
+    const std::optional<bool> cold = chooseVariant(seed, chunkX, chunkZ);
+    return cold.has_value() && *cold != warm;
+}
+
 void OceanRuinStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
                                             std::int32_t chunkZ) const {
     if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {

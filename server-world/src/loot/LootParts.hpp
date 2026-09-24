@@ -29,6 +29,7 @@ struct LootFunction::Parts {
     ItemPredicate filter;
     std::vector<LootFunction> onPass;
     std::vector<LootFunction> onFail;
+    ExplorationMapRequest exploration;
 };
 
 /// The `minecraft:enchantments` component of a stack, by id, which is what an item predicate reads.

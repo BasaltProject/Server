@@ -172,6 +172,15 @@ void BuriedTreasureStructureGenerator::placeChest(Chunk& chunk, std::int64_t see
         ChunkBlockEntity{x & 15, y, z & 15, wire::common::Identifier::vanilla("chest"), std::move(data)});
 }
 
+bool BuriedTreasureStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
+        return false;
+    }
+    const std::int32_t centreX = chunkX * 16 + 8;
+    const std::int32_t centreZ = chunkZ * 16 + 8;
+    return beachBiomes_.contains(biomeAt_(centreX, surfaceHeightAt_(centreX, centreZ) - 1, centreZ));
+}
+
 void BuriedTreasureStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
     const std::int32_t chunkX = chunk.chunkX();
     const std::int32_t chunkZ = chunk.chunkZ();

@@ -316,10 +316,10 @@ void VillageStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, 
     }
 }
 
-std::optional<LocatedVillage> VillageStructureGenerator::locate(std::int64_t seed, std::int32_t fromChunkX,
-                                                                std::int32_t fromChunkZ,
-                                                                const wire::common::Identifier* structure,
-                                                                std::int32_t maxCells) const {
+std::optional<LocatedVillage>
+VillageStructureGenerator::locate(std::int64_t seed, std::int32_t fromChunkX, std::int32_t fromChunkZ,
+                                  const wire::common::Identifier* structure, std::int32_t maxCells,
+                                  const std::function<bool(std::int32_t, std::int32_t)>& skip) const {
     const std::int32_t cellX = floorDiv(fromChunkX, grid_.spacing());
     const std::int32_t cellZ = floorDiv(fromChunkZ, grid_.spacing());
     for (std::int32_t ring = 0; ring <= maxCells; ++ring) {
@@ -336,7 +336,7 @@ std::optional<LocatedVillage> VillageStructureGenerator::locate(std::int64_t see
                 if (variant == nullptr) {
                     continue;
                 }
-                if (structure != nullptr && variant->id != *structure) {
+                if ((structure != nullptr && variant->id != *structure) || (skip && skip(candidateX, candidateZ))) {
                     continue;
                 }
                 return LocatedVillage{.structure = variant->id, .chunkX = candidateX, .chunkZ = candidateZ};

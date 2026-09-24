@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
+#include <basalt/wire/bedrock/BedrockMaps.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 
 #include <chrono>
@@ -649,6 +650,12 @@ void BedrockListener::onConnect(RakSession& session) {
                                                 : edit->action == Action::DeletePage ? world::books::PageEdit::Delete
                                                                                      : world::books::PageEdit::Swap;
             entry.player->editBookPage(edit->slot, what, edit->page, edit->otherPage, edit->text);
+            return;
+        }
+        if (packet == BedrockPacket::MapInfoRequest && entry.player) {
+            if (const std::optional<std::int64_t> map = wire::bedrock::readMapInfoRequest(body); map.has_value()) {
+                entry.player->requestMap(*map);
+            }
             return;
         }
         if (packet == BedrockPacket::FilterText && entry.player) {

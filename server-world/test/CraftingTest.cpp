@@ -56,6 +56,10 @@ namespace {
                    "result":{"id":"minecraft:oak_planks","count":4}})"},
         {"transmute", R"({"type":"minecraft:crafting_transmute","input":"minecraft:shulker_box",
                    "material":"minecraft:red_dye","result":{"id":"minecraft:red_shulker_box","count":1}})"},
+        // parity: 26.3's own `map_cloning`, whose result is the input's item with its components.
+        {"mapcloning", R"({"type":"minecraft:crafting_transmute","add_material_count_to_result":true,
+                   "input":"minecraft:filled_map","material":"minecraft:map","material_count":{"min":1,"max":8},
+                   "result":{}})"},
         {"smelting", R"({"type":"minecraft:smelting","ingredient":"minecraft:iron_ore","experience":0.7,
                    "cookingtime":180,"result":{"id":"minecraft:iron_ingot","count":1}})"},
         {"blasting", R"({"type":"minecraft:blasting","ingredient":"minecraft:iron_ore","cookingtime":100,
@@ -633,7 +637,9 @@ TEST_CASE("the recipes match and assemble what the frozen kotlin does") {
     }
     SUBCASE("mapextending") {
         check("mapextending", "map", true, "", "special/MAP_EXTENDING/minecraft:filled_map;minecraft:paper;-/",
-              R"(minecraft:filled_mapx1{"minecraft:map_id":7})", "-,-,-,-,-,-,-,-,-", -4605486320582613029LL);
+              // parity: `MapExtendingRecipe.assemble` leaves the zoom to `map_post_processing`.
+              R"(minecraft:filled_mapx1{"minecraft:map_id":7,"minecraft:map_post_processing":"scale"})",
+              "-,-,-,-,-,-,-,-,-", 4824650867759912679LL);
     }
     SUBCASE("bookcloning") {
         check("bookcloning", "bookcloning", true, "",
@@ -814,4 +820,18 @@ TEST_CASE("a brewing recipe reads its bottle, the potion in it, the reagent and 
     const nbt::NbtCompound* contents = parsed->result.components.getCompound("minecraft:potion_contents");
     REQUIRE(contents != nullptr);
     CHECK(contents->getString("potion") == "minecraft:awkward");
+}
+
+TEST_CASE("map cloning keeps the map and makes one more per blank map") {
+    installHooks();
+    const std::expected<Recipe, RecipeParseError> recipe =
+        recipeJson::parse(recipes().find("mapcloning")->second, resolveTag);
+    REQUIRE(recipe.has_value());
+    const loot::ItemStack map = stack("minecraft:filled_map", 1, withInt("minecraft:map_id", 7));
+    const CraftingInput two = CraftingInput::of(3, 1, {map, stack("minecraft:map"), stack("minecraft:map")});
+    CHECK(recipe->matches(two));
+    CHECK(describe(recipe->assemble(two)) == R"(minecraft:filled_mapx3{"minecraft:map_id":7})");
+    // parity: `TransmuteRecipe.matches` wants one input and at least one material.
+    CHECK_FALSE(recipe->matches(CraftingInput::of(1, 1, {map})));
+    CHECK_FALSE(recipe->matches(CraftingInput::of(2, 1, {map, map})));
 }

@@ -407,6 +407,23 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
         }
         openBeacon_ = false;
     }
+    // parity: `CartographyTableMenu.removed`: the result goes, the two inputs come back.
+    if (openCartography_) {
+        for (const std::int32_t slot : {Menu::kCartographyMap, Menu::kCartographyAdditional}) {
+            const std::optional<storage::StoredItemStack>& leftover = cartographySlots_[static_cast<std::size_t>(slot)];
+            if (!leftover.has_value()) {
+                continue;
+            }
+            const std::int32_t left = session.inventory.add(*leftover);
+            if (left > 0) {
+                storage::StoredItemStack dropped = *leftover;
+                dropped.count = left;
+                dropStack(session, dropped);
+            }
+        }
+        std::ranges::fill(cartographySlots_, std::nullopt);
+        openCartography_ = false;
+    }
     // parity: `LoomMenu.removed`, which hands its three inputs back.
     if (openLoom_) {
         for (const std::int32_t slot : {Menu::kLoomBanner, Menu::kLoomDye, Menu::kLoomPattern}) {

@@ -239,6 +239,9 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             // turn left every lit block of tnt a tick behind the jar's. Measured in `hojagrande`.
             step("Primed tnt", [this, &world] { tickPrimedTnt(world); });
             step("Entity tick", [this, &world, &region] { tickEntities(world, region); });
+            if (region.isPrimary()) {
+                step("Framed map tick", [this, &world] { maps_->tickFrames(world); });
+            }
             // parity: `entityInside` is part of the entity's own turn, so it reads where the entity
             // has just moved to. Asking before that pass read the square of the turn before, which a
             // dropped item hides (they move first of all) and an arrow does not: a tick late.
@@ -254,6 +257,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 step("Effect tick", [this, &world] { statusEffects_->tickEffects(world); });
                 step("Raid tick", [this, &world] { raids_->tickRaids(world); });
                 step("Player tick", [this, &world] { environment_->tickPlayers(world); });
+                step("Map tick", [this, &world] { maps_->tickPlayers(world); });
                 step("Sleep tick", [this, &world] { environment_->tickSleep(world); });
             }
             // The end of the turn: what has to see everything it did, rather than a tick late.

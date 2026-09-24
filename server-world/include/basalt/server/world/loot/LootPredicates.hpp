@@ -3,6 +3,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -105,18 +106,54 @@ struct StateMatcher {
 
 /// What a location predicate can see of one square.
 struct PlaceFacts {
+    /// parity: `Level.isLoaded`, which the biome, structure, smoke, light and fluid tests need.
+    bool loaded = true;
+    /// The exact point asked about, which `position` compares.
+    std::array<double, 3> exact{};
+    std::optional<wire::common::Identifier> dimension;
     std::optional<wire::common::Identifier> biome;
     std::optional<wire::common::Identifier> block;
     std::map<std::string, std::string> properties;
+    /// parity: `FluidState`, its id and its `level` and `falling` properties.
+    std::optional<wire::common::Identifier> fluid;
+    std::map<std::string, std::string> fluidProperties;
+    /// parity: `Level.getMaxLocalRawBrightness`, `Level.canSeeSky` and `CampfireBlock.isSmokeyPos`.
+    std::int32_t light = 0;
+    bool canSeeSky = false;
+    bool smokey = false;
+    /// parity: `StructureManager.getStructureWithPieceAt` over a holder set of structures.
+    std::function<bool(const std::vector<std::string>& structures)> inStructure;
 };
 
-/// parity: `LocationPredicate`, the parts the loot tables use: the biome, and the block with its state.
+/// parity: `MinMaxBounds.Doubles`.
+struct DoubleBounds {
+    std::optional<double> min;
+    std::optional<double> max;
+
+    [[nodiscard]] bool test(double value) const {
+        return (!min.has_value() || value >= *min) && (!max.has_value() || value <= *max);
+    }
+};
+
+/// parity: `LocationPredicate`: where, which dimension, biome, structure, smoke, light, block,
+/// fluid and whether the sky is in view, tested in that order.
 struct LocationPredicate {
+    std::optional<std::array<DoubleBounds, 3>> position;
+    std::optional<wire::common::Identifier> dimension;
     /// Ids, or a single `#tag`; empty means any biome.
     std::vector<std::string> biomes;
+    std::vector<std::string> structures;
+    std::optional<bool> smokey;
+    std::optional<std::int32_t> lightMin;
+    std::optional<std::int32_t> lightMax;
+    bool hasLight = false;
     bool hasBlock = false;
     std::vector<std::string> blocks;
     StateMatcher state;
+    bool hasFluid = false;
+    std::vector<std::string> fluids;
+    StateMatcher fluidState;
+    std::optional<bool> canSeeSky;
     bool unsupported = false;
 
     [[nodiscard]] bool test(const PlaceFacts& place, const TagLookup& tags) const;

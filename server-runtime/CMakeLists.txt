@@ -15,6 +15,7 @@ basalt_module(server-runtime-core
         src/bedrock/BedrockBlockEntities.cpp
         src/bedrock/BedrockChunks.cpp
         src/bedrock/BedrockListener.cpp
+        src/bedrock/BedrockMaps.cpp
         src/bedrock/BedrockPlayer.cpp
         src/bedrock/BedrockSeen.cpp
         src/bedrock/BedrockShield.cpp
@@ -153,6 +154,7 @@ basalt_module(server-runtime-core
         src/ContainerAnvil.cpp
         src/ContainerBeacon.cpp
         src/ContainerLoom.cpp
+        src/ContainerCartography.cpp
         src/ContainerBrewing.cpp
         src/ContainerGrindstone.cpp
         src/ContainerEnchantment.cpp
@@ -184,6 +186,8 @@ basalt_module(server-runtime-core
         src/EndFightSystem.cpp
         src/ExperienceOrbSystem.cpp
         src/FishingSystem.cpp
+        src/MapSystem.cpp
+        src/MapExplorer.cpp
         src/BossBarView.cpp
         src/WitherSystem.cpp
         src/EndFightArena.cpp
@@ -335,6 +339,10 @@ basalt_module(server-runtime-core
         src/world/Campfires.cpp
         src/world/BlockEntityTicks.cpp
         src/world/Walls.cpp
+        src/world/maps/MapData.cpp
+        src/world/maps/MapDecorationTypes.cpp
+        src/world/maps/MapRenderer.cpp
+        src/world/maps/MapStorage.cpp
         src/world/Waxing.cpp
         src/world/WindBursts.cpp
         src/world/RedstoneWire.cpp
@@ -1712,6 +1720,12 @@ basalt_test(server-runtime-books-test
 basalt_test(server-runtime-looms-test
     SOURCES
         test/LoomsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-map-data-test
+    SOURCES
+        test/MapDataTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

@@ -361,16 +361,23 @@ std::expected<Recipe, RecipeParseError> parse(std::string_view json, const TagRe
     if (const JsonValue* resultValue = root->find("result"); resultValue != nullptr) {
         if (const JsonObject* result = resultValue->get<JsonObject>(); result != nullptr) {
             const std::optional<std::string> id = asString(result->find("id"));
+            const auto count = static_cast<std::int32_t>(asNumber(result->find("count")).value_or(1.0));
+            // parity: `TransmuteResult`, whose item defaults to the input's own; air stands for it here.
+            const bool keepsInput =
+                *type == "minecraft:crafting_transmute" || *type == "minecraft:crafting_special_mapextending";
             if (!id.has_value()) {
-                return std::unexpected(missing("result id"));
+                if (!keepsInput) {
+                    return std::unexpected(missing("result id"));
+                }
+                built.result.count = count;
+            } else {
+                const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
+                    wire::common::Identifier::parse(*id);
+                if (!item.has_value()) {
+                    return std::unexpected(RecipeParseError{"Malformed result id: " + *id});
+                }
+                built.result = loot::ItemStack{.item = *item, .count = count};
             }
-            const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
-                wire::common::Identifier::parse(*id);
-            if (!item.has_value()) {
-                return std::unexpected(RecipeParseError{"Malformed result id: " + *id});
-            }
-            built.result = loot::ItemStack{
-                .item = *item, .count = static_cast<std::int32_t>(asNumber(result->find("count")).value_or(1.0))};
         }
     }
 
@@ -422,6 +429,20 @@ std::expected<Recipe, RecipeParseError> parse(std::string_view json, const TagRe
         }
         built.kind = RecipeKind::Shapeless;
         built.ingredients = {std::move(*input), std::move(*material)};
+        built.transmute = true;
+        // parity: `MATERIAL_COUNT_BOUNDS`, a number or a min and max inside one to eight.
+        if (const JsonValue* bounds = root->find("material_count"); bounds != nullptr) {
+            if (const std::optional<double> exact = asNumber(bounds); exact.has_value()) {
+                built.materialMin = built.materialMax = static_cast<std::int32_t>(*exact);
+            } else if (const JsonObject* range = bounds->get<JsonObject>(); range != nullptr) {
+                built.materialMin = static_cast<std::int32_t>(asNumber(range->find("min")).value_or(1.0));
+                built.materialMax = static_cast<std::int32_t>(asNumber(range->find("max")).value_or(8.0));
+            }
+        }
+        if (const JsonValue* add = root->find("add_material_count_to_result"); add != nullptr) {
+            const bool* flag = add->get<bool>();
+            built.addMaterialCount = flag != nullptr && *flag;
+        }
         return built;
     }
     if (*type == "minecraft:stonecutting") {

@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/item/ItemComponentPayloads.hpp>
+#include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/text/ComponentNbt.hpp>
 
 #include <algorithm>
@@ -248,6 +249,20 @@ std::optional<std::pair<std::string, NbtTag>> toStored(const ItemComponent& comp
     }
     if (const auto* custom = component.as<ItemComponent::CustomData>(); custom != nullptr) {
         return std::pair{name, NbtTag::ofCompound(custom->tag)};
+    }
+    // A map a creative client moves has to keep which map it is.
+    if (const auto* raw = component.as<ItemComponent::Raw>(); raw != nullptr) {
+        wire::io::ByteBuffer payload = wire::io::ByteBuffer::wrap(raw->payload);
+        const std::int32_t value = wire::protocol::varInt::read(payload);
+        if (payload.failed()) {
+            return std::nullopt;
+        }
+        if (name == "minecraft:map_id") {
+            return std::pair{name, NbtTag::ofInt(value)};
+        }
+        if (name == "minecraft:map_post_processing" && (value == 0 || value == 1)) {
+            return std::pair{name, NbtTag::ofString(value == 0 ? "lock" : "scale")};
+        }
     }
     return std::nullopt;
 }

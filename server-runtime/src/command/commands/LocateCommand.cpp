@@ -29,6 +29,8 @@ constexpr std::int32_t kMaxRadiusBlocks = 6400;
 /// parity: `PoiManager.findClosestWithType`'s own radius, in blocks.
 constexpr std::int32_t kPoiRadius = 256;
 constexpr std::int32_t kSectionHeight = 16;
+/// parity: `LocateCommand`'s search, 100 cells of each placement grid.
+constexpr std::int32_t kLocateCells = 100;
 
 /// The one structure that is not placed on a grid, so it answers from its own ring list.
 [[nodiscard]] const Identifier& stronghold() {
@@ -162,7 +164,7 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                                                                       &world::StructureLocator::id);
                                locator != (*world)->structureLocators().end()) {
                         const std::optional<std::pair<std::int32_t, std::int32_t>> found =
-                            locator->locate((*world)->metadata().seed, startX >> 4, startZ >> 4);
+                            locator->locate((*world)->metadata().seed, startX >> 4, startZ >> 4, kLocateCells, {});
                         if (!found.has_value()) {
                             return std::unexpected{notFound("commands.locate.structure.not_found", *wanted)};
                         }

@@ -91,6 +91,10 @@ public:
     static constexpr std::int32_t kEnchantmentLapis = 1;
 
     /// parity: `GrindstoneMenu`'s own three, which are numbered like an anvil's.
+    static constexpr std::int32_t kCartographyMap = 0;
+    static constexpr std::int32_t kCartographyAdditional = 1;
+    static constexpr std::int32_t kCartographyResult = 2;
+
     static constexpr std::int32_t kGrindstoneInput = 0;
     static constexpr std::int32_t kGrindstoneAddition = 1;
     static constexpr std::int32_t kGrindstoneResult = 2;
@@ -158,6 +162,9 @@ public:
 
     /// parity: `LoomMenu`: banner, dye, pattern, result, then the player's 36.
     [[nodiscard]] static Menu loom(std::int32_t containerId);
+
+    /// parity: `CartographyTableMenu`'s map, additional and result slots.
+    [[nodiscard]] static Menu cartographyTable(std::int32_t containerId);
 
     /// A villager's window. The three trading slots are the menu's own rather than any block's, so
     /// nothing behind them is a container: the trade itself is what moves the items.

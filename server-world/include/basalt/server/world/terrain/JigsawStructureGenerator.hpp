@@ -101,10 +101,12 @@ public:
     /// Adds this chunk's pieces and junctions to the chunk's one beardifier.
     void addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
-    /// The nearest chunk holding a start, searched outward over the grid's own cells.
+    /// The nearest chunk holding a start, searched outward over the grid's own cells. `skip` passes
+    /// over a start somebody already claimed.
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>>
     locate(std::int64_t seed, std::int32_t fromChunkX, std::int32_t fromChunkZ,
-           std::int32_t maxCells = kDefaultSearchCells);
+           std::int32_t maxCells = kDefaultSearchCells,
+           const std::function<bool(std::int32_t, std::int32_t)>& skip = {});
 
 private:
     struct CandidateKey {

@@ -277,10 +277,9 @@ void JigsawStructureGenerator::addBeard(StructureBeard& beard, std::int32_t chun
     }
 }
 
-std::optional<std::pair<std::int32_t, std::int32_t>> JigsawStructureGenerator::locate(std::int64_t seed,
-                                                                                      std::int32_t fromChunkX,
-                                                                                      std::int32_t fromChunkZ,
-                                                                                      std::int32_t maxCells) {
+std::optional<std::pair<std::int32_t, std::int32_t>>
+JigsawStructureGenerator::locate(std::int64_t seed, std::int32_t fromChunkX, std::int32_t fromChunkZ,
+                                 std::int32_t maxCells, const std::function<bool(std::int32_t, std::int32_t)>& skip) {
     const std::int32_t cellX = floorDiv(fromChunkX, grid_.spacing());
     const std::int32_t cellZ = floorDiv(fromChunkZ, grid_.spacing());
     for (std::int32_t ring = 0; ring <= maxCells; ++ring) {
@@ -293,7 +292,7 @@ std::optional<std::pair<std::int32_t, std::int32_t>> JigsawStructureGenerator::l
                     grid_.candidateChunk(seed, (cellX + dx) * grid_.spacing(), (cellZ + dz) * grid_.spacing());
                 const std::shared_ptr<const std::vector<PlacedStructurePiece>> assembled =
                     assembledStart(candidateX, candidateZ, seed);
-                if (assembled == nullptr || assembled->empty()) {
+                if (assembled == nullptr || assembled->empty() || (skip && skip(candidateX, candidateZ))) {
                     continue;
                 }
                 return std::pair{candidateX, candidateZ};

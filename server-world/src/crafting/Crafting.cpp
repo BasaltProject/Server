@@ -204,6 +204,45 @@ namespace {
     return true;
 }
 
+/// parity: `TransmuteRecipe.matches` and `assemble`: one input, one to eight materials, and the
+/// input's components on whatever comes out.
+[[nodiscard]] std::optional<loot::ItemStack> transmuted(const Recipe& recipe, const CraftingInput& input) {
+    if (recipe.ingredients.size() != 2 || input.ingredientCount() < recipe.materialMin + 1 ||
+        input.ingredientCount() > recipe.materialMax + 1) {
+        return std::nullopt;
+    }
+    const loot::ItemStack* found = nullptr;
+    std::int32_t materials = 0;
+    for (std::int32_t y = 0; y < input.height(); ++y) {
+        for (std::int32_t x = 0; x < input.width(); ++x) {
+            const loot::ItemStack* stack = input.item(x, y);
+            if (stack == nullptr) {
+                continue;
+            }
+            if (recipe.ingredients[0].test(stack)) {
+                if (found != nullptr) {
+                    return std::nullopt;
+                }
+                found = stack;
+            } else if (!recipe.ingredients[1].test(stack) || ++materials > recipe.materialMax) {
+                return std::nullopt;
+            }
+        }
+    }
+    if (found == nullptr || materials < recipe.materialMin) {
+        return std::nullopt;
+    }
+    const std::int32_t count = recipe.result.count + (recipe.addMaterialCount ? materials : 0);
+    const wire::common::Identifier& item =
+        recipe.result.item == wire::common::Identifier::vanilla("air") ? found->item : recipe.result.item;
+    loot::ItemStack made = specialRecipes::withComponentsOf(item, count, *found);
+    // parity: a one-for-one that changes nothing is no recipe at all.
+    if (count == 1 && made.item == found->item && made.components == found->components) {
+        return std::nullopt;
+    }
+    return made;
+}
+
 } // namespace
 
 bool Recipe::matches(const CraftingInput& input) const {
@@ -223,6 +262,9 @@ bool Recipe::matches(const CraftingInput& input) const {
         return matchesFlip(*this, input, false);
     }
     case RecipeKind::Shapeless: {
+        if (transmute) {
+            return transmuted(*this, input).has_value();
+        }
         if (input.ingredientCount() != static_cast<std::int32_t>(ingredients.size())) {
             return false;
         }
@@ -243,6 +285,9 @@ bool Recipe::matches(const CraftingInput& input) const {
 }
 
 loot::ItemStack Recipe::assemble(const CraftingInput& input) const {
+    if (transmute) {
+        return transmuted(*this, input).value_or(result);
+    }
     if (kind != RecipeKind::Special) {
         return result;
     }
