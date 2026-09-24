@@ -29,4 +29,36 @@ void MobActionSystem::tickVillager(world::LoadedWorld& world, entity::ServerEnti
     travelMob(world, villager, context.speed);
 }
 
+namespace {
+
+/// A turn with nobody else in it, for what a villager does on its way out.
+[[nodiscard]] entity::ai::MobContext quietTurn(world::LoadedWorld& world, entity::ServerEntity& villager,
+                                               entity::ai::MobActions& actions, random::RandomSource& random) {
+    static const std::vector<entity::ServerEntity*> kNobody;
+    static const std::vector<entity::ai::PlayerView> kNoPlayers;
+    return entity::ai::MobContext{.world = world.state(),
+                                  .mob = villager,
+                                  .random = random,
+                                  .entities = kNobody,
+                                  .players = kNoPlayers,
+                                  .actions = actions,
+                                  .dayTime = world.clock().totalTicks(),
+                                  .gameTime = world.gameTime()};
+}
+
+} // namespace
+
+void MobActionSystem::villagerDied(world::LoadedWorld& world, entity::ServerEntity& villager,
+                                   const std::optional<std::string>& killerUuid) {
+    random::RandomSource random = freshRandom();
+    entity::ai::MobContext context = quietTurn(world, villager, *this, random);
+    entity::villager::villagerBrain::died(context, villagersIn(world), killerUuid);
+}
+
+void MobActionSystem::releaseVillagerPois(world::LoadedWorld& world, entity::ServerEntity& villager) {
+    random::RandomSource random = freshRandom();
+    entity::ai::MobContext context = quietTurn(world, villager, *this, random);
+    entity::villager::villagerBrain::releaseAllPois(context, villagersIn(world));
+}
+
 } // namespace basalt::server::runtime

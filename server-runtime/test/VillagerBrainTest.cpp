@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
@@ -94,7 +95,9 @@ public:
 
     void ringBell(ServerEntity&, const BlockPos&) override {}
 
-    std::vector<basalt::server::runtime::world::trades::Offer>* offers(ServerEntity&) override { return nullptr; }
+    std::vector<basalt::server::runtime::world::trades::Offer>* offers(ServerEntity& mob) override {
+        return mob.offers == nullptr ? nullptr : &mob.offers->list;
+    }
 
     std::optional<std::int32_t> composterAdd(ServerEntity&, const BlockPos&, const Identifier&) override {
         return std::nullopt;
@@ -123,6 +126,12 @@ public:
 
     void mainHandChanged(ServerEntity&) override {}
 
+    void unhappyChanged(ServerEntity&, std::int32_t) override {}
+
+    void addEffect(ServerEntity&, std::string_view effect, std::int32_t, std::int32_t) override {
+        effects.emplace_back(effect);
+    }
+
     bool summonGolem(ServerEntity&) override {
         golems++;
         return true;
@@ -132,7 +141,7 @@ public:
 
     void launchFirework(ServerEntity&, std::int32_t, std::int32_t) override {}
 
-    std::optional<std::int32_t> heroLevel(std::int32_t) override { return std::nullopt; }
+    std::optional<std::int32_t> heroLevel(std::int32_t) override { return hero; }
 
     std::optional<std::string> playerMainHand(std::int32_t) override { return std::nullopt; }
 
@@ -150,6 +159,8 @@ public:
 
     std::vector<std::int8_t> events;
     std::int32_t dataChanges = 0;
+    std::vector<std::string> effects;
+    std::optional<std::int32_t> hero;
     std::int32_t golems = 0;
 };
 
@@ -284,4 +295,35 @@ TEST_CASE("gossip and the brain's saved memories survive a save") {
     // parity: minor negative weighs minus one, trading plus one.
     CHECK(read.gossips.reputation(Uuid{9, 9}.toString()) == -23);
     CHECK(read.foodLevel == 3);
+}
+
+TEST_CASE("a trade prices by reputation and hero, pays experience and promotes the villager") {
+    Fixture fixture;
+    ServerEntity& villager = fixture.villagerAt(4.5, 4.5);
+    villager.profession = "farmer";
+    villager.offers = std::make_shared<basalt::server::runtime::entity::villagers::Offers>();
+    villager.offers->list.push_back(
+        basalt::server::runtime::world::trades::Offer{.costA = {.item = Identifier::vanilla("wheat"), .count = 10},
+                                                      .result = {.item = Identifier::vanilla("emerald"), .count = 1},
+                                                      .experience = 10,
+                                                      .priceMultiplier = 0.2F});
+    const std::string buyer = Uuid{9, 9}.toString();
+    brain::stateOf(villager).gossips.add(buyer, GossipType::kTrading, 10);
+    fixture.villagers.hero = 1;
+
+    REQUIRE(brain::startTrading(villager, fixture.villagers, 77, buyer, true));
+    // parity: floor(10 * 0.2F) off for reputation, floor(0.3625 * 10) off for hero level two.
+    CHECK(villager.offers->list[0].specialPrice == -5);
+    CHECK_FALSE(brain::startTrading(villager, fixture.villagers, 78, buyer, true));
+
+    const std::int32_t orb = brain::rewardTradeXp(villager, fixture.villagers, 10, fixture.random);
+    CHECK(villager.villagerLevel == 2);
+    CHECK(orb >= 8);
+    CHECK(orb <= 11);
+    CHECK(fixture.villagers.effects == std::vector<std::string>{"regeneration"});
+    CHECK(brain::stateOf(villager).lastTradedPlayer == std::optional<std::int32_t>{77});
+
+    brain::stopTrading(villager);
+    CHECK(villager.offers->list[0].specialPrice == 0);
+    CHECK_FALSE(brain::stateOf(villager).tradingPlayer.has_value());
 }

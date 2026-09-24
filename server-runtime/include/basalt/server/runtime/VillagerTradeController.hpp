@@ -32,8 +32,14 @@ public:
 
     explicit VillagerTradeController(ClientSession& owner, Hooks hooks = {});
 
-    /// Opens a villager's trades.
-    void openTrades(entity::ServerEntity& villager);
+    /// Opens a villager's trades, from the hand that clicked it.
+    void openTrades(entity::ServerEntity& villager, bool mainHand = true);
+
+    /// parity: `MerchantMenu.removed`, which stops the villager trading.
+    void menuClosed();
+
+    /// parity: `AbstractVillager.stillValid`, checked on the player's own turn.
+    void tick();
 
     /// parity: `ClientboundMerchantOffersPacket`, sent when the window opens and after every trade.
     void sendOffers();
@@ -42,6 +48,8 @@ public:
     void selectTrade(std::int32_t index);
 
 private:
+    [[nodiscard]] bool tradingStillValid();
+
     ClientSession* owner_;
     Hooks hooks_;
     /// The villager this client is trading with, and what it offered.

@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
+#include <basalt/server/runtime/VillagerWorldSystem.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
@@ -96,6 +97,8 @@ bool ringBellFor(const BreakContext& context, world::LoadedWorld& world, const s
                                   .volume = 2.0F,
                                   .pitch = 1.0F}};
     context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, *stateId, effects);
+    // parity: `BellBlockEntity.triggerEvent` over `updateEntities`, every villager in earshot.
+    VillagerWorldSystem::alertVillagers(world, x, y, z);
     return true;
 }
 

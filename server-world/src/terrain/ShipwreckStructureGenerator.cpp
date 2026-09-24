@@ -101,6 +101,15 @@ const structure::StructurePlacementGrid& ShipwreckStructureGenerator::grid() {
     return built;
 }
 
+bool ShipwreckStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                           bool beached) const {
+    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
+        return false;
+    }
+    const std::optional<bool> chosen = chooseVariant(seed, chunkX, chunkZ);
+    return chosen.has_value() && *chosen == beached;
+}
+
 std::optional<bool> ShipwreckStructureGenerator::chooseVariant(std::int64_t seed, std::int32_t chunkX,
                                                                std::int32_t chunkZ) const {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));

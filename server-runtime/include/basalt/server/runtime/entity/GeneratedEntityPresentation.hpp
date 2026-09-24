@@ -60,6 +60,10 @@ struct RuntimeEntityMetadata {
     std::optional<bool> dangerousSkull;
     std::optional<std::int32_t> copperWeather;
     std::optional<std::int32_t> copperPose;
+    /// parity: `Shulker`'s attach face, raw peek and colour.
+    std::optional<std::int32_t> shulkerFace;
+    std::optional<std::int32_t> shulkerPeek;
+    std::optional<std::int32_t> shulkerColor;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

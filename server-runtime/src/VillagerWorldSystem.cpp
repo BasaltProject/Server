@@ -85,9 +85,9 @@ constexpr double kBellAlarmRange = 32.0;
 VillagerWorldSystem::VillagerWorldSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster,
                                          NaturalSpawningSystem& spawning, RaidSystem& raids,
                                          world::RealLootTables& lootTables, world::RealVillagerTrades* trades,
-                                         std::function<std::int64_t()> nextSeed)
+                                         std::function<std::int64_t()> nextSeed, AddEffect addEffect)
     : players_(&players), broadcaster_(&broadcaster), spawning_(&spawning), raids_(&raids), lootTables_(&lootTables),
-      trades_(trades), nextSeed_(std::move(nextSeed)) {}
+      trades_(trades), nextSeed_(std::move(nextSeed)), addEffect_(std::move(addEffect)) {}
 
 std::vector<PlayerSession*> VillagerWorldSystem::watchers() const {
     std::vector<PlayerSession*> found;
@@ -479,6 +479,29 @@ void VillagerWorldSystem::villagerDataChanged(ServerEntity& mob) {
             player->connection().sendPlayPacket(SetEntityDataPacket::kId,
                                                 [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
         }
+    }
+}
+
+void VillagerWorldSystem::unhappyChanged(ServerEntity& mob, std::int32_t counter) {
+    // parity: `AbstractVillager.DATA_UNHAPPY_COUNTER`, index eighteen.
+    const SetEntityDataPacket packet{
+        .entityId = mob.entityId(),
+        .entries = {SetEntityDataPacket::Entry{.index = 18, .value = SetEntityDataPacket::IntValue{.value = counter}}}};
+    for (PlayerSession* player : watchers()) {
+        if (player->connection().sendPlayPacket) {
+            player->connection().sendPlayPacket(SetEntityDataPacket::kId,
+                                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        }
+    }
+}
+
+void VillagerWorldSystem::addEffect(ServerEntity& mob, std::string_view effect, std::int32_t duration,
+                                    std::int32_t amplifier) {
+    if (addEffect_ && world_ != nullptr) {
+        addEffect_(*world_, watchers(), mob,
+                   world::ActiveEffect{.effect = Identifier::vanilla(std::string{effect}),
+                                       .amplifier = amplifier,
+                                       .remainingTicks = duration});
     }
 }
 

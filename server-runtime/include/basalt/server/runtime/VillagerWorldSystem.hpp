@@ -19,6 +19,7 @@ namespace basalt::server::runtime::world {
 class LoadedWorld;
 class RealLootTables;
 class RealVillagerTrades;
+struct ActiveEffect;
 } // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
@@ -33,9 +34,14 @@ class RaidSystem;
 /// looked up on every call.
 class VillagerWorldSystem final : public entity::villager::VillagerWorld {
 public:
+    /// parity: `LivingEntity.addEffect`, which the mob machinery owns.
+    using AddEffect = std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                                         entity::ServerEntity& mob, const world::ActiveEffect& effect)>;
+
     VillagerWorldSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster,
                         NaturalSpawningSystem& spawning, RaidSystem& raids, world::RealLootTables& lootTables,
-                        world::RealVillagerTrades* trades, std::function<std::int64_t()> nextSeed);
+                        world::RealVillagerTrades* trades, std::function<std::int64_t()> nextSeed,
+                        AddEffect addEffect = {});
 
     /// The world the calls that follow are about.
     void bind(world::LoadedWorld& world) { world_ = &world; }
@@ -62,6 +68,9 @@ public:
     void setSleeping(entity::ServerEntity& mob, std::optional<entity::villager::BlockPos> bed) override;
     void villagerDataChanged(entity::ServerEntity& mob) override;
     void mainHandChanged(entity::ServerEntity& mob) override;
+    void unhappyChanged(entity::ServerEntity& mob, std::int32_t counter) override;
+    void addEffect(entity::ServerEntity& mob, std::string_view effect, std::int32_t duration,
+                   std::int32_t amplifier) override;
     bool summonGolem(entity::ServerEntity& mob) override;
     entity::ServerEntity* spawnChild(entity::ServerEntity& mob, entity::ServerEntity& partner) override;
     void launchFirework(entity::ServerEntity& mob, std::int32_t colour, std::int32_t flight) override;
@@ -91,6 +100,7 @@ private:
     world::RealLootTables* lootTables_;
     world::RealVillagerTrades* trades_;
     std::function<std::int64_t()> nextSeed_;
+    AddEffect addEffect_;
     world::LoadedWorld* world_ = nullptr;
 };
 

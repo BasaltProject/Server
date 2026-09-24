@@ -39,6 +39,9 @@ public:
 
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
+    /// Whether a wreck of that kind starts in the chunk, which is what `/locate` and a dolphin ask.
+    [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, bool beached) const;
+
 private:
     void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 

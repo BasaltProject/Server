@@ -14,7 +14,9 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/PrimedTnt.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
+#include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/SwimPath.hpp>
+#include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/world/AttachedEntities.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -317,6 +319,13 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
             continue;
         }
         dead->killed = false;
+        // parity: `Villager.die`, whose murderer is the player that hit it last.
+        if (dead->type() == entity::villagers::type()) {
+            mobActions_->villagerDied(world, *dead,
+                                      dead->lastHurtByPlayer.has_value() && dead->lastHurtByPlayerTime > 0
+                                          ? std::optional<std::string>{dead->lastHurtByPlayer->toString()}
+                                          : std::nullopt);
+        }
         // parity: `killer.awardKillScore`, the kill credit going to the player who hit it last.
         if (dead->lastHurtByPlayer.has_value() && dead->lastHurtByPlayerTime > 0) {
             const std::lock_guard<std::mutex> guard(pendingKillsLock_);
@@ -509,6 +518,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     std::vector<entity::ai::PlayerView> views;
     for (player::PlayerSession* player : watchers) {
         if (region.ownsPosition(player->x, player->z)) {
+            player->movedHorizontally = std::hypot(player->x - player->seenAt[0], player->z - player->seenAt[1]) >
+                                        static_cast<double>(1.0E-5F);
+            player->seenAt = {player->x, player->z};
             std::optional<wire::common::Identifier> heldItem;
             const std::optional<storage::StoredItemStack>& held = player->inventory.heldItem();
             if (held.has_value()) {
@@ -531,7 +543,12 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                    .sneaking = player->sneaking,
                                                    .swimming = player->sprinting && inWater(world, *player),
                                                    .yaw = player->yaw,
-                                                   .pitch = player->pitch});
+                                                   .pitch = player->pitch,
+                                                   .vehicleId = player->vehicleId,
+                                                   .movedHorizontally = player->movedHorizontally,
+                                                   .facing = wire::common::mth::floor((player->yaw / 90.0F) + 0.5) & 3,
+                                                   .sleeping = player->sleepingBed.has_value(),
+                                                   .sleepTicks = player->sleepTicks});
         }
     }
 
@@ -642,6 +659,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                                       {}});
                 }
             }
+            continue;
+        }
+        if (entity::shulkers::isBullet(entity->type())) {
+            mobActions_->tickShulkerBullet(world, watchers, living, *entity, random);
             continue;
         }
         const entity::projectiles::Kind* projectile = entity::projectiles::kindOf(entity->type());

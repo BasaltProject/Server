@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 
 namespace basalt::server::runtime::entity::ai {
 
@@ -82,6 +83,28 @@ public:
 
 protected:
     [[nodiscard]] bool isValidTarget(MobContext& mob, std::int32_t x, std::int32_t y, std::int32_t z) override;
+};
+
+/// parity: `Cat.CatRelaxOnOwnerGoal`: to the bed its owner sleeps in, curled up there, and on
+/// waking perhaps a gift from `gameplay/cat_morning_gift`.
+class CatRelaxOnOwnerGoal final : public Goal {
+public:
+    [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
+
+    void start(MobContext& mob) override;
+
+    void stop(MobContext& mob) override;
+
+    void tick(MobContext& mob) override;
+
+private:
+    [[nodiscard]] bool spaceIsOccupied(MobContext& mob) const;
+
+    std::optional<std::int32_t> owner_;
+    std::optional<std::array<std::int32_t, 3>> goalPos_;
+    std::int32_t onBedTicks_ = 0;
 };
 
 } // namespace basalt::server::runtime::entity::ai

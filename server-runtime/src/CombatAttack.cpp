@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
@@ -143,6 +144,16 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
             owner_->options().combat->hitCrystal(*world, owner_->playersInSameWorld(), *target, false, false,
                                                  session->entityId(), session->gamemode == Gamemode::Creative);
         }
+        return;
+    }
+    // parity: `ShulkerBullet.hurtServer`: any blow breaks it, with its sound and a burst of crits.
+    if (entity::shulkers::isBullet(target->type())) {
+        session->ticksSinceSwing = 0;
+        owner_->broadcastSound("entity.shulker_bullet.hurt", target->x, target->y, target->z, SoundSource::Hostile);
+        broadcastParticle("minecraft:crit", target->x, target->y, target->z, 15);
+        target->removed = true;
+        world::vibrations::emit(world->state(), "entity_damage", target->x, target->y, target->z, world->gameTime(),
+                                {.entity = target->uuid()});
         return;
     }
     // parity: `Player.attack` turns a redirectable projectile back instead of hurting it.
@@ -283,10 +294,14 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     if (world::itemFrames::isFrame(entity->type()) && useItemFrame(*session, *entity)) {
         return;
     }
-    // parity: `Villager.mobInteract` opens its trades whatever is in the player's hand.
+    // parity: `Villager.mobInteract`, which a villager spawn egg skips.
     if (entity->type() == entity::villagers::type()) {
-        owner_->trades().openTrades(*entity);
-        return;
+        const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
+        const std::optional<storage::StoredItemStack>& held = session->inventory.heldItem();
+        if (!mainHand || !held.has_value() || held->id != "minecraft:villager_spawn_egg") {
+            owner_->trades().openTrades(*entity, mainHand);
+            return;
+        }
     }
     // parity: `AbstractMinecart.interact`, which seats whoever clicked it.
     if (world::detectorRails::isMinecart(entity->type())) {
@@ -340,6 +355,24 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         MobActionSystem* mobs = owner_->options().mobs;
         if (mobs != nullptr && mobs->startCure(*world, *entity, session->uuid()) &&
             session->gamemode != Gamemode::Creative) {
+            storage::StoredItemStack left = *held;
+            left.count = held->count - 1;
+            session->inventory.set(heldSlot, left.count <= 0 ? std::nullopt : std::optional{left});
+            owner_->sendInventorySlot(heldSlot);
+        }
+        return;
+    }
+    // parity: `Dolphin.mobInteract`: any fish, a calf grows and a grown one is ready to lead.
+    if (item.has_value() && entity->type().path() == "dolphin" && owner_->options().itemTags != nullptr &&
+        world::realItemTags::contains(*owner_->options().itemTags, "minecraft:fishes", *item)) {
+        owner_->broadcastSound("minecraft:entity.dolphin.eat", entity->x, entity->y, entity->z, SoundSource::Neutral);
+        if (entity::breeding::canAgeUp(*entity)) {
+            entity::breeding::feedBaby(*entity);
+        } else if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr) {
+            entity->gotFish = true;
+            mobs->poseChanged(*entity);
+        }
+        if (session->gamemode != Gamemode::Creative) {
             storage::StoredItemStack left = *held;
             left.count = held->count - 1;
             session->inventory.set(heldSlot, left.count <= 0 ? std::nullopt : std::optional{left});

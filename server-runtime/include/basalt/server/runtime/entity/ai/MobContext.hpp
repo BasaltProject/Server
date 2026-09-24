@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -40,6 +41,15 @@ struct PlayerView {
     /// Where they are looking, which is what an enderman reads.
     float yaw = 0.0F;
     float pitch = 0.0F;
+    /// The boat or other vehicle it steers, and whether it moved sideways last tick.
+    /// parity: `getControllingPassenger` and `hasMovedHorizontallyRecently`.
+    std::optional<std::int32_t> vehicleId;
+    bool movedHorizontally = false;
+    /// The way it faces, 0 south, 1 west, 2 north, 3 east. parity: `Entity.getDirection`.
+    std::int32_t facing = 0;
+    /// parity: `Player.isSleeping` and `getSleepTimer`, which a cat on the bed reads.
+    bool sleeping = false;
+    std::int32_t sleepTicks = 0;
 };
 
 /// What a goal can make the world do beyond moving its own mob.
@@ -134,6 +144,42 @@ public:
     /// parity: `Container.setChanged`: the chunk is saved and a comparator reads it again.
     virtual void containerChanged(ServerEntity& /*mob*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/) {}
 
+    /// An item lying in the world, as a goal sees it.
+    struct ItemView {
+        std::int32_t entityId = 0;
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+    };
+
+    /// parity: `Dolphin.ALLOWED_ITEMS` in the mob's box grown by `grow`: alive, in water and free to
+    /// take, in the level's own order.
+    [[nodiscard]] virtual std::vector<ItemView> itemsInWater(const ServerEntity& /*mob*/, double /*grow*/) {
+        return {};
+    }
+
+    /// parity: `Dolphin.ItemGoal.drop`, the held stack thrown ahead with forty ticks before anyone may
+    /// take it. Answers whether it held anything.
+    virtual bool throwHeldItem(ServerEntity& /*mob*/) { return false; }
+
+    /// parity: `ServerLevel.findNearestMapStructure(#dolphin_located, pos, 50, false)`.
+    [[nodiscard]] virtual std::optional<std::array<std::int32_t, 3>> nearestTreasure(const ServerEntity& /*mob*/) {
+        return std::nullopt;
+    }
+
+    /// parity: `Level.broadcastEntityEvent`.
+    virtual void entityEvent(ServerEntity& /*mob*/, std::int8_t /*event*/) {}
+
+    /// parity: `LivingEntity.dropFromGiftLootTable`: a gift table rolled for this mob, dropped in front
+    /// of it.
+    virtual void dropGift(ServerEntity& /*mob*/, std::string_view /*table*/) {}
+
+    /// parity: `Shulker.setRawPeekAmount`: the lid, its armour, its sound and its game event.
+    virtual void shulkerPeek(ServerEntity& /*shulker*/, std::int32_t /*amount*/) {}
+
+    /// parity: `ShulkerAttackGoal`'s `new ShulkerBullet(level, shulker, target, axis)` and its sound.
+    virtual void shootShulkerBullet(ServerEntity& /*shulker*/, std::int32_t /*targetId*/) {}
+
     /// Whether a block is in a block tag, which 26.3 decides teleports and jumps with. Without the
     /// server's tags nothing is in any, which a goal reads as the tag-free rule.
     [[nodiscard]] virtual std::optional<bool> blockTagged(std::string_view /*tag*/,
@@ -170,11 +216,11 @@ public:
     std::int32_t skyDarken = 0;
     bool hasSkylight = true;
     float ambientLight = 0.0F;
-
-    [[nodiscard]] const PlayerView* nearestPlayer(double range) const;
     /// parity: `Level.getSeaLevel` and `getMinY`, which a phantom's anchor and a bat's aim read.
     std::int32_t seaLevel = 63;
     std::int32_t minY = -64;
+
+    [[nodiscard]] const PlayerView* nearestPlayer(double range) const;
 
     [[nodiscard]] double distanceSquaredTo(double x, double y, double z) const;
 

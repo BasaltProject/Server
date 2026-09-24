@@ -470,6 +470,15 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
                                                   return ruins->startsAt(seed, x, z, warm);
                                               })});
     }
+    const terrain::ShipwreckStructureGenerator* wrecks = built->shipwrecks.get();
+    for (const auto& [name, beached] : {std::pair{"shipwreck", false}, std::pair{"shipwreck_beached", true}}) {
+        answer.locators.push_back(
+            StructureLocator{.id = Identifier::vanilla(name),
+                             .locate = onGrid(terrain::ShipwreckStructureGenerator::grid(),
+                                              [wrecks, beached](std::int64_t seed, std::int32_t x, std::int32_t z) {
+                                                  return wrecks->startsAt(seed, x, z, beached);
+                                              })});
+    }
     answer.strongholds = built->strongholds.get();
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
                                const std::string& difficulty,

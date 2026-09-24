@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/ai/CatGoals.hpp>
 #include <basalt/server/runtime/entity/ai/CopperGolemGoals.hpp>
 #include <basalt/server/runtime/entity/ai/DolphinGoals.hpp>
+#include <basalt/server/runtime/entity/ai/DolphinItemGoals.hpp>
 #include <basalt/server/runtime/entity/ai/FlyingGoals.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
@@ -10,6 +11,7 @@
 #include <basalt/server/runtime/entity/ai/LongDistancePatrolGoal.hpp>
 #include <basalt/server/runtime/entity/ai/MobGoals.hpp>
 #include <basalt/server/runtime/entity/ai/PhantomGoals.hpp>
+#include <basalt/server/runtime/entity/ai/ShulkerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TameGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
@@ -227,6 +229,7 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         // parity: `Cat.registerGoals`, with its 26.3 block goals at 5 and 7.
         add<FloatGoal>(selector, 1);
         add<SitWhenOrderedToGoal>(selector, 2);
+        add<CatRelaxOnOwnerGoal>(selector, 3);
         add<TemptGoal>(selector, 4, 0.6, entity::breeding::foodFor(type));
         add<CatLieOnBlockGoal>(selector, 5, 1.1, 8);
         add<FollowOwnerGoal>(selector, 6, 1.0, 10.0, 5.0);
@@ -334,6 +337,16 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
 }
 
 bool buildMonster(GoalSelector& selector, std::string_view path) {
+    // parity: `Shulker.registerGoals`, less the team defence.
+    if (path == "shulker") {
+        add<LookAtPlayerGoal>(selector, 1, kLookFar, 0.02F);
+        add<ShulkerAttackGoal>(selector, 4);
+        add<ShulkerPeekGoal>(selector, 7);
+        add<RandomLookAroundGoal>(selector, 8);
+        add<HurtByTargetGoal>(selector, 1);
+        add<ShulkerTargetGoal>(selector, 2);
+        return true;
+    }
     if (path == "silverfish" || path == "endermite") {
         add<FloatGoal>(selector, 1);
         add<MeleeAttackGoal>(selector, 2, 1.0);
@@ -576,19 +589,22 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path) {
         add<SwimAboutGoal>(selector, 4, kFishPush);
         return true;
     }
-    // parity: `Dolphin.registerGoals`, less the treasure hunt, the play with items and the boat
-    // following this build has nothing for.
+    // parity: `Dolphin.registerGoals`.
     if (path == "dolphin") {
         add<BreathAirGoal>(selector, 0);
         add<TryFindWaterGoal>(selector, 0);
+        add<DolphinSwimToTreasureGoal>(selector, 1);
         add<DolphinSwimWithPlayerGoal>(selector, 2, 4.0);
         add<RandomSwimmingGoal>(selector, 4, 1.0, 10);
         add<RandomLookAroundGoal>(selector, 4);
         add<LookAtPlayerGoal>(selector, 5, 6.0);
         add<DolphinJumpGoal>(selector, 5, 10);
-        add<MeleeAttackGoal>(selector, 6, 1.2);
-        add<AvoidEntityGoal>(selector, 9, Names{"guardian"}, 8.0, 1.0, 1.0);
-        add<HurtByTargetGoal>(selector, 1);
+        add<MeleeAttackGoal>(selector, 6, static_cast<double>(1.2F));
+        add<DolphinMoveToItemGoal>(selector, 7);
+        add<DolphinPlayWithItemsGoal>(selector, 8);
+        add<FollowRiddenBoatGoal>(selector, 8);
+        add<AvoidEntityGoal>(selector, 9, Names{"guardian", "elder_guardian"}, 8.0, 1.0, 1.0);
+        add<HurtByTargetGoal>(selector, 1, Names{"guardian", "elder_guardian"}, true);
         return true;
     }
     if (path == "guardian" || path == "elder_guardian") {

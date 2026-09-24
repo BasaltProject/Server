@@ -156,6 +156,34 @@ public:
 
     void containerChanged(entity::ServerEntity& mob, std::int32_t x, std::int32_t y, std::int32_t z) override;
 
+    void dropGift(entity::ServerEntity& mob, std::string_view table) override;
+
+    [[nodiscard]] std::vector<ItemView> itemsInWater(const entity::ServerEntity& mob, double grow) override;
+
+    bool throwHeldItem(entity::ServerEntity& mob) override;
+
+    [[nodiscard]] std::optional<std::array<std::int32_t, 3>> nearestTreasure(const entity::ServerEntity& mob) override;
+
+    void entityEvent(entity::ServerEntity& mob, std::int8_t event) override;
+
+    /// parity: `Mob.aiStep`'s looting and `Dolphin.pickUpItem`: an empty mouth takes what it touches.
+    void dolphinPicksUp(world::LoadedWorld& world, entity::ServerEntity& dolphin);
+
+    void shulkerPeek(entity::ServerEntity& shulker, std::int32_t amount) override;
+
+    void shootShulkerBullet(entity::ServerEntity& shulker, std::int32_t targetId) override;
+
+    /// parity: `Shulker.tick`: the reaction to a hit, a new face or a jump when it lost its hold,
+    /// and the lid easing towards its peek.
+    void tickShulker(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                     const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& shulker,
+                     random::RandomSource& random);
+
+    /// parity: `ShulkerBullet.tick`.
+    void tickShulkerBullet(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                           const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& bullet,
+                           random::RandomSource& random);
+
     /// The copper golem's own turn: its weathering, the statue it may become and the cooldown its
     /// chest rounds wait on. parity: `CopperGolem.tick` and the brain's core countdown.
     void tickCopperGolem(world::LoadedWorld& world, entity::ServerEntity& golem, random::RandomSource& random);
@@ -259,6 +287,13 @@ public:
     /// What a villager's brain does to this world, bound to it for the calls that follow.
     [[nodiscard]] entity::villager::VillagerWorld& villagersIn(world::LoadedWorld& world);
 
+    /// parity: `Villager.die`: witnesses hear of the killer and the villager's spots are let go.
+    void villagerDied(world::LoadedWorld& world, entity::ServerEntity& villager,
+                      const std::optional<std::string>& killerUuid);
+
+    /// parity: `Villager.releaseAllPois`, for a villager turned into something else.
+    void releaseVillagerPois(world::LoadedWorld& world, entity::ServerEntity& villager);
+
     /// parity: `Entity.die` over `LootTable`, the drops a mob leaves where it fell.
     void dropDeathLoot(world::LoadedWorld& world, const entity::ServerEntity& entity);
 
@@ -294,6 +329,23 @@ private:
 
     void runWardenActions(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                           entity::ServerEntity& warden, const std::vector<entity::wardenBrain::Action>& actions);
+
+    /// Where a bullet's target stands and how tall it is, or nothing once it is gone.
+    [[nodiscard]] std::optional<std::array<double, 4>> bulletTarget(world::LoadedWorld& world, std::int32_t targetId);
+
+    /// parity: `Shulker.teleportSomewhere`.
+    bool teleportShulker(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                         const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& shulker,
+                         random::RandomSource& random);
+
+    /// parity: `Shulker.hitByShulkerBullet`, the jump and the new shulker left behind.
+    void splitShulker(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                      const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& shulker,
+                      random::RandomSource& random);
+
+    /// parity: `ShulkerBullet.onHitEntity`: four points and levitation.
+    void bulletHitsEntity(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                          entity::ServerEntity& bullet, entity::ServerEntity* mob, player::PlayerSession* player);
 
     /// parity: `CopperGolem.turnToStatue`.
     void turnToStatue(world::LoadedWorld& world, entity::ServerEntity& golem, random::RandomSource& random);

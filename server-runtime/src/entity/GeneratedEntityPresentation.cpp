@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
@@ -562,6 +563,23 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
                 wire::protocol::play::RegistryHolder::WeatheringCopperState);
     copperEntry(&RuntimeEntityMetadata::copperPose, copperGolems::kStateDataIndex,
                 wire::protocol::play::RegistryHolder::CopperGolemState);
+    // parity: `Shulker.defineSynchedData`: down, closed and without a colour.
+    if (shulkerFace.has_value() && (previous == nullptr || previous->shulkerFace != shulkerFace) &&
+        (previous != nullptr || *shulkerFace != 0)) {
+        entries.push_back(Entry{.index = shulkers::kAttachFaceDataIndex,
+                                .value = SetEntityDataPacket::RegistryIdValue{
+                                    .value = *shulkerFace, .registry = wire::protocol::play::RegistryHolder::Direction}});
+    }
+    if (shulkerPeek.has_value() && (previous == nullptr || previous->shulkerPeek != shulkerPeek) &&
+        (previous != nullptr || *shulkerPeek != 0)) {
+        entries.push_back(Entry{.index = shulkers::kPeekDataIndex,
+                                .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*shulkerPeek)}});
+    }
+    if (shulkerColor.has_value() && (previous == nullptr || previous->shulkerColor != shulkerColor) &&
+        (previous != nullptr || *shulkerColor != shulkers::kNoColor)) {
+        entries.push_back(Entry{.index = shulkers::kColorDataIndex,
+                                .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*shulkerColor)}});
+    }
     // parity: a fresh dragon is defined hovering, so only a different phase is news.
     if (dragonPhase.has_value() && (previous == nullptr || previous->dragonPhase != dragonPhase) &&
         (previous != nullptr || *dragonPhase != static_cast<std::int32_t>(enderDragon::Phase::Hover))) {
@@ -620,6 +638,11 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     if (entity.copperGolem != nullptr) {
         live.copperWeather = static_cast<std::int32_t>(entity.copperGolem->weather);
         live.copperPose = static_cast<std::int32_t>(entity.copperGolem->pose);
+    }
+    if (entity.shulker != nullptr) {
+        live.shulkerFace = static_cast<std::int32_t>(entity.shulker->attachFace);
+        live.shulkerPeek = entity.shulker->peek;
+        live.shulkerColor = entity.shulker->color;
     }
     if (entity.hook != nullptr) {
         live.hookedEntity = entity.hook->hookedIn.has_value() ? *entity.hook->hookedIn + 1 : 0;
