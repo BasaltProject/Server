@@ -346,6 +346,17 @@ void UiStateSync::sendStats() {
             if (id.has_value()) {
                 stats.push_back(StatCounter{.statType = AwardStatsPacket::kTypeMined, .value = *id, .count = count});
             }
+            continue;
+        }
+        if (key.starts_with(storage::stats::kUsed)) {
+            const std::expected<Identifier, wire::common::IdentifierError> item =
+                Identifier::parse(key.substr(std::string_view{storage::stats::kUsed}.size() + 1));
+            const server::registry::Item* entry =
+                item.has_value() ? server::registry::items::registry().byName(*item) : nullptr;
+            if (entry != nullptr) {
+                stats.push_back(
+                    StatCounter{.statType = AwardStatsPacket::kTypeUsed, .value = entry->protocolId, .count = count});
+            }
         }
     }
     owner_->sendCompressed(AwardStatsPacket::kId,

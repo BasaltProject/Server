@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
 
 #include <algorithm>
@@ -35,9 +36,18 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 
 [[nodiscard]] std::int32_t unpackZ(std::int64_t packed) { return static_cast<std::int32_t>(packed << 26 >> 38); }
 
-[[nodiscard]] bool isOpen(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+[[nodiscard]] bool isOpen(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                          bool doors = false) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    return stateId.has_value() && registry::blockShapes::isEmptyShape(*stateId);
+    return stateId.has_value() && (registry::blockShapes::isEmptyShape(*stateId) || (doors && isMobDoor(*stateId)));
+}
+
+[[nodiscard]] bool standable(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool doors) {
+    const std::optional<std::int32_t> ground = world.blockState(x, y - 1, z);
+    if (!ground.has_value() || registry::blockShapes::isEmptyShape(*ground) || (doors && isMobDoor(*ground))) {
+        return false;
+    }
+    return isOpen(world, x, y, z, doors) && isOpen(world, x, y + 1, z, doors);
 }
 
 /// parity: `Node.distanceTo`, the straight line the heuristic uses.
@@ -71,15 +81,16 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 }
 
 /// Where a step in this direction lands: the same height, one up, or up to three down.
-[[nodiscard]] std::optional<Position> step(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    if (canStandAt(world, x, y, z)) {
+[[nodiscard]] std::optional<Position> step(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                           bool doors = false) {
+    if (standable(world, x, y, z, doors)) {
         return Position{x, y, z};
     }
-    if (canStandAt(world, x, y + 1, z) && isOpen(world, x, y + 2, z)) {
+    if (standable(world, x, y + 1, z, doors) && isOpen(world, x, y + 2, z, doors)) {
         return Position{x, y + 1, z};
     }
     for (std::int32_t drop = 1; drop <= kMaxDrop; ++drop) {
-        if (canStandAt(world, x, y - drop, z)) {
+        if (standable(world, x, y - drop, z, doors)) {
             return Position{x, y - drop, z};
         }
     }
@@ -88,11 +99,12 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 
 /// parity: `WalkNodeEvaluator.getNeighbors`: the four sides and the four corners, up one or down
 /// three.
-[[nodiscard]] std::vector<Position> neighbours(world::WorldState& world, std::int32_t x, std::int32_t y,
-                                               std::int32_t z) {
+[[nodiscard]] std::vector<Position> neighbours(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                               bool doors = false) {
     std::vector<Position> found;
     for (const registry::BlockFace face : kHorizontal) {
-        const std::optional<Position> landed = step(world, x + registry::stepX(face), y, z + registry::stepZ(face));
+        const std::optional<Position> landed =
+            step(world, x + registry::stepX(face), y, z + registry::stepZ(face), doors);
         if (landed.has_value()) {
             found.push_back(*landed);
         }
@@ -101,10 +113,10 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     // through the inside of a corner.
     for (const std::int32_t dx : {-1, 1}) {
         for (const std::int32_t dz : {-1, 1}) {
-            if (!isOpen(world, x + dx, y, z) || !isOpen(world, x, y, z + dz)) {
+            if (!isOpen(world, x + dx, y, z, doors) || !isOpen(world, x, y, z + dz, doors)) {
                 continue;
             }
-            const std::optional<Position> landed = step(world, x + dx, y, z + dz);
+            const std::optional<Position> landed = step(world, x + dx, y, z + dz, doors);
             if (landed.has_value()) {
                 found.push_back(*landed);
             }
@@ -136,11 +148,161 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 } // namespace
 
 bool canStandAt(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    const std::optional<std::int32_t> ground = world.blockState(x, y - 1, z);
-    if (!ground.has_value() || registry::blockShapes::isEmptyShape(*ground)) {
-        return false;
+    return standable(world, x, y, z, false);
+}
+
+bool isMobDoor(std::int32_t stateId) {
+    // parity: `BlockTags.MOB_INTERACTABLE_DOORS`, every wooden and copper door, never the iron one.
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && block->path().ends_with("_door") && block->path() != "iron_door";
+}
+
+std::array<std::int32_t, 3> startOf(world::WorldState& world, double x, double y, double z, bool onGround) {
+    const auto blockX = static_cast<std::int32_t>(std::floor(x));
+    const auto blockZ = static_cast<std::int32_t>(std::floor(z));
+    if (onGround) {
+        return {blockX, static_cast<std::int32_t>(std::floor(y + 0.5)), blockZ};
     }
-    return isOpen(world, x, y, z) && isOpen(world, x, y + 1, z);
+    auto blockY = static_cast<std::int32_t>(std::floor(y + 1.0));
+    for (std::int32_t step = 0; step < 64; ++step) {
+        const std::optional<std::int32_t> below = world.blockState(blockX, blockY - 1, blockZ);
+        if (!below.has_value() || (!registry::blocks::isAir(*below) && !registry::blockShapes::isEmptyShape(*below))) {
+            break;
+        }
+        --blockY;
+    }
+    return {blockX, blockY, blockZ};
+}
+
+std::optional<Route> findRoute(world::WorldState& world, std::int32_t fromX, std::int32_t fromY, std::int32_t fromZ,
+                               std::span<const Position> targets, const RouteOptions& options) {
+    // parity: `WalkNodeEvaluator.getStart` takes the start as it comes, standable or not.
+    if (targets.empty() || !world.blockState(fromX, fromY, fromZ).has_value()) {
+        return std::nullopt;
+    }
+
+    struct Node {
+        std::int64_t cameFrom = -1;
+        float g = 0.0F;
+        float f = 0.0F;
+        float walked = 0.0F;
+        bool closed = false;
+    };
+
+    struct Best {
+        float h = std::numeric_limits<float>::max();
+        std::int64_t node = 0;
+        bool reached = false;
+    };
+
+    const auto distanceTo = [](const Position& one, const Position& other) {
+        const auto dx = static_cast<float>(other[0] - one[0]);
+        const auto dy = static_cast<float>(other[1] - one[1]);
+        const auto dz = static_cast<float>(other[2] - one[2]);
+        return std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    };
+    const auto unpack = [](std::int64_t key) { return Position{unpackX(key), unpackY(key), unpackZ(key)}; };
+    std::map<std::int64_t, Node> nodes;
+    std::vector<Best> best(targets.size());
+    // parity: `getBestH`, which also remembers the node nearest each target.
+    const auto bestH = [&](std::int64_t key) {
+        const Position at = unpack(key);
+        float h = std::numeric_limits<float>::max();
+        for (std::size_t index = 0; index < targets.size(); ++index) {
+            const float distance = distanceTo(at, targets[index]);
+            if (distance < best[index].h) {
+                best[index].h = distance;
+                best[index].node = key;
+            }
+            h = std::min(h, distance);
+        }
+        return h;
+    };
+    const Position from{fromX, fromY, fromZ};
+    const std::int64_t start = pack(fromX, fromY, fromZ);
+    nodes[start].f = bestH(start);
+    std::vector<std::int64_t> open{start};
+    std::int32_t count = 0;
+    bool anyReached = false;
+    while (!open.empty()) {
+        if (++count >= options.maxVisited) {
+            break;
+        }
+        const auto cheapest = std::ranges::min_element(
+            open, [&nodes](std::int64_t one, std::int64_t other) { return nodes[one].f < nodes[other].f; });
+        const std::int64_t current = *cheapest;
+        open.erase(cheapest);
+        Node& node = nodes[current];
+        node.closed = true;
+        const Position at = unpack(current);
+        for (std::size_t index = 0; index < targets.size(); ++index) {
+            const Position& target = targets[index];
+            const std::int32_t manhattan =
+                std::abs(at[0] - target[0]) + std::abs(at[1] - target[1]) + std::abs(at[2] - target[2]);
+            if (manhattan <= options.accuracy) {
+                // parity: the path still ends at the node nearest the target, not at this one.
+                best[index].reached = true;
+                anyReached = true;
+            }
+        }
+        if (anyReached) {
+            break;
+        }
+        if (distanceTo(at, from) >= options.maxPathLength) {
+            continue;
+        }
+        const float g = node.g;
+        const float walked = node.walked;
+        for (const Position& neighbour : neighbours(world, at[0], at[1], at[2], options.openDoors)) {
+            const std::int64_t next = pack(neighbour[0], neighbour[1], neighbour[2]);
+            const float distance = distanceTo(at, neighbour);
+            const float nextWalked = walked + distance;
+            const float tentative =
+                g + distance + static_cast<float>(malus(world, neighbour[0], neighbour[1], neighbour[2]));
+            const auto known = nodes.find(next);
+            const bool inOpen = std::ranges::find(open, next) != open.end();
+            if (nextWalked >= options.maxPathLength ||
+                (known != nodes.end() && (known->second.closed || (inOpen && tentative >= known->second.g)))) {
+                continue;
+            }
+            Node& entry = nodes[next];
+            entry.cameFrom = current;
+            entry.g = tentative;
+            entry.walked = nextWalked;
+            entry.f = tentative + (bestH(next) * static_cast<float>(kHeuristicWeight));
+            if (!inOpen) {
+                open.push_back(next);
+            }
+        }
+    }
+    const auto build = [&](std::size_t index) {
+        Route route;
+        route.target = targets[index];
+        route.reached = best[index].reached;
+        for (std::int64_t key = best[index].node; key != -1 && key != start; key = nodes[key].cameFrom) {
+            route.nodes.push_back(unpack(key));
+        }
+        std::ranges::reverse(route.nodes);
+        return route;
+    };
+    std::optional<Route> chosen;
+    float chosenDistance = std::numeric_limits<float>::max();
+    for (std::size_t index = 0; index < targets.size(); ++index) {
+        if (anyReached != best[index].reached) {
+            continue;
+        }
+        Route route = build(index);
+        const float distance = best[index].h;
+        const bool better = !chosen.has_value() ||
+                            (anyReached ? route.nodes.size() < chosen->nodes.size()
+                                        : (distance < chosenDistance ||
+                                           (distance == chosenDistance && route.nodes.size() < chosen->nodes.size())));
+        if (better) {
+            chosenDistance = distance;
+            chosen = std::move(route);
+        }
+    }
+    return chosen;
 }
 
 std::optional<std::vector<Position>> find(world::WorldState& world, std::int32_t fromX, std::int32_t fromY,

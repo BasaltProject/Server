@@ -74,6 +74,8 @@ struct DimensionFacts {
     /// angle of the sun moves there. Without this the End went dark at night and a detector in it
     /// followed the overworld's clock.
     bool hasDayTimeline = false;
+    /// parity: `DimensionType.ambientLight`, what `getLightLevelDependentMagicValue` lifts darkness by.
+    float ambientLight = 0.0F;
 };
 
 [[nodiscard]] const DimensionFacts& dimensionFacts(WorldDimension dimension) noexcept;

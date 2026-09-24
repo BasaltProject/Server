@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 namespace basalt::server::runtime::entity {
@@ -21,6 +22,23 @@ inline constexpr double kJumpPower = 0.42;
 
 /// parity: `Attributes.STEP_HEIGHT`'s default, which is what a mob climbs without jumping.
 inline constexpr double kStepHeight = 0.6;
+
+/// A mob's `xxa`, `yya` and `zza`.
+struct Input {
+    double strafe = 0.0;
+    double up = 0.0;
+    double forward = 0.0;
+};
+
+/// parity: `LivingEntity.travelInAir` with the upward input a flying move control sets: the speed
+/// is the ground's or the air's 0.02, `gravity` comes off after the move, and an omnidirectional
+/// flier keeps 0.91 of its vertical speed instead of 0.98.
+void travelAir(world::WorldState& world, ServerEntity& entity, const Input& input, double speed, double gravity,
+               bool omnidirectional, bool noPhysics = false);
+
+/// parity: `LivingEntity.travelFlying`, what a ghast, a phantom and an allay travel with.
+void travelFlying(world::WorldState& world, ServerEntity& entity, const Input& input, float airSpeed,
+                  world::Submersion in, bool noPhysics = false);
 
 /// One tick of walking. `forward` and `strafe` are the input, in the entity's own facing, and `speed`
 /// is `Attributes.MOVEMENT_SPEED`.

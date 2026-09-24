@@ -153,6 +153,26 @@ Touched interact(entity::ServerEntity& frame, const std::optional<server::world:
     return Touched::Rotated;
 }
 
+std::array<double, 6> boundingBox(const entity::ServerEntity& frame) {
+    constexpr double kThin = 0.0625;
+    constexpr double kPlain = 0.75;
+    constexpr double kWithMap = 1.0;
+    const std::array<std::int32_t, 3> square = squareOf(frame);
+    const auto facing =
+        static_cast<registry::BlockFace>(frame.sourceNbt.has_value() ? frame.sourceNbt->getByte("Facing", 0) : 0);
+    const std::optional<server::world::loot::ItemStack> shown = shownIn(frame);
+    const bool map = shown.has_value() && shown->components.find("minecraft:map_id") != nullptr;
+    const double across = map ? kWithMap : kPlain;
+    const double x = square[0] + 0.5 - (registry::stepX(facing) * kAgainstTheWall);
+    const double y = square[1] + 0.5 - (registry::stepY(facing) * kAgainstTheWall);
+    const double z = square[2] + 0.5 - (registry::stepZ(facing) * kAgainstTheWall);
+    const double sizeX = registry::stepX(facing) != 0 ? kThin : across;
+    const double sizeY = registry::stepY(facing) != 0 ? kThin : across;
+    const double sizeZ = registry::stepZ(facing) != 0 ? kThin : across;
+    return {x - (sizeX / 2.0), y - (sizeY / 2.0), z - (sizeZ / 2.0),
+            x + (sizeX / 2.0), y + (sizeY / 2.0), z + (sizeZ / 2.0)};
+}
+
 std::optional<std::int32_t> analogOutput(const WorldState& world, const std::int32_t x, const std::int32_t y,
                                          const std::int32_t z, const registry::BlockFace facing) {
     std::optional<std::int32_t> reading;

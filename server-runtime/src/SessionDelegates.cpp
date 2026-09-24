@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
+#include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -196,6 +197,13 @@ void ClientSession::applyConsumeEffects(PlayerSession& session, const std::vecto
 }
 
 bool ClientSession::withinAttackReach(const PlayerSession& session, const entity::ServerEntity& target) const {
+    // parity: a frame's box is its own, and grows to the whole square with a map in it.
+    if (world::itemFrames::isFrame(target.type())) {
+        const std::array<double, 6> box = world::itemFrames::boundingBox(target);
+        const double width = std::max(box[3] - box[0], box[5] - box[2]);
+        return player::combat::withinAttackReach(session.x, session.y, session.z, (box[0] + box[3]) / 2.0, box[1],
+                                                 (box[2] + box[5]) / 2.0, width, box[4] - box[1]);
+    }
     return player::combat::withinAttackReach(session.x, session.y, session.z, target.x, target.y, target.z,
                                              target.width(), target.height());
 }

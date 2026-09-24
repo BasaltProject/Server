@@ -6,25 +6,32 @@ namespace basalt::server::runtime::entity::ai::villagerSchedule {
 namespace {
 
 constexpr std::int64_t kDay = 24000;
-constexpr std::int32_t kWorkStart = 2000;
-constexpr std::int32_t kMeetStart = 9000;
-constexpr std::int32_t kEveningStart = 11000;
-constexpr std::int32_t kRestStart = 12000;
+/// parity: the first keyframe of both tracks; before it the day still holds the last one, rest.
+constexpr std::int32_t kFirstKeyframe = 10;
 
 } // namespace
 
-Activity activityAt(std::int64_t dayTime) {
+Activity activityAt(std::int64_t dayTime, bool baby) {
     const auto time = static_cast<std::int32_t>(((dayTime % kDay) + kDay) % kDay);
-    if (time < kWorkStart) {
+    if (time < kFirstKeyframe || time >= 12000) {
+        return Activity::Rest;
+    }
+    if (baby) {
+        if (time < 3000) {
+            return Activity::Idle;
+        }
+        if (time < 6000) {
+            return Activity::Play;
+        }
+        return time < 10000 ? Activity::Idle : Activity::Play;
+    }
+    if (time < 2000) {
         return Activity::Idle;
     }
-    if (time < kMeetStart) {
+    if (time < 9000) {
         return Activity::Work;
     }
-    if (time < kEveningStart) {
-        return Activity::Meet;
-    }
-    return time < kRestStart ? Activity::Idle : Activity::Rest;
+    return time < 11000 ? Activity::Meet : Activity::Idle;
 }
 
 } // namespace basalt::server::runtime::entity::ai::villagerSchedule

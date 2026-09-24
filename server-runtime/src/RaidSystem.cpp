@@ -4,7 +4,6 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
-#include <basalt/server/runtime/entity/ai/VillagerGoals.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -102,6 +101,21 @@ entity::RaidManager& RaidSystem::raidsIn(const world::LoadedWorld& world) {
         return *found->second;
     }
     return *managers_.emplace(world.name(), std::make_unique<entity::RaidManager>()).first->second;
+}
+
+std::optional<entity::villager::RaidView> RaidSystem::viewAt(world::LoadedWorld& world, std::int32_t x, std::int32_t y,
+                                                             std::int32_t z) {
+    const Raid* raid = raidsIn(world).nearby(x, y, z);
+    if (raid == nullptr) {
+        return std::nullopt;
+    }
+    return entity::villager::RaidView{.active = raid->active(),
+                                      .victory = raid->status == RaidStatus::Victory,
+                                      .loss = raid->status == RaidStatus::Loss,
+                                      .stopped = raid->status == RaidStatus::Stopped,
+                                      .firstWaveSpawned = raid->groupsSpawned > 0,
+                                      .betweenWaves =
+                                          raid->groupsSpawned > 0 && raid->raiders.empty() && raid->cooldown > 0};
 }
 
 void RaidSystem::tickRaids(world::LoadedWorld& world) {

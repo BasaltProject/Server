@@ -137,6 +137,9 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (entity.panicTicks > 0) {
         entity.panicTicks--;
     }
+    if (entity.type().path() == "vex") {
+        actions_->tickVexLife(watchers, entity);
+    }
     actions_->tickFire(world, watchers, entity, random);
     actions_->tickMobEffects(world, watchers, entity);
     actions_->tickBreath(world, watchers, entity, random);
@@ -178,9 +181,6 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     }
     if (!entity.noAi) {
         actions_->tickMobAi(world, entity, views, living, random);
-        if (entity.type().path() == "villager") {
-            actions_->tickVillageGolem(world, entity, living, random);
-        }
         ServerEntity* partner = entity::breeding::tick(entity, living);
         if (partner != nullptr) {
             actions_->breed(world, entity, *partner);

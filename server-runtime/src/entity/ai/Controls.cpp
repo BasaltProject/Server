@@ -1,5 +1,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/entity/FlyingMovement.hpp>
+#include <basalt/server/runtime/entity/FlyingPathFinder.hpp>
 #include <basalt/server/runtime/entity/LivingMovement.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -29,6 +31,20 @@ pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, d
         const double half = mob.width() / 2.0;
         return swimPath::find(world, {blockOf(mob.x - half), blockOf(mob.y + 0.5), blockOf(mob.z - half)},
                               {blockOf(x), blockOf(y), blockOf(z)}, true);
+    }
+    // parity: `FlyingPathNavigation`, a path through the air from half a block over the feet.
+    if (flyingMovement::usesFlyingPath(mob.type())) {
+        const double range = mob.attributeWithModifiers("minecraft:follow_range");
+        const flyingPathFinder::Footprint size{.width = static_cast<std::int32_t>(std::floor(mob.width() + 1.0)),
+                                               .height = static_cast<std::int32_t>(std::floor(mob.height() + 1.0))};
+        const flyingPathFinder::Mob flier{.maluses = pathTypes::of(mob.type()),
+                                          .at = std::array<std::int32_t, 3>{blockOf(mob.x), blockOf(mob.y),
+                                                                            blockOf(mob.z)}};
+        std::vector<std::array<std::int32_t, 3>> path =
+            flyingPathFinder::find(world, size, {blockOf(mob.x), blockOf(mob.y + 0.5), blockOf(mob.z)},
+                                   {blockOf(x), blockOf(y), blockOf(z)}, static_cast<std::int32_t>(range * 16.0),
+                                   range, flier);
+        return path;
     }
     return pathFinder::find(world, blockOf(mob.x), blockOf(mob.y), blockOf(mob.z), blockOf(x), blockOf(y), blockOf(z));
 }
@@ -61,6 +77,18 @@ bool moveTo(world::WorldState& world, ServerEntity& mob, double x, double y, dou
 bool canReach(world::WorldState& world, ServerEntity& mob, double x, double y, double z) {
     const std::optional<std::vector<std::array<std::int32_t, 3>>> path = pathFor(world, mob, x, y, z);
     return path.has_value() && !path->empty();
+}
+
+bool follow(ServerEntity& mob, std::vector<std::array<std::int32_t, 3>> nodes, const std::array<double, 3>& target,
+            double speedModifier) {
+    if (nodes.empty()) {
+        return false;
+    }
+    mob.path = std::move(nodes);
+    mob.pathIndex = 0;
+    mob.walkTarget = target;
+    mob.moveSpeed = speedModifier;
+    return true;
 }
 
 bool isDone(const ServerEntity& mob) {

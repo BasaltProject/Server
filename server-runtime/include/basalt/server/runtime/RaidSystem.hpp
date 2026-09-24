@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/Raids.hpp>
+#include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <cstdint>
@@ -46,6 +47,10 @@ public:
 
     /// parity: `Raids`, one per world, which this build keeps in memory rather than saved data.
     [[nodiscard]] entity::RaidManager& raidsIn(const world::LoadedWorld& world);
+
+    /// parity: `ServerLevel.getRaidAt`, as the villagers' behaviours see it.
+    [[nodiscard]] std::optional<entity::villager::RaidView> viewAt(world::LoadedWorld& world, std::int32_t x,
+                                                                   std::int32_t y, std::int32_t z);
 
     /// Every raid in one world.
     ///

@@ -1,29 +1,51 @@
 #pragma once
 
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/wire/common/Identifier.hpp>
+
+#include <array>
+#include <cstdint>
+#include <optional>
 
 namespace basalt::server::runtime::entity {
 
 class ServerEntity;
 
-/// How something that flies moves.
+/// How something that flies moves: its own move control, then its own travel.
 ///
-/// parity: `FlyingMoveControl` with `Mob.travel`'s flying branch: nothing falls, the mob is nudged
-/// towards where it wants to be a tenth of the distance at a time, and the air keeps 0.91 of what is
-/// left every tick. A ghast drifts because of that, not because anything steers it.
+/// parity: `FlyingMoveControl` over `travelInAir` (wither, parrot, bee, allay), `GhastMoveControl`
+/// over `travelFlying`, `VexMoveControl`, `PhantomMoveControl` and the bat's `customServerAiStep`.
 namespace flyingMovement {
 
-/// Leans towards a point. Answers false once it is there.
-///
-/// parity: every flier's move control adds to the speed rather than setting a position, and each has
-/// its own number for how much: the ghast's 0.1 impulse, the vex's 0.05, and the 0.02 of the air
-/// input everything else flies on. That number is `step`, and with the drag it is what decides how
-/// fast the mob ends up going: about eleven times the step, and no faster.
-bool approach(ServerEntity& entity, double x, double y, double z, double step);
+enum class Control : std::uint8_t {
+    /// Nothing steers it: the drift of `travelFlying` with no input.
+    Drift,
+    /// parity: `FlyingMoveControl`.
+    Flying,
+    /// parity: `Ghast.GhastMoveControl`, not careful.
+    Ghast,
+    /// parity: `Vex.VexMoveControl`, with `noPhysics`.
+    Vex,
+    /// parity: `Phantom.PhantomMoveControl`.
+    Phantom,
+    /// parity: `Bat.customServerAiStep`, which steers it without any control.
+    Bat,
+};
 
-/// The one move a flying mob makes each tick, whatever its goals decided.
-void tick(world::WorldState& world, ServerEntity& entity);
+[[nodiscard]] Control controlOf(const wire::common::Identifier& type);
+
+/// parity: the fliers whose navigation is `FlyingPathNavigation`, so their paths are flown.
+[[nodiscard]] bool usesFlyingPath(const wire::common::Identifier& type);
+
+/// parity: `GhastMoveControl.canReach`, not careful: no block's shape along the way is in the box's
+/// path, those it starts in aside.
+[[nodiscard]] bool ghastCanReach(world::WorldState& world, const ServerEntity& mob, double dx, double dy, double dz);
+
+/// One tick of the flier's move control and travel. `target` is where its attack target stands,
+/// which the vex turns to face.
+void tick(world::WorldState& world, ServerEntity& entity, random::RandomSource& random,
+          const std::optional<std::array<double, 3>>& target = std::nullopt);
 
 } // namespace flyingMovement
 

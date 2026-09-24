@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <vector>
 
 namespace basalt::server::runtime::entity {
 class ServerEntity;
@@ -25,6 +27,11 @@ bool moveTo(world::WorldState& world, ServerEntity& mob, double x, double y, dou
 [[nodiscard]] bool canReach(world::WorldState& world, ServerEntity& mob, double x, double y, double z);
 
 [[nodiscard]] bool isDone(const ServerEntity& mob);
+
+/// parity: `PathNavigation.moveTo(Path, speed)`, a path already worked out. Answers false for an
+/// empty one, which leaves the mob standing.
+bool follow(ServerEntity& mob, std::vector<std::array<std::int32_t, 3>> nodes, const std::array<double, 3>& target,
+            double speedModifier);
 
 void stop(ServerEntity& mob);
 

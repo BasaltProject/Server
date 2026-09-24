@@ -40,6 +40,8 @@ basalt_module(server-runtime-core
         src/entity/BlockTriggers.cpp
         src/entity/EntityPhysics.cpp
         src/entity/FlyingMovement.cpp
+        src/entity/FlyingPathFinder.cpp
+        src/entity/PathTypes.cpp
         src/entity/LivingMovement.cpp
         src/entity/PathFinder.cpp
         src/entity/Minecarts.cpp
@@ -179,6 +181,8 @@ basalt_module(server-runtime-core
         src/NaturalSpawningMaterialize.cpp
         src/NaturalSpawningSystem.cpp
         src/RaidSystem.cpp
+        src/MobActionVillager.cpp
+        src/VillagerWorldSystem.cpp
         src/EntityVisibilityExtras.cpp
         src/EntityVisibilityTracker.cpp
         src/EnvironmentTickSystem.cpp
@@ -453,6 +457,7 @@ basalt_module(server-runtime-core
         src/world/SpawnEquipmentEnchantments.cpp
         src/world/SpawnEquipmentFinalizer.cpp
         src/world/SkeletonHorseTrap.cpp
+        src/world/Precipitation.cpp
         src/world/StructureSpawnLists.cpp
         src/world/ZombieSpawnFinalizer.cpp
         src/world/Trades.cpp
@@ -476,6 +481,7 @@ basalt_module(server-runtime-core
         src/entity/ai/HoverWanderGoal.cpp
         src/entity/ai/GoalSelector.cpp
         src/entity/ai/Goals.cpp
+        src/entity/ai/PhantomGoals.cpp
         src/entity/ai/IllagerGoals.cpp
         src/entity/ai/LongDistancePatrolGoal.cpp
         src/entity/ai/MobContext.cpp
@@ -484,6 +490,19 @@ basalt_module(server-runtime-core
         src/entity/ai/TameGoals.cpp
         src/entity/ai/TargetGoals.cpp
         src/entity/ai/VillagerGoals.cpp
+        src/entity/ai/RandomPos.cpp
+        src/entity/villager/BrainTables.cpp
+        src/entity/villager/CoreBehaviors.cpp
+        src/entity/villager/Gossips.cpp
+        src/entity/villager/PoiBehaviors.cpp
+        src/entity/villager/RaidBehaviors.cpp
+        src/entity/villager/SocialBehaviors.cpp
+        src/entity/villager/VillagerBrain.cpp
+        src/entity/villager/VillagerHelpers.cpp
+        src/entity/villager/VillagerLife.cpp
+        src/entity/villager/VillagerNbt.cpp
+        src/entity/villager/VillagerSensors.cpp
+        src/entity/villager/WorkBehaviors.cpp
         src/entity/ai/VillagerSchedule.cpp
         src/entity/ai/WanderingTraderGoals.cpp
         src/entity/ai/WitherGoals.cpp
@@ -978,6 +997,12 @@ target_compile_definitions(server-runtime-server-list-status-test
 basalt_test(server-runtime-generated-entity-presentation-test
     SOURCES
         test/GeneratedEntityPresentationTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-villager-brain-test
+    SOURCES
+        test/VillagerBrainTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

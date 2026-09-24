@@ -211,7 +211,7 @@ void MapSystem::tickCarriedBy(maps::MapData& data, PlayerSession& ticking, const
             if (frame == nullptr && otherWorld != nullptr && otherWorld->levelKey() == data.dimension() &&
                 data.trackingPosition()) {
                 data.addDecoration(maps::decorationTypes::kPlayer, otherWorld->gameTime(), name, other->x, other->z,
-                                   other->yaw, std::nullopt);
+                                   static_cast<double>(other->yaw), std::nullopt);
             }
         } else {
             // parity: the jar removes from the list it is walking and still steps on, so the holder
@@ -239,8 +239,10 @@ void MapSystem::update(world::LoadedWorld& world, maps::MapData& data, PlayerSes
     }
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
     const maps::ScanWorld scan{
+        // parity: `Level.getChunk`, which loads or generates a chunk the map reaches rather than
+        // leaving that part of it blank.
         .chunkAt = [&world](std::int32_t chunkX, std::int32_t chunkZ) -> const server::world::Chunk* {
-            return world.state().chunkIfLoaded(chunkX, chunkZ);
+            return &world.state().getOrGenerateChunk(chunkX, chunkZ);
         },
         .bannerAt = [&world](const maps::BlockPos& pos) { return bannerAt(world, pos); },
         .minY = facts.chunkHeight.minY(),
@@ -345,9 +347,31 @@ void MapSystem::tickFrames(world::LoadedWorld& world) {
     }
 }
 
+void MapSystem::frameLostMap(const wire::nbt::NbtCompound& components, const entity::ServerEntity& frame) {
+    const std::optional<std::int32_t> id = mapIdOf(components);
+    if (!id.has_value()) {
+        return;
+    }
+    const std::unique_lock<std::mutex> lock = storage_->lock();
+    if (maps::MapData* data = storage_->get(*id); data != nullptr) {
+        const std::array<std::int32_t, 3> square = world::itemFrames::squareOf(frame);
+        data->removedFromFrame(maps::BlockPos{square[0], square[1], square[2]}, frame.entityId());
+    }
+}
+
+bool MapSystem::tooManyMarkers(const wire::nbt::NbtCompound& components) {
+    const std::optional<std::int32_t> id = mapIdOf(components);
+    if (!id.has_value()) {
+        return false;
+    }
+    const std::unique_lock<std::mutex> lock = storage_->lock();
+    const maps::MapData* data = storage_->get(*id);
+    return data != nullptr && data->trackedCountOverLimit(maps::MapData::kTrackedDecorationLimit);
+}
+
 void MapSystem::sweepFrames(world::LoadedWorld& world, const std::vector<entity::ServerEntity*>& frames) {
-    // The jar clears a frame's marker the moment its map leaves the frame. Here a marker whose frame
-    // stands in a loaded chunk but no longer shows that map is cleared on the next framed-map pass.
+    // parity: `ItemFrame.onKilled`. A frame taken out of the world any other way than the ones that
+    // call `frameLostMap` takes its marker with it on the next framed-map pass.
     std::vector<std::pair<maps::BlockPos, std::int32_t>> gone;
     storage_->forEachLoaded([&](std::int32_t id, maps::MapData& data) {
         if (data.frames().empty() || data.dimension() != world.levelKey()) {
@@ -358,14 +382,10 @@ void MapSystem::sweepFrames(world::LoadedWorld& world, const std::vector<entity:
             if (!world.state().isLoaded(marker.pos[0] >> 4, marker.pos[2] >> 4)) {
                 continue;
             }
-            const bool shown = std::ranges::any_of(frames, [&](const entity::ServerEntity* frame) {
-                if (frame->entityId() != marker.entityId) {
-                    return false;
-                }
-                const std::optional<server::world::loot::ItemStack> held = world::itemFrames::shownIn(*frame);
-                return held.has_value() && mapIdOf(held->components) == id;
-            });
-            if (!shown) {
+            static_cast<void>(id);
+            const bool standing = std::ranges::any_of(
+                frames, [&](const entity::ServerEntity* frame) { return frame->entityId() == marker.entityId; });
+            if (!standing) {
                 gone.emplace_back(marker.pos, marker.entityId);
             }
         }
@@ -395,6 +415,8 @@ bool MapSystem::useEmptyMap(const player::BreakContext& context, PlayerSession& 
     if (player.gamemode != play::Gamemode::Creative) {
         --rest->count;
     }
+    // parity: `EmptyMapItem.use` counts the use itself, right after the map is spent.
+    player.stats.increment(storage::stats::used(kEmptyMap));
     const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
     for (PlayerSession* listener : players_->snapshot()) {
         if (listener->worldName == world.name()) {
@@ -429,13 +451,16 @@ std::optional<bool> MapSystem::useOnBanner(PlayerSession& player, world::LoadedW
         return std::nullopt;
     }
     const std::optional<std::int32_t> id = mapIdOf(held->components);
+    // parity: `ItemStack.useOn` counts a use for any success, which is all but a refused banner.
+    const std::string used = storage::stats::used(held->id);
     const std::unique_lock<std::mutex> lock = storage_->lock();
     maps::MapData* data = id.has_value() ? storage_->get(*id) : nullptr;
-    if (data == nullptr) {
-        return true;
-    }
     const maps::BlockPos pos{x, y, z};
-    return data->toggleBanner(bannerAt(world, pos), pos, world.gameTime());
+    const bool toggled = data == nullptr || data->toggleBanner(bannerAt(world, pos), pos, world.gameTime());
+    if (toggled) {
+        player.stats.increment(used);
+    }
+    return toggled;
 }
 
 void MapSystem::postProcessCrafted(NbtCompound& components, const world::LoadedWorld& world) {

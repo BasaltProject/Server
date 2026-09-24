@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/BiomeTagLoader.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/maps/MapStorage.hpp>
+#include <basalt/server/world/structure/StructureQueries.hpp>
 #include <basalt/server/world/terrain/OverworldBiomeSource.hpp>
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -49,6 +50,23 @@ bool MapSystem::explore(world::LoadedWorld& world, wire::nbt::NbtCompound& compo
     std::optional<Found> nearest;
     double nearestDistance = std::numeric_limits<double>::max();
     const std::unique_lock<std::mutex> lock = storage_->lock();
+    // parity: `ExplorationMapFunction.claimStructureAt`: a structure the loot stands in is claimed
+    // first, so a cartographer never sells the map to its own village.
+    if (request.skipExistingChunks) {
+        const server::world::structure::StructureQueries structures{
+            [&world](std::int32_t chunkX, std::int32_t chunkZ) -> const server::world::structure::ChunkStructures* {
+                const server::world::Chunk* chunk = world.state().chunkIfLoaded(chunkX, chunkZ);
+                return chunk == nullptr ? nullptr : &chunk->structures();
+            }};
+        const server::world::structure::StructurePos at{originX, originY, originZ};
+        for (const Identifier& structure : wanted) {
+            if (const server::world::structure::StructureStartRecord* start = structures.startAt(at, structure.path());
+                start != nullptr) {
+                storage_->claim(claimKey(world, structure, start->chunkX, start->chunkZ));
+                break;
+            }
+        }
+    }
     for (const Identifier& structure : wanted) {
         // parity: `skip_existing_chunks` passes over a start an earlier map already claimed.
         const world::ClaimedStart skip = [&](std::int32_t chunkX, std::int32_t chunkZ) {

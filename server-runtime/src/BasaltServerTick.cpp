@@ -27,6 +27,7 @@
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
+#include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -68,6 +69,10 @@ constexpr double kFullTurn = 6.283185307179586;
     // parity: `TargetingConditions.forCombat`, which skips whoever cannot be fought.
     return !player.dead && player.gamemode != wire::protocol::play::Gamemode::Creative &&
            player.gamemode != wire::protocol::play::Gamemode::Spectator;
+}
+
+[[nodiscard]] bool isSpectator(const player::PlayerSession& player) {
+    return player.gamemode == wire::protocol::play::Gamemode::Spectator;
 }
 
 /// parity: `Player.updateSwimming`, near enough: sprinting with its feet in water.
@@ -521,6 +526,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                    .width = playerWidth,
                                                    .height = playerHeight,
                                                    .targetable = isTargetable(*player),
+                                                   .spectator = isSpectator(*player),
                                                    .heldItem = std::move(heldItem),
                                                    .sneaking = player->sneaking,
                                                    .swimming = player->sprinting && inWater(world, *player),
@@ -750,6 +756,13 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         // parity: `BlockAttachedEntity.tick`, the hundred-tick check that something still holds it.
         if (world::attachedEntities::isAttached(entity->type()) && world::attachedEntities::dueForCheck(*entity) &&
             !world::attachedEntities::survives(world.state(), *entity, attachedTags)) {
+            // parity: `ItemFrame.dropItem(level, null, true)` drops the framed map's marker either way.
+            if (maps_ != nullptr && world::itemFrames::isFrame(entity->type())) {
+                if (const std::optional<server::world::loot::ItemStack> held = world::itemFrames::shownIn(*entity);
+                    held.has_value()) {
+                    maps_->frameLostMap(held->components, *entity);
+                }
+            }
             world::attachedEntities::comeOff(world, *entity, watchers, random,
                                              [this] { return playerRegistry_.allocateEntityId(); });
             continue;

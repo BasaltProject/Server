@@ -36,6 +36,8 @@ std::string stats::custom(std::string_view name) { return std::string{kCustom} +
 
 std::string stats::mined(std::string_view block) { return std::string{kMined} + "/" + std::string{block}; }
 
+std::string stats::used(std::string_view item) { return std::string{kUsed} + "/" + std::string{item}; }
+
 namespace {
 
 const std::string& named(std::string_view name) {

@@ -78,7 +78,86 @@ void addInput(ServerEntity& entity, double forward, double strafe, double speed)
     entity.velocityZ += (z * cosYaw) + (x * sinYaw);
 }
 
+/// parity: `Entity.getInputVector` with its upward part, as a flier's input has one.
+void addInput3(ServerEntity& entity, double strafe, double up, double forward, double speed) {
+    const double length = (strafe * strafe) + (up * up) + (forward * forward);
+    if (length < 1.0e-7) {
+        return;
+    }
+    const double scale = length > 1.0 ? speed / std::sqrt(length) : speed;
+    const double x = strafe * scale;
+    const double z = forward * scale;
+    const auto radians = entity.yaw * (std::numbers::pi_v<float> / 180.0F);
+    const auto sinYaw = static_cast<double>(std::sin(radians));
+    const auto cosYaw = static_cast<double>(std::cos(radians));
+    entity.velocityX += (x * cosYaw) - (z * sinYaw);
+    entity.velocityY += up * scale;
+    entity.velocityZ += (z * cosYaw) + (x * sinYaw);
+}
+
+/// parity: `Entity.move(SELF)`, or the straight add of a mob with `noPhysics`.
+void moveBy(world::WorldState& world, ServerEntity& entity, bool noPhysics) {
+    if (noPhysics) {
+        entity.x += entity.velocityX;
+        entity.y += entity.velocityY;
+        entity.z += entity.velocityZ;
+        entity.onGround = false;
+        entity.horizontallyBlocked = false;
+        return;
+    }
+    const Aabb box = Aabb::of(entity.x, entity.y, entity.z, entity.width(), entity.height());
+    const std::array<double, 3> moved = entityCollision::collideWithStep(
+        blocksOf(world), box, entity.velocityX, entity.velocityY, entity.velocityZ, kStepHeight, entity.onGround);
+    entity.x += moved[0];
+    entity.y += moved[1];
+    entity.z += moved[2];
+    const bool collidedX = !nearlyEqual(moved[0], entity.velocityX);
+    const bool collidedZ = !nearlyEqual(moved[2], entity.velocityZ);
+    const bool collidedY = moved[1] != entity.velocityY;
+    entity.onGround = collidedY && entity.velocityY < 0.0;
+    entity.horizontallyBlocked = collidedX || collidedZ;
+    if (collidedX) {
+        entity.velocityX = 0.0;
+    }
+    if (collidedZ) {
+        entity.velocityZ = 0.0;
+    }
+    if (collidedY) {
+        entity.velocityY = 0.0;
+    }
+}
+
 } // namespace
+
+void travelAir(world::WorldState& world, ServerEntity& entity, const Input& input, double speed, double gravity,
+               bool omnidirectional, bool noPhysics) {
+    const double blockFriction =
+        entity.onGround ? static_cast<double>(registry::blockMovement::frictionOf(blockUnder(world, entity))) : 1.0;
+    addInput3(entity, input.strafe, input.up, input.forward, frictionInfluencedSpeed(entity, speed, blockFriction));
+    moveBy(world, entity, noPhysics);
+    entity.velocityY -= gravity;
+    const double horizontalDrag = blockFriction * kAirDrag;
+    entity.velocityX *= horizontalDrag;
+    entity.velocityY *= omnidirectional ? kAirDrag : kVerticalDrag;
+    entity.velocityZ *= horizontalDrag;
+}
+
+void travelFlying(world::WorldState& world, ServerEntity& entity, const Input& input, float airSpeed,
+                  world::Submersion in, bool noPhysics) {
+    // parity: `LivingEntity.travelFlying`: the water's 0.02 and 0.8, lava's 0.02 and 0.5, the air's
+    // own speed and 0.91.
+    constexpr double kFluidInput = static_cast<double>(0.02F);
+    constexpr double kWaterKept = static_cast<double>(0.8F);
+    constexpr double kLavaKept = static_cast<double>(0.5F);
+    const bool fluid = in == world::Submersion::Water || in == world::Submersion::Lava;
+    addInput3(entity, input.strafe, input.up, input.forward, fluid ? kFluidInput : static_cast<double>(airSpeed));
+    moveBy(world, entity, noPhysics);
+    const double kept =
+        in == world::Submersion::Water ? kWaterKept : (in == world::Submersion::Lava ? kLavaKept : kAirDrag);
+    entity.velocityX *= kept;
+    entity.velocityY *= kept;
+    entity.velocityZ *= kept;
+}
 
 void travel(world::WorldState& world, ServerEntity& entity, double forward, double strafe, double speed,
             double gravity) {

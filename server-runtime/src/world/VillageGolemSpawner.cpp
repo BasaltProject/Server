@@ -6,7 +6,6 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
-#include <basalt/server/runtime/entity/ai/VillagerSchedule.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/VillageGolemSpawner.hpp>
 
@@ -25,19 +24,9 @@ using entity::Aabb;
 using entity::ServerEntity;
 using wire::common::Identifier;
 
-constexpr std::int64_t kRecentSleepTicks = 24000;
-constexpr std::int32_t kGolemMemoryTicks = 599;
-constexpr std::int32_t kGolemSensorInterval = 200;
-constexpr double kGolemSensorRangeSquared = 16.0 * 16.0;
-constexpr std::int64_t kPanicInterval = 100;
-constexpr std::int64_t kGossipInterval = 1200;
-constexpr double kVillagerSearch = 10.0;
-constexpr std::int32_t kPanicAgreement = 3;
-constexpr std::int32_t kGossipAgreement = 5;
 constexpr std::int32_t kSpawnAttempts = 10;
 constexpr std::int32_t kSpawnRangeXz = 8;
 constexpr std::int32_t kSpawnRangeY = 6;
-constexpr double kThreatRangeSquared = 8.0 * 8.0;
 
 [[nodiscard]] const Identifier& ironGolem() {
     static const Identifier type = Identifier::vanilla("iron_golem");
@@ -49,53 +38,6 @@ constexpr double kThreatRangeSquared = 8.0 * 8.0;
                                                         "ice",         "tnt",         "glowstone",    "beacon",
                                                         "sea_lantern", "frosted_ice", "tinted_glass", "glass"};
     return all;
-}
-
-[[nodiscard]] const std::set<std::string, std::less<>>& villagerThreats() {
-    static const std::set<std::string, std::less<>> all{"zombie",   "husk",       "drowned", "zombie_villager",
-                                                        "pillager", "vindicator", "evoker",  "ravager",
-                                                        "vex",      "illusioner", "zoglin"};
-    return all;
-}
-
-[[nodiscard]] double distanceSquared(const ServerEntity& first, const ServerEntity& second) {
-    const double dx = first.x - second.x;
-    const double dy = first.y - second.y;
-    const double dz = first.z - second.z;
-    return dx * dx + dy * dy + dz * dz;
-}
-
-[[nodiscard]] std::vector<ServerEntity*> nearbyVillagers(const ServerEntity& source,
-                                                         const std::vector<ServerEntity*>& living) {
-    const Aabb sourceBox = Aabb::of(source.x, source.y, source.z, source.width(), source.height());
-    const Aabb search{sourceBox.minX - kVillagerSearch, sourceBox.minY - kVillagerSearch,
-                      sourceBox.minZ - kVillagerSearch, sourceBox.maxX + kVillagerSearch,
-                      sourceBox.maxY + kVillagerSearch, sourceBox.maxZ + kVillagerSearch};
-    std::vector<ServerEntity*> found;
-    for (ServerEntity* candidate : living) {
-        if (candidate == nullptr || candidate->removed || candidate->type().path() != "villager") {
-            continue;
-        }
-        if (Aabb::of(candidate->x, candidate->y, candidate->z, candidate->width(), candidate->height())
-                .intersects(search)) {
-            found.push_back(candidate);
-        }
-    }
-    return found;
-}
-
-[[nodiscard]] bool nearbyGolem(const ServerEntity& villager, const std::vector<ServerEntity*>& living) {
-    return std::ranges::any_of(living, [&villager](const ServerEntity* candidate) {
-        return candidate != nullptr && !candidate->removed && candidate->type() == ironGolem() &&
-               distanceSquared(villager, *candidate) <= kGolemSensorRangeSquared;
-    });
-}
-
-[[nodiscard]] bool nearbyThreat(const ServerEntity& villager, const std::vector<ServerEntity*>& living) {
-    return std::ranges::any_of(living, [&villager](const ServerEntity* candidate) {
-        return candidate != nullptr && !candidate->removed && villagerThreats().contains(candidate->type().path()) &&
-               distanceSquared(villager, *candidate) <= kThreatRangeSquared;
-    });
 }
 
 /// parity: `SpawnUtil.Strategy.LEGACY_IRON_GOLEM`, which is fussier than an ordinary spawn check.
@@ -132,11 +74,6 @@ constexpr double kThreatRangeSquared = 8.0 * 8.0;
 }
 
 } // namespace
-
-bool wantsGolem(const ServerEntity& villager, std::int64_t gameTime) {
-    return villager.lastSleptGameTime != std::numeric_limits<std::int64_t>::min() &&
-           gameTime - villager.lastSleptGameTime < kRecentSleepTicks && villager.golemDetectedTicks <= 0;
-}
 
 std::optional<std::array<std::int32_t, 3>> findSpawnPosition(LoadedWorld& world, const ServerEntity& villager,
                                                              random::RandomSource& random) {
@@ -181,56 +118,6 @@ std::optional<std::array<std::int32_t, 3>> findSpawnPosition(LoadedWorld& world,
         }
     }
     return std::nullopt;
-}
-
-void tick(LoadedWorld& world, ServerEntity& villager, const std::vector<ServerEntity*>& living,
-          random::RandomSource& random, const Spawn& spawn) {
-    if (villager.golemDetectedTicks > 0) {
-        villager.golemDetectedTicks--;
-    }
-    if ((villager.tickCount + villager.entityId()) % kGolemSensorInterval == 0 && nearbyGolem(villager, living)) {
-        villager.golemDetectedTicks = kGolemMemoryTicks;
-    }
-    if (!wantsGolem(villager, world.gameTime())) {
-        return;
-    }
-
-    const bool panicking = villager.panicTicks > 0 || nearbyThreat(villager, living);
-    const bool gossipReady = villager.lastGossipTime == std::numeric_limits<std::int64_t>::min() ||
-                             world.gameTime() >= villager.lastGossipTime + kGossipInterval;
-    std::int32_t agreement = 0;
-    if (panicking && world.gameTime() % kPanicInterval == 0) {
-        agreement = kPanicAgreement;
-    } else if (entity::ai::villagerSchedule::activityAt(world.clock().totalTicks()) ==
-                   entity::ai::villagerSchedule::Activity::Meet &&
-               gossipReady) {
-        villager.lastGossipTime = world.gameTime();
-        agreement = kGossipAgreement;
-    } else {
-        return;
-    }
-
-    const std::vector<ServerEntity*> nearby = nearbyVillagers(villager, living);
-    std::int32_t agreeing = 0;
-    for (const ServerEntity* candidate : nearby) {
-        if (agreeing >= 5) {
-            break;
-        }
-        if (wantsGolem(*candidate, world.gameTime())) {
-            agreeing++;
-        }
-    }
-    if (agreeing < agreement) {
-        return;
-    }
-    const std::optional<std::array<std::int32_t, 3>> position = findSpawnPosition(world, villager, random);
-    if (!position.has_value() || !spawn || !spawn(*position)) {
-        return;
-    }
-    // Everyone who agreed has now seen one, which is what stops a village making a second.
-    for (ServerEntity* candidate : nearby) {
-        candidate->golemDetectedTicks = kGolemMemoryTicks;
-    }
 }
 
 } // namespace basalt::server::runtime::world::villageGolemSpawner

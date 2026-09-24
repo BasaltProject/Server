@@ -5,46 +5,42 @@
 #include <array>
 #include <cstdint>
 #include <set>
+#include <vector>
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `Ghast.RandomFloatAroundGoal`: a point picked within sixteen blocks across and a few up
-/// or down, floated to and then forgotten. It is the whole of a ghast's idle life.
-class FlyingWanderGoal final : public Goal {
+/// parity: `Ghast.RandomFloatAroundGoal`: a point up to sixteen blocks off each way, handed to the
+/// move control whenever the last one is reached, lost or over sixty blocks away.
+class GhastFloatGoal final : public Goal {
 public:
-    /// `gated` is parity: `GhastMoveControl.floatDuration`, which pushes every few ticks rather than
-    /// every one.
-    explicit FlyingWanderGoal(std::int32_t range = 16, double step = 0.1, bool gated = true);
-
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
-
-    [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
 
     [[nodiscard]] bool canUse(MobContext& mob) override;
 
-    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
+    [[nodiscard]] bool canContinueToUse(MobContext& /*mob*/) override { return false; }
 
     void start(MobContext& mob) override;
-
-    void tick(MobContext& mob) override;
-
-private:
-    std::int32_t range_;
-    double step_;
-    bool gated_;
-    double wantedX_ = 0.0;
-    double wantedY_ = 0.0;
-    double wantedZ_ = 0.0;
-    bool arrived_ = true;
-    std::int32_t floatDuration_ = 0;
 };
 
-/// parity: `WaterAvoidingRandomFlyingGoal`: one roll in sixty, then a spot eight blocks out within a
-/// quarter turn of where it faces, hovering one to three blocks over the ground, or failing that
-/// one in the air, and flown to.
+/// parity: `Ghast.GhastLookGoal`: `faceMovementDirection`, or at the target within 64 blocks.
+class GhastLookGoal final : public Goal {
+public:
+    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Look}; }
+
+    [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
+
+    [[nodiscard]] bool canUse(MobContext& /*mob*/) override { return true; }
+
+    void tick(MobContext& mob) override;
+};
+
+/// parity: `WaterAvoidingRandomFlyingGoal`: one roll in sixty, then of ten spots eight blocks out
+/// within a quarter turn of where it faces the darkest, hovering one to three blocks over the ground
+/// or failing that in the air, and a flying path there followed square by square.
 class HoverWanderGoal final : public Goal {
 public:
-    explicit HoverWanderGoal(double step);
+    /// `interval` is the one-in-that roll; `BeeWanderGoal` asks it every tenth of that.
+    explicit HoverWanderGoal(std::int32_t interval = 120, bool whenIdle = false);
 
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
 
@@ -54,12 +50,11 @@ public:
 
     [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
 
-    void tick(MobContext& mob) override;
+    void stop(MobContext& mob) override;
 
 private:
-    double step_;
-    std::array<double, 3> wanted_{};
-    bool arrived_ = true;
+    std::int32_t interval_;
+    bool whenIdle_;
 };
 
 /// parity: `Ghast.GhastShootFireballGoal`: twenty ticks of charging where it stands, a fireball
@@ -99,30 +94,44 @@ private:
     std::int32_t attackStep_ = 0;
 };
 
-/// parity: `Phantom`'s circle and swoop: it climbs to a point above whatever it is after, then dives
-/// through it and pulls up again.
-class SwoopAttackGoal final : public Goal {
+/// parity: `Vex.VexChargeAttackGoal`: one roll in seven when idle, the target's eyes as the point,
+/// and a hit the moment the two boxes meet.
+class VexChargeGoal final : public Goal {
 public:
-    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
+    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
 
     [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
 
     [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
+
+    void start(MobContext& mob) override;
+
+    void stop(MobContext& mob) override;
 
     void tick(MobContext& mob) override;
-
-private:
-    bool diving_ = false;
 };
 
-/// parity: `Vex.VexChargeAttackGoal`: it picks a point past you and flies through it.
-class ChargeAttackGoal final : public Goal {
+/// parity: `Vex.VexRandomMoveGoal`: three tries at an empty block near where it was summoned.
+class VexRandomMoveGoal final : public Goal {
 public:
-    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
-
-    [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
+    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
 
     [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    [[nodiscard]] bool canContinueToUse(MobContext& /*mob*/) override { return false; }
+
+    void tick(MobContext& mob) override;
+};
+
+/// parity: `Bat.customServerAiStep`: hang under a solid block, or flutter at a point that changes
+/// one tick in thirty.
+class BatFlightGoal final : public Goal {
+public:
+    [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
+
+    [[nodiscard]] bool canUse(MobContext& /*mob*/) override { return true; }
 
     void tick(MobContext& mob) override;
 };
