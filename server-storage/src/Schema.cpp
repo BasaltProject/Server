@@ -45,7 +45,9 @@ CREATE TABLE IF NOT EXISTS player (
     stats BLOB,
     -- Scoreboard tags, comma-separated. A list rather than a table because it is always read and
     -- written whole, exactly like the inventory blob above it.
-    tags TEXT
+    tags TEXT,
+    -- The screen shaders /posteffect put on them, comma-separated, in the order they were added.
+    post_effects TEXT
 );
 
 -- Name lookup is how an operator refers to a player; the others are what the admin queries scan.

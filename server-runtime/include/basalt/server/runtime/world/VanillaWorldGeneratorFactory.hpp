@@ -18,6 +18,7 @@
 
 namespace basalt::server::world::terrain {
 class StrongholdStructureGenerator;
+class JigsawStructureGenerator;
 class VillageStructureGenerator;
 } // namespace basalt::server::world::terrain
 
@@ -54,6 +55,8 @@ public:
             generate;
         server::world::terrain::VillageStructureGenerator* villages = nullptr;
         server::world::terrain::VillageStructureGenerator* camps = nullptr;
+        /// The outposts, trail ruins, ancient cities and trial chambers.
+        std::vector<server::world::terrain::JigsawStructureGenerator*> jigsaws;
         server::world::terrain::StrongholdStructureGenerator* strongholds = nullptr;
         /// parity: `randomState().sampler().findSpawnPosition()`, in chunk coordinates.
         std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunk;

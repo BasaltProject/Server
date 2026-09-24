@@ -369,6 +369,38 @@ using Encoder = std::function<bool(ByteBuffer&, const NbtTag&)>;
         };
         table.emplace("minecraft:attack_animation", swing);
         table.emplace("minecraft:interact_animation", swing);
+        // parity: `PotDecorations.STREAM_CODEC`, four optional `ItemStackTemplate`s. A sherd carrying
+        // components of its own is not written: this build has no component patch encoder here.
+        table.emplace("minecraft:pot_decorations", [](ByteBuffer& buffer, const NbtTag& value) {
+            const NbtCompound* compound = value.get<NbtCompound>();
+            if (compound == nullptr) {
+                return false;
+            }
+            for (const std::string_view side : {"back", "left", "right", "front"}) {
+                const NbtTag* entry = compound->find(side);
+                wire::protocol::writeBoolean(buffer, entry != nullptr);
+                if (entry == nullptr) {
+                    continue;
+                }
+                const NbtCompound* stack = entry->get<NbtCompound>();
+                const std::string_view name = stack == nullptr ? stringOf(entry) : stringOf(stack->find("id"));
+                if (stack != nullptr && stack->getCompound("components") != nullptr &&
+                    stack->getCompound("components")->size() > 0) {
+                    return false;
+                }
+                const std::expected<Identifier, wire::common::IdentifierError> item = Identifier::parse(name);
+                const std::optional<std::int32_t> id = item.has_value() ? itemProtocolId(*item) : std::nullopt;
+                if (!id.has_value()) {
+                    return false;
+                }
+                wire::protocol::varInt::write(buffer, *id);
+                wire::protocol::varInt::write(buffer, stack == nullptr ? 1 : intField(*entry, "count").value_or(1));
+                // An empty component patch: nothing added, nothing removed.
+                wire::protocol::varInt::write(buffer, 0);
+                wire::protocol::varInt::write(buffer, 0);
+            }
+            return true;
+        });
         table.emplace("minecraft:repairable", [](ByteBuffer& buffer, const NbtTag& value) {
             const NbtCompound* compound = value.get<NbtCompound>();
             if (compound == nullptr) {

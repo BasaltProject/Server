@@ -80,6 +80,7 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         // same villages the world already has.
         options.villageGenerator = built.villages;
         options.campGenerator = built.camps;
+        options.jigsawGenerators = built.jigsaws;
         options.strongholdGenerator = built.strongholds;
         options.spawnChunkFinder = built.spawnChunk;
         if (built.generate) {

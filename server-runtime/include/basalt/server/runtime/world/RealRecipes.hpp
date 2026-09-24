@@ -17,11 +17,8 @@
 namespace basalt::server::runtime::world {
 
 /// Every crafting recipe the operator's own `server.jar` carries, read once at startup, like
-/// `RealLootTables` and `RealNoiseParameters`: datapack content is never committed here.
-///
-/// Item tags load first, because an ingredient can name one and the parser flattens it as it reads.
-/// A recipe type this build has no model for is skipped rather than failing the load: refusing to
-/// start over an uncraftable firework would be the worse answer.
+/// `RealLootTables`: datapack content is never committed. Item tags load first so ingredients can
+/// name them. An unmodelled recipe type is skipped rather than failing the load.
 class RealRecipes {
 public:
     /// One jar entry as text, or nothing when the jar has no such entry.
@@ -83,6 +80,10 @@ public:
     [[nodiscard]] const std::vector<const server::world::crafting::Recipe*>& smithing() const noexcept {
         return smithing_;
     }
+
+    /// Every recipe one cooker takes, in the order they were read.
+    [[nodiscard]] const std::vector<const server::world::crafting::Recipe*>&
+    cooking(server::world::crafting::Cooker cooker) const;
 
     /// Every `minecraft:brewing` recipe, in the order they were read.
     [[nodiscard]] const std::vector<const server::world::crafting::Recipe*>& brewing() const noexcept {

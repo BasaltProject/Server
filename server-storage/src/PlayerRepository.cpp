@@ -11,7 +11,7 @@ namespace {
 constexpr std::string_view kColumns =
     "uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch, health, food, "
     "saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode, group_name, last_ip, "
-    "inventory, ender_chest, stats, tags";
+    "inventory, ender_chest, stats, tags, post_effects";
 
 /// A tag cannot contain a comma: vanilla's own tag argument is a single word.
 [[nodiscard]] std::set<std::string, std::less<>> splitTags(const std::optional<std::string>& stored) {
@@ -46,6 +46,40 @@ constexpr std::string_view kColumns =
             joined += ',';
         }
         joined += tag;
+    }
+    return joined;
+}
+
+/// An identifier cannot contain a comma either.
+[[nodiscard]] std::vector<std::string> splitList(const std::optional<std::string>& stored) {
+    std::vector<std::string> items;
+    if (!stored.has_value()) {
+        return items;
+    }
+    std::string_view rest = *stored;
+    while (!rest.empty()) {
+        const std::size_t comma = rest.find(',');
+        if (const std::string_view item = rest.substr(0, comma); !item.empty()) {
+            items.emplace_back(item);
+        }
+        if (comma == std::string_view::npos) {
+            break;
+        }
+        rest.remove_prefix(comma + 1);
+    }
+    return items;
+}
+
+[[nodiscard]] std::optional<std::string> joinList(const std::vector<std::string>& items) {
+    if (items.empty()) {
+        return std::nullopt;
+    }
+    std::string joined;
+    for (const std::string& item : items) {
+        if (!joined.empty()) {
+            joined += ',';
+        }
+        joined += item;
     }
     return joined;
 }
@@ -90,6 +124,7 @@ constexpr std::string_view kColumns =
         }
     }
     player.tags = splitTags(row.textOrNull(24));
+    player.postEffects = splitList(row.textOrNull(25));
     return player;
 }
 
@@ -139,9 +174,9 @@ void PlayerRepository::save(const StoredPlayer& player) {
 INSERT INTO player(
     uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch,
     health, food, saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode,
-    group_name, inventory, ender_chest, stats, tags
+    group_name, inventory, ender_chest, stats, tags, post_effects
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(uuid) DO UPDATE SET
     name = excluded.name,
     last_seen = excluded.last_seen,
@@ -161,7 +196,8 @@ ON CONFLICT(uuid) DO UPDATE SET
     inventory = excluded.inventory,
     ender_chest = excluded.ender_chest,
     stats = excluded.stats,
-    tags = excluded.tags)");
+    tags = excluded.tags,
+    post_effects = excluded.post_effects)");
     const std::vector<std::uint8_t> inventory = inventoryNbt::encode(player.inventory);
     const std::vector<std::uint8_t> enderChest = inventoryNbt::encode(player.enderChest);
     const std::vector<std::uint8_t> stats = statsNbt::encode(player.stats);
@@ -189,6 +225,7 @@ ON CONFLICT(uuid) DO UPDATE SET
     statement.bind(22, std::span<const std::uint8_t>{enderChest});
     statement.bindBlobOrNull(23, stats);
     statement.bind(24, joinTags(player.tags));
+    statement.bind(25, joinList(player.postEffects));
     statement.execute();
 }
 

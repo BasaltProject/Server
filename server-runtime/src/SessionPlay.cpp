@@ -39,7 +39,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <expected>
+#include <set>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace basalt::server::runtime {
 namespace {
@@ -97,6 +101,53 @@ play::PlayerInfoEntry entryFor(const PlayerSession& player) {
                                  .properties = player.profileProperties};
 }
 
+/// The protocol ids of every item the ingredients name, each once.
+[[nodiscard]] std::vector<std::int32_t> itemIdsOf(const std::vector<const server::world::crafting::Ingredient*>& from) {
+    std::set<std::int32_t> ids;
+    for (const server::world::crafting::Ingredient* ingredient : from) {
+        for (const std::string& item : ingredient->items) {
+            const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(item);
+            if (const reg::Item* entry = id.has_value() ? reg::items::registry().byName(*id) : nullptr;
+                entry != nullptr) {
+                ids.insert(entry->protocolId);
+            }
+        }
+    }
+    return {ids.begin(), ids.end()};
+}
+
+/// parity: `RecipeManager`'s nine `RecipePropertySet`s, which decide what a client lets into a
+/// furnace, smithing table or brewing stand slot.
+[[nodiscard]] std::vector<play::ItemPropertySet> propertySetsOf(const world::RealRecipes& recipes) {
+    namespace crafting = server::world::crafting;
+    using Pick = const crafting::Ingredient* (*)(const crafting::Recipe&);
+    const auto set = [](std::string_view key, const std::vector<const crafting::Recipe*>& from, Pick pick) {
+        std::vector<const crafting::Ingredient*> ingredients;
+        for (const crafting::Recipe* recipe : from) {
+            if (const crafting::Ingredient* ingredient = pick(*recipe); ingredient != nullptr) {
+                ingredients.push_back(ingredient);
+            }
+        }
+        return play::ItemPropertySet{.key = std::string{key}, .itemIds = itemIdsOf(ingredients)};
+    };
+    const Pick input = [](const crafting::Recipe& recipe) { return &recipe.ingredient; };
+    std::vector<play::ItemPropertySet> sets;
+    sets.push_back(set("minecraft:smithing_base", recipes.smithing(),
+                       [](const crafting::Recipe& recipe) { return &recipe.base; }));
+    sets.push_back(set("minecraft:smithing_template", recipes.smithing(),
+                       [](const crafting::Recipe& recipe) { return &recipe.smithingTemplate; }));
+    sets.push_back(set("minecraft:smithing_addition", recipes.smithing(),
+                       [](const crafting::Recipe& recipe) { return &recipe.addition; }));
+    sets.push_back(set("minecraft:furnace_input", recipes.cooking(crafting::Cooker::Smelting), input));
+    sets.push_back(set("minecraft:blast_furnace_input", recipes.cooking(crafting::Cooker::Blasting), input));
+    sets.push_back(set("minecraft:smoker_input", recipes.cooking(crafting::Cooker::Smoking), input));
+    sets.push_back(set("minecraft:campfire_input", recipes.cooking(crafting::Cooker::Campfire), input));
+    sets.push_back(
+        set("minecraft:brewing_input", recipes.brewing(), [](const crafting::Recipe& recipe) { return &recipe.base; }));
+    sets.push_back(set("minecraft:brewing_reagent", recipes.brewing(), input));
+    return sets;
+}
+
 } // namespace
 
 void ClientSession::sendStonecutterRecipes() {
@@ -104,8 +155,6 @@ void ClientSession::sendStonecutterRecipes() {
     if (recipes == nullptr) {
         return;
     }
-    // The recipe book's own item sets go out empty: they only drive the highlighting of what can be
-    // crafted, and drawing a stonecutter's buttons does not depend on them.
     std::vector<play::StonecutterOption> options;
     for (const server::world::crafting::Recipe* recipe : recipes->stonecutting()) {
         const reg::Item* result = reg::items::registry().byName(recipe->result.item);
@@ -127,9 +176,8 @@ void ClientSession::sendStonecutterRecipes() {
                                                   .resultItemId = result->protocolId,
                                                   .resultCount = recipe->result.count});
     }
-    sendCompressed(play::UpdateRecipesPacket::kId, [&options](wire::io::ByteBuffer& buffer) {
-        play::UpdateRecipesPacket{.stonecutter = options}.write(buffer);
-    });
+    const play::UpdateRecipesPacket packet{.propertySets = propertySetsOf(*recipes), .stonecutter = std::move(options)};
+    sendCompressed(play::UpdateRecipesPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
 }
 
 void ClientSession::broadcastChat(const std::string& message) {
@@ -598,6 +646,8 @@ void ClientSession::enterPlay() {
     // The HUD draws no hearts and no experience bar until it has been told what to draw.
     uiState_->syncHealth();
     uiState_->syncExperience();
+    // parity: `PlayerList.placeNewPlayer` sends the saved post effects after the mob effects.
+    sendPostEffects();
     // parity: the inventory goes here, after the level info and the player list, not among the
     // chunk-radius packets above. Order matters on join.
     sendInventory();
@@ -637,7 +687,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
     PlayerSession* session = playerSession_.get();
     if (packetId == play::ServerboundPositionPacket::kId) {
         const std::optional<play::ServerboundPositionPacket> move = play::ServerboundPositionPacket::read(body);
-        if (move.has_value()) {
+        if (move.has_value() && !updateAwaitingTeleport()) {
             updatePosition(move->x, move->y, move->z, session == nullptr ? 0.0F : session->yaw,
                            session == nullptr ? 0.0F : session->pitch, move->onGround);
         }
@@ -645,7 +695,11 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
     }
     if (packetId == play::ServerboundPositionLookPacket::kId) {
         const std::optional<play::ServerboundPositionLookPacket> move = play::ServerboundPositionLookPacket::read(body);
-        if (move.has_value()) {
+        if (move.has_value() && session != nullptr && updateAwaitingTeleport()) {
+            // parity: only the rotation is taken while a teleport is unanswered.
+            session->yaw = move->yaw;
+            session->pitch = move->pitch;
+        } else if (move.has_value()) {
             updatePosition(move->x, move->y, move->z, move->yaw, move->pitch, move->onGround);
         }
         return;
@@ -663,7 +717,10 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         const float yaw = body.readFloat();
         const float pitch = body.readFloat();
         const bool onGround = (body.readByte() & 1) != 0;
-        if (session != nullptr && !body.failed()) {
+        if (session != nullptr && !body.failed() && updateAwaitingTeleport()) {
+            session->yaw = yaw;
+            session->pitch = pitch;
+        } else if (session != nullptr && !body.failed()) {
             updatePosition(session->x, session->y, session->z, yaw, pitch, onGround);
         }
         return;
@@ -671,7 +728,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
     // parity: `ServerboundMovePlayerPacket.StatusOnly`: neither moved nor turned, only landed.
     if (packetId == kMovePlayerStatusOnlyId) {
         const bool onGround = (body.readByte() & 1) != 0;
-        if (session != nullptr && !body.failed()) {
+        if (session != nullptr && !body.failed() && !updateAwaitingTeleport()) {
             updatePosition(session->x, session->y, session->z, session->yaw, session->pitch, onGround);
         }
         return;

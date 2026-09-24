@@ -350,9 +350,16 @@ public:
     /// parity: `ServerGamePacketListenerImpl.teleport`, `awaitingTeleport` and `awaitingPositionFromClient`.
     void sendPlayerPosition(double x, double y, double z, float yaw, float pitch);
 
+    /// parity: 26.3 `ServerPlayer.sendPostEffects`, the whole list, on join and on respawn.
+    void sendPostEffects();
+
     /// parity: 26.3 `handleAcceptTeleportPacket`: only the awaited id counts, and its carried
     /// position is then a move like any other.
     void acceptTeleport(const wire::protocol::play::AcceptTeleportationPacket& accept);
+
+    /// parity: `updateAwaitingTeleport`: while a teleport is unanswered a move is ignored, and the
+    /// teleport is sent again once more than twenty ticks have passed since the last one.
+    [[nodiscard]] bool updateAwaitingTeleport();
 
     /// parity: `ServerPlayer.tick`'s own pickup pass, which is what makes an item fly to a player.
     void tryPickupNearbyItems();
@@ -616,6 +623,8 @@ private:
     std::mutex teleportMutex_;
     std::int32_t awaitingTeleport_ = 0;
     std::optional<std::array<double, 3>> awaitingPosition_;
+    /// The `uiTick` the last teleport went out on.
+    std::int64_t awaitingTeleportTime_ = 0;
 };
 
 } // namespace basalt::server::runtime

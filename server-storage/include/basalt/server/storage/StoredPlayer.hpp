@@ -132,6 +132,8 @@ struct StoredPlayer {
     StoredStats stats;
     /// Scoreboard tags, as `/tag` set them. parity: vanilla keeps these with the entity.
     std::set<std::string, std::less<>> tags;
+    /// parity: 26.3 `ServerPlayer.postEffects`, in the order `/posteffect` added them.
+    std::vector<std::string> postEffects;
 };
 
 } // namespace basalt::server::storage

@@ -43,7 +43,8 @@ storage::StoredPlayer toStored(const PlayerSession& session, std::string_view wo
                                  .inventory = session.inventory.snapshot(),
                                  .enderChest = std::move(enderChest),
                                  .stats = session.stats.snapshot(playTimeTicks),
-                                 .tags = session.tags};
+                                 .tags = session.tags,
+                                 .postEffects = session.postEffects};
 }
 
 void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
@@ -64,6 +65,7 @@ void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
         session.enderChest[slot] = slot < stored.enderChest.slots.size() ? stored.enderChest.slots[slot] : std::nullopt;
     }
     session.tags = stored.tags;
+    session.postEffects = stored.postEffects;
 }
 
 } // namespace basalt::server::runtime::player::playerPersistence
