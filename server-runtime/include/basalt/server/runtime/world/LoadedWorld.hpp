@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/PortalIndex.hpp>
 #include <basalt/server/runtime/world/RandomSequences.hpp>
 #include <basalt/server/runtime/world/RegionStore.hpp>
+#include <basalt/server/runtime/world/StructureLocator.hpp>
 #include <basalt/server/runtime/world/WorldBorder.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/runtime/world/WorldMetadata.hpp>
@@ -34,10 +35,6 @@
 #include <utility>
 #include <vector>
 
-namespace basalt::server::world::terrain {
-class JigsawStructureGenerator;
-} // namespace basalt::server::world::terrain
-
 namespace basalt::server::runtime::world {
 
 /// What a caller hands over besides the world's own declaration.
@@ -51,7 +48,7 @@ struct LoadedWorldOptions {
     const server::world::terrain::surface::SurfaceRuleEnvironment* surfaceEnvironment = nullptr;
     server::world::terrain::VillageStructureGenerator* villageGenerator = nullptr;
     server::world::terrain::VillageStructureGenerator* campGenerator = nullptr;
-    std::vector<server::world::terrain::JigsawStructureGenerator*> jigsawGenerators;
+    std::vector<StructureLocator> structureLocators;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator = nullptr;
     /// Where the climate search says this world's spawn chunk is; the origin without one.
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder;
@@ -223,14 +220,8 @@ public:
     /// Every structure the jigsaw set generators make, which is what `/locate` and `/place` accept.
     [[nodiscard]] std::vector<wire::common::Identifier> structureSetIds() const;
 
-    /// The single-structure jigsaw generator that makes `structure`, or null.
-    [[nodiscard]] server::world::terrain::JigsawStructureGenerator*
-    jigsawGenerator(const wire::common::Identifier& structure) const;
-
-    [[nodiscard]] const std::vector<server::world::terrain::JigsawStructureGenerator*>&
-    jigsawGenerators() const noexcept {
-        return jigsawGenerators_;
-    }
+    /// The single-generator structures `/locate` can find besides the sets and the stronghold.
+    [[nodiscard]] const std::vector<StructureLocator>& structureLocators() const noexcept { return structureLocators_; }
 
     [[nodiscard]] server::world::terrain::StrongholdStructureGenerator* strongholdGenerator() const noexcept {
         return strongholdGenerator_;
@@ -320,7 +311,7 @@ private:
     const server::world::terrain::surface::SurfaceRuleEnvironment* surfaceEnvironment_ = nullptr;
     server::world::terrain::VillageStructureGenerator* villageGenerator_ = nullptr;
     server::world::terrain::VillageStructureGenerator* campGenerator_ = nullptr;
-    std::vector<server::world::terrain::JigsawStructureGenerator*> jigsawGenerators_;
+    std::vector<StructureLocator> structureLocators_;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator_ = nullptr;
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder_;
     std::function<server::world::Chunk(std::int32_t, std::int32_t, std::int64_t, std::string_view,

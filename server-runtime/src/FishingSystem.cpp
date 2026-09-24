@@ -149,17 +149,17 @@ bool FishingSystem::useRod(const player::BreakContext& context, PlayerSession& p
     }
     playSound(heard, "entity.fishing_bobber.throw", player.x, player.y, player.z, 0.5F, soundPitch(random),
               random.nextLong());
-    cast(context, player, world);
+    cast(context, player, world, slot);
     world::vibrations::emit(world.state(), "item_interact_start", player.x, player.y, player.z, world.gameTime(),
                             {.entity = player.uuid()});
     return true;
 }
 
-void FishingSystem::cast(const player::BreakContext& context, PlayerSession& player, world::LoadedWorld& world) {
+void FishingSystem::cast(const player::BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
+                         std::int32_t slot) {
     static_cast<void>(context);
     const registry::EntityTypeEntry* entry = registry::entityTypes::of(Identifier::vanilla(std::string{kHookType}));
-    const std::optional<storage::StoredItemStack> rod =
-        player.inventory.at(player::PlayerInventory::kHotbarStart + player.inventory.heldSlot());
+    const std::optional<storage::StoredItemStack> rod = player.inventory.at(slot);
     if (entry == nullptr) {
         return;
     }
@@ -260,10 +260,14 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
             world::RealLootTables* tables = context.lootTables;
             server::world::loot::LootContext lootContext;
             lootContext.hasEntity = true;
+            // parity: `THIS_ENTITY` is the hook itself.
+            lootContext.thisEntity =
+                server::world::loot::EntityFacts{.type = hook.type(), .scoreName = hook.uuid().toString()};
             lootContext.inOpenWater = state->openWater;
             tables->prepareAt(lootContext, world, hook.x, hook.y, hook.z);
-            for (const server::world::loot::ItemStack& stack :
-                 table->generate(roll, static_cast<float>(state->luck), std::nullopt, lootContext)) {
+            // parity: `FishingHook.retrieve` rolls with the rod's luck plus the player's own.
+            const float luck = static_cast<float>(state->luck) + player.luck();
+            for (const server::world::loot::ItemStack& stack : table->generate(roll, luck, std::nullopt, lootContext)) {
                 const double xa = player.x - hook.x;
                 const double ya = player.y - hook.y;
                 const double za = player.z - hook.z;

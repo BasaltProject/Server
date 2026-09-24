@@ -271,6 +271,17 @@ const structure::StructurePlacementGrid& SwampHutStructureGenerator::grid() {
     return built;
 }
 
+bool SwampHutStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
+        return false;
+    }
+    // parity: `onTopOfChunkCenter` over `WORLD_SURFACE_WG`, which is where the biome is tested.
+    const std::int32_t centreX = chunkX * 16 + 8;
+    const std::int32_t centreZ = chunkZ * 16 + 8;
+    const std::int32_t stubY = surfaceHeightAt_(centreX, centreZ) - 1;
+    return biomePath(biomeAt_(centreX, stubY, centreZ)) == kBiome;
+}
+
 void SwampHutStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
     const std::int32_t chunkX = chunk.chunkX();
     const std::int32_t chunkZ = chunk.chunkZ();
@@ -282,11 +293,7 @@ void SwampHutStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, chunkX, chunkZ);
 
-    // parity: `onTopOfChunkCenter` over `WORLD_SURFACE_WG`, which is where the biome is tested.
-    const std::int32_t centreX = chunkX * 16 + 8;
-    const std::int32_t centreZ = chunkZ * 16 + 8;
-    const std::int32_t stubY = surfaceHeightAt_(centreX, centreZ) - 1;
-    if (biomePath(biomeAt_(centreX, stubY, centreZ)) != kBiome) {
+    if (!startsAt(seed, chunkX, chunkZ)) {
         return;
     }
 

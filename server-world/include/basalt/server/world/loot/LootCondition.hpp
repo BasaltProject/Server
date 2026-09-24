@@ -73,7 +73,7 @@ public:
         EnvironmentAttributeCheck,
     };
 
-    enum class Target : std::uint8_t { This, Attacker, DirectAttacker };
+    enum class Target : std::uint8_t { This, Attacker, DirectAttacker, AttackingPlayer };
 
     [[nodiscard]] static LootCondition randomChance(FloatProvider chance);
     [[nodiscard]] static LootCondition always();

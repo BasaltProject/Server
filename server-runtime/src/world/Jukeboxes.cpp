@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -60,11 +61,12 @@ constexpr std::string_view kDiscPrefix = "music_disc_";
 
 [[nodiscard]] std::optional<std::int32_t> turned(std::int32_t stateId, const wire::common::Identifier& id,
                                                  const std::string& hasRecord) {
-    return registry::blockStateDefinitions::stateIdOf(id, {{"has_record", hasRecord}}, stateId);
+    return server::registry::blockStateDefinitions::stateIdOf(id, {{"has_record", hasRecord}}, stateId);
 }
 
 [[nodiscard]] std::string propertyOf(std::int32_t stateId, const std::string& name) {
-    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const std::map<std::string, std::string> properties =
+        server::registry::blockStateDefinitions::propertiesOf(stateId);
     const auto found = properties.find(name);
     return found == properties.end() ? std::string{} : found->second;
 }
@@ -83,13 +85,25 @@ std::string songOf(const wire::common::Identifier& disc) {
 
 bool isDisc(const wire::common::Identifier& item) { return item.path().starts_with(kDiscPrefix); }
 
+std::optional<std::int32_t> songNetworkId(const std::string_view song) {
+    const std::vector<runtime::registry::vanillaRegistryData::Entry>& songs =
+        runtime::registry::vanillaRegistryData::jukeboxSongs();
+    const auto found = std::ranges::find(songs, song, &runtime::registry::vanillaRegistryData::Entry::first);
+    return found == songs.end() ? std::nullopt : std::optional{static_cast<std::int32_t>(found - songs.begin())};
+}
+
+bool isPlayingAt(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    const server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z, false);
+    return entity != nullptr && isPlaying(entity->data());
+}
+
 std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                   const wire::common::Identifier& disc) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
     }
-    const wire::common::Identifier* found = registry::blockStateDefinitions::blockOf(*stateId);
+    const wire::common::Identifier* found = server::registry::blockStateDefinitions::blockOf(*stateId);
     if (found == nullptr || *found != block() || propertyOf(*stateId, "has_record") == "true") {
         return std::nullopt;
     }
@@ -108,7 +122,12 @@ std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_
     entity->data().putLong(kTicksKey, 0);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
-    return BlockChange{.x = x, .y = y, .z = z, .stateId = *playing};
+    BlockChange change{.x = x, .y = y, .z = z, .stateId = *playing};
+    // parity: `JukeboxSongPlayer.play`, for a disc whose song this server knows.
+    if (const std::optional<std::int32_t> song = songNetworkId(songOf(disc)); song.has_value()) {
+        change.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kPlayJukeboxSong, .data = *song});
+    }
+    return change;
 }
 
 std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState& world, std::int32_t x, std::int32_t y,
@@ -117,7 +136,7 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState
     if (!stateId.has_value()) {
         return std::nullopt;
     }
-    const wire::common::Identifier* found = registry::blockStateDefinitions::blockOf(*stateId);
+    const wire::common::Identifier* found = server::registry::blockStateDefinitions::blockOf(*stateId);
     if (found == nullptr || *found != block() || propertyOf(*stateId, "has_record") != "true") {
         return std::nullopt;
     }
@@ -130,6 +149,7 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState
         return std::nullopt;
     }
     const std::optional<std::int32_t> quiet = turned(*stateId, *found, "false");
+    const bool wasPlaying = isPlaying(entity->data());
     if (!quiet.has_value() || !world.setBlockState(x, y, z, *quiet)) {
         return std::nullopt;
     }
@@ -137,7 +157,11 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState
     static_cast<void>(entity->data().remove(std::string{kTicksKey}));
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
-    return std::pair{BlockChange{.x = x, .y = y, .z = z, .stateId = *quiet}, *disc};
+    BlockChange change{.x = x, .y = y, .z = z, .stateId = *quiet};
+    if (wasPlaying) {
+        change.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kStopJukeboxSong});
+    }
+    return std::pair{change, *disc};
 }
 
 std::optional<std::string> songAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {

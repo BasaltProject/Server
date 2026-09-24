@@ -74,10 +74,17 @@ TEST_CASE("a disc goes in, plays, and comes back out") {
     CHECK(world.blockState(8, 64, 8) == playing);
     CHECK(jukeboxes::songAt(world, 8, 64, 8) == "13");
     CHECK(jukeboxes::comparatorOutputAt(world, dataAt(world, 8, 64, 8)) == 1);
+    // parity: `JukeboxSongPlayer.play` raises 1010 with the song's id in the synced registry.
+    const std::optional<std::int32_t> song = jukeboxes::songNetworkId("13");
+    REQUIRE(song.has_value());
+    CHECK(started->effects ==
+          std::vector<BlockEffect>{blockEffect::Effect{.type = blockEffect::Effect::kPlayJukeboxSong, .data = *song}});
 
     const std::optional<std::pair<BlockChange, basalt::wire::common::Identifier>> stopped =
         jukeboxes::eject(world, 8, 64, 8);
     REQUIRE(stopped.has_value());
+    CHECK(stopped->first.effects ==
+          std::vector<BlockEffect>{blockEffect::Effect{.type = blockEffect::Effect::kStopJukeboxSong}});
     CHECK(stopped->first.stateId == quiet);
     CHECK(stopped->second == item("music_disc_13"));
     CHECK(world.blockState(8, 64, 8) == quiet);
@@ -202,6 +209,10 @@ TEST_CASE("a song runs out and the jukebox stops feeding the redstone, disc stil
     CHECK(jukeboxes::comparatorOutputAt(world, dataAt(world, 8, 64, 8)) == 1);
     // And a jukebox that already stopped has nothing left to do.
     CHECK_FALSE(jukeboxes::tick(world, 8, 64, 8, kLength));
+    // parity: `JukeboxSongPlayer.stop` is silent for a song that already ended.
+    const auto ejected = jukeboxes::eject(world, 8, 64, 8);
+    REQUIRE(ejected.has_value());
+    CHECK(ejected->first.effects.empty());
 }
 
 TEST_CASE("a jukebox gives fifteen while the song plays and nothing once it has run out") {

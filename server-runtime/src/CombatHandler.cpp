@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
+#include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
@@ -10,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
@@ -43,6 +45,11 @@ using wire::text::Component;
 
 /// parity: `Entity.getEyeHeight` and the lift a dismount gives.
 constexpr double kDismountLift = 0.5;
+
+/// parity: `LivingEntity.getEffectiveGravity`, the least fall speed that bounces, and
+/// `getBlockPosBelowThatAffectsMyMovement`'s depth.
+constexpr double kBounceGravity = 0.08;
+constexpr double kBounceProbeDepth = 0.500001;
 
 /// The blocks that cancel a fall while you are in them. parity: `Entity.onClimbable`.
 const std::set<std::string, std::less<>>& climbableBlocks() {
@@ -121,6 +128,7 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
             if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
                 world::vibrations::emit(world->state(), "hit_ground", session.x, y, session.z, world->gameTime(),
                                         {.entity = session.uuid()});
+                bounceOn(session, *world, y);
             }
         }
         applyFallDamage(session, y);
@@ -128,6 +136,30 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
     }
     if (onGround) {
         fallDistance = 0.0;
+    }
+}
+
+void CombatHandler::bounceOn(PlayerSession& session, world::LoadedWorld& world, double landingY) {
+    // parity: `restituteMovementAfterCollisions` bounces only a fall faster than gravity, never a
+    // sneaking one; of what bounces, only `ShelfMushroomBlock.bounceOn` makes a sound.
+    if (session.sneaking || fallDistance <= kBounceGravity) {
+        return;
+    }
+    const auto blockX = static_cast<std::int32_t>(std::floor(session.x));
+    const auto blockY = static_cast<std::int32_t>(std::floor(landingY - kBounceProbeDepth));
+    const auto blockZ = static_cast<std::int32_t>(std::floor(session.z));
+    const std::optional<std::int32_t> under = world.state().blockState(blockX, blockY, blockZ);
+    const std::optional<server::registry::BlockState> block =
+        under.has_value() ? server::registry::blocks::byStateId(*under) : std::nullopt;
+    if (!block.has_value() || block->block.path() != "shelf_mushroom" ||
+        server::registry::blockMovement::bouncinessOf(*under) <= 0.0F) {
+        return;
+    }
+    const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
+    for (PlayerSession* listener : owner_->playersInSameWorld()) {
+        player::playSoundFor(*listener, "minecraft:block.shelf_mushroom.bounce",
+                             wire::protocol::play::SoundSource::Blocks, blockX + 0.5, blockY + 0.5, blockZ + 0.5, 1.0F,
+                             1.0F, seed);
     }
 }
 

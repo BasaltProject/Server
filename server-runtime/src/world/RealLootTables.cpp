@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/LootRegistries.hpp>
 #include <basalt/server/runtime/world/NaturalSpawner.hpp>
@@ -78,6 +79,11 @@ const LootTable* RealLootTables::forBlock(const Identifier& block) {
 void RealLootTables::prepare(server::world::loot::LootContext& context) {
     if (!context.tables) {
         context.tables = [this](const Identifier& id) { return byId(id); };
+    }
+    if (scoreboard_ != nullptr && !context.score) {
+        context.score = [scoreboard = scoreboard_](std::string_view holder, std::string_view objective) {
+            return scoreboard->score(holder, objective);
+        };
     }
     if (registries_ == nullptr) {
         return;

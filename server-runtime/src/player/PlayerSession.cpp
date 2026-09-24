@@ -18,6 +18,19 @@ void PlayerSession::setMaxHealth(float value) {
     }
 }
 
+float PlayerSession::luck() const {
+    // parity: `Attributes.LUCK`, base 0 and clamped to 1024 either way.
+    constexpr double kLuckLimit = 1024.0;
+    const auto base = attributeBases.find("minecraft:luck");
+    double value = base == attributeBases.end() ? 0.0 : base->second;
+    for (const auto& [id, effect] : effects) {
+        if (id.namespaceName() == "minecraft" && (id.path() == "luck" || id.path() == "unluck")) {
+            value += (id.path() == "luck" ? 1.0 : -1.0) * static_cast<double>(effect.amplifier + 1);
+        }
+    }
+    return static_cast<float>(std::clamp(value, -kLuckLimit, kLuckLimit));
+}
+
 bool PlayerSession::mayFly() const noexcept {
     return gamemode == wire::protocol::play::Gamemode::Creative ||
            gamemode == wire::protocol::play::Gamemode::Spectator;

@@ -102,6 +102,8 @@ struct LootContext {
     std::optional<EntityFacts> thisEntity;
     std::optional<EntityFacts> attacker;
     std::optional<EntityFacts> directAttacker;
+    /// parity: `LAST_DAMAGE_PLAYER`, the player behind the death whatever landed the last blow.
+    std::optional<EntityFacts> attackingPlayer;
     /// The highest level of each enchantment across what the attacker wears and holds.
     /// parity: `EnchantmentHelper.getEnchantmentLevel(enchantment, attacker)`.
     std::map<std::string, std::int32_t, std::less<>> attackerEnchantments;
@@ -113,6 +115,8 @@ struct LootContext {
     /// A tag's members in the order the tag lists them, for a `tag` entry and `set_instrument`.
     std::function<std::vector<wire::common::Identifier>(std::string_view registry, const wire::common::Identifier& tag)>
         tagMembers;
+    /// parity: `LootParams.getLuck`, what `fill` rolls with: the opening player's luck.
+    float luck = 0.0F;
     /// parity: `LootContextParams.ORIGIN`, and what a `location_check` sees at a square.
     std::optional<std::array<double, 3>> origin;
     std::function<PlaceFacts(std::int32_t x, std::int32_t y, std::int32_t z)> placeAt;
@@ -138,6 +142,10 @@ struct LootContext {
     std::optional<bool> raining;
     std::optional<bool> thundering;
 };
+
+/// The score holder behind one of the roll's entities: the context's own answer when it has one,
+/// else the name its facts carry. parity: `LootContext.getOptionalParameter(...).getScoreboardName`.
+[[nodiscard]] std::optional<std::string> scoreHolderOf(const LootContext& context, EntityTarget target);
 
 /// parity: `LevelBasedValue`, the two shapes the loot tables use.
 struct LevelBasedValue {

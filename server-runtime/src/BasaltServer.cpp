@@ -309,6 +309,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     timingsReport_ = std::make_unique<timings::TimingsReport>(timings_, tickLoop_->durations(), std::move(sources));
     whitelistEnforced_ = config.whitelist;
 
+    vanillaData_.lootTables.useScoreboard(&scoreboard_);
+
     CommandWiring wiring;
     wiring.players = &playerRegistry_;
     wiring.live = live_;

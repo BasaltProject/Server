@@ -2,6 +2,7 @@
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/server/world/terrain/JungleTempleStructureGenerator.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdlib>
@@ -14,6 +15,8 @@ using structure::StructureBoundingBox;
 using structure::StructureDirection;
 
 constexpr std::int32_t kSurfaceStructuresStep = 4;
+/// parity: the Overworld noise settings' `sea_level`.
+constexpr std::int32_t kSeaLevel = 63;
 constexpr std::int32_t kReachChunks = 2;
 
 /// parity: `Direction.Plane.HORIZONTAL`, the array `getRandomDirection` draws from.
@@ -43,10 +46,10 @@ const structure::StructurePlacementGrid& JungleTempleStructureGenerator::grid() 
     return built;
 }
 
-void JungleTempleStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
-                                               std::int32_t chunkZ) const {
+std::optional<JungleTemplePiece> JungleTempleStructureGenerator::startPiece(std::int64_t seed, std::int32_t chunkX,
+                                                                            std::int32_t chunkZ) const {
     if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
-        return;
+        return std::nullopt;
     }
 
     random::RandomSource startRandom = random::RandomSource::worldgen(random::RandomSource::legacy(0));
@@ -56,16 +59,34 @@ void JungleTempleStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, 
     const std::int32_t centreZ = chunkZ * 16 + 8;
     const std::int32_t stubY = surfaceHeightAt_(centreX, centreZ) - 1;
     if (!templeBiomes_.contains(biomeAt_(centreX, stubY, centreZ))) {
-        return;
+        return std::nullopt;
+    }
+    // parity: `SinglePieceStructure.findGenerationPoint` refuses a start whose lowest corner, over
+    // the piece's 12 by 15 footprint measured one past its far edges, is below sea level.
+    const std::int32_t minX = chunkX * 16;
+    const std::int32_t minZ = chunkZ * 16;
+    const auto occupied = [this](std::int32_t x, std::int32_t z) { return surfaceHeightAt_(x, z) - 1; };
+    if (std::min({occupied(minX, minZ), occupied(minX, minZ + 15), occupied(minX + 12, minZ),
+                  occupied(minX + 12, minZ + 15)}) < kSeaLevel) {
+        return std::nullopt;
     }
 
     const StructureDirection orientation =
         kHorizontal[static_cast<std::size_t>(startRandom.nextInt(static_cast<std::int32_t>(kHorizontal.size())))];
     JungleTemplePiece piece{chunkX * 16, chunkZ * 16, orientation};
     if (!piece.settleOnGround(surfaceHeightAt_)) {
+        return std::nullopt;
+    }
+    return piece;
+}
+
+void JungleTempleStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
+                                               std::int32_t chunkZ) const {
+    std::optional<JungleTemplePiece> start = startPiece(seed, chunkX, chunkZ);
+    if (!start.has_value()) {
         return;
     }
-
+    JungleTemplePiece& piece = *start;
     const StructureBoundingBox clip = chunkClip(chunk.chunkX(), chunk.chunkZ());
     if (!piece.bounds().intersects(clip)) {
         return;

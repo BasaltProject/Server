@@ -30,9 +30,9 @@ MineshaftStructureGenerator::MineshaftStructureGenerator(BiomeAt biomeAt,
                                                          std::set<std::string, std::less<>> normalBiomes,
                                                          std::set<std::string, std::less<>> mesaBiomes,
                                                          structure::mineshaftLayout::SurfaceHeightAt surfaceHeightAt,
-                                                         std::int32_t seaLevel)
-    : biomeAt_(std::move(biomeAt)), normalBiomes_(std::move(normalBiomes)), mesaBiomes_(std::move(mesaBiomes)),
-      surfaceHeightAt_(std::move(surfaceHeightAt)), seaLevel_(seaLevel),
+                                                         std::int32_t seaLevel, BiomeAt startBiomeAt)
+    : biomeAt_(std::move(biomeAt)), startBiomeAt_(std::move(startBiomeAt)), normalBiomes_(std::move(normalBiomes)),
+      mesaBiomes_(std::move(mesaBiomes)), surfaceHeightAt_(std::move(surfaceHeightAt)), seaLevel_(seaLevel),
       grid_(1, 0, 0, structure::SpreadType::Linear, kFrequency, structure::FrequencyReduction::LegacyType3) {}
 
 bool MineshaftStructureGenerator::allows(structure::MineshaftType type, const std::string& biome) const {
@@ -64,7 +64,8 @@ bool MineshaftStructureGenerator::accepts(std::int64_t seed, std::int32_t chunkX
     // that position out of the chunk's middle x but its minimum z. A shaft that ends up in a cave
     // biome is kept on that biome's tag even when the surface above it is ocean.
     const std::shared_ptr<const structure::mineshaftLayout::Assembly> assembly = assemblyOf(seed, chunkX, chunkZ, type);
-    return allows(type, biomeAt_(chunkX * 16 + 8, assembly->stubY, chunkZ * 16));
+    const BiomeAt& biomeAt = startBiomeAt_ ? startBiomeAt_ : biomeAt_;
+    return allows(type, biomeAt(chunkX * 16 + 8, assembly->stubY, chunkZ * 16));
 }
 
 std::shared_ptr<const structure::mineshaftLayout::Assembly>

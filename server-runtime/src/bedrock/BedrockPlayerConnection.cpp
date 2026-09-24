@@ -2,7 +2,10 @@
 #include <basalt/server/runtime/bedrock/BedrockBlockEntities.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
+#include <basalt/server/runtime/bedrock/BedrockRecords.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
+#include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -24,6 +27,7 @@
 #include <cstdlib>
 #include <limits>
 #include <map>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -761,9 +765,35 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     // One of the numbered one-off effects. That edition splits what Java's single number carries
     // into an effect and a sound, and has no answer at all for most of them: one it cannot draw is
     // left undrawn rather than drawn as something else.
-    connection.sendLevelEvent = [mailbox = joining.mailbox, protocol = joining.protocol](
+    const auto records = std::make_shared<BedrockRecords>(
+        joining.protocol, [mailbox = joining.mailbox](wire::bedrock::BedrockPacket id, std::vector<std::uint8_t> body) {
+            mailbox->post(static_cast<std::uint16_t>(id), std::move(body));
+        });
+    connection.sendLevelEvent = [mailbox = joining.mailbox, protocol = joining.protocol, records, lang = context_.lang](
                                     const std::int32_t type, const std::int32_t x, const std::int32_t y,
                                     const std::int32_t z, const std::int32_t data) {
+        // parity: Geyser's `SOUND_PLAY_JUKEBOX_SONG` and `SOUND_STOP_JUKEBOX_SONG`, with the popup
+        // Java draws itself sent as a jukebox line.
+        if (type == world::blockEffect::Effect::kStopJukeboxSong) {
+            records->stopped(x, y, z);
+            return;
+        }
+        if (type == world::blockEffect::Effect::kPlayJukeboxSong) {
+            const std::vector<registry::vanillaRegistryData::Entry>& songs =
+                registry::vanillaRegistryData::jukeboxSongs();
+            if (data < 0 || static_cast<std::size_t>(data) >= songs.size()) {
+                return;
+            }
+            const auto& [song, definition] = songs[static_cast<std::size_t>(data)];
+            records->started(x, y, z, definition.getString("sound_event"));
+            const Component playing = Component::translatable(
+                "record.nowPlaying", {Component::translatable("jukebox_song.minecraft." + song)});
+            wire::io::ByteBuffer popup;
+            wire::bedrock::writeText(popup, wire::bedrock::TextType::JukeboxPopup, "",
+                                     wire::text::toLegacyText(wire::text::resolveComponent(playing, lang)));
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Text), popup.toVector());
+            return;
+        }
         const wire::bedrock::BedrockLevelEffect effect = wire::bedrock::bedrockLevelEffect(type, data);
         if (effect.event != 0) {
             const std::int32_t carried = effect.translatesBlock

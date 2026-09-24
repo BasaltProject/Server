@@ -12,7 +12,7 @@ namespace basalt::server::runtime::world::containerLoot {
 
 void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, std::int64_t seed,
           std::vector<std::optional<server::world::loot::ItemStack>>& slots, bool byPlayer,
-          const std::array<std::int32_t, 3>& at) {
+          const std::array<std::int32_t, 3>& at, const float luck) {
     const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
         wire::common::Identifier::parse(table);
     const server::world::loot::LootTable* rolled = id.has_value() ? tables.byId(*id) : nullptr;
@@ -20,6 +20,8 @@ void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, st
         return;
     }
     server::world::loot::LootContext context{.hasEntity = byPlayer};
+    // parity: `unpackLootTable` rolls with the player's luck, and none without one.
+    context.luck = byPlayer ? luck : 0.0F;
     // parity: `Vec3.atCenterOf(worldPosition)`.
     tables.prepareAt(context, world, at[0] + 0.5, at[1] + 0.5, at[2] + 0.5);
     // parity: `withOptionalRandomSeed`, a fresh `LegacyRandomSource` unless the seed is zero, and
@@ -39,7 +41,7 @@ void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, st
 
 std::optional<wire::common::Identifier> unpack(LoadedWorld& world, RealLootTables& tables, std::int32_t x,
                                                std::int32_t y, std::int32_t z,
-                                               const std::optional<wire::common::Uuid>& player) {
+                                               const std::optional<wire::common::Uuid>& player, const float luck) {
     server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
     server::world::ChunkBlockEntity* entity = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
     if (entity == nullptr) {
@@ -63,7 +65,7 @@ std::optional<wire::common::Identifier> unpack(LoadedWorld& world, RealLootTable
         return named;
     }
     blockInventory::Slots slots = blockInventory::readFor(path, entity->data(), *size);
-    fill(world, tables, table, seed, slots, player.has_value(), {x, y, z});
+    fill(world, tables, table, seed, slots, player.has_value(), {x, y, z}, luck);
     // The roll may have written blocks; look the entity up again rather than trust the pointer.
     server::world::ChunkBlockEntity* again = chunk->blockEntityAt(x & 15, y, z & 15);
     if (again != nullptr) {

@@ -72,7 +72,7 @@ void LootTable::fill(std::vector<std::optional<ItemStack>>& slots, random::Rando
     std::vector<ItemStack> stacks;
     // parity: `createStackSplitter`, which cuts anything past the item's own stack size.
     generateRaw(
-        random, 0.0F, std::nullopt,
+        random, context.luck, std::nullopt,
         [&stacks](ItemStack stack) {
             const std::int32_t most = server::registry::itemStacking::maxStackSize(stack.item);
             if (stack.count < most) {

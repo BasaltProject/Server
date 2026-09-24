@@ -587,13 +587,19 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
         return;
     }
     // parity: a client that got nothing from the main hand asks again with the off hand, and the
-    // shield is what answers there.
+    // rod or the shield is what answers there.
     if (useItem.hand != play::Hand::MainHand) {
         const std::optional<storage::StoredItemStack> offhand = session->inventory.at(PlayerInventory::kOffhandSlot);
         const std::optional<Identifier> other = offhand.has_value() ? parsedOrNothing(offhand->id) : std::nullopt;
-        if (other.has_value() && !owner_->itemUseTimers().onCooldown(*other)) {
-            static_cast<void>(owner_->itemUseTimers().startBlocking(*session, *other, PlayerInventory::kOffhandSlot));
+        if (!other.has_value() || owner_->itemUseTimers().onCooldown(*other)) {
+            return;
         }
+        // parity: `FishingRodItem.use` answers either hand.
+        if (owner_->options().fishing != nullptr &&
+            owner_->options().fishing->useRod(breakContext(), *session, *world, PlayerInventory::kOffhandSlot)) {
+            return;
+        }
+        static_cast<void>(owner_->itemUseTimers().startBlocking(*session, *other, PlayerInventory::kOffhandSlot));
         return;
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();

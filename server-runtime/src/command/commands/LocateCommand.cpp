@@ -3,7 +3,6 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/LocateCommand.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
-#include <basalt/server/world/terrain/JigsawStructureGenerator.hpp>
 #include <basalt/server/world/terrain/StrongholdStructureGenerator.hpp>
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 
@@ -125,8 +124,8 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                     std::vector<Identifier> ids = world == nullptr ? terrain::VillageStructureGenerator::structureIds()
                                                                    : world->structureSetIds();
                     if (world != nullptr) {
-                        for (const terrain::JigsawStructureGenerator* jigsaw : world->jigsawGenerators()) {
-                            ids.push_back(jigsaw->id());
+                        for (const world::StructureLocator& locator : world->structureLocators()) {
+                            ids.push_back(locator.id);
                         }
                     }
                     ids.push_back(stronghold());
@@ -159,10 +158,11 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                         }
                         x = found->first * 16;
                         z = found->second * 16;
-                    } else if (terrain::JigsawStructureGenerator* jigsaw = (*world)->jigsawGenerator(*wanted);
-                               jigsaw != nullptr) {
+                    } else if (const auto locator = std::ranges::find((*world)->structureLocators(), *wanted,
+                                                                      &world::StructureLocator::id);
+                               locator != (*world)->structureLocators().end()) {
                         const std::optional<std::pair<std::int32_t, std::int32_t>> found =
-                            jigsaw->locate((*world)->metadata().seed, startX >> 4, startZ >> 4);
+                            locator->locate((*world)->metadata().seed, startX >> 4, startZ >> 4);
                         if (!found.has_value()) {
                             return std::unexpected{notFound("commands.locate.structure.not_found", *wanted)};
                         }

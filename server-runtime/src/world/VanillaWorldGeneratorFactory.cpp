@@ -289,16 +289,16 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
 
     built->mineshafts = std::make_unique<terrain::MineshaftStructureGenerator>(
         blockBiome, biomesOf(tags, "minecraft:has_structure/mineshaft"),
-        biomesOf(tags, "minecraft:has_structure/mineshaft_mesa"), surfaceHeight);
+        biomesOf(tags, "minecraft:has_structure/mineshaft_mesa"), surfaceHeight, 63, quartBiome);
     built->ruinedPortals = std::make_unique<terrain::RuinedPortalStructureGenerator>(
         ruinedPortalVariants::overworld(tags), templateOf, blockBiome, surfaceHeight, oceanFloor,
         [&columns](std::int32_t x, std::int32_t y, std::int32_t z) { return columns.isSolid(x, y, z); });
-    built->swampHuts = std::make_unique<terrain::SwampHutStructureGenerator>(blockBiome, surfaceHeight);
-    built->desertPyramids = std::make_unique<terrain::DesertPyramidStructureGenerator>(blockBiome, surfaceHeight);
+    built->swampHuts = std::make_unique<terrain::SwampHutStructureGenerator>(quartBiome, surfaceHeight);
+    built->desertPyramids = std::make_unique<terrain::DesertPyramidStructureGenerator>(quartBiome, surfaceHeight);
     built->jungleTemples = std::make_unique<terrain::JungleTempleStructureGenerator>(
-        blockBiome, biomesOf(tags, "minecraft:has_structure/jungle_temple"), surfaceHeight);
+        quartBiome, biomesOf(tags, "minecraft:has_structure/jungle_temple"), surfaceHeight);
     built->mansions = std::make_unique<terrain::WoodlandMansionStructureGenerator>(
-        blockBiome, biomesOf(tags, "minecraft:has_structure/woodland_mansion"), templateOf, surfaceHeight);
+        quartBiome, biomesOf(tags, "minecraft:has_structure/woodland_mansion"), templateOf, surfaceHeight);
     built->oceanMonuments = std::make_unique<terrain::OceanMonumentStructureGenerator>(
         noiseBiome, biomesOf(tags, "minecraft:has_structure/ocean_monument"),
         biomesOf(tags, "minecraft:required_ocean_monument_surrounding"), oceanFloor);
@@ -394,8 +394,58 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     };
     answer.villages = built->village.get();
     answer.camps = built->camps.get();
-    answer.jigsaws = {built->pillagerOutposts.get(), built->trailRuins.get(), built->ancientCities.get(),
-                      built->trialChambers.get()};
+    // parity: `LocateCommand` searches 100 cells of each placement grid.
+    constexpr std::int32_t kLocateCells = 100;
+    const auto onGrid = [](const structure::StructurePlacementGrid& grid, auto startsAt) {
+        return [&grid, startsAt](std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+            return grid.locate(seed, chunkX, chunkZ, kLocateCells,
+                               [&](std::int32_t x, std::int32_t z) { return startsAt(seed, x, z); });
+        };
+    };
+    for (terrain::JigsawStructureGenerator* jigsaw : {built->pillagerOutposts.get(), built->trailRuins.get(),
+                                                      built->ancientCities.get(), built->trialChambers.get()}) {
+        answer.locators.push_back(
+            StructureLocator{.id = Identifier::vanilla(jigsaw->name()),
+                             .locate = [jigsaw](std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+                                 return jigsaw->locate(seed, chunkX, chunkZ, kLocateCells);
+                             }});
+    }
+    const terrain::MineshaftStructureGenerator* mineshafts = built->mineshafts.get();
+    for (const auto& [name, type] : {std::pair{"mineshaft", structure::MineshaftType::Normal},
+                                     std::pair{"mineshaft_mesa", structure::MineshaftType::Mesa}}) {
+        answer.locators.push_back(StructureLocator{
+            .id = Identifier::vanilla(name),
+            .locate = onGrid(mineshafts->grid(), [mineshafts, type](std::int64_t seed, std::int32_t x, std::int32_t z) {
+                return mineshafts->typeAt(seed, x, z) == type;
+            })});
+    }
+    const terrain::SwampHutStructureGenerator* huts = built->swampHuts.get();
+    answer.locators.push_back(StructureLocator{
+        .id = Identifier::vanilla(std::string{terrain::SwampHutStructureGenerator::kName}),
+        .locate =
+            onGrid(terrain::SwampHutStructureGenerator::grid(),
+                   [huts](std::int64_t seed, std::int32_t x, std::int32_t z) { return huts->startsAt(seed, x, z); })});
+    const terrain::DesertPyramidStructureGenerator* pyramids = built->desertPyramids.get();
+    answer.locators.push_back(
+        StructureLocator{.id = Identifier::vanilla(std::string{terrain::DesertPyramidStructureGenerator::kName}),
+                         .locate = onGrid(terrain::DesertPyramidStructureGenerator::grid(),
+                                          [pyramids](std::int64_t seed, std::int32_t x, std::int32_t z) {
+                                              return pyramids->startsAt(seed, x, z);
+                                          })});
+    const terrain::JungleTempleStructureGenerator* temples = built->jungleTemples.get();
+    answer.locators.push_back(
+        StructureLocator{.id = Identifier::vanilla(std::string{terrain::JungleTempleStructureGenerator::kName}),
+                         .locate = onGrid(terrain::JungleTempleStructureGenerator::grid(),
+                                          [temples](std::int64_t seed, std::int32_t x, std::int32_t z) {
+                                              return temples->startsAt(seed, x, z);
+                                          })});
+    const terrain::WoodlandMansionStructureGenerator* mansions = built->mansions.get();
+    answer.locators.push_back(
+        StructureLocator{.id = Identifier::vanilla(std::string{terrain::WoodlandMansionStructureGenerator::kName}),
+                         .locate = onGrid(terrain::WoodlandMansionStructureGenerator::grid(),
+                                          [mansions](std::int64_t seed, std::int32_t x, std::int32_t z) {
+                                              return mansions->startsAt(seed, x, z);
+                                          })});
     answer.strongholds = built->strongholds.get();
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
                                const std::string& difficulty,

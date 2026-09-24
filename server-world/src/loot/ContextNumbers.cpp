@@ -133,10 +133,34 @@ template <typename Value>
     if (!target.entity.has_value()) {
         return target.name;
     }
-    return context.scoreHolder ? context.scoreHolder(*target.entity) : std::nullopt;
+    return scoreHolderOf(context, *target.entity);
 }
 
 } // namespace
+
+std::optional<std::string> scoreHolderOf(const LootContext& context, EntityTarget target) {
+    if (context.scoreHolder) {
+        return context.scoreHolder(target);
+    }
+    const std::optional<EntityFacts>* facts = nullptr;
+    switch (target) {
+    case EntityTarget::This:
+        facts = &context.thisEntity;
+        break;
+    case EntityTarget::Attacker:
+        facts = &context.attacker;
+        break;
+    case EntityTarget::DirectAttacker:
+        facts = &context.directAttacker;
+        break;
+    case EntityTarget::AttackingPlayer:
+        facts = &context.attackingPlayer;
+        break;
+    default:
+        break;
+    }
+    return facts == nullptr || !facts->has_value() ? std::nullopt : (*facts)->scoreName;
+}
 
 IntProvider IntProvider::constant(std::int32_t value) {
     IntProvider built;

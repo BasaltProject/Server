@@ -41,6 +41,19 @@ namespace {
     return found == levels.end() ? 0 : found->second;
 }
 
+[[nodiscard]] const std::optional<EntityFacts>& factsFor(const LootContext& context, LootCondition::Target target) {
+    switch (target) {
+    case LootCondition::Target::Attacker:
+        return context.attacker;
+    case LootCondition::Target::DirectAttacker:
+        return context.directAttacker;
+    case LootCondition::Target::AttackingPlayer:
+        return context.attackingPlayer;
+    default:
+        return context.thisEntity;
+    }
+}
+
 } // namespace
 
 bool IntRange::test(random::RandomSource& random, const LootContext& context, std::int32_t value) const {
@@ -317,9 +330,7 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
         return context.tool.has_value() &&
                (part.item == nullptr || part.item->test(context.tool, context.toolEnchantments, context.tags));
     case Kind::EntityMatches: {
-        const std::optional<EntityFacts>& entity = target_ == Target::This       ? context.thisEntity
-                                                   : target_ == Target::Attacker ? context.attacker
-                                                                                 : context.directAttacker;
+        const std::optional<EntityFacts>& entity = factsFor(context, target_);
         return part.entity != nullptr && part.entity->test(entity, context.tags);
     }
     // parity: `DamageSourcePredicate.matches`, false without a damage source at all.
@@ -351,9 +362,8 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
     // parity: `LootItemEntityPropertyCondition` with an empty predicate, which asks only that the
     // entity be there: the player mining the block or the arrow that hit it.
     case Kind::ThisEntityExists:
-        return target_ == Target::This       ? context.hasEntity || context.thisEntity.has_value()
-               : target_ == Target::Attacker ? context.attacker.has_value()
-                                             : context.directAttacker.has_value();
+        return target_ == Target::This ? context.hasEntity || context.thisEntity.has_value()
+                                       : factsFor(context, target_).has_value();
     // parity: `MatchBlock`: a roll with no block behind it matches nothing, and a predicate on the
     // block entity is a gap that never matches.
     case Kind::MatchBlock:
@@ -421,8 +431,7 @@ bool LootCondition::testWorld(random::RandomSource& random, const LootContext& c
         return !part.thundering.has_value() || context.thundering.value_or(false) == *part.thundering;
     // parity: `EntityHasScoreCondition`: every objective scored and in range, in the file's order.
     case Kind::EntityScores: {
-        const std::optional<std::string> holder =
-            context.scoreHolder ? context.scoreHolder(part.entityTarget) : std::nullopt;
+        const std::optional<std::string> holder = scoreHolderOf(context, part.entityTarget);
         if (!holder.has_value()) {
             return false;
         }
