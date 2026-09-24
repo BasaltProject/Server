@@ -49,7 +49,7 @@ namespace {
 
 TEST_CASE("the table of events is the table of events") {
     const std::vector<const PluginEventType*>& all = pluginEventTypes::all();
-    CHECK(all.size() == 168);
+    CHECK(all.size() == 169);
 
     std::set<std::string> names;
     std::string joined;
@@ -60,8 +60,8 @@ TEST_CASE("the table of events is the table of events") {
         }
         joined += describe(*type);
     }
-    CHECK(names.size() == 168);
-    CHECK(checksumOf(joined) == 7082120343648057312LL);
+    CHECK(names.size() == 169);
+    CHECK(checksumOf(joined) == 2896640649002488609LL);
 
     CHECK(describe(*all[0]) == "player.join|false|player_name,player_uuid,world,message,silent|message,silent");
     CHECK(describe(*all[1]) == "player.quit|false|player_name,player_uuid,world,message,silent|message,silent");
