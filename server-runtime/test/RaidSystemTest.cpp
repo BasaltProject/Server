@@ -149,11 +149,9 @@ struct RaidFixture {
 TEST_CASE("a bad omen carried into a village turns into a raid omen") {
     RaidFixture fixture{scratch("raid-omen")};
     LoadedWorld& world = *fixture.spawn.base.world;
-    // Three beds is what makes a place a village here, since there is no point of interest map.
-    const std::int32_t bed = blocks::named("red_bed")->stateId;
-    REQUIRE(world.state().setBlockState(8, 64, 8, bed));
-    REQUIRE(world.state().setBlockState(9, 64, 8, bed));
-    REQUIRE(world.state().setBlockState(10, 64, 8, bed));
+    // parity: a bell somebody has claimed is what makes the sections around it a village.
+    REQUIRE(world.state().setBlockState(8, 64, 8, blocks::named("bell")->stateId));
+    REQUIRE(world.state().poi().acquire(basalt::server::runtime::world::poi::BlockPos{8, 64, 8}));
     fixture.spawn.base.player->x = 8.0;
     fixture.spawn.base.player->y = 64.0;
     fixture.spawn.base.player->z = 8.0;

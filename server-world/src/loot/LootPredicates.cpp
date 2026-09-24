@@ -175,7 +175,11 @@ bool LocationPredicate::test(const PlaceFacts& place, const TagLookup& tags) con
     // parity: `FluidPredicate`, where an empty square is the empty fluid.
     if (hasFluid) {
         const wire::common::Identifier fluid = place.fluid.value_or(wire::common::Identifier::vanilla("empty"));
-        if (!place.loaded || (!fluids.empty() && !matchesIdsOrTag(fluids, "fluid", fluid, tags)) ||
+        const TagLookup fluidTags = [&place, &tags](std::string_view registry, const wire::common::Identifier& id,
+                                                    std::string_view tag) {
+            return place.fluidTagged ? place.fluidTagged(id, tag) : tags && tags(registry, id, tag);
+        };
+        if (!place.loaded || (!fluids.empty() && !matchesIdsOrTag(fluids, "fluid", fluid, fluidTags)) ||
             !fluidState.test(place.fluidProperties)) {
             return false;
         }

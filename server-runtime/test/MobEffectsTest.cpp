@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/PotionEffects.hpp>
 
 #include <doctest.h>
 
@@ -94,4 +95,27 @@ TEST_CASE("an effect is shown, not ambient, and carries an icon unless told othe
     CHECK_FALSE(beacon.visible);
     CHECK_FALSE(beacon.showIcon);
     CHECK_FALSE(beacon == plain);
+}
+
+TEST_CASE("a potion's effects come scaled and floored, never under a tick, custom ones after") {
+    basalt::wire::nbt::NbtCompound contents;
+    contents.putString("potion", "minecraft:strong_poison");
+    basalt::wire::nbt::NbtCompound custom;
+    custom.putString("id", "minecraft:slowness");
+    custom.putByte("amplifier", 2);
+    custom.putInt("duration", 3);
+    contents.set("custom_effects",
+                 basalt::wire::nbt::NbtTag::ofList(basalt::wire::nbt::NbtList{
+                     basalt::wire::nbt::NbtType::Compound, {basalt::wire::nbt::NbtTag::ofCompound(custom)}}));
+    // parity: a tipped arrow's eighth: 432 poison ticks are 54, and 3 slowness ticks floor to the one.
+    const std::vector<ActiveEffect> effects = potionEffects::of(contents, 0.125F);
+    REQUIRE(effects.size() == 2);
+    CHECK(effects[0].effect == Identifier::vanilla("poison"));
+    CHECK(effects[0].amplifier == 1);
+    CHECK(effects[0].remainingTicks == 54);
+    CHECK(effects[1].effect == Identifier::vanilla("slowness"));
+    CHECK(effects[1].amplifier == 2);
+    CHECK(effects[1].remainingTicks == 1);
+    CHECK(potionEffects::ofPotion("turtle_master").size() == 2);
+    CHECK(potionEffects::ofPotion("water").empty());
 }

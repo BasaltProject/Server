@@ -1420,7 +1420,7 @@ void BasaltServer::startBedrockListener() {
                 if (found == worlds.end() || found->second == nullptr) {
                     return;
                 }
-                bedrock::shield::tick(*session, found->second->gameTime());
+                bedrock::shield::tick(*session, found->second->gameTime(), playerRegistry_.snapshot());
                 // parity: `AbstractArrow.playerTouch`, the same arrows a Java player picks up.
                 const std::vector<player::PickedArrow> arrows =
                     player::pickupNearbyArrows(*session, found->second->state());

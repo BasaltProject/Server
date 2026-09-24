@@ -123,6 +123,8 @@ struct PlaceFacts {
     bool smokey = false;
     /// parity: `StructureManager.getStructureWithPieceAt` over a holder set of structures.
     std::function<bool(const std::vector<std::string>& structures)> inStructure;
+    /// The fluid tags, which the roll's own tag lookup does not carry.
+    std::function<bool(const wire::common::Identifier& fluid, std::string_view tag)> fluidTagged;
 };
 
 /// parity: `MinMaxBounds.Doubles`.

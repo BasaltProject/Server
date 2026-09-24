@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/wire/protocol/play/EntityData.hpp>
 
 #include <optional>
 #include <string_view>
@@ -30,9 +31,8 @@ constexpr std::string_view kShield = "minecraft:shield";
     return std::nullopt;
 }
 
-} // namespace
-
-void tick(player::PlayerSession& player, const std::int64_t gameTime) {
+/// Raises the shield in the hand a sneak lifts it with, keeps its count, or drops it.
+void raise(player::PlayerSession& player, const std::int64_t gameTime) {
     const std::optional<std::int32_t> hand = player.sneaking && !player.dead ? shieldHand(player) : std::nullopt;
     if (player.blockingSlot.has_value() && hand != player.blockingSlot) {
         player.blockingSlot.reset();
@@ -51,6 +51,39 @@ void tick(player::PlayerSession& player, const std::int64_t gameTime) {
     }
     player.blockingSlot = *hand;
     player.blockingTicks = 0;
+}
+
+/// parity: `LivingEntity.DATA_LIVING_ENTITY_FLAGS`, using an item and with which hand.
+void announce(const player::PlayerSession& player, const std::vector<player::PlayerSession*>& watchers) {
+    constexpr std::int8_t kUsingItem = 1;
+    constexpr std::int8_t kOffhand = 2;
+    const bool raised = player.blockingSlot.has_value();
+    const bool offhand = raised && *player.blockingSlot == PlayerInventory::kOffhandSlot;
+    const wire::protocol::play::SetEntityDataPacket packet{
+        .entityId = player.entityId(),
+        .entries = {wire::protocol::play::SetEntityDataPacket::Entry{
+            .index = wire::protocol::play::SetEntityDataPacket::kLivingFlagsIndex,
+            .value = wire::protocol::play::SetEntityDataPacket::ByteValue{
+                .value = static_cast<std::int8_t>((raised ? kUsingItem : 0) | (offhand ? kOffhand : 0))}}}};
+    for (const player::PlayerSession* other : watchers) {
+        if (other->entityId() != player.entityId() && other->worldName == player.worldName &&
+            other->connection().sendPlayPacket) {
+            other->connection().sendPlayPacket(wire::protocol::play::SetEntityDataPacket::kId,
+                                               [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        }
+    }
+}
+
+} // namespace
+
+void tick(player::PlayerSession& player, const std::int64_t gameTime,
+          const std::vector<player::PlayerSession*>& watchers) {
+    const bool wasRaised = player.blockingSlot.has_value();
+    raise(player, gameTime);
+    if (player.blockingSlot.has_value() != wasRaised) {
+        player.usingItem = player.blockingSlot.has_value();
+        announce(player, watchers);
+    }
 }
 
 } // namespace basalt::server::runtime::bedrock::shield

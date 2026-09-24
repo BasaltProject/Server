@@ -338,6 +338,7 @@ basalt_module(server-runtime-core
         src/world/NetherSurfaceEnvironment.cpp
         src/world/Campfires.cpp
         src/world/BlockEntityTicks.cpp
+        src/world/PotionEffects.cpp
         src/world/Walls.cpp
         src/world/maps/MapData.cpp
         src/world/maps/MapDecorationTypes.cpp
@@ -492,6 +493,9 @@ basalt_module(server-runtime-core
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
         src/world/VillageProximity.cpp
+        src/world/poi/PoiManager.cpp
+        src/world/poi/PoiStorage.cpp
+        src/world/poi/PoiTypes.cpp
         src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
@@ -976,6 +980,15 @@ basalt_test(server-runtime-generated-entity-presentation-test
         test/GeneratedEntityPresentationTest.cpp
     DEPENDS basalt::server-runtime-core
 )
+
+basalt_test(server-runtime-poi-manager-test
+    SOURCES
+        test/PoiManagerTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-poi-manager-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-raids-test
     SOURCES

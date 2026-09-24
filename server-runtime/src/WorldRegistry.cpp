@@ -107,7 +107,16 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
             const player::PlayerSession* session =
                 player.has_value() && players != nullptr ? players->get(*player) : nullptr;
             const std::optional<wire::common::Identifier> rolled = world::containerLoot::unpack(
-                *holder, *tables, x, y, z, player, session == nullptr ? 0.0F : session->luck());
+                *holder, *tables, x, y, z, player,
+                session == nullptr
+                    ? std::nullopt
+                    : std::optional{world::containerLoot::Opener{
+                          .name = session->name(),
+                          .luck = session->luck(),
+                          .mainhand = session->inventory.heldItem().has_value()
+                                          ? wire::common::Identifier::parse(session->inventory.heldItem()->id)
+                                                .value_or(wire::common::Identifier::vanilla("air"))
+                                          : std::optional<wire::common::Identifier>{}}});
             // parity: `unpackLootTable` fires `GENERATE_LOOT` for the player who opened it.
             if (rolled.has_value() && session != nullptr && triggers != nullptr) {
                 triggers->onContainerLoot(session->name(), player->toString(), *rolled);

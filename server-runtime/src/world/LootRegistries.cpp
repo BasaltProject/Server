@@ -22,7 +22,8 @@ using wire::nbt::NbtTag;
 
 constexpr std::string_view kTagPrefix = "data/minecraft/tags/";
 constexpr std::string_view kJsonSuffix = ".json";
-constexpr std::array<std::string_view, 3> kRegistries{"enchantment", "instrument", "item"};
+constexpr std::array<std::string_view, 5> kRegistries{"enchantment", "instrument", "item", "fluid",
+                                                      "worldgen/structure"};
 
 [[nodiscard]] std::int32_t intOf(const NbtCompound& compound, std::string_view key, std::int32_t fallback) {
     const NbtTag* tag = compound.find(key);

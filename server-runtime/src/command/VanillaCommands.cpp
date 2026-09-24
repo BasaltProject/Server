@@ -128,7 +128,7 @@ std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommand
     add(std::make_shared<commands::ItemCommand>(hooks.recipes, hooks.lootTables));
     add(std::make_shared<commands::ComputeCommand>(hooks.lootTables));
     if (hooks.lootTables != nullptr && hooks.worldSeed) {
-        add(std::make_shared<commands::LootCommand>(*hooks.lootTables, hooks.worldSeed));
+        add(std::make_shared<commands::LootCommand>(*hooks.lootTables));
     }
     if (hooks.templates != nullptr && hooks.nextStructureSeed) {
         add(std::make_shared<commands::PlaceCommand>(*hooks.templates, hooks.nextStructureSeed));

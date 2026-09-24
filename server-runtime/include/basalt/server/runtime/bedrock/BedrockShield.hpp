@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace basalt::server::runtime::player {
 class PlayerSession;
@@ -8,9 +9,9 @@ class PlayerSession;
 
 namespace basalt::server::runtime::bedrock::shield {
 
-/// One turn of a Bedrock player's shield, on the world's thread. Bedrock raises a held shield by
-/// sneaking where Java asks with a use, so the sneak is what starts and ends the block here; the
-/// count it keeps is the same one a Java player's raised shield keeps.
-void tick(player::PlayerSession& player, std::int64_t gameTime);
+/// One turn of a Bedrock player's shield, on the world's thread. Bedrock raises a shield by sneaking
+/// rather than with a use, so the sneak starts and ends the block; `watchers` are told when it goes up
+/// or down, through the living flags a Java client draws a raised shield from.
+void tick(player::PlayerSession& player, std::int64_t gameTime, const std::vector<player::PlayerSession*>& watchers);
 
 } // namespace basalt::server::runtime::bedrock::shield
