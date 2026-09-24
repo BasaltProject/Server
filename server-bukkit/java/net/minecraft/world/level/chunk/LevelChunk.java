@@ -297,6 +297,9 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     public Holder getNoiseBiome(int x, int y, int z) {
         int index = (y >> 2) - minSection;
         LevelChunkSection section = getSections()[Math.max(0, Math.min(index, sections.length - 1))];
+        if (section == null) {
+            throw new IllegalStateException("The chunk " + locX + "," + locZ + " of " + world + " is not loaded");
+        }
         return section.getNoiseBiome(x & 3, y & 3, z & 3);
     }
 
@@ -305,7 +308,11 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     }
 
     public LevelChunkSection getSection(int index) {
-        return getSections()[index];
+        LevelChunkSection section = getSections()[index];
+        if (section == null) {
+            throw new IllegalStateException("The chunk " + locX + "," + locZ + " of " + world + " is not loaded");
+        }
+        return section;
     }
 
     public int getSectionIndex(int y) {
