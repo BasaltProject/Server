@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
 #include <basalt/server/runtime/bedrock/BedrockSeen.hpp>
+#include <basalt/server/runtime/bedrock/BedrockShield.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -22,6 +23,7 @@
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerAnvil.hpp>
+#include <basalt/server/runtime/player/PlayerArrowPickup.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
@@ -297,6 +299,7 @@ void BasaltServer::shutdown() {
         world->saveDirty();
         world->flushRegions();
     }
+    maps_->save();
     // Nothing else runs anywhere: what was queued is cancelled rather than run against a world that
     // is already written out.
     worldRegistry_->scheduler().close();
@@ -839,6 +842,8 @@ void BasaltServer::startBedrockListener() {
                     return;
                 }
 
+                entity::entityCombat::blame(*target, session->entityId(), session->entityId(),
+                                            wire::common::Identifier::vanilla("player"));
                 const entity::entityCombat::Result result = entity::entityCombat::hurt(
                     *target, swing.damage, session->x, session->z, {}, "attack", session->name());
                 if (!result.landed) {
@@ -1404,9 +1409,23 @@ void BasaltServer::startBedrockListener() {
                 if (found == worlds.end() || found->second == nullptr) {
                     return;
                 }
+                bedrock::shield::tick(*session, found->second->gameTime());
+                // parity: `AbstractArrow.playerTouch`, the same arrows a Java player picks up.
+                const std::vector<player::PickedArrow> arrows =
+                    player::pickupNearbyArrows(*session, found->second->state());
+                for (const player::PickedArrow& arrow : arrows) {
+                    for (const player::PlayerSession* watcher : playerRegistry_.snapshot()) {
+                        if (watcher->worldName == session->worldName && watcher->connection().sendPickupAnimation) {
+                            watcher->connection().sendPickupAnimation(arrow.entityId, session->entityId());
+                        }
+                    }
+                }
                 const std::vector<player::PickedItem> taken =
                     player::pickupNearbyItems(*session, found->second->state(), pluginHooks().pickupAllowed);
                 if (taken.empty()) {
+                    if (!arrows.empty() && session->connection().sendInventoryAll) {
+                        session->connection().sendInventoryAll();
+                    }
                     return;
                 }
                 // The little arc the stack makes on its way in, to everybody who can see it.
@@ -1517,6 +1536,15 @@ void BasaltServer::startBedrockListener() {
                             window->containerId = windows->nextContainerId;
                             windows->open = *window;
                             windows->trades.reset();
+                            // parity: `RandomizableContainer.unpackLootTable` before the menu reads a slot.
+                            if (!window->playerOwned && window->size > 0) {
+                                world::WorldState& state = found->second->state();
+                                state.unpackLoot(window->x, window->y, window->z, session->uuid());
+                                if (window->second.has_value()) {
+                                    state.unpackLoot((*window->second)[0], (*window->second)[1], (*window->second)[2],
+                                                     session->uuid());
+                                }
+                            }
                             // The next window is a different window: what was said about the last
                             // one says nothing about this one.
                             windows->saidSlots = bedrock::readWindow(*found->second, *window, session);

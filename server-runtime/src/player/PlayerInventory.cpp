@@ -199,6 +199,29 @@ std::optional<std::int32_t> PlayerInventory::indexOf(std::string_view id) const 
     return std::nullopt;
 }
 
+std::optional<std::int32_t> PlayerInventory::arrowSlot() const {
+    static constexpr std::array<std::string_view, 3> kArrows{"minecraft:arrow", "minecraft:tipped_arrow",
+                                                             "minecraft:spectral_arrow"};
+    const auto isArrow = [this](std::int32_t slot) {
+        const std::optional<storage::StoredItemStack>& stack = slots_[static_cast<std::size_t>(slot)];
+        return stack.has_value() && stack->count > 0 && std::ranges::find(kArrows, stack->id) != kArrows.end();
+    };
+    if (isArrow(kOffhandSlot)) {
+        return kOffhandSlot;
+    }
+    if (isArrow(kHotbarStart + heldSlot_)) {
+        return kHotbarStart + heldSlot_;
+    }
+    // parity: `Inventory` counts the hotbar as its first nine slots.
+    for (std::int32_t index = 0; index < kMainSlots; index++) {
+        const std::int32_t slot = (index + kHotbarStart) % kMainSlots;
+        if (isArrow(slot)) {
+            return slot;
+        }
+    }
+    return std::nullopt;
+}
+
 std::int32_t PlayerInventory::suitableHotbarSlot() const {
     for (std::int32_t offset = 0; offset < kHotbarSize; offset++) {
         const std::int32_t index = (heldSlot_ + offset) % kHotbarSize;

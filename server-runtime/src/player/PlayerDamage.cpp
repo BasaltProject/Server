@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/ShieldBlows.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
@@ -53,6 +54,9 @@ constexpr float kShieldWearThreshold = 3.0F;
 constexpr float kAxeDisableSeconds = 5.0F;
 constexpr double kBlockedPush = 0.5;
 
+/// parity: `Ravager.handleEntityEvent` 39, the stun.
+constexpr std::int8_t kStunEvent = 39;
+
 [[nodiscard]] bool tagged(const DamageContext& context, std::string_view tag,
                           const std::optional<Identifier>& damageType) {
     return damageType.has_value() && context.damageTypeTags != nullptr &&
@@ -87,6 +91,10 @@ void playAround(const PlayerSession& session, std::string_view sound, float volu
     }
     const world::LoadedWorld* world = context.world ? context.world() : nullptr;
     const entity::ServerEntity* mob = world == nullptr ? nullptr : world->state().entity(attackerId);
+    // parity: `Warden.getSecondsToDisableBlocking`, five seconds whatever it holds.
+    if (mob != nullptr && mob->type().path() == "warden") {
+        return kAxeDisableSeconds;
+    }
     const wire::nbt::NbtCompound* equipment =
         mob == nullptr || !mob->sourceNbt.has_value() ? nullptr : mob->sourceNbt->getCompound("equipment");
     const wire::nbt::NbtCompound* hand = equipment == nullptr ? nullptr : equipment->getCompound("mainhand");
@@ -111,7 +119,37 @@ struct Blocked {
     float amount = 0.0F;
     /// Whether the attacker was a body that the shield pushed back against.
     bool pushed = false;
+    /// What the attacker's own `blockedByItem` shoved the defender with.
+    std::optional<entity::shieldBlows::Push> thrown;
 };
+
+/// parity: `LivingEntity.blockUsingItem` hands the blow to the attacker's `blockedByItem`.
+[[nodiscard]] std::optional<entity::shieldBlows::Push>
+attackerAnswers(const PlayerSession& session, std::int32_t attackerId, const DamageContext& context) {
+    world::LoadedWorld* world = context.world ? context.world() : nullptr;
+    entity::ServerEntity* attacker = world == nullptr ? nullptr : world->state().entity(attackerId);
+    if (attacker == nullptr) {
+        return std::nullopt;
+    }
+    random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+    const entity::shieldBlows::Reply reply = entity::shieldBlows::blocked(*attacker, session.x, session.z, 0.0, random);
+    // parity: `Ravager.blockedByItem`'s stun: its sound, and event 39 that starts the client's count.
+    if (reply.stunned && context.registry != nullptr) {
+        const wire::protocol::play::EntityEventPacket stun{.entityId = attacker->entityId(), .eventId = kStunEvent};
+        for (const PlayerSession* heard : context.registry->snapshot()) {
+            if (heard->worldName != session.worldName) {
+                continue;
+            }
+            playSoundFor(*heard, "entity.ravager.stunned", wire::protocol::play::SoundSource::Hostile, attacker->x,
+                         attacker->y, attacker->z, 1.0F, 1.0F, random.nextLong());
+            if (heard->connection().sendPlayPacket) {
+                heard->connection().sendPlayPacket(wire::protocol::play::EntityEventPacket::kId,
+                                                   [&stun](wire::io::ByteBuffer& buffer) { stun.write(buffer); });
+            }
+        }
+    }
+    return reply.push;
+}
 
 /// parity: `LivingEntity.applyItemBlocking` for a shield, with `hurtBlockingItem` and
 /// `Player.blockUsingItem`.
@@ -126,7 +164,7 @@ struct Blocked {
         return {};
     }
     // parity: a source with no position is taken as straight behind, which nothing blocks.
-    if (!source.has_value() || !facesSource(session, source->x, source->z)) {
+    if (!source.has_value() || source->piercing || !facesSource(session, source->x, source->z)) {
         return {};
     }
     const float blocked = damage;
@@ -152,6 +190,7 @@ struct Blocked {
     Blocked answer{.amount = blocked, .pushed = false};
     if (!tagged(context, "is_projectile", damageType)) {
         answer.pushed = true;
+        answer.thrown = attackerAnswers(session, source->entityId, context);
         const float seconds = secondsToDisable(source->entityId, context);
         if (seconds > 0.0F && context.disableBlocking) {
             context.disableBlocking(session, static_cast<std::int32_t>(std::lround(seconds * 20.0F)));
@@ -231,6 +270,23 @@ void pushAway(const PlayerSession& session, const entity::DamageSource& source, 
     session.connection().sendPlayPacket(
         wire::protocol::play::HurtAnimationPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::HurtAnimationPacket{.entityId = session.entityId(), .yaw = angle}.write(buffer);
+        });
+}
+
+/// A push the server decides on its own, sent as the player's new motion.
+void shove(const PlayerSession& session, const entity::shieldBlows::Push& push) {
+    if (session.connection().pushBack) {
+        session.connection().pushBack(push.x, push.y, push.z, session.yaw);
+        return;
+    }
+    if (!session.connection().sendPlayPacket) {
+        return;
+    }
+    session.connection().sendPlayPacket(
+        wire::protocol::play::SetEntityMotionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            wire::protocol::play::SetEntityMotionPacket{
+                .entityId = session.entityId(), .velocityX = push.x, .velocityY = push.y, .velocityZ = push.z}
+                .write(buffer);
         });
 }
 
@@ -352,8 +408,12 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         } else {
             showDamage(*session, damageType, source.has_value() ? source->entityId : -1, context);
         }
-        if (source.has_value()) {
+        // parity: a hit the shield took whole deals no knockback; only the attacker's own shove lands.
+        const bool fullyBlocked = blocked.amount > 0.0F && incoming <= 0.0F;
+        if (source.has_value() && !fullyBlocked) {
             pushAway(*session, *source, blocked.pushed);
+        } else if (blocked.thrown.has_value()) {
+            shove(*session, *blocked.thrown);
         }
     }
     if (afterArmour <= 0.0F) {

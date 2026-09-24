@@ -140,6 +140,9 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     actions_->tickFire(world, watchers, entity, random);
     actions_->tickMobEffects(world, watchers, entity);
     actions_->tickBreath(world, watchers, entity, random);
+    if (entity.type().path() == "ravager") {
+        actions_->tickRavager(world, watchers, entity);
+    }
     if (actions_->tickConversion(world, watchers, entity)) {
         return;
     }

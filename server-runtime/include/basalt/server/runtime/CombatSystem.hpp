@@ -106,6 +106,13 @@ public:
                                                            const std::vector<entity::ServerEntity*>& living,
                                                            const entity::ServerEntity& projectile);
 
+    /// parity: `#minecraft:redirectable_projectile`, what a punch sends back.
+    [[nodiscard]] static bool isRedirectable(const wire::common::Identifier& type);
+
+    /// parity: `Player.deflectProjectile`: along the puncher's look, and theirs from now on.
+    static void deflectByPunch(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& projectile,
+                               const player::PlayerSession& by);
+
 private:
     /// The nearest thing a projectile passed through this tick, as a mob or as a player.
     struct Target {
@@ -128,12 +135,20 @@ private:
     static void rememberShooter(const std::vector<player::PlayerSession*>& watchers,
                                 const entity::ServerEntity& projectile, entity::ServerEntity& target);
 
+    /// parity: `LargeFireball.onHitEntity`, the direct hit before the blast.
+    void hitByLargeFireball(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                            const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& fireball,
+                            const Target& target, double fromX, double fromZ);
+
     /// parity: `AbstractArrow.onHitEntity`'s failed hit, the arrow turned back.
     void deflectArrow(entity::ServerEntity& arrow);
 
-    bool hitEntityAlong(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
-                        const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& arrow, double fromX,
-                        double fromY, double fromZ);
+    /// What an arrow did with the next thing along its flight.
+    enum class ArrowHit : std::uint8_t { Missed, Stopped, Pierced };
+
+    ArrowHit hitEntityAlong(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                            const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& arrow, double fromX,
+                            double fromY, double fromZ);
 
     /// The gust a wind charge leaves where it landed.
     void gustWhereItLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,

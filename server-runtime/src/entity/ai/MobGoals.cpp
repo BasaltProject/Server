@@ -499,7 +499,7 @@ bool buildFlier(GoalSelector& selector, std::string_view path) {
     if (path == "wither") {
         add<WitherDoNothingGoal>(selector, 0);
         add<RangedAttackGoal>(selector, 2, 1.0, kWitherShotInterval, kWitherShotInterval, kWitherRange);
-        add<FlyingWanderGoal>(selector, 5, kBatRange, kBatStep, false);
+        add<HoverWanderGoal>(selector, 5, kBatStep);
         add<LookAtPlayerGoal>(selector, 6, kLookFar);
         add<RandomLookAroundGoal>(selector, 7);
         add<HurtByTargetGoal>(selector, 1);

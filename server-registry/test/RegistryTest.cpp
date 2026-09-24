@@ -9,6 +9,7 @@
 #include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
+#include <basalt/server/registry/MapColors.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/Tags.hpp>
 #include <basalt/server/registry/VanillaBlocks.hpp>
@@ -216,12 +217,9 @@ TEST_CASE("the generic support rule cannot answer a state question, and these ar
     REQUIRE(top.has_value());
     const std::int32_t air = blocks::air().stateId;
 
-    // A trapdoor closed at the top of its block is sturdy, so in the jar it holds all of these up.
-    // The generated rule is a set of block ids taken from a probe of default states, and a trapdoor
-    // in its default state does not support, so it never made any of those sets.
-    //
-    // These four have their own case in `blockSurvival::isSupported` because of it. The list is the
-    // point: it is what a reader needs to know before trusting the table for a fifth block.
+    // A trapdoor closed at the top of its block is sturdy and holds all of these up in the jar, but the
+    // generated rule probes default states, where a trapdoor does not support. Hence these four cases in
+    // `blockSurvival::isSupported`; check this list before trusting the table for a fifth block.
     for (const std::string& name : {std::string{"redstone_wire"}, std::string{"stone_pressure_plate"},
                                     std::string{"oak_pressure_plate"}, std::string{"light_weighted_pressure_plate"}}) {
         const std::optional<std::int32_t> state =
@@ -721,4 +719,15 @@ TEST_CASE("a tag file is read the way vanilla writes one") {
     // A shape this build does not understand is refused rather than half-read.
     CHECK(tagFileJson::parse(R"({"values": [42]})").error() == tagFileJson::ParseError::UnsupportedEntry);
     CHECK(tagFileJson::parse(R"({})").error() == tagFileJson::ParseError::MissingValues);
+}
+
+TEST_CASE("map colours come from the jar's per-state table") {
+    namespace colors = basalt::server::registry::mapColors;
+    CHECK(colors::of(basalt::server::registry::blocks::air().stateId) == colors::kNone);
+    CHECK(colors::of(1) == colors::kStone);
+    CHECK(colors::of(basalt::server::registry::blocks::water().stateId) == colors::kWater);
+    // parity: grass is 0x7FB238, scaled by 180/255 when drawn low.
+    CHECK(colors::argbOf(colors::packed(1, colors::Brightness::High)) == 0xFF7FB238U);
+    CHECK(colors::argbOf(colors::packed(1, colors::Brightness::Low)) == 0xFF597D27U);
+    CHECK(colors::argbOf(0) == 0U);
 }

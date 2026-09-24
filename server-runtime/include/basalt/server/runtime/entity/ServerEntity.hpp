@@ -138,6 +138,17 @@ public:
     /// `LivingEntity.lastDamageSource`, which a death roll's `damage_source_properties` reads.
     std::string lastDamageCause;
 
+    /// parity: `DamageSource.getEntity` and `getDirectEntity`. The caller sets `nextBlame` just
+    /// before a hit; `lastBlame` is what the last hit that landed carried.
+    struct Blame {
+        std::optional<std::int32_t> causingId;
+        std::optional<std::int32_t> directId;
+        std::optional<wire::common::Identifier> directType;
+    };
+
+    Blame nextBlame;
+    Blame lastBlame;
+
     /// parity: `LivingEntity.lastHurt`: inside that window only a bigger hit lands, and only the
     /// rest of it.
     float lastHurt = 0.0F;
@@ -264,6 +275,22 @@ public:
     /// The item a projectile was made from, which it carries and saves. parity: `Fireball.setItem`
     /// and `ThrowableItemProjectile.setItem`, whose stack reaches disk as `Item`.
     std::optional<std::string> heldItem;
+    /// The rest of an arrow's stack, a tipped arrow's potion among it. parity: the components of
+    /// `AbstractArrow.pickupItemStack`, which an arrow saves under `item`.
+    wire::nbt::NbtCompound heldItemComponents;
+
+    /// parity: `AbstractArrow.Pickup`: a mob's arrow stays, a player's comes back.
+    enum class ArrowPickup : std::uint8_t { Disallowed, Allowed, CreativeOnly };
+    ArrowPickup arrowPickup = ArrowPickup::Disallowed;
+
+    /// parity: `AbstractArrow.pierceLevel`, and the ids it has already gone through.
+    std::int8_t pierceLevel = 0;
+    std::vector<std::int32_t> piercedIds;
+
+    /// parity: `Ravager.attackTick`, `stunnedTick` and `roarTick`; any of them holds it still.
+    std::int32_t ravagerAttackTicks = 0;
+    std::int32_t ravagerStunTicks = 0;
+    std::int32_t ravagerRoarTicks = 0;
 
     /// How hard a fireball goes off where it lands. parity: `LargeFireball.explosionPower`.
     float explosionPower = 0.0F;

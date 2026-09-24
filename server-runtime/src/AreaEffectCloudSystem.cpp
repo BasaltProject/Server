@@ -188,6 +188,7 @@ void AreaEffectCloudSystem::affect(world::LoadedWorld& world, const ServerEntity
                                          .name = CombatSystem::shooterName(watchers, living, cloud)});
             }
             if (mob != nullptr) {
+                entity::entityCombat::blame(*mob, cloud.ownerId, cloud.entityId(), cloud.type());
                 const entity::entityCombat::Result result = entity::entityCombat::hurt(
                     *mob, static_cast<float>(amount), cloud.x, cloud.z, {}, "indirect_magic");
                 if (result.landed) {

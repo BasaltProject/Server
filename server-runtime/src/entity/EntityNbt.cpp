@@ -33,6 +33,11 @@ constexpr std::string_view kGolemDetectedMemory = "minecraft:golem_detected_rece
 constexpr std::array<std::string_view, 6> kPatrollingTypes{"pillager",   "vindicator", "evoker",
                                                            "illusioner", "witch",      "ravager"};
 
+[[nodiscard]] bool isArrow(const Identifier& type) {
+    return type.namespaceName() == Identifier::kVanillaNamespace &&
+           (type.path() == "arrow" || type.path() == "spectral_arrow");
+}
+
 [[nodiscard]] bool patrols(std::string_view path) {
     return std::ranges::find(kPatrollingTypes, path) != kPatrollingTypes.end();
 }
@@ -291,11 +296,26 @@ NbtCompound encode(const ServerEntity& entity) {
     }
     // parity: `Fireball.addAdditionalSaveData` stores the stack it was made from under `Item`, and
     // stores nothing when there is none: a ghast's own fireball comes from no item.
+    const bool arrow = isArrow(entity.type());
     if (entity.heldItem.has_value()) {
         wire::nbt::NbtCompound stack;
         stack.putInt("count", 1);
         stack.putString("id", Identifier::vanilla(*entity.heldItem).toString());
-        tag.set("Item", wire::nbt::NbtTag::ofCompound(std::move(stack)));
+        if (!entity.heldItemComponents.empty()) {
+            stack.set("components", wire::nbt::NbtTag::ofCompound(entity.heldItemComponents));
+        }
+        tag.set(arrow ? "item" : "Item", wire::nbt::NbtTag::ofCompound(std::move(stack)));
+    }
+    // parity: `AbstractArrow.addAdditionalSaveData`.
+    if (arrow) {
+        tag.putByte("pickup", static_cast<std::int8_t>(entity.arrowPickup));
+        tag.putByte("PierceLevel", entity.pierceLevel);
+    }
+    // parity: `Ravager.addAdditionalSaveData`.
+    if (entity.type().path() == "ravager") {
+        tag.putInt("AttackTick", entity.ravagerAttackTicks);
+        tag.putInt("StunTick", entity.ravagerStunTicks);
+        tag.putInt("RoarTick", entity.ravagerRoarTicks);
     }
     tag.set("Pos", doubles(entity.x, entity.y, entity.z));
     tag.set("Motion", doubles(entity.velocityX, entity.velocityY, entity.velocityZ));
@@ -503,11 +523,26 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     entity->lastHurtByPlayer = uuidIn(tag, "last_hurt_by_player");
     entity->lastHurtByPlayerTime = numericInt(tag, "last_hurt_by_player_memory_time");
     entity->noGravity = numericBoolean(tag, "NoGravity");
-    if (const NbtCompound* held = tag.getCompound("Item"); held != nullptr) {
+    const bool arrow = isArrow(*type);
+    if (const NbtCompound* held = tag.getCompound(arrow ? "item" : "Item"); held != nullptr) {
         const std::expected<Identifier, wire::common::IdentifierError> item = Identifier::parse(held->getString("id"));
         if (item.has_value()) {
             entity->heldItem = std::string{item->path()};
         }
+        if (const NbtCompound* components = held->getCompound("components"); arrow && components != nullptr) {
+            entity->heldItemComponents = *components;
+        }
+    }
+    if (arrow) {
+        const std::int8_t pickup = tag.getByte("pickup");
+        entity->arrowPickup = pickup >= 0 && pickup <= 2 ? static_cast<ServerEntity::ArrowPickup>(pickup)
+                                                         : ServerEntity::ArrowPickup::Disallowed;
+        entity->pierceLevel = tag.getByte("PierceLevel");
+    }
+    if (type->path() == "ravager") {
+        entity->ravagerAttackTicks = numericInt(tag, "AttackTick");
+        entity->ravagerStunTicks = numericInt(tag, "StunTick");
+        entity->ravagerRoarTicks = numericInt(tag, "RoarTick");
     }
     const std::string_view path = type->path();
     entity->age = ageableMobs::usesBooleanBabyFlag(path) && numericBoolean(tag, "IsBaby") ? ageableMobs::kBabyStartAge

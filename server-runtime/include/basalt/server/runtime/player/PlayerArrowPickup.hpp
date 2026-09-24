@@ -20,7 +20,7 @@ struct PickedArrow {
 /// animation and the slots are each edition's own, the same as for an item on the floor.
 ///
 /// parity: `AbstractArrow.playerTouch`: only a stuck arrow is picked up, it goes whole or not at
-/// all, and in creative it goes without giving anything back.
+/// all, and only as its `pickup` allows.
 [[nodiscard]] std::vector<PickedArrow> pickupNearbyArrows(PlayerSession& session, world::WorldState& world);
 
 } // namespace basalt::server::runtime::player

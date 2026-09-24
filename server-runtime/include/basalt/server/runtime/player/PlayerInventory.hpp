@@ -112,6 +112,10 @@ public:
     /// so armour and the offhand deliberately do not answer here either.
     [[nodiscard]] std::optional<std::int32_t> indexOf(std::string_view id) const;
 
+    /// The slot a bow draws its arrow from. parity: `Player.getProjectile`: the off hand, then the
+    /// main hand, then the bag from the hotbar on, taking any of `#minecraft:arrows`.
+    [[nodiscard]] std::optional<std::int32_t> arrowSlot() const;
+
     /// The hotbar slot a picked item should go to, as a 0-8 index.
     ///
     /// parity: `Inventory.getSuitableHotbarSlot`. Scans from the currently held slot and wraps, so

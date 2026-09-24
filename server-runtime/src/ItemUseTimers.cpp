@@ -33,7 +33,6 @@ using wire::protocol::play::SetEntityDataPacket;
 using wire::protocol::play::SoundSource;
 
 constexpr std::string_view kBow = "bow";
-constexpr std::string_view kArrowItem = "minecraft:arrow";
 constexpr std::string_view kEnderPearl = "ender_pearl";
 
 /// parity: `LivingEntity`'s own using-item bit.
@@ -131,7 +130,7 @@ bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item,
     }
     // parity: `BowItem.use`, which refuses without an arrow unless the player has infinite
     // materials, and otherwise just starts the draw: the shot happens on release.
-    if (session.gamemode != Gamemode::Creative && !session.inventory.indexOf(kArrowItem).has_value()) {
+    if (session.gamemode != Gamemode::Creative && !session.inventory.arrowSlot().has_value()) {
         return true;
     }
     drawingSlot_ = slot;

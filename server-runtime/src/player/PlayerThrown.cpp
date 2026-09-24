@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
@@ -129,11 +130,17 @@ void shootBowFor(const BreakContext& context, PlayerSession& player, world::Load
         return;
     }
     const bool creative = player.gamemode == Gamemode::Creative;
-    const std::optional<std::int32_t> arrowSlot = player.inventory.indexOf(kArrowItem);
+    const std::optional<std::int32_t> arrowSlot = player.inventory.arrowSlot();
     if (!creative && !arrowSlot.has_value()) {
         return;
     }
-    const entity::projectiles::Kind& kind = entity::projectiles::arrow();
+    // parity: `Player.getProjectile` hands a creative player a plain arrow when the bag has none.
+    const storage::StoredItemStack ammo = arrowSlot.has_value() && player.inventory.at(*arrowSlot).has_value()
+                                              ? *player.inventory.at(*arrowSlot)
+                                              : storage::StoredItemStack{.id = std::string{kArrowItem}, .count = 1};
+    const bool spectral = ammo.id == "minecraft:spectral_arrow";
+    const entity::projectiles::Kind& kind =
+        spectral ? *entity::projectiles::kindOf(Identifier::vanilla("spectral_arrow")) : entity::projectiles::arrow();
     const server::registry::EntityTypeEntry* entry = server::registry::entityTypes::of(kind.type);
     if (context.registry == nullptr || entry == nullptr) {
         return;
@@ -148,6 +155,14 @@ void shootBowFor(const BreakContext& context, PlayerSession& player, world::Load
         player.y + kThrowEyeHeight, player.z, aim.x, aim.y, aim.z, power * kBowPowerScale, kBowUncertainty, random);
     arrow.ownerId = player.entityId();
     arrow.critical = power >= 1.0F;
+    // parity: `ProjectileWeaponItem.useAmmo`: creative, or Infinity on a plain arrow, spends nothing
+    // and marks the arrow `intangible_projectile`, which only a creative player may pick back up.
+    const bool infinite =
+        creative || (ammo.id == kArrowItem && player::enchantmentLevel(*held, Identifier::vanilla("infinity")) > 0);
+    arrow.arrowPickup =
+        infinite ? entity::ServerEntity::ArrowPickup::CreativeOnly : entity::ServerEntity::ArrowPickup::Allowed;
+    arrow.heldItem = std::string{parsedOrNothing(ammo.id).value_or(Identifier::vanilla("arrow")).path()};
+    arrow.heldItemComponents = ammo.components;
 
     const double roll = context.nextDouble ? context.nextDouble() : 0.5;
     const auto soundPitch = static_cast<float>((1.0 / ((roll * 0.4) + 1.2)) + (static_cast<double>(power) * 0.5));
@@ -156,7 +171,7 @@ void shootBowFor(const BreakContext& context, PlayerSession& player, world::Load
         playSoundFor(*heard, kSoundArrowShoot, wire::protocol::play::SoundSource::Players, player.x, player.y, player.z,
                      1.0F, soundPitch, seed);
     }
-    if (creative || !arrowSlot.has_value()) {
+    if (infinite || !arrowSlot.has_value()) {
         return;
     }
     spendOne(context, player, *arrowSlot);

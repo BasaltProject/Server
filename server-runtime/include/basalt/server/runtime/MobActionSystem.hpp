@@ -226,6 +226,13 @@ public:
     void tickBreath(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                     entity::ServerEntity& dolphin, random::RandomSource& random);
 
+    /// parity: `Ravager.aiStep`: held still while it attacks, is stunned or roars, and the roar.
+    void tickRavager(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                     entity::ServerEntity& ravager);
+
+    /// parity: `Ravager.doHurtTarget`, the swing that holds it still for half a second.
+    void ravagerSwings(world::LoadedWorld& world, entity::ServerEntity& ravager);
+
     /// parity: `LivingEntity.aiStep`'s travel half, which runs for a mob this build has no goals
     /// for as much as for one it does.
     void travelMob(world::LoadedWorld& world, entity::ServerEntity& mob, double speed);

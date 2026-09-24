@@ -118,31 +118,50 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
         // parity: `#minecraft:smelts_loot`, which is fire aspect and nothing else.
         return registry == "enchantment" && tag == "minecraft:smelts_loot" && id == Identifier::vanilla("fire_aspect");
     };
-    // parity: `ATTACKING_ENTITY` and `DIRECT_ATTACKING_ENTITY`: the player behind the hit, or the
-    // mob that struck last. A melee kill has the two the same.
-    const PlayerSession* killer = nullptr;
-    if (dead.lastHurtByPlayer.has_value()) {
+    // parity: `LAST_DAMAGE_PLAYER`, the player whose hit is still remembered, and their luck.
+    const auto playerFacts = [](const PlayerSession& player) {
+        EntityFacts facts{.type = Identifier::vanilla("player"), .scoreName = player.name()};
+        addHeld(facts, player.inventory.heldItem());
+        return facts;
+    };
+    const auto playerById = [this](std::int32_t entityId) -> const PlayerSession* {
         for (const PlayerSession* player : players_->snapshot()) {
-            if (player->uuid() == *dead.lastHurtByPlayer) {
-                killer = player;
+            if (player->entityId() == entityId) {
+                return player;
             }
         }
-    }
-    if (killer != nullptr) {
-        // parity: `dropFromLootTable` rolls with the luck of the player behind the kill.
-        context.luck = context.killedByPlayer ? killer->luck() : 0.0F;
-        EntityFacts facts{.type = Identifier::vanilla("player"), .scoreName = killer->name()};
-        addHeld(facts, killer->inventory.heldItem());
-        context.attackerEnchantments = facts.mainhandEnchantments;
-        context.attacker = facts;
-        context.directAttacker = facts;
-        if (context.killedByPlayer) {
-            context.attackingPlayer = facts;
+        return nullptr;
+    };
+    if (context.killedByPlayer && dead.lastHurtByPlayer.has_value()) {
+        if (const PlayerSession* killer = players_->get(*dead.lastHurtByPlayer); killer != nullptr) {
+            context.attackingPlayer = playerFacts(*killer);
+            context.luck = killer->luck();
         }
-    } else if (dead.hurtBy.has_value()) {
-        if (const ServerEntity* mob = world.state().entity(*dead.hurtBy); mob != nullptr) {
-            context.attacker = factsOf(world, *mob);
-            context.directAttacker = context.attacker;
+    }
+    context.killedByPlayer = context.attackingPlayer.has_value();
+    // parity: `ATTACKING_ENTITY` and `DIRECT_ATTACKING_ENTITY` come off the killing blow's source:
+    // who is behind it, and what landed it, the arrow or the fireball rather than its shooter.
+    const ServerEntity::Blame& blame = dead.lastBlame;
+    const auto factsById = [&](std::int32_t entityId) -> std::optional<EntityFacts> {
+        if (const PlayerSession* player = playerById(entityId); player != nullptr) {
+            return playerFacts(*player);
+        }
+        if (const ServerEntity* mob = world.state().entity(entityId); mob != nullptr) {
+            return factsOf(world, *mob);
+        }
+        return std::nullopt;
+    };
+    if (blame.causingId.has_value()) {
+        context.attacker = factsById(*blame.causingId);
+        if (context.attacker.has_value() && context.attacker->type == Identifier::vanilla("player")) {
+            context.attackerEnchantments = context.attacker->mainhandEnchantments;
+        }
+    }
+    if (blame.directId.has_value()) {
+        context.directAttacker = blame.directId == blame.causingId ? context.attacker : factsById(*blame.directId);
+        // A fireball that went off is gone by the time the body drops; its kind is what is left.
+        if (!context.directAttacker.has_value() && blame.directType.has_value()) {
+            context.directAttacker = EntityFacts{.type = *blame.directType};
         }
     }
     return context;
