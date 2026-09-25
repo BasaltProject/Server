@@ -14,11 +14,13 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -300,6 +302,29 @@ void shove(const PlayerSession& session, const entity::shieldBlows::Push& push) 
         });
 }
 
+/// The hit as `DamagePredicate` reads it: before and after the shield, and who is behind it.
+[[nodiscard]] world::TriggerDamage triggerDamageOf(float original, float taken, bool blocked,
+                                                   const std::optional<Identifier>& damageType,
+                                                   std::string_view deathMessageId,
+                                                   const std::optional<entity::DamageSource>& source,
+                                                   const DamageContext& context) {
+    world::TriggerDamage hit{.dealt = original,
+                             .taken = taken,
+                             .blocked = blocked,
+                             .type = damageType.value_or(world::triggerFacts::damageTypeOf(deathMessageId))};
+    world::LoadedWorld* world = context.world ? context.world() : nullptr;
+    if (!source.has_value() || world == nullptr) {
+        return hit;
+    }
+    const std::vector<PlayerSession*> players =
+        context.registry == nullptr ? std::vector<PlayerSession*>{} : context.registry->snapshot();
+    const std::int32_t causing = source->ownerId.value_or(source->entityId);
+    hit.source = world::triggerFacts::ofId(*world, players, causing);
+    hit.direct = world::triggerFacts::ofId(*world, players, source->entityId);
+    hit.directHit = causing == source->entityId;
+    return hit;
+}
+
 } // namespace
 
 float damageAfterProtection(const PlayerSession& session, const float amount,
@@ -439,6 +464,13 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
             shove(*session, *blocked.thrown);
         }
     }
+    std::optional<world::TriggerDamage> hit;
+    if (context.triggers != nullptr) {
+        hit = triggerDamageOf(amount, dealt, blocked.amount > 0.0F, damageType, deathMessageId, source, context);
+        // parity: `hurtServer` ends in `ENTITY_HURT_PLAYER` whatever the shield and armour left.
+        context.triggers->fire("entity_hurt_player", session->name(), session->uuid().toString(),
+                               world::TriggerEvent{.damage = hit});
+    }
     if (afterArmour <= 0.0F) {
         return;
     }
@@ -484,6 +516,11 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         world::vibrations::emit(world->state(), "entity_damage", session->x, session->y, session->z, world->gameTime());
     }
     session->setHealth(std::max(session->health() - damage, 0.0F));
+    // parity: `Entity.awardKillScore` of whoever caused it, `ENTITY_KILLED_PLAYER` for this player.
+    if (session->health() <= 0.0F && hit.has_value() && hit->source.has_value()) {
+        context.triggers->fire("entity_killed_player", session->name(), session->uuid().toString(),
+                               world::TriggerEvent{.entities = {{"entity", *hit->source}}, .damage = hit});
+    }
     if (session->health() <= 0.0F) {
         killPlayer(*session, deathMessageId, source.has_value() ? source->name : std::nullopt, context.death);
     } else if (session->connection().syncHealth) {

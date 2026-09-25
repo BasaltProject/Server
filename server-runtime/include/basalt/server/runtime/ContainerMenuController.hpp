@@ -304,6 +304,9 @@ private:
     /// `AbstractFurnaceBlockEntity.awardUsedRecipesAndPopExperience`.
     void payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity);
 
+    /// parity: `BrewingStandMenu.PotionSlot.onTake`'s trigger, for a bottle just taken out.
+    void awardBrewed(const server::world::loot::ItemStack& bottle);
+
     /// Which half of a double chest a menu slot belongs to, and where in it.
     [[nodiscard]] std::optional<std::pair<wire::protocol::play::BlockPos, std::int32_t>>
     halfFor(std::int32_t index) const;

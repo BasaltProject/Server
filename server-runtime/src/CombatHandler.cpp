@@ -208,6 +208,7 @@ void CombatHandler::applyFallDamage(PlayerSession& session, const double landing
 player::DamageContext CombatHandler::damageContext() const {
     player::DamageContext context;
     context.registry = owner_->options().playerRegistry;
+    context.triggers = owner_->options().advancementTriggers;
     context.damageTypeTags = owner_->options().damageTypeTags;
     context.enchantments = owner_->options().enchantments;
     context.world = [this] { return owner_->currentWorld(); };

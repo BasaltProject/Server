@@ -313,6 +313,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
     const bool sameItem = was.has_value() && put.has_value() && was->item == put->item;
     const std::int32_t hadCount = was.has_value() ? was->count : 0;
     const std::optional<std::string> hadItem = was.has_value() ? std::optional{was->item.toString()} : std::nullopt;
+    const std::optional<server::world::loot::ItemStack> before = was;
     slots[static_cast<std::size_t>(half->second)] = put;
     world::blockInventory::write(entity->data(), slots);
     // parity: `AbstractFurnaceBlockEntity.setItem`, which recomputes the cook time when the thing
@@ -343,12 +344,37 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
         }
         payFurnace(*world, *entity);
     }
+    // parity: `BrewingStandMenu.PotionSlot.onTake`, `BREWED_POTION` for a bottle with a potion.
+    if (cooking != nullptr && *cooking == world::brewingStands::block() &&
+        half->second < world::brewingStands::kBottles && before.has_value() && !put.has_value()) {
+        awardBrewed(*before);
+    }
     chunk->markDirty();
     if (cooking != nullptr && world::containers::setItemTellsComparators(cooking->path(), half->second, sameItem)) {
         world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), half->first.x,
                                                              half->first.y, half->first.z,
                                                              world::comparatorReading::of(world->state()));
     }
+}
+
+void ContainerMenuController::awardBrewed(const server::world::loot::ItemStack& bottle) {
+    world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+    const PlayerSession* session = owner_->playerSession();
+    const wire::nbt::NbtTag* contents = bottle.components.find("minecraft:potion_contents");
+    if (triggers == nullptr || session == nullptr || contents == nullptr) {
+        return;
+    }
+    const std::string* named = contents->get<std::string>();
+    const wire::nbt::NbtCompound* full = contents->get<wire::nbt::NbtCompound>();
+    const std::string_view potion = named != nullptr  ? std::string_view{*named}
+                                    : full != nullptr ? full->getString("potion")
+                                                      : std::string_view{};
+    const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(potion);
+    if (potion.empty() || !id.has_value()) {
+        return;
+    }
+    triggers->fire("brewed_potion", session->name(), session->uuid().toString(),
+                   world::TriggerEvent{.ids = {{"potion", *id}}});
 }
 
 void ContainerMenuController::payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity) {

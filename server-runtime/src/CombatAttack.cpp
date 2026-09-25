@@ -210,6 +210,10 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         owner_->broadcastSound(kSoundAttackNoDamage, session->x, session->y, session->z, SoundSource::Players);
         return;
     }
+    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
+        world::triggerFacts::playerHurtEntity(*triggers, *world, *session, *target, damage,
+                                              Identifier::vanilla("player_attack"));
+    }
     // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
     world::vibrations::emit(world->state(), "entity_damage", target->x, target->y, target->z, world->gameTime(),
                             {.entity = target->uuid()});
@@ -541,6 +545,10 @@ void CombatHandler::mount(PlayerSession& session, ServerEntity& vehicle) {
     session.vehicleId = vehicle.entityId();
     vehicle.passengerIds.push_back(session.entityId());
     broadcastPassengers(vehicle);
+    // parity: `Entity.startRiding` ends in `START_RIDING_TRIGGER` for every player now aboard.
+    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
+        triggers->fire("started_riding", session.name(), session.uuid().toString());
+    }
 }
 
 void CombatHandler::breakVehicle(PlayerSession& session, ServerEntity& vehicle) {

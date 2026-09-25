@@ -428,6 +428,7 @@ player::BreakContext BasaltServer::breakContext() {
 player::DamageContext BasaltServer::damageContext() {
     player::DamageContext context;
     context.registry = &playerRegistry_;
+    context.triggers = advancementTriggers_.get();
     context.damageTypeTags = &vanillaData_.damageTypeTags;
     context.enchantments = &vanillaData_.enchantments;
     context.slotChanged = [](const player::PlayerSession& player, std::int32_t) {
@@ -853,6 +854,10 @@ void BasaltServer::startBedrockListener() {
                     *target, swing.damage, session->x, session->z, {}, "attack", session->name());
                 if (!result.landed) {
                     return;
+                }
+                if (advancementTriggers_ != nullptr) {
+                    world::triggerFacts::playerHurtEntity(*advancementTriggers_, world, *session, *target, swing.damage,
+                                                          wire::common::Identifier::vanilla("player_attack"));
                 }
                 if (swing.knockbackAttack) {
                     entity::entityCombat::knockback(*target, 0.5, session->x - target->x, session->z - target->z);
