@@ -12,12 +12,9 @@
 
 namespace basalt::server::runtime::world {
 
-/// The block that plays a disc.
-///
-/// parity: `JukeboxBlock` over `JukeboxBlockEntity`. A disc goes in, the block says so, and while it
-/// plays the block gives off a full signal and a comparator reads the song's own number: eleven for
-/// `11`, thirteen for `13`, and so on. Those numbers are data
-/// (`data/minecraft/jukebox_song/<name>.json`), so they are read from the operator's own jar.
+/// The jukebox. parity: `JukeboxBlock` over `JukeboxBlockEntity`: while a disc plays the block gives
+/// a full signal and a comparator reads the song's number, read from the operator's jar
+/// (`data/minecraft/jukebox_song/<name>.json`).
 namespace jukeboxes {
 
 [[nodiscard]] const wire::common::Identifier& block();
@@ -39,9 +36,10 @@ namespace jukeboxes {
                                                 const wire::common::Identifier& disc);
 
 /// Takes the disc back out, which is what right-clicking a playing jukebox does. Answers the change
-/// and the disc that popped.
-[[nodiscard]] std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState& world, std::int32_t x,
-                                                                                    std::int32_t y, std::int32_t z);
+/// and the disc that popped. With `gameTime`, a song cut short raises `JUKEBOX_STOP_PLAY`.
+[[nodiscard]] std::optional<std::pair<BlockChange, wire::common::Identifier>>
+eject(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+      std::optional<std::int64_t> gameTime = std::nullopt);
 
 /// What is playing here, or nothing when the jukebox is empty.
 [[nodiscard]] std::optional<std::string> songAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
@@ -53,7 +51,9 @@ namespace jukeboxes {
 /// One turn of the song. parity: `JukeboxSongPlayer.tick`, which stops the song once it has run its
 /// length plus a second. Answers whether it stopped on this turn, because that is when the block
 /// stops feeding the redstone around it.
-[[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t lengthTicks);
+/// With `gameTime`, it also raises `JUKEBOX_PLAY` every twenty ticks and `JUKEBOX_STOP_PLAY` at the end.
+[[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t lengthTicks,
+                        std::optional<std::int64_t> gameTime = std::nullopt);
 
 /// parity: `JukeboxBlock.getAnalogOutputSignal` into `JukeboxSong.comparatorOutput`, which is looked
 /// up from the disc rather than kept beside it: the block entity holds vanilla's `RecordItem` and

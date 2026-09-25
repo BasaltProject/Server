@@ -13,9 +13,11 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/poi/PoiManager.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -482,11 +484,23 @@ void MobActionSystem::emptyHive(world::LoadedWorld& world, const Pos& hive, std:
 
 void MobActionSystem::hiveBroken(world::LoadedWorld& world, const PlayerSession& player, const Pos& hive,
                                  std::int32_t stateId, wire::nbt::NbtCompound data, bool silkTouch) {
-    if (silkTouch) {
+    if (!silkTouch) {
+        static_cast<void>(releaseAll(world, hive, stateId, data, &player, beehives::Release::Emergency));
+        angerBeesAround(world, hive);
+    }
+    // parity: `BeehiveBlock.playerDestroy` ends in `BEE_NEST_DESTROYED` with the bees still inside.
+    world::AdvancementTriggers* triggers = options_.advancementTriggers;
+    const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
+    if (triggers == nullptr || block == nullptr) {
         return;
     }
-    static_cast<void>(releaseAll(world, hive, stateId, data, &player, beehives::Release::Emergency));
-    angerBeesAround(world, hive);
+    world::TriggerEvent event{.numbers = {{"num_bees_inside", static_cast<double>(beehives::occupantCount(data))}},
+                              .ids = {{"block", *block}}};
+    if (const std::optional<world::TriggerItem> tool = world::triggerFacts::itemOf(player.inventory.heldItem());
+        tool.has_value()) {
+        event.items.emplace("item", *tool);
+    }
+    triggers->fire("bee_nest_destroyed", player.name(), player.uuid().toString(), event);
 }
 
 void MobActionSystem::hiveBlown(world::LoadedWorld& world, const Pos& hive, std::int32_t stateId,

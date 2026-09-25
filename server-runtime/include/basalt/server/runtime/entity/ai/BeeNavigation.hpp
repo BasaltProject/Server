@@ -10,7 +10,7 @@ namespace basalt::server::runtime::entity::ai {
 class MobContext;
 
 /// How a bee finds its way: a flying path forty-eight blocks long, and the random spots it wanders
-/// and hops towards.
+/// and hops towards. The allay flies the same forty-eight blocks and shares the path.
 ///
 /// parity: `Bee.createNavigation`, `Bee.pathfindRandomlyTowards` and `BeeWanderGoal.findPos`.
 namespace beeNavigation {
@@ -37,6 +37,11 @@ void hopTowards(MobContext& mob, const Block& target);
 /// in the air. The bottom centre of the chosen block.
 [[nodiscard]] std::optional<std::array<double, 3>> wanderSpot(MobContext& mob, const std::optional<Block>& hive,
                                                               std::int32_t threshold);
+
+/// parity: `AirAndWaterRandomPos.getPos` along the way the mob faces, which the allay's
+/// `RandomStroll.fly` flies to as well.
+[[nodiscard]] std::optional<std::array<double, 3>> airAndWaterSpot(MobContext& mob, std::int32_t horizontal,
+                                                                   std::int32_t vertical, std::int32_t lift);
 
 /// parity: `Level.findBlocksInBoxByManhattanDistance(origin, reach)`, nearest shells first.
 template <typename Visit>

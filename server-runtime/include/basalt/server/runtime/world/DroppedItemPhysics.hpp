@@ -82,6 +82,9 @@ public:
     /// stack at zero, with no invulnerable window of any kind.
     bool hurtItem(std::int32_t entityId, std::int32_t amount);
 
+    /// What is left of a stack something took part of. Answers whether the item is still there.
+    bool setItemCount(std::int32_t entityId, std::int32_t count);
+
     /// One tick of item physics for the whole world, answering the entity ids that despawned. parity:
     /// `ItemEntity.tick`: gravity, the move against real block shapes, drag, ground friction, the
     /// half-damped bounce and the merge with a neighbouring stack. Floating on a fluid is a gap.

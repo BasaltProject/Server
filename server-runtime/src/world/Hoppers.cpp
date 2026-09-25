@@ -390,7 +390,8 @@ void noteChange(const Around& around, const BlockChange& change) {
     if (!accepts(slots, disc)) {
         return false;
     }
-    const std::optional<std::pair<BlockChange, wire::common::Identifier>> ejected = jukeboxes::eject(world, x, y, z);
+    const std::optional<std::pair<BlockChange, wire::common::Identifier>> ejected =
+        jukeboxes::eject(world, x, y, z, around.gameTime);
     if (!ejected.has_value()) {
         return false;
     }

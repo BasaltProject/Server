@@ -821,10 +821,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                                                    .recipes = &vanillaData_.recipes,
                                                                    .damageTypeTags = &vanillaData_.damageTypeTags,
                                                                    .blockTags = &vanillaData_.blockTags,
-                                                                   .villagerTrades = &vanillaData_.villagerTrades});
+                                                                   .villagerTrades = &vanillaData_.villagerTrades,
+                                                                   .advancementTriggers = advancementTriggers_.get()});
     shriekers_ = std::make_unique<ShriekerSystem>(playerRegistry_, *broadcaster_, *spawning_, *mobActions_,
                                                   ShriekerSystem::Options{.nextSeed = [] { return scratchSeed(); }});
-    lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_);
+    lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_, advancementTriggers_.get());
     mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_);
 
     // The online count comes from the registry rather than from a counter kept alongside it: a

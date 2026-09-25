@@ -98,14 +98,14 @@ void addRaiderGoals(GoalSelector& selector) {
 }
 
 /// parity: the goal set nearly every animal shares, with its own three speeds.
-void farmAnimal(GoalSelector& selector, const wire::common::Identifier& type, double panic, double tempt,
-                double follow) {
+void farmAnimal(GoalSelector& selector, const wire::common::Identifier& type, double panic, double tempt, double follow,
+                double stroll = 1.0) {
     add<FloatGoal>(selector, 0);
     add<PanicGoal>(selector, 1, panic);
     add<BreedGoal>(selector, 2, 1.0);
     add<TemptGoal>(selector, 3, tempt, entity::breeding::foodFor(type));
     add<FollowParentGoal>(selector, 4, follow);
-    add<RandomStrollGoal>(selector, 5, 1.0);
+    add<RandomStrollGoal>(selector, 5, stroll);
     add<LookAtPlayerGoal>(selector, 6, kLookNear);
     add<RandomLookAroundGoal>(selector, 7);
 }
@@ -155,8 +155,18 @@ std::unique_ptr<GoalSelector> mobGoals::forType(const wire::common::Identifier& 
 namespace {
 
 bool buildAnimal(GoalSelector& selector, const wire::common::Identifier& type, std::string_view path) {
-    static const Names kSlow{"goat",      "horse",  "donkey", "mule", "llama",   "camel", "sniffer",
-                             "armadillo", "turtle", "panda",  "fox",  "strider", "frog",  "axolotl"};
+    static const Names kSlow{"horse", "donkey", "mule", "llama", "turtle", "panda", "fox", "strider", "axolotl"};
+    // parity: the brains' own speeds, `GoatAi`, `FrogAi`, `ArmadilloAi` and `SnifferAi`: two to flee and
+    // a quarter more to follow food or a parent; the camel's four, two and a half, and two to idle.
+    static const Names kBrained{"goat", "frog", "armadillo", "sniffer"};
+    if (kBrained.contains(path)) {
+        farmAnimal(selector, type, 2.0, 1.25, 1.25);
+        return true;
+    }
+    if (path == "camel") {
+        farmAnimal(selector, type, 4.0, 2.5, 2.5, 2.0);
+        return true;
+    }
     if (path == "cow" || path == "mooshroom") {
         farmAnimal(selector, type, 2.0, 1.25, 1.25);
         return true;
@@ -525,12 +535,6 @@ bool buildFlier(GoalSelector& selector, std::string_view path) {
     // parity: `Bat.customServerAiStep`, which is all a bat does.
     if (path == "bat") {
         add<BatFlightGoal>(selector, 0);
-        return true;
-    }
-    // parity: the allay's idle `RandomStroll.fly`, the same hover and air roll.
-    if (path == "allay") {
-        add<HoverWanderGoal>(selector, 1);
-        add<LookAtPlayerGoal>(selector, 2, kLookFar);
         return true;
     }
     if (path == "bee") {

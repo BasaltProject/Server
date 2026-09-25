@@ -4,14 +4,17 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
+#include <algorithm>
 #include <cmath>
 
 namespace basalt::server::runtime {
@@ -28,6 +31,9 @@ constexpr double kHeight = 6.0;
 constexpr float kLightningDamage = 5.0F;
 /// parity: `spawnFire(4)` on the strike.
 constexpr std::int32_t kStrikeFires = 4;
+/// parity: the box `LightningBolt.tick` looks for bystanders in, and who hears of it.
+constexpr double kViewerReach = 15.0;
+constexpr double kAnnounceDistance = 256.0;
 /// parity: `GameRules.FIRE_SPREAD_RADIUS_AROUND_PLAYER`.
 constexpr world::GameRule kFireSpreadRadius = world::GameRule::integer("fire_spread_radius_around_player", 128, -1);
 
@@ -54,8 +60,9 @@ constexpr world::GameRule kFireSpreadRadius = world::GameRule::integer("fire_spr
 
 } // namespace
 
-LightningBoltSystem::LightningBoltSystem(BlockChangeBroadcaster& broadcaster, MobActionSystem& mobs)
-    : broadcaster_(&broadcaster), mobs_(&mobs) {}
+LightningBoltSystem::LightningBoltSystem(BlockChangeBroadcaster& broadcaster, MobActionSystem& mobs,
+                                         world::AdvancementTriggers* triggers)
+    : broadcaster_(&broadcaster), mobs_(&mobs), triggers_(triggers) {}
 
 void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                const std::vector<ServerEntity*>& living, ServerEntity& bolt,
@@ -75,8 +82,10 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
                                  false, random, changes);
         if (fierce &&
             canSpreadFireAround(world, watchers, mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z))) {
+            const std::size_t before = changes.size();
             world::lightning::spawnFire(world.state(), mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z),
                                         kStrikeFires, random, changes);
+            bolt.boltFiresSet += static_cast<std::int32_t>(changes.size() - before);
         }
         world::vibrations::emit(world.state(), "lightning_strike", bolt.x, bolt.y, bolt.z, world.gameTime(),
                                 {.entity = bolt.uuid()});
@@ -84,13 +93,16 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
     bolt.boltLife--;
     if (bolt.boltLife < 0) {
         if (bolt.boltFlashes == 0) {
+            announceStrike(world, watchers, living, bolt);
             bolt.removed = true;
         } else if (bolt.boltLife < -random.nextInt(10)) {
             bolt.boltFlashes--;
             bolt.boltLife = 1;
             if (canSpreadFireAround(world, watchers, mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z))) {
+                const std::size_t before = changes.size();
                 world::lightning::spawnFire(world.state(), mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z),
                                             0, random, changes);
+                bolt.boltFiresSet += static_cast<std::int32_t>(changes.size() - before);
             }
         }
     }
@@ -103,7 +115,7 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
 }
 
 void LightningBoltSystem::hitAround(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
-                                    const std::vector<ServerEntity*>& living, const ServerEntity& bolt) {
+                                    const std::vector<ServerEntity*>& living, ServerEntity& bolt) {
     const auto touches = [&bolt](double x, double y, double z, double halfWidth, double height) {
         return x + halfWidth > bolt.x - kReach && x - halfWidth < bolt.x + kReach && y + height > bolt.y - kReach &&
                y < bolt.y + kHeight + kReach && z + halfWidth > bolt.z - kReach && z - halfWidth < bolt.z + kReach;
@@ -115,6 +127,7 @@ void LightningBoltSystem::hitAround(world::LoadedWorld& world, const std::vector
             continue;
         }
         mobs_->thunderHit(world, watchers, *entity, bolt.entityId());
+        bolt.boltHitIds.push_back(entity->entityId());
     }
     // parity: `Entity.thunderHit` on an item: five points against its five health, and gone.
     for (const world::DroppedItem& item : world.state().nearbyItems(bolt.x, bolt.y, bolt.z, 2.0 * (kReach + kHeight))) {
@@ -129,11 +142,56 @@ void LightningBoltSystem::hitAround(world::LoadedWorld& world, const std::vector
         if (player->dead || !touches(player->x, player->y, player->z, 0.3, 1.8)) {
             continue;
         }
+        bolt.boltHitIds.push_back(player->entityId());
         // parity: a player rests at minus twenty or zero, never minus one, so the tick is all it gets.
         player->fireTicks++;
         if (player->connection().hurt) {
             player->connection().hurt(kLightningDamage, "lightningBolt", world::damageTypes::kLightningBolt,
                                       std::nullopt);
+        }
+    }
+}
+
+void LightningBoltSystem::announceStrike(const world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                         const std::vector<ServerEntity*>& living, const ServerEntity& bolt) const {
+    if (triggers_ == nullptr || !triggers_->listensTo("lightning_strike")) {
+        return;
+    }
+    const auto hit = [&bolt](std::int32_t id) { return std::ranges::contains(bolt.boltHitIds, id); };
+    // parity: the entities in a box fifteen out and twenty-one up that the bolt did not hit.
+    const auto sees = [&bolt](double x, double y, double z) {
+        return x >= bolt.x - kViewerReach && x <= bolt.x + kViewerReach && y >= bolt.y - kViewerReach &&
+               y <= bolt.y + kHeight + kViewerReach && z >= bolt.z - kViewerReach && z <= bolt.z + kViewerReach;
+    };
+    std::vector<::basalt::server::world::loot::EntityFacts> viewers;
+    for (const ServerEntity* entity : living) {
+        if (entity != &bolt && !entity->removed && !entity->dying && sees(entity->x, entity->y, entity->z) &&
+            !hit(entity->entityId())) {
+            viewers.push_back(world::triggerFacts::ofEntity(world, *entity));
+        }
+    }
+    for (const PlayerSession* player : watchers) {
+        if (!player->dead && sees(player->x, player->y, player->z) && !hit(player->entityId())) {
+            viewers.push_back(world::triggerFacts::ofPlayer(*player));
+        }
+    }
+    ::basalt::server::world::loot::EntityFacts facts = world::triggerFacts::ofEntity(world, bolt);
+    facts.blocksSetOnFire = bolt.boltFiresSet;
+    for (const PlayerSession* player : watchers) {
+        const double dx = player->x - bolt.x;
+        const double dy = player->y - bolt.y;
+        const double dz = player->z - bolt.z;
+        if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) >= kAnnounceDistance) {
+            continue;
+        }
+        // parity: `LightningStrikeTrigger` wants any one viewer to match, so each is offered in turn.
+        if (viewers.empty()) {
+            triggers_->fire("lightning_strike", player->name(), player->uuid().toString(),
+                            world::TriggerEvent{.entities = {{"lightning", facts}}});
+        }
+        for (const ::basalt::server::world::loot::EntityFacts& viewer : viewers) {
+            triggers_->fire("lightning_strike", player->name(), player->uuid().toString(),
+                            world::TriggerEvent{.entities = {{"lightning", facts}, {"bystander", viewer}}});
         }
     }
 }

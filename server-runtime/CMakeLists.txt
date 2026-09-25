@@ -186,6 +186,7 @@ basalt_module(server-runtime-core
         src/MobActionRavager.cpp
         src/MobActionWarden.cpp
         src/MobDeathLoot.cpp
+        src/MobActionAllay.cpp
         src/MobActionBees.cpp
         src/MobActionCopperGolem.cpp
         src/MobActionShulker.cpp
@@ -500,6 +501,7 @@ basalt_module(server-runtime-core
         src/entity/MobConversions.cpp
         src/entity/MobStatusEffects.cpp
         src/entity/WardenBrain.cpp
+        src/entity/Allays.cpp
         src/entity/Bees.cpp
         src/entity/CopperGolem.cpp
         src/entity/EntityCombat.cpp
@@ -1044,6 +1046,12 @@ basalt_test(server-runtime-poi-manager-test
 
 target_compile_definitions(server-runtime-poi-manager-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-allays-test
+    SOURCES
+        test/AllaysTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
 
 basalt_test(server-runtime-bees-test
     SOURCES

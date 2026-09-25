@@ -516,10 +516,23 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         world::vibrations::emit(world->state(), "entity_damage", session->x, session->y, session->z, world->gameTime());
     }
     session->setHealth(std::max(session->health() - damage, 0.0F));
-    // parity: `Entity.awardKillScore` of whoever caused it, `ENTITY_KILLED_PLAYER` for this player.
-    if (session->health() <= 0.0F && hit.has_value() && hit->source.has_value()) {
-        context.triggers->fire("entity_killed_player", session->name(), session->uuid().toString(),
-                               world::TriggerEvent{.entities = {{"entity", *hit->source}}, .damage = hit});
+    // parity: `getKillCredit().awardKillScore`: `ENTITY_KILLED_PLAYER` names the player who hit
+    // them last, else the mob, whatever this blow was.
+    if (session->health() <= 0.0F && hit.has_value()) {
+        std::optional<::basalt::server::world::loot::EntityFacts> credit;
+        world::LoadedWorld* world = context.world ? context.world() : nullptr;
+        if (session->lastHurtByPlayerId.has_value() && session->lastHurtByPlayerTime.load() > 0 && world != nullptr &&
+            context.registry != nullptr) {
+            credit = world::triggerFacts::ofId(*world, context.registry->snapshot(), *session->lastHurtByPlayerId);
+        } else if (session->lastHurtByMobType.has_value() && session->lastHurtByMobTime.load() > 0) {
+            credit = hit->source.has_value() && hit->source->type == *session->lastHurtByMobType
+                         ? hit->source
+                         : ::basalt::server::world::loot::EntityFacts{.type = *session->lastHurtByMobType};
+        }
+        if (credit.has_value()) {
+            context.triggers->fire("entity_killed_player", session->name(), session->uuid().toString(),
+                                   world::TriggerEvent{.entities = {{"entity", *credit}}, .damage = hit});
+        }
     }
     if (session->health() <= 0.0F) {
         killPlayer(*session, deathMessageId, source.has_value() ? source->name : std::nullopt, context.death);

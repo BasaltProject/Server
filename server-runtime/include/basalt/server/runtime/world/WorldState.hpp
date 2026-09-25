@@ -364,6 +364,9 @@ public:
     /// parity: `ItemEntity.hurtServer`. Answers whether the stack is gone.
     bool hurtItem(std::int32_t entityId, std::int32_t amount);
 
+    /// What is left of a stack a mob took part of.
+    bool setItemCount(std::int32_t entityId, std::int32_t count);
+
     /// Shoves one item along, for a piston pushing whatever its blocks sweep over.
     bool shiftItem(std::int32_t entityId, double dx, double dy, double dz);
 
