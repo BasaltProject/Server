@@ -49,6 +49,11 @@ public:
 
     [[nodiscard]] bool has() const noexcept { return storage_ != nullptr; }
 
+    /// Parsed by a type the client signs, which is what `SignableCommand` collects.
+    [[nodiscard]] bool signable() const noexcept { return signable_; }
+
+    void markSignable() noexcept { signable_ = true; }
+
 private:
     template <typename T>
     [[nodiscard]] static const void* keyOf() noexcept {
@@ -58,6 +63,7 @@ private:
 
     const void* key_ = nullptr;
     std::shared_ptr<const void> storage_;
+    bool signable_ = false;
 };
 
 /// What a line has parsed so far, by argument name.
@@ -154,6 +160,9 @@ public:
 
     /// A vanilla provider the client resolves itself, for types whose values it already has.
     [[nodiscard]] virtual std::optional<std::string> clientSuggestions() const { return std::nullopt; }
+
+    /// parity: `SignedArgument`, a type whose text the client signs as a chat message.
+    [[nodiscard]] virtual bool signable() const { return false; }
 };
 
 class CommandContext;
@@ -169,16 +178,10 @@ using SourceModifier = std::function<std::vector<std::shared_ptr<const CommandSo
 
 enum class NodeKind : std::uint8_t { Root, Literal, Argument };
 
-/// A node of the server's own command tree.
-///
-/// Same shape as brigadier's: a root with literal and argument children, each optionally executable
-/// and optionally redirecting somewhere else in the tree (which is how `/tp` is an alias of
-/// `/teleport` rather than a copy of it). Parsing tries literals before arguments, so a literal
-/// child always wins over an argument that would also match its text, matching brigadier's own
-/// ordering.
-///
-/// One struct with a kind rather than three classes: without RTTI a caller cannot ask what a base
-/// pointer really is, and the three cases differ by two fields.
+/// A node of the server's own command tree, shaped like brigadier's: literal and argument children,
+/// each optionally executable and optionally redirecting (how `/tp` aliases `/teleport`). Literals are
+/// tried before arguments, as in brigadier. One struct with a kind rather than three classes, since
+/// without RTTI a caller cannot ask what a base pointer is.
 class CommandNode {
 public:
     CommandNode(NodeKind kind, std::string name, std::shared_ptr<const ArgumentType> type = nullptr);
@@ -268,12 +271,9 @@ public:
 
     void executes(CommandExecutor executor) const;
 
-    /// What this argument completes to when the client asks about it.
-    ///
-    /// No provider name travels in the tree, which is what vanilla does for an argument whose own
-    /// parser names a registry: the client completes from its copy when it has one and asks the
-    /// server when it has not. Use `suggestsFromServer` for an argument whose parser carries
-    /// nothing to complete from, since the client never asks about one of those on its own.
+    /// What this argument completes to when the client asks about it. No provider name travels in the
+    /// tree, as vanilla does for a registry-backed parser: the client completes from its own copy. Use
+    /// `suggestsFromServer` when the parser carries nothing to complete from.
     void suggests(SuggestionProvider provider) const;
 
     /// Same, but the tree tells the client to ask. parity: an argument vanilla calls `.suggests` on.

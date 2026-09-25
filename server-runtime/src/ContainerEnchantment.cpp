@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/ItemEnchantability.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -165,7 +166,11 @@ void ContainerMenuController::takeEnchantmentOffer(PlayerSession& session, const
     session.stats.increment(storage::stats::enchantItem());
     // parity: `EnchantmentMenu.clickMenuButton` ends in `ENCHANTED_ITEM.trigger`.
     if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
-        triggers->onEnchantedItem(session.name(), session.uuid().toString());
+        world::TriggerEvent enchanted{.numbers = {{"levels", price}}};
+        if (const std::optional<world::TriggerItem> item = world::triggerFacts::itemOf(input); item.has_value()) {
+            enchanted.items.emplace("item", *item);
+        }
+        triggers->fire("enchanted_item", session.name(), session.uuid().toString(), enchanted);
     }
     // parity: the seed moves on, which is what gives the next item different offers.
     if (options_.nextSeed) {

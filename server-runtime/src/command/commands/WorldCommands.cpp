@@ -1,5 +1,7 @@
+#include <basalt/server/runtime/chat/ChatBroadcast.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/Coordinates.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/commands/WorldCommands.hpp>
 #include <basalt/server/runtime/player/FoodData.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -74,16 +76,21 @@ void MsgCommand::build(const CommandNodeBuilder& root) const {
         targets.argument("message", messageArgument(), [](const CommandNodeBuilder& message) {
             message.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
                 const auto* found = context.get<std::vector<player::PlayerSession*>>("targets");
-                const auto* text = context.get<std::string>("message");
-                if (found == nullptr || text == nullptr) {
+                if (found == nullptr || found->empty()) {
                     return 0;
                 }
-                const Component body = Component::text(*text);
-                for (player::PlayerSession* target : *found) {
-                    target->sendSystemMessage(Component::translatable("commands.message.display.incoming",
-                                                                      {context.source().displayName(), body}));
-                    context.source().sendSystemMessage(Component::translatable(
-                        "commands.message.display.outgoing", {Component::text(target->name()), body}));
+                // parity: `MsgCommand.sendMessage`, the sender shown each target and each target the
+                // sender.
+                const CommandEnvironment& environment = context.environment();
+                const chat::PlayerChatMessage sent = messageArguments::resolveChatMessage(context, "message");
+                const chat::BoundChatType incoming =
+                    messageArguments::bind(chat::chatType::kMsgCommandIncoming, context.source(), environment);
+                for (const player::PlayerSession* target : *found) {
+                    const chat::BoundChatType outgoing =
+                        messageArguments::bind(chat::chatType::kMsgCommandOutgoing, context.source(), environment)
+                            .withTarget(chat::displayName(*target, environment.options().teams));
+                    messageArguments::sendChatMessage(context.source(), sent, outgoing);
+                    target->sendChatMessage(sent, incoming);
                 }
                 return static_cast<std::int32_t>(found->size());
             });

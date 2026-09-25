@@ -5,7 +5,9 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/VillagerWorldSystem.hpp>
+#include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
+#include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
@@ -85,9 +87,11 @@ constexpr double kBellAlarmRange = 32.0;
 VillagerWorldSystem::VillagerWorldSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster,
                                          NaturalSpawningSystem& spawning, RaidSystem& raids,
                                          world::RealLootTables& lootTables, world::RealVillagerTrades* trades,
-                                         std::function<std::int64_t()> nextSeed, AddEffect addEffect)
+                                         std::function<std::int64_t()> nextSeed, AddEffect addEffect,
+                                         LaunchFirework launchFirework)
     : players_(&players), broadcaster_(&broadcaster), spawning_(&spawning), raids_(&raids), lootTables_(&lootTables),
-      trades_(trades), nextSeed_(std::move(nextSeed)), addEffect_(std::move(addEffect)) {}
+      trades_(trades), nextSeed_(std::move(nextSeed)), addEffect_(std::move(addEffect)),
+      launchFirework_(std::move(launchFirework)) {}
 
 std::vector<PlayerSession*> VillagerWorldSystem::watchers() const {
     std::vector<PlayerSession*> found;
@@ -572,9 +576,12 @@ ServerEntity* VillagerWorldSystem::spawnChild(ServerEntity& mob, ServerEntity& p
                                });
 }
 
-void VillagerWorldSystem::launchFirework(ServerEntity& mob, std::int32_t /*colour*/, std::int32_t /*flight*/) {
-    // documented gap: rockets are not entities here, so a celebration is heard rather than seen.
-    sound(mob, "entity.firework_rocket.launch", 3.0F, 1.0F);
+void VillagerWorldSystem::launchFirework(ServerEntity& mob, std::int32_t colour, std::int32_t flight) {
+    // parity: `new FireworkRocketEntity(level, body, x, eyeY, z, firework)`.
+    if (launchFirework_ && world_ != nullptr) {
+        launchFirework_(*world_, entity::fireworkRockets::celebrationRocket(colour, flight), mob.x,
+                        mob.y + entity::mobBreathing::eyeHeightOf(mob), mob.z, mob.entityId());
+    }
 }
 
 std::optional<std::int32_t> VillagerWorldSystem::heroLevel(std::int32_t playerId) {

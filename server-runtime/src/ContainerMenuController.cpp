@@ -268,6 +268,25 @@ void ContainerMenuController::closeOpenMenu() {
     closeOpenMenu(*session);
 }
 
+void ContainerMenuController::openMerchantMenu(PlayerSession& session) {
+    returnCraftingGrid(session);
+    openMenu = Menu::merchant(allocateContainerId());
+    openBlock.reset();
+    openBlockSecond.reset();
+    openEnderChest_ = false;
+    openStonecutter_ = false;
+    openSmithing_ = false;
+    openAnvil_ = false;
+    openGrindstone_ = false;
+    openEnchantment_ = false;
+    openBeacon_ = false;
+    openLoom_ = false;
+    openCartography_ = false;
+    openMerchant_ = true;
+    openBlockSize = 3;
+    openBlockData_ = {-1, -1, -1, -1};
+}
+
 void ContainerMenuController::openSmithingMenu(PlayerSession& session) {
     returnCraftingGrid(session);
     openMenu = Menu::smithing(allocateContainerId());
@@ -362,6 +381,7 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
     }
     returnCraftingGrid(session);
     owner_->trades().menuClosed();
+    openMerchant_ = false;
     const std::optional<BlockPos> closing = openedAt_;
     std::optional<BlockPos> closingSecond;
     if (openBlockSecond.has_value()) {

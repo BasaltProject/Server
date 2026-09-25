@@ -1,7 +1,11 @@
+#include "../loot/LootJsonParts.hpp"
+
 #include <basalt/server/world/advancement/AdvancementJson.hpp>
+#include <basalt/server/world/loot/LootTableJson.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
 
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <cstdint>
@@ -83,65 +87,6 @@ using wire::common::JsonValue;
     return ItemMatcher{.items = {*parsed}, .tag = std::nullopt};
 }
 
-/// The `type` of a condition, with the default namespace filled in.
-[[nodiscard]] std::string conditionType(const JsonObject& condition) {
-    const std::string* type = asString(condition.find("type"));
-    if (type == nullptr) {
-        return {};
-    }
-    return type->find(':') == std::string::npos ? "minecraft:" + *type : *type;
-}
-
-/// The terms of a criterion's condition. parity: 26.3 made it one predicate holder where 26.2 had a
-/// list, and a list of several is written as `all_of`, so this unwraps that one level. `ok` goes
-/// false for a term that is a named predicate or a tag, which this build does not read here.
-[[nodiscard]] std::vector<const JsonObject*> conditionTerms(const JsonValue* value, bool& ok) {
-    std::vector<const JsonObject*> terms;
-    const JsonObject* condition = asObject(value);
-    if (condition == nullptr) {
-        ok = false;
-        return terms;
-    }
-    if (conditionType(*condition) != "minecraft:all_of") {
-        terms.push_back(condition);
-        return terms;
-    }
-    const std::vector<JsonValue>* list = asArray(condition->find("terms"));
-    if (list == nullptr) {
-        ok = false;
-        return terms;
-    }
-    for (const JsonValue& element : *list) {
-        const JsonObject* term = element.get<JsonObject>();
-        if (term == nullptr) {
-            ok = false;
-            return {};
-        }
-        terms.push_back(term);
-    }
-    return terms;
-}
-
-/// The entity type one `entity_properties` condition names. Only the type is read: a predicate that
-/// asks for equipment or components is one this build cannot answer, and a criterion that never
-/// fires is better than one granted to the wrong animal. `ok` goes false for anything else.
-[[nodiscard]] std::vector<std::string> parseEntityTypes(const JsonValue* condition, bool& ok) {
-    std::vector<std::string> types;
-    for (const JsonObject* check : conditionTerms(condition, ok)) {
-        const JsonObject* predicate =
-            conditionType(*check) == "minecraft:entity_properties" ? asObject(check->find("predicate")) : nullptr;
-        const std::string* type = predicate == nullptr || predicate->size() != 1
-                                      ? nullptr
-                                      : asString(predicate->find("minecraft:entity_type"));
-        if (type == nullptr) {
-            ok = false;
-            return {};
-        }
-        types.push_back(*type);
-    }
-    return types;
-}
-
 /// The one entry a holder set names: an id, or a list of exactly one. parity: 26.3 turned the
 /// recipe, loot table and block of several triggers into holder sets; the model keeps one.
 [[nodiscard]] std::optional<Identifier> singleHolder(const JsonValue* value) {
@@ -152,47 +97,194 @@ using wire::common::JsonValue;
     return text == nullptr || text->starts_with('#') ? std::nullopt : asIdentifier(value);
 }
 
-/// The blocks a `blocks` holder set names: one id or a list of them. A `#tag` is left unsupported,
-/// since a matcher with no blocks would match every block.
-[[nodiscard]] std::optional<BlockMatcher> blocksOf(const JsonValue* blocks) {
-    if (asArray(blocks) != nullptr) {
-        return BlockMatcher{.blocks = identifiers(blocks)};
-    }
-    const std::string* text = asString(blocks);
-    const std::optional<Identifier> one =
-        text == nullptr || text->starts_with('#') ? std::nullopt : asIdentifier(blocks);
-    return one.has_value() ? std::optional{BlockMatcher{.blocks = {*one}}} : std::nullopt;
-}
+namespace parts = loot::lootTableJson::parts;
 
-/// A JSON number as a whole one. Integers arrive as `std::int64_t` and only the ones written with a
-/// decimal point as `double`, so a reader that asks for one shape misses half the files.
-[[nodiscard]] std::optional<std::int32_t> asWholeNumber(const JsonValue* value) {
-    if (value == nullptr) {
-        return std::nullopt;
-    }
-    if (const std::int64_t* whole = value->get<std::int64_t>(); whole != nullptr) {
-        return static_cast<std::int32_t>(*whole);
-    }
-    const double* real = value->get<double>();
-    return real == nullptr ? std::nullopt : std::optional{static_cast<std::int32_t>(*real)};
-}
-
-/// The state values a criterion asks of a block, as `match_block` and `location_check` both spell
-/// them: a flat object of strings. `ok` goes false for a value that is not one.
-[[nodiscard]] std::vector<std::pair<std::string, std::string>> parseStateValues(const JsonObject* state, bool& ok) {
-    std::vector<std::pair<std::string, std::string>> values;
-    if (state == nullptr) {
-        return values;
-    }
-    for (std::size_t index = 0; index < state->names().size(); ++index) {
-        const std::string* text = state->values()[index].get<std::string>();
-        if (text == nullptr) {
-            ok = false;
-            return {};
+/// A context-aware predicate: one loot condition as 26.3 writes it, or the older list of them.
+[[nodiscard]] std::optional<std::vector<loot::LootCondition>> contextPredicate(const JsonValue& value) {
+    std::vector<loot::LootCondition> conditions;
+    const auto one = [&conditions](const JsonValue& term) {
+        std::expected<loot::LootCondition, loot::LootTableParseError> parsed =
+            loot::lootTableJson::parseCondition(term);
+        if (!parsed.has_value()) {
+            return false;
         }
-        values.emplace_back(state->names()[index], *text);
+        conditions.push_back(*std::move(parsed));
+        return true;
+    };
+    if (const std::vector<JsonValue>* list = asArray(&value); list != nullptr) {
+        for (const JsonValue& term : *list) {
+            if (!one(term)) {
+                return std::nullopt;
+            }
+        }
+        return conditions;
     }
-    return values;
+    return one(value) ? std::optional{std::move(conditions)} : std::nullopt;
+}
+
+/// parity: `DamageSourcePredicate`.
+[[nodiscard]] std::optional<DamageSourceCheck> damageSourceOf(const JsonObject& object) {
+    DamageSourceCheck check;
+    for (std::size_t index = 0; index < object.names().size(); ++index) {
+        const std::string& key = object.names()[index];
+        const JsonValue& value = object.values()[index];
+        if (key == "tags") {
+            const std::vector<JsonValue>* tags = asArray(&value);
+            if (tags == nullptr) {
+                return std::nullopt;
+            }
+            for (const JsonValue& tag : *tags) {
+                const JsonObject* entry = tag.get<JsonObject>();
+                const std::string* id = entry == nullptr ? nullptr : asString(entry->find("id"));
+                const bool* expected = entry == nullptr || entry->find("expected") == nullptr
+                                           ? nullptr
+                                           : entry->find("expected")->get<bool>();
+                if (id == nullptr || expected == nullptr) {
+                    return std::nullopt;
+                }
+                check.tags.emplace_back(*id, *expected);
+            }
+        } else if ((key == "direct_entity" || key == "source_entity") && value.get<JsonObject>() != nullptr) {
+            auto predicate =
+                std::make_shared<const loot::EntityPredicate>(parts::parseEntityPredicate(*value.get<JsonObject>()));
+            (key == "direct_entity" ? check.direct : check.source) = std::move(predicate);
+        } else if (key == "is_direct" && value.get<bool>() != nullptr) {
+            check.isDirect = *value.get<bool>();
+        } else {
+            return std::nullopt;
+        }
+    }
+    return check;
+}
+
+/// parity: `DamagePredicate`.
+[[nodiscard]] std::optional<DamageCheck> damageOf(const JsonObject& object) {
+    DamageCheck check;
+    for (std::size_t index = 0; index < object.names().size(); ++index) {
+        const std::string& key = object.names()[index];
+        const JsonValue& value = object.values()[index];
+        if (key == "dealt" || key == "taken") {
+            (key == "dealt" ? check.dealt : check.taken) = parts::doubleBounds(&value);
+        } else if (key == "source_entity" && value.get<JsonObject>() != nullptr) {
+            check.source =
+                std::make_shared<const loot::EntityPredicate>(parts::parseEntityPredicate(*value.get<JsonObject>()));
+        } else if (key == "blocked" && value.get<bool>() != nullptr) {
+            check.blocked = *value.get<bool>();
+        } else if (key == "type" && value.get<JsonObject>() != nullptr) {
+            check.type = damageSourceOf(*value.get<JsonObject>());
+            if (!check.type.has_value()) {
+                return std::nullopt;
+            }
+        } else {
+            return std::nullopt;
+        }
+    }
+    return check;
+}
+
+/// The trigger instances read field by field. parity: each trigger's `TriggerInstance` codec; an
+/// unknown field is refused, so a criterion is never granted on less than it asks for.
+[[nodiscard]] std::optional<GenericCondition> parseGeneric(std::string_view trigger, const JsonObject* conditions) {
+    static constexpr std::array<std::string_view, 13> kEntityFields{
+        "player", "entity", "source",   "projectile", "shooter", "bystander", "lightning",
+        "cause",  "zombie", "villager", "child",      "parent",  "partner"};
+    static constexpr std::array<std::string_view, 3> kItemFields{"item", "fired_from_weapon", "rod"};
+    static constexpr std::array<std::string_view, 9> kNumberFields{
+        "count",  "unique_entity_types", "signal_strength", "num_bees_inside", "level",
+        "levels", "durability",          "delta",           "duration"};
+    static constexpr std::array<std::string_view, 3> kIdFields{"recipes", "potion", "block"};
+    GenericCondition built;
+    if (conditions == nullptr) {
+        return built;
+    }
+    for (std::size_t index = 0; index < conditions->names().size(); ++index) {
+        const std::string& key = conditions->names()[index];
+        const JsonValue& value = conditions->values()[index];
+        const JsonObject* object = value.get<JsonObject>();
+        if (std::ranges::find(kEntityFields, key) != kEntityFields.end()) {
+            std::optional<std::vector<loot::LootCondition>> predicate = contextPredicate(value);
+            if (!predicate.has_value()) {
+                return std::nullopt;
+            }
+            built.entities.emplace(key, *std::move(predicate));
+        } else if (key == "victims") {
+            const std::vector<JsonValue>* victims = asArray(&value);
+            if (victims == nullptr) {
+                return std::nullopt;
+            }
+            for (const JsonValue& victim : *victims) {
+                std::optional<std::vector<loot::LootCondition>> predicate = contextPredicate(victim);
+                if (!predicate.has_value()) {
+                    return std::nullopt;
+                }
+                built.victims.push_back(*std::move(predicate));
+            }
+        } else if (std::ranges::find(kItemFields, key) != kItemFields.end() && object != nullptr) {
+            built.items.emplace(key, parts::parseItemPredicate(*object));
+        } else if (std::ranges::find(kNumberFields, key) != kNumberFields.end() ||
+                   (key == "distance" && trigger == "minecraft:used_ender_eye")) {
+            built.numbers.emplace(key, parts::doubleBounds(&value));
+        } else if (std::ranges::find(kIdFields, key) != kIdFields.end()) {
+            built.ids.emplace(key, parts::idsOrTag(&value));
+        } else if (key == "state") {
+            built.state = parts::parseStateMatcher(object);
+        } else if (key == "distance" && object != nullptr) {
+            built.distance = loot::DistancePredicate{.x = parts::doubleBounds(object->find("x")),
+                                                     .y = parts::doubleBounds(object->find("y")),
+                                                     .z = parts::doubleBounds(object->find("z")),
+                                                     .horizontal = parts::doubleBounds(object->find("horizontal")),
+                                                     .absolute = parts::doubleBounds(object->find("absolute"))};
+        } else if (key == "start_position" && object != nullptr) {
+            built.startPosition = std::make_shared<const loot::LocationPredicate>(parts::parseLocation(object));
+        } else if (key == "effects" && object != nullptr) {
+            for (std::size_t at = 0; at < object->names().size(); ++at) {
+                const JsonObject* wanted = object->values()[at].get<JsonObject>();
+                loot::EffectRequirement requirement{.effect = object->names()[at]};
+                if (wanted != nullptr) {
+                    requirement.amplifier = parts::doubleBounds(wanted->find("amplifier"));
+                    requirement.duration = parts::doubleBounds(wanted->find("duration"));
+                    requirement.ambient = parts::asBool(wanted->find("ambient"));
+                    requirement.visible = parts::asBool(wanted->find("visible"));
+                }
+                built.effects.push_back(std::move(requirement));
+            }
+        } else if (key == "damage" && object != nullptr) {
+            built.damage = damageOf(*object);
+            if (!built.damage.has_value()) {
+                return std::nullopt;
+            }
+        } else if (key == "killing_blow" && object != nullptr) {
+            built.killingBlow = damageSourceOf(*object);
+            if (!built.killingBlow.has_value()) {
+                return std::nullopt;
+            }
+        } else if (key == "ingredients") {
+            const std::vector<JsonValue>* ingredients = asArray(&value);
+            if (ingredients == nullptr) {
+                return std::nullopt;
+            }
+            for (const JsonValue& ingredient : *ingredients) {
+                if (const JsonObject* predicate = ingredient.get<JsonObject>(); predicate != nullptr) {
+                    built.ingredients.push_back(parts::parseItemPredicate(*predicate));
+                }
+            }
+        } else if (key == "location") {
+            built.location = contextPredicate(value);
+            if (!built.location.has_value()) {
+                return std::nullopt;
+            }
+        } else {
+            return std::nullopt;
+        }
+    }
+    return built;
+}
+
+/// The triggers kept on their own shape: indexed by item or recipe, or naming only ids.
+[[nodiscard]] bool isSpecialized(std::string_view name) {
+    return name == "minecraft:inventory_changed" || name == "minecraft:recipe_unlocked" ||
+           name == "minecraft:recipe_crafted" || name == "minecraft:player_generates_container_loot" ||
+           name == "minecraft:changed_dimension";
 }
 
 /// The condition a trigger fires under, for the triggers this server can observe. Anything else is
@@ -200,6 +292,16 @@ using wire::common::JsonValue;
 /// advancement nobody earned.
 [[nodiscard]] CriterionCondition parseCondition(const Identifier& trigger, const JsonObject* conditions) {
     const std::string name = trigger.toString();
+    if (!isSpecialized(name)) {
+        // parity: `impossible` never fires, which is what an unsupported criterion is too.
+        std::optional<GenericCondition> generic =
+            name == "minecraft:impossible" ? std::nullopt : parseGeneric(name, conditions);
+        if (!generic.has_value()) {
+            return CriterionCondition{};
+        }
+        return CriterionCondition{.kind = ConditionKind::Generic,
+                                  .generic = std::make_shared<const GenericCondition>(*std::move(generic))};
+    }
     if (name == "minecraft:inventory_changed") {
         const std::vector<JsonValue>* items = conditions == nullptr ? nullptr : asArray(conditions->find("items"));
         if (items == nullptr) {
@@ -221,21 +323,6 @@ using wire::common::JsonValue;
         }
         return CriterionCondition{.kind = ConditionKind::RecipeUnlocked, .matchers = {}, .recipe = recipe};
     }
-    // parity: the entity predicate of `player_killed_entity`, `tame_animal` and `summoned_entity`.
-    if (name == "minecraft:player_killed_entity" || name == "minecraft:tame_animal" ||
-        name == "minecraft:summoned_entity") {
-        const ConditionKind kind = name == "minecraft:player_killed_entity" ? ConditionKind::KilledEntity
-                                   : name == "minecraft:tame_animal"        ? ConditionKind::TamedAnimal
-                                                                            : ConditionKind::SummonedEntity;
-        const JsonValue* entity = conditions == nullptr ? nullptr : conditions->find("entity");
-        CriterionCondition built{.kind = kind};
-        if (entity == nullptr) {
-            return conditions == nullptr || conditions->empty() ? built : CriterionCondition{};
-        }
-        bool ok = true;
-        built.entityTypes = parseEntityTypes(entity, ok);
-        return ok ? built : CriterionCondition{};
-    }
     if (name == "minecraft:player_generates_container_loot") {
         const std::optional<Identifier> table =
             conditions == nullptr ? std::nullopt : singleHolder(conditions->find("loot_tables"));
@@ -250,154 +337,6 @@ using wire::common::JsonValue;
         }
         return built;
     }
-    // parity: `FishingRodHookedTrigger` also knows the rod and what was hooked; every criterion in
-    // the jar names only the item, so anything else is left unsupported.
-    if (name == "minecraft:consume_item" || name == "minecraft:filled_bucket" ||
-        name == "minecraft:fishing_rod_hooked") {
-        const JsonValue* item = conditions == nullptr ? nullptr : conditions->find("item");
-        if (name == "minecraft:fishing_rod_hooked" && conditions != nullptr &&
-            (conditions->find("rod") != nullptr || conditions->find("entity") != nullptr)) {
-            return CriterionCondition{};
-        }
-        CriterionCondition built{.kind = name == "minecraft:consume_item"    ? ConditionKind::ConsumedItem
-                                         : name == "minecraft:filled_bucket" ? ConditionKind::FilledBucket
-                                                                             : ConditionKind::FishingHooked};
-        if (item == nullptr) {
-            return built;
-        }
-        std::optional<ItemMatcher> matcher = parseMatcher(*item);
-        if (!matcher.has_value()) {
-            return CriterionCondition{};
-        }
-        built.matchers.push_back(std::move(*matcher));
-        return built;
-    }
-    // parity: the triggers whose criteria in the jar ask for nothing at all: doing the thing is the
-    // whole condition. A file that does add one is left unsupported rather than granted blind.
-    if (name == "minecraft:slept_in_bed" || name == "minecraft:villager_trade" || name == "minecraft:enchanted_item" ||
-        name == "minecraft:cured_zombie_villager") {
-        const ConditionKind kind = name == "minecraft:slept_in_bed"     ? ConditionKind::SleptInBed
-                                   : name == "minecraft:villager_trade" ? ConditionKind::VillagerTrade
-                                   : name == "minecraft:enchanted_item" ? ConditionKind::EnchantedItem
-                                                                        : ConditionKind::CuredZombieVillager;
-        return conditions == nullptr || conditions->empty() ? CriterionCondition{.kind = kind} : CriterionCondition{};
-    }
-    // parity: `ConstructBeaconTrigger`, whose `level` is either a number or a range.
-    if (name == "minecraft:construct_beacon") {
-        const JsonValue* level = conditions == nullptr ? nullptr : conditions->find("level");
-        CriterionCondition built{.kind = ConditionKind::ConstructedBeacon};
-        if (level == nullptr) {
-            return conditions == nullptr || conditions->empty() ? built : CriterionCondition{};
-        }
-        if (const std::optional<std::int32_t> exact = asWholeNumber(level);
-            exact.has_value() && level->get<JsonObject>() == nullptr) {
-            built.minLevel = *exact;
-            built.maxLevel = *exact;
-            return built;
-        }
-        const JsonObject* range = level->get<JsonObject>();
-        if (range == nullptr) {
-            return CriterionCondition{};
-        }
-        const auto bound = [range](std::string_view key) { return asWholeNumber(range->find(key)); };
-        built.minLevel = bound("min");
-        built.maxLevel = bound("max");
-        return built.minLevel.has_value() || built.maxLevel.has_value() ? built : CriterionCondition{};
-    }
-    // parity: `ItemUsedOnLocationTrigger` as `placed_block`: one `match_block` term, which names the
-    // block and may name state values. The criteria that also ask what is in the squares around (the
-    // chiseled bookshelf and its comparator, the creaking heart) are left unsupported.
-    if (name == "minecraft:placed_block") {
-        bool ok = true;
-        const std::vector<const JsonObject*> terms =
-            conditionTerms(conditions == nullptr ? nullptr : conditions->find("location"), ok);
-        if (!ok || terms.size() != 1 || conditionType(*terms.front()) != "minecraft:match_block") {
-            return CriterionCondition{};
-        }
-        const JsonObject& term = *terms.front();
-        std::optional<BlockMatcher> matcher = blocksOf(term.find("blocks"));
-        for (const std::string& key : term.names()) {
-            ok = ok && (key == "type" || key == "blocks" || key == "state");
-        }
-        if (!matcher.has_value() || !ok) {
-            return CriterionCondition{};
-        }
-        matcher->properties = parseStateValues(asObject(term.find("state")), ok);
-        return ok ? CriterionCondition{.kind = ConditionKind::PlacedBlock, .blockMatcher = std::move(*matcher)}
-                  : CriterionCondition{};
-    }
-    // parity: `ItemUsedOnLocationTrigger` as `item_used_on_block`: an `all_of` of a `location_check`
-    // naming the block and a `match_tool` naming the item. A check with an offset asks about another
-    // square, which this build does not answer, so those are left unsupported.
-    if (name == "minecraft:item_used_on_block") {
-        bool ok = true;
-        const std::vector<const JsonObject*> terms =
-            conditionTerms(conditions == nullptr ? nullptr : conditions->find("location"), ok);
-        if (!ok || terms.size() != 2) {
-            return CriterionCondition{};
-        }
-        CriterionCondition built{.kind = ConditionKind::ItemUsedOnBlock};
-        for (const JsonObject* term : terms) {
-            const std::string condition = conditionType(*term);
-            const JsonObject* predicate = asObject(term->find("predicate"));
-            if (predicate == nullptr || term->size() != 2) {
-                return CriterionCondition{};
-            }
-            if (condition == "minecraft:location_check") {
-                const JsonObject* block = asObject(predicate->find("block"));
-                std::optional<BlockMatcher> matcher = block == nullptr ? std::nullopt : blocksOf(block->find("blocks"));
-                if (predicate->size() != 1 || !matcher.has_value()) {
-                    return CriterionCondition{};
-                }
-                matcher->properties = parseStateValues(asObject(block->find("state")), ok);
-                built.blockMatcher = std::move(matcher);
-                continue;
-            }
-            if (condition != "minecraft:match_tool") {
-                return CriterionCondition{};
-            }
-            std::optional<ItemMatcher> matcher = parseMatcher(JsonValue{*predicate});
-            if (!matcher.has_value()) {
-                return CriterionCondition{};
-            }
-            built.matchers.push_back(std::move(*matcher));
-        }
-        return ok && built.blockMatcher.has_value() && !built.matchers.empty() ? built : CriterionCondition{};
-    }
-    // parity: `PlayerInteractTrigger`, which names one entity and the item held. Beyond the type and
-    // whether it is a baby, an entity predicate here asks about components or equipment, which this
-    // build cannot answer, so those criteria stay unsupported.
-    if (name == "minecraft:player_interacted_with_entity") {
-        bool ok = true;
-        const std::vector<const JsonObject*> entity =
-            conditionTerms(conditions == nullptr ? nullptr : conditions->find("entity"), ok);
-        const JsonValue* item = conditions == nullptr ? nullptr : conditions->find("item");
-        if (!ok || entity.size() != 1 || item == nullptr ||
-            conditionType(*entity.front()) != "minecraft:entity_properties") {
-            return CriterionCondition{};
-        }
-        const JsonObject* predicate = asObject(entity.front()->find("predicate"));
-        const std::string* type = predicate == nullptr ? nullptr : asString(predicate->find("minecraft:entity_type"));
-        if (type == nullptr || predicate->size() > 2) {
-            return CriterionCondition{};
-        }
-        CriterionCondition built{.kind = ConditionKind::InteractedWithEntity, .entityTypes = {*type}};
-        if (predicate->size() == 2) {
-            const JsonObject* flags = asObject(predicate->find("minecraft:flags"));
-            const JsonValue* isBaby = flags == nullptr || flags->size() != 1 ? nullptr : flags->find("is_baby");
-            const bool* wanted = isBaby == nullptr ? nullptr : isBaby->get<bool>();
-            if (wanted == nullptr) {
-                return CriterionCondition{};
-            }
-            built.baby = *wanted;
-        }
-        std::optional<ItemMatcher> matcher = parseMatcher(*item);
-        if (!matcher.has_value()) {
-            return CriterionCondition{};
-        }
-        built.matchers.push_back(std::move(*matcher));
-        return built;
-    }
     // parity: `RecipeCraftedTrigger`. A criterion that also names the ingredients is left
     // unsupported: what was in the grid is gone by the time the result is taken.
     if (name == "minecraft:recipe_crafted") {
@@ -407,53 +346,6 @@ using wire::common::JsonValue;
             return CriterionCondition{};
         }
         return CriterionCondition{.kind = ConditionKind::RecipeCrafted, .recipe = recipe};
-    }
-    // parity: `PlayerTrigger` as `location`, whose predicate this build reads only as far as one
-    // biome or one structure: the two `adventuring_time` and `explore_nether` ask for, plus the four
-    // structure ones. Anything else (equipment, what the player is stepping on) is left unsupported.
-    if (name == "minecraft:location") {
-        bool ok = true;
-        const std::vector<const JsonObject*> player =
-            conditionTerms(conditions == nullptr ? nullptr : conditions->find("player"), ok);
-        if (!ok || player.size() != 1 || conditionType(*player.front()) != "minecraft:entity_properties") {
-            return CriterionCondition{};
-        }
-        const JsonObject* predicate = asObject(player.front()->find("predicate"));
-        const JsonObject* where =
-            predicate == nullptr || predicate->size() != 1 ? nullptr : asObject(predicate->find("minecraft:location"));
-        if (where == nullptr || where->size() != 1) {
-            return CriterionCondition{};
-        }
-        CriterionCondition built{.kind = ConditionKind::AtLocation};
-        built.biome = asIdentifier(where->find("biomes"));
-        built.structure = asIdentifier(where->find("structures"));
-        return built.biome.has_value() || built.structure.has_value() ? built : CriterionCondition{};
-    }
-    // parity: `EnterBlockTrigger`. A criterion that also names block properties is one this build
-    // cannot answer, so it is left unsupported rather than granted on the block alone.
-    if (name == "minecraft:enter_block") {
-        const std::optional<Identifier> block =
-            conditions == nullptr ? std::nullopt : singleHolder(conditions->find("blocks"));
-        if (!block.has_value() || conditions->find("state") != nullptr) {
-            return CriterionCondition{};
-        }
-        return CriterionCondition{.kind = ConditionKind::EnteredBlock, .block = block};
-    }
-    // parity: `BredAnimalsTrigger`: the newborn, or the pair that made it.
-    if (name == "minecraft:bred_animals") {
-        CriterionCondition built{.kind = ConditionKind::BredAnimals};
-        if (conditions == nullptr || conditions->empty()) {
-            return built;
-        }
-        bool ok = true;
-        const auto read = [&conditions, &ok](std::string_view key) {
-            const JsonValue* condition = conditions->find(key);
-            return condition == nullptr ? std::vector<std::string>{} : parseEntityTypes(condition, ok);
-        };
-        built.entityTypes = read("child");
-        built.parentTypes = read("parent");
-        built.partnerTypes = read("partner");
-        return ok ? built : CriterionCondition{};
     }
     return CriterionCondition{};
 }

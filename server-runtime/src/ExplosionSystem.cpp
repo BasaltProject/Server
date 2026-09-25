@@ -134,6 +134,9 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(block.stateId); state.has_value()) {
             collectExplodedBlock(world, state->block, block.stateId, block.x, block.y, block.z, power, drops);
         }
+        if (block.hive.has_value() && hooks_.hiveBlown) {
+            hooks_.hiveBlown(world, block.x, block.y, block.z, block.stateId, *block.hive, sourceEntityId);
+        }
     }
 
     const world::neighbourUpdates::Context context{.world = world.state(),

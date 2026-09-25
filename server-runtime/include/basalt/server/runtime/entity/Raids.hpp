@@ -1,11 +1,13 @@
 #pragma once
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/runtime/entity/IntHashOrder.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/text/Component.hpp>
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -131,6 +133,8 @@ public:
     std::set<std::int32_t> barPlayers;
     wire::text::Component barName;
     float barProgress = 0.0F;
+    /// When the bar was last worked out, against `entityCombat::nextRaidBarStamp`.
+    std::int64_t barStamp = 0;
     bool barVisible = true;
 };
 
@@ -166,7 +170,10 @@ public:
     void remove(std::int32_t id);
 
     /// The ids in the order `Int2ObjectOpenHashMap` walks them.
-    [[nodiscard]] std::vector<std::int32_t> tickOrder() const;
+    [[nodiscard]] std::vector<std::int32_t> tickOrder() const { return order_.order(); }
+
+    /// parity: `Raids.tick`'s iterator: `visit` answers true to remove that raid on the spot.
+    void forEachInTickOrder(const std::function<bool(std::int32_t id, Raid& raid)>& visit);
 
     [[nodiscard]] std::size_t size() const noexcept { return raids_.size(); }
 
@@ -182,6 +189,7 @@ public:
 
 private:
     std::map<std::int32_t, std::unique_ptr<Raid>> raids_;
+    IntHashOrder order_;
     std::int32_t nextId_ = 1;
     std::int64_t seeds_ = 0;
 };

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <cstdint>
 
 namespace basalt::server::world::loot {
@@ -89,26 +90,123 @@ bool ItemPredicate::test(const std::optional<wire::common::Identifier>& item,
                          const std::map<std::string, std::int32_t, std::less<>>& itemEnchantments,
                          const TagLookup& tags) const {
     if (unsupported || !item.has_value() || !matchesIdsOrTag(items, "item", *item, tags) ||
-        !storedEnchantments.empty() || !present.empty()) {
+        !storedEnchantments.empty() || !present.empty() || !exact.empty()) {
         return false;
     }
     return meets(enchantments, itemEnchantments, tags);
 }
 
 bool ItemPredicate::test(const wire::common::Identifier& item, const wire::nbt::NbtCompound& components,
-                         const TagLookup& tags) const {
-    if (unsupported || !matchesIdsOrTag(items, "item", item, tags)) {
+                         const TagLookup& tags, std::int32_t stackCount) const {
+    if (unsupported || !matchesIdsOrTag(items, "item", item, tags) ||
+        (count.has_value() && !count->test(static_cast<double>(stackCount)))) {
         return false;
     }
     if (!std::ranges::all_of(present, [&components](const std::string& key) { return components.contains(key); })) {
+        return false;
+    }
+    if (!std::ranges::all_of(exact, [&components](const auto& wanted) {
+            const wire::nbt::NbtTag* held = components.find(wanted.first);
+            return held != nullptr && *held == wanted.second;
+        })) {
         return false;
     }
     return meets(enchantments, levelsIn(components, "minecraft:enchantments"), tags) &&
            meets(storedEnchantments, levelsIn(components, "minecraft:stored_enchantments"), tags);
 }
 
-bool EntityPredicate::test(const std::optional<EntityFacts>& entity, const TagLookup& tags) const {
+bool DistancePredicate::test(const std::array<double, 3>& from, const std::array<double, 3>& to) const {
+    // parity: the differences are floats before they are compared.
+    const auto dx = static_cast<float>(from[0] - to[0]);
+    const auto dy = static_cast<float>(from[1] - to[1]);
+    const auto dz = static_cast<float>(from[2] - to[2]);
+    return x.test(std::abs(dx)) && y.test(std::abs(dy)) && z.test(std::abs(dz)) &&
+           horizontal.testSquared(static_cast<double>(dx * dx + dz * dz)) &&
+           absolute.testSquared(static_cast<double>(dx * dx + dy * dy + dz * dz));
+}
+
+namespace {
+
+/// parity: `LocationPredicate.matches` at a point: the square it falls in, and the point itself.
+[[nodiscard]] bool locatedAt(const LocationPredicate& predicate, const EntityFacts& entity,
+                             const std::array<double, 3>& point, const TagLookup& tags) {
+    if (!entity.placeAt) {
+        return false;
+    }
+    PlaceFacts place =
+        entity.placeAt(static_cast<std::int32_t>(std::floor(point[0])), static_cast<std::int32_t>(std::floor(point[1])),
+                       static_cast<std::int32_t>(std::floor(point[2])));
+    place.exact = point;
+    return predicate.test(place, tags);
+}
+
+[[nodiscard]] bool flagOf(const EntityFacts& entity, std::string_view name) {
+    const auto found = entity.flags.find(name);
+    return found != entity.flags.end() && found->second;
+}
+
+} // namespace
+
+bool EntityPredicate::test(const std::optional<EntityFacts>& entity, const TagLookup& tags,
+                           const std::optional<std::array<double, 3>>& origin) const {
     if (unsupported || !entity.has_value() || !matchesIdsOrTag(types, "entity_type", entity->type, tags)) {
+        return false;
+    }
+    for (const auto& [name, wanted] : flags) {
+        if (flagOf(*entity, name) != wanted) {
+            return false;
+        }
+    }
+    if (distance.has_value() &&
+        (!origin.has_value() || !entity->position.has_value() || !distance->test(*origin, *entity->position))) {
+        return false;
+    }
+    if (location != nullptr &&
+        (!entity->position.has_value() || !locatedAt(*location, *entity, *entity->position, tags))) {
+        return false;
+    }
+    // parity: `SteppingOnPredicate`, only on the ground and at the centre of the square underfoot.
+    if (steppingOn != nullptr) {
+        if (!entity->position.has_value() || !flagOf(*entity, "is_on_ground")) {
+            return false;
+        }
+        const std::array<double, 3> under{std::floor((*entity->position)[0]) + 0.5,
+                                          std::floor((*entity->position)[1] - 1.0E-5) + 0.5,
+                                          std::floor((*entity->position)[2]) + 0.5};
+        if (!locatedAt(*steppingOn, *entity, under, tags)) {
+            return false;
+        }
+    }
+    for (const auto& [slot, wanted] : equipment) {
+        const auto worn = entity->equipment.find(slot);
+        const bool matched = worn != entity->equipment.end()
+                                 ? wanted.test(worn->second.item, worn->second.components, tags, worn->second.count)
+                                 : wanted.test(wire::common::Identifier::vanilla("air"), {}, tags, 0);
+        if (!matched) {
+            return false;
+        }
+    }
+    for (const EffectRequirement& requirement : effects) {
+        const auto found = entity->effects.find(requirement.effect);
+        if (found == entity->effects.end() || !requirement.amplifier.test(found->second.amplifier) ||
+            !requirement.duration.test(found->second.duration) ||
+            (requirement.ambient.has_value() && *requirement.ambient != found->second.ambient) ||
+            (requirement.visible.has_value() && *requirement.visible != found->second.visible)) {
+            return false;
+        }
+    }
+    if (blocksSetOnFire.has_value() &&
+        (!entity->blocksSetOnFire.has_value() || !blocksSetOnFire->test(*entity->blocksSetOnFire))) {
+        return false;
+    }
+    if (lookingAt != nullptr) {
+        if (entity->lookingAt == nullptr || !lookingAt->test(*entity->lookingAt, tags, origin)) {
+            return false;
+        }
+    }
+    if (passenger != nullptr && !std::ranges::any_of(entity->passengers, [this, &tags, &origin](const auto& rider) {
+            return rider != nullptr && passenger->test(*rider, tags, origin);
+        })) {
         return false;
     }
     if ((onFire.has_value() && *onFire != entity->onFire) || (baby.has_value() && *baby != entity->baby) ||
@@ -130,15 +228,23 @@ bool EntityPredicate::test(const std::optional<EntityFacts>& entity, const TagLo
         }
     }
     if (vehicle != nullptr) {
-        if (!entity->vehicle.has_value()) {
-            return false;
-        }
-        EntityFacts ridden{.type = *entity->vehicle};
-        if (!vehicle->test(ridden, tags)) {
+        if (entity->vehicleFacts != nullptr) {
+            if (!vehicle->test(*entity->vehicleFacts, tags, origin)) {
+                return false;
+            }
+        } else if (!entity->vehicle.has_value() ||
+                   !vehicle->test(EntityFacts{.type = *entity->vehicle}, tags, origin)) {
             return false;
         }
     }
-    return !mainhand.has_value() || mainhand->test(entity->mainhand, entity->mainhandEnchantments, tags);
+    if (!mainhand.has_value()) {
+        return true;
+    }
+    // A stack with its components answers every part of the predicate; the bare id only some.
+    if (const auto held = entity->equipment.find("mainhand"); held != entity->equipment.end()) {
+        return mainhand->test(held->second.item, held->second.components, tags, held->second.count);
+    }
+    return mainhand->test(entity->mainhand, entity->mainhandEnchantments, tags);
 }
 
 bool LocationPredicate::test(const PlaceFacts& place, const TagLookup& tags) const {

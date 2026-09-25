@@ -23,6 +23,7 @@
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <utility>
@@ -53,6 +54,9 @@ std::uint8_t sharedFlags(const PlayerSession& session) {
     if (session.sprinting) {
         flags |= SetEntityDataPacket::kFlagSprinting;
     }
+    if (session.fallFlying) {
+        flags |= SetEntityDataPacket::kFlagFallFlying;
+    }
     return flags;
 }
 
@@ -79,7 +83,7 @@ void UiStateSync::syncPosture() {
     const std::uint8_t flags = sharedFlags(*session);
     // parity: `Player.updatePlayerPose`, of which this build has the two poses it can tell apart:
     // crouching and standing.
-    const Pose pose = session->sneaking ? Pose::Crouching : Pose::Standing;
+    const Pose pose = session->fallFlying ? Pose::FallFlying : session->sneaking ? Pose::Crouching : Pose::Standing;
     if (flags == owner_->lastSharedFlags && pose == owner_->lastPose) {
         return;
     }
@@ -327,36 +331,57 @@ void UiStateSync::sendStats() {
     using wire::protocol::play::AwardStatsPacket;
     using wire::protocol::play::StatCounter;
     std::vector<StatCounter> stats;
+    // parity: `ClientboundAwardStatsPacket`, each counter as its type and the id of what it counts.
+    const auto itemId = [](std::string_view name) -> std::optional<std::int32_t> {
+        const std::expected<Identifier, wire::common::IdentifierError> item = Identifier::parse(name);
+        const server::registry::Item* entry =
+            item.has_value() ? server::registry::items::registry().byName(*item) : nullptr;
+        return entry == nullptr ? std::nullopt : std::optional{entry->protocolId};
+    };
+    const auto entityId = [](std::string_view name) -> std::optional<std::int32_t> {
+        const std::expected<Identifier, wire::common::IdentifierError> type = Identifier::parse(name);
+        const server::registry::EntityTypeEntry* entry =
+            type.has_value() ? server::registry::entityTypes::of(*type) : nullptr;
+        return entry == nullptr ? std::nullopt : std::optional{entry->protocolId};
+    };
+    const auto blockId = [](std::string_view name) -> std::optional<std::int32_t> {
+        const std::expected<Identifier, wire::common::IdentifierError> block = Identifier::parse(name);
+        return block.has_value() ? server::registry::blocks::registry().idOf(*block) : std::nullopt;
+    };
+    const auto customId = [](std::string_view name) -> std::optional<std::int32_t> {
+        const std::expected<Identifier, wire::common::IdentifierError> custom = Identifier::parse(name);
+        return custom.has_value() && custom->namespaceName() == "minecraft"
+                   ? server::registry::customStats::idOf(custom->path())
+                   : std::nullopt;
+    };
+
+    struct Kind {
+        std::string_view prefix;
+        std::int32_t type;
+        std::optional<std::int32_t> (*id)(std::string_view);
+    };
+
+    const std::array<Kind, 9> kinds{Kind{storage::stats::kMined, AwardStatsPacket::kTypeMined, +blockId},
+                                    Kind{storage::stats::kCrafted, AwardStatsPacket::kTypeCrafted, +itemId},
+                                    Kind{storage::stats::kUsed, AwardStatsPacket::kTypeUsed, +itemId},
+                                    Kind{storage::stats::kBroken, AwardStatsPacket::kTypeBroken, +itemId},
+                                    Kind{storage::stats::kPickedUp, AwardStatsPacket::kTypePickedUp, +itemId},
+                                    Kind{storage::stats::kDropped, AwardStatsPacket::kTypeDropped, +itemId},
+                                    Kind{storage::stats::kKilledBy, AwardStatsPacket::kTypeKilledBy, +entityId},
+                                    Kind{storage::stats::kKilled, AwardStatsPacket::kTypeKilled, +entityId},
+                                    Kind{storage::stats::kCustom, AwardStatsPacket::kTypeCustom, +customId}};
     for (const auto& [key, value] : session->stats.snapshot(owner_->playTimeTicks).counters) {
         const auto count =
             static_cast<std::int32_t>(std::min<std::int64_t>(value, std::numeric_limits<std::int32_t>::max()));
-        if (key.starts_with(storage::stats::kCustom)) {
-            const std::optional<std::int32_t> id =
-                server::registry::customStats::idOf(key.substr(std::string_view{storage::stats::kCustom}.size() + 1));
-            if (id.has_value()) {
-                stats.push_back(StatCounter{.statType = AwardStatsPacket::kTypeCustom, .value = *id, .count = count});
+        for (const Kind& kind : kinds) {
+            if (!key.starts_with(kind.prefix) || key.size() <= kind.prefix.size() || key[kind.prefix.size()] != '/') {
+                continue;
             }
-            continue;
-        }
-        if (key.starts_with(storage::stats::kMined)) {
-            const std::expected<Identifier, wire::common::IdentifierError> block =
-                Identifier::parse(key.substr(std::string_view{storage::stats::kMined}.size() + 1));
-            const std::optional<std::int32_t> id =
-                block.has_value() ? server::registry::blocks::registry().idOf(*block) : std::nullopt;
-            if (id.has_value()) {
-                stats.push_back(StatCounter{.statType = AwardStatsPacket::kTypeMined, .value = *id, .count = count});
+            if (const std::optional<std::int32_t> id = kind.id(std::string_view{key}.substr(kind.prefix.size() + 1));
+                id.has_value()) {
+                stats.push_back(StatCounter{.statType = kind.type, .value = *id, .count = count});
             }
-            continue;
-        }
-        if (key.starts_with(storage::stats::kUsed)) {
-            const std::expected<Identifier, wire::common::IdentifierError> item =
-                Identifier::parse(key.substr(std::string_view{storage::stats::kUsed}.size() + 1));
-            const server::registry::Item* entry =
-                item.has_value() ? server::registry::items::registry().byName(*item) : nullptr;
-            if (entry != nullptr) {
-                stats.push_back(
-                    StatCounter{.statType = AwardStatsPacket::kTypeUsed, .value = entry->protocolId, .count = count});
-            }
+            break;
         }
     }
     owner_->sendCompressed(AwardStatsPacket::kId,

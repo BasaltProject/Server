@@ -307,13 +307,13 @@ std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::
     const Parsed<std::vector<Link>> links = parse(reader, root_, source, {});
     std::int32_t result = 0;
     if (!links.has_value()) {
-        reportSyntaxError(source, links.error());
+        reportSyntaxError(source, links.error(), input);
     } else {
         const Parsed<std::int32_t> ran = runChain(*links, 0, source, input, reader, successes);
         if (ran.has_value()) {
             result = *ran;
         } else {
-            reportSyntaxError(source, ran.error());
+            reportSyntaxError(source, ran.error(), input);
         }
     }
     if (environment_->options().timings != nullptr) {
@@ -323,6 +323,26 @@ std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::
                         .count());
     }
     return result;
+}
+
+std::vector<std::pair<std::string, std::string>> CommandDispatcher::signableArguments(const CommandSource& source,
+                                                                                      const std::string& input) const {
+    StringReader reader{input};
+    const Parsed<std::vector<Link>> links = parse(reader, root_, source, {});
+    std::vector<std::pair<std::string, std::string>> found;
+    if (!links.has_value()) {
+        return found;
+    }
+    for (const Link& link : *links) {
+        for (const auto& [name, value] : link.arguments) {
+            const std::string* text = value.signable() ? value.as<std::string>() : nullptr;
+            const bool seen = std::ranges::any_of(found, [&name](const auto& entry) { return entry.first == name; });
+            if (text != nullptr && !seen) {
+                found.emplace_back(name, *text);
+            }
+        }
+    }
+    return found;
 }
 
 Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links, std::size_t index,
@@ -427,7 +447,11 @@ Parsed<std::vector<CommandDispatcher::Link>> CommandDispatcher::parse(StringRead
             if (!value.has_value()) {
                 failure = value.error();
             } else {
-                branch.insert_or_assign(child->name(), *value);
+                ArgumentValue parsed = *value;
+                if (child->type()->signable()) {
+                    parsed.markSignable();
+                }
+                branch.insert_or_assign(child->name(), std::move(parsed));
             }
         }
         if (!failure.has_value() && reader.canRead() && reader.peek() != ' ') {
@@ -540,7 +564,8 @@ void CommandDispatcher::collect(StringReader& reader, const CommandNode& node, c
     }
 }
 
-void CommandDispatcher::reportSyntaxError(const CommandSource& source, const CommandSyntaxError& error) const {
+void CommandDispatcher::reportSyntaxError(const CommandSource& source, const CommandSyntaxError& error,
+                                          const std::string& input) const {
     feedback_.failure(source, error.component);
     if (!error.input.has_value() || error.cursor < 0) {
         return;
@@ -559,9 +584,13 @@ void CommandDispatcher::reportSyntaxError(const CommandSource& source, const Com
         context.push_back(Component::text(rawInput.substr(cursor)).color(wire::text::kRed).underlined(true));
     }
     context.push_back(Component::translatable("command.context.here").color(wire::text::kRed).italic(true));
-    // Vanilla also hangs a "suggest this command again" click event off this line: skipped,
-    // documented gap, nothing else about the message changes.
-    source.sendSystemMessage(Component::text("").withChildren(std::move(context)).color(wire::text::kGray));
+    // parity: `Commands.finishParsing`, whose line suggests the whole command again when clicked
+    // and goes out through `sendFailure`, so inside a red parent.
+    const Component line = Component::text("")
+                               .withChildren(std::move(context))
+                               .color(wire::text::kGray)
+                               .clickEvent(wire::text::ClickEvent::suggestCommand("/" + input));
+    source.sendSystemMessage(Component::text("").withChildren({line}).color(wire::text::kRed));
 }
 
 CommandsPacket CommandDispatcher::treeFor(const CommandSource& source) const {

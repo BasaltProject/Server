@@ -25,6 +25,9 @@ public:
     void reset(std::string_view key);
 
     /// Fallen distance, in centimetres like the walked one.
+    /// A counter kept somewhere else, as play time is: only the objectives that count it hear of it.
+    void noteOnly(std::string_view key, std::int64_t amount);
+
     void addFallen(double blocks);
 
     void addDamageTaken(float amount);

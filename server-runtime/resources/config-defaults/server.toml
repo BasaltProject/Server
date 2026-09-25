@@ -16,6 +16,11 @@ max-players = 80
 # claimed username with no verification (vanilla's "cracked" mode).
 online-mode = true
 
+# Require signed chat from every player, as vanilla's enforce-secure-profile does.
+# Only takes effect in online mode and while Mojang's public keys could be
+# fetched at startup; unsigned chat from a player then is refused.
+enforce-secure-profile = true
+
 # Game mode new players join in: survival, creative, adventure or spectator.
 gamemode = "survival"
 

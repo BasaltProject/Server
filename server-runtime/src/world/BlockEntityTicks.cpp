@@ -126,6 +126,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
         }
     }
     std::vector<vibrations::ShriekerArrival> shrieks;
+    std::vector<BlockChange> hives;
     for (const std::array<std::int32_t, 2>& position : chunks) {
         server::world::Chunk* chunk = world.chunkIfLoaded(position[0], position[1]);
         if (chunk == nullptr || chunk->blockEntityCount() == 0) {
@@ -177,6 +178,12 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     if (hooks.songStopped) {
                         hooks.songStopped(x, y, z);
                     }
+                }
+                continue;
+            }
+            if (path == "beehive") {
+                if (hooks.beehive && hooks.beehive(x, y, z, hives)) {
+                    chunk->markDirty();
                 }
                 continue;
             }
@@ -355,6 +362,12 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
     if (hooks.shriekerHeard) {
         for (const vibrations::ShriekerArrival& arrival : shrieks) {
             hooks.shriekerHeard(arrival);
+        }
+    }
+    // parity: the honey a bee brought in, which the jar sets inside the hive's own turn.
+    for (BlockChange& honey : hives) {
+        if (world.setBlockState(honey.x, honey.y, honey.z, honey.stateId)) {
+            changes.push_back(std::move(honey));
         }
     }
     return changes;

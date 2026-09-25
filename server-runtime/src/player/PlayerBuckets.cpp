@@ -2,6 +2,8 @@
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBuckets.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Buckets.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -52,6 +54,8 @@ void settle(const BreakContext& context, PlayerSession& player, world::LoadedWor
                                     at.y + 0.5, at.z + 0.5, world.gameTime(), {.entity = player.uuid()});
         }
     }
+    // parity: `BucketItem.use`, which counts the bucket it was whether it filled or emptied.
+    statAwards::used(player, item.toString());
     for (const world::FluidChange& change : result.changes) {
         announceBlock(context, world.name(), change.x, change.y, change.z, change.stateId);
     }
@@ -69,7 +73,10 @@ void settle(const BreakContext& context, PlayerSession& player, world::LoadedWor
     // parity: `BucketItem.use` and `Bucketable.bucketMobPickup` both end in `FILLED_BUCKET.trigger`,
     // which is the bucket that came back full and never the empty one.
     if (context.triggers != nullptr && result.replacement->path() != "bucket") {
-        context.triggers->onFilledBucket(player.name(), player.uuid().toString(), *result.replacement);
+        context.triggers->fire(
+            "filled_bucket", player.name(), player.uuid().toString(),
+            world::TriggerEvent{
+                .items = {{"item", world::TriggerItem{.item = *result.replacement, .components = held.components}}}});
     }
     if (context.slotChanged) {
         context.slotChanged(player, heldSlot);

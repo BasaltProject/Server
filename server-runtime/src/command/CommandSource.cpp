@@ -24,8 +24,9 @@ bool ConsoleCommandSource::hasPermission(std::optional<std::string_view> node) c
     return true;
 }
 
-PlayerCommandSource::PlayerCommandSource(player::PlayerSession& player, const config::GroupsConfig& groups)
-    : player_(&player), groups_(&groups) {}
+PlayerCommandSource::PlayerCommandSource(player::PlayerSession& player, const config::GroupsConfig& groups,
+                                         const chat::SignedArguments* signedArguments)
+    : player_(&player), groups_(&groups), signedArguments_(signedArguments) {}
 
 std::string PlayerCommandSource::name() const { return player_->name(); }
 

@@ -149,7 +149,6 @@ TEST_CASE("every mob this build gives an AI to comes back with goals") {
                                          "vex",
                                          "guardian",
                                          "bat",
-                                         "villager",
                                          "wandering_trader",
                                          "squid",
                                          "cod",

@@ -1,3 +1,6 @@
+#include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
 
 #include <algorithm>
@@ -18,6 +21,29 @@ namespace {
 constexpr std::array<std::string_view, 16> kTeamColors{
     "black",     "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple",  "gold",   "gray",
     "dark_gray", "blue",      "green",      "aqua",      "red",      "light_purple", "yellow", "white"};
+
+/// parity: `StatType.getRegistry`: a statistic names something that registry holds, or nothing.
+[[nodiscard]] bool inStatRegistry(std::string_view type, std::string_view value) {
+    // parity: `Identifier.bySeparator(name, '.')`, which splits at the first dot.
+    std::string id{value};
+    id[id.find('.')] = ':';
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
+        wire::common::Identifier::parse(id);
+    if (!parsed.has_value()) {
+        return false;
+    }
+    if (type == "minecraft.mined") {
+        return server::registry::blocks::blockIdOf(*parsed).has_value();
+    }
+    if (type == "minecraft.killed" || type == "minecraft.killed_by") {
+        return server::registry::entityTypes::of(*parsed) != nullptr;
+    }
+    if (type == "minecraft.custom") {
+        return parsed->namespaceName() == "minecraft" &&
+               server::registry::customStats::idOf(parsed->path()).has_value();
+    }
+    return server::registry::items::registry().byName(*parsed) != nullptr;
+}
 
 } // namespace
 
@@ -68,7 +94,8 @@ std::optional<std::string> Objective::canonical(std::string_view criterion) {
     }
     const std::string type = fullName(criterion.substr(0, colon));
     const std::string value = fullName(criterion.substr(colon + 1));
-    if (std::ranges::find(kStatTypes, type) == kStatTypes.end() || value.ends_with('.')) {
+    if (std::ranges::find(kStatTypes, type) == kStatTypes.end() || value.ends_with('.') ||
+        !inStatRegistry(type, value)) {
         return std::nullopt;
     }
     return type + ":" + value;

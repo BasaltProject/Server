@@ -324,15 +324,53 @@ void died(ai::MobContext& mob, VillagerWorld& world, const std::optional<std::st
     stopTrading(ctx.self);
 }
 
+namespace {
+
+[[nodiscard]] std::array<Memory<BlockPos>*, 4> globalPositions(Memories& memories) {
+    return {&memories.home, &memories.jobSite, &memories.potentialJobSite, &memories.meetingPoint};
+}
+
+/// parity: `GlobalPos` memories of another dimension, which every behaviour checks and ignores.
+void setAsideForeignPositions(VillagerState& state) {
+    const std::array<Memory<BlockPos>*, 4> slots = globalPositions(state.memories);
+    for (std::size_t index = 0; index < slots.size(); ++index) {
+        Memory<BlockPos>& memory = *slots[index];
+        std::string& dimension = state.positionDimensions[index];
+        if (memory.present() && !dimension.empty() && dimension != state.dimension) {
+            state.foreignPositions[index] = VillagerState::ForeignPos{dimension, *memory.value};
+            memory.erase();
+        } else if (!memory.present() && state.foreignPositions[index].has_value() &&
+                   state.foreignPositions[index]->dimension == state.dimension) {
+            memory.set(state.foreignPositions[index]->pos);
+            state.foreignPositions[index].reset();
+        }
+    }
+}
+
+/// A position set this turn belongs to this world and replaces whatever was set aside.
+void claimPositions(VillagerState& state) {
+    const std::array<Memory<BlockPos>*, 4> slots = globalPositions(state.memories);
+    for (std::size_t index = 0; index < slots.size(); ++index) {
+        if (slots[index]->present()) {
+            state.positionDimensions[index] = state.dimension;
+            state.foreignPositions[index].reset();
+        }
+    }
+}
+
+} // namespace
+
 void tick(ai::MobContext& mob, VillagerWorld& world) {
     Ctx ctx = contextFor(mob, world);
     VillagerState& state = ctx.state;
+    setAsideForeignPositions(state);
     // parity: `ageBoundaryReached`, a baby grown up gets an adult's brain.
     if (state.refresh || state.table == nullptr || state.wasBaby != look::isBaby(ctx.self)) {
         rebuild(ctx);
     }
     noticeHurt(ctx);
     engine::run(ctx);
+    claimPositions(state);
     if (state.refresh) {
         rebuild(ctx);
     }

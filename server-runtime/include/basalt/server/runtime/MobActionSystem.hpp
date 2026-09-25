@@ -5,6 +5,8 @@
 #include <basalt/server/runtime/entity/MobConversions.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
+#include <basalt/server/runtime/world/Beehives.hpp>
+#include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -78,6 +80,10 @@ public:
         std::function<void(const std::string& from, const std::string& to)> teamCarried;
         /// parity: `CriteriaTriggers.CURED_ZOMBIE_VILLAGER`, for whoever gave the apple.
         std::function<void(const wire::common::Uuid& player)> curedZombieVillager;
+        /// A firework rocket a mob set off, from the item it was made of.
+        std::function<void(world::LoadedWorld& world, wire::nbt::NbtCompound item, double x, double y, double z,
+                           std::int32_t ownerId)>
+            launchFirework;
     };
 
     /// The rolls a mob's turn needs, none of which is part of the level's own stream.
@@ -316,6 +322,47 @@ public:
     /// parity: `Animal.spawnChildFromBreeding`: the calf appears where its parent stands.
     void breed(world::LoadedWorld& world, entity::ServerEntity& animal, entity::ServerEntity& partner);
 
+    /// The bee's own turn beyond its goals. parity: `Bee.customServerAiStep` and the rest of `Bee.aiStep`.
+    void tickBee(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                 entity::ServerEntity& bee, random::RandomSource& random);
+
+    [[nodiscard]] HiveView hiveAt(const entity::ServerEntity& bee, const std::array<std::int32_t, 3>& pos) override;
+
+    void enterHive(entity::ServerEntity& bee, const std::array<std::int32_t, 3>& hive) override;
+
+    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> beeHomesNear(const entity::ServerEntity& bee,
+                                                                        std::int32_t radius) override;
+
+    [[nodiscard]] bool beesStayInHive(const entity::ServerEntity& bee) override;
+
+    [[nodiscard]] bool raining(const entity::ServerEntity& bee) override;
+
+    bool growBeeCrop(entity::ServerEntity& bee, const std::array<std::int32_t, 3>& pos) override;
+
+    /// parity: `BeehiveBlockEntity.serverTick`. The honey it adds is left in `pending` for the caller to
+    /// set once the block entities are done; answers whether the hive changed.
+    bool tickBeehive(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                     std::vector<world::BlockChange>& pending);
+
+    /// parity: `BeehiveBlockEntity.emptyAllLivingFromHive`: every bee out, and the ones near `player`
+    /// after them unless the hive is smoked.
+    void emptyHive(world::LoadedWorld& world, const std::array<std::int32_t, 3>& hive, std::int32_t stateId,
+                   const player::PlayerSession* player, world::beehives::Release release);
+
+    /// parity: `BeehiveBlock.playerDestroy`: the bees out after the player, and the ones around angry,
+    /// unless silk touch took the hive with them inside.
+    void hiveBroken(world::LoadedWorld& world, const player::PlayerSession& player,
+                    const std::array<std::int32_t, 3>& hive, std::int32_t stateId, wire::nbt::NbtCompound data,
+                    bool silkTouch);
+
+    /// parity: `BeehiveBlock.getDrops` and `onExplosionHit`: tnt, a creeper, a wither or its skull let
+    /// the bees out, and every blast angers the ones around.
+    void hiveBlown(world::LoadedWorld& world, const std::array<std::int32_t, 3>& hive, std::int32_t stateId,
+                   wire::nbt::NbtCompound data, std::int32_t sourceEntityId);
+
+    /// parity: `BeehiveBlock.angerNearbyBees`.
+    void angerBeesAround(world::LoadedWorld& world, const std::array<std::int32_t, 3>& hive);
+
     /// Whether somebody is stood close enough to a cart to shove it. parity: two boxes touching.
     [[nodiscard]] static bool touchesCart(const entity::ServerEntity& cart, const player::PlayerSession& player);
 
@@ -386,6 +433,25 @@ private:
 
     /// parity: the rest of `ZombieVillager.finishConversion`: the kept gear dropped and the trigger.
     void villagerCured(world::LoadedWorld& world, const entity::ServerEntity& zombie, entity::ServerEntity& villager);
+
+    /// parity: `NeutralMob.updatePersistentAnger(level, false)`.
+    void updateBeeAnger(world::LoadedWorld& world, entity::ServerEntity& bee, random::RandomSource& random);
+
+    /// parity: the rest of `Bee.doHurtTarget` once the sting landed.
+    void beeStung(world::LoadedWorld& world, entity::ServerEntity& bee, player::PlayerSession* player,
+                  entity::ServerEntity* mob);
+
+    /// parity: `releaseAllOccupants` over a hive's saved form, and the aim at `player`. Answers
+    /// whether anybody came out.
+    bool releaseAll(world::LoadedWorld& world, const std::array<std::int32_t, 3>& hive, std::int32_t stateId,
+                    wire::nbt::NbtCompound& data, const player::PlayerSession* player,
+                    world::beehives::Release release);
+
+    /// parity: `BeehiveBlockEntity.releaseOccupant`. Answers whether the bee came out.
+    bool releaseOccupant(world::LoadedWorld& world, const std::array<std::int32_t, 3>& hive, std::int32_t stateId,
+                         const wire::nbt::NbtCompound& occupant, world::beehives::Release release,
+                         const std::optional<std::array<std::int32_t, 3>>& flower,
+                         std::vector<entity::ServerEntity*>* spawned, std::vector<world::BlockChange>* pending);
 
     /// parity: `Villager.customServerAiStep`, the brain every tick instead of goals every other.
     void tickVillager(world::LoadedWorld& world, entity::ServerEntity& villager,

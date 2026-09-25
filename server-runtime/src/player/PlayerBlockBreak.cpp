@@ -13,6 +13,8 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/BlockExperience.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
@@ -265,6 +267,13 @@ void wearHeldItemOnBreak(const BreakContext& context, PlayerSession& player, con
     if (session->gamemode == Gamemode::Creative) {
         return;
     }
+    // parity: `Item.mineBlock` answers true for anything with a `tool` component, which counts it.
+    if (const std::optional<storage::StoredItemStack>& tool = session->inventory.heldItem(); tool.has_value()) {
+        if (const std::optional<Identifier> id = parsedOrNothing(tool->id);
+            id.has_value() && !reg::itemTools::rulesFor(*id).empty()) {
+            statAwards::used(*session, tool->id);
+        }
+    }
     const reg::BlockHardness* hardness = reg::blocks::hardnessOf(block);
     // parity: `Item.mineBlock` wears nothing on a block that comes apart on its own.
     if (hardness == nullptr || hardness->isInstant()) {
@@ -298,6 +307,9 @@ void wearHeldItem(const BreakContext& context, PlayerSession& player, const std:
         return;
     }
     session->inventory.set(heldSlot, worn);
+    if (!worn.has_value()) {
+        statAwards::itemBroken(*session, held->id, statAwards::kBreakMainHand, context.registry);
+    }
     if (context.slotChanged) {
         context.slotChanged(*session, heldSlot);
     }
@@ -328,6 +340,16 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
         if (entity != nullptr) {
             carried = world::shulkers::contentsOf(entity->data());
+        }
+    }
+    // parity: `BeehiveBlock.playerDestroy` is handed the block entity as it was before the break.
+    std::optional<wire::nbt::NbtCompound> hive;
+    if (brokenBlock != nullptr && world::beehives::isHive(brokenBlock->path())) {
+        server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* entity =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        if (entity != nullptr) {
+            hive = entity->data();
         }
     }
     // parity: `TripWireBlock.playerWillDestroy`, which writes `disarmed` before the string goes and
@@ -442,6 +464,9 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             const std::int32_t points = world::blockExperience::onBreak(*brokenBlock, silkTouch, random);
             if (points > 0 && context.awardExperience && world.gameRules().get(world::gameRules::kBlockDrops)) {
                 context.awardExperience(world, x + 0.5, y + 0.5, z + 0.5, points);
+            }
+            if (hive.has_value() && context.hiveBroken) {
+                context.hiveBroken(world, *session, x, y, z, broken.value_or(0), *hive, silkTouch);
             }
         }
     }

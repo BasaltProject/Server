@@ -1,14 +1,17 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/runtime/entity/IntHashOrder.hpp>
 #include <basalt/server/runtime/entity/Raids.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <doctest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
 using basalt::server::runtime::entity::Raid;
 using basalt::server::runtime::entity::RaiderType;
@@ -114,4 +117,26 @@ TEST_CASE("the raids survive a restart with their ids, heroes and progress") {
     CHECK(reloaded.tick == 450);
     // The next raid does not reuse a saved id.
     CHECK(reloaded.add(std::make_unique<Raid>(RaidPos{0, 0, 0}, 3, 2)) == id + 1);
+}
+
+TEST_CASE("the raid table visits every raid once even when ticking removes some") {
+    basalt::server::runtime::entity::IntHashOrder order;
+    for (std::int32_t key = 2; key < 40; ++key) {
+        order.insert(key);
+    }
+    std::vector<std::int32_t> seen;
+    order.iterate([&seen](std::int32_t key) {
+        seen.push_back(key);
+        return key % 3 == 0;
+    });
+    std::ranges::sort(seen);
+    std::vector<std::int32_t> all;
+    for (std::int32_t key = 2; key < 40; ++key) {
+        all.push_back(key);
+    }
+    CHECK(seen == all);
+    for (const std::int32_t key : order.order()) {
+        CHECK(key % 3 != 0);
+    }
+    CHECK(order.size() == static_cast<std::int32_t>(all.size() - 13));
 }

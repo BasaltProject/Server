@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/RaiderEquipment.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -84,6 +85,7 @@ void RaidSystem::joinRaid(world::LoadedWorld& world, Raid& raid, std::int32_t wa
     updateBossbar(world, raid);
     world.raids().dirty = true;
     raider.raidId = world.raids().idOf(&raid);
+    raider.raidStale = false;
     raider.raidWave = wave;
     raider.canJoinRaid = true;
     raider.ticksOutsideRaid = 0;
@@ -97,8 +99,19 @@ void RaidSystem::removeFromRaid(world::LoadedWorld& world, Raid& raid, ServerEnt
         raid.totalHealth -= static_cast<float>(raider.health);
     }
     raider.raidId.reset();
+    raider.raidStale = false;
     updateBossbar(world, raid);
     world.raids().dirty = true;
+}
+
+void RaidSystem::releaseRaiders(world::LoadedWorld& world, Raid& raid) {
+    for (const auto& [wave, raiders] : raid.groups) {
+        for (const std::int32_t id : raiders) {
+            if (ServerEntity* raider = world.state().entity(id); raider != nullptr) {
+                raider->raidStale = true;
+            }
+        }
+    }
 }
 
 void RaidSystem::setLeader(world::LoadedWorld& world, Raid& raid, std::int32_t wave, ServerEntity& raider) {
@@ -143,16 +156,48 @@ void RaidSystem::updateRaiders(world::LoadedWorld& world, Raid& raid) {
     }
 }
 
-void RaidSystem::updateBossbar(world::LoadedWorld& world, Raid& raid) {
+namespace {
+
+[[nodiscard]] float healthOf(world::LoadedWorld& world, const Raid& raid, std::optional<std::int32_t> hurtId,
+                             double hurtHealth) {
     float health = 0.0F;
     for (const auto& [wave, raiders] : raid.groups) {
         for (const std::int32_t id : raiders) {
-            if (const ServerEntity* raider = world.state().entity(id); raider != nullptr) {
+            if (id == hurtId) {
+                health += static_cast<float>(hurtHealth);
+            } else if (const ServerEntity* raider = world.state().entity(id); raider != nullptr) {
                 health += static_cast<float>(raider->health);
             }
         }
     }
+    return health;
+}
+
+} // namespace
+
+void RaidSystem::updateBossbar(world::LoadedWorld& world, Raid& raid) {
+    const float health = healthOf(world, raid, std::nullopt, 0.0);
+    raid.barStamp = entity::entityCombat::nextRaidBarStamp();
     // parity: `Mth.clamp(health / totalHealth, 0, 1)`; nothing spawned yet reads as empty.
+    setBarProgress(world, raid, raid.totalHealth > 0.0F ? std::clamp(health / raid.totalHealth, 0.0F, 1.0F) : 0.0F);
+}
+
+void RaidSystem::applyRaiderHurts(world::LoadedWorld& world, Raid& raid) {
+    const ServerEntity* latest = nullptr;
+    for (const auto& [wave, raiders] : raid.groups) {
+        for (const std::int32_t id : raiders) {
+            const ServerEntity* raider = world.state().entity(id);
+            if (raider != nullptr && raider->raidHurtStamp > raid.barStamp &&
+                (latest == nullptr || raider->raidHurtStamp > latest->raidHurtStamp)) {
+                latest = raider;
+            }
+        }
+    }
+    if (latest == nullptr) {
+        return;
+    }
+    const float health = healthOf(world, raid, latest->entityId(), latest->raidHealthAtHurt);
+    raid.barStamp = latest->raidHurtStamp;
     setBarProgress(world, raid, raid.totalHealth > 0.0F ? std::clamp(health / raid.totalHealth, 0.0F, 1.0F) : 0.0F);
 }
 
@@ -264,8 +309,8 @@ void RaidSystem::tickRaider(world::LoadedWorld& world, ServerEntity& raider) {
     // parity: `Raider.updateNoActionTime`, two a tick rather than one.
     raider.idleTicks++;
     Raid* raid = raider.raidId.has_value() ? world.raids().get(*raider.raidId) : nullptr;
-    // A raid no longer saved lets its raider go, which vanilla only does once it is reloaded.
-    if (raider.raidId.has_value() && raid == nullptr) {
+    // parity: `readAdditionalSaveData` finds no raid under a saved id that is gone.
+    if (raider.raidId.has_value() && raid == nullptr && !raider.raidStale) {
         raider.raidId.reset();
     }
     // parity: `readAdditionalSaveData`'s `addWaveMob` without health, for a raider loaded back in.

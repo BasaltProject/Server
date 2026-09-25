@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
+#include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -189,6 +190,10 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         if (partner != nullptr) {
             actions_->breed(world, entity, *partner);
         }
+    }
+    // parity: `Bee.customServerAiStep` and the rest of `Bee.aiStep`, after the goals.
+    if (entity::bees::isBee(entity.type())) {
+        actions_->tickBee(world, watchers, entity, random);
     }
     // parity: `Shulker.tick`, after the living entity's own turn.
     if (entity::shulkers::isShulker(entity.type())) {

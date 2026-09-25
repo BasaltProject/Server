@@ -37,6 +37,10 @@ struct Event {
 struct Effect {
     /// parity: `LevelEvent.SOUND_DISPENSER_FAIL`, the click of a dispenser with nothing in it.
     static constexpr std::int32_t kDispenserFail = 1001;
+    /// parity: `LevelEvent.SOUND_FIREWORK_SHOOT`, the dispense sound a rocket plays instead.
+    static constexpr std::int32_t kFireworkShoot = 1004;
+    /// parity: `LevelEvent.PARTICLES_SHOOT_SMOKE`, the puff out of the face, whose data is the face.
+    static constexpr std::int32_t kDispenserSmoke = 2000;
     /// parity: `LevelEvent.PARTICLES_AND_SOUND_BRUSH_BLOCK_COMPLETE`'s neighbour in the list, the
     /// puff of smoke a redstone torch makes when it burns out.
     static constexpr std::int32_t kRedstoneTorchBurnout = 1502;

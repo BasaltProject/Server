@@ -14,14 +14,20 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/WitherSystem.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
+#include <basalt/server/runtime/player/PlayerBeehives.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
 #include <basalt/server/runtime/player/PlayerBuckets.hpp>
+#include <basalt/server/runtime/player/PlayerCakesAndPots.hpp>
+#include <basalt/server/runtime/player/PlayerCauldrons.hpp>
+#include <basalt/server/runtime/player/PlayerFireworks.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
+#include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -54,6 +60,7 @@
 #include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/Waxing.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
@@ -161,13 +168,19 @@ void BlockInteractionHandler::placeEnderEye(PlayerSession& session, const BlockP
     owner_->sendInventorySlot(heldSlot);
 }
 
-void BlockInteractionHandler::awardItemUsedOn(const PlayerSession& session,
+void BlockInteractionHandler::awardItemUsedOn(const PlayerSession& session, const BlockPos& pos,
                                               const std::optional<std::int32_t>& clickedState,
-                                              const Identifier& item) const {
+                                              const std::optional<storage::StoredItemStack>& tool) const {
     world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
-    if (triggers != nullptr && clickedState.has_value()) {
-        triggers->onItemUsedOnBlock(session.name(), session.uuid().toString(), *clickedState, item);
+    world::LoadedWorld* world = owner_->currentWorld();
+    world::RealLootTables* tables = owner_->options().lootTables;
+    if (triggers == nullptr || world == nullptr || tables == nullptr || !clickedState.has_value() ||
+        !triggers->listensTo("item_used_on_block")) {
+        return;
     }
+    triggers->fire("item_used_on_block", session.name(), session.uuid().toString(),
+                   world::TriggerEvent{.location = world::triggerFacts::atBlock(*tables, *world, session, pos.x, pos.y,
+                                                                                pos.z, tool, clickedState)});
 }
 
 void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPacket& useItemOn) {
@@ -210,6 +223,14 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         const Identifier* clicked =
             clickedState.has_value() ? reg::blockStateDefinitions::blockOf(*clickedState) : nullptr;
         const std::string path = clicked == nullptr ? std::string{} : std::string{clicked->path()};
+        // parity: each screen block's `useWithoutItem` awards its statistic once the screen opens.
+        const std::int32_t containerIdBefore = owner_->menus().nextContainerId;
+        const auto awardOpened = [this, session, &path, containerIdBefore] {
+            const std::optional<std::string_view> stat = player::statAwards::openStatOf(path);
+            if (stat.has_value() && owner_->menus().nextContainerId != containerIdBefore) {
+                player::statAwards::award(*session, *stat);
+            }
+        };
         // parity: `RedStoneOreBlock.useItemOn` lights the ore and then answers `PASS` whenever the
         // held item is a block that could go down, so the ore lights **and** the block is placed.
         // This is why it falls through rather than acking here.
@@ -225,21 +246,25 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         }
         if (path == "crafting_table") {
             owner_->menus().openCraftingTable(*session);
+            awardOpened();
             ack();
             return;
         }
         if (!path.empty() && world::furnaces::cookerFor(path).has_value()) {
             owner_->menus().openFurnace(*session, hit.pos, path);
+            awardOpened();
             ack();
             return;
         }
         if (path == "brewing_stand") {
             owner_->menus().openBrewingStand(*session, hit.pos);
+            awardOpened();
             ack();
             return;
         }
         if (!path.empty() && world::containers::isPlain(path)) {
             owner_->menus().openChest(*session, hit.pos, path);
+            awardOpened();
             ack();
             return;
         }
@@ -284,6 +309,15 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             ack();
             return;
         }
+        // parity: `BeehiveBlock.useItemOn`, shears or a bottle on a full hive.
+        if (world::beehives::isHive(path)) {
+            if (world::LoadedWorld* world = owner_->currentWorld();
+                world != nullptr && player::harvestHive(breakContext(), *session, *world, hit.pos.x, hit.pos.y,
+                                                        hit.pos.z, heldSlot, held, owner_->options().mobs)) {
+                ack();
+                return;
+            }
+        }
         // parity: `CampfireBlock.useItemOn`, one piece of food and nothing a campfire cannot cook.
         if (world::campfires::isCampfire(path) && placeOnCampfire(*session, hit.pos)) {
             ack();
@@ -292,11 +326,13 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         // parity: `SmithingTableBlock.useWithoutItem`, whose four slots belong to the screen.
         if (path == "smithing_table") {
             owner_->menus().openSmithingMenu(*session);
+            awardOpened();
             ack();
             return;
         }
         if (path == "stonecutter") {
             owner_->menus().openStonecutterMenu(*session);
+            awardOpened();
             ack();
             return;
         }
@@ -312,35 +348,41 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         // parity: `CartographyTableBlock.useWithoutItem`.
         if (path == "cartography_table") {
             owner_->menus().openCartographyTable(*session, hit.pos);
+            awardOpened();
             ack();
             return;
         }
         // parity: `LoomBlock.useWithoutItem`, whose four slots belong to the screen.
         if (path == "loom") {
             owner_->menus().openLoomMenu(*session, hit.pos);
+            awardOpened();
             ack();
             return;
         }
         // parity: `BeaconBlockEntity` is a `MenuProvider`, so the block just opens its screen.
         if (path == "beacon") {
             owner_->menus().openBeaconMenu(*session, hit.pos);
+            awardOpened();
             ack();
             return;
         }
         // parity: `GrindstoneBlock.useWithoutItem`, whose three slots belong to the screen.
         if (path == "grindstone") {
             owner_->menus().openGrindstoneMenu(*session, hit.pos);
+            awardOpened();
             ack();
             return;
         }
         if (path == "anvil" || path == "chipped_anvil" || path == "damaged_anvil") {
             owner_->menus().openAnvilMenu(*session, hit.pos);
+            awardOpened();
             ack();
             return;
         }
         // parity: `EnderChestBlock.useWithoutItem`, the player's own slots and not the block's.
         if (path == "ender_chest") {
             owner_->menus().openEnderChest(*session, hit.pos);
+            awardOpened();
             ack();
             return;
         }
@@ -360,9 +402,30 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             ack();
             return;
         }
+        // parity: `AbstractCauldronBlock.useItemOn`, whatever the held item does to one.
+        if (path.ends_with("cauldron") &&
+            player::useCauldronFor(breakContext(), *session, *owner_->currentWorld(), hit.pos.x, hit.pos.y, hit.pos.z,
+                                   heldSlot, held)) {
+            ack();
+            return;
+        }
+        // parity: `CakeBlock` and `CandleCakeBlock`, a slice or a candle.
+        if ((path == "cake" || path.ends_with("candle_cake")) &&
+            player::useCakeFor(breakContext(), *session, *owner_->currentWorld(), hit.pos.x, hit.pos.y, hit.pos.z,
+                               heldSlot, held, hit.clickY)) {
+            ack();
+            return;
+        }
+        // parity: `FlowerPotBlock`, a plant in or a plant out.
+        if ((path == "flower_pot" || path.starts_with("potted_")) &&
+            player::useFlowerPotFor(breakContext(), *session, *owner_->currentWorld(), hit.pos.x, hit.pos.y,
+                                    hit.pos.z, heldSlot, held)) {
+            ack();
+            return;
+        }
         if (path == "note_block") {
             if (world::LoadedWorld* loaded = owner_->currentWorld(); loaded != nullptr) {
-                player::tuneNoteBlockFor(breakContext(), *loaded, hit.pos.x, hit.pos.y, hit.pos.z);
+                player::tuneNoteBlockFor(breakContext(), *loaded, hit.pos.x, hit.pos.y, hit.pos.z, session);
             }
             ack();
             return;
@@ -449,6 +512,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     // parity: `BoneMealItem.useOn`, which acts on the block clicked rather than the square beside it.
     if (held.has_value() && heldBlock == Identifier::vanilla("bone_meal") &&
         useBoneMeal(*session, hit.pos, heldSlot, *held)) {
+        player::statAwards::used(*session, held->id);
         ack();
         return;
     }
@@ -457,6 +521,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     if (held.has_value() && heldBlock.has_value() &&
         (heldBlock->path().ends_with("item_frame") || heldBlock->path() == "painting") &&
         hangFrame(*session, hit, heldSlot, *held, *heldBlock)) {
+        player::statAwards::used(*session, held->id);
         ack();
         return;
     }
@@ -465,7 +530,8 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     // player clicked: waxing is earned on the bare copper, not on the waxed one it becomes.
     if (held.has_value() && heldBlock == Identifier::vanilla("honeycomb") &&
         useHoneycomb(*session, hit.pos, heldSlot, *held)) {
-        awardItemUsedOn(*session, clickedState, *heldBlock);
+        awardItemUsedOn(*session, hit.pos, clickedState, held);
+        player::statAwards::used(*session, held->id);
         ack();
         return;
     }
@@ -477,13 +543,30 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (transformer.has_value() && here != nullptr &&
             player::transformBlockFor(breakContext(), *session, *here, *owner_->options().blockTransformers,
                                       *transformer, hit.pos.x, hit.pos.y, hit.pos.z, hit.direction, heldSlot, *held)) {
-            awardItemUsedOn(*session, clickedState, *heldBlock);
+            awardItemUsedOn(*session, hit.pos, clickedState, held);
+            player::statAwards::used(*session, held->id);
             ack();
             return;
         }
     }
     if (held.has_value() && heldBlock->path().ends_with("_axe") && useAxe(*session, hit.pos, heldSlot, *held)) {
-        awardItemUsedOn(*session, clickedState, *heldBlock);
+        awardItemUsedOn(*session, hit.pos, clickedState, held);
+        player::statAwards::used(*session, held->id);
+        ack();
+        return;
+    }
+    // parity: `FireworkRocketItem.useOn`, which launches from the face clicked.
+    if (held.has_value() && heldBlock == Identifier::vanilla("firework_rocket") &&
+        owner_->options().fireworks != nullptr && owner_->currentWorld() != nullptr &&
+        player::useRocketOnFor(breakContext(), *owner_->options().fireworks, *session, *owner_->currentWorld(),
+                               heldSlot,
+                               player::BlockHit{.x = hit.pos.x,
+                                                .y = hit.pos.y,
+                                                .z = hit.pos.z,
+                                                .direction = hit.direction,
+                                                .clickX = hit.clickX,
+                                                .clickY = hit.clickY,
+                                                .clickZ = hit.clickZ})) {
         ack();
         return;
     }
@@ -505,6 +588,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     }
     // parity: `MinecartItem.useOn`, which only works on a rail and sits the cart on it.
     if (heldBlock->path().ends_with("minecart") && placeMinecart(*session, *heldBlock, heldSlot, *held, hit)) {
+        player::statAwards::used(*session, held->id);
         ack();
         return;
     }
@@ -512,6 +596,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     const bool isBoat = heldBlock->path().ends_with("_boat") || heldBlock->path() == "bamboo_raft" ||
                         heldBlock->path() == "bamboo_chest_raft";
     if (isBoat && placeBoat(*session, *heldBlock, heldSlot, *held, hit)) {
+        player::statAwards::used(*session, held->id);
         ack();
         return;
     }
@@ -550,6 +635,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     }
     // parity: `SpawnEggItem.useOn`, which drops the mob on top of what was clicked.
     if (heldBlock->path().ends_with("_spawn_egg") && useSpawnEgg(*session, *heldBlock, heldSlot, *held, hit)) {
+        player::statAwards::used(*session, held->id);
         ack();
         return;
     }
@@ -635,6 +721,8 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     if (owner_->itemUseTimers().onCooldown(*item) || owner_->itemUseTimers().startEating(*session, *item, heldSlot) ||
         owner_->itemUseTimers().startDrawing(*session, *item, heldSlot) ||
         owner_->itemUseTimers().throwEnderPearl(*session, *item, heldSlot) ||
+        (owner_->options().fireworks != nullptr &&
+         player::useRocketFor(breakContext(), *owner_->options().fireworks, *session, *world, heldSlot)) ||
         owner_->itemUseTimers().startBlocking(*session, *item, heldSlot) ||
         (owner_->options().fishing != nullptr &&
          owner_->options().fishing->useRod(breakContext(), *session, *world, heldSlot)) ||

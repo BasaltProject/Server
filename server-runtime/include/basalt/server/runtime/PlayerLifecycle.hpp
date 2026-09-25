@@ -6,8 +6,10 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace basalt::server::runtime::player {
 class PlayerSession;
@@ -55,6 +57,9 @@ public:
     /// player behind a client that has stopped reading.
     void tickPlayer();
 
+    /// parity: `ServerPlayer.rideTick`: a rider is carried where its vehicle is, and counts it.
+    void rideTick(player::PlayerSession& session);
+
     /// parity: `PlayerList.respawn`, in the order it sends things: respawn, then position, then the
     /// spawn point, then experience.
     void respawn();
@@ -85,10 +90,26 @@ private:
     /// is silent on the first tick, which is what the empty snapshot below stands for.
     void checkEquipment(player::PlayerSession& session);
 
+    /// parity: `ServerPlayer.tick`'s `TICK` and `LEVITATION`, and `EFFECTS_CHANGED` from
+    /// `onEffectAdded`, `onEffectUpdated` and `onEffectsRemoved`, seen as the effects differ from
+    /// last turn's since they are written in many places.
+    void tickTriggers(player::PlayerSession& session);
+
+    /// parity: `ServerPlayer.triggerDimensionChangeTriggers`, after the player has arrived.
+    void dimensionTriggers(player::PlayerSession& session, const world::LoadedWorld& previous,
+                           const world::LoadedWorld& target, const std::array<double, 3>& left);
+
     ClientSession* owner_;
     Hooks hooks_;
     /// What the four armour slots held last turn, to see what moved. Empty until the first turn.
     std::optional<std::array<std::optional<storage::StoredItemStack>, 4>> worn_;
+    /// The effects as they stood last turn, by id: amplifier and ticks left.
+    std::map<std::string, std::pair<std::int32_t, std::int32_t>, std::less<>> seenEffects_;
+    /// parity: `levitationStartPos` and how many turns ago levitation began.
+    std::optional<std::array<double, 3>> levitationStart_;
+    std::int32_t levitationTicks_ = 0;
+    /// parity: `enteredNetherPosition`, where the overworld was left for the nether.
+    std::optional<std::array<double, 3>> enteredNether_;
 };
 
 } // namespace basalt::server::runtime

@@ -735,7 +735,8 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                         watcher->y > y + kUp || watcher->y < y - kUnder - kUp) {
                         continue;
                     }
-                    triggers->onConstructedBeacon(watcher->name(), watcher->uuid().toString(), levels);
+                    triggers->fire("construct_beacon", watcher->name(), watcher->uuid().toString(),
+                                   world::TriggerEvent{.numbers = {{"level", levels}}});
                 }
             },
         .songStopped =
@@ -752,6 +753,11 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                 if (options_.shriekerHeard) {
                     options_.shriekerHeard(world, arrival);
                 }
+            },
+        .beehive =
+            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                           std::vector<world::BlockChange>& pending) {
+                return options_.tickBeehive && options_.tickBeehive(world, x, y, z, pending);
             },
         .ticking = tickingChunks(world, region, 1)};
     random::RandomSource random = freshRandom();

@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/item/ItemComponentPayloads.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
@@ -50,6 +51,54 @@ constexpr std::array<std::string_view, 6> kPersistentOnly{"minecraft:intangible_
 
 /// A writer answers false when the value it was handed is not the shape the component takes.
 using Encoder = std::function<bool(ByteBuffer&, const NbtTag&)>;
+
+/// parity: `FireworkExplosion.Shape`, whose id is its place in this list.
+constexpr std::array<std::string_view, 5> kFireworkShapes{"small_ball", "large_ball", "star", "creeper", "burst"};
+
+/// parity: `FireworkExplosion.COLOR_LIST_STREAM_CODEC`, a count and then each colour as a plain int.
+bool writeColours(ByteBuffer& buffer, const NbtCompound& explosion, std::string_view field) {
+    const NbtTag* colours = explosion.find(field);
+    std::vector<std::int32_t> values;
+    if (colours != nullptr) {
+        if (const auto* ints = colours->get<std::vector<std::int32_t>>(); ints != nullptr) {
+            values = *ints;
+        } else if (const auto* list = colours->get<NbtList>(); list != nullptr) {
+            for (const NbtTag& each : *list) {
+                const auto* colour = each.get<std::int32_t>();
+                if (colour == nullptr) {
+                    return false;
+                }
+                values.push_back(*colour);
+            }
+        } else {
+            return false;
+        }
+    }
+    wire::protocol::varInt::write(buffer, static_cast<std::int32_t>(values.size()));
+    for (const std::int32_t colour : values) {
+        buffer.writeInt(colour);
+    }
+    return true;
+}
+
+/// parity: `FireworkExplosion.STREAM_CODEC`.
+bool writeExplosion(ByteBuffer& buffer, const NbtTag& value) {
+    const NbtCompound* explosion = value.get<NbtCompound>();
+    if (explosion == nullptr) {
+        return false;
+    }
+    const auto shape = std::ranges::find(kFireworkShapes, explosion->getString("shape"));
+    if (shape == kFireworkShapes.end()) {
+        return false;
+    }
+    wire::protocol::varInt::write(buffer, static_cast<std::int32_t>(shape - kFireworkShapes.begin()));
+    if (!writeColours(buffer, *explosion, "colors") || !writeColours(buffer, *explosion, "fade_colors")) {
+        return false;
+    }
+    wire::protocol::writeBoolean(buffer, explosion->getBoolean("has_trail"));
+    wire::protocol::writeBoolean(buffer, explosion->getBoolean("has_twinkle"));
+    return true;
+}
 
 [[nodiscard]] std::optional<std::int32_t> componentId(std::string_view name) {
     const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(name);
@@ -224,6 +273,59 @@ using Encoder = std::function<bool(ByteBuffer&, const NbtTag&)>;
         table.emplace("minecraft:tooltip_style", identifierEncoder());
         table.emplace("minecraft:note_block_sound", identifierEncoder());
         table.emplace("minecraft:glider", [](ByteBuffer&, const NbtTag&) { return true; });
+        table.emplace("minecraft:firework_explosion", writeExplosion);
+        // parity: `ChargedProjectiles.STREAM_CODEC`, each an `ItemStackTemplate`: item, count, patch.
+        table.emplace("minecraft:charged_projectiles", [](ByteBuffer& buffer, const NbtTag& value) {
+            const NbtList* stacks = value.get<NbtList>();
+            if (stacks == nullptr) {
+                return false;
+            }
+            wire::protocol::varInt::write(buffer, static_cast<std::int32_t>(stacks->size()));
+            for (const NbtTag& each : *stacks) {
+                const NbtCompound* stack = each.get<NbtCompound>();
+                const std::expected<Identifier, wire::common::IdentifierError> id =
+                    stack == nullptr ? std::unexpected(wire::common::IdentifierError{})
+                                     : Identifier::parse(stack->getString("id"));
+                const reg::Item* item = id.has_value() ? reg::items::registry().byName(*id) : nullptr;
+                if (item == nullptr) {
+                    return false;
+                }
+                wire::protocol::varInt::write(buffer, item->protocolId);
+                wire::protocol::varInt::write(buffer, stack->getInt("count", 1));
+                const NbtCompound* components = stack->getCompound("components");
+                const std::vector<ItemComponent> patch =
+                    components == nullptr ? std::vector<ItemComponent>{}
+                                          : itemComponentCodecs::toWire(*components, [](const Identifier&) {
+                                                return std::optional<std::int32_t>{};
+                                            });
+                wire::protocol::varInt::write(buffer, static_cast<std::int32_t>(patch.size()));
+                wire::protocol::varInt::write(buffer, 0);
+                for (const ItemComponent& component : patch) {
+                    wire::protocol::varInt::write(buffer, component.id());
+                    component.writePayload(buffer);
+                }
+            }
+            return true;
+        });
+        // parity: `Fireworks.STREAM_CODEC`, the flight as a varint and then the explosions.
+        table.emplace("minecraft:fireworks", [](ByteBuffer& buffer, const NbtTag& value) {
+            const NbtCompound* fireworks = value.get<NbtCompound>();
+            if (fireworks == nullptr) {
+                return false;
+            }
+            wire::protocol::varInt::write(buffer, fireworks->getByte("flight_duration") & 0xFF);
+            const NbtList* explosions = fireworks->getList("explosions");
+            wire::protocol::varInt::write(buffer,
+                                          explosions == nullptr ? 0 : static_cast<std::int32_t>(explosions->size()));
+            if (explosions != nullptr) {
+                for (const NbtTag& explosion : *explosions) {
+                    if (!writeExplosion(buffer, explosion)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        });
 
         // parity: `BannerPatternLayers.STREAM_CODEC`. Reference holders use registry id + 1; zero is
         // reserved for a direct, inline pattern.

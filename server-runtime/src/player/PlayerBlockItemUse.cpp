@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/BlockTransformers.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
@@ -161,6 +162,12 @@ void wearOne(const BreakContext& context, PlayerSession& player, const std::int3
         return;
     }
     player.inventory.set(heldSlot, worn);
+    if (!worn.has_value()) {
+        statAwards::itemBroken(player, held.id,
+                               heldSlot == PlayerInventory::kOffhandSlot ? statAwards::kBreakOffHand
+                                                                         : statAwards::kBreakMainHand,
+                               context.registry);
+    }
     if (context.slotChanged) {
         context.slotChanged(player, heldSlot);
     }
@@ -423,6 +430,8 @@ bool placeOnCampfireFor(const BreakContext& context, PlayerSession& player, worl
     world::campfires::write(state, entity->data());
     chunk->markDirty();
     notifyComparators(world, x, y, z);
+    // parity: `CampfireBlock.useItemOn`, the statistic before the item is spent.
+    statAwards::award(player, "interact_with_campfire");
     spendOne(context, player, heldSlot, *held);
     return true;
 }

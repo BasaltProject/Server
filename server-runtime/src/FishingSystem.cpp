@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -23,6 +24,7 @@
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -104,6 +106,13 @@ void wearRod(const player::BreakContext& context, PlayerSession& player, std::in
         return;
     }
     player.inventory.set(slot, worn);
+    if (!worn.has_value()) {
+        player::statAwards::itemBroken(player, held->id,
+                                       slot == player::PlayerInventory::kOffhandSlot
+                                           ? player::statAwards::kBreakOffHand
+                                           : player::statAwards::kBreakMainHand,
+                                       context.registry);
+    }
     if (context.slotChanged) {
         context.slotChanged(player, slot);
     }
@@ -135,6 +144,8 @@ bool FishingSystem::useRod(const player::BreakContext& context, PlayerSession& p
     if (!isRodAt(player, slot)) {
         return false;
     }
+    // parity: `FishingRodItem.use` counts the cast and the reel alike.
+    player::statAwards::used(player, "minecraft:fishing_rod");
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     const std::vector<PlayerSession*> heard = playersIn(*players_, world);
     ServerEntity* hook = player.fishingHook.has_value() ? world.state().entity(*player.fishingHook) : nullptr;
@@ -218,7 +229,6 @@ bool FishingSystem::stopsFishing(world::LoadedWorld& world, ServerEntity& hook, 
 
 std::int32_t FishingSystem::retrieve(const player::BreakContext& context, PlayerSession& player,
                                      world::LoadedWorld& world, ServerEntity& hook, std::int32_t slot) {
-    static_cast<void>(slot);
     hooks::HookState* state = hook.hook.get();
     if (state == nullptr || stopsFishing(world, hook, &player)) {
         return 0;
@@ -229,13 +239,23 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
         const double pullY = (player.y - hook.y) * 0.1;
         const double pullZ = (player.z - hook.z) * 0.1;
         bool isItem = false;
+        world::TriggerEvent hooked{.entities = {{"entity", world::triggerFacts::ofEntity(world, hook)}}};
+        if (const std::optional<world::TriggerItem> rod = world::triggerFacts::itemOf(player.inventory.at(slot));
+            rod.has_value()) {
+            hooked.items.emplace("rod", *rod);
+        }
         if (ServerEntity* caught = world.state().entity(*state->hookedIn); caught != nullptr) {
+            hooked.entities.insert_or_assign("entity", world::triggerFacts::ofEntity(world, *caught));
             caught->velocityX += pullX;
             caught->velocityY += pullY;
             caught->velocityZ += pullZ;
         } else if (std::optional<world::DroppedItem> item = world.state().removeItem(*state->hookedIn);
                    item.has_value()) {
             isItem = true;
+            hooked.entities.insert_or_assign("entity",
+                                             server::world::loot::EntityFacts{.type = Identifier::vanilla("item")});
+            hooked.items.insert_or_assign(
+                "item", world::TriggerItem{.item = item->item, .count = item->count, .components = item->components});
             item->velocityX += pullX;
             item->velocityY += pullY;
             item->velocityZ += pullZ;
@@ -248,6 +268,9 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
                     play::EntityEventPacket{.entityId = hook.entityId(), .eventId = kReelInEvent}.write(buffer);
                 });
             }
+        }
+        if (context.triggers != nullptr) {
+            context.triggers->fire("fishing_rod_hooked", player.name(), player.uuid().toString(), hooked);
         }
         wear = isItem ? kItemPullWear : kEntityPullWear;
     } else if (state->nibble > 0) {
@@ -287,7 +310,16 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
                 static_cast<void>(world.state().spawnItem(std::move(dropped)));
                 orbs_->spawn(world, player.x, player.y + 0.5, player.z + 0.5, state->random.nextInt(6) + 1);
                 if (context.triggers != nullptr) {
-                    context.triggers->onFishingHooked(player.name(), player.uuid().toString(), stack.item);
+                    world::TriggerEvent caught{.entities = {{"entity", world::triggerFacts::ofEntity(world, hook)}},
+                                               .items = {{"item", world::TriggerItem{.item = stack.item,
+                                                                                     .count = stack.count,
+                                                                                     .components = stack.components}}}};
+                    if (const std::optional<world::TriggerItem> rod =
+                            world::triggerFacts::itemOf(player.inventory.at(slot));
+                        rod.has_value()) {
+                        caught.items.emplace("rod", *rod);
+                    }
+                    context.triggers->fire("fishing_rod_hooked", player.name(), player.uuid().toString(), caught);
                 }
                 // parity: `Stats.FISH_CAUGHT` counts what the `fishes` tag holds, not every catch.
                 if (context.itemTags != nullptr &&

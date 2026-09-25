@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
+#include <basalt/server/world/advancement/AdvancementJson.hpp>
 
 #include <doctest.h>
 
@@ -12,6 +13,9 @@
 using basalt::server::runtime::world::AdvancementTriggers;
 using basalt::server::runtime::world::PlayerProgress;
 using basalt::server::runtime::world::RealAdvancements;
+using basalt::server::runtime::world::TriggerDamage;
+using basalt::server::runtime::world::TriggerEvent;
+using basalt::server::runtime::world::TriggerItem;
 using basalt::server::storage::StoredItemStack;
 using basalt::server::world::advancement::Advancement;
 using basalt::server::world::advancement::AdvancementCriterion;
@@ -19,6 +23,7 @@ using basalt::server::world::advancement::AdvancementDisplay;
 using basalt::server::world::advancement::ConditionKind;
 using basalt::server::world::advancement::CriterionCondition;
 using basalt::server::world::advancement::ItemMatcher;
+using basalt::server::world::loot::EntityFacts;
 using basalt::wire::common::Identifier;
 using basalt::wire::text::Component;
 
@@ -259,15 +264,33 @@ namespace {
 
 } // namespace
 
-TEST_CASE("a kill grants only the criterion whose entity it matches, tags included") {
+namespace {
+
+/// One criterion as the jar writes it, read by the same parser the server uses.
+[[nodiscard]] Advancement parsed(std::string_view trigger, std::string_view conditions) {
+    const std::string json = R"({"criteria":{"c":{"trigger":")" + std::string{trigger} + R"(","conditions":)" +
+                             std::string{conditions} + R"(}},"requirements":[["c"]]})";
+    const std::expected<Advancement, basalt::server::world::advancement::AdvancementParseError> advancement =
+        basalt::server::world::advancement::advancementJson::parse(json);
+    REQUIRE(advancement.has_value());
+    return *advancement;
+}
+
+[[nodiscard]] EntityFacts entity(std::string_view type) {
+    return EntityFacts{.type = Identifier::vanilla(std::string{type})};
+}
+
+} // namespace
+
+TEST_CASE("a kill grants only the criterion whose entity it matches, tags and killing blow included") {
     std::map<Identifier, Advancement> definitions;
     definitions.emplace(Identifier::vanilla("adventure/kill_a_mob"),
-                        waitingFor("killed", Identifier::vanilla("player_killed_entity"),
-                                   CriterionCondition{.kind = ConditionKind::KilledEntity}));
+                        parsed("minecraft:player_killed_entity", R"({"entity":{"type":"minecraft:entity_properties",
+                               "entity":"this","predicate":{"minecraft:entity_type":"#minecraft:raiders"}}})"));
     definitions.emplace(
-        Identifier::vanilla("adventure/voluntary_exile"),
-        waitingFor("raider", Identifier::vanilla("player_killed_entity"),
-                   CriterionCondition{.kind = ConditionKind::KilledEntity, .entityTypes = {"#minecraft:raiders"}}));
+        Identifier::vanilla("adventure/sniper_duel"),
+        parsed("minecraft:player_killed_entity", R"({"killing_blow":{"tags":[{"id":"minecraft:is_projectile",
+                               "expected":true}]}})"));
     const RealAdvancements advancements{std::move(definitions)};
     PlayerProgress progress;
     Told told;
@@ -275,14 +298,51 @@ TEST_CASE("a kill grants only the criterion whose entity it matches, tags includ
     hooks.entityTagged = [](const Identifier& type, std::string_view tag) {
         return tag == "minecraft:raiders" && type.path() == "pillager";
     };
+    hooks.damageTagged = [](const Identifier& type, std::string_view tag) {
+        return tag == "minecraft:is_projectile" && type.path() == "arrow";
+    };
     AdvancementTriggers triggers{advancements, progress, hooks};
 
-    triggers.onKilledEntity("Steve", "uuid-1", Identifier::vanilla("zombie"));
-    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/kill_a_mob")).size() == 1);
-    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/voluntary_exile")).empty());
+    triggers.fire("player_killed_entity", "Steve", "uuid-1",
+                  TriggerEvent{.entities = {{"entity", entity("zombie")}},
+                               .damage = TriggerDamage{.type = Identifier::vanilla("player_attack")}});
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/kill_a_mob")).empty());
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/sniper_duel")).empty());
 
-    triggers.onKilledEntity("Steve", "uuid-1", Identifier::vanilla("pillager"));
-    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/voluntary_exile")).size() == 1);
+    triggers.fire("player_killed_entity", "Steve", "uuid-1",
+                  TriggerEvent{.entities = {{"entity", entity("pillager")}},
+                               .damage = TriggerDamage{.type = Identifier::vanilla("arrow")}});
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/kill_a_mob")).size() == 1);
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/sniper_duel")).size() == 1);
+}
+
+TEST_CASE("the player's own predicate reads the context the hooks give") {
+    std::map<Identifier, Advancement> definitions;
+    definitions.emplace(Identifier::vanilla("adventure/walk_on_powder_snow_with_leather_boots"),
+                        parsed("minecraft:location", R"({"player":{"type":"minecraft:entity_properties",
+                               "entity":"this","predicate":{"minecraft:equipment":{"feet":{"items":"minecraft:leather_boots"}}}}})"));
+    const RealAdvancements advancements{std::move(definitions)};
+    PlayerProgress progress;
+    Told told;
+    bool booted = false;
+    AdvancementTriggers::Hooks hooks = told.hooks();
+    hooks.playerContext = [&booted](std::string_view) {
+        EntityFacts player = entity("player");
+        if (booted) {
+            player.equipment.emplace(
+                "feet", basalt::server::world::loot::EquippedItem{.item = Identifier::vanilla("leather_boots")});
+        }
+        return std::optional{basalt::server::world::loot::LootContext{.thisEntity = player}};
+    };
+    AdvancementTriggers triggers{advancements, progress, hooks};
+
+    triggers.fire("location", "Steve", "uuid-1");
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/walk_on_powder_snow_with_leather_boots"))
+              .empty());
+    booted = true;
+    triggers.fire("location", "Steve", "uuid-1");
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/walk_on_powder_snow_with_leather_boots"))
+              .size() == 1);
 }
 
 TEST_CASE("the dimension, the chest and the bucket each grant their own") {
@@ -295,11 +355,8 @@ TEST_CASE("the dimension, the chest and the bucket each grant their own") {
                         waitingFor("rolled", Identifier::vanilla("player_generates_container_loot"),
                                    CriterionCondition{.kind = ConditionKind::ContainerLoot,
                                                       .lootTable = Identifier::vanilla("chests/simple_dungeon")}));
-    definitions.emplace(
-        Identifier::vanilla("husbandry/tadpole_in_a_bucket"),
-        waitingFor("filled", Identifier::vanilla("filled_bucket"),
-                   CriterionCondition{.kind = ConditionKind::FilledBucket,
-                                      .matchers = {ItemMatcher{.items = {Identifier::vanilla("tadpole_bucket")}}}}));
+    definitions.emplace(Identifier::vanilla("husbandry/tadpole_in_a_bucket"),
+                        parsed("minecraft:filled_bucket", R"({"item":{"items":"minecraft:tadpole_bucket"}})"));
     const RealAdvancements advancements{std::move(definitions)};
     PlayerProgress progress;
     Told told;
@@ -313,43 +370,29 @@ TEST_CASE("the dimension, the chest and the bucket each grant their own") {
     triggers.onContainerLoot("Steve", "uuid-1", Identifier::vanilla("chests/simple_dungeon"));
     CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/salvage_sherd")).size() == 1);
 
-    triggers.onFilledBucket("Steve", "uuid-1", Identifier::vanilla("water_bucket"));
+    triggers.fire("filled_bucket", "Steve", "uuid-1",
+                  TriggerEvent{.items = {{"item", TriggerItem{.item = Identifier::vanilla("water_bucket")}}}});
     CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/tadpole_in_a_bucket")).empty());
-    triggers.onFilledBucket("Steve", "uuid-1", Identifier::vanilla("tadpole_bucket"));
+    triggers.fire("filled_bucket", "Steve", "uuid-1",
+                  TriggerEvent{.items = {{"item", TriggerItem{.item = Identifier::vanilla("tadpole_bucket")}}}});
     CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/tadpole_in_a_bucket")).size() == 1);
 }
 
-TEST_CASE("a newborn grants the criterion of its kind, and the pair matches either way round") {
+TEST_CASE("the victims of one arrow each need a predicate of their own") {
     std::map<Identifier, Advancement> definitions;
-    definitions.emplace(Identifier::vanilla("husbandry/breed_an_animal"),
-                        waitingFor("bred", Identifier::vanilla("bred_animals"),
-                                   CriterionCondition{.kind = ConditionKind::BredAnimals}));
-    definitions.emplace(
-        Identifier::vanilla("husbandry/bred_all_animals"),
-        waitingFor("sheep", Identifier::vanilla("bred_animals"),
-                   CriterionCondition{.kind = ConditionKind::BredAnimals, .entityTypes = {"minecraft:sheep"}}));
-    // parity: the frog pair, whose tadpole is not an animal, so the trigger names the parents.
-    definitions.emplace(Identifier::vanilla("husbandry/froglights"),
-                        waitingFor("frogs", Identifier::vanilla("bred_animals"),
-                                   CriterionCondition{.kind = ConditionKind::BredAnimals,
-                                                      .parentTypes = {"minecraft:frog"},
-                                                      .partnerTypes = {"minecraft:frog"}}));
+    const std::string_view creeper = R"({"type":"minecraft:entity_properties","entity":"this",
+                                        "predicate":{"minecraft:entity_type":"minecraft:creeper"}})";
+    definitions.emplace(Identifier::vanilla("adventure/two_creepers"),
+                        parsed("minecraft:killed_by_arrow",
+                               R"({"victims":[)" + std::string{creeper} + "," + std::string{creeper} + "]}"));
     const RealAdvancements advancements{std::move(definitions)};
     PlayerProgress progress;
     Told told;
     AdvancementTriggers triggers{advancements, progress, told.hooks()};
 
-    triggers.onBredAnimals("Steve", "uuid-1", Identifier::vanilla("cow"), Identifier::vanilla("cow"),
-                           Identifier::vanilla("cow"));
-    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/breed_an_animal")).size() == 1);
-    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/bred_all_animals")).empty());
-    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/froglights")).empty());
-
-    triggers.onBredAnimals("Steve", "uuid-1", Identifier::vanilla("sheep"), Identifier::vanilla("sheep"),
-                           Identifier::vanilla("sheep"));
-    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/bred_all_animals")).size() == 1);
-
-    triggers.onBredAnimals("Steve", "uuid-1", Identifier::vanilla("tadpole"), Identifier::vanilla("frog"),
-                           Identifier::vanilla("frog"));
-    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/froglights")).size() == 1);
+    triggers.fire("killed_by_arrow", "Steve", "uuid-1", TriggerEvent{.victims = {entity("creeper"), entity("pig")}});
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/two_creepers")).empty());
+    triggers.fire("killed_by_arrow", "Steve", "uuid-1",
+                  TriggerEvent{.victims = {entity("creeper"), entity("creeper")}});
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/two_creepers")).size() == 1);
 }

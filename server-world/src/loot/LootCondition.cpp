@@ -329,11 +329,16 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
     }
     // parity: `MatchTool` with no tool fails; with no predicate any tool passes.
     case Kind::MatchTool:
-        return context.tool.has_value() &&
-               (part.item == nullptr || part.item->test(context.tool, context.toolEnchantments, context.tags));
+        if (!context.tool.has_value()) {
+            return false;
+        }
+        if (part.item != nullptr && context.toolComponents.has_value()) {
+            return part.item->test(*context.tool, *context.toolComponents, context.tags);
+        }
+        return part.item == nullptr || part.item->test(context.tool, context.toolEnchantments, context.tags);
     case Kind::EntityMatches: {
         const std::optional<EntityFacts>& entity = factsFor(context, target_);
-        return part.entity != nullptr && part.entity->test(entity, context.tags);
+        return part.entity != nullptr && part.entity->test(entity, context.tags, context.origin);
     }
     // parity: `DamageSourcePredicate.matches`, false without a damage source at all.
     case Kind::DamageSource: {

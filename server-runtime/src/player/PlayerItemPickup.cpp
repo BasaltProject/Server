@@ -43,6 +43,8 @@ std::vector<PickedItem> pickupNearbyItems(
             static_cast<void>(world.spawnItem(*removed));
             continue;
         }
+        // parity: `ItemEntity.playerTouch` counts the whole stack it touched, even when only some fit.
+        session.stats.increment(storage::stats::pickedUp(removed->item.toString()), removed->count);
         PickedItem row{.item = *removed, .picked = picked, .leftover = leftover};
         if (leftover > 0) {
             // Only some of it fit: the same entity, fewer items, still sitting where it was.

@@ -44,6 +44,8 @@ struct BasaltConfig {
     std::string bedrockPrefix = ".";
     std::int32_t maxPlayers = 80;
     bool onlineMode = true;
+    /// parity: `enforce-secure-profile`, which only matters in online mode.
+    bool enforceSecureProfile = true;
     std::string gamemode = "survival";
     /// Whether only whitelisted players may join. Who is whitelisted lives in `players.db`.
     bool whitelist = false;

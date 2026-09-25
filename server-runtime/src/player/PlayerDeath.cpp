@@ -20,9 +20,15 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     // parity: `LivingEntity.die` empties the absorption pool, so respawning starts without it.
     session.absorption = 0.0F;
     session.stats.increment(storage::stats::deaths());
-    // parity: `getKillCredit`, the player who hit them within the last hundred ticks.
+    // parity: `getKillCredit`, the player who hit them within the last hundred ticks, else the mob.
     session.killerEntityId = session.lastHurtByPlayerTime.load() > 0 ? session.lastHurtByPlayerId : std::nullopt;
+    if (session.killerEntityId.has_value()) {
+        session.stats.increment(storage::stats::killedBy("minecraft:player"));
+    } else if (session.lastHurtByMobType.has_value() && session.lastHurtByMobTime.load() > 0) {
+        session.stats.increment(storage::stats::killedBy(session.lastHurtByMobType->toString()));
+    }
     session.deathsToScore.fetch_add(1);
+    session.stats.reset(storage::stats::custom("time_since_death"));
     session.stats.reset(storage::stats::timeSinceRest());
     if (session.connection().syncHealth) {
         session.connection().syncHealth();

@@ -69,11 +69,23 @@ namespace stats {
 inline constexpr std::string_view kCustom = "minecraft:custom";
 inline constexpr std::string_view kMined = "minecraft:mined";
 inline constexpr std::string_view kUsed = "minecraft:used";
+inline constexpr std::string_view kCrafted = "minecraft:crafted";
+inline constexpr std::string_view kBroken = "minecraft:broken";
+inline constexpr std::string_view kPickedUp = "minecraft:picked_up";
+inline constexpr std::string_view kDropped = "minecraft:dropped";
+inline constexpr std::string_view kKilled = "minecraft:killed";
+inline constexpr std::string_view kKilledBy = "minecraft:killed_by";
 
 [[nodiscard]] std::string custom(std::string_view name);
 [[nodiscard]] std::string mined(std::string_view block);
 /// parity: `Stats.ITEM_USED`, keyed by the item's id.
 [[nodiscard]] std::string used(std::string_view item);
+[[nodiscard]] std::string crafted(std::string_view item);
+[[nodiscard]] std::string broken(std::string_view item);
+[[nodiscard]] std::string pickedUp(std::string_view item);
+[[nodiscard]] std::string dropped(std::string_view item);
+[[nodiscard]] std::string killed(std::string_view entityType);
+[[nodiscard]] std::string killedBy(std::string_view entityType);
 
 // The handful this server can honestly count today. Vanilla has around a hundred more, and each one
 // is a place in the code that has to notice something happening: they arrive with the systems that

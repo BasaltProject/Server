@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealVillagerTrades.hpp>
@@ -14,6 +15,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <expected>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -50,24 +52,28 @@ void VillagerTradeController::openTrades(entity::ServerEntity& villager, bool ma
     // parity: `Villager.mobInteract`: a baby or a villager with nothing to offer shakes its head, one
     // already trading or asleep does nothing, and the rest open with this buyer's prices.
     entity::villager::VillagerWorld& villagers = owner_->options().mobs->villagersIn(*world);
-    if (!entity::villager::villagerBrain::startTrading(villager, villagers, session->entityId(),
-                                                       session->uuid().toString(), mainHand)) {
+    bool talked = false;
+    const bool trading = entity::villager::villagerBrain::startTrading(villager, villagers, session->entityId(),
+                                                                       session->uuid().toString(), mainHand, &talked);
+    if (talked) {
+        player::statAwards::award(*session, "talked_to_villager");
+    }
+    if (!trading) {
         return;
     }
     ContainerMenuController& menus = owner_->menus();
-    menus.returnCraftingGrid(*session);
-    menus.nextContainerId = menus.nextContainerId >= ClientSession::kMaxContainerId
-                                ? ClientSession::kFirstBlockContainerId
-                                : menus.nextContainerId + 1;
-    menus.openMenu = player::Menu::merchant(menus.nextContainerId);
-    menus.openBlock.reset();
-    menus.openBlockSecond.reset();
+    menus.openMerchantMenu(*session);
     openTradingWith_ = villager.entityId();
     openOffers_ = villager.offers;
+    slots_ = {};
+    selectionHint_ = 0;
+    activeOffer_.reset();
+    // parity: `getDisplayName`, which for a villager is its profession's name.
     owner_->sendCompressed(OpenScreenPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         OpenScreenPacket{.containerId = menus.openMenu.containerId(),
                          .menuType = wire::protocol::play::menuType::kMerchant,
-                         .title = wire::text::Component::translatable("entity.minecraft.villager")}
+                         .title =
+                             wire::text::Component::translatable("entity.minecraft.villager." + villager.profession)}
             .write(buffer);
     });
     sendOffers();
@@ -130,63 +136,83 @@ void VillagerTradeController::sendOffers() {
 
 void VillagerTradeController::selectTrade(std::int32_t index) {
     PlayerSession* session = owner_->playerSession();
-    if (session == nullptr || openOffers_ == nullptr || index < 0 ||
-        static_cast<std::size_t>(index) >= openOffers_->list.size()) {
+    if (session == nullptr || openOffers_ == nullptr) {
         return;
     }
-    if (hooks_.tradeAllowed &&
+    if (!tradingStillValid()) {
+        return;
+    }
+    if (hooks_.tradeAllowed && index >= 0 && static_cast<std::size_t>(index) < openOffers_->list.size() &&
         !hooks_.tradeAllowed(
             owner_->menus().openMenu.containerId(), index,
             std::optional{openOffers_->list[static_cast<std::size_t>(index)].result.item.toString()})) {
         return;
     }
-    // parity: `MerchantMenu.clickMenuButton`: the offer is checked against what they are carrying,
-    // the cost comes out of the inventory, the result goes in, and the offer's own use is counted.
-    if (!tradingStillValid()) {
-        owner_->menus().closeOpenMenu();
+    selectionHint_ = index;
+    updateSellItem();
+    // parity: `tryMoveItems`: what is in the payment slots goes back, then the offer's costs come in.
+    if (index < 0 || static_cast<std::size_t>(index) >= openOffers_->list.size()) {
         return;
     }
-    world::trades::Offer& offer = openOffers_->list[static_cast<std::size_t>(index)];
-    if (offer.outOfStock()) {
+    for (const std::int32_t payment : {kPaymentA, kPaymentB}) {
+        std::optional<storage::StoredItemStack>& held = slots_[static_cast<std::size_t>(payment)];
+        if (!held.has_value()) {
+            continue;
+        }
+        const std::int32_t left = session->inventory.add(*held);
+        if (left > 0) {
+            held->count = left;
+            updateSellItem();
+            owner_->sendInventory();
+            return;
+        }
+        held.reset();
+        updateSellItem();
+    }
+    const world::trades::Offer offer = openOffers_->list[static_cast<std::size_t>(index)];
+    moveFromInventory(*session, kPaymentA, offer.costA);
+    if (offer.costB.has_value()) {
+        moveFromInventory(*session, kPaymentB, *offer.costB);
+    }
+    owner_->sendInventory();
+}
+
+void VillagerTradeController::menuClosed() {
+    if (!openTradingWith_.has_value()) {
         return;
     }
-    const auto [costA, costB] = world::trades::currentCost(offer);
-    if (session->inventory.countOf(costA.item.toString()) < costA.count) {
-        return;
-    }
-    if (costB.has_value() && session->inventory.countOf(costB->item.toString()) < costB->count) {
-        return;
-    }
-    static_cast<void>(session->inventory.take(costA.item.toString(), costA.count));
-    if (costB.has_value()) {
-        static_cast<void>(session->inventory.take(costB->item.toString(), costB->count));
-    }
-    const std::int32_t given = session->inventory.add(storage::StoredItemStack{
-        .id = offer.result.item.toString(), .count = offer.result.count, .components = offer.result.components});
-    if (given > 0) {
-        owner_->spawnDroppedItem(offer.result.item, given, session->x, session->y, session->z);
-    }
-    world::trades::take(offer);
-    // parity: `AbstractVillager.notifyTrade` ends in `TRADE.trigger`, once per offer taken.
-    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
-        triggers->onVillagerTrade(session->name(), session->uuid().toString());
-    }
-    // parity: `AbstractVillager.notifyTrade` over `Villager.rewardTradeXp`.
-    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr && owner_->options().mobs != nullptr) {
-        entity::ServerEntity* villager =
-            openTradingWith_.has_value() ? world->state().entity(*openTradingWith_) : nullptr;
-        if (villager != nullptr) {
-            random::RandomSource random =
-                random::RandomSource::legacy(owner_->options().nextSeed ? owner_->options().nextSeed() : 0);
-            const std::int32_t orb = entity::villager::villagerBrain::rewardTradeXp(
-                *villager, owner_->options().mobs->villagersIn(*world), offer.experience, random);
-            if (orb > 0 && owner_->options().spawnOrb) {
-                owner_->options().spawnOrb(*world, villager->x, villager->y + 0.5, villager->z, orb);
+    PlayerSession* session = owner_->playerSession();
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        if (entity::ServerEntity* villager = world->state().entity(*openTradingWith_); villager != nullptr) {
+            const entity::villager::VillagerState& state = entity::villager::villagerBrain::stateOf(*villager);
+            if (session != nullptr && state.tradingPlayer == session->entityId()) {
+                entity::villager::villagerBrain::stopTrading(*villager);
             }
         }
     }
-    owner_->sendInventory();
-    sendOffers();
+    // parity: `MerchantMenu.removed`: the payments back into the inventory, or on the ground for a
+    // player who is dead.
+    if (session != nullptr) {
+        for (const std::int32_t payment : {kPaymentA, kPaymentB}) {
+            std::optional<storage::StoredItemStack>& held = slots_[static_cast<std::size_t>(payment)];
+            if (!held.has_value()) {
+                continue;
+            }
+            const std::int32_t left = session->dead ? held->count : session->inventory.add(*held);
+            if (left > 0) {
+                if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+                        wire::common::Identifier::parse(held->id);
+                    id.has_value()) {
+                    owner_->spawnDroppedItem(*id, left, session->x, session->y, session->z);
+                }
+            }
+            held.reset();
+        }
+    }
+    slots_ = {};
+    activeOffer_.reset();
+    openTradingWith_.reset();
+    openOffers_.reset();
 }
 
 } // namespace basalt::server::runtime
@@ -212,23 +238,6 @@ bool VillagerTradeController::tradingStillValid() {
     const double dz = std::max({villager->z - halfWidth - session->z, 0.0, session->z - (villager->z + halfWidth)});
     const double range = kEntityInteractionRange + kStillValidBuffer;
     return (dx * dx) + (dy * dy) + (dz * dz) < range * range;
-}
-
-void VillagerTradeController::menuClosed() {
-    if (!openTradingWith_.has_value()) {
-        return;
-    }
-    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
-        if (entity::ServerEntity* villager = world->state().entity(*openTradingWith_); villager != nullptr) {
-            entity::villager::VillagerState& state = entity::villager::villagerBrain::stateOf(*villager);
-            const PlayerSession* session = owner_->playerSession();
-            if (session != nullptr && state.tradingPlayer == session->entityId()) {
-                entity::villager::villagerBrain::stopTrading(*villager);
-            }
-        }
-    }
-    openTradingWith_.reset();
-    openOffers_.reset();
 }
 
 void VillagerTradeController::tick() {

@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
+#include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -74,6 +75,9 @@ std::int32_t ContainerMenuController::halfSize() const {
 }
 
 std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(std::int32_t index) const {
+    if (openMerchant_) {
+        return owner_->trades().slot(index);
+    }
     if (openCartography_) {
         return index >= 0 && static_cast<std::size_t>(index) < cartographySlots_.size()
                    ? cartographySlots_[static_cast<std::size_t>(index)]
@@ -142,6 +146,10 @@ std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(s
 }
 
 void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::optional<storage::StoredItemStack>& stack) {
+    if (openMerchant_) {
+        owner_->trades().setSlot(index, stack);
+        return;
+    }
     if (openCartography_) {
         if (index < 0 || static_cast<std::size_t>(index) >= cartographySlots_.size()) {
             return;
@@ -223,6 +231,12 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
         if (index == Menu::kSmithingResult) {
             // Taking the result is the only way this slot is written, and it costs the inputs.
             if (!stack.has_value()) {
+                // parity: `SmithingMenu.onTake` over `ItemStack.onCraftedBy`.
+                const std::optional<storage::StoredItemStack>& made =
+                    smithingSlots_[static_cast<std::size_t>(Menu::kSmithingResult)];
+                if (PlayerSession* crafter = owner_->playerSession(); crafter != nullptr && made.has_value()) {
+                    crafter->stats.increment(storage::stats::crafted(made->id), made->count);
+                }
                 awardRecipeCrafted();
                 takeSmithingResult();
             }
@@ -238,6 +252,11 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
             // parity: `slotsChanged`, which clears the choice whenever the input changes.
             stonecutterResult_.reset();
         } else if (!stack.has_value()) {
+            // parity: `StonecutterMenu`'s result slot `onTake` over `ItemStack.onCraftedBy`.
+            if (PlayerSession* crafter = owner_->playerSession();
+                crafter != nullptr && stonecutterResult_.has_value()) {
+                crafter->stats.increment(storage::stats::crafted(stonecutterResult_->id), stonecutterResult_->count);
+            }
             takeStonecutterResult();
         }
         return;
@@ -293,6 +312,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
     const std::optional<server::world::loot::ItemStack> put = craftingStackOf(stack);
     const bool sameItem = was.has_value() && put.has_value() && was->item == put->item;
     const std::int32_t hadCount = was.has_value() ? was->count : 0;
+    const std::optional<std::string> hadItem = was.has_value() ? std::optional{was->item.toString()} : std::nullopt;
     slots[static_cast<std::size_t>(half->second)] = put;
     world::blockInventory::write(entity->data(), slots);
     // parity: `AbstractFurnaceBlockEntity.setItem`, which recomputes the cook time when the thing
@@ -317,6 +337,10 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
     // cooked since the last taker, at the taker's feet.
     if (half->second == world::furnaces::kResultSlot && cooker.has_value() &&
         (put.has_value() ? put->count : 0) < hadCount) {
+        // parity: `FurnaceResultSlot.checkTakeAchievements` over `ItemStack.onCraftedBy`.
+        if (PlayerSession* taker = owner_->playerSession(); taker != nullptr && hadItem.has_value()) {
+            taker->stats.increment(storage::stats::crafted(*hadItem), hadCount - (put.has_value() ? put->count : 0));
+        }
         payFurnace(*world, *entity);
     }
     chunk->markDirty();
@@ -464,6 +488,10 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
     if (openBlockSize == world::furnaces::kSize && block->index == world::furnaces::kResultSlot) {
         return false;
     }
+    // parity: `MerchantResultSlot.mayPlace`.
+    if (openMerchant_ && block->index == VillagerTradeController::kResult) {
+        return false;
+    }
     // parity: `StonecutterMenu.ResultSlot.mayPlace`, and the smithing table's, both always false.
     if (openStonecutter_ && block->index == Menu::kStonecutterResult) {
         return false;
@@ -484,8 +512,8 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
 }
 
 bool ContainerMenuController::hasBlockSlots() const {
-    return openBlock.has_value() || openEnderChest_ || openStonecutter_ || openSmithing_ || openAnvil_ ||
-           openGrindstone_ || openEnchantment_ || openBeacon_ || openLoom_ || openCartography_;
+    return openBlock.has_value() || openEnderChest_ || openMerchant_ || openStonecutter_ || openSmithing_ ||
+           openAnvil_ || openGrindstone_ || openEnchantment_ || openBeacon_ || openLoom_ || openCartography_;
 }
 
 bool ContainerMenuController::accepts(const MenuSlot& target, const storage::StoredItemStack& stack) const {
@@ -723,7 +751,6 @@ void ContainerMenuController::awardRecipeCrafted() {
 }
 
 void ContainerMenuController::takeCraftingResult(PlayerSession& session) {
-    static_cast<void>(session);
     if (!craftingResult_.has_value()) {
         return;
     }
@@ -740,6 +767,8 @@ void ContainerMenuController::takeCraftingResult(PlayerSession& session) {
     } else {
         carriedItem_ = result;
     }
+    // parity: `ResultSlot.checkTakeAchievements` over `ItemStack.onCraftedBy`.
+    session.stats.increment(storage::stats::crafted(result.id), result.count);
     awardRecipeCrafted();
     settleCraftedMaps(session);
     // parity: `Recipe.getRemainingItems`: a cell whose item leaves something behind (a bucket, a

@@ -78,11 +78,23 @@ public:
             foreignTick;
         /// A wither skull a dispenser put down, for whoever knows how to raise the boss.
         std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> skullPlaced;
+        /// A firework rocket a dispenser shot, from where and which way.
+        std::function<void(world::LoadedWorld& world, double x, double y, double z, double dirX, double dirY,
+                           double dirZ, const server::world::loot::ItemStack& stack)>
+            launchFirework;
         /// What a hatching block left behind, put in the world. parity: `spawnGhastling` and the two
         /// like it, which make their entity inside the block's own turn.
         std::function<void(world::LoadedWorld& world, const world::scheduledBlocks::Hatchling& hatched)> spawnHatchling;
         /// Where the advancement for lighting a beacon goes, which is to whoever is standing near it.
         world::AdvancementTriggers* advancementTriggers = nullptr;
+        /// A hive a dispenser took the honey from. parity: `releaseBeesAndResetHoneyLevel`.
+        std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t stateId)>
+            releaseHive;
+        /// A beehive's turn, which lets bees out. parity: `BeehiveBlockEntity.serverTick`.
+        std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::vector<world::BlockChange>& pending)>
+            tickBeehive;
         /// A noise that reached a shrieker, handed to whoever knows the players.
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
     };

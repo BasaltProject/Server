@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 
 #include <cmath>
 #include <limits>
@@ -61,13 +62,16 @@ void BasaltServer::updateCriterion(std::string_view criterion, std::string_view 
     }
 }
 
-void BasaltServer::awardKillScore(const PlayerSession& killer, const std::string& victim, bool victimIsPlayer) {
+void BasaltServer::awardKillScore(PlayerSession& killer, const std::string& victim, bool victimIsPlayer) {
     if (killer.name() == victim) {
         return;
     }
     updateCriterion("totalKillCount", killer.name(), increment);
     if (victimIsPlayer) {
+        player::statAwards::award(killer, "player_kills");
         updateCriterion("playerKillCount", killer.name(), increment);
+    } else {
+        player::statAwards::award(killer, "mob_kills");
     }
     // parity: `handleTeamKill`, by the colour of the other side's team.
     if (const scoreboard::Team* team = teams_.teamOf(victim); team != nullptr && team->color.has_value()) {
@@ -82,8 +86,8 @@ void BasaltServer::awardKillScore(const PlayerSession& killer, const std::string
 
 void BasaltServer::tickScoreCriteria() {
     const std::vector<PlayerSession*> online = playerRegistry_.snapshot();
-    const auto byEntityId = [&online](std::int32_t entityId) -> const PlayerSession* {
-        for (const PlayerSession* player : online) {
+    const auto byEntityId = [&online](std::int32_t entityId) -> PlayerSession* {
+        for (PlayerSession* player : online) {
             if (player->entityId() == entityId) {
                 return player;
             }
@@ -95,10 +99,13 @@ void BasaltServer::tickScoreCriteria() {
         if (player->lastHurtByPlayerTime.load() > 0) {
             player->lastHurtByPlayerTime.fetch_sub(1);
         }
+        if (player->lastHurtByMobTime.load() > 0) {
+            player->lastHurtByMobTime.fetch_sub(1);
+        }
         for (std::int32_t deaths = player->deathsToScore.exchange(0); deaths > 0; --deaths) {
             updateCriterion("deathCount", player->name(), increment);
             if (player->killerEntityId.has_value()) {
-                if (const PlayerSession* killer = byEntityId(*player->killerEntityId); killer != nullptr) {
+                if (PlayerSession* killer = byEntityId(*player->killerEntityId); killer != nullptr) {
                     awardKillScore(*killer, player->name(), true);
                 }
             }
@@ -153,11 +160,13 @@ void BasaltServer::tickScoreCriteria() {
         kills.swap(pendingKills_);
     }
     for (const PendingKill& kill : kills) {
-        if (const PlayerSession* killer = playerRegistry_.get(kill.killer); killer != nullptr) {
+        if (PlayerSession* killer = playerRegistry_.get(kill.killer); killer != nullptr) {
             awardKillScore(*killer, kill.victim, false);
             // parity: `ServerPlayer.awardKillScore` ends in `PLAYER_KILLED_ENTITY.trigger`.
             if (advancementTriggers_ != nullptr) {
-                advancementTriggers_->onKilledEntity(killer->name(), kill.killer.toString(), kill.victimType);
+                advancementTriggers_->fire(
+                    "player_killed_entity", killer->name(), kill.killer.toString(),
+                    world::TriggerEvent{.entities = {{"entity", kill.victimFacts}}, .damage = kill.killingBlow});
             }
         }
     }

@@ -19,6 +19,8 @@ constexpr std::int32_t kLastLevel = 5;
 /// parity: `Villager.rewardTradeXp`: the regeneration of a promotion and the orb it adds to.
 constexpr std::int32_t kPromotionRegeneration = 200;
 constexpr std::int32_t kPromotionOrbBonus = 5;
+/// parity: `ambientSoundTime > -getAmbientSoundInterval() + 20`, twenty ticks after a reset.
+constexpr std::int64_t kTradeSoundGap = 20;
 
 void setUnhappy(ServerEntity& villager, VillagerWorld& world) {
     stateOf(villager).unhappyCounter = kUnhappyTicks;
@@ -81,7 +83,7 @@ void increaseMerchantCareer(ServerEntity& villager, VillagerWorld& world) {
 } // namespace
 
 bool startTrading(ServerEntity& villager, VillagerWorld& world, std::int32_t playerId, const std::string& playerUuid,
-                  bool mainHand) {
+                  bool mainHand, bool* talked) {
     VillagerState& state = stateOf(villager);
     if (state.tradingPlayer.has_value() || villager.sleepingAt.has_value()) {
         return false;
@@ -95,6 +97,10 @@ bool startTrading(ServerEntity& villager, VillagerWorld& world, std::int32_t pla
     if (mainHand && noOffers) {
         setUnhappy(villager, world);
     }
+    // parity: `TALKED_TO_VILLAGER`, awarded for the main hand whether or not there are offers.
+    if (talked != nullptr) {
+        *talked = mainHand;
+    }
     if (noOffers) {
         return false;
     }
@@ -102,6 +108,17 @@ bool startTrading(ServerEntity& villager, VillagerWorld& world, std::int32_t pla
     state.tradingPlayer = playerId;
     return true;
 }
+
+void tradeUpdated(ServerEntity& villager, VillagerWorld& world, bool validTrade, std::int64_t gameTime) {
+    VillagerState& state = stateOf(villager);
+    if (gameTime - state.tradeSoundTime <= kTradeSoundGap) {
+        return;
+    }
+    state.tradeSoundTime = gameTime;
+    world.sound(villager, validTrade ? "entity.villager.yes" : "entity.villager.no", 1.0F, 1.0F);
+}
+
+void noteTrade(ServerEntity& villager, std::int64_t gameTime) { stateOf(villager).tradeSoundTime = gameTime; }
 
 void stopTrading(ServerEntity& villager) {
     stateOf(villager).tradingPlayer.reset();

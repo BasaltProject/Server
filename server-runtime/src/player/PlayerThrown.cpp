@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <algorithm>
@@ -106,6 +107,8 @@ bool throwItemFor(const BreakContext& context, PlayerSession& player, world::Loa
         playSoundFor(*heard, kSoundPearlThrow, wire::protocol::play::SoundSource::Neutral, player.x, player.y, player.z,
                      0.5F, pitchOfSound, seed);
     }
+    // parity: `EnderpearlItem.use`.
+    statAwards::used(player, item.toString());
     if (player.gamemode == Gamemode::Creative) {
         return true;
     }
@@ -171,6 +174,8 @@ void shootBowFor(const BreakContext& context, PlayerSession& player, world::Load
         playSoundFor(*heard, kSoundArrowShoot, wire::protocol::play::SoundSource::Players, player.x, player.y, player.z,
                      1.0F, soundPitch, seed);
     }
+    // parity: `BowItem.releaseUsing`, right after the sound.
+    statAwards::used(player, held->id);
     if (infinite || !arrowSlot.has_value()) {
         return;
     }

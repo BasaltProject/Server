@@ -7,6 +7,8 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/ai/DoorInteraction.hpp>
+#include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
@@ -122,6 +124,21 @@ void MobActionSystem::tickCopperGolem(world::LoadedWorld& world, ServerEntity& g
             state.weather = golems::weatherOfBlock(block->path());
         }
         mobSound(golem, "entity.copper_golem.spawn");
+    }
+    // parity: `InteractWithDoor`, which the golem's navigation paths through doors for.
+    {
+        std::vector<ServerEntity*> nearest;
+        for (ServerEntity* other : world.state().entities()) {
+            if (other != nullptr && other != &golem && !other->removed && std::abs(other->x - golem.x) <= 16.0 &&
+                std::abs(other->y - golem.y) <= 16.0 && std::abs(other->z - golem.z) <= 16.0) {
+                nearest.push_back(other);
+            }
+        }
+        entity::villager::VillagerWorld& doors = villagersIn(world);
+        entity::ai::doorInteraction::tick(world.state(), golem, state.doors, nearest,
+                                          [&](const entity::ai::doorInteraction::Block& pos, bool open) {
+                                              doors.setDoorOpen(golem, {pos[0], pos[1], pos[2]}, open);
+                                          });
     }
     // parity: `CountDownCooldownTicks` in the core activity, before anything idle runs.
     if (state.transportCooldown > 0) {

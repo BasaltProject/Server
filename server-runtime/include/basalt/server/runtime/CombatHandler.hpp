@@ -5,6 +5,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -47,6 +48,12 @@ public:
     /// How far this player has fallen so far, which is what a landing is charged for.
     double fallDistance = 0.0;
 
+    /// parity: `ServerPlayer.startingToFallPosition`, where the fall now being counted began.
+    std::optional<std::array<double, 3>> fallStart;
+
+    /// parity: `ServerPlayer.resetFallDistance`, which grants `fall_from_height` to a fall survived.
+    void resetFall(const player::PlayerSession& session);
+
     void dismount(player::PlayerSession& session);
 
     /// parity: `ServerGamePacketListenerImpl.handleInteract`'s attack branch.
@@ -86,7 +93,7 @@ private:
                      float strength);
 
     /// parity: `TamableAnimal.mobInteract`: a pet sits or stands, and a wild one may be tamed.
-    bool tameOrSit(player::PlayerSession& session, entity::ServerEntity& entity);
+    bool tameOrSit(const world::LoadedWorld& world, player::PlayerSession& session, entity::ServerEntity& entity);
 
     /// parity: `ItemFrame.interact`, which takes what is in the hand and turns what is already
     /// behind the glass. Answers whether the click was a frame's.

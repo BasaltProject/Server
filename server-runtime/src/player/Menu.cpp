@@ -98,14 +98,7 @@ Menu Menu::loom(std::int32_t containerId) { return Menu{containerId, 0, 0, block
 
 Menu Menu::cartographyTable(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(3)}; }
 
-Menu Menu::merchant(std::int32_t containerId) {
-    std::vector<std::optional<MenuSlot>> slots;
-    slots.reserve(3 + kPlayerSlotsInWindow);
-    for (std::int32_t slot = 0; slot < 3; slot++) {
-        slots.emplace_back(std::nullopt);
-    }
-    return Menu{containerId, 0, 0, withPlayerSlots(std::move(slots))};
-}
+Menu Menu::merchant(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(3)}; }
 
 Menu Menu::crafter(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(kCrafterSize)}; }
 

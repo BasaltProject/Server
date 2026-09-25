@@ -7,8 +7,10 @@
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/PlayerLifecycle.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
@@ -27,6 +29,9 @@
 
 namespace basalt::server::runtime {
 namespace {
+
+/// parity: `Avatar.DEFAULT_VEHICLE_ATTACHMENT`, where a player sits on what carries them.
+constexpr double kPlayerVehicleAttachment = 0.6;
 
 using player::PlayerSession;
 using wire::protocol::play::Gamemode;
@@ -74,20 +79,88 @@ void PlayerLifecycle::tickPlayer() {
     if (session == nullptr) {
         return;
     }
+    // parity: `ServerPlayer.tick`'s five clocks, in its order.
     owner_->playTimeTicks++;
+    session->stats.noteOnly(storage::stats::playTime(), 1);
+    player::statAwards::award(*session, "total_world_time");
+    if (!session->dead) {
+        player::statAwards::award(*session, "time_since_death");
+    }
+    if (session->sneaking) {
+        player::statAwards::award(*session, "sneak_time");
+    }
     if (!session->sleepingBed.has_value()) {
         session->stats.increment(storage::stats::timeSinceRest());
     }
     checkAdvancements(*session);
+    tickTriggers(*session);
     if (session->dead) {
         return;
     }
+    rideTick(*session);
     owner_->tryPickupNearbyItems();
     checkEquipment(*session);
     owner_->itemUseTimers().tickEating(*session);
     owner_->itemUseTimers().tickDrawing(*session);
     owner_->itemUseTimers().tickBlocking(*session);
     owner_->blockInteraction().tickDigging(*session);
+}
+
+void PlayerLifecycle::tickTriggers(PlayerSession& session) {
+    world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+    if (triggers == nullptr) {
+        return;
+    }
+    const std::string name{session.name()};
+    const std::string uuid = session.uuid().toString();
+    bool changed = session.effects.size() != seenEffects_.size();
+    std::map<std::string, std::pair<std::int32_t, std::int32_t>, std::less<>> now;
+    for (const auto& [id, active] : session.effects) {
+        const std::string key = id.toString();
+        const auto before = seenEffects_.find(key);
+        // parity: a refresh or a stronger dose is `onEffectUpdated`; the clock running down is not.
+        changed = changed || before == seenEffects_.end() || before->second.first != active.amplifier ||
+                  (active.remainingTicks > before->second.second && !active.infinite());
+        now.emplace(key, std::pair{active.amplifier, active.remainingTicks});
+    }
+    const bool levitating = now.contains("minecraft:levitation");
+    if (levitating && !seenEffects_.contains("minecraft:levitation")) {
+        levitationStart_ = std::array<double, 3>{session.x, session.y, session.z};
+        levitationTicks_ = 0;
+    } else if (!levitating) {
+        levitationStart_.reset();
+    }
+    seenEffects_ = std::move(now);
+    if (changed) {
+        triggers->fire("effects_changed", name, uuid);
+    }
+    triggers->fire("tick", name, uuid);
+    if (levitationStart_.has_value()) {
+        triggers->fire("levitation", name, uuid,
+                       world::TriggerEvent{.numbers = {{"duration", levitationTicks_}},
+                                           .startPosition = levitationStart_});
+        ++levitationTicks_;
+    }
+}
+
+void PlayerLifecycle::rideTick(PlayerSession& session) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (!session.vehicleId.has_value() || world == nullptr) {
+        return;
+    }
+    const entity::ServerEntity* vehicle = world->state().entity(*session.vehicleId);
+    if (vehicle == nullptr || vehicle->removed) {
+        return;
+    }
+    // parity: `positionRider`, the vehicle's passenger point less the player's own vehicle point.
+    const double x = vehicle->x;
+    const double y = vehicle->y + vehicle->height() - kPlayerVehicleAttachment;
+    const double z = vehicle->z;
+    player::statAwards::awardRiding(session, vehicle->type(), x - session.x, y - session.y, z - session.z);
+    session.x = x;
+    session.y = y;
+    session.z = z;
+    owner_->chunkStreamer().streamChunksAround(x, z);
 }
 
 void PlayerLifecycle::checkAdvancements(PlayerSession& session) {
@@ -238,21 +311,11 @@ bool PlayerLifecycle::switchWorld(world::LoadedWorld& target, double x, double y
     if ((!from.has_value() || *from != target.name()) && hooks_.worldChanged) {
         hooks_.worldChanged(*session, target, from);
     }
-    // parity: `ServerPlayer.changeDimension` ends in `CHANGED_DIMENSION.trigger`, which names the
-    // dimension types rather than the worlds.
-    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
-        triggers != nullptr && previous != nullptr &&
-        previous->declaration().dimension != target.declaration().dimension) {
-        const auto named = [](config::WorldDimension dimension) {
-            return wire::common::Identifier::vanilla(std::string{config::dimensionFacts(dimension).registryPath});
-        };
-        triggers->onChangedDimension(session->name(), session->uuid().toString(),
-                                     named(previous->declaration().dimension), named(target.declaration().dimension));
-    }
     if (previous == nullptr || previous->name() == target.name()) {
         return false;
     }
 
+    const std::array<double, 3> left{session->x, session->y, session->z};
     owner_->currentWorld_ = &target;
     session->worldName = target.name();
     session->x = x;
@@ -271,9 +334,39 @@ bool PlayerLifecycle::switchWorld(world::LoadedWorld& target, double x, double y
     owner_->uiState().syncExperience();
 
     owner_->chunkStreamer().resetForWorldSwitch(x, z, target.settings().viewDistance);
+    dimensionTriggers(*session, *previous, target, left);
 
     owner_->logger().info([&] { return session->name() + " moved to world '" + target.name() + "'."; });
     return true;
+}
+
+void PlayerLifecycle::dimensionTriggers(PlayerSession& session, const world::LoadedWorld& previous,
+                                        const world::LoadedWorld& target, const std::array<double, 3>& left) {
+    const config::WorldDimension from = previous.declaration().dimension;
+    const config::WorldDimension to = target.declaration().dimension;
+    if (from == to) {
+        return;
+    }
+    // parity: `ServerPlayer.teleport` remembers where the overworld was left for the nether.
+    if (from == config::WorldDimension::Overworld && to == config::WorldDimension::Nether) {
+        enteredNether_ = left;
+    }
+    world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+    if (triggers != nullptr) {
+        // parity: `triggerDimensionChangeTriggers`, which names the dimension types.
+        const auto named = [](config::WorldDimension dimension) {
+            return wire::common::Identifier::vanilla(std::string{config::dimensionFacts(dimension).registryPath});
+        };
+        triggers->onChangedDimension(session.name(), session.uuid().toString(), named(from), named(to));
+        if (from == config::WorldDimension::Nether && to == config::WorldDimension::Overworld &&
+            enteredNether_.has_value()) {
+            triggers->fire("nether_travel", session.name(), session.uuid().toString(),
+                           world::TriggerEvent{.startPosition = enteredNether_});
+        }
+    }
+    if (to != config::WorldDimension::Nether) {
+        enteredNether_.reset();
+    }
 }
 
 void PlayerLifecycle::teleportTo(double x, double y, double z, float yaw, float pitch, std::string_view cause) {
@@ -283,7 +376,7 @@ void PlayerLifecycle::teleportTo(double x, double y, double z, float yaw, float 
     }
     owner_->sendPlayerPosition(x, y, z, yaw, pitch);
     // parity: `Entity.teleportTo` clears the fall, so arriving is never a landing.
-    owner_->combat().fallDistance = 0.0;
+    owner_->combat().resetFall(*session);
     // Straight to updatePosition rather than waiting for the client to confirm: the world has to
     // agree the player is there now, so chunks around the destination start generating immediately
     // instead of one round trip later.
@@ -300,6 +393,8 @@ void PlayerLifecycle::leavePlayIfPresent() {
     owner_->wakeUp();
     // And leaving with a chest open would leave its lid up and a trapped chest powered.
     owner_->menus().closeOpenMenu(*session);
+    // parity: `PlayerList.remove` awards it before the player is saved.
+    player::statAwards::award(*session, "leave_game");
     // Before removing them from the registry, so a save triggered elsewhere cannot race this one
     // into writing a player who is already half gone.
     savePlayerState();

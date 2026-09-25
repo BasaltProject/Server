@@ -46,6 +46,22 @@ pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, d
                                    range, flier);
         return path;
     }
+    // parity: `CopperGolem`'s navigation, forty-eight blocks long and through doors.
+    if (mob.copperGolem != nullptr) {
+        constexpr float kGolemPathLength = 48.0F;
+        const std::array<std::int32_t, 3> start = pathFinder::startOf(world, mob.x, mob.y, mob.z, mob.onGround);
+        const std::array<std::array<std::int32_t, 3>, 1> targets{{{blockOf(x), blockOf(y), blockOf(z)}}};
+        const std::optional<pathFinder::Route> route = pathFinder::findRoute(
+            world, start[0], start[1], start[2], targets,
+            pathFinder::RouteOptions{.accuracy = 1,
+                                     .maxPathLength = kGolemPathLength,
+                                     .maxVisited = static_cast<std::int32_t>(kGolemPathLength * 16.0F),
+                                     .openDoors = true});
+        if (!route.has_value()) {
+            return std::nullopt;
+        }
+        return route->nodes;
+    }
     return pathFinder::find(world, blockOf(mob.x), blockOf(mob.y), blockOf(mob.z), blockOf(x), blockOf(y), blockOf(z));
 }
 
@@ -60,18 +76,38 @@ namespace {
     return width > 0.75 ? width / 2.0 : 0.75 - width / 2.0;
 }
 
+/// parity: `PathNavigation.resetStuckTimeout`.
+void resetStuckTimeout(ServerEntity& mob) {
+    mob.navigationWatch.timeoutNode = {};
+    mob.navigationWatch.timeoutTimer = 0;
+    mob.navigationWatch.timeoutLimit = 0.0;
+    mob.navigationWatch.stuck = false;
+}
+
+/// parity: `moveTo(Path, speed)`: a new path starts the hundred-tick stuck clock where the mob is.
+bool start(ServerEntity& mob, std::vector<std::array<std::int32_t, 3>> nodes, const std::array<double, 3>& target,
+           double speedModifier) {
+    if (nodes.empty()) {
+        return false;
+    }
+    resetStuckTimeout(mob);
+    mob.path = std::move(nodes);
+    mob.pathIndex = 0;
+    mob.walkTarget = target;
+    mob.moveSpeed = speedModifier;
+    mob.navigationWatch.lastStuckCheck = mob.navigationWatch.tick;
+    mob.navigationWatch.lastStuckCheckPos = {mob.x, mob.y, mob.z};
+    return true;
+}
+
 } // namespace
 
 bool moveTo(world::WorldState& world, ServerEntity& mob, double x, double y, double z, double speedModifier) {
-    const std::optional<std::vector<std::array<std::int32_t, 3>>> path = pathFor(world, mob, x, y, z);
+    std::optional<std::vector<std::array<std::int32_t, 3>>> path = pathFor(world, mob, x, y, z);
     if (!path.has_value() || path->empty()) {
         return false;
     }
-    mob.path = path;
-    mob.pathIndex = 0;
-    mob.walkTarget = std::array<double, 3>{x, y, z};
-    mob.moveSpeed = speedModifier;
-    return true;
+    return start(mob, std::move(*path), {x, y, z}, speedModifier);
 }
 
 bool canReach(world::WorldState& world, ServerEntity& mob, double x, double y, double z) {
@@ -81,14 +117,7 @@ bool canReach(world::WorldState& world, ServerEntity& mob, double x, double y, d
 
 bool follow(ServerEntity& mob, std::vector<std::array<std::int32_t, 3>> nodes, const std::array<double, 3>& target,
             double speedModifier) {
-    if (nodes.empty()) {
-        return false;
-    }
-    mob.path = std::move(nodes);
-    mob.pathIndex = 0;
-    mob.walkTarget = target;
-    mob.moveSpeed = speedModifier;
-    return true;
+    return start(mob, std::move(nodes), target, speedModifier);
 }
 
 bool isDone(const ServerEntity& mob) {
@@ -101,7 +130,83 @@ void stop(ServerEntity& mob) {
     mob.pathIndex = 0;
 }
 
-void tick(world::WorldState& /*world*/, ServerEntity& mob) {
+namespace {
+
+/// parity: `PathNavigation.shouldTargetNextNodeInDirection` without a direct line, which the
+/// ground navigation never has.
+[[nodiscard]] bool shouldTargetNextNode(const ServerEntity& mob) {
+    const auto next = static_cast<std::size_t>(mob.pathIndex) + 1;
+    if (next >= mob.path->size()) {
+        return false;
+    }
+    const std::array<std::int32_t, 3>& current = (*mob.path)[static_cast<std::size_t>(mob.pathIndex)];
+    const std::array<std::int32_t, 3>& after = (*mob.path)[next];
+    const double toCurrentX = current[0] + 0.5 - mob.x;
+    const double toCurrentY = current[1] - mob.y;
+    const double toCurrentZ = current[2] + 0.5 - mob.z;
+    const double toCurrent = (toCurrentX * toCurrentX) + (toCurrentY * toCurrentY) + (toCurrentZ * toCurrentZ);
+    if (toCurrent >= 4.0) {
+        return false;
+    }
+    const double toNextX = after[0] + 0.5 - mob.x;
+    const double toNextY = after[1] - mob.y;
+    const double toNextZ = after[2] + 0.5 - mob.z;
+    const double toNext = (toNextX * toNextX) + (toNextY * toNextY) + (toNextZ * toNextZ);
+    if (toNext >= toCurrent && toCurrent >= 0.5) {
+        return false;
+    }
+    const double dot = (toCurrentX * toNextX) + (toCurrentY * toNextY) + (toCurrentZ * toNextZ);
+    return dot / (std::sqrt(toCurrent) * std::sqrt(toNext)) < 0.0;
+}
+
+/// parity: `canCutCorner`, which a door node refuses.
+[[nodiscard]] bool canCutCorner(world::WorldState& world, const std::array<std::int32_t, 3>& node) {
+    const std::optional<std::int32_t> state = world.blockState(node[0], node[1], node[2]);
+    return !state.has_value() || !pathFinder::isMobDoor(*state);
+}
+
+/// parity: `PathNavigation.doStuckDetection`.
+void detectStuck(ServerEntity& mob) {
+    ServerEntity::NavigationWatch& watch = mob.navigationWatch;
+    if (watch.tick - watch.lastStuckCheck > 100) {
+        const float speed = mob.aiSpeed >= 1.0F ? mob.aiSpeed : mob.aiSpeed * mob.aiSpeed;
+        const float threshold = speed * 100.0F * 0.25F;
+        const double dx = mob.x - watch.lastStuckCheckPos[0];
+        const double dy = mob.y - watch.lastStuckCheckPos[1];
+        const double dz = mob.z - watch.lastStuckCheckPos[2];
+        watch.stuck = (dx * dx) + (dy * dy) + (dz * dz) < static_cast<double>(threshold * threshold);
+        if (watch.stuck) {
+            stop(mob);
+        }
+        watch.lastStuckCheck = watch.tick;
+        watch.lastStuckCheckPos = {mob.x, mob.y, mob.z};
+    }
+    if (isDone(mob)) {
+        return;
+    }
+    const std::array<std::int32_t, 3>& node = (*mob.path)[static_cast<std::size_t>(mob.pathIndex)];
+    const std::int64_t time = watch.tick;
+    if (node == watch.timeoutNode) {
+        watch.timeoutTimer += time - watch.lastTimeoutCheck;
+    } else {
+        watch.timeoutNode = node;
+        const double dx = mob.x - (node[0] + 0.5);
+        const double dy = mob.y - node[1];
+        const double dz = mob.z - (node[2] + 0.5);
+        const double distance = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        watch.timeoutLimit = mob.aiSpeed > 0.0F ? distance / static_cast<double>(mob.aiSpeed) * 20.0 : 0.0;
+    }
+    if (watch.timeoutLimit > 0.0 && static_cast<double>(watch.timeoutTimer) > watch.timeoutLimit * 3.0) {
+        resetStuckTimeout(mob);
+        stop(mob);
+    }
+    watch.lastTimeoutCheck = time;
+}
+
+} // namespace
+
+void tick(world::WorldState& world, ServerEntity& mob) {
+    mob.navigationWatch.tick++;
     if (!mob.path.has_value()) {
         return;
     }
@@ -109,19 +214,17 @@ void tick(world::WorldState& /*world*/, ServerEntity& mob) {
         stop(mob);
         return;
     }
+    // parity: `followThePath`: one node a tick at most, then the stuck check.
     const double range = waypointRange(mob);
     // parity: `WaterBoundPathNavigation.getMaxVerticalDistanceToWaypoint`.
     const double vertical = swimsSmoothly(mob) ? 0.5 : 1.0;
-    while (mob.pathIndex < static_cast<std::int32_t>(mob.path->size())) {
-        const std::array<std::int32_t, 3>& node = (*mob.path)[static_cast<std::size_t>(mob.pathIndex)];
-        const double dx = std::abs(mob.x - (node[0] + 0.5));
-        const double dy = std::abs(mob.y - node[1]);
-        const double dz = std::abs(mob.z - (node[2] + 0.5));
-        if (dx >= range || dz >= range || dy >= vertical) {
-            break;
-        }
+    const std::array<std::int32_t, 3>& current = (*mob.path)[static_cast<std::size_t>(mob.pathIndex)];
+    const bool close = std::abs(mob.x - (current[0] + 0.5)) < range && std::abs(mob.z - (current[2] + 0.5)) < range &&
+                       std::abs(mob.y - current[1]) < vertical;
+    if (close || (canCutCorner(world, current) && shouldTargetNextNode(mob))) {
         mob.pathIndex++;
     }
+    detectStuck(mob);
     if (isDone(mob)) {
         stop(mob);
         return;
@@ -214,6 +317,7 @@ void tick(world::WorldState& world, ServerEntity& mob, double speed) {
     // parity: `Mob.setSpeed`, which also sets the forward input to the same number, so what a mob
     // accelerates by is the speed times itself. Passing one here made every mob run.
     const double walk = speed * mob.moveSpeed;
+    mob.aiSpeed = static_cast<float>(walk);
     // parity: the jump when the next step is above what the mob can climb, or when it is stood
     // inside something with a collision box.
     if (dy > livingMovement::kStepHeight && dx * dx + dz * dz < std::max(1.0, mob.width())) {

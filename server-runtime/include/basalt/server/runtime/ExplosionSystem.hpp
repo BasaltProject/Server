@@ -36,6 +36,11 @@ public:
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
                            double y, double z, float power, std::int32_t sourceEntityId)>
             struck;
+        /// A beehive the blast broke, with its block entity. parity: `BeehiveBlock.onExplosionHit`
+        /// and `getDrops`.
+        std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t stateId, const wire::nbt::NbtCompound& hive, std::int32_t sourceEntityId)>
+            hiveBlown;
     };
 
     /// What the blast rolls its loot and scatters its drops with.
@@ -49,13 +54,9 @@ public:
     [[nodiscard]] static std::int32_t particleId(std::string_view path);
 
     /// Sets off an explosion, drops what it broke and hurts whoever was standing in it.
-    ///
-    /// parity: `ServerExplosion`, the same shape as the bed's own: what it breaks drops with no tool
-    /// involved, and the neighbours of every hole are told afterwards.
-    ///
-    /// `sourceEntityId` is 0 for a blast with nothing behind it, which is what a bed in the Nether
-    /// and a command-driven explosion both are.
-    /// `spares` is what the source entity refuses to break, and only a primed tnt cart has one.
+    /// parity: `ServerExplosion`: broken blocks drop with no tool, neighbours of every hole are told after.
+    /// `sourceEntityId` is 0 for a blast with no entity behind it (a Nether bed, a command); `spares` is
+    /// what the source refuses to break, which only a primed tnt cart has.
     void blowUp(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x, double y,
                 double z, float power, std::string_view cause = "explosion", std::int32_t sourceEntityId = 0,
                 const world::explosions::Spares& spares = {}, const world::explosions::Resistance& resistance = {});

@@ -754,6 +754,9 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
             if (emptied.has_value() && context.world.setBlockState(tx, ty, tz, *emptied)) {
                 filled = ItemStack{.item = honeyBottle(), .count = 1};
                 change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *emptied};
+                if (hooks.releaseHive) {
+                    hooks.releaseHive(tx, ty, tz, *target);
+                }
             }
         } else if (target.has_value() && registry::blockSupport::holdsWater(*target)) {
             filled = waterBottle();
@@ -782,6 +785,9 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
         }
         popHoneycombs(context, tx, ty, tz, hooks);
         heard(context.world, "shear", tx, ty, tz, hooks.gameTime);
+        if (hooks.releaseHive) {
+            hooks.releaseHive(tx, ty, tz, *target);
+        }
         return Special{.handled = true,
                        .left = wornOnce(stack, context.random),
                        .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *emptied}};
@@ -1028,6 +1034,24 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     // item is: a dropper never shoots and never pours, it only throws or hands over.
     const bool dropper = block->path() == "dropper";
 
+    // parity: `FireworkRocketItem`'s dispense config: half a block and a hair out of the face, a
+    // power of a half and a spread of one, and the firework's own launch sound.
+    if (!dropper && stack.item.path() == "firework_rocket" && hooks.launchFirework) {
+        constexpr double kJustOutside = 0.5000099999997474;
+        hooks.launchFirework(x + 0.5 + (kJustOutside * registry::stepX(*out)),
+                             y + 0.5 + (kJustOutside * registry::stepY(*out)),
+                             z + 0.5 + (kJustOutside * registry::stepZ(*out)), registry::stepX(*out),
+                             registry::stepY(*out), registry::stepZ(*out), stack);
+        result.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kFireworkShoot, .data = 0});
+        result.effects.emplace_back(
+            blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = static_cast<std::int32_t>(*out)});
+        slots[*slot] = minusOne(stack);
+        blockInventory::write(blockEntity->data(), slots);
+        chunk->markDirty();
+        redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
+        result.fired = true;
+        return result;
+    }
     // parity: `DispenserBlock.registerProjectileBehavior`, which shoots rather than throws.
     const std::optional<entity::projectiles::DispenseShot> projectile =
         dropper ? std::nullopt : entity::projectiles::dispensed(stack.item);

@@ -55,6 +55,11 @@ public:
         /// Experience left as orbs at a point.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;
+        /// A target block struck by a player's projectile, where, and the signal it now gives.
+        /// parity: `TargetBlock.onProjectileHit`'s statistic and trigger.
+        std::function<void(world::LoadedWorld& world, player::PlayerSession& shooter,
+                           const entity::ServerEntity& projectile, std::int32_t signal)>
+            targetHit;
         /// A crystal went, by that player if one was behind it.
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer)>

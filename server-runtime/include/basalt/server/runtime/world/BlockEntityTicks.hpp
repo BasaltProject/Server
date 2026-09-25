@@ -70,6 +70,10 @@ struct Hooks {
     /// A noise that reached a shrieker: whether it shrieks depends on the players, which this
     /// module does not know. Called after every block entity has had its turn.
     std::function<void(const vibrations::ShriekerArrival& arrival)> shriekerHeard;
+    /// parity: `BeehiveBlockEntity.serverTick`, which lets bees out and so needs the entities. The
+    /// honey it adds goes in `pending`, set once every block entity has had its turn; answers whether
+    /// the hive changed.
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& pending)> beehive;
     /// The chunks that tick this turn, which a shrieker's noise waits on. Unset, every loaded one.
     WorldState::Ticking ticking;
 };

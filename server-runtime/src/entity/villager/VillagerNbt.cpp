@@ -15,21 +15,33 @@ using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
 using wire::nbt::NbtType;
 
-/// The dimension a saved `GlobalPos` names. A world here is one dimension, so the position is all
-/// that is read back.
-constexpr std::string_view kDimension = "minecraft:overworld";
+/// The dimension a `GlobalPos` names when the villager has not ticked in any world yet.
+constexpr std::string_view kDefaultDimension = "minecraft:overworld";
 
 [[nodiscard]] const NbtCompound* compoundAt(const NbtCompound& tag, std::string_view key) {
     return tag.getCompound(key);
 }
 
-void putPosition(NbtCompound& memories, std::string_view name, const Memory<BlockPos>& memory) {
-    if (!memory.present()) {
+void putPosition(NbtCompound& memories, std::string_view name, const Memory<BlockPos>& memory,
+                 const VillagerState& state, std::size_t slotIndex) {
+    std::optional<BlockPos> pos;
+    std::string dimension;
+    if (memory.present()) {
+        pos = *memory.value;
+        dimension = state.positionDimensions[slotIndex];
+    } else if (state.foreignPositions[slotIndex].has_value()) {
+        pos = state.foreignPositions[slotIndex]->pos;
+        dimension = state.foreignPositions[slotIndex]->dimension;
+    }
+    if (!pos.has_value()) {
         return;
     }
+    if (dimension.empty()) {
+        dimension = state.dimension.empty() ? std::string{kDefaultDimension} : state.dimension;
+    }
     NbtCompound value;
-    value.putIntArray("pos", {memory.value->x, memory.value->y, memory.value->z});
-    value.putString("dimension", std::string{kDimension});
+    value.putIntArray("pos", {pos->x, pos->y, pos->z});
+    value.putString("dimension", std::move(dimension));
     NbtCompound slot;
     slot.set("value", NbtTag::ofCompound(std::move(value)));
     memories.set(name, NbtTag::ofCompound(std::move(slot)));
@@ -47,7 +59,8 @@ void putLong(NbtCompound& memories, std::string_view name, const Memory<std::int
     memories.set(name, NbtTag::ofCompound(std::move(slot)));
 }
 
-void readPosition(const NbtCompound& memories, std::string_view name, Memory<BlockPos>& memory) {
+void readPosition(const NbtCompound& memories, std::string_view name, Memory<BlockPos>& memory, VillagerState& state,
+                  std::size_t slotIndex) {
     const NbtCompound* slot = compoundAt(memories, name);
     const NbtCompound* value = slot == nullptr ? nullptr : slot->getCompound("value");
     if (value == nullptr) {
@@ -56,6 +69,7 @@ void readPosition(const NbtCompound& memories, std::string_view name, Memory<Blo
     const std::span<const std::int32_t> pos = value->getIntArray("pos");
     if (pos.size() == 3) {
         memory.set(BlockPos{pos[0], pos[1], pos[2]});
+        state.positionDimensions[slotIndex] = std::string{value->getString("dimension", kDefaultDimension)};
     }
 }
 
@@ -105,10 +119,10 @@ void write(const ServerEntity& villager, NbtCompound& tag) {
     }
     NbtCompound memories;
     const Memories& memory = state.memories;
-    putPosition(memories, "minecraft:home", memory.home);
-    putPosition(memories, "minecraft:job_site", memory.jobSite);
-    putPosition(memories, "minecraft:potential_job_site", memory.potentialJobSite);
-    putPosition(memories, "minecraft:meeting_point", memory.meetingPoint);
+    putPosition(memories, "minecraft:home", memory.home, state, 0);
+    putPosition(memories, "minecraft:job_site", memory.jobSite, state, 1);
+    putPosition(memories, "minecraft:potential_job_site", memory.potentialJobSite, state, 2);
+    putPosition(memories, "minecraft:meeting_point", memory.meetingPoint, state, 3);
     putLong(memories, "minecraft:last_slept", memory.lastSlept);
     putLong(memories, "minecraft:last_woken", memory.lastWoken);
     putLong(memories, "minecraft:last_worked_at_poi", memory.lastWorkedAtPoi);
@@ -158,10 +172,10 @@ void read(const NbtCompound& tag, ServerEntity& villager) {
         return;
     }
     Memories& memory = state.memories;
-    readPosition(*memories, "minecraft:home", memory.home);
-    readPosition(*memories, "minecraft:job_site", memory.jobSite);
-    readPosition(*memories, "minecraft:potential_job_site", memory.potentialJobSite);
-    readPosition(*memories, "minecraft:meeting_point", memory.meetingPoint);
+    readPosition(*memories, "minecraft:home", memory.home, state, 0);
+    readPosition(*memories, "minecraft:job_site", memory.jobSite, state, 1);
+    readPosition(*memories, "minecraft:potential_job_site", memory.potentialJobSite, state, 2);
+    readPosition(*memories, "minecraft:meeting_point", memory.meetingPoint, state, 3);
     readLong(*memories, "minecraft:last_slept", memory.lastSlept);
     readLong(*memories, "minecraft:last_woken", memory.lastWoken);
     readLong(*memories, "minecraft:last_worked_at_poi", memory.lastWorkedAtPoi);

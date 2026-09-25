@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/player/PlayerCrossbow.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
@@ -107,6 +108,8 @@ private:
     /// The bow being drawn, and for how long.
     std::int32_t drawingSlot_ = -1;
     std::int32_t drawingTicks_ = 0;
+    /// The sounds a crossbow charge in progress has played.
+    player::crossbow::Charging crossbowCharging_;
 };
 
 } // namespace basalt::server::runtime

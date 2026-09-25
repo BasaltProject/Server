@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
+#include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
@@ -197,7 +198,8 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
     // parity: every flier's own move control and travel; the ones on `FlyingPathNavigation` follow
     // their path first.
     if (entity::flyers::flies(mob.type())) {
-        if (entity::flyingMovement::usesFlyingPath(mob.type())) {
+        // parity: a bee's navigation holds still while it pollinates.
+        if (entity::flyingMovement::usesFlyingPath(mob.type()) && (mob.bee == nullptr || !mob.bee->pollinating)) {
             entity::ai::navigation::tick(world.state(), mob);
         }
         random::RandomSource scratch = freshRandom();
@@ -249,7 +251,6 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                    .night = world::beds::isNight(world.clock().totalTicks()),
                                    .dayTime = world.clock().totalTicks(),
                                    .gameTime = world.gameTime(),
-                                   .raidNearby = RaidSystem::raidAt(world, mob.x, mob.y, mob.z) != nullptr,
                                    .raid = raider ? raids_->raidOf(world, mob) : std::nullopt,
                                    .speed = mob.attributeWithModifiers(entity::attribute::kMovementSpeed),
                                    .skyDarken = world.skyDarken(),

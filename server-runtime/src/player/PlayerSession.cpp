@@ -41,9 +41,30 @@ bool PlayerSession::invulnerable() const noexcept { return mayFly(); }
 bool PlayerSession::instabuild() const noexcept { return gamemode == wire::protocol::play::Gamemode::Creative; }
 
 void PlayerSession::sendSystemMessage(const wire::text::Component& message) const {
-    if (connection_.sendSystemMessage) {
+    if (chatVisibility.load() != ChatVisibility::Hidden && connection_.sendSystemMessage) {
         connection_.sendSystemMessage(message);
     }
+}
+
+void PlayerSession::sendChatMessage(const chat::PlayerChatMessage& message, const chat::BoundChatType& chatType) const {
+    if (chatVisibility.load() != ChatVisibility::Full) {
+        return;
+    }
+    if (connection_.sendChatMessage) {
+        connection_.sendChatMessage(message, chatType);
+    } else if (connection_.sendSystemMessage) {
+        connection_.sendSystemMessage(chatType.decorate(message.decoratedContent()));
+    }
+}
+
+std::optional<wire::protocol::play::RemoteChatSessionData> PlayerSession::chatSession() const {
+    const std::scoped_lock lock{chatSessionMutex_};
+    return chatSession_;
+}
+
+void PlayerSession::setChatSession(std::optional<wire::protocol::play::RemoteChatSessionData> session) {
+    const std::scoped_lock lock{chatSessionMutex_};
+    chatSession_ = std::move(session);
 }
 
 void PlayerSession::resetForRespawn() {

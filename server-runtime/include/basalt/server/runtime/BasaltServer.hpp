@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/EnvironmentTickSystem.hpp>
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/FireworkSystem.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/MapSystem.hpp>
@@ -44,9 +45,11 @@
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
 #include <basalt/server/runtime/scoreboard/Teams.hpp>
 #include <basalt/server/runtime/timings/TimingsReport.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/maps/MapStorage.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
+#include <basalt/wire/auth/SignatureValidator.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>
 
 #include <atomic>
@@ -79,6 +82,8 @@ public:
         /// Online mode's own key pair and session service, or null for offline mode.
         const wire::auth::SessionKeyPair* keyPair = nullptr;
         wire::auth::SessionService* sessionService = nullptr;
+        /// Mojang's public keys, which a chat session is checked against. Online mode only.
+        const wire::auth::ServicesKeySet* servicesKeys = nullptr;
         /// Which client versions may in. Read once: it decides what a connection is before there
         /// is a player, so it is not one of the files a reload swaps.
         config::CompatibilityConfig compatibility{config::BackwardsSelection{},
@@ -148,14 +153,20 @@ private:
     void updateCriterion(std::string_view criterion, std::string_view holder,
                          const std::function<std::int32_t(std::int32_t)>& update);
 
+    /// parity: the `DamageSource` of the blow that killed `dead`, as `killing_blow` reads it.
+    [[nodiscard]] world::TriggerDamage killingBlowOf(const world::LoadedWorld& world, const entity::ServerEntity& dead);
+
     /// parity: `ServerPlayer.awardKillScore`.
-    void awardKillScore(const player::PlayerSession& killer, const std::string& victim, bool victimIsPlayer);
+    void awardKillScore(player::PlayerSession& killer, const std::string& victim, bool victimIsPlayer);
 
     /// A mob a player killed, waiting for the scoring pass: killer uuid and the mob's holder name.
     struct PendingKill {
         wire::common::Uuid killer;
         std::string victim;
         wire::common::Identifier victimType;
+        /// What `player_killed_entity` reads: the victim and the blow that killed it.
+        server::world::loot::EntityFacts victimFacts;
+        world::TriggerDamage killingBlow;
     };
 
     /// parity: `TntBlock.prime` makes the entity inside the neighbour update that lit the block, so
@@ -281,6 +292,7 @@ private:
     std::unique_ptr<LightningBoltSystem> lightning_;
     std::unique_ptr<ShriekerSystem> shriekers_;
     std::unique_ptr<CombatSystem> combat_;
+    std::unique_ptr<FireworkSystem> fireworks_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;
     std::unique_ptr<EndFightSystem> endFight_;
     std::unique_ptr<RedstoneTickSystem> redstone_;

@@ -18,10 +18,12 @@
 #include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
+#include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -33,6 +35,7 @@
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -251,6 +254,12 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
                                SoundSource::Players);
     }
     session->stats.addDamageDealt(result.damage);
+    // parity: `ItemStack.hurtEnemy` counts a `weapon` as used, and `postHurtEnemy` wears it.
+    if (const std::optional<storage::StoredItemStack> weapon = session->inventory.heldItem();
+        weapon.has_value() && item::itemWear::costPerAttack(*weapon) > 0) {
+        player::statAwards::used(*session, weapon->id);
+        owner_->blockInteraction().wearHeldItem(item::itemWear::costPerAttack(*weapon));
+    }
     session->food.addExhaustion(kAttackExhaustion);
     if (result.died) {
         killEntity(*target);
@@ -317,7 +326,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         }
         return;
     }
-    if (tameOrSit(*session, *entity)) {
+    if (tameOrSit(*world, *session, *entity)) {
         return;
     }
     // parity: `CopperGolem.mobInteract`: the carried item back, shears, wax and a scrape.
@@ -385,7 +394,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     }
     // parity: `Animal.mobInteract` feeds a grown one into love and a calf into growing faster, and
     // does nothing at all to one that is neither.
-    const bool baby = entity->age < 0;
+    const std::optional<world::TriggerItem> used = world::triggerFacts::itemOf(held);
     if (entity::breeding::canFallInLove(*entity)) {
         entity::breeding::feed(*entity, session->uuid().toString());
     } else if (entity::breeding::canAgeUp(*entity)) {
@@ -394,7 +403,9 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         return;
     }
     if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
-        triggers->onInteractedWithEntity(session->name(), session->uuid().toString(), entity->type(), baby, *item);
+        triggers->fire("player_interacted_with_entity", session->name(), session->uuid().toString(),
+                       world::TriggerEvent{.entities = {{"entity", world::triggerFacts::ofEntity(*world, *entity)}},
+                                           .items = {{"item", used.value_or(world::TriggerItem{.item = *item})}}});
     }
     if (session->gamemode != Gamemode::Creative) {
         if (held->count <= 1) {
@@ -474,7 +485,7 @@ void CombatHandler::broadcastFrame(const ServerEntity& frame) {
     }
 }
 
-bool CombatHandler::tameOrSit(PlayerSession& session, ServerEntity& entity) {
+bool CombatHandler::tameOrSit(const world::LoadedWorld& world, PlayerSession& session, ServerEntity& entity) {
     if (!entity::taming::isTamable(entity.type())) {
         return false;
     }
@@ -512,7 +523,8 @@ bool CombatHandler::tameOrSit(PlayerSession& session, ServerEntity& entity) {
     entity.owner = session.uuid().toString();
     // parity: `TamableAnimal.tame` ends in `TAME_ANIMAL.trigger`.
     if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
-        triggers->onTamedAnimal(session.name(), session.uuid().toString(), entity.type());
+        triggers->fire("tame_animal", session.name(), session.uuid().toString(),
+                       world::TriggerEvent{.entities = {{"entity", world::triggerFacts::ofEntity(world, entity)}}});
     }
     entity.sitting = true;
     entity.targetId.reset();

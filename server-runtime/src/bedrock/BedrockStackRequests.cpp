@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/bedrock/BedrockStackRequests.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 
 #include <algorithm>
 #include <array>
@@ -268,6 +269,7 @@ void commit(Reach& reach, const std::function<void(const storage::StoredItemStac
     }
     for (const storage::StoredItemStack& stack : reach.dropped) {
         drop(stack);
+        player::statAwards::awardThrown(reach.session, stack.id, stack.count);
     }
 }
 
