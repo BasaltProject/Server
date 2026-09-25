@@ -28,11 +28,8 @@ struct Boxes {
     jmethodID doubleValue = nullptr;
 };
 
-[[nodiscard]] inline Boxes& boxes(JNIEnv* env) {
-    static Boxes cached;
-    if (cached.booleanClass != nullptr) {
-        return cached;
-    }
+[[nodiscard]] inline Boxes makeBoxes(JNIEnv* env) {
+    Boxes cached;
     const auto global = [env](const char* name) {
         jclass local = env->FindClass(name);
         auto* made = static_cast<jclass>(env->NewGlobalRef(local));
@@ -53,6 +50,11 @@ struct Boxes {
     cached.longValue = env->GetMethodID(cached.longClass, "longValue", "()J");
     cached.integerValue = env->GetMethodID(cached.integerClass, "intValue", "()I");
     cached.doubleValue = env->GetMethodID(cached.doubleClass, "doubleValue", "()D");
+    return cached;
+}
+
+[[nodiscard]] inline Boxes& boxes(JNIEnv* env) {
+    static Boxes cached = makeBoxes(env);
     return cached;
 }
 
