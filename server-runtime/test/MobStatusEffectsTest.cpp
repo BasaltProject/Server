@@ -105,3 +105,26 @@ TEST_CASE("strength and speed change the mob's own attributes while they last") 
     effects::clear(zombie);
     CHECK(zombie.attributeWithModifiers("minecraft:movement_speed") == doctest::Approx(speed));
 }
+
+TEST_CASE("a stronger, shorter dose hides the weaker one, which comes back when it runs out") {
+    ServerEntity cow = mobOf("cow");
+    const Identifier speed = Identifier::vanilla("speed");
+    REQUIRE(effects::add(cow, ActiveEffect{.effect = speed, .amplifier = 0, .remainingTicks = 100}));
+    REQUIRE(effects::add(cow, ActiveEffect{.effect = speed, .amplifier = 2, .remainingTicks = 10}));
+    CHECK(cow.effects.at(speed).amplifier == 2);
+    std::vector<Identifier> expired;
+    for (std::int32_t tick = 0; tick < 10; ++tick) {
+        static_cast<void>(effects::tick(cow, expired));
+    }
+    CHECK(expired.empty());
+    CHECK(cow.effects.at(speed).amplifier == 0);
+    CHECK(cow.effects.at(speed).remainingTicks == 90);
+    // The hidden dose travels with the save.
+    REQUIRE(effects::add(cow, ActiveEffect{.effect = speed, .amplifier = 1, .remainingTicks = 5}));
+    basalt::wire::nbt::NbtCompound saved;
+    saved.set("active_effects", effects::encode(cow));
+    ServerEntity loaded = mobOf("cow");
+    effects::decode(loaded, saved);
+    REQUIRE(loaded.hiddenEffects.contains(speed));
+    CHECK(loaded.hiddenEffects.at(speed).front().remainingTicks == 90);
+}

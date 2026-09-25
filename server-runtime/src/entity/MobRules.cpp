@@ -20,13 +20,8 @@ using wire::common::Identifier;
 } // namespace
 
 bool mobs::isMob(const Identifier& type) {
-    // parity: `MobCategory.MISC` is items, boats, arrows and the rest of the furniture, but a
-    // villager and an iron golem are misc too. What settles it is `follow_range`, which only a
-    // `Mob` has.
-    //
-    // The category half decides nothing on today's registry, where everything in a spawn category
-    // also has the attribute: it is the cheap half, and it is the half that says what the rule
-    // means.
+    // parity: `MobCategory.MISC` also holds villagers and iron golems, so `follow_range` (which only a
+    // `Mob` has) settles it. The category check is the cheap half and says what the rule means.
     return registry::entityTypeShapes::categoryOf(type) != "misc" ||
            registry::entityAttributes::baseValue(type, "follow_range").has_value();
 }
@@ -192,7 +187,7 @@ bool mobPersistence::requiresCustomPersistence(const ServerEntity& entity) {
     if (entity.owner.has_value()) {
         return true;
     }
-    if (entity.raidCenter.has_value()) {
+    if (entity.raidId.has_value()) {
         return true;
     }
 

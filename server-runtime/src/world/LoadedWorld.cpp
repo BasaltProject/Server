@@ -101,6 +101,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     }
     portals_.load(worldRoot_);
     randomSequences_.load(worldRoot_);
+    raids_.load(worldRoot_);
     state_.setOwner(&region_->owner());
     state_.setInstallOwner(&scheduler_.global());
     state_.setRegionCount([this] {
@@ -391,6 +392,7 @@ void LoadedWorld::saveDirty() {
     save(chunks);
     portals_.save(worldRoot_);
     randomSequences_.save(worldRoot_);
+    raids_.save(worldRoot_);
     state_.poi().save();
 }
 

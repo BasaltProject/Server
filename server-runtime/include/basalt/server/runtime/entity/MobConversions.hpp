@@ -41,6 +41,13 @@ struct Conversion {
     bool nausea = false;
     /// parity: `setPersistenceRequired` on what comes out, which a grown tadpole's frog gets.
     bool persistent = false;
+    /// The sound the old mob makes as it goes, empty for none, and whether peace keeps it quiet.
+    std::string_view sound;
+    float soundVolume = 1.0F;
+    bool quietInPeace = false;
+    /// parity: the `finalizeSpawn(CONVERSION)` the new mob gets, for the three that call it.
+    enum class Finalize : std::uint8_t { None, Frog, CuredVillager, ZombieVillager };
+    Finalize finalize = Finalize::None;
 };
 
 /// The synched flag that makes the client shake it, as an index, or nothing for a mob without one.

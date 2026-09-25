@@ -66,6 +66,10 @@ struct ShriekerArrival {
     Source source;
 };
 
+/// parity: `VibrationSystem.Listener.isOccluded`, wool on all six nudged lines between the two blocks.
+[[nodiscard]] bool occludedBetween(WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY,
+                                   double toZ);
+
 /// The signal this event is worth, or zero for one nothing listens to.
 [[nodiscard]] std::int32_t frequencyOf(std::string_view event);
 

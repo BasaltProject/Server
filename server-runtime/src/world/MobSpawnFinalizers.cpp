@@ -257,7 +257,8 @@ void beforeCommon(MobSpawnGroupData& group, const MobSpawnContext& context, rand
     equipment.finalizePillagerEquipmentBeforeCommon(data, random, context.specialMultiplier);
 
     bool leader = group.patrolLeader;
-    if (!leader && context.reason != MobSpawnReason::Patrol && context.reason != MobSpawnReason::Structure) {
+    if (!leader && context.reason != MobSpawnReason::Patrol && context.reason != MobSpawnReason::Event &&
+        context.reason != MobSpawnReason::Structure) {
         leader = random.nextFloat() < kRandomLeaderChance;
     }
     if (group.patrolLeader) {

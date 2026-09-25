@@ -186,6 +186,8 @@ void MobActionSystem::tickWarden(world::LoadedWorld& world, const std::vector<Pl
     if (warden.touchCooldown > 0) {
         warden.touchCooldown--;
     }
+    // parity: `Warden.tick` runs its vibration ticker first.
+    wardenHears(world, watchers, warden);
     if (warden.noAi) {
         return;
     }

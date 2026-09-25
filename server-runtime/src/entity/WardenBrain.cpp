@@ -1,6 +1,8 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
+#include <basalt/server/runtime/entity/ai/Controls.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <cmath>
 #include <memory>
@@ -59,7 +61,10 @@ Pose poseOf(const ServerEntity& warden) {
     if (warden.warden->digTicks > 0) {
         return Pose::Digging;
     }
-    return warden.warden->roarTicks > 0 ? Pose::Roaring : Pose::Standing;
+    if (warden.warden->roarTicks > 0) {
+        return Pose::Roaring;
+    }
+    return warden.warden->sniffTicks > 0 ? Pose::Sniffing : Pose::Standing;
 }
 
 std::vector<Action> startEmerging(ServerEntity& warden) {
@@ -88,6 +93,32 @@ void refreshDigCooldown(ServerEntity& warden) {
     }
 }
 
+void setDisturbance(ServerEntity& warden, const std::array<std::int32_t, 3>& at) {
+    WardenState& state = stateOf(warden);
+    if (warden.targetId.has_value() || wardens::target(warden).has_value()) {
+        return;
+    }
+    refreshDigCooldown(warden);
+    state.sniffCooldown = kDisturbanceTicks;
+    state.disturbance = at;
+    state.disturbanceTicks = kDisturbanceTicks;
+    ai::navigation::stop(warden);
+}
+
+void offer(WardenState& state, Heard heard) {
+    if (state.candidate.has_value()) {
+        const Heard& standing = *state.candidate;
+        if (heard.tick != standing.tick || heard.distance > standing.distance) {
+            return;
+        }
+        if (heard.distance == standing.distance &&
+            world::vibrations::frequencyOf(heard.event) <= world::vibrations::frequencyOf(standing.event)) {
+            return;
+        }
+    }
+    state.candidate = std::move(heard);
+}
+
 std::vector<Action> meleeHit(ServerEntity& warden) {
     WardenState& state = stateOf(warden);
     state.sonicCooldown = kSonicCooldown;
@@ -106,6 +137,13 @@ std::vector<Action> tick(ServerEntity& warden, const View& view) {
     }
     if (state.sonicCooldown > 0) {
         state.sonicCooldown--;
+    }
+    // parity: the memories that expire: sniffing may start again, and the disturbance is forgotten.
+    if (state.sniffCooldown > 0) {
+        state.sniffCooldown--;
+    }
+    if (state.disturbanceTicks > 0 && --state.disturbanceTicks == 0) {
+        state.disturbance.reset();
     }
     // parity: `EMERGE` comes first and holds everything else until it is done.
     if (state.emergeTicks > 0) {

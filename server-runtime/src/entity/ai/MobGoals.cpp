@@ -11,12 +11,14 @@
 #include <basalt/server/runtime/entity/ai/LongDistancePatrolGoal.hpp>
 #include <basalt/server/runtime/entity/ai/MobGoals.hpp>
 #include <basalt/server/runtime/entity/ai/PhantomGoals.hpp>
+#include <basalt/server/runtime/entity/ai/RaiderGoals.hpp>
 #include <basalt/server/runtime/entity/ai/ShulkerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TameGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
 #include <basalt/server/runtime/entity/ai/VillagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WanderingTraderGoals.hpp>
+#include <basalt/server/runtime/entity/ai/WardenGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WitherGoals.hpp>
 
 #include <cstdint>
@@ -59,9 +61,6 @@ constexpr std::int32_t kBlindCooldown = 180;
 constexpr std::int32_t kWitherShotInterval = 40;
 constexpr double kWitherRange = 20.0;
 
-/// parity: `PathfindToRaidGoal`, which walks a raider into the village at its own pace.
-constexpr double kRaidSpeed = 1.0;
-
 /// parity: the villager's own 0.5 speed modifier.
 constexpr double kVillagerSpeed = 0.5;
 
@@ -98,6 +97,14 @@ const Names& villagerThreats() {
 template <typename GoalType, typename... Args>
 void add(GoalSelector& selector, std::int32_t priority, Args&&... args) {
     selector.add(priority, std::make_unique<GoalType>(std::forward<Args>(args)...));
+}
+
+/// parity: `Raider.registerGoals`, which every raider runs before its own.
+void addRaiderGoals(GoalSelector& selector) {
+    add<ObtainRaidLeaderBannerGoal>(selector, 1);
+    add<PathfindToRaidGoal>(selector, 3);
+    add<RaiderMoveThroughVillageGoal>(selector, 4);
+    add<RaiderCelebrationGoal>(selector, 5);
 }
 
 /// parity: the goal set nearly every animal shares, with its own three speeds.
@@ -276,7 +283,7 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<PanicGoal>(selector, 0, copperGolems::kPanicSpeed);
         add<CopperGolemTransportGoal>(selector, 1);
         add<CopperGolemIdleGoal>(selector, 2);
-        add<LookAtPlayerGoal>(selector, 3, kLookNear);
+        add<LookAtPlayerSometimesGoal>(selector, 3);
         return true;
     }
     if (path == "iron_golem" || path == "snow_golem") {
@@ -318,14 +325,18 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
         add<FloatGoal>(selector, 0);
         add<WardenBusyGoal>(selector, 0);
         add<MeleeAttackGoal>(selector, 4, 1.0);
+        add<WardenInvestigateGoal>(selector, 5);
+        add<WardenSniffGoal>(selector, 6);
         monsterTail(selector);
         add<AngerTargetGoal>(selector, 1);
         return true;
     }
     static const Names kBrutes{"wither_skeleton", "piglin_brute", "hoglin", "zoglin", "vindicator", "ravager"};
     if (kBrutes.contains(path)) {
+        if (patrollingTypes().contains(path)) {
+            addRaiderGoals(selector);
+        }
         add<FloatGoal>(selector, 0);
-        add<PathfindToRaidGoal>(selector, 3, kRaidSpeed);
         add<MeleeAttackGoal>(selector, 4, 1.0);
         monsterTail(selector);
         add<HurtByTargetGoal>(selector, 1);
@@ -421,8 +432,8 @@ bool buildMonster(GoalSelector& selector, std::string_view path) {
 
 bool buildIllager(GoalSelector& selector, std::string_view path) {
     if (path == "witch") {
+        addRaiderGoals(selector);
         add<FloatGoal>(selector, 0);
-        add<PathfindToRaidGoal>(selector, 3, kRaidSpeed);
         add<ThrowPotionGoal>(selector, 2);
         add<RandomStrollGoal>(selector, 3, 1.0);
         add<LookAtPlayerGoal>(selector, 3, kLookFar);
@@ -432,8 +443,8 @@ bool buildIllager(GoalSelector& selector, std::string_view path) {
         return true;
     }
     if (path == "pillager") {
+        addRaiderGoals(selector);
         add<FloatGoal>(selector, 0);
-        add<PathfindToRaidGoal>(selector, 3, kRaidSpeed);
         add<CrossbowAttackGoal>(selector, 3, 1.0, kCrossbowRange);
         add<RandomStrollGoal>(selector, 8, 0.6);
         add<LookAtPlayerGoal>(selector, 9, kLookMeet, 1.0F);
@@ -444,8 +455,8 @@ bool buildIllager(GoalSelector& selector, std::string_view path) {
         return true;
     }
     if (path == "evoker") {
+        addRaiderGoals(selector);
         add<FloatGoal>(selector, 0);
-        add<PathfindToRaidGoal>(selector, 3, kRaidSpeed);
         // parity: `Evoker.registerGoals`, the fangs before the vexes and the wololo left out.
         add<CastSpellGoal>(selector, 4, CastSpellGoal::Spell::SummonVexes, kSummonCast, kSummonCooldown);
         add<CastSpellGoal>(selector, 5, CastSpellGoal::Spell::Fangs, kFangCast, kFangCooldown);
@@ -458,8 +469,8 @@ bool buildIllager(GoalSelector& selector, std::string_view path) {
         return true;
     }
     if (path == "illusioner") {
+        addRaiderGoals(selector);
         add<FloatGoal>(selector, 0);
-        add<PathfindToRaidGoal>(selector, 3, kRaidSpeed);
         add<CastSpellGoal>(selector, 4, CastSpellGoal::Spell::Blindness, kBlindCast, kBlindCooldown);
         add<RangedAttackGoal>(selector, 5, 0.5, kBowIntervalMin, kBowIntervalMax, kBowRange);
         add<RandomStrollGoal>(selector, 8, 0.6);
@@ -488,7 +499,7 @@ bool buildFlier(GoalSelector& selector, std::string_view path) {
         add<RandomStrollGoal>(selector, 7, 1.0);
         add<LookAtPlayerGoal>(selector, 8, kLookFar);
         add<RandomLookAroundGoal>(selector, 8);
-        add<HurtByTargetGoal>(selector, 1);
+        add<HurtByTargetGoal>(selector, 1, Names{}, true);
         add<NearestAttackablePlayerGoal>(selector, 2);
         return true;
     }
@@ -505,7 +516,8 @@ bool buildFlier(GoalSelector& selector, std::string_view path) {
         add<VexChargeGoal>(selector, 4);
         add<VexRandomMoveGoal>(selector, 8);
         add<LookAtPlayerGoal>(selector, 9, kLookMeet, 1.0F);
-        add<HurtByTargetGoal>(selector, 1);
+        add<HurtByTargetGoal>(selector, 1,
+                              Names{"pillager", "vindicator", "evoker", "illusioner", "witch", "ravager"}, true);
         add<NearestAttackablePlayerGoal>(selector, 3);
         return true;
     }

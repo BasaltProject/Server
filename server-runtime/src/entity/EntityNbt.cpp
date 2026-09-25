@@ -380,6 +380,14 @@ NbtCompound encode(const ServerEntity& entity) {
         }
         tag.putBoolean("PatrolLeader", entity.patrolLeader);
         tag.putBoolean("Patrolling", entity.patrolling);
+        // parity: `Raider.addAdditionalSaveData`; the raid id only while that raid is still saved.
+        tag.putInt("Wave", entity.raidWave);
+        tag.putBoolean("CanJoinRaid", entity.canJoinRaid);
+        if (entity.raidId.has_value()) {
+            tag.putInt("RaidId", *entity.raidId);
+        } else {
+            tag.remove("RaidId");
+        }
     }
     if (path == "wandering_trader" || path == "trader_llama") {
         tag.putInt("DespawnDelay", entity.despawnDelay);
@@ -563,6 +571,11 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
         }
         entity->patrolLeader = numericBoolean(tag, "PatrolLeader");
         entity->patrolling = numericBoolean(tag, "Patrolling");
+        entity->raidWave = numericInt(tag, "Wave");
+        entity->canJoinRaid = numericBoolean(tag, "CanJoinRaid");
+        if (tag.contains("RaidId")) {
+            entity->raidId = numericInt(tag, "RaidId");
+        }
     }
     if ((path == "wandering_trader" || path == "trader_llama") && tag.contains("DespawnDelay")) {
         entity->despawnDelay = tag.getInt("DespawnDelay");

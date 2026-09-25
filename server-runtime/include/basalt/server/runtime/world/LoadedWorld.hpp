@@ -2,6 +2,7 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
+#include <basalt/server/runtime/entity/Raids.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/DragonFight.hpp>
@@ -114,6 +115,9 @@ public:
 
     /// The named random streams this world keeps, which is what a loot table rolls on.
     [[nodiscard]] RandomSequences& randomSequences() noexcept { return randomSequences_; }
+
+    /// parity: `ServerLevel.getRaids`, saved beside the regions.
+    [[nodiscard]] entity::RaidManager& raids() noexcept { return raids_; }
 
     /// The region this world is ticked in. One per world while the world is in one piece.
     [[nodiscard]] sched::Region& region() const noexcept { return *region_; }
@@ -304,6 +308,7 @@ private:
     WorldMetadata metadata_;
     std::unique_ptr<DragonFight> dragonFight_;
     RandomSequences randomSequences_{metadata_.seed};
+    entity::RaidManager raids_;
     wire::common::Logger logger_;
     wire::common::Timings ownTimings_;
     wire::common::Timings& timings_;

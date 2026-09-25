@@ -1,114 +1,189 @@
 #pragma once
 
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/wire/common/Uuid.hpp>
+#include <basalt/wire/text/Component.hpp>
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
+
+namespace basalt::wire::nbt {
+class NbtCompound;
+}
 
 namespace basalt::server::runtime::entity {
 
-/// How a raid ended, which is what decides whether anybody gets the hero effect.
+/// parity: `Raid.RaidStatus`.
 enum class RaidStatus : std::uint8_t { Ongoing, Victory, Loss, Stopped };
+
+/// parity: `Raid.RaiderType`, in its declaration order, which is the order a wave is spawned in.
+enum class RaiderType : std::uint8_t { Vindicator, Evoker, Pillager, Witch, Ravager };
+
+using RaidPos = std::array<std::int32_t, 3>;
 
 /// One raid on one village.
 ///
-/// parity: `Raid`, minus what needs a POI map: the centre never moves, and the raid is over when its
-/// waves are, rather than when the village stops being one.
+/// parity: `Raid`. The raiders are held by entity id, grouped by the wave they joined.
 class Raid {
 public:
-    /// parity: `DEFAULT_PRE_RAID_TICKS`, `RAID_TIMEOUT_TICKS` and `MAX_CELEBRATION_TICKS`.
     static constexpr std::int32_t kPreRaidTicks = 300;
-    static constexpr std::int32_t kTimeoutTicks = 48000;
+    static constexpr std::int64_t kTimeoutTicks = 48000;
     static constexpr std::int32_t kCelebrationTicks = 600;
-
-    /// parity: `VALID_RAID_RADIUS_SQR`, the distance a player counts as being in the raid from.
-    static constexpr double kValidRadiusSquared = 9216.0;
-
-    /// parity: `MAX_RAID_OMEN_LEVEL` and the hero effect's own duration.
+    static constexpr std::int32_t kPostRaidTicks = 40;
+    static constexpr std::int32_t kMaxNoActionTime = 2400;
+    static constexpr std::int32_t kOutsideRaidTimeout = 30;
     static constexpr std::int32_t kMaxOmenLevel = 5;
     static constexpr std::int32_t kHeroDurationTicks = 48000;
+    static constexpr std::int32_t kValidRadiusSquared = 9216;
+    static constexpr std::int32_t kRemovalRadiusSquared = 12544;
 
-    /// parity: `getNumGroups`, three waves on easy, five on normal, seven on hard.
-    Raid(std::int32_t centerX, std::int32_t centerY, std::int32_t centerZ, std::int32_t totalGroups);
+    Raid(const RaidPos& center, std::int32_t numGroups, std::int64_t seed);
 
-    [[nodiscard]] std::int32_t centerX() const noexcept { return centerX_; }
+    [[nodiscard]] bool isOver() const noexcept { return status == RaidStatus::Victory || status == RaidStatus::Loss; }
 
-    [[nodiscard]] std::int32_t centerY() const noexcept { return centerY_; }
+    [[nodiscard]] bool isStopped() const noexcept { return status == RaidStatus::Stopped; }
 
-    [[nodiscard]] std::int32_t centerZ() const noexcept { return centerZ_; }
+    [[nodiscard]] bool hasFirstWaveSpawned() const noexcept { return groupsSpawned > 0; }
 
-    [[nodiscard]] std::int32_t totalGroups() const noexcept { return totalGroups_; }
+    [[nodiscard]] bool isBetweenWaves() const {
+        return hasFirstWaveSpawned() && totalRaidersAlive() == 0 && cooldownTicks > 0;
+    }
 
-    [[nodiscard]] const wire::common::Uuid& barId() const noexcept { return barId_; }
+    [[nodiscard]] std::int32_t totalRaidersAlive() const;
 
-    [[nodiscard]] bool active() const noexcept { return status == RaidStatus::Ongoing; }
+    [[nodiscard]] bool hasBonusWave() const noexcept { return raidOmenLevel > 1; }
 
-    [[nodiscard]] bool hasMoreWaves() const noexcept { return groupsSpawned < totalGroups_; }
+    [[nodiscard]] bool isFinalWave() const noexcept { return groupsSpawned == numGroups; }
 
-    [[nodiscard]] double distanceSquaredTo(double x, double y, double z) const;
+    [[nodiscard]] bool hasSpawnedBonusWave() const noexcept { return groupsSpawned > numGroups; }
 
-    std::int32_t omenLevel = 0;
+    [[nodiscard]] bool hasMoreWaves() const noexcept {
+        return hasBonusWave() ? !hasSpawnedBonusWave() : !isFinalWave();
+    }
+
+    [[nodiscard]] bool shouldSpawnBonusGroup() const {
+        return isFinalWave() && totalRaidersAlive() == 0 && hasBonusWave();
+    }
+
+    [[nodiscard]] bool shouldSpawnGroup() const {
+        return cooldownTicks == 0 && (groupsSpawned < numGroups || shouldSpawnBonusGroup()) && totalRaidersAlive() == 0;
+    }
+
+    /// parity: `absorbRaidOmen`: the omen's level plus one, capped at five.
+    void absorbOmen(std::int32_t amplifier);
+
+    /// parity: `stop`. The bar's players are dropped by whoever owns the bar.
+    void stop();
+
+    /// parity: `getEnchantOdds`.
+    [[nodiscard]] float enchantOdds() const noexcept;
+
+    /// parity: `getDefaultNumSpawns` plus `getPotentialBonusSpawns`, drawn off the raid's random.
+    [[nodiscard]] std::int32_t spawnsFor(RaiderType type, std::int32_t wave, std::string_view difficulty,
+                                         bool bonusWave);
+
+    /// Whether `entityId` is one of this raid's raiders.
+    [[nodiscard]] bool has(std::int32_t entityId) const;
+
+    /// parity: `addWaveMob`. Answers whether it was new.
+    bool addWaveMob(std::int32_t wave, std::int32_t entityId);
+
+    /// parity: `removeFromRaid`'s set removal. Answers whether it was there.
+    bool removeRaider(std::int32_t wave, std::int32_t entityId);
+
+    /// parity: the `MAP_CODEC` fields.
+    void encode(wire::nbt::NbtCompound& tag) const;
+    [[nodiscard]] static std::unique_ptr<Raid> decode(const wire::nbt::NbtCompound& tag, std::int64_t seed);
+
+    bool started = false;
+    bool active = true;
+    std::int64_t ticksActive = 0;
+    std::int32_t raidOmenLevel = 0;
     std::int32_t groupsSpawned = 0;
-    std::int32_t ticksActive = 0;
-
-    /// parity: `raidCooldownTicks`, the fifteen seconds between one wave dying and the next.
-    std::int32_t cooldown = kPreRaidTicks;
+    std::int32_t cooldownTicks = kPreRaidTicks;
+    std::int32_t postRaidTicks = 0;
+    float totalHealth = 0.0F;
+    std::int32_t numGroups = 0;
     RaidStatus status = RaidStatus::Ongoing;
+    /// How it ended before `stop` wrote over it. Not saved.
+    RaidStatus endedAs = RaidStatus::Ongoing;
+    RaidPos center{};
+    /// Insertion order stands in for the `HashSet`'s.
+    std::vector<wire::common::Uuid> heroes;
     std::int32_t celebrationTicks = 0;
+    std::optional<RaidPos> waveSpawnPos;
+    std::map<std::int32_t, std::vector<std::int32_t>> groups;
+    std::map<std::int32_t, std::int32_t> leaders;
 
-    /// Entity ids, which is all this build needs to count what is left of a wave.
-    std::vector<std::int32_t> raiders;
-    double totalHealth = 0.0;
+    /// parity: `RandomSource.create()`, a raid's own unseeded stream.
+    random::RandomSource random;
 
-    /// Whoever was near while it was on, and so gets the hero effect when it is won.
-    std::set<std::int32_t> heroes;
-
-    /// Which players are currently being sent the bar.
-    std::set<std::int32_t> watchers;
-
-private:
-    std::int32_t centerX_ = 0;
-    std::int32_t centerY_ = 0;
-    std::int32_t centerZ_ = 0;
-    std::int32_t totalGroups_ = 0;
-    wire::common::Uuid barId_;
+    /// parity: the `ServerBossEvent`: its players by entity id, and what they were last sent.
+    wire::common::Uuid barId;
+    std::set<std::int32_t> barPlayers;
+    wire::text::Component barName;
+    float barProgress = 0.0F;
+    bool barVisible = true;
 };
 
-/// parity: `Raid.RaiderType`, whose arrays are how many of each kind each wave brings.
+/// parity: `Raid.RaiderType`'s per-wave arrays and `getNumGroups`.
 namespace raidWaves {
 
-[[nodiscard]] const std::vector<std::string>& types();
+[[nodiscard]] std::string_view typeName(RaiderType type);
 
-/// How many of `type` wave `wave` brings, counting from one.
-[[nodiscard]] std::int32_t countFor(std::string_view type, std::int32_t wave);
+[[nodiscard]] std::int32_t countFor(RaiderType type, std::int32_t wave);
 
-/// parity: `getNumGroups`, which is the difficulty and nothing else.
 [[nodiscard]] std::int32_t groupsFor(std::string_view difficulty);
 
 } // namespace raidWaves
 
-/// Every raid running in one world. parity: `Raids`, the saved data behind `ServerLevel.getRaids`.
+/// Every raid in one world.
+///
+/// parity: `Raids`, the saved data behind `ServerLevel.getRaids`, kept in `raids.nbt` next to the
+/// world's regions.
 class RaidManager {
 public:
-    [[nodiscard]] const std::vector<std::unique_ptr<Raid>>& all() const noexcept { return raids_; }
+    [[nodiscard]] Raid* get(std::int32_t id);
 
-    /// parity: `getNearbyRaid`, which is what tells a village it is under attack.
-    [[nodiscard]] Raid* nearby(double x, double y, double z, double radiusSquared = Raid::kValidRadiusSquared);
+    [[nodiscard]] std::optional<std::int32_t> idOf(const Raid* raid) const;
 
-    /// parity: `createOrExtendRaid`: a second omen carried into a raid that is already running makes
-    /// that raid harder rather than starting another one.
-    Raid* createOrExtend(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t amplifier,
-                         std::string_view difficulty);
+    /// parity: `getNearbyRaid`, the closest active one strictly inside the radius.
+    [[nodiscard]] Raid* nearby(const RaidPos& pos, std::int32_t maxDistanceSquared = Raid::kValidRadiusSquared);
 
-    void forget(const std::vector<Raid*>& finished);
+    /// parity: `getUniqueId`, which bumps before it answers: the first raid is number two.
+    std::int32_t add(std::unique_ptr<Raid> raid);
+
+    [[nodiscard]] bool contains(const Raid* raid) const { return idOf(raid).has_value(); }
+
+    void remove(std::int32_t id);
+
+    /// The ids in the order `Int2ObjectOpenHashMap` walks them.
+    [[nodiscard]] std::vector<std::int32_t> tickOrder() const;
+
+    [[nodiscard]] std::size_t size() const noexcept { return raids_.size(); }
+
+    /// parity: `Raids.tick`'s own counter.
+    std::int32_t tick = 0;
+    bool dirty = false;
+
+    void encode(wire::nbt::NbtCompound& tag) const;
+    void decode(const wire::nbt::NbtCompound& tag);
+
+    void load(std::string_view worldRoot);
+    void save(std::string_view worldRoot);
 
 private:
-    std::vector<std::unique_ptr<Raid>> raids_;
+    std::map<std::int32_t, std::unique_ptr<Raid>> raids_;
+    std::int32_t nextId_ = 1;
+    std::int64_t seeds_ = 0;
 };
 
 } // namespace basalt::server::runtime::entity

@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
+#include <basalt/server/runtime/entity/ai/RaiderGoals.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <doctest.h>
@@ -223,25 +224,28 @@ TEST_CASE("an evoker's other spell summons three vexes") {
     CHECK(fixture.actions.vexes == 3);
 }
 
-TEST_CASE("a raider walks to its raid and stops once it is inside the village") {
+TEST_CASE("a raider walks to its raid until it has somebody to hit") {
     Fixture fixture;
     ServerEntity& pillager = fixture.add("pillager", 8.0, 8.0);
 
     ai::MobContext context = fixture.context(pillager);
-    ai::PathfindToRaidGoal raid{0.7};
+    ai::PathfindToRaidGoal raid;
     // No raid to be at.
     CHECK_FALSE(raid.canUse(context));
 
-    pillager.raidCenter = std::array<std::int32_t, 3>{100, 64, 100};
+    context.raid = ai::MobContext::RaiderRaid{.active = true, .center = {100, 64, 100}};
     CHECK(raid.canUse(context));
 
-    // Twelve blocks is close enough to count as being there.
-    pillager.raidCenter = std::array<std::int32_t, 3>{12, 64, 8};
+    // A raid that is over, or one stopped under it, is not walked to.
+    context.raid->over = true;
+    CHECK_FALSE(raid.canUse(context));
+    context.raid->over = false;
+    context.raid->active = false;
     CHECK_FALSE(raid.canUse(context));
 
     // Something to hit outranks getting there.
+    context.raid->active = true;
     ServerEntity& cow = fixture.add("cow", 8.0, 12.0);
-    pillager.raidCenter = std::array<std::int32_t, 3>{100, 64, 100};
     pillager.targetId = cow.entityId();
     CHECK_FALSE(raid.canUse(context));
 }

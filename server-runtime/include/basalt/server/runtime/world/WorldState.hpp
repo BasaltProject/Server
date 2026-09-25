@@ -50,6 +50,20 @@ struct BlockEvent {
     std::int32_t second = 0;
 };
 
+/// A game event as it was raised, kept a tick or two for the listeners that are entities.
+///
+/// parity: what `GameEventDispatcher.post` hands a warden's `VibrationSystem.Listener`: the event,
+/// where it happened, and who made it.
+struct GameEventRecord {
+    std::string event;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    std::int64_t gameTime = 0;
+    std::optional<wire::common::Uuid> entity;
+    std::optional<wire::common::Uuid> projectileOwner;
+};
+
 /// Shared view over the loaded chunks.
 ///
 /// The owner writes blocks without waiting for anybody: what the lock guards is the *set* of
@@ -223,6 +237,12 @@ public:
 
     /// Everything booked since the last call, in the order it was booked.
     [[nodiscard]] std::vector<BlockEvent> takeBlockEvents();
+
+    /// Keeps a game event for the entities that listen, dropping those older than the last tick.
+    void recordGameEvent(GameEventRecord record);
+
+    /// The game events of this tick and the last, in the order they were raised.
+    [[nodiscard]] std::vector<GameEventRecord> recentGameEvents() const;
 
     /// The oldest one booked, taken out of the queue. The rest stay in, so one booked while this
     /// runs still sees them and collapses against them.
@@ -462,6 +482,7 @@ private:
     std::vector<Spilled> spilled_;
     PendingChunkDecorations pendingDecorations_;
     std::vector<BlockEvent> blockEvents_;
+    std::vector<GameEventRecord> gameEvents_;
     std::deque<TorchToggle> torchToggles_;
     SculkSensorTracker sculkSensors_;
     mutable poi::PoiManager poi_;

@@ -1,82 +1,117 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/runtime/entity/Raids.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <doctest.h>
 
 #include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <string>
 
 using basalt::server::runtime::entity::Raid;
+using basalt::server::runtime::entity::RaiderType;
 using basalt::server::runtime::entity::RaidManager;
+using basalt::server::runtime::entity::RaidPos;
 using basalt::server::runtime::entity::RaidStatus;
 namespace raidWaves = basalt::server::runtime::entity::raidWaves;
 
-TEST_CASE("how many waves a raid brings is the difficulty and nothing else") {
+TEST_CASE("each wave brings its own count of each kind of raider") {
     CHECK(raidWaves::groupsFor("peaceful") == 0);
     CHECK(raidWaves::groupsFor("easy") == 3);
     CHECK(raidWaves::groupsFor("normal") == 5);
     CHECK(raidWaves::groupsFor("hard") == 7);
-    // The difficulty arrives from a config file, so its spelling is not to be trusted.
-    CHECK(raidWaves::groupsFor("HARD") == 7);
-    CHECK(raidWaves::groupsFor("nonsense") == 5);
-}
-
-TEST_CASE("each wave brings its own count of each kind of raider") {
     // parity: `Raid.RaiderType`, whose first wave is four pillagers and nothing else.
-    CHECK(raidWaves::countFor("pillager", 1) == 4);
-    CHECK(raidWaves::countFor("vindicator", 1) == 0);
-    CHECK(raidWaves::countFor("vindicator", 2) == 2);
-    CHECK(raidWaves::countFor("evoker", 5) == 1);
-    CHECK(raidWaves::countFor("ravager", 3) == 1);
-    CHECK(raidWaves::countFor("witch", 4) == 3);
-    // Past the last wave the last column keeps being used, and an unknown raider brings none.
-    CHECK(raidWaves::countFor("pillager", 99) == raidWaves::countFor("pillager", 7));
-    CHECK(raidWaves::countFor("zombie", 1) == 0);
+    CHECK(raidWaves::countFor(RaiderType::Pillager, 1) == 4);
+    CHECK(raidWaves::countFor(RaiderType::Vindicator, 1) == 0);
+    CHECK(raidWaves::countFor(RaiderType::Vindicator, 7) == 5);
+    CHECK(raidWaves::countFor(RaiderType::Witch, 4) == 3);
+    CHECK(raidWaves::countFor(RaiderType::Ravager, 3) == 1);
 }
 
-TEST_CASE("a second omen carried into a running raid makes it harder rather than starting another") {
-    RaidManager manager;
-    Raid* first = manager.createOrExtend(0, 64, 0, 0, "normal");
-    REQUIRE(first != nullptr);
-    CHECK(first->omenLevel == 1);
-    CHECK(first->totalGroups() == 5);
+TEST_CASE("bonus spawns draw off the raid's own random only where vanilla draws") {
+    Raid raid{RaidPos{0, 64, 0}, 5, 42};
+    Raid twin{RaidPos{0, 64, 0}, 5, 42};
+    // parity: an evoker and a witch before the fifth wave never touch the random.
+    CHECK(raid.spawnsFor(RaiderType::Evoker, 5, "normal", false) == 1);
+    CHECK(raid.spawnsFor(RaiderType::Witch, 4, "normal", false) == 3);
+    CHECK(raid.random.nextInt(1000) == twin.random.nextInt(1000));
+    // On normal a pillager gets zero or one more: one draw of `nextInt(2)`.
+    const std::int32_t expected = 4 + twin.random.nextInt(2);
+    CHECK(raid.spawnsFor(RaiderType::Pillager, 1, "normal", false) == expected);
+    // A bonus wave counts from the last regular one.
+    CHECK(raid.spawnsFor(RaiderType::Evoker, 6, "normal", true) == raidWaves::countFor(RaiderType::Evoker, 5));
+}
 
-    Raid* again = manager.createOrExtend(10, 64, 10, 1, "normal");
-    CHECK(again == first);
-    CHECK(first->omenLevel == 3);
-    CHECK(manager.all().size() == 1);
-
-    // parity: `MAX_RAID_OMEN_LEVEL`, which no number of omens gets past.
+TEST_CASE("a raid with a strong omen earns one bonus wave after its last") {
+    Raid raid{RaidPos{0, 64, 0}, 3, 1};
+    raid.absorbOmen(0);
+    CHECK(raid.raidOmenLevel == 1);
+    raid.groupsSpawned = 3;
+    CHECK_FALSE(raid.hasMoreWaves());
+    raid.absorbOmen(0);
+    CHECK(raid.hasBonusWave());
+    CHECK(raid.hasMoreWaves());
+    CHECK(raid.shouldSpawnBonusGroup());
+    raid.groupsSpawned = 4;
+    CHECK_FALSE(raid.hasMoreWaves());
+    // parity: `MAX_RAID_OMEN_LEVEL`.
     for (std::int32_t carried = 0; carried < 10; carried++) {
-        manager.createOrExtend(0, 64, 0, 4, "normal");
+        raid.absorbOmen(4);
     }
-    CHECK(first->omenLevel == Raid::kMaxOmenLevel);
-
-    // Far enough away is its own raid.
-    Raid* elsewhere = manager.createOrExtend(1000, 64, 1000, 0, "easy");
-    REQUIRE(elsewhere != nullptr);
-    CHECK(elsewhere != first);
-    CHECK(manager.all().size() == 2);
+    CHECK(raid.raidOmenLevel == Raid::kMaxOmenLevel);
 }
 
-TEST_CASE("a peaceful world has no raids at all") {
+TEST_CASE("only an active raid strictly inside the radius is nearby, and the closest wins") {
     RaidManager manager;
-    CHECK(manager.createOrExtend(0, 64, 0, 0, "peaceful") == nullptr);
-    CHECK(manager.all().empty());
+    const std::int32_t far = manager.add(std::make_unique<Raid>(RaidPos{60, 64, 0}, 5, 1));
+    const std::int32_t near = manager.add(std::make_unique<Raid>(RaidPos{10, 64, 0}, 5, 2));
+    // parity: `getUniqueId` bumps before it answers.
+    CHECK(far == 2);
+    CHECK(near == 3);
+    CHECK(manager.nearby(RaidPos{0, 64, 0}) == manager.get(near));
+    manager.get(near)->active = false;
+    CHECK(manager.nearby(RaidPos{0, 64, 0}) == manager.get(far));
+    // Ninety-six blocks is exactly the edge, and the edge is out.
+    CHECK(manager.nearby(RaidPos{-36, 64, 0}) == nullptr);
 }
 
-TEST_CASE("a raid that is over stops being nearby anything") {
+TEST_CASE("the raids survive a restart with their ids, heroes and progress") {
+    const std::filesystem::path root = std::filesystem::path{BASALT_TEST_SCRATCH_DIR} / "raids-saved";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+
     RaidManager manager;
-    Raid* raid = manager.createOrExtend(0, 64, 0, 0, "normal");
-    REQUIRE(raid != nullptr);
-    CHECK(manager.nearby(0.5, 64.5, 0.5) == raid);
+    auto raid = std::make_unique<Raid>(RaidPos{8, 70, -3}, 7, 1);
+    raid->started = true;
+    raid->raidOmenLevel = 3;
+    raid->groupsSpawned = 2;
+    raid->cooldownTicks = 120;
+    raid->ticksActive = 4000;
+    raid->totalHealth = 88.5F;
+    raid->status = RaidStatus::Loss;
+    raid->heroes.emplace_back(0x0102030405060708ULL, 0x1112131415161718ULL);
+    const std::int32_t id = manager.add(std::move(raid));
+    manager.tick = 450;
+    manager.save(root.string());
 
-    raid->status = RaidStatus::Victory;
-    CHECK(manager.nearby(0.5, 64.5, 0.5) == nullptr);
-    // And a won raid is what the next omen extends into a new one.
-    Raid* next = manager.createOrExtend(0, 64, 0, 0, "normal");
-    CHECK(next != raid);
-
-    manager.forget({raid});
-    CHECK(manager.all().size() == 1);
+    RaidManager reloaded;
+    reloaded.load(root.string());
+    const Raid* read = reloaded.get(id);
+    REQUIRE(read != nullptr);
+    CHECK(read->center == RaidPos{8, 70, -3});
+    CHECK(read->started);
+    CHECK(read->raidOmenLevel == 3);
+    CHECK(read->groupsSpawned == 2);
+    CHECK(read->cooldownTicks == 120);
+    CHECK(read->ticksActive == 4000);
+    CHECK(read->totalHealth == 88.5F);
+    CHECK(read->numGroups == 7);
+    CHECK(read->status == RaidStatus::Loss);
+    REQUIRE(read->heroes.size() == 1);
+    CHECK(read->heroes.front().high() == 0x0102030405060708ULL);
+    CHECK(reloaded.tick == 450);
+    // The next raid does not reuse a saved id.
+    CHECK(reloaded.add(std::make_unique<Raid>(RaidPos{0, 0, 0}, 3, 2)) == id + 1);
 }

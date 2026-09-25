@@ -272,12 +272,14 @@ using wire::common::JsonValue;
         built.matchers.push_back(std::move(*matcher));
         return built;
     }
-    // parity: the three triggers whose criteria in the jar ask for nothing at all: doing the thing is
-    // the whole condition. A file that does add one is left unsupported rather than granted blind.
-    if (name == "minecraft:slept_in_bed" || name == "minecraft:villager_trade" || name == "minecraft:enchanted_item") {
+    // parity: the triggers whose criteria in the jar ask for nothing at all: doing the thing is the
+    // whole condition. A file that does add one is left unsupported rather than granted blind.
+    if (name == "minecraft:slept_in_bed" || name == "minecraft:villager_trade" || name == "minecraft:enchanted_item" ||
+        name == "minecraft:cured_zombie_villager") {
         const ConditionKind kind = name == "minecraft:slept_in_bed"     ? ConditionKind::SleptInBed
                                    : name == "minecraft:villager_trade" ? ConditionKind::VillagerTrade
-                                                                        : ConditionKind::EnchantedItem;
+                                   : name == "minecraft:enchanted_item" ? ConditionKind::EnchantedItem
+                                                                        : ConditionKind::CuredZombieVillager;
         return conditions == nullptr || conditions->empty() ? CriterionCondition{.kind = kind} : CriterionCondition{};
     }
     // parity: `ConstructBeaconTrigger`, whose `level` is either a number or a range.

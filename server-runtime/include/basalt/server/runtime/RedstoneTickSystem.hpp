@@ -166,9 +166,6 @@ private:
                                                  const std::vector<world::DroppedItem>& items,
                                                  std::size_t movedThrough);
 
-    /// parity: `Warden.increaseAngerAt` from a vibration: a step it hears is worth thirty-five.
-    static void hearFootstep(world::LoadedWorld& world, const player::PlayerSession& player);
-
     [[nodiscard]] random::RandomSource freshRandom() const;
 
     player::PlayerRegistry* players_;

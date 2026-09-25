@@ -73,6 +73,8 @@ enum class ConditionKind : std::uint8_t {
     EnchantedItem,
     /// parity: `ConstructBeaconTrigger`, the tiers under a beacon that just lit.
     ConstructedBeacon,
+    /// parity: `CuredZombieVillagerTrigger`, with neither of its two entity predicates.
+    CuredZombieVillager,
     Unsupported,
 };
 

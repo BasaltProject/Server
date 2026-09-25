@@ -1,92 +1,47 @@
-#include <basalt/server/registry/BlockShapes.hpp>
-#include <basalt/server/registry/Blocks.hpp>
-#include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
-#include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
-#include <basalt/wire/protocol/play/UiPackets.hpp>
+#include <basalt/server/runtime/world/poi/PoiManager.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <numbers>
 #include <utility>
 
 namespace basalt::server::runtime {
 namespace {
 
 using entity::Raid;
+using entity::RaidPos;
 using entity::RaidStatus;
 using player::PlayerSession;
-using wire::common::Identifier;
-using wire::protocol::play::BossEventPacket;
 using wire::protocol::play::Gamemode;
 using wire::text::Component;
 
-constexpr std::string_view kSoundRaidHorn = "event.raid.horn";
-
-/// parity: the horn is heard sixty-four blocks away, at sixty-four blocks of volume.
-constexpr double kRaidHornRangeSquared = 4096.0;
-constexpr float kRaidHornVolume = 64.0F;
-constexpr std::string_view kRaidBarKey = "event.minecraft.raid";
-
-/// parity: `NUM_SPAWN_ATTEMPTS` and the ring `findRandomSpawnPos` looks along.
-constexpr std::int32_t kRaidSpawnAttempts = 20;
-constexpr double kRaidSpawnMin = 24.0;
-constexpr double kRaidSpawnMax = 32.0;
-constexpr std::int32_t kRaidSpawnLift = 12;
-constexpr std::int32_t kRaidSpawnDrop = 24;
-
-/// parity: `BadOmenMobEffect`, whose raid omen lasts thirty seconds.
+/// parity: `BadOmenMobEffect`'s raid omen, thirty seconds long.
 constexpr std::int32_t kRaidOmenTicks = 600;
+/// parity: `createOrExtendRaid`'s search for the village's points.
+constexpr std::int32_t kVillageSearch = 64;
+/// parity: `Raids.tick` saves every ten seconds even when nothing moved.
+constexpr std::int32_t kSaveInterval = 200;
+/// parity: `Raid.updatePlayers` and the name refresh run once a second.
+constexpr std::int64_t kSecond = 20;
+constexpr std::int32_t kLowMobThreshold = 2;
+constexpr std::int32_t kSpawnAttempts = 5;
+constexpr std::int32_t kCachedSpawnTries = 8;
+constexpr std::int32_t kSpawnTries = 20;
+constexpr std::int32_t kSectionRadius = 2;
 
-/// How often a bad omen looks for a village.
-constexpr std::int32_t kVillageCheckInterval = 20;
-
-void sendRaidBar(PlayerSession& player, const Raid& raid, BossEventPacket::Operation operation) {
-    // A client that draws bars its own way is told what the bar says rather than handed Java's
-    // packet: the shape of the operation is this edition's, the bar is not.
-    if (player.connection().showBossBar) {
-        if (const auto* add = std::get_if<BossEventPacket::Add>(&operation); add != nullptr) {
-            player.connection().showBossBar(raid.barId(), add->name, add->progress, true);
-            return;
-        }
-        if (const auto* progress = std::get_if<BossEventPacket::UpdateProgress>(&operation); progress != nullptr) {
-            player.connection().showBossBar(raid.barId(), wire::text::Component::empty(), progress->progress, true);
-            return;
-        }
-        player.connection().showBossBar(raid.barId(), wire::text::Component::empty(), 0.0F, false);
-        return;
-    }
-    if (!player.connection().sendPlayPacket) {
-        return;
-    }
-    player.connection().sendPlayPacket(BossEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        BossEventPacket{.id = raid.barId(), .operation = std::move(operation)}.write(buffer);
-    });
+[[nodiscard]] RaidPos blockOf(double x, double y, double z) {
+    return {static_cast<std::int32_t>(std::floor(x)), static_cast<std::int32_t>(std::floor(y)),
+            static_cast<std::int32_t>(std::floor(z))};
 }
 
-/// The first solid block under a column, which is where anything spawned outdoors stands.
-std::optional<std::int32_t> groundBelow(world::LoadedWorld& world, std::int32_t x, std::int32_t fromY, std::int32_t z) {
-    std::int32_t y = fromY;
-    for (std::int32_t dropped = 0; dropped < kRaidSpawnDrop; dropped++) {
-        const std::optional<std::int32_t> below = world.state().blockState(x, y - 1, z);
-        const std::optional<std::int32_t> here = world.state().blockState(x, y, z);
-        if (!below.has_value() || !here.has_value()) {
-            return std::nullopt;
-        }
-        if (!server::registry::blockShapes::isEmptyShape(*below) &&
-            server::registry::blockShapes::isEmptyShape(*here)) {
-            return y;
-        }
-        y--;
-    }
-    return std::nullopt;
-}
+[[nodiscard]] Component raidName() { return Component::translatable("event.minecraft.raid"); }
 
 } // namespace
 
@@ -95,257 +50,304 @@ RaidSystem::RaidSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& 
     : players_(&players), broadcaster_(&broadcaster), spawning_(&spawning), hooks_(std::move(hooks)),
       options_(std::move(options)), logger_(std::move(logger)) {}
 
-entity::RaidManager& RaidSystem::raidsIn(const world::LoadedWorld& world) {
-    const auto found = managers_.find(world.name());
-    if (found != managers_.end()) {
-        return *found->second;
-    }
-    return *managers_.emplace(world.name(), std::make_unique<entity::RaidManager>()).first->second;
+entity::RaidManager& RaidSystem::raidsIn(world::LoadedWorld& world) { return world.raids(); }
+
+Raid* RaidSystem::raidAt(world::LoadedWorld& world, double x, double y, double z) {
+    return world.raids().nearby(blockOf(x, y, z));
 }
 
 std::optional<entity::villager::RaidView> RaidSystem::viewAt(world::LoadedWorld& world, std::int32_t x, std::int32_t y,
                                                              std::int32_t z) {
-    const Raid* raid = raidsIn(world).nearby(x, y, z);
+    const Raid* raid = world.raids().nearby({x, y, z});
     if (raid == nullptr) {
         return std::nullopt;
     }
-    return entity::villager::RaidView{.active = raid->active(),
+    return entity::villager::RaidView{.active = raid->active,
                                       .victory = raid->status == RaidStatus::Victory,
                                       .loss = raid->status == RaidStatus::Loss,
-                                      .stopped = raid->status == RaidStatus::Stopped,
-                                      .firstWaveSpawned = raid->groupsSpawned > 0,
-                                      .betweenWaves =
-                                          raid->groupsSpawned > 0 && raid->raiders.empty() && raid->cooldown > 0};
+                                      .stopped = raid->isStopped(),
+                                      .firstWaveSpawned = raid->hasFirstWaveSpawned(),
+                                      .betweenWaves = raid->isBetweenWaves()};
+}
+
+std::vector<PlayerSession*> RaidSystem::playersIn(const world::LoadedWorld& world) const {
+    std::vector<PlayerSession*> found;
+    for (PlayerSession* player : players_->snapshot()) {
+        if (player->worldName == world.name()) {
+            found.push_back(player);
+        }
+    }
+    return found;
+}
+
+bool RaidSystem::isVillage(world::LoadedWorld& world, const RaidPos& pos) {
+    return world.state().poi().isVillage(world::poi::BlockPos{pos[0], pos[1], pos[2]});
 }
 
 void RaidSystem::tickRaids(world::LoadedWorld& world) {
-    const auto found = managers_.find(world.name());
-    if (found == managers_.end() || found->second->all().empty()) {
-        return;
-    }
-    entity::RaidManager& manager = *found->second;
-    std::vector<PlayerSession*> players;
-    for (PlayerSession* player : players_->snapshot()) {
-        if (player->worldName == world.name()) {
-            players.push_back(player);
+    entity::RaidManager& manager = world.raids();
+    manager.tick++;
+    const bool allowed = world.gameRules().get(world::gameRules::kRaids);
+    for (const std::int32_t id : manager.tickOrder()) {
+        Raid* raid = manager.get(id);
+        if (!allowed) {
+            raid->stop();
+            removeAllBarPlayers(world, *raid);
         }
-    }
-    std::vector<Raid*> running;
-    running.reserve(manager.all().size());
-    for (const std::unique_ptr<Raid>& raid : manager.all()) {
-        running.push_back(raid.get());
-    }
-    std::vector<Raid*> finished;
-    for (Raid* raid : running) {
-        tickRaid(world, players, *raid);
-        if (raid->status == RaidStatus::Ongoing || raid->celebrationTicks > 0) {
-            continue;
-        }
-        hideRaidBar(players, *raid);
-        if (hooks_.raidFinished) {
-            hooks_.raidFinished(world, *raid, raid->status == RaidStatus::Victory);
-        }
-        finished.push_back(raid);
-    }
-    manager.forget(finished);
-}
-
-void RaidSystem::tickRaid(world::LoadedWorld& world, const std::vector<PlayerSession*>& players, Raid& raid) {
-    if (raid.status != RaidStatus::Ongoing) {
-        raid.celebrationTicks--;
-        return;
-    }
-    raid.ticksActive++;
-    if (raid.ticksActive >= Raid::kTimeoutTicks) {
-        raid.status = RaidStatus::Stopped;
-        raid.celebrationTicks = 0;
-        return;
-    }
-    double health = 0.0;
-    std::erase_if(raid.raiders, [&world, &health](std::int32_t id) {
-        const entity::ServerEntity* raider = world.state().entity(id);
-        if (raider == nullptr || raider->removed || raider->health <= 0.0) {
-            return true;
-        }
-        health += raider->health;
-        return false;
-    });
-    // parity: `updatePlayers`, which is who the bar belongs to and who ends up a hero.
-    for (const PlayerSession* player : players) {
-        if (raid.distanceSquaredTo(player->x, player->y, player->z) < Raid::kValidRadiusSquared) {
-            raid.heroes.insert(player->entityId());
-        }
-    }
-    if (raid.raiders.empty()) {
-        if (!raid.hasMoreWaves()) {
-            winRaid(players, raid);
-            return;
-        }
-        if (raid.cooldown > 0) {
-            raid.cooldown--;
-        } else {
-            spawnRaidWave(world, players, raid);
-            raid.cooldown = Raid::kPreRaidTicks;
-        }
-    }
-    updateRaidBar(players, raid, health);
-}
-
-void RaidSystem::spawnRaidWave(world::LoadedWorld& world, const std::vector<PlayerSession*>& players, Raid& raid) {
-    const std::int32_t wave = raid.groupsSpawned + 1;
-    const std::optional<std::array<std::int32_t, 3>> position = raidSpawnPosition(world, raid);
-    if (!position.has_value()) {
-        logger_.debug([&] {
-            return "Raid wave " + std::to_string(wave) + " found nowhere to spawn around " +
-                   std::to_string(raid.centerX()) + ", " + std::to_string(raid.centerZ());
-        });
-        return;
-    }
-    double total = 0.0;
-    for (const std::string& type : entity::raidWaves::types()) {
-        const std::int32_t count = entity::raidWaves::countFor(type, wave);
-        for (std::int32_t index = 0; index < count; index++) {
-            entity::ServerEntity* raider =
-                spawning_->spawnMob(world, Identifier::vanilla(type), (*position)[0] + 0.5,
-                                    static_cast<double>((*position)[1]), (*position)[2] + 0.5);
-            if (raider == nullptr) {
-                continue;
+        if (raid->isStopped()) {
+            removeAllBarPlayers(world, *raid);
+            if (hooks_.raidFinished) {
+                hooks_.raidFinished(world, *raid, raid->endedAs == RaidStatus::Victory);
             }
-            raider->persistent = true;
-            raider->raidCenter = std::array<std::int32_t, 3>{raid.centerX(), raid.centerY(), raid.centerZ()};
-            raid.raiders.push_back(raider->entityId());
-            total += raider->health;
-        }
-    }
-    raid.groupsSpawned = wave;
-    raid.totalHealth = total;
-    // parity: `playSound`, the horn everyone within sixty-four blocks hears.
-    std::vector<PlayerSession*> hearers;
-    for (PlayerSession* player : players) {
-        if (raid.distanceSquaredTo(player->x, player->y, player->z) < kRaidHornRangeSquared) {
-            hearers.push_back(player);
-        }
-    }
-    broadcaster_->sendEffects(hearers, (*position)[0], (*position)[1], (*position)[2],
-                              server::registry::blocks::air().stateId,
-                              {world::blockEffect::Sound{.name = std::string{kSoundRaidHorn},
-                                                         .source = wire::protocol::play::SoundSource::Neutral,
-                                                         .volume = kRaidHornVolume,
-                                                         .pitch = 1.0F}});
-}
-
-std::optional<std::array<std::int32_t, 3>> RaidSystem::raidSpawnPosition(world::LoadedWorld& world,
-                                                                         const Raid& raid) const {
-    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
-    for (std::int32_t attempt = 0; attempt < kRaidSpawnAttempts; attempt++) {
-        const double angle = random.nextDouble() * 2.0 * std::numbers::pi;
-        const double distance = kRaidSpawnMin + (random.nextDouble() * (kRaidSpawnMax - kRaidSpawnMin));
-        const std::int32_t x = raid.centerX() + static_cast<std::int32_t>(std::cos(angle) * distance);
-        const std::int32_t z = raid.centerZ() + static_cast<std::int32_t>(std::sin(angle) * distance);
-        const std::optional<std::int32_t> ground = groundBelow(world, x, raid.centerY() + kRaidSpawnLift, z);
-        if (ground.has_value()) {
-            return std::array<std::int32_t, 3>{x, *ground, z};
-        }
-    }
-    return std::nullopt;
-}
-
-void RaidSystem::winRaid(const std::vector<PlayerSession*>& players, Raid& raid) {
-    raid.status = RaidStatus::Victory;
-    raid.celebrationTicks = Raid::kCelebrationTicks;
-    for (PlayerSession* player : players) {
-        if (!raid.heroes.contains(player->entityId()) || !player->connection().addEffect) {
+            manager.remove(id);
             continue;
         }
-        player->connection().addEffect(world::mobEffects::heroOfTheVillage(), Raid::kHeroDurationTicks,
-                                       raid.omenLevel - 1);
+        tickRaid(world, *raid);
+    }
+    if (manager.tick % kSaveInterval == 0) {
+        manager.dirty = true;
     }
 }
 
-void RaidSystem::updateRaidBar(const std::vector<PlayerSession*>& players, Raid& raid, double health) {
-    if (raid.groupsSpawned == 0) {
+void RaidSystem::tickRaid(world::LoadedWorld& world, Raid& raid) {
+    if (raid.isStopped()) {
         return;
     }
-    const float progress =
-        raid.totalHealth <= 0.0 ? 0.0F : std::clamp(static_cast<float>(health / raid.totalHealth), 0.0F, 1.0F);
-    for (PlayerSession* player : players) {
-        const bool inRaid = raid.distanceSquaredTo(player->x, player->y, player->z) < Raid::kValidRadiusSquared;
-        if (!inRaid) {
-            if (raid.watchers.erase(player->entityId()) > 0) {
-                sendRaidBar(*player, raid, BossEventPacket::Remove{});
-            }
-            continue;
-        }
-        if (raid.watchers.insert(player->entityId()).second) {
-            sendRaidBar(*player, raid,
-                        BossEventPacket::Add{.name = Component::translatable(std::string{kRaidBarKey}),
-                                             .progress = progress,
-                                             .color = wire::protocol::play::BossBarColor::Red,
-                                             .overlay = wire::protocol::play::BossBarOverlay::Notched10});
-        } else {
-            sendRaidBar(*player, raid, BossEventPacket::UpdateProgress{.progress = progress});
-        }
+    if (raid.status == RaidStatus::Ongoing) {
+        tickOngoing(world, raid);
+    } else if (raid.isOver()) {
+        tickCelebration(world, raid);
     }
 }
 
-void RaidSystem::hideRaidBar(const std::vector<PlayerSession*>& players, Raid& raid) {
-    for (PlayerSession* player : players) {
-        if (raid.watchers.erase(player->entityId()) > 0) {
-            sendRaidBar(*player, raid, BossEventPacket::Remove{});
+void RaidSystem::tickOngoing(world::LoadedWorld& world, Raid& raid) {
+    const bool wasActive = raid.active;
+    raid.active = world.state().isLoaded(raid.center[0] >> 4, raid.center[2] >> 4);
+    if (world.difficulty() == "peaceful") {
+        raid.stop();
+        removeAllBarPlayers(world, raid);
+        return;
+    }
+    if (wasActive != raid.active) {
+        setBarVisible(world, raid, raid.active);
+    }
+    if (!raid.active) {
+        return;
+    }
+    if (!isVillage(world, raid.center)) {
+        moveCenterToVillageSection(world, raid);
+    }
+    if (!isVillage(world, raid.center)) {
+        if (raid.groupsSpawned > 0) {
+            raid.status = RaidStatus::Loss;
+        } else {
+            raid.stop();
+            removeAllBarPlayers(world, raid);
         }
+    }
+    if (++raid.ticksActive >= Raid::kTimeoutTicks) {
+        raid.stop();
+        removeAllBarPlayers(world, raid);
+        return;
+    }
+    const std::int32_t raidersAlive = raid.totalRaidersAlive();
+    if (raidersAlive == 0 && raid.hasMoreWaves()) {
+        if (raid.cooldownTicks <= 0) {
+            if (raid.cooldownTicks == 0 && raid.groupsSpawned > 0) {
+                raid.cooldownTicks = Raid::kPreRaidTicks;
+                setBarName(world, raid, raidName());
+                return;
+            }
+        } else {
+            const bool cached = raid.waveSpawnPos.has_value();
+            bool shouldFind = !cached && raid.cooldownTicks % 5 == 0;
+            if (cached && !world.state().isLoaded((*raid.waveSpawnPos)[0] >> 4, (*raid.waveSpawnPos)[2] >> 4)) {
+                shouldFind = true;
+            }
+            if (shouldFind) {
+                raid.waveSpawnPos = findRandomSpawnPos(world, raid, kCachedSpawnTries);
+            }
+            if (raid.cooldownTicks == Raid::kPreRaidTicks || raid.cooldownTicks % 20 == 0) {
+                updatePlayers(world, raid);
+            }
+            --raid.cooldownTicks;
+            setBarProgress(world, raid,
+                           std::clamp(static_cast<float>(Raid::kPreRaidTicks - raid.cooldownTicks) /
+                                          static_cast<float>(Raid::kPreRaidTicks),
+                                      0.0F, 1.0F));
+        }
+    }
+    if (raid.ticksActive % kSecond == 0) {
+        updatePlayers(world, raid);
+        updateRaiders(world, raid);
+        if (raidersAlive > 0 && raidersAlive <= kLowMobThreshold) {
+            setBarName(world, raid,
+                       raidName()
+                           .append(Component::text(" - "))
+                           .append(Component::translatable("event.minecraft.raid.raiders_remaining",
+                                                           {Component::text(std::to_string(raidersAlive))})));
+        } else {
+            setBarName(world, raid, raidName());
+        }
+    }
+    bool hornPlayed = false;
+    std::int32_t attempt = 0;
+    while (raid.shouldSpawnGroup()) {
+        const std::optional<RaidPos> spawnPos =
+            raid.waveSpawnPos.has_value() ? raid.waveSpawnPos : findRandomSpawnPos(world, raid, kSpawnTries);
+        if (spawnPos.has_value()) {
+            raid.started = true;
+            spawnGroup(world, raid, *spawnPos);
+            if (!hornPlayed) {
+                playHorn(world, raid, *spawnPos);
+                hornPlayed = true;
+            }
+        } else {
+            ++attempt;
+        }
+        if (attempt > kSpawnAttempts) {
+            raid.stop();
+            removeAllBarPlayers(world, raid);
+            break;
+        }
+    }
+    if (raid.started && !raid.hasMoreWaves() && raidersAlive == 0) {
+        if (raid.postRaidTicks < Raid::kPostRaidTicks) {
+            ++raid.postRaidTicks;
+        } else {
+            raid.status = RaidStatus::Victory;
+            rewardHeroes(world, raid);
+        }
+    }
+    if (raid.totalRaidersAlive() > 0) {
+        updateBossbar(world, raid);
+    }
+    world.raids().dirty = true;
+}
+
+void RaidSystem::tickCelebration(world::LoadedWorld& world, Raid& raid) {
+    if (++raid.celebrationTicks >= Raid::kCelebrationTicks) {
+        raid.stop();
+        removeAllBarPlayers(world, raid);
+        return;
+    }
+    if (raid.celebrationTicks % kSecond != 0) {
+        return;
+    }
+    updatePlayers(world, raid);
+    setBarVisible(world, raid, true);
+    if (raid.status == RaidStatus::Victory) {
+        setBarProgress(world, raid, 0.0F);
+        setBarName(world, raid, Component::translatable("event.minecraft.raid.victory.full"));
+    } else {
+        setBarName(world, raid, Component::translatable("event.minecraft.raid.defeat.full"));
+    }
+}
+
+void RaidSystem::moveCenterToVillageSection(world::LoadedWorld& world, Raid& raid) {
+    // parity: `SectionPos.cube` walks x fastest, then y, then z; the first nearest wins.
+    const std::int32_t sectionX = raid.center[0] >> 4;
+    const std::int32_t sectionY = raid.center[1] >> 4;
+    const std::int32_t sectionZ = raid.center[2] >> 4;
+    std::optional<RaidPos> best;
+    double bestDistance = 0.0;
+    for (std::int32_t z = sectionZ - kSectionRadius; z <= sectionZ + kSectionRadius; ++z) {
+        for (std::int32_t y = sectionY - kSectionRadius; y <= sectionY + kSectionRadius; ++y) {
+            for (std::int32_t x = sectionX - kSectionRadius; x <= sectionX + kSectionRadius; ++x) {
+                if (world.state().poi().sectionsToVillage(x, y, z) > 1) {
+                    continue;
+                }
+                const RaidPos center{(x << 4) + 8, (y << 4) + 8, (z << 4) + 8};
+                const auto dx = static_cast<double>(center[0] - raid.center[0]);
+                const auto dy = static_cast<double>(center[1] - raid.center[1]);
+                const auto dz = static_cast<double>(center[2] - raid.center[2]);
+                const double distance = (dx * dx) + (dy * dy) + (dz * dz);
+                if (!best.has_value() || distance < bestDistance) {
+                    best = center;
+                    bestDistance = distance;
+                }
+            }
+        }
+    }
+    if (best.has_value()) {
+        raid.center = *best;
     }
 }
 
 void RaidSystem::tickOmens(world::LoadedWorld& world, PlayerSession& player, const world::ActiveEffect& active) {
-    if (player.gamemode == Gamemode::Spectator) {
-        return;
-    }
     if (active.effect == world::mobEffects::badOmen()) {
-        if (world.difficulty() == "peaceful") {
+        const RaidPos pos = blockOf(player.x, player.y, player.z);
+        if (player.gamemode == Gamemode::Spectator || world.difficulty() == "peaceful" || !isVillage(world, pos)) {
             return;
         }
-        // The effect's own countdown is the clock here: it runs whether or not the day does.
-        if (active.remainingTicks % kVillageCheckInterval != 0 || !isVillage(world, player.x, player.y, player.z)) {
+        const Raid* raid = world.raids().nearby(pos);
+        if (raid != nullptr && raid->raidOmenLevel >= Raid::kMaxOmenLevel) {
             return;
         }
-        const Raid* raid = raidsIn(world).nearby(player.x, player.y, player.z);
-        if (raid != nullptr && raid->omenLevel >= Raid::kMaxOmenLevel) {
-            return;
+        if (player.connection().addEffect) {
+            player.connection().addEffect(world::mobEffects::raidOmen(), kRaidOmenTicks, active.amplifier);
         }
+        player.raidOmenPosition = pos;
+        // parity: `applyEffectTick` answering false takes the bad omen away.
         player.effects.erase(world::mobEffects::badOmen());
         if (player.connection().sendEffectRemoved) {
             player.connection().sendEffectRemoved(world::mobEffects::badOmen());
         }
-        player.raidOmenPosition = std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(player.x)),
-                                                              static_cast<std::int32_t>(std::floor(player.y)),
-                                                              static_cast<std::int32_t>(std::floor(player.z))};
-        if (player.connection().addEffect) {
-            player.connection().addEffect(world::mobEffects::raidOmen(), kRaidOmenTicks, active.amplifier);
-        }
         return;
     }
-    if (active.effect != world::mobEffects::raidOmen() || active.remainingTicks > 1 ||
-        !player.raidOmenPosition.has_value()) {
+    if (active.effect != world::mobEffects::raidOmen() || active.remainingTicks != 1 ||
+        player.gamemode == Gamemode::Spectator || !player.raidOmenPosition.has_value()) {
         return;
     }
-    const std::array<std::int32_t, 3> position = *player.raidOmenPosition;
+    const RaidPos position = *player.raidOmenPosition;
+    static_cast<void>(createOrExtendRaid(world, player, position, active.amplifier));
     player.raidOmenPosition.reset();
-    const Raid* raid =
-        raidsIn(world).createOrExtend(position[0], position[1], position[2], active.amplifier, world.difficulty());
-    if (raid != nullptr) {
-        logger_.debug([&] {
-            return "Raid at " + std::to_string(raid->centerX()) + ", " + std::to_string(raid->centerY()) + ", " +
-                   std::to_string(raid->centerZ()) + " in world '" + world.name() +
-                   "': " + std::to_string(raid->totalGroups()) + " wave(s), omen level " +
-                   std::to_string(raid->omenLevel);
-        });
-    }
 }
 
-bool RaidSystem::isVillage(world::LoadedWorld& world, double x, double y, double z) {
-    return world.state().poi().isVillage(world::poi::BlockPos{static_cast<std::int32_t>(std::floor(x)),
-                                                              static_cast<std::int32_t>(std::floor(y)),
-                                                              static_cast<std::int32_t>(std::floor(z))});
+Raid* RaidSystem::createOrExtendRaid(world::LoadedWorld& world, PlayerSession& player, const RaidPos& position,
+                                     std::int32_t amplifier) {
+    // parity: `gameplay/can_start_raid`, which only the Nether's dimension type turns off.
+    if (player.gamemode == Gamemode::Spectator || !world.gameRules().get(world::gameRules::kRaids) ||
+        world.declaration().dimension == config::WorldDimension::Nether) {
+        return nullptr;
+    }
+    std::vector<world::poi::PoiRecord> points;
+    world.state().poi().inRange(world::poi::poiTypes::kVillage,
+                                world::poi::BlockPos{position[0], position[1], position[2]}, kVillageSearch,
+                                world::poi::Occupancy::kIsOccupied, points);
+    RaidPos center = position;
+    if (!points.empty()) {
+        double sumX = 0.0;
+        double sumY = 0.0;
+        double sumZ = 0.0;
+        for (const world::poi::PoiRecord& point : points) {
+            sumX += point.pos.x;
+            sumY += point.pos.y;
+            sumZ += point.pos.z;
+        }
+        const double scale = 1.0 / static_cast<double>(points.size());
+        center = blockOf(sumX * scale, sumY * scale, sumZ * scale);
+    }
+    entity::RaidManager& manager = world.raids();
+    Raid* raid = manager.nearby(center);
+    if (raid == nullptr) {
+        const std::int32_t id = manager.add(std::make_unique<Raid>(
+            center, entity::raidWaves::groupsFor(world.difficulty()), options_.nextSeed ? options_.nextSeed() : 0));
+        raid = manager.get(id);
+    }
+    if (!raid->started || raid->raidOmenLevel < Raid::kMaxOmenLevel) {
+        raid->absorbOmen(amplifier);
+        if (!raid->hasFirstWaveSpawned() && hooks_.raidTriggered) {
+            hooks_.raidTriggered(player);
+        }
+    }
+    manager.dirty = true;
+    logger_.debug([&] {
+        return "Raid at " + std::to_string(raid->center[0]) + ", " + std::to_string(raid->center[1]) + ", " +
+               std::to_string(raid->center[2]) + " in world '" + world.name() + "', omen level " +
+               std::to_string(raid->raidOmenLevel);
+    });
+    return raid;
 }
 
 } // namespace basalt::server::runtime

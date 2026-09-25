@@ -47,7 +47,9 @@ CREATE TABLE IF NOT EXISTS player (
     -- written whole, exactly like the inventory blob above it.
     tags TEXT,
     -- The screen shaders /posteffect put on them, comma-separated, in the order they were added.
-    post_effects TEXT
+    post_effects TEXT,
+    -- How close they are to a warden: ticks since the last warning, the level and the cooldown.
+    warden_spawn_tracker TEXT
 );
 
 -- Name lookup is how an operator refers to a player; the others are what the admin queries scan.

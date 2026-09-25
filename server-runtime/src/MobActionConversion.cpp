@@ -14,8 +14,13 @@
 #include <basalt/server/runtime/entity/villager/Gossips.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/MobLocalDifficulty.hpp>
+#include <basalt/server/runtime/world/MobSpawnFinalization.hpp>
+#include <basalt/server/runtime/world/NaturalSpawner.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -220,6 +225,7 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
     }
     converted->persistent = converted->persistent || conversion.persistent;
     converted->sourceNbt = tag;
+    finalizeConverted(world, mob, *converted, conversion);
     // parity: the nausea a zombified piglin or a zoglin wakes up with.
     if (conversion.nausea) {
         static_cast<void>(entity::mobStatusEffects::add(
@@ -227,9 +233,21 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
             world::ActiveEffect{.effect = wire::common::Identifier::vanilla("nausea"), .remainingTicks = 200}));
     }
     const bool silent = mob.sourceNbt.has_value() && mob.sourceNbt->getBoolean("Silent");
+    if (!conversion.sound.empty() && !silent && (!conversion.quietInPeace || world.difficulty() != "peaceful")) {
+        random::RandomSource voice = freshRandom();
+        // parity: `Mob.makeSound`, at the mob's own voice pitch; a grown tadpole's is a plain one.
+        const float pitch = conversion.soundVolume != 1.0F
+                                ? 1.0F
+                                : ((voice.nextFloat() - voice.nextFloat()) * 0.2F) + (mob.age < 0 ? 1.5F : 1.0F);
+        playSound(world, mob, conversion.sound, conversion.soundVolume, pitch);
+    }
+    carryOver(world, watchers, mob, *converted);
     // parity: `SINGLE` discards the old mob; it neither dies nor drops anything.
     mob.removed = true;
-    static_cast<void>(world.state().spawnEntity(std::move(converted)));
+    ServerEntity& spawned = world.state().spawnEntity(std::move(converted));
+    if (conversion.finalize == conversions::Conversion::Finalize::CuredVillager) {
+        villagerCured(world, mob, spawned);
+    }
     if (conversion.levelEvent != 0 && !silent) {
         const std::int32_t x = mth::floor(mob.x);
         const std::int32_t y = mth::floor(mob.y);
@@ -263,7 +281,8 @@ bool MobActionSystem::infectVillager(world::LoadedWorld& world, const ServerEnti
     const bool silent = zombie.sourceNbt.has_value() && zombie.sourceNbt->getBoolean("Silent");
     const wire::nbt::NbtCompound villagerData = entity::entityNbt::encode(villager);
     const conversions::Conversion conversion{.into = wire::common::Identifier::vanilla("zombie_villager"),
-                                             .levelEvent = silent ? 0 : kInfectionEvent};
+                                             .levelEvent = silent ? 0 : kInfectionEvent,
+                                             .finalize = conversions::Conversion::Finalize::ZombieVillager};
     const bool converted =
         convertMob(world, watchersOf(world), villager, conversion, [&villagerData](wire::nbt::NbtCompound& tag) {
             for (const std::string_view key : {"VillagerData", "Offers", "Gossips", "Xp"}) {
@@ -303,8 +322,14 @@ bool MobActionSystem::addMobEffect(world::LoadedWorld& world, const std::vector<
         }
         return true;
     }
-    static_cast<void>(world);
-    return entity::mobStatusEffects::add(mob, effect);
+    const bool fresh = !mob.effects.contains(effect.effect);
+    const bool changed = entity::mobStatusEffects::add(mob, effect);
+    // parity: `MobEffect.onEffectAdded`, the three omens' sound when one is newly given.
+    const std::string_view path = effect.effect.path();
+    if (fresh && changed && (path == "bad_omen" || path == "trial_omen" || path == "raid_omen")) {
+        playSound(world, mob, "event.mob_effect." + std::string{path});
+    }
+    return changed;
 }
 
 void MobActionSystem::tickMobEffects(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
@@ -406,6 +431,154 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
                                                .index = kCreeperPoweredIndex,
                                                .value = SetEntityDataPacket::BoolValue{.value = true}}}});
     }
+}
+
+void MobActionSystem::carryOver(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                ServerEntity& from, ServerEntity& to) {
+    // parity: `ConversionType.SINGLE`: the first passenger climbs onto the new mob, the rest get
+    // off, and the new one takes the old one's seat.
+    for (std::size_t index = 0; index < from.passengerIds.size(); ++index) {
+        const std::int32_t passengerId = from.passengerIds[index];
+        ServerEntity* passenger = world.state().entity(passengerId);
+        PlayerSession* rider = nullptr;
+        for (PlayerSession* player : watchers) {
+            if (player->entityId() == passengerId) {
+                rider = player;
+            }
+        }
+        if (index == 0) {
+            to.passengerIds.push_back(passengerId);
+            if (passenger != nullptr) {
+                passenger->vehicleId = to.entityId();
+            }
+            if (rider != nullptr) {
+                rider->vehicleId = to.entityId();
+            }
+        } else if (passenger != nullptr) {
+            passenger->vehicleId.reset();
+        } else if (rider != nullptr) {
+            rider->vehicleId.reset();
+        }
+    }
+    from.passengerIds.clear();
+    if (from.vehicleId.has_value()) {
+        if (ServerEntity* vehicle = world.state().entity(*from.vehicleId); vehicle != nullptr) {
+            std::ranges::replace(vehicle->passengerIds, from.entityId(), to.entityId());
+            to.vehicleId = vehicle->entityId();
+        }
+        from.vehicleId.reset();
+    }
+    to.leashHolderId = from.leashHolderId;
+    to.leashHolderUuid = from.leashHolderUuid;
+    to.lastHurtByPlayer = from.lastHurtByPlayer;
+    to.lastHurtByPlayerTime = from.lastHurtByPlayerTime;
+    to.fireTicks = from.fireTicks;
+    to.sleeping = from.sleeping;
+    // parity: `ConversionParams.team`, the old mob's team, which the new one joins.
+    if (hooks_.teamCarried) {
+        hooks_.teamCarried(from.uuid().toString(), to.uuid().toString());
+    }
+}
+
+void MobActionSystem::finalizeConverted(world::LoadedWorld& world, const ServerEntity& from, ServerEntity& to,
+                                        const conversions::Conversion& conversion) {
+    using Finalize = conversions::Conversion::Finalize;
+    if (conversion.finalize == Finalize::None) {
+        return;
+    }
+    random::RandomSource random = freshRandom();
+    wire::nbt::NbtCompound& data = *to.sourceNbt;
+    const std::int32_t bx = mth::floor(to.x);
+    const std::int32_t by = mth::floor(to.y);
+    const std::int32_t bz = mth::floor(to.z);
+    if (conversion.finalize == Finalize::Frog) {
+        // parity: `Frog.finalizeSpawn`, the variant for the biome it grew up in and its memories.
+        world::MobSpawnContext context;
+        context.random = &random;
+        context.difficulty = std::string{world.difficulty()};
+        context.biome = world::naturalSpawner::biomeAt(world, bx, by, bz);
+        context.gameTime = world.gameTime();
+        context.entityRandomFactory = [this] { return freshRandom(); };
+        world::MobSpawnGroupData group;
+        static_cast<void>(
+            world::mobVariantSpawnFinalizer::beforeCommon("frog", context, group, data, bx, by, bz, random));
+    }
+    // parity: `ZombieVillager.finalizeSpawn` under `Zombie.finalizeSpawn(CONVERSION)`: never a baby,
+    // no gear, but the doors, the reinforcements and a leader's bonus all rolled.
+    const server::world::Chunk* chunk = world.state().chunkIfLoaded(bx >> 4, bz >> 4);
+    const float special = world::mobLocalDifficulty::specialMultiplier(
+        world.difficulty(), world.gameTime(), chunk == nullptr ? 0 : chunk->inhabitedTime(),
+        world::naturalSpawner::surfaceSlimeChance(world.clock().totalTicks()) * 2.0F);
+    const auto modifier = [&to](std::string_view attribute, std::string_view id, double amount,
+                                entity::AttributeOperation operation) {
+        to.attributeModifiers[std::string{attribute}].insert_or_assign(
+            std::string{id},
+            entity::AttributeModifier{.id = std::string{id}, .amount = amount, .operation = operation});
+    };
+    // parity: `Mob.finalizeSpawn`, the follow range bonus and the left hand.
+    modifier("minecraft:follow_range", "minecraft:random_spawn_bonus", random.triangle(0.0, 0.11485000000000001),
+             entity::AttributeOperation::AddMultipliedBase);
+    data.putBoolean("LeftHanded", random.nextFloat() < 0.05F);
+    if (conversion.finalize != Finalize::ZombieVillager) {
+        return;
+    }
+    static_cast<void>(from);
+    data.putBoolean("CanBreakDoors", random.nextFloat() < special * 0.1F);
+    to.attributeValues["minecraft:spawn_reinforcements"] = random.nextDouble() * static_cast<double>(0.1F);
+    modifier("minecraft:knockback_resistance", "minecraft:random_spawn_bonus",
+             random.nextDouble() * static_cast<double>(0.05F), entity::AttributeOperation::AddValue);
+    const double followBonus = random.nextDouble() * 1.5 * static_cast<double>(special);
+    if (followBonus > 1.0) {
+        modifier("minecraft:follow_range", "minecraft:zombie_random_spawn_bonus", followBonus,
+                 entity::AttributeOperation::AddMultipliedTotal);
+    }
+    if (random.nextFloat() < special * 0.05F) {
+        modifier("minecraft:spawn_reinforcements", "minecraft:leader_zombie_bonus", (random.nextDouble() * 0.25) + 0.5,
+                 entity::AttributeOperation::AddValue);
+        modifier("minecraft:max_health", "minecraft:leader_zombie_bonus", (random.nextDouble() * 3.0) + 1.0,
+                 entity::AttributeOperation::AddMultipliedTotal);
+        data.putBoolean("CanBreakDoors", true);
+    }
+}
+
+void MobActionSystem::villagerCured(world::LoadedWorld& world, const ServerEntity& zombie, ServerEntity& villager) {
+    // parity: `dropPreservedEquipment`: what the zombie picked up up falls out, as the cured
+    // villager wears nothing.
+    const wire::nbt::NbtCompound saved = entity::entityNbt::encode(zombie);
+    const wire::nbt::NbtCompound* equipment = saved.getCompound("equipment");
+    const wire::nbt::NbtCompound* chances = saved.getCompound("drop_chances");
+    if (equipment != nullptr) {
+        for (const std::string& slot : equipment->names()) {
+            const wire::nbt::NbtCompound* stack = equipment->getCompound(slot);
+            // parity: `DropChances.isPreserved`, a chance over one, which is what picking up gives.
+            if (stack == nullptr || chances == nullptr || chances->getFloat(slot, 0.0F) <= 1.0F) {
+                continue;
+            }
+            const std::optional<server::world::loot::ItemStack> item = world::blockInventory::readStack(*stack);
+            if (!item.has_value()) {
+                continue;
+            }
+            world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
+                                                       .uuid = wire::common::Uuid::random(),
+                                                       .item = item->item,
+                                                       .count = item->count,
+                                                       .x = zombie.x,
+                                                       .y = zombie.y,
+                                                       .z = zombie.z,
+                                                       .components = item->components});
+        }
+    }
+    const std::span<const std::int32_t> starter = zombie.sourceNbt.has_value()
+                                                      ? zombie.sourceNbt->getIntArray("ConversionPlayer")
+                                                      : std::span<const std::int32_t>{};
+    if (starter.size() == 4 && hooks_.curedZombieVillager) {
+        const auto half = [&starter](std::size_t at) {
+            return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(starter[at])) << 32U) |
+                   static_cast<std::uint32_t>(starter[at + 1]);
+        };
+        hooks_.curedZombieVillager(wire::common::Uuid{half(0), half(2)});
+    }
+    static_cast<void>(villager);
 }
 
 } // namespace basalt::server::runtime

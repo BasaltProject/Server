@@ -186,7 +186,7 @@ void BlazeAttackGoal::tick(MobContext& mob) {
         return;
     }
     const double distance = mob.distanceSquaredTo(target->x, target->y, target->z);
-    const double follow = mob.mob.attributeWithModifiers("follow_range");
+    const double follow = mob.mob.attributeWithModifiers("minecraft:follow_range");
     if (distance < kMeleeSquared) {
         if (attackTime_ <= 0) {
             attackTime_ = kMeleeInterval;

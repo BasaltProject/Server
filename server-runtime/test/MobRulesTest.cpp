@@ -182,9 +182,9 @@ TEST_CASE("what keeps a mob in the world without anybody asking for it") {
     cow.owner = "an-owner";
     CHECK(mobPersistence::requiresCustomPersistence(cow));
     cow.owner.reset();
-    cow.raidCenter = std::array<std::int32_t, 3>{1, 2, 3};
+    cow.raidId = 2;
     CHECK(mobPersistence::requiresCustomPersistence(cow));
-    cow.raidCenter.reset();
+    cow.raidId.reset();
     CHECK_FALSE(mobPersistence::requiresCustomPersistence(cow));
 }
 

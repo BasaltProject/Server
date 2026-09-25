@@ -23,7 +23,7 @@ void MobActionSystem::tickVillager(world::LoadedWorld& world, entity::ServerEnti
                                    .dayTime = world.clock().totalTicks(),
                                    .gameTime = world.gameTime(),
                                    .raidNearby =
-                                       raids_->raidsIn(world).nearby(villager.x, villager.y, villager.z) != nullptr,
+                                       RaidSystem::raidAt(world, villager.x, villager.y, villager.z) != nullptr,
                                    .speed = villager.attributeWithModifiers(entity::attribute::kMovementSpeed)};
     entity::villager::villagerBrain::tick(context, villagersIn(world));
     travelMob(world, villager, context.speed);
@@ -53,6 +53,29 @@ void MobActionSystem::villagerDied(world::LoadedWorld& world, entity::ServerEnti
     random::RandomSource random = freshRandom();
     entity::ai::MobContext context = quietTurn(world, villager, *this, random);
     entity::villager::villagerBrain::died(context, villagersIn(world), killerUuid);
+}
+
+void MobActionSystem::recruitRaiders(entity::ServerEntity& raider) {
+    if (world::LoadedWorld* world = worldOf(raider); world != nullptr) {
+        raids_->recruitAround(*world, raider);
+    }
+}
+
+void MobActionSystem::takeRaidBanner(entity::ServerEntity& raider, std::int32_t itemId) {
+    if (world::LoadedWorld* world = worldOf(raider); world != nullptr) {
+        raids_->takeBanner(*world, raider, itemId);
+    }
+}
+
+void MobActionSystem::setCelebrating(entity::ServerEntity& raider, bool celebrating) {
+    RaidSystem::setCelebrating(raider, celebrating);
+    if (world::LoadedWorld* world = worldOf(raider); world != nullptr) {
+        // parity: `Raider.IS_CELEBRATING`, index sixteen.
+        sendEntityData(
+            *world, raider.entityId(),
+            wire::protocol::play::SetEntityDataPacket::Entry{
+                .index = 16, .value = wire::protocol::play::SetEntityDataPacket::BoolValue{.value = celebrating}});
+    }
 }
 
 void MobActionSystem::releaseVillagerPois(world::LoadedWorld& world, entity::ServerEntity& villager) {
