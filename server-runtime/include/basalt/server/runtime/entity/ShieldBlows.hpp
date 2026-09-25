@@ -31,6 +31,10 @@ struct Reply {
 [[nodiscard]] Reply blocked(ServerEntity& attacker, double defenderX, double defenderZ, double defenderResistance,
                             random::RandomSource& random);
 
+/// parity: `HoglinBase.throwTarget`, the toss at the end of a hoglin's or zoglin's blow.
+[[nodiscard]] std::optional<Push> hoglinThrow(const ServerEntity& body, double targetX, double targetZ,
+                                              double resistance, random::RandomSource& random);
+
 /// parity: `Ravager.strongKnockback`.
 [[nodiscard]] Push strongKnockback(const ServerEntity& ravager, double targetX, double targetZ);
 

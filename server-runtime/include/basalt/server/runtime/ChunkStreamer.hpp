@@ -4,6 +4,7 @@
 #include <basalt/server/world/ChunkTracker.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <mutex>
 #include <set>
@@ -14,17 +15,14 @@ namespace basalt::server::runtime {
 
 class ClientSession;
 
-/// The chunk-streaming state and its packets: view radius, the tracker, the queue of chunks
-/// generated but not yet on the wire, and the client's own reported chunks-per-tick budget.
-///
-/// Entering play, respawning and switching worlds each reset this differently enough (waiting for
-/// the ground, re-centering, dropping the old world's queue) that each gets its own method here
-/// rather than one shared reset.
+/// The chunk-streaming state and its packets: view radius, tracker, the queue of chunks generated but
+/// not yet sent, and the client's own chunks-per-tick budget. Entering play, respawning and switching
+/// worlds each reset it differently, hence one method each.
 class ChunkStreamer {
 public:
     explicit ChunkStreamer(ClientSession& owner);
 
-    /// The chunk-radius half of a fresh join, seeding the tracker with the square about to be sent.
+    /// The chunk-radius half of a fresh join, seeding the tracker with the view about to be sent.
     [[nodiscard]] server::world::ChunkTracker::Delta initialJoin(double x, double z, std::int32_t radius);
 
     void sendInitialChunks(const server::world::ChunkTracker::Delta& initialChunks);
@@ -39,6 +37,10 @@ public:
     /// New biomes for these columns without resending the columns themselves.
     void sendBiomes(const std::vector<std::pair<std::int32_t, std::int32_t>>& chunks);
 
+    /// parity: `ServerPlayer.requestedViewDistance`, from the client's settings, which narrows the
+    /// view to `ChunkMap.getPlayerViewDistance`: between two and the server's own distance.
+    void setRequestedViewDistance(std::int32_t distance);
+
     /// Asks for whatever the player has walked into view of, and forgets what they walked out of.
     void streamChunksAround(double x, double z);
 
@@ -50,7 +52,16 @@ public:
     float sendBudget = 0.0F;
 
 private:
+    /// parity: `ChunkMap.getPlayerViewDistance`'s floor.
+    static constexpr std::int32_t kMinViewDistance = 2;
+
     [[nodiscard]] std::int64_t squaredDistanceToCenter(std::int32_t chunkX, std::int32_t chunkZ) const;
+
+    /// The distance the tracked view is drawn at, which the client's own setting may narrow.
+    [[nodiscard]] std::int32_t trackedRadius() const;
+
+    /// Queues what came into view and forgets what left it.
+    void applyDelta(const server::world::ChunkTracker::Delta& delta);
 
     void sendChunk(server::world::Chunk& chunk);
 
@@ -63,6 +74,8 @@ private:
     ClientSession* owner_;
     server::world::ChunkTracker chunkTracker_;
     std::int32_t viewRadius_ = 0;
+    /// parity: `ServerPlayer.requestedViewDistance`, two until the client says otherwise.
+    std::int32_t requestedViewDistance_ = kMinViewDistance;
     std::int32_t centerChunkX_ = 0;
     std::int32_t centerChunkZ_ = 0;
     /// Requested from the generation queue, not yet on the wire. Both this connection's thread and

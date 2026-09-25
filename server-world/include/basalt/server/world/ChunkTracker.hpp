@@ -15,17 +15,13 @@ struct ChunkPos {
     friend std::strong_ordering operator<=>(const ChunkPos&, const ChunkPos&) = default;
 };
 
-/// Which chunks one player should have loaded, as a load and unload delta whenever their view
-/// centre or distance changes. It decides the set only: no packets, no chunk data, and not
-/// vanilla's nearest-first spiral, which affects how fast terrain appears rather than correctness.
+/// Which chunks one player should have loaded, as a load/unload delta when their view changes. The set
+/// only: no packets, and not vanilla's nearest-first order, which affects speed rather than correctness.
 ///
-/// The set is a square, Chebyshev distance at most `radius`, as `SetChunkCacheRadiusPacket`
-/// declares it. Vanilla's circular area with its ticket falloff is a documented gap.
+/// parity: `ChunkTrackingView.Positioned`, a cylinder with the neighbour ring `contains` counts in.
 class ChunkTracker {
 public:
-    /// Both lists come out sorted by x then z. The frozen Kotlin emitted them in the order its
-    /// insertion-ordered set happened to hold, which was an artifact of that container rather than
-    /// anything vanilla promises: vanilla sends a nearest-first spiral, which neither does.
+    /// Both lists sorted by x then z, not vanilla's nearest-first spiral.
     struct Delta {
         std::vector<ChunkPos> toLoad;
         std::vector<ChunkPos> toUnload;
@@ -37,6 +33,11 @@ public:
     /// needs this: the client discards its own level when it respawns, so chunks it was previously
     /// sent are gone on its side while this tracker still believed it had them.
     void reset() { loadedChunks_.clear(); }
+
+    /// parity: `ChunkTrackingView.isWithinDistance`: each axis less the buffer, squared, under the
+    /// view distance squared. `includeNeighbors` is the one-chunk ring the tracked set carries.
+    [[nodiscard]] static bool isWithinDistance(std::int32_t centerX, std::int32_t centerZ, std::int32_t viewDistance,
+                                               std::int32_t chunkX, std::int32_t chunkZ, bool includeNeighbors);
 
     /// Refuses a negative radius: that is a caller bug, not a view the server can serve.
     [[nodiscard]] Delta update(std::int32_t centerX, std::int32_t centerZ, std::int32_t radius);

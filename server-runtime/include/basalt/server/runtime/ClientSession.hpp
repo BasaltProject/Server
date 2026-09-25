@@ -648,6 +648,8 @@ private:
     std::optional<wire::auth::SessionProfile> pendingProfile_;
     std::int8_t pendingSkinParts_ = static_cast<std::int8_t>(0x7F);
     std::int32_t pendingChatVisibility_ = 0;
+    /// parity: `ClientInformation.viewDistance`, kept until the chunk view exists to take it.
+    std::int32_t pendingViewDistance_ = 2;
     /// This connection's secure chat, from the moment there is a player to sign for.
     std::unique_ptr<chat::SecureChat> secureChat_;
     chat::ChatThrottle chatSpam_;

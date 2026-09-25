@@ -422,13 +422,14 @@ void ClientSession::handleConfiguration(std::int32_t packetId, wire::io::ByteBuf
         return;
     }
     if (packetId == wire::protocol::configuration::ClientInformationPacket::kId) {
-        // Read even here, before the player exists: it is where the skin layer mask arrives, and it
-        // is the only thing this build takes from client settings.
+        // Read even here, before the player exists: it is where the skin layer mask, the chat
+        // setting and the view distance first arrive.
         const std::optional<wire::protocol::configuration::ClientInformationPacket> information =
             wire::protocol::configuration::ClientInformationPacket::read(body);
         if (information.has_value()) {
             pendingSkinParts_ = static_cast<std::int8_t>(information->skinParts);
             pendingChatVisibility_ = information->chatFlags;
+            pendingViewDistance_ = information->viewDistance;
         }
     }
 }

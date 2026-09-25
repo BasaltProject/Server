@@ -194,6 +194,14 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.slotChanged = [this](const PlayerSession&, const std::int32_t slot) { owner_->sendInventorySlot(slot); };
     context.stopDigging = [this] { stopDigging(); };
     context.dismount = [this](player::PlayerSession& player) { owner_->dismount(player); };
+    context.guardedBroken = [this](world::LoadedWorld& world, const PlayerSession& player, const std::int32_t stateId) {
+        MobActionSystem* mobs = owner_->options().mobs;
+        const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+        if (mobs != nullptr && block != nullptr &&
+            mobs->blockTagged("minecraft:guarded_by_piglins", *block).value_or(false)) {
+            mobs->angerNearbyPiglins(world, player, false);
+        }
+    };
     context.hiveBroken = [this](world::LoadedWorld& world, const PlayerSession& player, const std::int32_t x,
                                 const std::int32_t y, const std::int32_t z, const std::int32_t stateId,
                                 const wire::nbt::NbtCompound& hive, const bool silkTouch) {

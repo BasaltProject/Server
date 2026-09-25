@@ -187,7 +187,12 @@ basalt_module(server-runtime-core
         src/MobActionWarden.cpp
         src/MobDeathLoot.cpp
         src/MobActionAllay.cpp
+        src/MobActionAxolotl.cpp
         src/MobActionBees.cpp
+        src/MobActionHoglin.cpp
+        src/MobActionNeutral.cpp
+        src/MobActionPiglin.cpp
+        src/MobActionPiglinItems.cpp
         src/MobActionCopperGolem.cpp
         src/MobActionShulker.cpp
         src/MobActionGifts.cpp
@@ -391,6 +396,8 @@ basalt_module(server-runtime-core
         src/world/Explosions.cpp
         src/world/AdvancementTriggers.cpp
         src/world/TriggerFacts.cpp
+        src/world/BlockPickData.cpp
+        src/player/PlayerTotem.cpp
         src/world/Anvils.cpp
         src/world/Beacons.cpp
         src/world/Beehives.cpp
@@ -503,6 +510,9 @@ basalt_module(server-runtime-core
         src/entity/WardenBrain.cpp
         src/entity/Allays.cpp
         src/entity/Bees.cpp
+        src/entity/MobEquipment.cpp
+        src/entity/NeutralAnger.cpp
+        src/entity/Piglins.cpp
         src/entity/CopperGolem.cpp
         src/entity/EntityCombat.cpp
         src/entity/MobBrain.cpp
@@ -546,6 +556,8 @@ basalt_module(server-runtime-core
         src/entity/ai/CopperGolemGoals.cpp
         src/entity/ai/BeeGoals.cpp
         src/entity/ai/BeeNavigation.cpp
+        src/entity/ai/BrainKit.cpp
+        src/entity/ai/NeutralGoals.cpp
         src/entity/ai/DoorInteraction.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
@@ -1053,6 +1065,12 @@ basalt_test(server-runtime-allays-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-piglins-test
+    SOURCES
+        test/PiglinsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-bees-test
     SOURCES
         test/BeesTest.cpp
@@ -1439,6 +1457,12 @@ basalt_test(server-runtime-player-stats-test
 basalt_test(server-runtime-player-arrow-pickup-test
     SOURCES
         test/PlayerArrowPickupTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-block-pick-data-test
+    SOURCES
+        test/BlockPickDataTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

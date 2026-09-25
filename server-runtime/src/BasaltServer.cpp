@@ -821,6 +821,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                                                    .recipes = &vanillaData_.recipes,
                                                                    .damageTypeTags = &vanillaData_.damageTypeTags,
                                                                    .blockTags = &vanillaData_.blockTags,
+                                                                   .itemTags = &vanillaData_.itemTags,
                                                                    .villagerTrades = &vanillaData_.villagerTrades,
                                                                    .advancementTriggers = advancementTriggers_.get()});
     shriekers_ = std::make_unique<ShriekerSystem>(playerRegistry_, *broadcaster_, *spawning_, *mobActions_,

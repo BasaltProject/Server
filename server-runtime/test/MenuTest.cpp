@@ -142,12 +142,13 @@ TEST_CASE("a crafter has nine and no result to take from") {
     checkPlayerSlotsFrom(menu, Menu::kCrafterSize);
 }
 
-TEST_CASE("a villager's three trading slots are nobody's container") {
+TEST_CASE("a villager's two payment slots and its result come before the player's own") {
     const Menu menu = Menu::merchant(9);
 
+    // parity: `MerchantMenu`, whose `MerchantContainer` holds the payments and the result.
     CHECK(menu.slotCount() == 39);
-    CHECK_FALSE(menu.slotAt(0).has_value());
-    CHECK_FALSE(menu.slotAt(2).has_value());
+    CHECK(menu.slotAt(0) == MenuSlot{menuSlot::Block{.index = 0}});
+    CHECK(menu.slotAt(2) == MenuSlot{menuSlot::Block{.index = 2}});
     checkPlayerSlotsFrom(menu, 3);
 }
 

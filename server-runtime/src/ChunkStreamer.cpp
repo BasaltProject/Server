@@ -47,7 +47,8 @@ server::world::ChunkTracker::Delta ChunkStreamer::initialJoin(double x, double z
     centerChunkX_ = static_cast<std::int32_t>(x) >> 4;
     centerChunkZ_ = static_cast<std::int32_t>(z) >> 4;
     viewRadius_ = radius;
-    server::world::ChunkTracker::Delta initialChunks = chunkTracker_.update(centerChunkX_, centerChunkZ_, viewRadius_);
+    server::world::ChunkTracker::Delta initialChunks =
+        chunkTracker_.update(centerChunkX_, centerChunkZ_, trackedRadius());
     owner_->sendCompressed(SetChunkCacheCenterPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         SetChunkCacheCenterPacket{.chunkX = centerChunkX_, .chunkZ = centerChunkZ_}.write(buffer);
     });
@@ -118,7 +119,8 @@ void ChunkStreamer::resetForRespawn(double spawnX, double spawnZ) {
     centerChunkX_ = static_cast<std::int32_t>(spawnX) >> 4;
     centerChunkZ_ = static_cast<std::int32_t>(spawnZ) >> 4;
     chunkTracker_.reset();
-    const server::world::ChunkTracker::Delta delta = chunkTracker_.update(centerChunkX_, centerChunkZ_, viewRadius_);
+    const server::world::ChunkTracker::Delta delta =
+        chunkTracker_.update(centerChunkX_, centerChunkZ_, trackedRadius());
     owner_->sendCompressed(SetChunkCacheCenterPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         SetChunkCacheCenterPacket{.chunkX = centerChunkX_, .chunkZ = centerChunkZ_}.write(buffer);
     });
@@ -140,7 +142,8 @@ void ChunkStreamer::resetForWorldSwitch(double x, double z, std::int32_t radius)
     centerChunkZ_ = static_cast<std::int32_t>(z) >> 4;
     viewRadius_ = radius;
     chunkTracker_.reset();
-    const server::world::ChunkTracker::Delta delta = chunkTracker_.update(centerChunkX_, centerChunkZ_, viewRadius_);
+    const server::world::ChunkTracker::Delta delta =
+        chunkTracker_.update(centerChunkX_, centerChunkZ_, trackedRadius());
     owner_->sendCompressed(SetChunkCacheCenterPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         SetChunkCacheCenterPacket{.chunkX = centerChunkX_, .chunkZ = centerChunkZ_}.write(buffer);
     });
@@ -246,6 +249,40 @@ void ChunkStreamer::sendChunk(Chunk& chunk) {
     });
 }
 
+std::int32_t ChunkStreamer::trackedRadius() const {
+    return std::clamp(requestedViewDistance_, kMinViewDistance, std::max(viewRadius_, kMinViewDistance));
+}
+
+void ChunkStreamer::setRequestedViewDistance(std::int32_t distance) {
+    if (distance == requestedViewDistance_) {
+        return;
+    }
+    requestedViewDistance_ = distance;
+    // Before the first join there is no view yet to move.
+    if (viewRadius_ > 0) {
+        applyDelta(chunkTracker_.update(centerChunkX_, centerChunkZ_, trackedRadius()));
+    }
+}
+
+void ChunkStreamer::applyDelta(const server::world::ChunkTracker::Delta& delta) {
+    {
+        const std::lock_guard<std::mutex> guard{chunkStreamMutex_};
+        pendingChunks_.insert(pendingChunks_.end(), delta.toLoad.begin(), delta.toLoad.end());
+        for (const ChunkPos& pos : delta.toUnload) {
+            std::erase(pendingChunks_, pos);
+        }
+    }
+    for (const ChunkPos& pos : delta.toLoad) {
+        owner_->generationQueue().request(pos.x, pos.z,
+                                          static_cast<std::int32_t>(squaredDistanceToCenter(pos.x, pos.z)));
+    }
+    for (const ChunkPos& pos : delta.toUnload) {
+        owner_->sendCompressed(ForgetLevelChunkPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            ForgetLevelChunkPacket{.chunkX = pos.x, .chunkZ = pos.z}.write(buffer);
+        });
+    }
+}
+
 void ChunkStreamer::streamChunksAround(double x, double z) {
     const std::int32_t chunkX = static_cast<std::int32_t>(x) >> 4;
     const std::int32_t chunkZ = static_cast<std::int32_t>(z) >> 4;
@@ -257,7 +294,7 @@ void ChunkStreamer::streamChunksAround(double x, double z) {
     centerChunkX_ = chunkX;
     centerChunkZ_ = chunkZ;
 
-    const server::world::ChunkTracker::Delta delta = chunkTracker_.update(chunkX, chunkZ, viewRadius_);
+    const server::world::ChunkTracker::Delta delta = chunkTracker_.update(chunkX, chunkZ, trackedRadius());
     if (delta.toLoad.empty() && delta.toUnload.empty()) {
         return;
     }

@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
+#include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -38,6 +39,14 @@ class RealRecipes;
 
 namespace basalt::server::runtime::entity::allays {
 struct AllayState;
+}
+
+namespace basalt::server::runtime::entity::piglins {
+struct PiglinState;
+}
+
+namespace basalt::server::runtime::entity::neutralAnger {
+struct Anger;
 }
 
 namespace basalt::server::runtime {
@@ -103,6 +112,8 @@ public:
         const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
         /// The block tags, which decide where a mob may teleport to.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
+        /// The item tags, which a piglin's likes and fears are read from.
+        const world::realItemTags::TagMembers* itemTags = nullptr;
         /// The jar's trade sets, which a villager's offers are rolled from.
         world::RealVillagerTrades* villagerTrades = nullptr;
         /// Where the triggers a mob's doing earns a player go: a hive broken, an allay's delivery.
@@ -342,6 +353,35 @@ public:
     /// parity: `Allay.dropEquipment`'s inventory, spilled where it died.
     void dropAllayInventory(world::LoadedWorld& world, const entity::ServerEntity& allay);
 
+    /// parity: `Piglin.customServerAiStep` and `PiglinBrute.customServerAiStep` over their brains.
+    void tickPiglin(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// parity: `PiglinAi.mobInteract`: a gold ingot handed over to admire. Answers whether it took one.
+    [[nodiscard]] bool useOnPiglin(world::LoadedWorld& world, player::PlayerSession& player,
+                                   entity::ServerEntity& piglin,
+                                   const std::optional<server::world::loot::ItemStack>& held);
+
+    /// parity: `PiglinAi.angerNearbyPiglins`, for a guarded container opened or a guarded block broken.
+    void angerNearbyPiglins(world::LoadedWorld& world, const player::PlayerSession& player, bool onlyIfSeen);
+
+    /// parity: `Piglin.dropCustomDeathLoot`'s inventory.
+    void dropPiglinInventory(world::LoadedWorld& world, const entity::ServerEntity& piglin);
+
+    /// parity: `Axolotl.customServerAiStep` over `AxolotlAi`.
+    void tickAxolotl(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// parity: `Axolotl.applySupportingEffects`.
+    void axolotlSupports(player::PlayerSession& player);
+
+    /// parity: `Hoglin.customServerAiStep` over `HoglinAi`.
+    void tickHoglin(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// parity: `HoglinAi.setAttackTarget`, the nearer of the two kept, for two hundred ticks.
+    void hoglinSetAttackTarget(world::LoadedWorld& world, entity::ServerEntity& hoglin, std::int32_t targetId);
+
+    /// parity: `ZombifiedPiglin.customServerAiStep`: the anger, its growl, its speed and the others called in.
+    void tickZombifiedPiglin(world::LoadedWorld& world, entity::ServerEntity& mob, random::RandomSource& random);
+
     /// The bee's own turn beyond its goals. parity: `Bee.customServerAiStep` and the rest of `Bee.aiStep`.
     void tickBee(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                  entity::ServerEntity& bee, random::RandomSource& random);
@@ -453,6 +493,49 @@ private:
 
     /// parity: the rest of `ZombieVillager.finishConversion`: the kept gear dropped and the trigger.
     void villagerCured(world::LoadedWorld& world, const entity::ServerEntity& zombie, entity::ServerEntity& villager);
+
+    /// parity: `NeutralMob.updatePersistentAnger`.
+    void updateNeutralAnger(world::LoadedWorld& world, entity::ServerEntity& mob, entity::neutralAnger::Anger& anger,
+                            random::RandomSource& random, bool stayAngry, std::int32_t minTicks, std::int32_t maxTicks);
+
+    /// Whether an item is in an item tag.
+    [[nodiscard]] bool itemTagged(std::string_view tag, const wire::common::Identifier& item) const;
+
+    /// One equipment slot to everybody watching, components and all.
+    void equipmentChanged(entity::ServerEntity& mob, std::uint8_t slot);
+
+    /// parity: `Mob.makeSound`: the mob's own voice, its volume and a pitch a baby raises.
+    void makeSound(world::LoadedWorld& world, const entity::ServerEntity& mob, std::string_view sound, float volume);
+
+    /// parity: `BehaviorUtils.throwItem(body, stack, target)` at 0.3, from 0.3 under the eyes.
+    void throwFromMob(world::LoadedWorld& world, const entity::ServerEntity& mob,
+                      const server::world::loot::ItemStack& stack, const std::array<double, 3>& target);
+
+    /// The piglin brain's pieces. parity: `PiglinAi` and `PiglinBruteAi`.
+    void piglinSense(world::LoadedWorld& world, entity::ai::MobContext& context, entity::piglins::PiglinState& state);
+    void piglinCore(world::LoadedWorld& world, entity::ai::MobContext& context, entity::piglins::PiglinState& state);
+    void piglinActivity(world::LoadedWorld& world, entity::ai::MobContext& context,
+                        entity::piglins::PiglinState& state);
+    void piglinIdle(world::LoadedWorld& world, entity::ai::MobContext& context, entity::piglins::PiglinState& state,
+                    bool moving);
+    void piglinFight(world::LoadedWorld& world, entity::ai::MobContext& context, entity::piglins::PiglinState& state);
+    void piglinPicksUp(world::LoadedWorld& world, entity::ServerEntity& piglin, entity::piglins::PiglinState& state);
+    void piglinStopHoldingOffhand(world::LoadedWorld& world, entity::ServerEntity& piglin,
+                                  entity::piglins::PiglinState& state, bool barter);
+    void piglinWasHurtBy(world::LoadedWorld& world, entity::ai::MobContext& context,
+                         entity::piglins::PiglinState& state, std::int32_t attackerId);
+    void piglinSetAngerTarget(world::LoadedWorld& world, entity::ServerEntity& piglin,
+                              entity::piglins::PiglinState& state, std::int32_t targetId);
+    void piglinBroadcastAnger(world::LoadedWorld& world, entity::ServerEntity& piglin,
+                              entity::piglins::PiglinState& state, std::int32_t targetId);
+    [[nodiscard]] std::optional<std::int32_t> piglinAttackTarget(world::LoadedWorld& world,
+                                                                 const entity::ai::MobContext& context,
+                                                                 entity::piglins::PiglinState& state);
+    [[nodiscard]] bool piglinWantsToPickUp(const entity::ServerEntity& piglin,
+                                           const entity::piglins::PiglinState& state,
+                                           const server::world::loot::ItemStack& stack, std::int64_t now) const;
+    bool piglinEquip(world::LoadedWorld& world, entity::ServerEntity& piglin,
+                     const server::world::loot::ItemStack& stack);
 
     /// parity: the allay's vibration user and `JukeboxListener`.
     void allayHears(world::LoadedWorld& world, entity::ServerEntity& allay, entity::allays::AllayState& state);

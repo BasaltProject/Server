@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/ShieldBlows.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -234,6 +235,12 @@ void MobActionSystem::hurtPlayer(ServerEntity& mob, std::int32_t playerId, float
     }
     // parity: `Bee.doHurtTarget` stings, with the whole of its attack damage cut to an int.
     const bool bee = entity::bees::isBee(mob.type());
+    // parity: `HoglinBase.hurtAndThrowTarget`: half the attack and a random share of the rest.
+    const bool tosses = (mob.type().path() == "hoglin" || mob.type().path() == "zoglin") && mob.age >= 0;
+    random::RandomSource toss = freshRandom();
+    if (tosses && static_cast<std::int32_t>(damage) > 0) {
+        damage = (damage / 2.0F) + static_cast<float>(toss.nextInt(static_cast<std::int32_t>(damage)));
+    }
     const std::int32_t invulnerableBefore = player->invulnerableTicks;
     const float healthBefore = player->health();
     const float lastHurtBefore = player->lastHurt;
@@ -244,9 +251,17 @@ void MobActionSystem::hurtPlayer(ServerEntity& mob, std::int32_t playerId, float
         bee ? kDeathSting : kDeathMob, bee ? world::damageTypes::kSting : world::damageTypes::kMobAttack,
         entity::DamageSource{
             .entityId = mob.entityId(), .x = mob.x, .z = mob.z, .name = entity::entityCombat::displayName(mob)});
-    if (bee && (player->invulnerableTicks != invulnerableBefore || player->health() != healthBefore ||
-                player->lastHurt != lastHurtBefore)) {
+    const bool landed = player->invulnerableTicks != invulnerableBefore || player->health() != healthBefore ||
+                        player->lastHurt != lastHurtBefore;
+    if (bee && landed) {
         beeStung(*world, mob, player, nullptr);
+    }
+    if (tosses && landed && player->connection().pushBack) {
+        if (const std::optional<entity::shieldBlows::Push> push =
+                entity::shieldBlows::hoglinThrow(mob, player->x, player->z, 0.0, toss);
+            push.has_value()) {
+            player->connection().pushBack(push->x, push->y, push->z, mob.yaw);
+        }
     }
     // parity: `OwnerHurtByTargetGoal`: a pet goes for whatever hit the person it follows.
     for (ServerEntity* pet : world->state().entities()) {
@@ -266,6 +281,11 @@ void MobActionSystem::hurtMob(ServerEntity& mob, ServerEntity& target, float dam
     }
     entity::entityCombat::blame(target, mob.entityId(), mob.entityId(), mob.type());
     const bool bee = entity::bees::isBee(mob.type());
+    const bool tosses = (mob.type().path() == "hoglin" || mob.type().path() == "zoglin") && mob.age >= 0;
+    random::RandomSource toss = freshRandom();
+    if (tosses && static_cast<std::int32_t>(damage) > 0) {
+        damage = (damage / 2.0F) + static_cast<float>(toss.nextInt(static_cast<std::int32_t>(damage)));
+    }
     const entity::entityCombat::Result result =
         entity::entityCombat::hurt(target, bee ? static_cast<float>(static_cast<std::int32_t>(damage)) : damage, mob.x,
                                    mob.z, hooks_.combat, bee ? "sting" : "mob_attack", mob.type().toString());
@@ -274,6 +294,15 @@ void MobActionSystem::hurtMob(ServerEntity& mob, ServerEntity& target, float dam
     }
     if (bee) {
         beeStung(*world, mob, nullptr, &target);
+    }
+    if (tosses) {
+        if (const std::optional<entity::shieldBlows::Push> push = entity::shieldBlows::hoglinThrow(
+                mob, target.x, target.z, target.attributeWithModifiers("minecraft:knockback_resistance"), toss);
+            push.has_value()) {
+            target.velocityX += push->x;
+            target.velocityY += push->y;
+            target.velocityZ += push->z;
+        }
     }
     target.hurtBy = mob.entityId();
     // parity: a tame wolf's bite counts as its owner's.
