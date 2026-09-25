@@ -338,8 +338,9 @@ bool BukkitBridge::deliver(const std::string& event, std::int32_t priority, Snap
         return false;
     }
     const std::vector<std::string>& names = snapshot.type->fields();
-    jobjectArray fields =
-        env->NewObjectArray(static_cast<jsize>(names.size()), env->FindClass("java/lang/Object"), nullptr);
+    jclass objectClass = env->FindClass("java/lang/Object");
+    jobjectArray fields = env->NewObjectArray(static_cast<jsize>(names.size()), objectClass, nullptr);
+    env->DeleteLocalRef(objectClass);
     for (std::size_t index = 0; index < names.size(); ++index) {
         jobject value = box(env, snapshot.values[index]);
         env->SetObjectArrayElement(fields, static_cast<jsize>(index), value);
