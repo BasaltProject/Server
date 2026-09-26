@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
@@ -179,6 +180,19 @@ void MobActionSystem::tickCamel(world::LoadedWorld& world, entity::ai::MobContex
         camel.velocityZ = 0.0;
         context.speed = 0.0;
     }
+}
+
+void MobActionSystem::camelRidden(world::LoadedWorld& world, ServerEntity& camel, const player::PlayerSession& rider) {
+    // parity: `Camel.tickRidden`: forward on the keys gets a settled sitting camel up.
+    CamelState& state = camels::stateOf(camel);
+    const std::int64_t now = world.gameTime();
+    const bool forward = rider.inputForward && !rider.inputBack;
+    if (!forward || !camels::sitting(state) || camels::poseTime(state, now) < camels::kSitDownTicks) {
+        return;
+    }
+    makeSound(world, camel, husk(camel) ? "entity.camel_husk.stand" : "entity.camel.stand", 1.0F);
+    state.lastPoseTick = now;
+    world::vibrations::emit(world.state(), "entity_action", camel.x, camel.y, camel.z, now, {.entity = camel.uuid()});
 }
 
 } // namespace basalt::server::runtime

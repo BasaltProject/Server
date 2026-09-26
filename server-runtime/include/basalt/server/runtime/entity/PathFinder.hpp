@@ -11,11 +11,8 @@
 namespace basalt::server::runtime::entity {
 
 /// A way through the blocks from one place to another.
-///
-/// parity: `PathFinder` over `WalkNodeEvaluator`: A* over the positions a mob can stand in, with the
-/// heuristic weighted by 1.5 as vanilla weights it, a step up of one block, a drop of at most three,
-/// and diagonals only when both of the blocks beside them are open. What a mob does with the path is
-/// `PathNavigation`'s business, and here the caller's.
+/// parity: `PathFinder` over `WalkNodeEvaluator`: A* with the heuristic weighted by 1.5, a step up of
+/// one, a drop of at most three, diagonals only when both side blocks are open.
 namespace pathFinder {
 
 /// parity: `WalkNodeEvaluator`, a drop a mob will take without looking for another way round.
@@ -41,6 +38,9 @@ struct RouteOptions {
     std::int32_t maxVisited = 256;
     /// parity: `canOpenDoors`, which walks through a wooden or copper door as if it were open.
     bool openDoors = false;
+    /// parity: `AmphibiousNodeEvaluator`: water is as good as ground and can be swum up and down,
+    /// the shore costs four and dry land six.
+    bool amphibious = false;
 };
 
 /// What a search found. parity: `Path`, whose last node is the target or the nearest it got.
@@ -61,6 +61,11 @@ struct Route {
 /// block under it that is not air.
 [[nodiscard]] std::array<std::int32_t, 3> startOf(world::WorldState& world, double x, double y, double z,
                                                   bool onGround);
+
+/// parity: `AmphibiousNodeEvaluator.getStart`: in water, the square of the box's lower corner half a
+/// block up; out of it, as `startOf`.
+[[nodiscard]] std::array<std::int32_t, 3> amphibiousStartOf(world::WorldState& world, double x, double y, double z,
+                                                            double width, bool onGround, bool inWater);
 
 /// Whether a closed door here is one a mob that opens doors walks through.
 [[nodiscard]] bool isMobDoor(std::int32_t stateId);

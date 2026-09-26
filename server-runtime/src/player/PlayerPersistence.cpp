@@ -14,6 +14,25 @@ namespace {
     return static_cast<wire::protocol::play::Gamemode>(static_cast<std::uint8_t>(gamemode));
 }
 
+/// parity: `Player.addAdditionalSaveData`'s `Score` and `ServerPlayer`'s shoulder parrots.
+[[nodiscard]] wire::nbt::NbtCompound entityDataOf(const PlayerSession& session) {
+    wire::nbt::NbtCompound data;
+    data.putInt("Score", session.experience.score());
+    if (session.shoulderLeft.has_value()) {
+        data.set("ShoulderEntityLeft", wire::nbt::NbtTag::ofCompound(*session.shoulderLeft));
+    }
+    if (session.shoulderRight.has_value()) {
+        data.set("ShoulderEntityRight", wire::nbt::NbtTag::ofCompound(*session.shoulderRight));
+    }
+    return data;
+}
+
+[[nodiscard]] std::optional<wire::nbt::NbtCompound> shoulderOf(const wire::nbt::NbtCompound& data,
+                                                               std::string_view key) {
+    const wire::nbt::NbtCompound* shoulder = data.getCompound(key);
+    return shoulder == nullptr || shoulder->empty() ? std::nullopt : std::optional{*shoulder};
+}
+
 } // namespace
 
 storage::StoredPlayer toStored(const PlayerSession& session, std::string_view world, std::int64_t firstSeenEpochSeconds,
@@ -47,7 +66,8 @@ storage::StoredPlayer toStored(const PlayerSession& session, std::string_view wo
                                  .postEffects = session.postEffects,
                                  .wardenSpawnTracker = {session.wardenTracker.ticksSinceLastWarning,
                                                         session.wardenTracker.warningLevel,
-                                                        session.wardenTracker.cooldownTicks}};
+                                                        session.wardenTracker.cooldownTicks},
+                                 .entityData = entityDataOf(session)};
 }
 
 void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
@@ -72,6 +92,9 @@ void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
     session.wardenTracker = world::wardenSpawnTracker::Tracker{.ticksSinceLastWarning = stored.wardenSpawnTracker[0],
                                                                .warningLevel = stored.wardenSpawnTracker[1],
                                                                .cooldownTicks = stored.wardenSpawnTracker[2]};
+    session.experience.setScore(stored.entityData.getInt("Score"));
+    session.shoulderLeft = shoulderOf(stored.entityData, "ShoulderEntityLeft");
+    session.shoulderRight = shoulderOf(stored.entityData, "ShoulderEntityRight");
 }
 
 } // namespace basalt::server::runtime::player::playerPersistence

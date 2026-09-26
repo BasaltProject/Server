@@ -124,6 +124,7 @@ EntityVisibilityTracker::EntityVisibilityTracker(ClientSession& owner) : owner_(
 void EntityVisibilityTracker::forgetEverythingDrawn() {
     trackedEntities_.clear();
     trackedPlayers_.clear();
+    lastPlayerData_.clear();
     trackedNpcs_.clear();
     namelessTeamMade_ = false;
     lastNpcLook_.clear();
@@ -433,9 +434,8 @@ void EntityVisibilityTracker::syncPlayers() {
                               .headYaw = other->yaw}
                 .write(buffer);
         });
-        owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-            SetEntityDataPacket::skinParts(other->entityId(), other->skinParts).write(buffer);
-        });
+        lastPlayerData_.erase(other->entityId());
+        syncPlayerData(*other);
         owner_->sendPlayPacket(wire::protocol::play::EntityTeleportPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::EntityTeleportPacket{.entityId = other->entityId(),
                                                        .x = other->x,
@@ -451,7 +451,9 @@ void EntityVisibilityTracker::syncPlayers() {
         });
     }
 
+    syncPlayerData(*session);
     for (const PlayerSession* other : visible) {
+        syncPlayerData(*other);
         syncEquipmentOf(*other);
     }
 
@@ -471,6 +473,7 @@ void EntityVisibilityTracker::syncPlayers() {
     for (const std::int32_t entityId : gone) {
         trackedPlayers_.erase(entityId);
         trackedEquipment_.erase(entityId);
+        lastPlayerData_.erase(entityId);
     }
     owner_->sendPlayPacket(RemoveEntitiesPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         RemoveEntitiesPacket{.entityIds = gone}.write(buffer);
@@ -502,6 +505,20 @@ void EntityVisibilityTracker::syncEquipmentOf(const PlayerSession& other) {
     }
     owner_->sendPlayPacket(SetEquipmentPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         SetEquipmentPacket{.entityId = other.entityId(), .slots = slots}.write(buffer);
+    });
+}
+
+void EntityVisibilityTracker::syncPlayerData(const PlayerSession& player) {
+    const player::PlayerEntityData now = player::PlayerEntityData::of(player);
+    const auto last = lastPlayerData_.find(player.entityId());
+    const std::vector<SetEntityDataPacket::Entry> changes =
+        now.changesFrom(last == lastPlayerData_.end() ? nullptr : &last->second);
+    lastPlayerData_.insert_or_assign(player.entityId(), now);
+    if (changes.empty()) {
+        return;
+    }
+    owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        SetEntityDataPacket{.entityId = player.entityId(), .entries = changes}.write(buffer);
     });
 }
 

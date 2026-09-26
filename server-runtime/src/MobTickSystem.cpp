@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
+#include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
@@ -130,7 +131,15 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     entity.tickCount++;
     entity::entityCombat::tick(entity);
     actions_->tickAmbientSound(world, entity, random);
-    // parity: `LivingEntity.tick`: one stinger falls out every twenty times thirty less the count.
+    // parity: `LivingEntity.tick`: one arrow or stinger falls out every twenty times thirty less the count.
+    if (entity.arrowCount > 0) {
+        if (entity.removeArrowTime <= 0) {
+            entity.removeArrowTime = 20 * (30 - entity.arrowCount);
+        }
+        if (--entity.removeArrowTime <= 0) {
+            --entity.arrowCount;
+        }
+    }
     if (entity.stingerCount > 0) {
         if (entity.removeStingerTime <= 0) {
             entity.removeStingerTime = 20 * (30 - entity.stingerCount);
@@ -215,12 +224,30 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (entity::horses::isHorse(entity.type())) {
         actions_->tickHorse(world, entity, random);
     }
+    if (steered && entity::camels::isCamel(entity.type())) {
+        for (const PlayerSession* rider : watchers) {
+            if (rider->entityId() == entity.passengerIds.front()) {
+                actions_->camelRidden(world, entity, *rider);
+            }
+        }
+    }
     // parity: `Bee.customServerAiStep` and the rest of `Bee.aiStep`, after the goals.
     if (entity::bees::isBee(entity.type())) {
         actions_->tickBee(world, watchers, entity, random);
     }
     if (entity.type().path() == "zombified_piglin") {
         actions_->tickZombifiedPiglin(world, entity, random);
+    }
+    if (const std::string_view kind = entity.type().path();
+        kind == "wolf" || kind == "iron_golem" || kind == "polar_bear" || kind == "enderman") {
+        actions_->tickNeutralMob(world, entity, random);
+    }
+    if (entity.type().path() == "parrot") {
+        actions_->tickParrot(world, entity);
+    }
+    actions_->emitMovement(world, entity);
+    if (entity.removed) {
+        return;
     }
     // parity: `Shulker.tick`, after the living entity's own turn.
     if (entity::shulkers::isShulker(entity.type())) {

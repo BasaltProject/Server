@@ -3,6 +3,8 @@
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/item/ItemWear.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -257,6 +259,23 @@ std::optional<loot::EntityFacts> ofId(const LoadedWorld& world, const std::vecto
     }
     const entity::ServerEntity* mob = world.state().entity(id);
     return mob == nullptr ? std::nullopt : std::optional{ofEntity(world, *mob)};
+}
+
+void durabilityChanged(AdvancementTriggers* triggers, const player::PlayerSession& player,
+                       const storage::StoredItemStack& before, const std::optional<storage::StoredItemStack>& after) {
+    if (triggers == nullptr || !triggers->listensTo("item_durability_changed")) {
+        return;
+    }
+    const std::int32_t max = item::itemWear::maxDamage(before);
+    const std::int32_t newDamage = after.has_value() ? item::itemWear::damage(*after) : max;
+    const std::optional<TriggerItem> item = itemOf(before);
+    if (!item.has_value() || newDamage == item::itemWear::damage(before)) {
+        return;
+    }
+    triggers->fire("item_durability_changed", player.name(), player.uuid().toString(),
+                   TriggerEvent{.items = {{"item", *item}},
+                                .numbers = {{"durability", static_cast<double>(max - newDamage)},
+                                            {"delta", static_cast<double>(item::itemWear::damage(before) - newDamage)}}});
 }
 
 void playerHurtEntity(AdvancementTriggers& triggers, const LoadedWorld& world, const player::PlayerSession& player,

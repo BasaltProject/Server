@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -344,6 +345,10 @@ void MobActionSystem::piglinSetAngerTarget(world::LoadedWorld& world, ServerEnti
     }
     state.motion.cantReachSince.reset();
     state.angryAt.setFor(*uuid, now, piglins::kAngerDuration);
+    if (!hoglin && world.state().entity(targetId) == nullptr &&
+        world.gameRules().get(world::gameRules::kUniversalAnger)) {
+        state.universalAnger.setFor(true, now, piglins::kAngerDuration);
+    }
     if (hoglin && !state.brute && !state.cannotHunt) {
         random::RandomSource random = freshRandom();
         state.huntedRecently.setFor(true, now,
@@ -417,8 +422,7 @@ void MobActionSystem::piglinWasHurtBy(world::LoadedWorld& world, entity::ai::Mob
     }
     if (state.brute) {
         // parity: `PiglinBruteAi.wasHurtBy` over `maybeRetaliate`.
-        piglinSetAngerTarget(world, piglin, state, attackerId);
-        piglinBroadcastAnger(world, piglin, state, attackerId);
+        piglinRetaliate(world, piglin, state, attackerId, player);
         return;
     }
     if (equipment::get(piglin, equipment::Slot::OffHand).has_value()) {
@@ -479,8 +483,7 @@ void MobActionSystem::piglinWasHurtBy(world::LoadedWorld& world, entity::ai::Mob
     }
     // parity: `maybeRetaliate`, never while fleeing.
     if (state.activity != piglins::Activity::Avoid) {
-        piglinSetAngerTarget(world, piglin, state, attackerId);
-        piglinBroadcastAnger(world, piglin, state, attackerId);
+        piglinRetaliate(world, piglin, state, attackerId, player);
     }
 }
 
@@ -521,9 +524,14 @@ void MobActionSystem::angerNearbyPiglins(world::LoadedWorld& world, const Player
             continue;
         }
         PiglinState& state = piglins::stateOf(*other);
-        if (state.activity == piglins::Activity::Idle) {
-            piglinSetAngerTarget(world, *other, state, player.entityId());
+        if (state.activity != piglins::Activity::Idle) {
+            continue;
         }
+        // parity: under `universal_anger`, `setAngerTargetToNearestTargetablePlayerIfFound`.
+        const bool universal = world.gameRules().get(world::gameRules::kUniversalAnger);
+        piglinSetAngerTarget(world, *other, state,
+                             universal ? piglinNearestPlayer(world, *other).value_or(player.entityId())
+                                       : player.entityId());
     }
 }
 

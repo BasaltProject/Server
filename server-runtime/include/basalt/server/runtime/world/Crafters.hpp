@@ -14,14 +14,9 @@
 namespace basalt::server::runtime::world {
 
 /// The block that crafts on its own when a signal reaches it.
-///
-/// parity: `CrafterBlock`, which is the one block that is a container and a redstone component at
-/// once: it books four ticks on the rising edge, crafts what its nine slots make, and puts the result
-/// into whatever it faces. Every slot with something in it loses exactly one, whatever the recipe
-/// asked for.
-///
-/// A slot can be switched off from its own screen, which counts as full for the comparator and
-/// refuses items from a hopper. That is kept beside the items in the block entity.
+/// parity: `CrafterBlock`: four ticks after the rising edge it crafts from its nine slots (each loses
+/// exactly one) and ejects forward. A disabled slot counts as full for the comparator and refuses
+/// hopper items.
 namespace crafters {
 
 /// parity: `CrafterBlock`'s nine slots and its four ticks of delay.
@@ -41,6 +36,8 @@ struct Hooks {
         resultFor;
     /// A free entity id for the item it throws when there is nowhere to put the result.
     std::function<std::int32_t()> allocateEntityId;
+    /// The recipe the grid made, with the grid as it was. parity: `CRAFTER_RECIPE_CRAFTED`.
+    std::function<void(const server::world::crafting::CraftingInput& input, const blockInventory::Slots& grid)> crafted;
 };
 
 /// The turn itself. Answers what changed, so the caller can tell the clients.

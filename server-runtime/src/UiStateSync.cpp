@@ -33,79 +33,13 @@ namespace {
 
 using player::PlayerSession;
 using wire::common::Identifier;
-using wire::protocol::play::Pose;
-using wire::protocol::play::SetEntityDataPacket;
 
 /// parity: `AbsorptionMobEffect`, four hearts a level.
 constexpr float kAbsorptionPerLevel = 4.0F;
 
-/// The shared flags byte: everything about how this player is standing that fits in eight bits.
-///
-/// parity: `Entity.DATA_SHARED_FLAGS_ID`. One byte for all of them, which is why it is composed in
-/// one place: whoever writes only the bit they care about erases the others.
-std::uint8_t sharedFlags(const PlayerSession& session) {
-    std::uint8_t flags = 0;
-    if (session.fireTicks > 0) {
-        flags |= SetEntityDataPacket::kFlagOnFire;
-    }
-    if (session.sneaking) {
-        flags |= SetEntityDataPacket::kFlagSneaking;
-    }
-    if (session.sprinting) {
-        flags |= SetEntityDataPacket::kFlagSprinting;
-    }
-    if (session.fallFlying) {
-        flags |= SetEntityDataPacket::kFlagFallFlying;
-    }
-    return flags;
-}
-
-/// One packet to everybody else who can see this player.
-void sendToOthers(ClientSession& owner, const PlayerSession& session, std::int32_t packetId,
-                  const std::function<void(wire::io::ByteBuffer&)>& write) {
-    for (PlayerSession* other : owner.playersInSameWorld()) {
-        if (other->entityId() == session.entityId() || !other->connection().sendPlayPacket) {
-            continue;
-        }
-        other->connection().sendPlayPacket(packetId, write);
-    }
-}
-
 } // namespace
 
 UiStateSync::UiStateSync(ClientSession& owner, Hooks hooks) : owner_(&owner), hooks_(std::move(hooks)) {}
-
-void UiStateSync::syncPosture() {
-    PlayerSession* session = owner_->playerSession();
-    if (session == nullptr || session->sleepingBed.has_value()) {
-        return;
-    }
-    const std::uint8_t flags = sharedFlags(*session);
-    // parity: `Player.updatePlayerPose`, of which this build has the two poses it can tell apart:
-    // crouching and standing.
-    const Pose pose = session->fallFlying ? Pose::FallFlying : session->sneaking ? Pose::Crouching : Pose::Standing;
-    if (flags == owner_->lastSharedFlags && pose == owner_->lastPose) {
-        return;
-    }
-    owner_->lastSharedFlags = flags;
-    owner_->lastPose = pose;
-    const SetEntityDataPacket packet = SetEntityDataPacket::posture(session->entityId(), flags, pose);
-    const auto write = [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); };
-    owner_->sendPlayPacket(SetEntityDataPacket::kId, write);
-    sendToOthers(*owner_, *session, SetEntityDataPacket::kId, write);
-}
-
-void UiStateSync::syncSubmersion() {
-    PlayerSession* session = owner_->playerSession();
-    if (session == nullptr) {
-        return;
-    }
-    const SetEntityDataPacket packet =
-        SetEntityDataPacket::submersion(session->entityId(), session->airSupply, sharedFlags(*session));
-    const auto write = [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); };
-    owner_->sendPlayPacket(SetEntityDataPacket::kId, write);
-    sendToOthers(*owner_, *session, SetEntityDataPacket::kId, write);
-}
 
 void UiStateSync::syncHealth() {
     PlayerSession* session = owner_->playerSession();
@@ -145,7 +79,6 @@ void UiStateSync::sendEffect(const world::ActiveEffect& effect) {
     // parity: `AbsorptionMobEffect.onEffectStarted` adds its hearts on top of whatever is left.
     if (effect.effect == world::mobEffects::absorption()) {
         session->absorption += kAbsorptionPerLevel * static_cast<float>(effect.amplifier + 1);
-        syncAbsorption();
     }
     owner_->sendPlayPacket(wire::protocol::play::UpdateMobEffectPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         wire::protocol::play::UpdateMobEffectPacket{.entityId = session->entityId(),
@@ -172,7 +105,6 @@ void UiStateSync::sendEffectRemoved(const Identifier& effect) {
     // nothing else gives any, so the pool empties.
     if (effect == world::mobEffects::absorption()) {
         session->absorption = 0.0F;
-        syncAbsorption();
     }
     owner_->sendPlayPacket(wire::protocol::play::RemoveMobEffectPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         wire::protocol::play::RemoveMobEffectPacket{.entityId = session->entityId(), .effect = *id}.write(buffer);
@@ -245,17 +177,6 @@ void UiStateSync::tickUi() {
     const wire::common::placeholder::PlaceholderContext context =
         wire::common::placeholder::PlaceholderContext{}.with(placeholder::playerSlot(), session);
     owner_->playerUi().tick(owner_->uiTick++, context);
-}
-
-void UiStateSync::syncAbsorption() {
-    PlayerSession* session = owner_->playerSession();
-    if (session == nullptr) {
-        return;
-    }
-    const SetEntityDataPacket packet = SetEntityDataPacket::playerAbsorption(session->entityId(), session->absorption);
-    const auto write = [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); };
-    owner_->sendCompressed(SetEntityDataPacket::kId, write);
-    sendToOthers(*owner_, *session, SetEntityDataPacket::kId, write);
 }
 
 void UiStateSync::sendTime(const world::LoadedWorld& world) {

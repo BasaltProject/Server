@@ -24,11 +24,8 @@ namespace basalt::server::runtime {
 class ClientSession;
 
 /// The HUD-facing sync surface: health, effects, absorption, experience, abilities, the command
-/// tree, statistics and the sidebar, scoreboard and boss bar redraw.
-///
-/// A back-reference to the owning session rather than narrow callbacks, the same pattern as the
-/// other satellites: this state was already tightly coupled to the session, and every method here
-/// still needs a handful of its collaborators.
+/// tree, statistics and the sidebar, scoreboard and boss bar redraw. Holds a back-reference to the
+/// owning session, like the other satellites, since every method needs several of its collaborators.
 class UiStateSync {
 public:
     /// What a plugin gets a say in. Unset means nobody objects.
@@ -41,13 +38,6 @@ public:
     };
 
     explicit UiStateSync(ClientSession& owner, Hooks hooks = {});
-
-    /// How this player looks to everyone else: crouched, sprinting, burning, and the pose that goes
-    /// with it. Sent only when it changes.
-    void syncPosture();
-
-    /// The air left and whether this player burns, to them and to everyone who can see them.
-    void syncSubmersion();
 
     void syncHealth();
 
@@ -68,9 +58,6 @@ public:
 
     /// Redraws whatever is due. Failures are swallowed: decoration must never drop a connection.
     void tickUi();
-
-    /// parity: absorption rides on the player's own entity data, not on `set_health`.
-    void syncAbsorption();
 
     /// This world's clocks, as the join sequence and every `/time` send them.
     void sendTime(const world::LoadedWorld& world);

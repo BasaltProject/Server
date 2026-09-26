@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
 #include <cmath>
@@ -106,7 +107,8 @@ constexpr double kArrowDrop = 0.1;
 
 /// parity: `CrossbowItem.getChargeDuration`.
 [[nodiscard]] std::int32_t chargeDuration(const BreakContext& context, const StoredItemStack& weapon) {
-    return mth::floor(enchantedValue(context, weapon, "minecraft:crossbow_charge_time", kChargeSeconds) * 20.0F);
+    return mth::floor(
+        static_cast<double>(enchantedValue(context, weapon, "minecraft:crossbow_charge_time", kChargeSeconds) * 20.0F));
 }
 
 /// parity: `CrossbowItem.getChargingSounds`, the highest level's entry of the enchantment's list.
@@ -241,6 +243,7 @@ void changed(const BreakContext& context, PlayerSession& player, std::int32_t sl
                              [&effects](const StoredItemStack& stack, std::int32_t cost, random::RandomSource& source) {
                                  return effects.process(stack, cost, source);
                              });
+    world::triggerFacts::durabilityChanged(context.triggers, player, *weapon, worn);
     player.inventory.set(slot, worn);
     changed(context, player, slot);
     return worn.has_value();
@@ -366,8 +369,9 @@ void shoot(const BreakContext& context, FireworkSystem* fireworks, PlayerSession
                     item.set("components", NbtTag::ofCompound(projectile.components));
                 }
                 static_cast<void>(fireworks->shoot(world, std::move(item), player.x,
-                                                   player.y + kEyeHeight - kRocketDrop, player.z, aim[0], aim[1],
-                                                   aim[2], power, 1.0F, player.entityId()));
+                                                   player.y + kEyeHeight - kRocketDrop, player.z,
+                                                   static_cast<double>(aim[0]), static_cast<double>(aim[1]),
+                                                   static_cast<double>(aim[2]), power, 1.0F, player.entityId()));
             }
         } else {
             const bool spectral = projectile.id == "minecraft:spectral_arrow";
@@ -378,7 +382,8 @@ void shoot(const BreakContext& context, FireworkSystem* fireworks, PlayerSession
             if (entry != nullptr && context.registry != nullptr) {
                 entity::ServerEntity& arrow = entity::projectiles::spawn(
                     world.state(), kind, context.registry->allocateEntityId(), entry->protocolId, player.x,
-                    player.y + kEyeHeight - kArrowDrop, player.z, aim[0], aim[1], aim[2], power, 1.0F, random);
+                    player.y + kEyeHeight - kArrowDrop, player.z, static_cast<double>(aim[0]),
+                    static_cast<double>(aim[1]), static_cast<double>(aim[2]), power, 1.0F, random);
                 arrow.ownerId = player.entityId();
                 arrow.critical = true;
                 arrow.pierceLevel = pierce;

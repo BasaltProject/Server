@@ -423,8 +423,6 @@ public:
     /// parity: `LivingEntity.addEffect`, for what a mob puts on somebody rather than a drink.
     void addEffect(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier);
 
-    void syncSubmersion();
-
     void syncHeldAttributes();
 
     void syncExperience();
@@ -469,11 +467,7 @@ public:
     std::unique_ptr<player::PlayerSession> playerSession_;
     world::LoadedWorld* currentWorld_ = nullptr;
 
-    /// What was last sent about how this player is standing and what level they are, so nothing
-    /// goes out twice. On the session rather than on the entity tracker: it is what this connection
-    /// last said about its own player, not what it has been told about anybody else.
-    std::int32_t lastSharedFlags = -1;
-    wire::protocol::play::Pose lastPose = wire::protocol::play::Pose::Standing;
+    /// What level was last sent, so nothing goes out twice.
     std::int32_t lastSyncedLevel = -1;
 
     /// Ticks lived, which is what the UI surfaces are paced by.
@@ -650,6 +644,7 @@ private:
     std::vector<std::uint8_t> challenge_;
     std::optional<wire::auth::SessionProfile> pendingProfile_;
     std::int8_t pendingSkinParts_ = static_cast<std::int8_t>(0x7F);
+    std::int32_t pendingMainHand_ = 1;
     std::int32_t pendingChatVisibility_ = 0;
     /// parity: `ClientInformation.viewDistance`, kept until the chunk view exists to take it.
     std::int32_t pendingViewDistance_ = 2;

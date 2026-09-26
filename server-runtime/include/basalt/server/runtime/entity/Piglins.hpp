@@ -56,6 +56,8 @@ struct PiglinState {
     bool cannotHunt = false;
     std::array<std::optional<server::world::loot::ItemStack>, kInventorySize> inventory;
     ai::brainKit::Memory<wire::common::Uuid> angryAt;
+    /// parity: `MemoryModuleType.UNIVERSAL_ANGER`, six hundred ticks of anger at every player.
+    ai::brainKit::Memory<bool> universalAnger;
     ai::brainKit::Memory<std::int32_t> avoidTarget;
     ai::brainKit::Memory<bool> huntedRecently;
     ai::brainKit::Memory<bool> admiring;

@@ -264,6 +264,8 @@ basalt_module(server-runtime-core
         src/player/PlayerArrowPickup.cpp
         src/player/PlayerMovementStats.cpp
         src/player/PlayerSession.cpp
+        src/player/PlayerEntityData.cpp
+        src/player/PlayerImpulse.cpp
         src/player/PlayerPersistence.cpp
         src/player/PlayerBlockUpdates.cpp
         src/player/PlayerDeath.cpp
@@ -584,6 +586,12 @@ basalt_module(server-runtime-core
         src/entity/ai/BrainKit.cpp
         src/entity/ai/LongJump.cpp
         src/entity/ai/NeutralGoals.cpp
+        src/entity/ai/EndermanGoals.cpp
+        src/entity/ai/ParrotGoals.cpp
+        src/entity/Parrots.cpp
+        src/MobActionParrots.cpp
+        src/MobActionMovement.cpp
+        src/entity/MobSteps.cpp
         src/entity/ai/DoorInteraction.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
@@ -749,6 +757,12 @@ basalt_test(server-runtime-projectile-hits-test
 basalt_test(server-runtime-combat-test
     SOURCES
         test/CombatTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-player-entity-data-test
+    SOURCES
+        test/PlayerEntityDataTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

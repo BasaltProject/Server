@@ -102,6 +102,17 @@ constexpr std::int32_t kOffhand = -106;
     return inventory;
 }
 
+/// parity: the `Score` and shoulder parrots a `.dat` keeps, which have no column of their own.
+[[nodiscard]] wire::nbt::NbtCompound entityDataOf(const wire::nbt::NbtCompound& root) {
+    wire::nbt::NbtCompound kept;
+    for (const std::string_view key : {"Score", "ShoulderEntityLeft", "ShoulderEntityRight"}) {
+        if (const wire::nbt::NbtTag* tag = root.find(key); tag != nullptr) {
+            kept.set(std::string{key}, *tag);
+        }
+    }
+    return kept;
+}
+
 } // namespace
 
 std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std::string_view name,
@@ -149,6 +160,7 @@ std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std:
         .tags = {},
         .postEffects = postEffectsOf(listOf(*root, "post_effects")),
         .wardenSpawnTracker = wardenTrackerOf(root->getCompound("warden_spawn_tracker")),
+        .entityData = entityDataOf(*root),
     };
 }
 

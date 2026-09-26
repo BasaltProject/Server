@@ -75,5 +75,10 @@ void playerHurtEntity(AdvancementTriggers& triggers, const LoadedWorld& world, c
                       const entity::ServerEntity& victim, float dealt, const wire::common::Identifier& damageType,
                       const std::optional<server::world::loot::EntityFacts>& direct = std::nullopt);
 
+/// parity: `ItemStack.applyDamage`'s `ITEM_DURABILITY_CHANGED`, read off the stack before the wear;
+/// `after` is nothing when the wear broke it.
+void durabilityChanged(AdvancementTriggers* triggers, const player::PlayerSession& player,
+                       const storage::StoredItemStack& before, const std::optional<storage::StoredItemStack>& after);
+
 } // namespace triggerFacts
 } // namespace basalt::server::runtime::world

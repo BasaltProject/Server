@@ -5,11 +5,9 @@
 namespace basalt::server::runtime::player {
 
 /// The experience bar: a level, a fraction of the way to the next one, and the running total.
-///
-/// parity: `Player.giveExperiencePoints`/`giveExperienceLevels`/`getXpNeededForNextLevel`. The
-/// level cost curve (7 + 2n below 15, 37 + 5n below 30, 112 + 9n above) and the odd two-step
-/// renormalisation in the overflow loop are copied deliberately: the same points always have to
-/// land on the same level, and the loop's rounding is part of that.
+/// parity: `Player.giveExperiencePoints`/`giveExperienceLevels`/`getXpNeededForNextLevel`: the cost
+/// curve (7 + 2n below 15, 37 + 5n below 30, 112 + 9n above) and the overflow loop's odd two-step
+/// renormalisation are kept so the same points always land on the same level.
 class ExperienceData {
 public:
     [[nodiscard]] std::int32_t level() const noexcept { return level_; }
@@ -19,6 +17,11 @@ public:
     [[nodiscard]] std::int32_t total() const noexcept { return total_; }
 
     [[nodiscard]] std::int32_t xpNeededForNextLevel() const;
+
+    /// parity: `Player.getScore`, every point ever given, shown on the death screen.
+    [[nodiscard]] std::int32_t score() const noexcept { return score_; }
+
+    void setScore(std::int32_t value) noexcept { score_ = value; }
 
     void giveLevels(std::int32_t amount);
 
@@ -43,6 +46,7 @@ private:
     std::int32_t level_ = 0;
     float progress_ = 0.0F;
     std::int32_t total_ = 0;
+    std::int32_t score_ = 0;
 };
 
 } // namespace basalt::server::runtime::player

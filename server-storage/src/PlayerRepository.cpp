@@ -1,5 +1,6 @@
 #include <basalt/server/storage/PlayerRepository.hpp>
 #include <basalt/server/storage/StorageNbt.hpp>
+#include <basalt/wire/nbt/NbtIO.hpp>
 
 #include <cstdint>
 #include <cstdlib>
@@ -13,7 +14,7 @@ namespace {
 constexpr std::string_view kColumns =
     "uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch, health, food, "
     "saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode, group_name, last_ip, "
-    "inventory, ender_chest, stats, tags, post_effects, warden_spawn_tracker";
+    "inventory, ender_chest, stats, tags, post_effects, warden_spawn_tracker, entity_data";
 
 /// A tag cannot contain a comma: vanilla's own tag argument is a single word.
 [[nodiscard]] std::set<std::string, std::less<>> splitTags(const std::optional<std::string>& stored) {
@@ -131,6 +132,13 @@ constexpr std::string_view kColumns =
     for (std::size_t index = 0; index < tracker.size() && index < player.wardenSpawnTracker.size(); ++index) {
         player.wardenSpawnTracker[index] = std::atoi(tracker[index].c_str());
     }
+    if (const std::vector<std::uint8_t> extra = row.blob(27); !extra.empty()) {
+        if (const auto read = wire::nbt::nbtIO::read(extra); read.has_value()) {
+            if (const wire::nbt::NbtCompound* compound = read->tag.get<wire::nbt::NbtCompound>(); compound != nullptr) {
+                player.entityData = *compound;
+            }
+        }
+    }
     return player;
 }
 
@@ -180,9 +188,9 @@ void PlayerRepository::save(const StoredPlayer& player) {
 INSERT INTO player(
     uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch,
     health, food, saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode,
-    group_name, inventory, ender_chest, stats, tags, post_effects, warden_spawn_tracker
+    group_name, inventory, ender_chest, stats, tags, post_effects, warden_spawn_tracker, entity_data
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(uuid) DO UPDATE SET
     name = excluded.name,
     last_seen = excluded.last_seen,
@@ -204,7 +212,8 @@ ON CONFLICT(uuid) DO UPDATE SET
     stats = excluded.stats,
     tags = excluded.tags,
     post_effects = excluded.post_effects,
-    warden_spawn_tracker = excluded.warden_spawn_tracker)");
+    warden_spawn_tracker = excluded.warden_spawn_tracker,
+    entity_data = excluded.entity_data)");
     const std::vector<std::uint8_t> inventory = inventoryNbt::encode(player.inventory);
     const std::vector<std::uint8_t> enderChest = inventoryNbt::encode(player.enderChest);
     const std::vector<std::uint8_t> stats = statsNbt::encode(player.stats);
@@ -236,6 +245,10 @@ ON CONFLICT(uuid) DO UPDATE SET
     statement.bind(26,
                    joinList({std::to_string(player.wardenSpawnTracker[0]), std::to_string(player.wardenSpawnTracker[1]),
                              std::to_string(player.wardenSpawnTracker[2])}));
+    const std::vector<std::uint8_t> entityData =
+        player.entityData.empty() ? std::vector<std::uint8_t>{}
+                                  : wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(player.entityData));
+    statement.bindBlobOrNull(27, entityData);
     statement.execute();
 }
 

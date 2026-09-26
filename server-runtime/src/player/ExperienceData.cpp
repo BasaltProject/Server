@@ -32,6 +32,8 @@ void ExperienceData::giveLevels(std::int32_t amount) {
 }
 
 void ExperienceData::givePoints(std::int32_t points) {
+    // parity: `Player.increaseScore`, an int that wraps.
+    score_ = static_cast<std::int32_t>(static_cast<std::uint32_t>(score_) + static_cast<std::uint32_t>(points));
     progress_ += static_cast<float>(points) / static_cast<float>(xpNeededForNextLevel());
     const std::int64_t sum = static_cast<std::int64_t>(total_) + points;
     total_ = static_cast<std::int32_t>(
@@ -72,6 +74,7 @@ void ExperienceData::reset() {
     level_ = 0;
     progress_ = 0.0F;
     total_ = 0;
+    score_ = 0;
 }
 
 } // namespace basalt::server::runtime::player

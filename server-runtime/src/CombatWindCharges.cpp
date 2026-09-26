@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerImpulse.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -158,6 +159,12 @@ void CombatSystem::gustWhereItLanded(world::LoadedWorld& world, const std::vecto
         const double dx = player->x - x;
         const double dy = player->y - y;
         const double dz = player->z - z;
+        // parity: `ServerExplosion.hurtEntities`' `onExplosionHit`, which only a player's own wind
+        // charge makes an impulse that spares the fall.
+        if (player->gamemode != play::Gamemode::Spectator &&
+            std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) / (static_cast<double>(radius) * 2.0) <= 1.0) {
+            player::impulse::onExplosionHit(*player, charge.type().path() == "wind_charge");
+        }
         if ((dx * dx) + (dy * dy) + (dz * dz) >= kPacketRangeSquared) {
             continue;
         }

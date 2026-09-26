@@ -196,6 +196,10 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
             return ArrowHit::Stopped;
         }
         emitVibration(world, "entity_damage", mob.x, mob.y, mob.z, mob.uuid());
+        // parity: `AbstractArrow.onHitEntity` leaves a non-piercing arrow stuck in it.
+        if (!piercing) {
+            ++mob.arrowCount;
+        }
         // parity: `Warden.hurtServer` angers it at whoever shot, and fights them within five blocks.
         if (arrow.ownerId.has_value() && entity::wardens::isWarden(mob.type())) {
             static_cast<void>(entity::wardens::anger(mob, *arrow.ownerId, entity::wardens::kHurt));

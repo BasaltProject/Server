@@ -190,6 +190,7 @@ attackerAnswers(const PlayerSession& session, std::int32_t attackerId, const Dam
             [&effects](const storage::StoredItemStack& stack, std::int32_t cost, random::RandomSource& source) {
                 return effects.process(stack, cost, source);
             });
+        world::triggerFacts::durabilityChanged(context.triggers, session, *shield, worn);
         session.inventory.set(slot, worn);
         if (context.slotChanged) {
             context.slotChanged(session, slot);
@@ -476,6 +477,11 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     } else {
         session->lastHurt = dealt;
         session->invulnerableTicks = kHurtCooldownTicks;
+    }
+    // parity: `AbstractArrow.onHitEntity` leaves a non-piercing arrow in whoever it really hurt.
+    if (damageType == world::damageTypes::kArrow && source.has_value() && !source->piercing &&
+        (blocked.amount <= 0.0F || incoming > 0.0F)) {
+        ++session->arrowCount;
     }
     float resisted = 0.0F;
     const float afterArmour = damageAfterProtection(*session, incoming, damageType, context, &resisted);

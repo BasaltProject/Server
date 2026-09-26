@@ -62,6 +62,12 @@ inline constexpr GameRule kRandomTickSpeed = GameRule::integer("random_tick_spee
 inline constexpr GameRule kSpreadVines = GameRule::boolean("spread_vines", true);
 inline constexpr GameRule kMobGriefing = GameRule::boolean("mob_griefing", true);
 
+/// parity: `GameRules.UNIVERSAL_ANGER`: a neutral mob hurt by a player turns on every player.
+inline constexpr GameRule kUniversalAnger = GameRule::boolean("universal_anger", false);
+
+/// parity: `GameRules.FORGIVE_DEAD_PLAYERS`: a neutral mob lets go of a player who died.
+inline constexpr GameRule kForgiveDeadPlayers = GameRule::boolean("forgive_dead_players", true);
+
 /// Named because a nether portal asks it before spawning anything.
 inline constexpr GameRule kSpawnMonsters = GameRule::boolean("spawn_monsters", true);
 inline constexpr GameRule kImmediateRespawn = GameRule::boolean("immediate_respawn", false);

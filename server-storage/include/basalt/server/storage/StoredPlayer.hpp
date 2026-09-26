@@ -46,12 +46,9 @@ enum class StoredGamemode : std::uint8_t { Survival, Creative, Adventure, Specta
 /// should not stop somebody logging in.
 [[nodiscard]] StoredGamemode gamemodeById(std::int32_t id);
 
-/// A player's counters, keyed the way vanilla keys them (`minecraft:custom/minecraft:deaths`), so an
-/// import from an existing `stats/<uuid>.json` does not have to translate names and quietly lose the
-/// ones it has none for.
-///
-/// Counters are 64-bit where vanilla's are 32: `walk_one_cm` counts in hundredths and overflows an
-/// int in a few hundred hours. Nothing on the wire carries these yet.
+/// A player's counters, keyed as vanilla keys them (`minecraft:custom/minecraft:deaths`) so a
+/// `stats/<uuid>.json` import needs no translation. 64-bit where vanilla's are 32: `walk_one_cm`
+/// overflows an int in a few hundred hours. Nothing on the wire carries these yet.
 struct StoredStats {
     std::map<std::string, std::int64_t, std::less<>> counters;
 
@@ -152,6 +149,9 @@ struct StoredPlayer {
     std::vector<std::string> postEffects;
     /// parity: `Player.wardenSpawnTracker`: ticks since the last warning, the level and the cooldown.
     std::array<std::int32_t, 3> wardenSpawnTracker{};
+    /// What the player's entity keeps that has no column of its own, under vanilla's own keys:
+    /// `Score`, `ShoulderEntityLeft` and `ShoulderEntityRight`.
+    wire::nbt::NbtCompound entityData;
 };
 
 } // namespace basalt::server::storage

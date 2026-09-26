@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
+#include <basalt/server/runtime/player/PlayerImpulse.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
@@ -68,10 +69,10 @@ void teleportRandomly(const BreakContext& context, PlayerSession& player, world:
     const double height =
         player.sneaking ? world::blockPlacement::kSneakingHeight : world::blockPlacement::kPlayerHeight;
     for (std::int32_t attempt = 0; attempt < kTeleportAttempts; ++attempt) {
-        const double x = player.x + ((next() - 0.5) * diameter);
-        const double y = std::clamp(player.y + ((next() - 0.5) * diameter), static_cast<double>(minY),
-                                    static_cast<double>(minY + logicalHeight - 1));
-        const double z = player.z + ((next() - 0.5) * diameter);
+        const double x = player.x + ((next() - 0.5) * static_cast<double>(diameter));
+        const double y = std::clamp(player.y + ((next() - 0.5) * static_cast<double>(diameter)),
+                                    static_cast<double>(minY), static_cast<double>(minY + logicalHeight - 1));
+        const double z = player.z + ((next() - 0.5) * static_cast<double>(diameter));
         // parity: `apply` gets off the mount before each try.
         if (player.vehicleId.has_value()) {
             context.dismount(player);
@@ -86,6 +87,8 @@ void teleportRandomly(const BreakContext& context, PlayerSession& player, world:
         const double fromY = player.y;
         const double fromZ = player.z;
         player.connection().teleportTo(x, *landing, z, player.yaw, player.pitch);
+        // parity: `TeleportRandomlyConsumeEffect.apply` lets go of any impulse.
+        impulse::reset(player);
         world::vibrations::emit(world.state(), "teleport", fromX, fromY, fromZ, world.gameTime(),
                                 {.entity = player.uuid()});
         const std::int64_t seed = context.nextSeed ? context.nextSeed() : 0;

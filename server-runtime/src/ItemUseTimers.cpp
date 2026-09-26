@@ -32,17 +32,12 @@ using player::PlayerInventory;
 using player::PlayerSession;
 using wire::common::Identifier;
 using wire::protocol::play::Gamemode;
-using wire::protocol::play::SetEntityDataPacket;
 using wire::protocol::play::SoundSource;
 
 constexpr std::string_view kBow = "bow";
 constexpr std::string_view kCrossbow = "crossbow";
 constexpr std::string_view kEnderPearl = "ender_pearl";
 
-/// parity: `LivingEntity`'s own using-item bit.
-constexpr std::int8_t kLivingFlagUsingItem = 1;
-/// parity: `LivingEntity.LIVING_ENTITY_FLAG_OFF_HAND`, which hand the item in use is in.
-constexpr std::int8_t kLivingFlagOffhand = 2;
 constexpr std::string_view kShield = "shield";
 constexpr std::string_view kSpyglass = "spyglass";
 /// parity: `SpyglassItem.USE_DURATION`, a minute.
@@ -385,27 +380,10 @@ void ItemUseTimers::setUsingItem(bool usingItem, std::optional<Identifier> item,
     if (session == nullptr) {
         return;
     }
-    // Kept on the session as well as sent: the door with no metadata of its own reads it from here
-    // to draw somebody else eating.
+    // The tracker sends the living flags from here to everyone, the owner included: the owner's
+    // `LocalPlayer.isUsingItem` is only cleared by that metadata coming back.
     session->usingItem = usingItem;
-    // The owner's own client needs this as much as the onlookers do: `LocalPlayer.isUsingItem` is
-    // its own flag, and the only thing that clears it is this metadata coming back saying the
-    // server is no longer using anything.
-    const SetEntityDataPacket packet{
-        .entityId = session->entityId(),
-        .entries = {SetEntityDataPacket::Entry{
-            .index = SetEntityDataPacket::kLivingFlagsIndex,
-            .value = SetEntityDataPacket::ByteValue{
-                .value = static_cast<std::int8_t>((usingItem ? kLivingFlagUsingItem : 0) |
-                                                  (usingItem && offhand ? kLivingFlagOffhand : 0))}}}};
-    const auto write = [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); };
-    owner_->sendPlayPacket(SetEntityDataPacket::kId, write);
-    for (PlayerSession* other : owner_->playersInSameWorld()) {
-        if (other->entityId() == session->entityId() || !other->connection().sendPlayPacket) {
-            continue;
-        }
-        other->connection().sendPlayPacket(SetEntityDataPacket::kId, write);
-    }
+    session->usingOffhand = usingItem && offhand;
 }
 
 } // namespace basalt::server::runtime

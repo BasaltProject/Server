@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
 #include <basalt/server/runtime/chat/ChatBroadcast.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
+#include <basalt/server/runtime/player/PlayerEntityData.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
@@ -832,6 +833,7 @@ void BedrockPlayer::move(const double x, const double y, const double z, const f
     } else if (y < session_->y) {
         fallDistance_ += session_->y - y;
     }
+    session_->fallDistance = fallDistance_;
     // Written from the listener's thread, read by the tick, which is exactly what a Java connection
     // does with the same fields from its own thread.
     session_->x = x;
@@ -1460,19 +1462,30 @@ void BedrockPlayer::syncOthers() {
                                                                            : std::string{};
             wornKey += '|';
         }
-        // parity: the three the other door carries in `SharedFlags` that this edition draws by
-        // itself. Sleeping is a flag of the second word and has its own packet here.
+        // parity: what the other door carries in `SharedFlags` and the living flags, as this edition
+        // draws them. Sleeping is a flag of the second word and has its own packet here.
+        const player::PlayerEntityData data = player::PlayerEntityData::of(*other);
+        const auto shared = [&data](const std::uint8_t bit) { return (data.sharedFlags & bit) != 0; };
         std::uint64_t flags = 0;
-        if (other->fireTicks > 0) {
+        if (shared(wire::protocol::play::SetEntityDataPacket::kFlagOnFire)) {
             flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::OnFire);
         }
-        if (other->sneaking) {
+        if (shared(wire::protocol::play::SetEntityDataPacket::kFlagSneaking)) {
             flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sneaking);
         }
-        if (other->sprinting) {
+        if (shared(wire::protocol::play::SetEntityDataPacket::kFlagSprinting)) {
             flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sprinting);
         }
-        if (other->usingItem) {
+        if (shared(wire::protocol::play::SetEntityDataPacket::kFlagSwimming)) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Swimming);
+        }
+        if (shared(wire::protocol::play::SetEntityDataPacket::kFlagInvisible)) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Invisible);
+        }
+        if (shared(wire::protocol::play::SetEntityDataPacket::kFlagFallFlying)) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Gliding);
+        }
+        if ((data.livingFlags & player::PlayerEntityData::kLivingFlagUsingItem) != 0) {
             flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::UsingItem);
         }
         const Other now{other->entityId(),

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/registry/Registry.hpp>
+#include <basalt/server/registry/VanillaEntries.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
@@ -60,11 +61,10 @@ struct InstrumentEntry {
 [[nodiscard]] std::span<const InstrumentEntry> instrumentsTable();
 [[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> poiBlocksTable();
 
-/// Every vanilla biome, in `BiomeData.bootstrap` order with the overworld ones first. Saved chunks
-/// name their biomes, so an id that moves when a version inserts one breaks nothing.
+/// Every vanilla biome, in `BiomeData.bootstrap` order with the overworld ones first.
 ///
-/// Biome network ids are dynamic and synced to each client at login, so only internal consistency
-/// between this registry, the synced definitions and chunk palettes is observable on the wire.
+/// Saved chunks name their biomes and network ids are synced at login, so only consistency between
+/// this registry, the synced definitions and chunk palettes matters.
 namespace biomes {
 
 [[nodiscard]] const Registry<Biome>& registry();
@@ -89,9 +89,8 @@ namespace customStats {
 
 /// How a block moves whatever is standing on it.
 ///
-/// parity: `Block.getFriction`, `getSpeedFactor` and `getJumpFactor`. Ice is slippery, soul sand and
-/// honey are slow, and honey also kills a jump. Everything else is the default, which is why only
-/// the blocks that differ are in the table.
+/// parity: `Block.getFriction`, `getSpeedFactor` and `getJumpFactor`. Only the blocks that differ
+/// from the default are in the table.
 namespace blockMovement {
 
 /// parity: `BlockBehaviour.Properties`' own defaults.
@@ -110,6 +109,13 @@ inline constexpr float kDefaultBounciness = 0.0F;
 
 } // namespace blockMovement
 
+namespace blockSounds {
+
+/// parity: `BlockState.getSoundType`, stone's for anything the table does not name.
+[[nodiscard]] const BlockSoundTypeEntry& of(std::int32_t stateId);
+
+} // namespace blockSounds
+
 namespace noteBlockInstruments {
 
 /// What a note block over `block` plays. Anything not in the table is the harp.
@@ -124,9 +130,8 @@ namespace noteBlockInstruments {
 
 /// The `minecraft:point_of_interest_type` registry: which blocks each type is made of.
 ///
-/// parity: `PoiTypes`' own registrations. Kept as block ids, not block *state* ids: a bed, a
-/// cauldron or a lightning rod has dozens of states and vanilla registers every one of them, so
-/// matching the block is both shorter and exactly as precise.
+/// parity: `PoiTypes`' registrations, kept as block ids: vanilla registers every state of each
+/// block, so matching the block is exactly as precise.
 namespace pointsOfInterest {
 
 [[nodiscard]] std::vector<wire::common::Identifier> ids();

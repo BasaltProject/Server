@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
@@ -13,6 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <numbers>
 
 namespace basalt::server::runtime::entity::ai::brainKit {
@@ -205,32 +207,116 @@ std::vector<std::size_t> shuffled(random::RandomSource& random, const std::vecto
     return order;
 }
 
-std::vector<Seen> nearby(const MobContext& mob, double range) {
-    std::vector<Seen> seen;
+namespace {
+
+/// parity: `Sensor.DEFAULT_SCAN_RATE`.
+constexpr std::int64_t kScanRate = 20;
+
+/// parity: the scan itself: the living things in the follow range's box and the players within the
+/// follow range, nearest first.
+void scan(const MobContext& mob, SensorScan& sensed) {
+    const double range = mob.mob.attributeWithModifiers("minecraft:follow_range");
+    std::vector<std::pair<double, std::pair<std::int32_t, bool>>> found;
+    const double half = mob.mob.width() / 2.0;
+    for (ServerEntity* other : mob.entities) {
+        if (other == &mob.mob || other->removed || other->dying || other->health <= 0.0) {
+            continue;
+        }
+        const double otherHalf = other->width() / 2.0;
+        if (other->x + otherHalf < mob.mob.x - half - range || other->x - otherHalf > mob.mob.x + half + range ||
+            other->y + other->height() < mob.mob.y - range || other->y > mob.mob.y + mob.mob.height() + range ||
+            other->z + otherHalf < mob.mob.z - half - range || other->z - otherHalf > mob.mob.z + half + range) {
+            continue;
+        }
+        found.emplace_back(mob.distanceSquaredTo(other->x, other->y, other->z), std::pair{other->entityId(), false});
+    }
+    for (const PlayerView& player : mob.players) {
+        const double distance = mob.distanceSquaredTo(player.x, player.y, player.z);
+        if (!player.spectator && distance < range * range) {
+            found.emplace_back(distance, std::pair{player.entityId, true});
+        }
+    }
+    std::ranges::stable_sort(found, {}, &decltype(found)::value_type::first);
+    sensed.seen.clear();
+    for (const auto& [distance, entry] : found) {
+        sensed.seen.push_back(entry);
+    }
+}
+
+/// parity: `Sensor.isEntityTargetable`: within the follow range, less a fifth for a crouching player,
+/// and in the mob's line of sight, eye to eye.
+[[nodiscard]] bool targetable(const MobContext& mob, double x, double y, double z, double eyeY, bool sneaking) {
+    const double range = mob.mob.attributeWithModifiers("minecraft:follow_range");
+    const double reach = std::max(range * (sneaking ? 0.8 : 1.0), 2.0);
+    const double distance = mob.distanceSquaredTo(x, y, z);
+    if (distance > reach * reach || distance > 128.0 * 128.0) {
+        return false;
+    }
+    const double ownEye = mob.mob.y + mobBreathing::eyeHeightOf(mob.mob);
+    return !blockRay::cast(mob.world, mob.mob.x, ownEye, mob.mob.z, x, eyeY, z).has_value();
+}
+
+} // namespace
+
+std::vector<Seen> nearby(const MobContext& mob, double range, bool visibleOnly) {
+    if (mob.mob.sensorScan == nullptr) {
+        mob.mob.sensorScan = std::make_shared<SensorScan>();
+    }
+    SensorScan& sensed = *mob.mob.sensorScan;
+    // parity: `Sensor.randomlyDelayStart`, then a scan every twenty ticks.
+    if (!sensed.started) {
+        sensed.started = true;
+        sensed.nextScan = mob.gameTime + std::max<std::int64_t>(mob.random.nextInt(kScanRate), 1) - 1;
+    }
+    if (mob.gameTime >= sensed.nextScan) {
+        sensed.nextScan = mob.gameTime + kScanRate;
+        scan(mob, sensed);
+    }
+    if (sensed.sightTime != mob.gameTime) {
+        sensed.sightTime = mob.gameTime;
+        sensed.sight.clear();
+    }
     const auto inBox = [&](double x, double y, double z) {
         return std::abs(x - mob.mob.x) <= range + (mob.mob.width() / 2.0) &&
                std::abs(z - mob.mob.z) <= range + (mob.mob.width() / 2.0) &&
                y <= mob.mob.y + mob.mob.height() + range && y >= mob.mob.y - range - 2.0;
     };
-    for (ServerEntity* other : mob.entities) {
-        if (other == &mob.mob || other->removed || other->dying || !inBox(other->x, other->y, other->z)) {
+    const auto visible = [&](std::int32_t id, double x, double y, double z, double eyeY, bool sneaking) {
+        for (const auto& [known, answer] : sensed.sight) {
+            if (known == id) {
+                return answer;
+            }
+        }
+        const bool answer = targetable(mob, x, y, z, eyeY, sneaking);
+        sensed.sight.emplace_back(id, answer);
+        return answer;
+    };
+    std::vector<Seen> seen;
+    for (const auto& [id, isPlayer] : sensed.seen) {
+        if (isPlayer) {
+            const PlayerView* player = mob.playerById(id);
+            if (player == nullptr || player->spectator || !inBox(player->x, player->y, player->z) ||
+                (visibleOnly && !visible(id, player->x, player->y, player->z,
+                                         player->y + (player->sneaking ? 1.27 : 1.62), player->sneaking))) {
+                continue;
+            }
+            seen.push_back(Seen{.player = player,
+                                .id = id,
+                                .distanceSquared = mob.distanceSquaredTo(player->x, player->y, player->z),
+                                .type = "player"});
+            continue;
+        }
+        ServerEntity* other = mob.world.entity(id);
+        if (other == nullptr || other->removed || other->dying || !inBox(other->x, other->y, other->z) ||
+            (visibleOnly &&
+             !visible(id, other->x, other->y, other->z, other->y + mobBreathing::eyeHeightOf(*other), false))) {
             continue;
         }
         seen.push_back(Seen{.mob = other,
-                            .id = other->entityId(),
+                            .id = id,
                             .distanceSquared = mob.distanceSquaredTo(other->x, other->y, other->z),
                             .type = other->type().path()});
     }
-    for (const PlayerView& player : mob.players) {
-        if (player.spectator || !inBox(player.x, player.y, player.z)) {
-            continue;
-        }
-        seen.push_back(Seen{.player = &player,
-                            .id = player.entityId,
-                            .distanceSquared = mob.distanceSquaredTo(player.x, player.y, player.z),
-                            .type = "player"});
-    }
-    std::ranges::stable_sort(seen, {}, &Seen::distanceSquared);
     return seen;
 }
 

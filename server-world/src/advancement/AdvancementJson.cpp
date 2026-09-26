@@ -192,7 +192,7 @@ namespace parts = loot::lootTableJson::parts;
     static constexpr std::array<std::string_view, 9> kNumberFields{
         "count",  "unique_entity_types", "signal_strength", "num_bees_inside", "level",
         "levels", "durability",          "delta",           "duration"};
-    static constexpr std::array<std::string_view, 3> kIdFields{"recipes", "potion", "block"};
+    static constexpr std::array<std::string_view, 4> kIdFields{"recipes", "recipe_id", "potion", "block"};
     GenericCondition built;
     if (conditions == nullptr) {
         return built;

@@ -162,6 +162,11 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         entity.lastHurt = amount;
         entity.hurtCooldown = kHurtCooldownTicks;
     }
+    // parity: `hurtServer` remembers whoever caused a hit that got past the cooldown.
+    if (blamed.causingId.has_value()) {
+        entity.lastHurtByMob = blamed.causingId;
+        entity.lastHurtByMobTimestamp = entity.tickCount;
+    }
     const float reduced = afterArmour(entity, incoming);
     if (reduced <= 0.0F) {
         return {};

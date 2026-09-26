@@ -26,27 +26,6 @@ public:
     void tick(MobContext& mob) override;
 };
 
-/// parity: `EnderMan.EndermanLookForPlayerGoal` over `isLookingAtMe`: the player has to be looking
-/// almost straight at its eyes, and the cone widens the closer they are.
-class StareTriggerGoal final : public Goal {
-public:
-    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
-
-    [[nodiscard]] bool canUse(MobContext& mob) override;
-
-    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
-
-    void start(MobContext& mob) override;
-
-    void stop(MobContext& mob) override;
-
-private:
-    [[nodiscard]] static bool staredAtBy(const MobContext& mob, const PlayerView& player);
-
-    std::int32_t aggroTime_ = 0;
-    std::optional<std::int32_t> pending_;
-};
-
 /// parity: `EnderMan.teleport`, `teleportTowards` and `customServerAiStep`: it goes away when it is
 /// hit, when it is rained on or standing in water, and when the sun catches it holding no target.
 class TeleportAwayGoal final : public Goal {
@@ -60,6 +39,12 @@ public:
 private:
     static void teleportRandomly(MobContext& mob);
 };
+
+/// parity: `Enderman.teleport(x, y, z)`. Answers whether it moved.
+bool teleportEnderman(MobContext& mob, double x, double y, double z);
+
+/// parity: `Enderman.teleport()`, anywhere within thirty-two across and up or down.
+bool teleportEndermanRandomly(MobContext& mob);
 
 /// Where a mob lands teleporting to around `x, y, z`, or nothing when it may not.
 ///

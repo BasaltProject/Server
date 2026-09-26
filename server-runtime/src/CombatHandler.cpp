@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
@@ -129,6 +130,22 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
     // parity: `trackStartFallingPosition`, where the player is once any fall is counted.
     if (fallDistance > 0.0 && !fallStart.has_value()) {
         fallStart = std::array<double, 3>{session.x, y, session.z};
+        // parity: `trackStartFallingPosition`'s `FALL_AFTER_EXPLOSION`, a fall starting at or above
+        // where the last blast caught them.
+        world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+        world::LoadedWorld* world = owner_->currentWorld();
+        if (session.explosionImpact.has_value() && (*session.explosionImpact)[1] <= y && triggers != nullptr &&
+            world != nullptr) {
+            world::TriggerEvent event{.startPosition = session.explosionImpact};
+            if (session.explosionCause.has_value()) {
+                if (const entity::ServerEntity* cause = world->state().entity(*session.explosionCause); cause != nullptr) {
+                    event.entities.emplace("cause", world::triggerFacts::ofEntity(*world, *cause));
+                }
+            }
+            triggers->fire("fall_after_explosion", session.name(), session.uuid().toString(), std::move(event));
+        }
+        session.explosionImpact.reset();
+        session.explosionCause.reset();
     }
     if (onGround && !session.onGround) {
         // parity: `Entity.checkFallDamage` raises `HIT_GROUND` at the landing whenever anything was

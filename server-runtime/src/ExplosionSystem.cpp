@@ -168,9 +168,14 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     for (const Drop& drop : drops) {
         popResource(world, drop);
     }
-    for (const player::PlayerSession* player : watchers) {
+    for (player::PlayerSession* player : watchers) {
         const double distance = std::sqrt((player->x - x) * (player->x - x) + (player->y - y) * (player->y - y) +
                                           (player->z - z) * (player->z - z));
+        // parity: `ServerExplosion.hurtEntities` calls `onExplosionHit` on whatever is inside the blast.
+        if (distance / (static_cast<double>(power) * 2.0) <= 1.0 && player->gamemode != play::Gamemode::Spectator) {
+            player->explosionImpact = std::array<double, 3>{player->x, player->y, player->z};
+            player->explosionCause = sourceEntityId == 0 ? std::nullopt : std::optional{sourceEntityId};
+        }
         const float damage = world::explosions::damageAt(distance, power, power * 2.0F);
         if (damage > 0.0F && player->connection().hurt) {
             player->connection().hurt(damage, "explosion", world::damageTypes::kExplosion, std::nullopt);

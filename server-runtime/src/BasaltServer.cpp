@@ -575,6 +575,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 },
             .nextSeed = [] { return scratchSeed(); },
             .blockTags = &vanillaData_.blockTags,
+            .entityTags = &vanillaData_.entityTags,
             .dragonFireballLanded =
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball) {

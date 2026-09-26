@@ -67,7 +67,7 @@ void MobActionSystem::tickBreeze(world::LoadedWorld& world, entity::ai::MobConte
                breezes::lineOfSight(context.world, breeze, {at[0], at[1] + 1.0, at[2]});
     };
     std::optional<std::int32_t> nearestAttackable;
-    for (const kit::Seen& seen : kit::nearby(context, kTargetingRange)) {
+    for (const kit::Seen& seen : kit::nearby(context, kTargetingRange, false)) {
         if (!attackable(seen)) {
             continue;
         }
