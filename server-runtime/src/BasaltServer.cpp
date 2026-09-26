@@ -988,6 +988,12 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     static_cast<void>(
                         dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line, successes));
                     return successes;
+                },
+            // parity: `MinecartSpawner.tick`, the same spawner run at the cart's square.
+            .tickSpawner =
+                [this](world::LoadedWorld& world, wire::nbt::NbtCompound& data, const std::array<std::int32_t, 3>& pos,
+                       const std::function<void(std::int32_t eventId)>& broadcastEvent) {
+                    return mobSpawners_ != nullptr && mobSpawners_->tick(world, data, pos, broadcastEvent);
                 }});
     mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_, *pushes_);
 

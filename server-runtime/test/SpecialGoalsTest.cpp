@@ -54,7 +54,8 @@ public:
 
     void summonVexes(ServerEntity&, std::int32_t) override {}
 
-    void applyEffect(std::int32_t, std::string_view, std::int32_t, std::int32_t) override {}
+    void applyEffect(std::int32_t, std::string_view, std::int32_t, std::int32_t, std::optional<std::int32_t>) override {
+    }
 
     void setSleeping(ServerEntity&, bool) override {}
 

@@ -533,9 +533,10 @@ void MobActionSystem::summonVexes(ServerEntity& mob, std::int32_t count) {
 }
 
 void MobActionSystem::applyEffect(std::int32_t playerId, std::string_view effect, std::int32_t durationTicks,
-                                  std::int32_t amplifier) {
+                                  std::int32_t amplifier, std::optional<std::int32_t> sourceId) {
     for (PlayerSession* player : players_->snapshot()) {
         if (player->entityId() == playerId && player->connection().addEffect) {
+            player->noteEffectSource(sourceId);
             player->connection().addEffect(Identifier::vanilla(std::string{effect}), durationTicks, amplifier);
             return;
         }

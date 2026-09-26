@@ -88,6 +88,7 @@ void CombatSystem::arrowEffects(world::LoadedWorld& world, const std::vector<Pla
             continue;
         }
         if (player->connection().addEffect) {
+            player->noteEffectSource(arrow.ownerId.value_or(arrow.entityId()));
             player->connection().addEffect(effect.effect, effect.remainingTicks, effect.amplifier);
         }
     }

@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/world/SpawnEquipment.hpp>
 #include <basalt/server/runtime/world/VanillaWorldGeneratorFactory.hpp>
 #include <basalt/server/runtime/world/VillageDataLoader.hpp>
+#include <basalt/server/world/SimpleWorldGenerators.hpp>
 #include <basalt/server/world/climate/Sampler.hpp>
 #include <basalt/server/world/climate/SpawnFinder.hpp>
 #include <basalt/server/world/terrain/BuriedTreasureStructureGenerator.hpp>
@@ -208,11 +209,14 @@ VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration
     const bool spawnMobs = metadata.gameRules.get(gameRules::kSpawnMobs);
     switch (declaration.dimension) {
     case config::WorldDimension::Overworld:
+        if (declaration.type == config::WorldType::Flat) {
+            return flat(metadata.seed, spawnMobs);
+        }
         // parity: the `world_preset`s differ only in the noise settings their overworld names.
         return overworld(metadata.seed, spawnMobs,
                          declaration.type == config::WorldType::Amplified     ? "minecraft:amplified"
                          : declaration.type == config::WorldType::LargeBiomes ? "minecraft:large_biomes"
-                                                                               : "minecraft:overworld");
+                                                                              : "minecraft:overworld");
     case config::WorldDimension::Nether:
         return nether(metadata.seed, spawnMobs);
     case config::WorldDimension::End:
@@ -222,7 +226,7 @@ VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration
 }
 
 VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld(std::int64_t seed, bool spawnMobs,
-                                                                                std::string_view settings) {
+                                                                                 std::string_view settings) {
     auto built = std::make_unique<Built>();
     built->seed = seed;
     built->spawnMobs = spawnMobs;
@@ -479,8 +483,8 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         }
         const std::int32_t chunkX = chunk.chunkX();
         const std::int32_t chunkZ = chunk.chunkZ();
-        const std::expected<Identifier, wire::common::IdentifierError> biome = Identifier::parse(
-            world.overworldSurface->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
+        const std::expected<Identifier, wire::common::IdentifierError> biome =
+            Identifier::parse(world.overworldSurface->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
         if (biome.has_value()) {
             random::RandomSource random = random::RandomSource::legacy(0);
             static_cast<void>(random::setDecorationSeed(random, world.seed, chunkX << 4, chunkZ << 4));
@@ -496,6 +500,63 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
             server::world::climate::Sampler{*router.state, router.temperature, router.vegetation, router.continents,
                                             router.erosion, router.depth, router.ridges});
         return std::pair{blockX >> 4, blockZ >> 4};
+    };
+    built_.push_back(std::move(built));
+    return answer;
+}
+
+VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std::int64_t seed, bool spawnMobs) {
+    auto built = std::make_unique<Built>();
+    built->seed = seed;
+    built->spawnMobs = spawnMobs;
+    built->templates = std::make_unique<StructureTemplates>(
+        StructureTemplates::Jar{.readEntry = jar_.readEntry, .dataIds = jar_.dataIds});
+    built->loader = std::make_unique<VillageDataLoader>(*built->templates, jar_.readEntry);
+    built->biomeSpawns = std::make_unique<RealBiomeSpawns>(RealBiomeSpawns::Jar{.readText = jar_.readText});
+    built->equipment = std::make_unique<SpawnEquipmentFinalizer>(
+        SpawnEquipmentJar{.entriesUnder = nullptr, .readText = jar_.readText});
+    StructureTemplates& templates = *built->templates;
+    const auto templateOf = [&templates](std::string_view name) -> const structure::StructureTemplate* {
+        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(name);
+        return id.has_value() ? templates.find(*id) : nullptr;
+    };
+    const auto poolLookup = [&loader = *built->loader](std::string_view name) { return loader.pool(name); };
+    static const std::string kPlains = "minecraft:plains";
+    built->village = std::make_unique<terrain::VillageStructureGenerator>(
+        terrain::NoiseRouter{}, structure::StructurePlacementGrid{34, 8, 10387312},
+        [](std::int32_t, std::int32_t, std::int32_t) { return kPlains; }, 6, 80, poolLookup, templateOf);
+    // parity: `FlatLevelSource.getBaseHeight`, one above the top of the four default layers.
+    built->village->useFlatSurface(server::world::kOverworldHeight.minY() + 4);
+    built->generators = terrain::TerrainStructureGenerators{.village = built->village.get()};
+
+    Built& world = *built;
+    Generators answer;
+    answer.villages = built->village.get();
+    answer.pipeline.terrain = [](std::int32_t chunkX, std::int32_t chunkZ) {
+        return terrain::realTerrainGenerator::GeneratedTerrain{
+            server::world::flatWorldGenerator::generate(chunkX, chunkZ), nullptr, nullptr};
+    };
+    answer.pipeline.adopt = [](server::world::Chunk chunk) {
+        return terrain::realTerrainGenerator::GeneratedTerrain{std::move(chunk), nullptr, nullptr};
+    };
+    // parity: `FlatLevelGeneratorSettings.adjustGenerationSettings` with `features` off keeps only the
+    // structure steps, and the only structures it keeps are the villages.
+    answer.pipeline.decorate = [&world](terrain::realTerrainGenerator::GeneratedTerrain& generated,
+                                        terrain::ProtoRegion& region) {
+        server::world::Chunk& chunk = generated.chunk();
+        const server::world::Chunk::RegionScope scope{chunk, region};
+        world.village->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), world.seed);
+    };
+    answer.spawnMobs = [&world](server::world::Chunk& chunk, std::int64_t gameTime, const std::string& difficulty) {
+        if (!world.spawnMobs) {
+            return;
+        }
+        const Identifier plains = Identifier::vanilla("plains");
+        random::RandomSource random = random::RandomSource::legacy(0);
+        static_cast<void>(random::setDecorationSeed(random, world.seed, chunk.chunkX() << 4, chunk.chunkZ() << 4));
+        static_cast<void>(originalMobSpawner::spawnInto(
+            chunk, world.biomeSpawns->listFor(plains, "creature"), world.biomeSpawns->creatureProbabilityFor(plains),
+            random, {.gameTime = gameTime, .difficulty = difficulty, .equipment = world.equipment.get()}));
     };
     built_.push_back(std::move(built));
     return answer;

@@ -119,18 +119,9 @@ public:
     /// One packed nibble array per section, which is how light travels and how it is kept.
     using PackedLight = std::vector<std::vector<std::uint8_t>>;
 
-    /// This chunk's sky light, worked out once and kept until a block moves.
-    ///
-    /// A pass run without every neighbour loaded is kept all the same: it lets light in from where
-    /// nothing is known yet, and `invalidateLight` throws it away as soon as the missing neighbour
-    /// arrives. Not keeping it meant recomputing the whole chunk on *every* query at the edge of the
-    /// loaded area, which cost over two milliseconds a time.
-    ///
-    /// A copy, not a reference into what is kept: the thread sending a chunk is not the thread that
-    /// writes blocks, and a reference to the cache stays valid only until the next block moves.
-    /// Measured with the sanitiser, that was a read of freed memory in the middle of encoding a
-    /// chunk. Copying a chunk's packed light is a few tens of kilobytes against sending the whole
-    /// column, which is the next thing that happens to it.
+    /// This chunk's sky light, worked out once and kept until a block moves. A pass with missing
+    /// neighbours is kept too, and `invalidateLight` drops it when they arrive. Returns a copy because
+    /// the sending thread is not the one writing blocks, and the cache dies on the next block change.
     [[nodiscard]] PackedLight skyLight(const std::function<PackedLight()>& compute);
 
     /// The same for the light the blocks themselves give off.
@@ -223,6 +214,9 @@ public:
     void markShapeUpdate(std::int32_t worldX, std::int32_t y, std::int32_t worldZ);
 
     [[nodiscard]] std::span<const ChunkShapeUpdate> shapeUpdates() const { return shapeUpdates_; }
+
+    /// parity: `Feature.markAboveForPostProcessing`, the two blocks over a placed one until air.
+    void markAboveForPostProcessing(std::int32_t worldX, std::int32_t y, std::int32_t worldZ);
 
     [[nodiscard]] std::int32_t decorationBlockStateId(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) const;
 

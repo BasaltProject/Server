@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/MobSpawnAttributes.hpp>
 #include <basalt/server/runtime/world/MobSpawnFinalization.hpp>
 #include <basalt/server/runtime/world/MobSpawnVariantData.hpp>
+#include <basalt/server/runtime/world/VariantSpawnConditions.hpp>
 
 #include <algorithm>
 #include <array>
@@ -59,6 +60,19 @@ constexpr std::array<std::string_view, 2> kSoundVariants{"classic", "royal"};
 } // namespace
 
 void afterCommon(const CatSpawnContext& context, random::RandomSource& random, NbtCompound& data) {
+    if (variantSpawnConditions::installed()) {
+        const VariantSpawnFacts facts{
+            .moonBrightness = context.moonBrightness, .inStructure = [&context](std::string_view structures) {
+                return context.inBlackCatStructure && structures == "#minecraft:cats_spawn_as_black";
+            }};
+        if (const auto index = variantSpawnConditions::pick("cat_variant", facts, random); index.has_value()) {
+            data.set("variant", NbtTag::ofString(variantSpawnConditions::entries("cat_variant")[*index].toString()));
+        }
+        if (const auto sound = variantSpawnConditions::randomEntry("cat_sound_variant", random); sound.has_value()) {
+            data.set("sound_variant", NbtTag::ofString(sound->toString()));
+        }
+        return;
+    }
     std::string_view variant;
     if (context.inBlackCatStructure) {
         // parity: `PriorityProvider` still samples the one-element highest-priority result.

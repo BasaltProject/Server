@@ -184,8 +184,8 @@ public:
 
     void summonVexes(entity::ServerEntity& mob, std::int32_t count) override;
 
-    void applyEffect(std::int32_t playerId, std::string_view effect, std::int32_t durationTicks,
-                     std::int32_t amplifier) override;
+    void applyEffect(std::int32_t playerId, std::string_view effect, std::int32_t durationTicks, std::int32_t amplifier,
+                     std::optional<std::int32_t> sourceId) override;
 
     void setSleeping(entity::ServerEntity& mob, bool sleeping) override;
 
@@ -553,7 +553,7 @@ public:
     void tickAxolotl(world::LoadedWorld& world, entity::ai::MobContext& context);
 
     /// parity: `Axolotl.applySupportingEffects`.
-    void axolotlSupports(player::PlayerSession& player);
+    void axolotlSupports(player::PlayerSession& player, std::int32_t axolotlId);
 
     /// parity: `Hoglin.customServerAiStep` over `HoglinAi`.
     void tickHoglin(world::LoadedWorld& world, entity::ai::MobContext& context);

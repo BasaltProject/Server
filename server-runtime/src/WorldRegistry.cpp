@@ -23,7 +23,7 @@ namespace {
 
 [[nodiscard]] bool isNormal(config::WorldType type) {
     return type == config::WorldType::Normal || type == config::WorldType::Amplified ||
-           type == config::WorldType::LargeBiomes;
+           type == config::WorldType::LargeBiomes || type == config::WorldType::Flat;
 }
 
 } // namespace

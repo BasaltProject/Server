@@ -61,7 +61,7 @@ void MobActionSystem::tickAxolotl(world::LoadedWorld& world, entity::ai::MobCont
     if (axolotl.hurtBy.has_value()) {
         const std::int32_t attacker = *std::exchange(axolotl.hurtBy, std::nullopt);
         state.hurtByEntity = attacker;
-        const double damage = axolotl.lastHurt;
+        const double damage = static_cast<double>(axolotl.lastHurt);
         const double before = axolotl.health + damage;
         const double max = axolotl.attributeWithModifiers("minecraft:max_health");
         if (context.random.nextInt(3) == 0 &&
@@ -126,7 +126,7 @@ void MobActionSystem::tickAxolotl(world::LoadedWorld& world, entity::ai::MobCont
                         std::abs(player->x - axolotl.x) <= axolotls::kPlayerRegenRange + 0.375 &&
                         std::abs(player->y - axolotl.y) <= axolotls::kPlayerRegenRange + 0.42 &&
                         std::abs(player->z - axolotl.z) <= axolotls::kPlayerRegenRange + 0.375) {
-                        axolotlSupports(*player);
+                        axolotlSupports(*player, axolotl.entityId());
                     }
                 }
             }
@@ -225,7 +225,7 @@ void MobActionSystem::tickAxolotl(world::LoadedWorld& world, entity::ai::MobCont
     kit::lookAtTarget(context, state.look);
 }
 
-void MobActionSystem::axolotlSupports(PlayerSession& player) {
+void MobActionSystem::axolotlSupports(PlayerSession& player, std::int32_t axolotlId) {
     // parity: `applySupportingEffects`: regeneration grown by five seconds to two minutes, and the
     // mining fatigue lifted.
     const wire::common::Identifier regeneration = wire::common::Identifier::vanilla("regeneration");
@@ -233,7 +233,7 @@ void MobActionSystem::axolotlSupports(PlayerSession& player) {
     if (existing == player.effects.end() || existing->second.remainingTicks <= 2399) {
         const std::int32_t previous = existing == player.effects.end() ? 0 : existing->second.remainingTicks;
         applyEffect(player.entityId(), "regeneration", std::min(axolotls::kRegenMax, axolotls::kRegenBase + previous),
-                    0);
+                    0, axolotlId);
     }
     const wire::common::Identifier fatigue = wire::common::Identifier::vanilla("mining_fatigue");
     if (player.effects.erase(fatigue) > 0 && player.connection().sendEffectRemoved) {

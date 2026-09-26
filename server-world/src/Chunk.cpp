@@ -448,9 +448,25 @@ void Chunk::markFluidUpdate(std::int32_t worldX, std::int32_t y, std::int32_t wo
 }
 
 void Chunk::markShapeUpdate(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
+    // parity: `level.getChunk(pos).markPosForPostProcessing`, the chunk that holds the position.
+    if (region_ != nullptr && ((worldX >> 4) != chunkX_ || (worldZ >> 4) != chunkZ_)) {
+        if (Chunk* owner = region_->chunkAt(worldX >> 4, worldZ >> 4); owner != nullptr) {
+            owner->markShapeUpdate(worldX, y, worldZ);
+        }
+        return;
+    }
     const ChunkShapeUpdate mark{.x = worldX, .y = y, .z = worldZ};
     if (std::ranges::find(shapeUpdates_, mark) == shapeUpdates_.end()) {
         shapeUpdates_.push_back(mark);
+    }
+}
+
+void Chunk::markAboveForPostProcessing(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
+    for (std::int32_t step = 1; step <= 2; ++step) {
+        if (registry::blocks::isAir(decorationBlockStateId(worldX, y + step, worldZ))) {
+            return;
+        }
+        markShapeUpdate(worldX, y + step, worldZ);
     }
 }
 

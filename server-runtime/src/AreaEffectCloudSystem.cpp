@@ -208,6 +208,7 @@ void AreaEffectCloudSystem::affect(world::LoadedWorld& world, const ServerEntity
     }
     const auto ticks = static_cast<std::int32_t>(static_cast<float>(effect.duration) * settings.potionDurationScale);
     if (player != nullptr && player->connection().addEffect) {
+        player->noteEffectSource(cloud.entityId());
         player->connection().addEffect(effect.id, ticks, effect.amplifier);
     }
     if (mob != nullptr) {

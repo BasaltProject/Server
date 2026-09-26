@@ -1,11 +1,13 @@
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/server/world/terrain/MineshaftStructureGenerator.hpp>
+#include <basalt/server/world/terrain/StructureReferenceOrder.hpp>
 
 #include <array>
 #include <cstdint>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace basalt::server::world::terrain {
 namespace {
@@ -104,6 +106,10 @@ void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) 
         const std::int64_t decorationSeed =
             random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
         random::setFeatureSeed(random, decorationSeed, index, kUndergroundStructuresStep);
+        // parity: `StructureManager.startsForStructure` walks the chunk's references, a `LongOpenHashSet`
+        // filled x outermost with every start whose box reaches the chunk. Its hash order decides which
+        // shaft draws from the shared random first.
+        std::vector<std::pair<std::int32_t, std::int32_t>> references;
         for (std::int32_t startX = chunk.chunkX() - kReachChunks; startX <= chunk.chunkX() + kReachChunks; ++startX) {
             for (std::int32_t startZ = chunk.chunkZ() - kReachChunks; startZ <= chunk.chunkZ() + kReachChunks;
                  ++startZ) {
@@ -111,6 +117,23 @@ void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) 
                 if (!type.has_value() || *type != wanted) {
                     continue;
                 }
+                const std::vector<structure::MineshaftPiece>& pieces = assemblyOf(seed, startX, startZ, *type)->pieces;
+                if (pieces.empty()) {
+                    continue;
+                }
+                structure::StructureBoundingBox whole = pieces.front().box;
+                for (const structure::MineshaftPiece& piece : pieces) {
+                    whole = whole.encapsulating(piece.box);
+                }
+                if (whole.minX <= clip.maxX && whole.maxX >= clip.minX && whole.minZ <= clip.maxZ &&
+                    whole.maxZ >= clip.minZ) {
+                    references.emplace_back(startX, startZ);
+                }
+            }
+        }
+        for (const auto& [startX, startZ] : vanillaStructureReferenceChunkOrder(references)) {
+            {
+                const std::optional<structure::MineshaftType> type = typeAt(seed, startX, startZ);
                 const std::shared_ptr<const structure::mineshaftLayout::Assembly> assembly =
                     assemblyOf(seed, startX, startZ, *type);
                 const std::vector<structure::MineshaftPiece>& pieces = assembly->pieces;

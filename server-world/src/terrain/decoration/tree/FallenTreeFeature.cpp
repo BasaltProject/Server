@@ -96,6 +96,8 @@ void decorateAttachedMushrooms(Chunk& chunk, random::RandomSource& random, const
 bool placeConfigured(Chunk& chunk, random::RandomSource& random, std::int32_t originX, std::int32_t originY,
                      std::int32_t originZ, const FallenTreeConfiguration& config) {
     setBlock(chunk, originX, originY, originZ, config.logStateId);
+    // parity: `placeLogBlock` marks the two blocks over every log for post-processing.
+    chunk.markAboveForPostProcessing(originX, originY, originZ);
     if (config.stumpVines) {
         decorateStumpVines(chunk, random, originX, originY, originZ);
     }
@@ -131,6 +133,7 @@ bool placeConfigured(Chunk& chunk, random::RandomSource& random, std::int32_t or
     for (std::int32_t index = 0; index < logLength; ++index) {
         const LogPos log{.x = startX + direction.dx * index, .y = startY, .z = startZ + direction.dz * index};
         setBlock(chunk, log.x, log.y, log.z, sidewaysState);
+        chunk.markAboveForPostProcessing(log.x, log.y, log.z);
         fallenLogs.push_back(log);
     }
     decorateAttachedMushrooms(chunk, random, fallenLogs, config.brownMushroomsOnly);

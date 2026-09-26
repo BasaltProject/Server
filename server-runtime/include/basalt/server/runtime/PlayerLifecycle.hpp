@@ -16,8 +16,9 @@ class PlayerSession;
 }
 
 namespace basalt::server::runtime::world {
+class AdvancementTriggers;
 class LoadedWorld;
-}
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
 
@@ -49,12 +50,9 @@ public:
 
     explicit PlayerLifecycle(ClientSession& owner, Hooks hooks = {});
 
-    /// One player tick, driven from this connection's own outbound loop rather than the tick loop.
-    ///
-    /// That loop already runs at twenty a second on this connection's thread, which is where
-    /// anything that writes to this socket has to happen: hunger and regeneration both end in a
-    /// `set_health` packet, so ticking them from the shared tick thread would park every other
-    /// player behind a client that has stopped reading.
+    /// One player tick, driven from this connection's own outbound loop rather than the tick loop:
+    /// hunger and regeneration end in a `set_health` write, and doing that from the shared tick thread
+    /// would park every other player behind a client that has stopped reading.
     void tickPlayer();
 
     /// parity: `ServerPlayer.rideTick`: a rider is carried where its vehicle is, and counts it.
@@ -94,6 +92,9 @@ private:
     /// `onEffectAdded`, `onEffectUpdated` and `onEffectsRemoved`, seen as the effects differ from
     /// last turn's since they are written in many places.
     void tickTriggers(player::PlayerSession& session);
+
+    /// `EFFECTS_CHANGED`, once for each entity that put an effect on the player this turn.
+    void fireEffectsChanged(player::PlayerSession& session, world::AdvancementTriggers& triggers);
 
     /// parity: `ServerPlayer.triggerDimensionChangeTriggers`, after the player has arrived.
     void dimensionTriggers(player::PlayerSession& session, const world::LoadedWorld& previous,

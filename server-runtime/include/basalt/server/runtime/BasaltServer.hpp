@@ -19,7 +19,6 @@
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
-#include <basalt/server/runtime/StructureBlockSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/PersistenceCoordinator.hpp>
@@ -30,6 +29,7 @@
 #include <basalt/server/runtime/ServerMetrics.hpp>
 #include <basalt/server/runtime/ShriekerSystem.hpp>
 #include <basalt/server/runtime/StatusEffectSystem.hpp>
+#include <basalt/server/runtime/StructureBlockSystem.hpp>
 #include <basalt/server/runtime/SubstituteLabels.hpp>
 #include <basalt/server/runtime/TickLoop.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
@@ -52,10 +52,9 @@
 #include <basalt/server/runtime/scoreboard/Teams.hpp>
 #include <basalt/server/runtime/timings/TimingsReport.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
+#include <basalt/server/runtime/world/PlayerAdvancements.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/maps/MapStorage.hpp>
-#include <basalt/server/runtime/world/PlayerAdvancements.hpp>
-#include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
 #include <basalt/wire/auth/SignatureValidator.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>

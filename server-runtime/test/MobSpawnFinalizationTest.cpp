@@ -1,10 +1,12 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/runtime/world/MobSpawnFinalization.hpp>
+#include <basalt/server/runtime/world/VariantSpawnConditions.hpp>
 
 #include <doctest.h>
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -131,4 +133,45 @@ TEST_CASE("a spider that rolls a jockey carries a finalized skeleton rather than
         CHECK(hasKey(rider.data, "LeftHanded"));
     }
     CHECK(sawJockey);
+}
+
+TEST_CASE("the packs' spawn conditions pick a variant, the highest priority that holds winning") {
+    const std::map<std::string, std::string, std::less<>> files{
+        {"data/minecraft/wolf_variant/pale.json", R"({"spawn_conditions":[{"priority":0}]})"},
+        {"data/minecraft/wolf_variant/spotted.json",
+         R"({"spawn_conditions":[{"condition":{"type":"minecraft:biome","biomes":"#minecraft:is_savanna"},"priority":1}]})"},
+        {"data/extra/wolf_variant/dusty.json",
+         R"({"spawn_conditions":[{"condition":{"type":"minecraft:biome","biomes":"minecraft:desert"},"priority":1}]})"},
+        {"data/minecraft/tags/worldgen/biome/is_savanna.json", R"({"values":["minecraft:savanna"]})"},
+        {"data/minecraft/wolf_sound_variant/classic.json", "{}"},
+    };
+    namespace variants = basalt::server::runtime::world::variantSpawnConditions;
+    variants::install(
+        [&files](std::string_view prefix) {
+            std::vector<std::string> names;
+            for (const auto& [name, text] : files) {
+                if (name.starts_with(prefix)) {
+                    names.push_back(name);
+                }
+            }
+            return names;
+        },
+        [&files](std::string_view name) -> std::optional<std::string> {
+            const auto found = files.find(name);
+            return found == files.end() ? std::nullopt : std::optional{found->second};
+        });
+    REQUIRE(variants::installed());
+    // parity: registry order is the file path first, so `extra:dusty` comes before `minecraft:pale`.
+    CHECK(variants::entries("wolf_variant").front() == Identifier{"extra", "dusty"});
+
+    Attempt savanna{"savanna"};
+    CHECK(stringAt(savanna.spawn("wolf").main.data, "variant") == "minecraft:spotted");
+    CHECK(stringAt(savanna.spawn("wolf").main.data, "sound_variant") == "minecraft:classic");
+    Attempt desert{"desert"};
+    CHECK(stringAt(desert.spawn("wolf").main.data, "variant") == "extra:dusty");
+    Attempt plains{"plains"};
+    CHECK(stringAt(plains.spawn("wolf").main.data, "variant") == "minecraft:pale");
+
+    variants::install({}, {});
+    CHECK_FALSE(variants::installed());
 }

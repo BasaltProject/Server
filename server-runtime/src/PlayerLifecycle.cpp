@@ -1,7 +1,6 @@
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
-#include <basalt/server/runtime/world/PlayerAdvancements.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
@@ -16,8 +15,10 @@
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/PlayerAdvancements.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
@@ -29,6 +30,7 @@
 #include <chrono>
 #include <cstdint>
 #include <utility>
+#include <vector>
 
 namespace basalt::server::runtime {
 namespace {
@@ -118,6 +120,32 @@ void PlayerLifecycle::tickPlayer() {
     owner_->blockInteraction().tickDigging(*session);
 }
 
+void PlayerLifecycle::fireEffectsChanged(PlayerSession& session, world::AdvancementTriggers& triggers) {
+    const std::string name{session.name()};
+    const std::string uuid = session.uuid().toString();
+    // parity: `ServerPlayer.onEffectAdded` and `onEffectUpdated` pass the entity `addEffect` named;
+    // a removal, and an effect nothing put there, pass none.
+    std::vector<std::optional<std::int32_t>> sources = session.effectSources;
+    std::ranges::sort(sources);
+    sources.erase(std::ranges::unique(sources).begin(), sources.end());
+    if (sources.empty()) {
+        sources.emplace_back(std::nullopt);
+    }
+    world::LoadedWorld* world = owner_->currentWorld();
+    player::PlayerRegistry* registry = owner_->options().playerRegistry;
+    for (const std::optional<std::int32_t>& source : sources) {
+        world::TriggerEvent event;
+        if (source.has_value() && world != nullptr) {
+            std::optional<server::world::loot::EntityFacts> facts = world::triggerFacts::ofId(
+                *world, registry != nullptr ? registry->snapshot() : std::vector<PlayerSession*>{}, *source);
+            if (facts.has_value()) {
+                event.entities.emplace("source", std::move(*facts));
+            }
+        }
+        triggers.fire("effects_changed", name, uuid, event);
+    }
+}
+
 void PlayerLifecycle::tickTriggers(PlayerSession& session) {
     world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
     if (triggers == nullptr) {
@@ -144,8 +172,9 @@ void PlayerLifecycle::tickTriggers(PlayerSession& session) {
     }
     seenEffects_ = std::move(now);
     if (changed) {
-        triggers->fire("effects_changed", name, uuid);
+        fireEffectsChanged(session, *triggers);
     }
+    session.effectSources.clear();
     triggers->fire("tick", name, uuid);
     // parity: `trackEnteredOrExitedLavaOnVehicle`: where the vehicle went into lava, and each turn it
     // is still in it, `ride_entity_in_lava` from there.

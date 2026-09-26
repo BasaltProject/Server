@@ -89,7 +89,7 @@ void installRegistries(std::vector<wire::protocol::configuration::RegistryDataPa
         std::ranges::stable_sort(packet.entries, [](const auto& left, const auto& right) {
             const auto a = wire::common::Identifier::parse(left.key);
             const auto b = wire::common::Identifier::parse(right.key);
-            return a.has_value() && b.has_value() ? *a < *b : left.key < right.key;
+            return a.has_value() && b.has_value() ? datapack::registryFileOrder(*a, *b) : left.key < right.key;
         });
     }
     vanillaRegistryData::install(packets);
