@@ -61,53 +61,66 @@ std::optional<Vec> jumpVector(MobContext& context, const Spec& spec, const Vec& 
     }
     const auto maxVelocity = static_cast<float>(body.attributeWithModifiers("minecraft:jump_strength") *
                                                 static_cast<double>(spec.velocityMultiplier));
+    for (const std::int32_t angle : angles) {
+        if (std::optional<Vec> vector = vectorForAngle(context, target, maxVelocity, angle,
+                                                       body.width() * static_cast<double>(spec.jumpingScale),
+                                                       body.height() * static_cast<double>(spec.jumpingScale), true);
+            vector.has_value()) {
+            return vector;
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+std::optional<Vec> vectorForAngle(MobContext& context, const Vec& target, float maxVelocity, std::int32_t angle,
+                                  double width, double height, bool checkCollision) {
+    ServerEntity& body = context.mob;
     constexpr double kGravity = 0.08;
-    const double width = body.width() * static_cast<double>(spec.jumpingScale);
-    const double height = body.height() * static_cast<double>(spec.jumpingScale);
     const entityCollision::BlockAt blockAt = [&context](std::int32_t x, std::int32_t y, std::int32_t z) {
         return context.world.blockState(x, y, z);
     };
-    for (const std::int32_t angle : angles) {
-        // parity: `LongJumpUtil.calculateJumpVectorForAngle`, half a block short of the middle.
-        double planeX = target[0] - body.x;
-        double planeZ = target[2] - body.z;
-        const double planeLength = std::sqrt((planeX * planeX) + (planeZ * planeZ));
-        if (planeLength < 1.0E-4) {
-            continue;
-        }
-        planeX = planeX / planeLength * 0.5;
-        planeZ = planeZ / planeLength * 0.5;
-        const double dx = target[0] - planeX - body.x;
-        const double dy = target[1] - body.y;
-        const double dz = target[2] - planeZ - body.z;
-        const float radians = static_cast<float>(angle) * std::numbers::pi_v<float> / 180.0F;
-        const double xzAngle = std::atan2(dz, dx);
-        const double r2 = (dx * dx) + (dz * dz);
-        const double r = std::sqrt(r2);
-        const double sin2 = std::sin(static_cast<double>(2.0F * radians));
-        const double cos2 = std::pow(std::cos(static_cast<double>(radians)), 2.0);
-        const double sinA = std::sin(static_cast<double>(radians));
-        const double cosA = std::cos(static_cast<double>(radians));
-        const double v0sqr = r2 * kGravity / ((r * sin2) - (2.0 * dy * cos2));
-        if (v0sqr < 0.0) {
-            continue;
-        }
-        const double v0 = std::sqrt(v0sqr);
-        if (v0 > static_cast<double>(maxVelocity)) {
-            continue;
-        }
-        const double v0r = v0 * cosA;
-        const double v0y = v0 * sinA;
+    // parity: `LongJumpUtil.calculateJumpVectorForAngle`, half a block short of the middle.
+    double planeX = target[0] - body.x;
+    double planeZ = target[2] - body.z;
+    const double planeLength = std::sqrt((planeX * planeX) + (planeZ * planeZ));
+    if (planeLength < 1.0E-4) {
+        return std::nullopt;
+    }
+    planeX = planeX / planeLength * 0.5;
+    planeZ = planeZ / planeLength * 0.5;
+    const double dx = target[0] - planeX - body.x;
+    const double dy = target[1] - body.y;
+    const double dz = target[2] - planeZ - body.z;
+    const float radians = static_cast<float>(angle) * std::numbers::pi_v<float> / 180.0F;
+    const double xzAngle = std::atan2(dz, dx);
+    const double r2 = (dx * dx) + (dz * dz);
+    const double r = std::sqrt(r2);
+    const double sin2 = std::sin(static_cast<double>(2.0F * radians));
+    const double cos2 = std::pow(std::cos(static_cast<double>(radians)), 2.0);
+    const double sinA = std::sin(static_cast<double>(radians));
+    const double cosA = std::cos(static_cast<double>(radians));
+    const double v0sqr = r2 * kGravity / ((r * sin2) - (2.0 * dy * cos2));
+    if (v0sqr < 0.0) {
+        return std::nullopt;
+    }
+    const double v0 = std::sqrt(v0sqr);
+    if (v0 > static_cast<double>(maxVelocity)) {
+        return std::nullopt;
+    }
+    const double v0r = v0 * cosA;
+    const double v0y = v0 * sinA;
+    if (checkCollision) {
         const std::int32_t samples = static_cast<std::int32_t>(std::ceil(r / v0r)) * 2;
         double ri = 0.0;
         std::optional<Vec> previous;
-        bool clear = true;
-        for (std::int32_t index = 0; index < samples - 1 && clear; ++index) {
+        for (std::int32_t index = 0; index < samples - 1; ++index) {
             ri += r / samples;
             const double yi = (sinA / cosA * ri) - (ri * ri * kGravity / (2.0 * v0sqr * cosA * cosA));
             const Vec sample{body.x + (ri * std::cos(xzAngle)), body.y + yi, body.z + (ri * std::sin(xzAngle))};
             if (previous.has_value()) {
-                // parity: `isClearTransition`, the shrunken box stepped along the arc.
+                // parity: `isClearTransition`, the box stepped along the arc.
                 const double sx = sample[0] - (*previous)[0];
                 const double sy = sample[1] - (*previous)[1];
                 const double sz = sample[2] - (*previous)[2];
@@ -115,7 +128,7 @@ std::optional<Vec> jumpVector(MobContext& context, const Spec& spec, const Vec& 
                 const double step = std::min(width, height);
                 const std::int32_t checks = static_cast<std::int32_t>(std::ceil(length / step));
                 Vec point = *previous;
-                for (std::int32_t check = 0; check < checks && clear; ++check) {
+                for (std::int32_t check = 0; check < checks; ++check) {
                     if (check == checks - 1) {
                         point = sample;
                     } else {
@@ -123,23 +136,18 @@ std::optional<Vec> jumpVector(MobContext& context, const Spec& spec, const Vec& 
                                  point[1] + (sy / length * step * static_cast<double>(0.9F)),
                                  point[2] + (sz / length * step * static_cast<double>(0.9F))};
                     }
-                    clear =
-                        entityCollision::collidingBoxes(blockAt, Aabb::of(point[0], point[1], point[2], width, height))
-                            .empty();
+                    if (!entityCollision::collidingBoxes(blockAt, Aabb::of(point[0], point[1], point[2], width, height))
+                             .empty()) {
+                        return std::nullopt;
+                    }
                 }
             }
             previous = sample;
         }
-        if (!clear) {
-            continue;
-        }
-        return Vec{v0r * std::cos(xzAngle) * static_cast<double>(0.95F), v0y * static_cast<double>(0.95F),
-                   v0r * std::sin(xzAngle) * static_cast<double>(0.95F)};
     }
-    return std::nullopt;
+    return Vec{v0r * std::cos(xzAngle) * static_cast<double>(0.95F), v0y * static_cast<double>(0.95F),
+               v0r * std::sin(xzAngle) * static_cast<double>(0.95F)};
 }
-
-} // namespace
 
 bool defaultAcceptable(const MobContext& mob, const Block& target) {
     const std::optional<std::int32_t> below = mob.world.blockState(target[0], target[1] - 1, target[2]);

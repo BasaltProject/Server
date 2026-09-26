@@ -33,6 +33,7 @@
 #include <basalt/wire/protocol/play/RecipePackets.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/protocol/play/UiPackets.hpp>
+#include <basalt/wire/protocol/play/VehiclePackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
@@ -384,6 +385,11 @@ player::PlayerConnection ClientSession::playerConnection() {
     };
     connection.teleportTo = [this](double x, double y, double z, float yaw, float pitch) {
         teleportTo(x, y, z, yaw, pitch);
+    };
+    connection.dismount = [this] {
+        if (player::PlayerSession* rider = playerSession(); rider != nullptr) {
+            dismount(*rider);
+        }
     };
     connection.showSleeping = [this](const std::int32_t entityId,
                                      const std::optional<std::array<std::int32_t, 3>> bed) {
@@ -754,6 +760,10 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
                 options_.plugins.sprintChanged(*session, true);
             }
             session->sprinting = true;
+        } else if (command->action == play::PlayerCommandPacket::Action::StartRidingJump ||
+                   command->action == play::PlayerCommandPacket::Action::StopRidingJump ||
+                   command->action == play::PlayerCommandPacket::Action::OpenInventory) {
+            combat_->handleRidingCommand(command->action, command->data);
         } else if (command->action == play::PlayerCommandPacket::Action::StartFallFlying && session != nullptr) {
             player::gliding::startFallFlying(*session);
         } else if (command->action == play::PlayerCommandPacket::Action::StopSprinting && session != nullptr) {
@@ -812,6 +822,20 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
                 options_.plugins.menuClosed(*session, menus_->openMenu.containerId() == 0 ? "player" : "container");
             }
             menus_->closeOpenMenu(*session);
+        }
+        return;
+    }
+    if (packetId == play::ServerboundMoveVehiclePacket::kId) {
+        if (const std::optional<play::ServerboundMoveVehiclePacket> packet = play::ServerboundMoveVehiclePacket::read(body);
+            packet.has_value()) {
+            combat_->handleMoveVehicle(*packet);
+        }
+        return;
+    }
+    if (packetId == play::ServerboundPaddleBoatPacket::kId) {
+        if (const std::optional<play::ServerboundPaddleBoatPacket> packet = play::ServerboundPaddleBoatPacket::read(body);
+            packet.has_value()) {
+            combat_->handlePaddleBoat(*packet);
         }
         return;
     }
@@ -878,6 +902,13 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         const std::optional<play::SetCommandBlockPacket> packet = play::SetCommandBlockPacket::read(body);
         if (packet.has_value()) {
             blockInteraction_->programCommandBlock(*packet);
+        }
+        return;
+    }
+    if (packetId == play::SetStructureBlockPacket::kId) {
+        if (const std::optional<play::SetStructureBlockPacket> packet = play::SetStructureBlockPacket::read(body);
+            packet.has_value()) {
+            blockInteraction_->setStructureBlock(*packet);
         }
         return;
     }

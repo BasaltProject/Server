@@ -367,6 +367,9 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         }
         entity->data().putBoolean("powered", powered);
         chunk->markDirty();
+        if (powered && path == "structure_block") {
+            world.queueStructureTrigger(x, y, z);
+        }
         return;
     }
     if (path == "tnt") {

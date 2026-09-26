@@ -409,7 +409,7 @@ void ContainerMenuController::pickupClick(PlayerSession& session, const MenuSlot
     const storage::StoredItemStack carried = *carriedItem_;
     // parity: `Slot.mayPlace` and `getMaxStackSize`, which only the brewing stand's slots narrow here.
     const std::int32_t capacity = slotCapacity(slot);
-    if (brewingStandOpen() && !accepts(slot, carried)) {
+    if ((brewingStandOpen() || mountOpen()) && !accepts(slot, carried)) {
         return;
     }
     if (!inSlot.has_value()) {
@@ -471,6 +471,10 @@ void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& 
     // parity: `AbstractContainerMenu.quickMoveStack`, whose whole job is picking the other side:
     // with a block open, the inventory sends to the block and the block sends to the inventory.
     // Without a block open the two halves of the inventory swap, hotbar to storage and back.
+    if (mountOpen()) {
+        quickMoveMount(session, slot, *stack);
+        return;
+    }
     const auto* fromInventory = std::get_if<player::menuSlot::Inventory>(&slot);
     if (fromInventory != nullptr && brewingStandOpen()) {
         quickMoveIntoBrewingStand(session, slot, *stack);

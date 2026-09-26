@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/StructureBlockSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/PersistenceCoordinator.hpp>
@@ -152,6 +153,10 @@ private:
     /// Applies `update` to every objective of `criterion` for `holder`, telling whoever shows it.
     void updateCriterion(std::string_view criterion, std::string_view holder,
                          const std::function<std::int32_t(std::int32_t)>& update);
+
+    /// One turn of a boat and whoever it takes aboard or throws off.
+    void tickBoat(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                  const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& boat);
 
     /// parity: the `DamageSource` of the blow that killed `dead`, as `killing_blow` reads it.
     [[nodiscard]] world::TriggerDamage killingBlowOf(const world::LoadedWorld& world, const entity::ServerEntity& dead);
@@ -301,6 +306,7 @@ private:
     std::unique_ptr<EnvironmentTickSystem> environment_;
     std::unique_ptr<MobActionSystem> mobActions_;
     std::unique_ptr<MobTickSystem> mobTicks_;
+    std::unique_ptr<StructureBlockSystem> structureBlocks_;
     std::unique_ptr<ServerListStatus> serverList_;
 
     wire::protocol::play::Gamemode defaultGamemode_ = wire::protocol::play::Gamemode::Survival;

@@ -44,15 +44,9 @@ struct Block {
 /// four cases that never grow do not need one.
 using MenuSlot = std::variant<menuSlot::Inventory, menuSlot::Grid, menuSlot::Result, menuSlot::Block>;
 
-/// The slot layout of one open window.
-///
-/// The client addresses everything by its position in *this* layout, which is neither the server's
-/// storage order nor the same between windows: the player's own inventory puts a 2x2 grid and the
-/// armour where the crafting table puts a 3x3 grid, and both are 46 slots long. Getting this
-/// mapping wrong does not fail loudly, it just moves the wrong item, so it lives in one place with
-/// both layouts written out rather than being computed at each call site.
-///
-/// parity: `InventoryMenu` and `CraftingMenu`, whose own slot order this mirrors.
+/// The slot layout of one open window, which is how the client addresses slots: it differs from
+/// storage order and between windows (inventory and crafting table are both 46 slots, laid out apart).
+/// parity: `InventoryMenu` and `CraftingMenu`.
 class Menu {
 public:
     /// Nine to a row, which is every window the client draws.
@@ -137,10 +131,12 @@ public:
 
     /// A window of `rows` rows of nine, then the player's own 36: `minecraft:generic_9xN`.
     ///
-    /// What a plugin's menu is drawn in. The slots above the player's are `menuSlot::Block` like a
-    /// chest's, because the *shape* is a chest's; what is behind them is not a block, which is the
-    /// caller's business and not this class's.
+    /// What a plugin's menu is drawn in. The slots above the player's are `menuSlot::Block` because
+    /// the shape is a chest's; what backs them is the caller's business.
     [[nodiscard]] static Menu rows(std::int32_t containerId, std::int32_t rows);
+
+    /// parity: `HorseInventoryMenu`: saddle, body armour, three rows of `columns`, then the player's 36.
+    [[nodiscard]] static Menu mount(std::int32_t containerId, std::int32_t columns);
 
     /// parity: `StonecutterMenu`: one slot in, one out, then the player's 36.
     [[nodiscard]] static Menu stonecutter(std::int32_t containerId);

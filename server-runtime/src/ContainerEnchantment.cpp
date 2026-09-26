@@ -48,6 +48,7 @@ void ContainerMenuController::openEnchantmentMenu(PlayerSession& session, const 
     openBlock = pos;
     openBlockSecond.reset();
     openEnderChest_ = false;
+    openEntity_.reset();
     openStonecutter_ = false;
     openSmithing_ = false;
     openAnvil_ = false;

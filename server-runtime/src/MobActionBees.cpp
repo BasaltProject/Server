@@ -226,6 +226,10 @@ void MobActionSystem::beeStung(world::LoadedWorld& world, ServerEntity& bee, Pla
             villagersIn(world).addEffect(*mob, "poison", seconds * 20, 0);
         }
     }
+    // parity: `Bee.doHurtTarget` leaves its stinger in whatever it stung.
+    if (mob != nullptr) {
+        ++mob->stingerCount;
+    }
     state.hasStung = true;
     entity::bees::stopBeingAngry(bee, state);
     playSound(world, bee, "entity.bee.sting");
@@ -446,6 +450,20 @@ bool MobActionSystem::tickBeehive(world::LoadedWorld& world, std::int32_t x, std
     const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
     if (entity == nullptr || !stateId.has_value() || !isHiveState(*stateId)) {
         return false;
+    }
+    // parity: `BeehiveBlock.updateShape`: fire arriving beside it sends every bee out at once.
+    bool fireBeside = false;
+    for (const auto& side : std::array<Pos, 6>{{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}}) {
+        const std::optional<std::int32_t> neighbour = world.state().blockState(x + side[0], y + side[1], z + side[2]);
+        const wire::common::Identifier* block =
+            neighbour.has_value() ? server::registry::blockStateDefinitions::blockOf(*neighbour) : nullptr;
+        fireBeside = fireBeside || (block != nullptr && block->path() == "fire");
+    }
+    const auto seen = hivesByFire_.find({world.name(), hive});
+    const bool fireArrived = fireBeside && seen != hivesByFire_.end() && !seen->second;
+    hivesByFire_[{world.name(), hive}] = fireBeside;
+    if (fireArrived && releaseAll(world, hive, *stateId, entity->data(), nullptr, beehives::Release::Emergency)) {
+        return true;
     }
     std::vector<std::size_t> due;
     beehives::tickOccupants(entity->data(), due);

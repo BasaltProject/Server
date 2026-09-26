@@ -97,9 +97,10 @@ void knock(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
 } // namespace
 
 std::vector<BlockChange> burst(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y, double z,
-                               std::int64_t gameTime, random::RandomSource& random, const explosions::Spares& stops) {
+                               std::int64_t gameTime, random::RandomSource& random, const explosions::Spares& stops,
+                               float radius) {
     std::vector<BlockChange> changes;
-    for (const explosions::Broken& square : explosions::reaches(world, minY, maxY, x, y, z, kRadius, random, stops)) {
+    for (const explosions::Broken& square : explosions::reaches(world, minY, maxY, x, y, z, radius, random, stops)) {
         knock(world, square.x, square.y, square.z, gameTime, changes);
     }
     return changes;

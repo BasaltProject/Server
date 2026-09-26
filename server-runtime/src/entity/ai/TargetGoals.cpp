@@ -1,5 +1,7 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -7,8 +9,10 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
 
+#include <array>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <utility>
 
 namespace basalt::server::runtime::entity::ai {
@@ -146,6 +150,20 @@ void HurtByTargetGoal::start(MobContext& mob) {
     mob.mob.hurtBy.reset();
     if (!alertOthers_ || !mob.mob.targetId.has_value()) {
         return;
+    }
+    // parity: `Mob.hasLineOfSight`, eye to eye within 128 blocks.
+    if (alertInSight_) {
+        std::optional<std::array<double, 3>> eyes;
+        if (const PlayerView* player = mob.playerById(*mob.mob.targetId); player != nullptr) {
+            eyes = std::array<double, 3>{player->x, player->y + 1.62, player->z};
+        } else if (const ServerEntity* by = mob.entityById(*mob.mob.targetId); by != nullptr) {
+            eyes = std::array<double, 3>{by->x, by->y + mobBreathing::eyeHeightOf(*by), by->z};
+        }
+        const double ownEyes = mob.mob.y + mobBreathing::eyeHeightOf(mob.mob);
+        if (!eyes.has_value() || mob.distanceSquaredTo((*eyes)[0], (*eyes)[1], (*eyes)[2]) > 128.0 * 128.0 ||
+            blockRay::cast(mob.world, mob.mob.x, ownEyes, mob.mob.z, (*eyes)[0], (*eyes)[1], (*eyes)[2]).has_value()) {
+            return;
+        }
     }
     // parity: `alertOthers`, the same kind within the follow range across and ten up or down that
     // has nothing to fight yet.

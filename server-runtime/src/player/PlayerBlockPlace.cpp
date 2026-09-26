@@ -245,6 +245,10 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
             if (world::decoratedPots::isPot(placedBlock.path())) {
                 world::decoratedPots::decorate(data, held.components);
             }
+            // parity: `StructureBlock.setPlacedBy`, which signs it with whoever put it down.
+            if (placedBlock.path() == "structure_block") {
+                data.putString("author", player.name());
+            }
             chunk->setBlockEntity(server::world::ChunkBlockEntity{placeAt.x & 15, placeAt.y, placeAt.z & 15,
                                                                   placedBlock, std::move(data)});
             if (mode.has_value()) {

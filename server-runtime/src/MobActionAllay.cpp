@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
+#include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -18,6 +19,7 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
@@ -128,16 +130,47 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
         deposit = Vec{liked->x, liked->y + static_cast<double>(1.62F), liked->z};
     }
     const std::optional<server::world::loot::ItemStack> hand = entity::copperGolems::mainHand(allay);
-    // parity: `NearestItemSensor`: the nearest item it wants within thirty-two, looked for every tick
-    // rather than every twenty and without the line of sight.
+    // parity: `NearestItemSensor`, every twenty ticks: the nearest item it wants within thirty-two
+    // across and sixteen up or down that it can see.
+    if (state.itemSensorTicks < 0) {
+        state.itemSensorTicks = random.nextInt(20);
+    }
+    const std::vector<world::DroppedItem> nearItems =
+        world.state().nearbyItems(allay.x, allay.y, allay.z, kWantedItemRange + kWantedItemRange);
+    if (--state.itemSensorTicks <= 0) {
+        state.itemSensorTicks = 20;
+        state.wantedItem.reset();
+        const double eyes = allay.y + entity::mobBreathing::eyeHeightOf(allay);
+        std::vector<const world::DroppedItem*> sorted;
+        for (const world::DroppedItem& item : nearItems) {
+            if (std::abs(item.x - allay.x) <= kWantedItemRange + 0.2 &&
+                std::abs(item.z - allay.z) <= kWantedItemRange + 0.2 &&
+                std::abs(item.y - allay.y) <= 16.0 + allay.height()) {
+                sorted.push_back(&item);
+            }
+        }
+        std::ranges::sort(sorted, {}, [&allay](const world::DroppedItem* item) {
+            return distanceSquared({item->x, item->y, item->z}, {allay.x, allay.y, allay.z});
+        });
+        for (const world::DroppedItem* item : sorted) {
+            const ItemStack stack{.item = item->item, .count = item->count, .components = item->components};
+            const bool wants = hand.has_value() && world.gameRules().get(world::gameRules::kMobGriefing) &&
+                               allays::considersEqual(*hand, stack) && allays::roomFor(state, stack) > 0;
+            const double itemEyes = item->y + static_cast<double>(0.2125F);
+            if (wants &&
+                distanceSquared({item->x, item->y, item->z}, {allay.x, allay.y, allay.z}) <
+                    kWantedItemRange * kWantedItemRange &&
+                !entity::blockRay::cast(context.world, allay.x, eyes, allay.z, item->x, itemEyes, item->z)
+                     .has_value()) {
+                state.wantedItem = item->entityId;
+                break;
+            }
+        }
+    }
     std::optional<world::DroppedItem> wanted;
-    if (hand.has_value() && world.gameRules().get(world::gameRules::kMobGriefing)) {
-        double best = kWantedItemRange * kWantedItemRange;
-        for (const world::DroppedItem& item : world.state().nearbyItems(allay.x, allay.y, allay.z, kWantedItemRange)) {
-            const ItemStack stack{.item = item.item, .count = item.count, .components = item.components};
-            const double distance = distanceSquared({item.x, item.y, item.z}, {allay.x, allay.y, allay.z});
-            if (distance < best && allays::considersEqual(*hand, stack) && allays::roomFor(state, stack) > 0) {
-                best = distance;
+    if (state.wantedItem.has_value()) {
+        for (const world::DroppedItem& item : nearItems) {
+            if (item.entityId == *state.wantedItem) {
                 wanted = item;
             }
         }
@@ -336,22 +369,46 @@ void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay,
             }
             continue;
         }
-        // parity: the vibration user: sixteen blocks from its eyes, and only the liked note block
-        // once it has one.
+        // parity: the vibration user: deaf while one travels, sixteen blocks from its eyes, past no
+        // wool, and only the liked note block once it has one.
         const double dy = record.y - eyeY;
-        if (record.event != "note_block_play" || allay.noAi ||
-            (dx * dx) + (dy * dy) + (dz * dz) > allays::kListenerRadius * allays::kListenerRadius) {
+        const bool liked = !state.likedNoteblock.has_value() ||
+                           (*state.likedNoteblock == pos &&
+                            (state.noteblockDimension.empty() ||
+                             state.noteblockDimension == config::dimensionRegistryKey(world.declaration().dimension)));
+        if (state.vibrationTravelling.has_value() || record.event != "note_block_play" || allay.noAi || !liked ||
+            (dx * dx) + (dy * dy) + (dz * dz) > allays::kListenerRadius * allays::kListenerRadius ||
+            world::vibrations::occludedBetween(world.state(), record.x, record.y, record.z, allay.x, eyeY, allay.z)) {
             continue;
         }
-        if (!state.likedNoteblock.has_value()) {
-            state.likedNoteblock = pos;
-            state.noteblockDimension = config::dimensionRegistryKey(world.declaration().dimension);
-            state.noteblockCooldown = allays::kNoteblockCooldown;
-        } else if (*state.likedNoteblock == pos) {
-            state.noteblockCooldown = allays::kNoteblockCooldown;
+        // parity: `VibrationSelector`: the nearest of one tick's candidates, never a later tick's.
+        const auto distance = static_cast<float>(std::sqrt((dx * dx) + (dy * dy) + (dz * dz)));
+        if (!state.vibrationCandidate.has_value() ||
+            (state.vibrationCandidate->tick == record.gameTime && distance < state.vibrationCandidate->distance)) {
+            state.vibrationCandidate =
+                allays::AllayState::Vibration{.pos = pos, .distance = distance, .tick = record.gameTime};
         }
     }
-    static_cast<void>(now);
+    // parity: `VibrationSystem.Ticker.tick`: last tick's pick sets off and travels a block a tick.
+    if (!state.vibrationTravelling.has_value() && state.vibrationCandidate.has_value() &&
+        state.vibrationCandidate->tick < now) {
+        state.vibrationTravelling = std::exchange(state.vibrationCandidate, std::nullopt);
+        state.vibrationTicks = mth::floor(state.vibrationTravelling->distance);
+    }
+    if (state.vibrationTravelling.has_value()) {
+        state.vibrationTicks = std::max(0, state.vibrationTicks - 1);
+        if (state.vibrationTicks <= 0) {
+            // parity: `AllayAi.hearNoteblock`.
+            const allays::Pos pos = std::exchange(state.vibrationTravelling, std::nullopt)->pos;
+            if (!state.likedNoteblock.has_value()) {
+                state.likedNoteblock = pos;
+                state.noteblockDimension = config::dimensionRegistryKey(world.declaration().dimension);
+                state.noteblockCooldown = allays::kNoteblockCooldown;
+            } else if (*state.likedNoteblock == pos) {
+                state.noteblockCooldown = allays::kNoteblockCooldown;
+            }
+        }
+    }
     if (lastTime > state.heardTime || (lastTime == state.heardTime && countAtLast > state.heardCount)) {
         state.heardTime = lastTime;
         state.heardCount = countAtLast;

@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
+#include <basalt/server/runtime/StructureBlockSystem.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
@@ -192,6 +193,18 @@ void BlockInteractionHandler::programCommandBlock(const play::SetCommandBlockPac
         session->sendSystemMessage(
             wire::text::Component::translatable(works ? "advMode.setCommand.success" : "advMode.setCommand.disabled",
                                                 {wire::text::Component::text(packet.command)}));
+    }
+}
+
+void BlockInteractionHandler::setStructureBlock(const play::SetStructureBlockPacket& packet) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    PlayerSession* session = owner_->playerSession();
+    StructureBlockSystem* structures = owner_->options().structureBlocks;
+    if (world == nullptr || session == nullptr || structures == nullptr || !mayUseGameMasterBlocks(*session)) {
+        return;
+    }
+    if (const std::optional<std::int32_t> moved = structures->handle(*world, *session, packet); moved.has_value()) {
+        broadcastBlockUpdate(packet.pos, *moved);
     }
 }
 

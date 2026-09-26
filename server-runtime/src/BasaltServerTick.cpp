@@ -5,7 +5,9 @@
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
+#include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
+#include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/DeathDrops.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
@@ -18,9 +20,11 @@
 #include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/SwimPath.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/AttachedEntities.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/ContainerDrops.hpp>
 #include <basalt/server/runtime/world/ContainerLoot.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
@@ -341,6 +345,65 @@ world::TriggerDamage BasaltServer::killingBlowOf(const world::LoadedWorld& world
     return blow;
 }
 
+void BasaltServer::tickBoat(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                            const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& boat) {
+    player::PlayerSession* driver = nullptr;
+    for (player::PlayerSession* player : watchers) {
+        if (!boat.passengerIds.empty() && player->entityId() == boat.passengerIds.front()) {
+            driver = player;
+        }
+    }
+    const entity::boats::TickResult result = entity::boats::tick(
+        world.state(), boat, driver != nullptr, living, [this](const wire::common::Identifier& type) {
+            return world::realEntityTypeTags::membersOf(
+                       vanillaData_.entityTags, wire::common::Identifier::vanilla("cannot_be_pushed_onto_boats"))
+                .contains(type);
+        });
+    // parity: `level.playSound(null, ...)` for each stroke, heard by everyone including the rower.
+    for (const entity::boats::TickResult::Stroke& stroke : result.strokes) {
+        random::RandomSource random = random::RandomSource::legacy(scratchSeed());
+        const float pitch = 0.8F + (0.4F * random.nextFloat());
+        for (player::PlayerSession* player : watchers) {
+            player::playSoundFor(*player, stroke.sound, wire::protocol::play::SoundSource::Neutral, stroke.x, stroke.y,
+                                 stroke.z, 1.0F, pitch, random.nextLong());
+        }
+    }
+    bool changed = !result.boarded.empty();
+    if (result.ejectAll) {
+        // parity: `ejectPassengers`, the last one first.
+        const std::vector<std::int32_t> aboard = boat.passengerIds;
+        for (auto id = aboard.rbegin(); id != aboard.rend(); ++id) {
+            bool wasPlayer = false;
+            for (player::PlayerSession* player : watchers) {
+                if (player->entityId() == *id && player->connection().dismount) {
+                    player->connection().dismount();
+                    wasPlayer = true;
+                }
+            }
+            if (!wasPlayer) {
+                if (entity::ServerEntity* mob = world.state().entity(*id); mob != nullptr) {
+                    mob->vehicleId.reset();
+                }
+                std::erase(boat.passengerIds, *id);
+                changed = true;
+            }
+        }
+    }
+    if (!changed) {
+        return;
+    }
+    const wire::protocol::play::SetPassengersPacket packet{.vehicleId = boat.entityId(),
+                                                           .passengerIds = boat.passengerIds};
+    for (player::PlayerSession* player : watchers) {
+        if (player->connection().sendPassengers) {
+            player->connection().sendPassengers(boat.entityId(), boat.passengerIds);
+        } else if (player->connection().sendPlayPacket) {
+            player->connection().sendPlayPacket(wire::protocol::play::SetPassengersPacket::kId,
+                                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        }
+    }
+}
+
 void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& region) {
     for (entity::ServerEntity* dead : world.state().entities()) {
         if (!dead->killed || !region.ownsPosition(dead->x, dead->z)) {
@@ -405,25 +468,12 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
         if (const std::optional<std::int32_t> size = world::containers::sizeOf(dead->type().path());
             size.has_value() && dead->sourceNbt.has_value()) {
             random::RandomSource random = random::RandomSource::legacy(scratchSeed());
-            constexpr double kItemWidth = 0.25;
-            constexpr double kRange = 1.0 - kItemWidth;
-            constexpr double kSpread = 0.11485000171139836;
             for (const std::optional<server::world::loot::ItemStack>& slot :
                  world::blockInventory::read(*dead->sourceNbt, *size)) {
-                if (!slot.has_value() || slot->count <= 0) {
-                    continue;
+                if (slot.has_value() && slot->count > 0) {
+                    world::containerDrops::dropItemStack(world.state(), dead->x, dead->y, dead->z, *slot, random,
+                                                         [this] { return playerRegistry_.allocateEntityId(); });
                 }
-                static_cast<void>(world.state().spawnItem(
-                    world::DroppedItem{.entityId = playerRegistry_.allocateEntityId(),
-                                       .uuid = wire::common::Uuid::random(),
-                                       .item = slot->item,
-                                       .count = slot->count,
-                                       .x = std::floor(dead->x) + (random.nextDouble() * kRange) + (kItemWidth / 2.0),
-                                       .y = std::floor(dead->y) + (random.nextDouble() * kRange),
-                                       .z = std::floor(dead->z) + (random.nextDouble() * kRange) + (kItemWidth / 2.0),
-                                       .velocityX = random.triangle(0.0, kSpread),
-                                       .velocityY = random.triangle(0.2, kSpread),
-                                       .velocityZ = random.triangle(0.0, kSpread)}));
             }
         }
         // parity: `GameEvent.ENTITY_DIE`, the loudest thing a sculk sensor hears. Measured in
@@ -445,6 +495,12 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     // parity: `BlockEntity.preRemoveSideEffects` over `Containers.dropItemStack`: what a container
     // held falls out where its block stood. The block write queues it because it holds the world's
     // lock; this is where it becomes items, on the same thread that owns them.
+    // parity: `StructureBlock.trigger`, off the signal a redstone update queued.
+    for (const std::array<std::int32_t, 3>& at : world.state().takeStructureTriggers()) {
+        if (structureBlocks_ != nullptr) {
+            structureBlocks_->trigger(world, at);
+        }
+    }
     for (world::WorldState::Spilled& spilled : world.state().takeSpilledContents()) {
         if (spilled.lootTable.has_value()) {
             world::containerLoot::fill(world, vanillaData_.lootTables, *spilled.lootTable, spilled.lootSeed,
@@ -457,26 +513,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         random::RandomSource random = random::RandomSource::legacy(scratchSeed());
         for (const server::world::loot::ItemStack& stack : spilled.stacks) {
-            // parity: the scatter is the item's own width taken off each side, and the drop is
-            // **not** centred on the square: `dropItemStack` adds half a width on x and z and none
-            // on y.
-            constexpr double kItemWidth = 0.25;
-            constexpr double kRange = 1.0 - kItemWidth;
-            const double x = spilled.x + (random.nextDouble() * kRange) + (kItemWidth / 2.0);
-            const double y = spilled.y + (random.nextDouble() * kRange);
-            const double z = spilled.z + (random.nextDouble() * kRange) + (kItemWidth / 2.0);
-            constexpr double kSpread = 0.11485000171139836;
-            static_cast<void>(world.state().spawnItem(world::DroppedItem{.entityId = playerRegistry_.allocateEntityId(),
-                                                                         .uuid = wire::common::Uuid::random(),
-                                                                         .item = stack.item,
-                                                                         .count = stack.count,
-                                                                         .x = x,
-                                                                         .y = y,
-                                                                         .z = z,
-                                                                         .velocityX = random.triangle(0.0, kSpread),
-                                                                         .velocityY = random.triangle(0.2, kSpread),
-                                                                         .velocityZ = random.triangle(0.0, kSpread),
-                                                                         .components = stack.components}));
+            // parity: `dropItemStack` from the square, not its centre, in handfuls.
+            world::containerDrops::dropItemStack(world.state(), spilled.x, spilled.y, spilled.z, stack, random,
+                                                 [this] { return playerRegistry_.allocateEntityId(); });
         }
         // parity: `AbstractFurnaceBlockEntity.preRemoveSideEffects` pays the cooking out at the centre.
         for (const auto& [name, count] : spilled.recipesUsed) {
@@ -534,6 +573,13 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             continue;
         }
         ++dying->deathTime;
+        // parity: `Creaking.tickDeath`: a heart's creaking twitches for forty-five ticks and comes apart.
+        if (dying->creaking != nullptr && dying->creaking->tearingDown && dying->creaking->home.has_value()) {
+            if (dying->deathTime > entity::creakings::kTearDownTicks && mobActions_ != nullptr) {
+                mobActions_->tearDownCreaking(world, *dying);
+            }
+            continue;
+        }
         if (dying->deathTime < entity::kDeathTicks) {
             continue;
         }
@@ -571,8 +617,8 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     std::vector<entity::ai::PlayerView> views;
     for (player::PlayerSession* player : watchers) {
         if (region.ownsPosition(player->x, player->z)) {
-            player->movedHorizontally = std::hypot(player->x - player->seenAt[0], player->z - player->seenAt[1]) >
-                                        static_cast<double>(1.0E-5F);
+            player->movedHorizontally =
+                std::hypot(player->x - player->seenAt[0], player->z - player->seenAt[1]) > static_cast<double>(1.0E-5F);
             player->seenAt = {player->x, player->z};
             std::optional<wire::common::Identifier> heldItem;
             const std::optional<storage::StoredItemStack>& held = player->inventory.heldItem();
@@ -594,6 +640,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                    .spectator = isSpectator(*player),
                                                    .heldItem = std::move(heldItem),
                                                    .sneaking = player->sneaking,
+                                                   .sprinting = player->sprinting,
                                                    .swimming = player->sprinting && inWater(world, *player),
                                                    .yaw = player->yaw,
                                                    .pitch = player->pitch,
@@ -844,6 +891,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             world::attachedEntities::comeOff(world, *entity, watchers, random,
                                              [this] { return playerRegistry_.allocateEntityId(); });
             continue;
+        }
+        // parity: `AbstractBoat.tick`: floats and drifts with nobody at the oars, and scoops up mobs.
+        if (entity::boats::isBoat(entity->type())) {
+            tickBoat(world, watchers, living, *entity);
         }
         // parity: `Mob.aiStep`, which is what makes an animal wander rather than stand there.
         if (entity::mobs::isMob(entity->type())) {

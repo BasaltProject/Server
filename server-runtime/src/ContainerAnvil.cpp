@@ -31,6 +31,7 @@ void ContainerMenuController::openAnvilMenu(PlayerSession& session, const BlockP
     openBlock = pos;
     openBlockSecond.reset();
     openEnderChest_ = false;
+    openEntity_.reset();
     openStonecutter_ = false;
     openSmithing_ = false;
     openAnvil_ = true;

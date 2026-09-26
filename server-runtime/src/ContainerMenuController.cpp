@@ -143,6 +143,7 @@ void ContainerMenuController::openChest(PlayerSession& session, const BlockPos& 
     const std::optional<std::pair<world::doubleChests::Half, world::doubleChests::Half>> halves =
         world == nullptr ? std::nullopt : world::doubleChests::halves(world->state(), pos.x, pos.y, pos.z);
     openEnderChest_ = false;
+    openEntity_.reset();
     openBlockSecond = halves.has_value()
                           ? std::optional{BlockPos{halves->second[0], halves->second[1], halves->second[2]}}
                           : std::nullopt;
@@ -202,6 +203,7 @@ void ContainerMenuController::openPluginMenu(const std::string& title, std::int3
     openBlock.reset();
     openBlockSecond.reset();
     openEnderChest_ = false;
+    openEntity_.reset();
     openStonecutter_ = false;
     openSmithing_ = false;
     openBlockSize = rows * Menu::kColumns;
@@ -274,6 +276,7 @@ void ContainerMenuController::openMerchantMenu(PlayerSession& session) {
     openBlock.reset();
     openBlockSecond.reset();
     openEnderChest_ = false;
+    openEntity_.reset();
     openStonecutter_ = false;
     openSmithing_ = false;
     openAnvil_ = false;
@@ -293,6 +296,7 @@ void ContainerMenuController::openSmithingMenu(PlayerSession& session) {
     openBlock.reset();
     openBlockSecond.reset();
     openEnderChest_ = false;
+    openEntity_.reset();
     openStonecutter_ = false;
     openSmithing_ = true;
     std::ranges::fill(smithingSlots_, std::nullopt);
@@ -313,6 +317,7 @@ void ContainerMenuController::openStonecutterMenu(PlayerSession& session) {
     openBlock.reset();
     openBlockSecond.reset();
     openEnderChest_ = false;
+    openEntity_.reset();
     openStonecutter_ = true;
     stonecutterInput_.reset();
     stonecutterResult_.reset();
@@ -401,6 +406,7 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
     openBlock.reset();
     openBlockSecond.reset();
     openEnderChest_ = false;
+    openEntity_.reset();
     pluginMenu_.reset();
     pluginMenuClick_ = nullptr;
     // parity: `SmithingMenu.removed`, which hands the three inputs back.

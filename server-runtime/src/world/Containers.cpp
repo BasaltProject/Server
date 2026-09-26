@@ -1,6 +1,8 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Items.hpp>
+#include <basalt/server/runtime/entity/Creakings.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
@@ -18,6 +20,7 @@
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <charconv>
 #include <cstdint>
 #include <map>
@@ -133,13 +136,6 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
     }
     if (path.ends_with("copper_bulb")) {
         return textOf(properties, "lit") == "true" ? redstone::kMaxSignal : 0;
-    }
-    // parity: `CreakingHeartBlock.hasAnalogOutputSignal` is true and its number comes from the
-    // Creaking bound to it: fifteen next to it, down to nothing at thirty-two blocks, and zero with
-    // none. There is no Creaking in this build, so the number is always zero; what matters is that
-    // the heart **answers**, because that is what stops a comparator looking past it for a container.
-    if (path == "creaking_heart") {
-        return 0;
     }
     // parity: `CopperGolemStatueBlock`, one per pose in the order the enum declares them.
     if (path == "copper_golem_statue" || path.ends_with("_copper_golem_statue")) {
@@ -293,6 +289,30 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
     if (const std::optional<std::int32_t> plain = stateSignal(path, properties); plain.has_value()) {
         return plain;
+    }
+    // parity: `CreakingHeartBlock.getAnalogOutputSignal`: the bound creaking's distance, fifteen next
+    // to it and nothing at thirty-two, and zero uprooted or alone. It always answers, which is what
+    // stops a comparator looking past it for a container.
+    if (path == "creaking_heart") {
+        if (textOf(properties, "creaking_heart_state") == "uprooted") {
+            return 0;
+        }
+        const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* heart = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        const std::optional<wire::common::Uuid> bound =
+            heart == nullptr ? std::nullopt : entity::creakings::heartCreaking(heart->data());
+        if (!bound.has_value()) {
+            return 0;
+        }
+        for (const entity::ServerEntity* creaking : world.entities()) {
+            if (!creaking->removed && creaking->uuid() == *bound) {
+                const double dx = creaking->x - (x + 0.5);
+                const double dy = creaking->y - y;
+                const double dz = creaking->z - (z + 0.5);
+                return entity::creakings::signalFor(std::sqrt((dx * dx) + (dy * dy) + (dz * dz)));
+            }
+        }
+        return 0;
     }
     // parity: `ShelfBlock.getAnalogOutputSignal`, three bits and only from behind.
     if (readers.shelf) {

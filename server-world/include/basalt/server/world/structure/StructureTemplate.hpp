@@ -75,6 +75,8 @@ struct TemplatePlacement {
     std::optional<std::int64_t> worldSeed;
     bool ignoreStructureBlocks = false;
     bool ignoreAir = false;
+    /// parity: `StructurePlaceSettings.setIgnoreEntities`, which a structure block sets by default.
+    bool ignoreEntities = false;
     /// Runs the processors over every block and clips only the write, so a pass per chunk draws
     /// the same stream. parity: `processBlockInfos` with no bounding box.
     bool wholePiece = false;

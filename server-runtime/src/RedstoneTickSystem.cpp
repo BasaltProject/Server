@@ -761,6 +761,11 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                            std::vector<world::BlockChange>& pending) {
                 return options_.tickBeehive && options_.tickBeehive(world, x, y, z, pending);
             },
+        .creakingHeart =
+            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                           std::vector<world::BlockChange>& pending) {
+                return options_.tickCreakingHeart && options_.tickCreakingHeart(world, x, y, z, pending);
+            },
         .ticking = tickingChunks(world, region, 1)};
     random::RandomSource random = freshRandom();
     std::vector<world::BlockChange> changes = world::blockEntityTicks::tick(

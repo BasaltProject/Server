@@ -108,6 +108,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.withers = withers_.get();
     options.fireworks = fireworks_.get();
     options.mobs = mobActions_.get();
+    options.structureBlocks = structureBlocks_.get();
     options.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
         orbs_->award(world, x, y, z, amount);
     };

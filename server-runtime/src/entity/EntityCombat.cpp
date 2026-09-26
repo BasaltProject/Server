@@ -1,8 +1,11 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
+#include <basalt/server/runtime/entity/Armadillos.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
+#include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
+#include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -42,6 +45,10 @@ constexpr std::int32_t kCooldownHalfTicks = kHurtCooldownTicks / 2;
 } // namespace
 
 void knockback(ServerEntity& entity, double power, double towardsX, double towardsZ) {
+    // parity: `Creaking.knockback`, which a frozen creaking shrugs off.
+    if (entity.creaking != nullptr && !entity.creaking->canMove) {
+        return;
+    }
     const std::array<double, 3> moved = player::combat::knockback(
         power, towardsX, towardsZ, entity.velocityX, entity.velocityY, entity.velocityZ, entity.onGround,
         static_cast<double>(attributeOf(entity.type(), reg::entityAttributes::kKnockbackResistance)));
@@ -77,6 +84,10 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         blamed.causingId == entity.allay->likedPlayerEntity) {
         return {};
     }
+    // parity: `Armadillo.hurtServer`: rolled up, it takes one less and then half.
+    if (armadillos::isScared(entity)) {
+        amount = (amount - 1.0F) / 2.0F;
+    }
     // parity: `Bee.hurtServer` stops pollinating before the hit is even weighed.
     if (entity.bee != nullptr) {
         entity.bee->pollinating = false;
@@ -99,6 +110,16 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     // parity: `Warden.isInvulnerableTo`, untouchable while it is rising or burrowing.
     if (wardenBrain::isDiggingOrEmerging(entity) && cause != "out_of_world" && cause != "generic_kill") {
         return {};
+    }
+    // parity: `Creaking.hurtServer`: bound to a heart, only the heart can end it.
+    if (creakings::isCreaking(entity.type()) && creakings::heartBound(entity) && cause != "out_of_world" &&
+        cause != "generic_kill") {
+        const bool living = blamed.directType.has_value() && reg::entityAttributes::isLiving(*blamed.directType);
+        const bool projectile = blamed.directType.has_value() && !living &&
+                                blamed.directType->path() != "tnt" && blamed.directType->path() != "tnt_minecart" &&
+                                blamed.directType->path() != "falling_block" &&
+                                blamed.directType->path() != "end_crystal";
+        return {.landed = creakings::hurtBound(entity, living || projectile, byPlayer)};
     }
     if (entity.wither != nullptr) {
         // A mob's melee names its type; a projectile or blast owned by one sets the flag instead.
@@ -192,6 +213,10 @@ std::string hurtSound(const wire::common::Identifier& type) { return "entity." +
 std::string deathSound(const wire::common::Identifier& type) { return "entity." + type.path() + ".death"; }
 
 std::string hurtSound(const ServerEntity& entity) {
+    // parity: the sound variants' own hurt sounds.
+    if (std::string variant = mobSounds::variantSound(entity, "hurt"); !variant.empty()) {
+        return variant;
+    }
     // parity: `Shulker.getHurtSound`, muffled with the lid shut.
     if (entity.shulker != nullptr && entity.shulker->peek == 0) {
         return "entity.shulker.hurt_closed";
@@ -201,6 +226,9 @@ std::string hurtSound(const ServerEntity& entity) {
 }
 
 std::string deathSound(const ServerEntity& entity) {
+    if (std::string variant = mobSounds::variantSound(entity, "death"); !variant.empty()) {
+        return variant;
+    }
     return entity.copperGolem != nullptr ? std::string{copperGolems::deathSound(entity.copperGolem->weather)}
                                          : deathSound(entity.type());
 }

@@ -1,6 +1,8 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
+#include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobBrain.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Sniffers.hpp>
 
 #include <algorithm>
 #include <map>
@@ -69,6 +71,13 @@ void feedBaby(ServerEntity& animal) {
 }
 
 bool canMate(const ServerEntity& animal, const ServerEntity& other) {
+    if (horses::isHorse(animal.type())) {
+        return horses::canMate(animal, other);
+    }
+    // parity: `Sniffer.canMate`, only while idling, scenting or happy.
+    if (animal.type().path() == "sniffer" && (!sniffers::canMateNow(animal) || !sniffers::canMateNow(other))) {
+        return false;
+    }
     return animal.entityId() != other.entityId() && animal.type() == other.type() && animal.loveTicks > 0 &&
            other.loveTicks > 0;
 }

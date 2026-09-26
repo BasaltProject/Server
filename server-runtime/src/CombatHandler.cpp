@@ -82,6 +82,7 @@ void CombatHandler::dismount(PlayerSession& session) {
     if (vehicle == nullptr) {
         return;
     }
+    const std::optional<std::array<double, 3>> spot = dismountSpot(session, *vehicle);
     std::erase(vehicle->passengerIds, session.entityId());
     // parity: `Cushion.removePassenger`, whose sound is only for a cushion still standing.
     if (world::cushions::isCushion(vehicle->type()) && !vehicle->removed) {
@@ -102,6 +103,10 @@ void CombatHandler::dismount(PlayerSession& session) {
     }
     // The client puts itself back on the ground, but the server's own copy of where they are came
     // from the cart, so it is told the same thing rather than left a tick behind.
+    if (spot.has_value()) {
+        owner_->teleportTo((*spot)[0], (*spot)[1], (*spot)[2], session.yaw, session.pitch);
+        return;
+    }
     owner_->teleportTo(session.x, session.y + kDismountLift, session.z, session.yaw, session.pitch);
 }
 

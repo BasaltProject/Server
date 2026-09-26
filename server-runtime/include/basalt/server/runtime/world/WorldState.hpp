@@ -419,6 +419,12 @@ public:
 
     [[nodiscard]] std::vector<Spilled> takeSpilledContents();
 
+    /// parity: `StructureBlock.neighborChanged`'s rising edge, which saves, loads or forgets a
+    /// structure. Queued like the spilled contents, for whoever owns the templates.
+    void queueStructureTrigger(std::int32_t x, std::int32_t y, std::int32_t z);
+
+    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> takeStructureTriggers();
+
 private:
     bool hasSkylight_ = true;
     /// Refuses an access from anywhere but the owner, and only while strict ownership is on.
@@ -483,6 +489,7 @@ private:
 
     PrimedTntQueue primedTntQueue_;
     std::vector<Spilled> spilled_;
+    std::vector<std::array<std::int32_t, 3>> structureTriggers_;
     PendingChunkDecorations pendingDecorations_;
     std::vector<BlockEvent> blockEvents_;
     std::vector<GameEventRecord> gameEvents_;

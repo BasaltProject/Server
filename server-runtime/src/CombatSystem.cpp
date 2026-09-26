@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
@@ -113,7 +114,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
 
     // parity: `AbstractWindCharge.onHitBlock`, whose gust goes off a quarter of a block back along
     // the face it came in through, and `onHitEntity`, which lets it off where it stands.
-    if (path == "wind_charge") {
+    if (path == "wind_charge" || path == "breeze_wind_charge") {
         const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
         if (!hit.has_value() && !target.has_value()) {
             return;
@@ -124,7 +125,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         if (target.has_value()) {
             if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
                 hitCrystal(world, watchers, *target->mob, false);
-            } else if (target->mob != nullptr) {
+            } else if (target->mob != nullptr && !breezeProof(living, entity, *target->mob)) {
                 if (target->mob->dragon != nullptr) {
                     target->mob->dragon->hitPart = target->dragonPart;
                 }
@@ -150,11 +151,11 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             }
         }
         if (!hit.has_value()) {
-            gustWhereItLanded(world, watchers, entity.x, entity.y, entity.z);
+            gustWhereItLanded(world, watchers, living, entity, entity.x, entity.y, entity.z);
             return;
         }
         const double back = world::windBursts::kBackOff;
-        gustWhereItLanded(world, watchers, hit->x + (back * server::registry::stepX(hit->face)),
+        gustWhereItLanded(world, watchers, living, entity, hit->x + (back * server::registry::stepX(hit->face)),
                           hit->y + (back * server::registry::stepY(hit->face)),
                           hit->z + (back * server::registry::stepZ(hit->face)));
         return;
@@ -282,8 +283,11 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     if (!hit.has_value()) {
         return;
     }
-    // parity: `AbstractArrow.onHitBlock` forgets its piercing once it sticks.
+    // parity: `AbstractArrow.onHitBlock` sounds, forgets its piercing once it sticks, and keeps the
+    // plain arrow's sound after.
     if (kind.sticks) {
+        arrowHitSound(watchers, entity);
+        entity.arrowLanded = true;
         entity.pierceLevel = 0;
         entity.piercedIds.clear();
     }
@@ -313,36 +317,6 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     }
     if (!kind.sticks) {
         entity.removed = true;
-    }
-}
-
-void CombatSystem::gustWhereItLanded(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers, double x,
-                                     double y, double z) {
-    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
-    const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    const world::explosions::Spares stops = [this](world::WorldState&, std::int32_t, std::int32_t, std::int32_t,
-                                                   std::int32_t stateId) {
-        const Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
-        return options_.blockTags != nullptr && block != nullptr &&
-               world::realBlockTags::contains(*options_.blockTags, "minecraft:blocks_wind_charge_explosions", *block);
-    };
-    const std::vector<world::BlockChange> knocked = world::windBursts::burst(
-        world.state(), facts.chunkHeight.minY(), facts.chunkHeight.maxY(), x, y, z, world.gameTime(), random, stops);
-    for (const world::BlockChange& change : knocked) {
-        broadcaster_.announceRedstone(world, watchers, change);
-        // parity: `updateNeighbours` tells the wall a button or a lever is stuck to, which is what
-        // carries the signal into whatever is behind it.
-        if (const std::optional<std::array<std::int32_t, 3>> wall =
-                world::blockInteractions::attachmentOf(change.stateId, change.x, change.y, change.z);
-            wall.has_value()) {
-            broadcaster_.announceRedstone(
-                world, watchers,
-                world::BlockChange{.x = (*wall)[0],
-                                   .y = (*wall)[1],
-                                   .z = (*wall)[2],
-                                   .stateId =
-                                       world.state().blockState((*wall)[0], (*wall)[1], (*wall)[2]).value_or(0)});
-        }
     }
 }
 
@@ -647,11 +621,19 @@ void CombatSystem::announceEntityHit(const std::vector<PlayerSession*>& watchers
         }
     }
     const std::string sound = died ? entity::entityCombat::deathSound(entity) : entity::entityCombat::hurtSound(entity);
+    // parity: `LivingEntity.makeSound` at the mob's own volume, voice and category, and
+    // `Mob.playHurtSound`, which puts its next ambient sound off.
+    random::RandomSource voice = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    const float volume = entity::mobSounds::volume(entity);
+    const float pitch = entity::mobSounds::voicePitch(entity, voice);
+    if (!died) {
+        entity.ambientSoundTime = -entity::mobSounds::ambientInterval(entity);
+    }
     for (PlayerSession* watcher : watchers) {
         // A client on the other edition hears the hit and nothing else of this: the flinch and the
         // knock back are drawn from its own metadata, which the entity sync already carries.
         if (watcher->connection().playSound) {
-            watcher->connection().playSound(sound, entity.x, entity.y, entity.z, 1.0F, 1.0F);
+            watcher->connection().playSound(sound, entity.x, entity.y, entity.z, volume, pitch);
             continue;
         }
         if (!watcher->connection().sendPlayPacket) {
@@ -677,12 +659,12 @@ void CombatSystem::announceEntityHit(const std::vector<PlayerSession*>& watchers
             });
         watcher->connection().sendPlayPacket(wire::protocol::play::SoundPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::SoundPacket{.sound = sound,
-                                              .source = wire::protocol::play::SoundSource::Hostile,
+                                              .source = entity::mobSounds::source(entity),
                                               .x = entity.x,
                                               .y = entity.y,
                                               .z = entity.z,
-                                              .volume = 1.0F,
-                                              .pitch = 1.0F,
+                                              .volume = volume,
+                                              .pitch = pitch,
                                               .seed = options_.nextSeed ? options_.nextSeed() : 0}
                 .write(buffer);
         });

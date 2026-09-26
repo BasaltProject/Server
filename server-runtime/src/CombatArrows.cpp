@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/PotionEffects.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
+#include <basalt/wire/protocol/play/HudPackets.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -214,6 +215,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         }
         mob.panicTicks = kPanicTicks;
         announceEntityHit(watchers, mob, world::damageTypes::kArrow, arrow.entityId(), result.died);
+        arrowHitSound(watchers, arrow);
         arrowTriggers(world, watchers, arrow, mob, static_cast<float>(damage), result.died);
         if (!result.died) {
             arrowEffects(world, watchers, living, arrow, &mob, nullptr);
@@ -236,11 +238,41 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         deflectArrow(arrow);
         return ArrowHit::Stopped;
     }
+    arrowHitSound(watchers, arrow);
     if (!target->player->dead) {
         arrowEffects(world, watchers, living, arrow, nullptr, target->player);
     }
     arrow.removed = !piercing;
     return piercing ? ArrowHit::Pierced : ArrowHit::Stopped;
+}
+
+void CombatSystem::arrowHitSound(const std::vector<PlayerSession*>& watchers, const ServerEntity& arrow) {
+    if (arrow.sourceNbt.has_value() && arrow.sourceNbt->getBoolean("Silent")) {
+        return;
+    }
+    const bool crossbow = !arrow.arrowLanded && arrow.firedFromWeapon.has_value() &&
+                          *arrow.firedFromWeapon == wire::common::Identifier::vanilla("crossbow");
+    const std::string sound = crossbow ? "item.crossbow.hit" : "entity.arrow.hit";
+    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    const float pitch = 1.2F / ((random.nextFloat() * 0.2F) + 0.9F);
+    for (PlayerSession* watcher : watchers) {
+        if (watcher->connection().playSound) {
+            watcher->connection().playSound(sound, arrow.x, arrow.y, arrow.z, 1.0F, pitch);
+            continue;
+        }
+        if (watcher->connection().sendPlayPacket) {
+            const wire::protocol::play::SoundPacket packet{.sound = sound,
+                                                           .source = wire::protocol::play::SoundSource::Neutral,
+                                                           .x = arrow.x,
+                                                           .y = arrow.y,
+                                                           .z = arrow.z,
+                                                           .volume = 1.0F,
+                                                           .pitch = pitch,
+                                                           .seed = random.nextLong()};
+            watcher->connection().sendPlayPacket(wire::protocol::play::SoundPacket::kId,
+                                                 [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        }
+    }
 }
 
 } // namespace basalt::server::runtime
