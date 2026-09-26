@@ -321,6 +321,7 @@ void ContainerMenuController::openStonecutterMenu(PlayerSession& session) {
     openStonecutter_ = true;
     stonecutterInput_.reset();
     stonecutterResult_.reset();
+    recipeUsed_.reset();
     openBlockSize = 2;
     openBlockData_ = {-1, -1, -1, -1};
     owner_->sendCompressed(OpenScreenPacket::kId, [&](wire::io::ByteBuffer& buffer) {

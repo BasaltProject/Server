@@ -54,6 +54,11 @@ struct MobSpawnContext {
     MobSpawnReason reason = MobSpawnReason::Natural;
     /// A fresh per-entity stream, which vanilla seeds anew for each mob it constructs.
     std::function<random::RandomSource()> entityRandomFactory;
+    /// What the variants' `moon_brightness` spawn condition reads.
+    float moonBrightness = 0.0F;
+    /// Whether a piece of this structure's start covers the block, as the `structure` condition asks.
+    std::function<bool(const wire::common::Identifier& structure, std::int32_t x, std::int32_t y, std::int32_t z)>
+        structureAt;
 
     [[nodiscard]] const SpawnEquipmentFinalizer& equipmentOrFallback() const;
 
@@ -80,12 +85,10 @@ struct CommonSpawnState {
     std::map<std::string, double> attributeBases;
 };
 
-/// Applies the common superclass finalizers in their exact order: `AgeableMob`'s five-percent baby
-/// roll for every pack member after the first, then `Mob`'s triangular follow-range bonus and
-/// left-handedness roll, then `AbstractCubeMob`'s size selection. Variants and equipment are their
-/// own layers.
-///
-/// Answers the passengers the finalization created, which the caller spawns alongside it.
+/// Applies the common superclass finalizers in order: `AgeableMob`'s five-percent baby roll for every
+/// pack member after the first, `Mob`'s triangular follow-range bonus and left-handedness roll, then
+/// `AbstractCubeMob`'s size. Variants and equipment are their own layers. Answers the passengers
+/// created, which the caller spawns alongside it.
 [[nodiscard]] std::vector<server::world::ChunkGeneratedEntity>
 apply(entity::ServerEntity& entity, std::int32_t groupIndex, const MobSpawnContext& context, MobSpawnGroupData& group);
 
@@ -129,7 +132,8 @@ void afterCommon(MobSpawnForestBuilder& builder, MobSpawnNode& node, std::int32_
 /// Minecraft 26.2's post-super cat variant and sound selection.
 namespace catSpawnFinalizer {
 
-void afterCommon(const CatSpawnContext& context, random::RandomSource& random, wire::nbt::NbtCompound& data);
+void afterCommon(const CatSpawnContext& cat, const MobSpawnContext& context, std::int32_t blockX, std::int32_t blockY,
+                 std::int32_t blockZ, random::RandomSource& random, wire::nbt::NbtCompound& data);
 
 } // namespace catSpawnFinalizer
 
@@ -184,8 +188,8 @@ namespace mobVariantSpawnFinalizer {
                                 std::int32_t blockZ, random::RandomSource& entityRandom);
 
 /// Concrete finalizers that run after their superclass has consumed the common mob RNG.
-void afterCommon(std::string_view type, MobSpawnGroupData& group, random::RandomSource& random,
-                 wire::nbt::NbtCompound& data);
+void afterCommon(std::string_view type, MobSpawnGroupData& group, const MobSpawnContext& context, std::int32_t blockX,
+                 std::int32_t blockY, std::int32_t blockZ, random::RandomSource& random, wire::nbt::NbtCompound& data);
 
 } // namespace mobVariantSpawnFinalizer
 

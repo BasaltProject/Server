@@ -59,13 +59,12 @@ constexpr std::array<std::string_view, 2> kSoundVariants{"classic", "royal"};
 
 } // namespace
 
-void afterCommon(const CatSpawnContext& context, random::RandomSource& random, NbtCompound& data) {
+void afterCommon(const CatSpawnContext& cat, const MobSpawnContext& context, std::int32_t blockX, std::int32_t blockY,
+                 std::int32_t blockZ, random::RandomSource& random, NbtCompound& data) {
     if (variantSpawnConditions::installed()) {
-        const VariantSpawnFacts facts{
-            .moonBrightness = context.moonBrightness, .inStructure = [&context](std::string_view structures) {
-                return context.inBlackCatStructure && structures == "#minecraft:cats_spawn_as_black";
-            }};
-        if (const auto index = variantSpawnConditions::pick("cat_variant", facts, random); index.has_value()) {
+        if (const auto index =
+                variantSpawnConditions::pick("cat_variant", spawnFactsOf(context, blockX, blockY, blockZ), random);
+            index.has_value()) {
             data.set("variant", NbtTag::ofString(variantSpawnConditions::entries("cat_variant")[*index].toString()));
         }
         if (const auto sound = variantSpawnConditions::randomEntry("cat_sound_variant", random); sound.has_value()) {
@@ -74,13 +73,13 @@ void afterCommon(const CatSpawnContext& context, random::RandomSource& random, N
         return;
     }
     std::string_view variant;
-    if (context.inBlackCatStructure) {
+    if (cat.inBlackCatStructure) {
         // parity: `PriorityProvider` still samples the one-element highest-priority result.
         static_cast<void>(random.nextInt(1));
         variant = kVariants[kAllBlackIndex];
     } else {
         const std::int32_t candidates =
-            context.moonBrightness >= kFullMoonThreshold ? static_cast<std::int32_t>(kVariants.size()) : kAllBlackIndex;
+            cat.moonBrightness >= kFullMoonThreshold ? static_cast<std::int32_t>(kVariants.size()) : kAllBlackIndex;
         variant = kVariants[static_cast<std::size_t>(random.nextInt(candidates))];
     }
     data.set("variant", NbtTag::ofString(registryKey(variant)));

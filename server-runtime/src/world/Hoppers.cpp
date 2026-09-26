@@ -51,18 +51,15 @@ constexpr double kCartLevelRise = 0.5;
 /// parity: `MinecartHopper.suckInItems`, whose second box is its own widened a quarter sideways.
 constexpr double kCartReach = 0.25;
 
-/// parity: `Container.getMaxStackSize()`, whose default nothing that holds items overrides.
-constexpr std::int32_t kContainerMaxStack = 99;
-
-/// parity: `Container.getMaxStackSize(stack)`: how high this item stacks here, and in practice the
-/// item's own maximum. A bucket goes sixteen to a slot and a sword one, not sixty-four.
-[[nodiscard]] std::int32_t capOf(const wire::common::Identifier& item) {
-    return std::min(kContainerMaxStack, registry::itemStacking::maxStackSize(item));
+/// parity: `Container.getMaxStackSize(stack)`: how high this stack goes here, and in practice its own
+/// maximum. A bucket goes sixteen to a slot and a sword one, not sixty-four.
+[[nodiscard]] std::int32_t capOf(const server::world::loot::ItemStack& stack) {
+    return std::min(containers::kSlotLimit, registry::itemStacking::maxStackSize(stack.item, stack.components));
 }
 
 /// The same, for a container that stacks lower than the item does.
-[[nodiscard]] std::int32_t capIn(std::string_view path, const wire::common::Identifier& item) {
-    return std::min(kContainerMaxStack, containers::maxStackFor(path, item));
+[[nodiscard]] std::int32_t capIn(std::string_view path, const server::world::loot::ItemStack& stack) {
+    return std::min(containers::kSlotLimit, containers::maxStackFor(path, stack));
 }
 
 /// parity: the sides `AbstractFurnaceBlockEntity.getSlotsForFace` opens to a hopper.
@@ -203,13 +200,13 @@ struct Container {
 
 [[nodiscard]] bool accepts(const Slots& slots, const ItemStack& stack) {
     return std::ranges::any_of(slots, [&stack](const std::optional<ItemStack>& there) {
-        return !there.has_value() || (same(*there, stack) && there->count < capOf(stack.item));
+        return !there.has_value() || (same(*there, stack) && there->count < capOf(stack));
     });
 }
 
 void add(Slots& slots, const ItemStack& stack) {
     for (std::optional<ItemStack>& there : slots) {
-        if (there.has_value() && (!same(*there, stack) || there->count >= capOf(stack.item))) {
+        if (there.has_value() && (!same(*there, stack) || there->count >= capOf(stack))) {
             continue;
         }
         if (there.has_value()) {
@@ -231,7 +228,7 @@ void add(Slots& slots, const ItemStack& stack) {
         if (there == nullptr) {
             continue;
         }
-        if (there->has_value() && (!same(**there, stack) || (*there)->count >= capIn(target.path, stack.item))) {
+        if (there->has_value() && (!same(**there, stack) || (*there)->count >= capIn(target.path, stack))) {
             continue;
         }
         // parity: `canPlaceItemThroughFace`. A furnace's result slot takes nothing, its fuel slot
@@ -277,9 +274,8 @@ void add(Slots& slots, const ItemStack& stack) {
 }
 
 [[nodiscard]] bool isFull(const Slots& slots) {
-    return std::ranges::all_of(slots, [](const std::optional<ItemStack>& slot) {
-        return slot.has_value() && slot->count >= capOf(slot->item);
-    });
+    return std::ranges::all_of(
+        slots, [](const std::optional<ItemStack>& slot) { return slot.has_value() && slot->count >= capOf(*slot); });
 }
 
 /// parity: `ejectItems`: the first slot with something in it gives one item to what it faces.
@@ -566,8 +562,17 @@ void noteChange(const Around& around, const BlockChange& change) {
     return took;
 }
 
-/// parity: `Hopper.SUCK_AABB` over a block hopper's own square, from 11/16 up to two blocks.
-[[nodiscard]] bool suckIn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
+/// parity: `Hopper.SUCK_AABB` over a block hopper's own square, from 11/16 up to two blocks. A block
+/// hopper under a full block takes nothing, unless the block is in `does_not_block_hoppers`.
+[[nodiscard]] bool suckIn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
+                          const Around& around) {
+    if (const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);
+        above.has_value() && registry::blockShapes::isFullCube(*above)) {
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*above);
+        if (block == nullptr || !around.doesNotBlockHoppers || !around.doesNotBlockHoppers(*block)) {
+            return false;
+        }
+    }
     return suckInBox(world, x, static_cast<double>(y) + kSuckBottom, z, static_cast<double>(x) + 1.0,
                      static_cast<double>(y) + kSuckTop, static_cast<double>(z) + 1.0, slots);
 }
@@ -588,12 +593,9 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
     if (entity == nullptr) {
         return false;
     }
-    // parity: `pushItemsTick` counts down first and only then asks whether the cooldown is over, so
-    // a hopper that just moved waits eight ticks and not nine.
-    // parity: only a move calls `setChanged`. Counting down is not a change worth saving, and
-    // marking the chunk for it would rewrite every hopper's region file every single tick.
-    // parity: `getIntOr("TransferCooldown", -1)`, and a hopper with no cooldown written down is one
-    // that has never moved anything.
+    // parity: `pushItemsTick` counts down before checking, so a hopper waits eight ticks, not nine;
+    // only a move calls `setChanged`, so the countdown does not dirty the chunk. A missing
+    // cooldown is `getIntOr("TransferCooldown", -1)`: a hopper that never moved anything.
     const std::int32_t was = entity->data().getInt(kCooldownKey, -1);
     if (was - 1 > 0) {
         entity->data().putInt(kCooldownKey, was - 1);
@@ -621,10 +623,11 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
         // parity: `suckInItems` looks at what is lying above only when there is no container there,
         // and a composter that is ready **is** one: its bone meal comes out downwards.
         const std::optional<Container> above = containerAt(world, x, y + 1, z);
-        const bool taken =
-            takeCompost(world, x, y + 1, z, slots, around.gameTime) || takeDisc(world, x, y + 1, z, slots, around) ||
-            unshelveBook(world, x, y + 1, z, slots, around) ||
-            (above.has_value() ? pullFrom(world, *above, slots, around.gameTime) : suckIn(world, x, y, z, slots));
+        const bool taken = takeCompost(world, x, y + 1, z, slots, around.gameTime) ||
+                           takeDisc(world, x, y + 1, z, slots, around) ||
+                           unshelveBook(world, x, y + 1, z, slots, around) ||
+                           (above.has_value() ? pullFrom(world, *above, slots, around.gameTime)
+                                              : suckIn(world, x, y, z, slots, around));
         moved = taken || moved;
     }
     if (!moved) {

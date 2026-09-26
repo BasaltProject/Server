@@ -41,13 +41,14 @@ template <typename Predicate>
             return false;
         }
         const std::span<const std::int32_t> shapes = registry::blockShapes::collisionBoxes(*state);
-        for (std::size_t at = 0; at + 5 < shapes.size(); at += 6) {
-            const Aabb shape{.minX = x + shapes[at] / 16.0,
-                             .minY = y + shapes[at + 1] / 16.0,
-                             .minZ = z + shapes[at + 2] / 16.0,
-                             .maxX = x + shapes[at + 3] / 16.0,
-                             .maxY = y + shapes[at + 4] / 16.0,
-                             .maxZ = z + shapes[at + 5] / 16.0};
+        constexpr double kUnits = registry::blockShapes::kUnits;
+        for (std::size_t at = 0; at + 5 < shapes.size(); at += registry::blockShapes::kCorners) {
+            const Aabb shape{.minX = x + (shapes[at] / kUnits),
+                             .minY = y + (shapes[at + 1] / kUnits),
+                             .minZ = z + (shapes[at + 2] / kUnits),
+                             .maxX = x + (shapes[at + 3] / kUnits),
+                             .maxY = y + (shapes[at + 4] / kUnits),
+                             .maxZ = z + (shapes[at + 5] / kUnits)};
             if (shape.intersects(box)) {
                 return true;
             }

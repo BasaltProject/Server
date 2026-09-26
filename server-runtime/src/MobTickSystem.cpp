@@ -134,6 +134,7 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (entity.boardingCooldown > 0) {
         --entity.boardingCooldown;
     }
+    pushes_->pushByFluid(world, entity);
     // parity: `Entity.baseTick` ends in `Leashable.tickLeash`, before the mob's own `aiStep`.
     actions_->tickLeash(world, entity);
     if (entity.removed) {

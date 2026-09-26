@@ -1,7 +1,9 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/world/DroppedItemPhysics.hpp>
+#include <basalt/server/runtime/world/FluidCurrents.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/StuckSpeed.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -208,7 +210,11 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
             droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(index));
             continue;
         }
+        // parity: `ItemEntity.tick` lets the current in twice: `super.tick()`'s `baseTick` before the
+        // move, and its own `updateFluidInteraction` after it.
+        carryByFluid(item);
         moveItem(item);
+        carryByFluid(item);
         // parity: `applyEffectsFromBlocks` runs on every tick of an item, on the resting branch as
         // much as on the moving one, so a stack lying against a cactus is pricked four times in
         // four ticks and not once.
@@ -243,8 +249,11 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
 
 void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,
                                              std::vector<std::int32_t>& absorbed) {
-    // A full stack takes nothing, which the fit check inside the loop would also decide.
-    if (droppedItems_[index].count >= kMaxStack) {
+    const auto maxOf = [](const DroppedItem& item) {
+        return registry::itemStacking::maxStackSize(item.item, item.components);
+    };
+    // parity: `ItemEntity.isMergable`: a full stack takes nothing.
+    if (droppedItems_[index].count >= maxOf(droppedItems_[index])) {
         return;
     }
     for (std::size_t other = 0; other < droppedItems_.size();) {
@@ -252,29 +261,36 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
             ++other;
             continue;
         }
-        const DroppedItem& candidate = droppedItems_[other];
+        DroppedItem& candidate = droppedItems_[other];
         DroppedItem& item = droppedItems_[index];
         // parity: `ItemEntity.tryToMerge`: same item, same components, and the two counts have to
         // fit in one stack.
         if (candidate.item != item.item || candidate.count <= 0 ||
-            !sameComponents(candidate.components, item.components) || item.count + candidate.count > kMaxStack ||
+            !sameComponents(candidate.components, item.components) || item.count + candidate.count > maxOf(candidate) ||
             std::abs(candidate.x - item.x) > kMergeRange || std::abs(candidate.z - item.z) > kMergeRange ||
             std::abs(candidate.y - item.y) > kMergeHeight) {
             ++other;
             continue;
         }
-        item.count += candidate.count;
+        const std::int32_t moved = std::min(std::min(maxOf(item), kMergeCap) - item.count, candidate.count);
+        item.count += moved;
         item.countChanged = true;
         // parity: the merged stack keeps the younger age and the longer pickup delay.
         item.age = std::min(item.age, candidate.age);
         item.pickupDelay = std::max(item.pickupDelay, candidate.pickupDelay);
+        if (moved < candidate.count) {
+            candidate.count -= moved;
+            candidate.countChanged = true;
+            ++other;
+            continue;
+        }
         despawned.push_back(candidate.entityId);
         absorbed.push_back(candidate.entityId);
         droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(other));
         if (other < index) {
             --index;
         }
-        if (droppedItems_[index].count >= kMaxStack) {
+        if (droppedItems_[index].count >= maxOf(droppedItems_[index])) {
             return;
         }
     }
@@ -304,6 +320,16 @@ double DroppedItemPhysics::fluidHeight(const DroppedItem& item, FluidKind kind) 
         }
     }
     return height;
+}
+
+void DroppedItemPhysics::carryByFluid(DroppedItem& item) const {
+    const entity::Aabb box = entity::Aabb::of(item.x, item.y, item.z, kItemWidth, kItemHeight);
+    const fluidCurrents::Contact contact = fluidCurrents::touch(blockAt_, box, true, nullptr);
+    std::array<double, 3> movement{item.velocityX, item.velocityY, item.velocityZ};
+    fluidCurrents::pushAll(movement, contact, false, false);
+    item.velocityX = movement[0];
+    item.velocityY = movement[1];
+    item.velocityZ = movement[2];
 }
 
 void DroppedItemPhysics::moveItem(DroppedItem& item) {

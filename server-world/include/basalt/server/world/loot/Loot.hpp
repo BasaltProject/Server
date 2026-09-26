@@ -18,6 +18,9 @@
 
 namespace basalt::server::world::loot {
 
+struct ComponentEdit;
+struct SlotSource;
+
 /// A post-processing step applied to a generated stack. parity: `LootItemFunction`, every one of
 /// which is a `LootItemConditionalFunction` with its own optional condition.
 class LootFunction {
@@ -55,6 +58,8 @@ public:
         SetRandomDyes,
         /// parity: `ExplorationMapFunction`, answered by the context.
         ExplorationMap,
+        /// The component editors, lists, books, fireworks, attributes and containers: see `ComponentEdit`.
+        EditComponents,
     };
 
     [[nodiscard]] static LootFunction enchantedCountIncrease(FloatProvider count,
@@ -88,10 +93,11 @@ public:
                                                std::optional<LootFunction> onFail);
     [[nodiscard]] static LootFunction discard();
     [[nodiscard]] static LootFunction setOminousBottleAmplifier(IntProvider amplifier);
-    /// `options` is a list of potion ids or a single `#tag`; empty is every potion, a gap here.
-    [[nodiscard]] static LootFunction setRandomPotion(std::vector<std::string> options);
+    /// `options` is a list of potion ids or a single `#tag`; `everyPotion` when there were none.
+    [[nodiscard]] static LootFunction setRandomPotion(std::vector<std::string> options, bool everyPotion = false);
     [[nodiscard]] static LootFunction setRandomDyes(IntProvider count);
     [[nodiscard]] static LootFunction explorationMap(ExplorationMapRequest request);
+    [[nodiscard]] static LootFunction editComponents(std::shared_ptr<const ComponentEdit> edit);
 
     [[nodiscard]] Kind kind() const noexcept { return kind_; }
 
@@ -120,6 +126,7 @@ private:
     bool onlyCompatible_ = true;
     bool additionalCost_ = false;
     std::shared_ptr<const Parts> parts_;
+    std::shared_ptr<const ComponentEdit> edit_;
 
     [[nodiscard]] const Parts& parts() const;
     [[nodiscard]] ItemStack run(ItemStack stack, random::RandomSource& random, std::optional<float> explosionRadius,
@@ -136,7 +143,7 @@ struct NestedTable {
 };
 
 /// One entry of a pool. parity: `LootPoolEntryContainer` and its nine types: the leaves `item`,
-/// `tag`, `loot_table`, `dynamic`, `empty` and `slots` (a gap), and the composites `alternatives`,
+/// `tag`, `loot_table`, `dynamic`, `empty` and `slots`, and the composites `alternatives`,
 /// `sequence` and `group`.
 struct LootEntry {
     enum class Composite : std::uint8_t { None, Alternatives, Sequence, Group };
@@ -154,6 +161,8 @@ struct LootEntry {
     bool expand = false;
     /// parity: `EmptyLootItem`, a choice that makes nothing.
     bool empty = false;
+    /// parity: `SlotLoot`, the stacks a slot source reads out of the roll's entities or container.
+    std::shared_ptr<const SlotSource> slotSource;
     std::int32_t weight = 1;
     std::int32_t quality = 0;
     /// parity: `LootPoolEntryContainer.condition`, gating the whole entry.

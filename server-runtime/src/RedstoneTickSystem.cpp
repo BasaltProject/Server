@@ -679,6 +679,11 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                 return options_.itemTags != nullptr &&
                        world::realItemTags::contains(*options_.itemTags, "minecraft:bookshelf_books", item);
             },
+        .doesNotBlockHoppers =
+            [this](const wire::common::Identifier& block) {
+                return options_.blockTags != nullptr &&
+                       world::realBlockTags::contains(*options_.blockTags, "minecraft:does_not_block_hoppers", block);
+            },
         .songLength = [this](const std::string& song) -> std::int64_t {
             return options_.jukeboxes == nullptr ? 0 : options_.jukeboxes->lengthOf(song);
         },

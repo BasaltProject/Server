@@ -33,8 +33,8 @@ public:
     static constexpr std::int32_t kMergeMovingInterval = 2;
     static constexpr std::int32_t kMergeRestingInterval = 40;
 
-    /// The stack this build fills, the same one the inventory works in.
-    static constexpr std::int32_t kMaxStack = 64;
+    /// parity: `ItemEntity.merge(toItem, toStack, fromStack)`, which never grows a stack past this.
+    static constexpr std::int32_t kMergeCap = 64;
 
     /// parity: `EntityType.ITEM`'s own box, a quarter of a block each way.
     static constexpr double kItemWidth = 0.25;
@@ -95,6 +95,9 @@ public:
 private:
     /// parity: `Entity.getFluidHeight`, how deep the box sits in that fluid, from its bottom.
     [[nodiscard]] double fluidHeight(const DroppedItem& item, FluidKind kind) const;
+
+    /// parity: `updateFluidInteraction` on an item: the current it floats in carries it.
+    void carryByFluid(DroppedItem& item) const;
 
     void moveItem(DroppedItem& item);
     void mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,

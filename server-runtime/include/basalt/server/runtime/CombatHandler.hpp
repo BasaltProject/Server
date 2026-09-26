@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerSpear.hpp>
+#include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
@@ -161,7 +162,13 @@ private:
 
     /// parity: `Player.attack`'s sweep, which hits what is standing beside what was hit.
     void sweepAround(player::PlayerSession& session, const entity::ServerEntity& target, world::LoadedWorld& world,
-                     float strength);
+                     float strength, float baseDamage, const std::optional<storage::StoredItemStack>& weapon);
+
+    /// What a melee blow needs, over `blocks` for the wear it causes.
+    [[nodiscard]] player::pvp::Context meleeContext(const player::BreakContext& blocks);
+
+    /// parity: `Player.attack` on another player, who is no entity of the world's.
+    void attackPlayer(player::PlayerSession& session, player::PlayerSession& victim, world::LoadedWorld& world);
 
     /// parity: `TamableAnimal.mobInteract`: a pet sits or stands, and a wild one may be tamed.
     bool tameOrSit(const world::LoadedWorld& world, player::PlayerSession& session, entity::ServerEntity& entity);

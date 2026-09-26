@@ -1,9 +1,11 @@
+#include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/bedrock/BedrockBlockEntities.hpp>
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/ChunkSection.hpp>
 #include <basalt/wire/bedrock/BedrockBanners.hpp>
+#include <basalt/wire/bedrock/BedrockBiomes.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
 
@@ -70,6 +72,24 @@ void writeBanner(wire::io::ByteBuffer& extras, const std::int32_t x, const std::
     }
     wire::bedrock::writeBannerTag(extras, x, y, z, kLastDye - static_cast<std::int32_t>(colour), layers, ominous,
                                   data.getString("CustomName"));
+}
+
+/// The Bedrock id for a Java biome id, or the fallback for one that edition lacks.
+[[nodiscard]] std::int32_t bedrockBiomeOf(const std::int32_t javaId) {
+    static const std::vector<std::int32_t> kByJavaId = [] {
+        const auto& registry = server::registry::biomes::registry();
+        std::vector<std::int32_t> built(registry.size(), wire::bedrock::kFallbackBedrockBiome);
+        for (std::size_t id = 0; id < built.size(); ++id) {
+            if (const server::registry::Biome* biome = registry.byId(static_cast<std::int32_t>(id)); biome != nullptr) {
+                built[id] =
+                    wire::bedrock::bedrockBiomeId(biome->id.toString()).value_or(wire::bedrock::kFallbackBedrockBiome);
+            }
+        }
+        return built;
+    }();
+    return javaId >= 0 && static_cast<std::size_t>(javaId) < kByJavaId.size()
+               ? kByJavaId[static_cast<std::size_t>(javaId)]
+               : wire::bedrock::kFallbackBedrockBiome;
 }
 
 } // namespace
@@ -144,12 +164,24 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
             world::signs::isWaxed(entity.data()));
     }
 
+    // parity: Geyser's `BiomeTranslator`: every section's quarts, each Java biome as its Bedrock id.
+    wire::io::ByteBuffer biomes{static_cast<std::size_t>(sections) * 4};
+    std::array<std::int32_t, server::world::ChunkSection::kBiomes> javaIds{};
+    wire::bedrock::BiomeQuarts quarts{};
+    for (std::int32_t section = 0; section < sections; ++section) {
+        chunk.section(static_cast<std::size_t>(section)).copyBiomeIdsInto(javaIds);
+        for (std::size_t quart = 0; quart < javaIds.size(); ++quart) {
+            quarts[quart] = bedrockBiomeOf(javaIds[quart]);
+        }
+        wire::bedrock::writeBiomeSection(biomes, quarts);
+    }
+
     wire::io::ByteBuffer body;
     // The count of subchunks is what was written; the count of biome sections is the column's own
     // height, which does not shrink with them.
     wire::bedrock::writeLevelChunk(body, chunk.chunkX(), chunk.chunkZ(), static_cast<std::uint32_t>(sent),
                                    packed.readable(), static_cast<std::uint32_t>(sections), 0, protocol,
-                                   extras.readable());
+                                   extras.readable(), biomes.readable());
     return body.toVector();
 }
 

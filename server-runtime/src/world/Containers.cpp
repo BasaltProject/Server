@@ -32,10 +32,6 @@
 namespace basalt::server::runtime::world::containers {
 namespace {
 
-/// parity: `Container.getMaxStackSize()`, whose default nothing that holds items overrides, so what
-/// decides the divisor is the item and only the item.
-constexpr std::int32_t kContainerMaxStack = 99;
-
 /// parity: `CakeBlock`'s seven slices, which is what `getOutputSignal` counts down from.
 constexpr std::int32_t kFullCake = 7;
 constexpr std::int32_t kLavaCauldronSignal = 3;
@@ -166,8 +162,8 @@ bool isPlain(std::string_view path) {
            shulkers::isShulkerBox(path);
 }
 
-std::int32_t maxStackFor(const std::string_view path, const wire::common::Identifier& item) {
-    const std::int32_t inHand = registry::itemStacking::maxStackSize(item);
+std::int32_t maxStackFor(const std::string_view path, const server::world::loot::ItemStack& stack) {
+    const std::int32_t inHand = registry::itemStacking::maxStackSize(stack.item, stack.components);
     // parity: `ChiseledBookShelfBlockEntity.getMaxStackSize` and `JukeboxBlockEntity`'s, both one.
     // The lectern's is one too and is not here: a lectern is no container to a hopper.
     if (path == "chiseled_bookshelf" || path == "jukebox") {
@@ -401,7 +397,8 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
         // `container.getMaxStackSize(stack)`, so a chest with one bucket in it reads far higher than
         // a chest with one stone. Reading 64 for everything was a full fifteen out on a shulker box.
         const std::int32_t cap =
-            slot.has_value() ? std::min(kContainerMaxStack, registry::itemStacking::maxStackSize(slot->item)) : 1;
+            slot.has_value() ? std::min(kSlotLimit, registry::itemStacking::maxStackSize(slot->item, slot->components))
+                             : 1;
         counts.emplace_back(slot.has_value() ? slot->count : 0, cap);
     }
     return redstone::containerSignal(counts, seen);

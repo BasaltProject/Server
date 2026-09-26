@@ -15,13 +15,9 @@ class ServerEntity;
 
 namespace basalt::server::runtime::world {
 
-/// The block that moves one item at a time, which is where redstone and containers meet.
-///
-/// parity: `HopperBlockEntity.tryMoveItems`: nothing happens while it is on cooldown or while its
-/// `enabled` is false, it pushes one item into whatever it faces, pulls one out of whatever is above
-/// it, and any move at all puts it back on an eight tick cooldown.
-///
-/// A hopper also eats what is lying above it, which is `suckInItems`' own box.
+/// The hopper. parity: `HopperBlockEntity.tryMoveItems`: idle while on cooldown or not `enabled`,
+/// it pushes one item into what it faces, pulls one from above (plus loose items in `suckInItems`'
+/// box), and any move puts it on an eight tick cooldown.
 namespace hoppers {
 
 /// parity: `HopperBlockEntity.HOPPER_CONTAINER_SIZE`.
@@ -32,6 +28,9 @@ struct Around {
     /// parity: `ChiseledBookShelfBlockEntity.acceptsItemType`, the one container door that asks an
     /// item **tag**. The tags come from the datapack, so the caller answers.
     std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
+    /// parity: the `does_not_block_hoppers` block tag, which lets a full block above still be sucked
+    /// through. Unset, no block is in it.
+    std::function<bool(const wire::common::Identifier& block)> doesNotBlockHoppers;
     /// parity: `AbstractFurnaceBlockEntity.setItem`, which is what a hopper filling an **empty**
     /// slot of a furnace goes through: the cooking time is set from what went in. The recipe book
     /// belongs to the world, so the caller answers it.
@@ -52,12 +51,9 @@ struct Around {
 [[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
                         const Around& around = {});
 
-/// One hopper minecart's turn, which is the same suck and nothing else.
-///
-/// parity: `MinecartHopper.tryConsumeItems` over `HopperBlockEntity.suckInItems`. A cart takes one
-/// item a tick with **no cooldown**, never gives anything away, and asks about the square above its
-/// own middle rather than about a grid square, so half over a chest still counts. It also picks up
-/// what is lying in its own box, which a block hopper does not.
+/// One hopper minecart's turn. parity: `MinecartHopper.tryConsumeItems` over
+/// `HopperBlockEntity.suckInItems`: one item a tick with no cooldown, never pushes, asks about the
+/// square above its own middle (half over a chest still counts), and also picks up items in its own box.
 [[nodiscard]] bool tickCart(WorldState& world, entity::ServerEntity& cart, std::int64_t gameTime);
 
 } // namespace hoppers

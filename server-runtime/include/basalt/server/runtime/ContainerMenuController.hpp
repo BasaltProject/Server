@@ -44,11 +44,8 @@ struct PluginMenuItem {
 };
 
 /// Container, menu, inventory and crafting state: every window this player can have open, and what
-/// a click, a shift-click or a drag does to it.
-///
-/// Kept as one class: reading a slot, writing one, and deciding what may go into it all switch on
-/// the same mutually exclusive "which window is open" fields, and splitting that check across files
-/// would either duplicate it or reintroduce a shared state holder anyway.
+/// a click, a shift-click or a drag does to it. One class because every slot operation switches on
+/// the same mutually exclusive "which window is open" fields.
 class ContainerMenuController {
 public:
     /// parity: the four grid cells of a player's own inventory, and the nine of a table.
@@ -234,6 +231,10 @@ private:
     /// slot was filled from.
     void awardRecipeCrafted();
 
+    /// parity: `ServerPlayer.awardRecipes` over `ServerRecipeBook.addRecipes`: the ones not yet
+    /// known are learnt, fire `recipe_unlocked` and go to the client's book together.
+    void awardRecipes(player::PlayerSession& session, const std::vector<wire::common::Identifier>& ids);
+
     void takeSmithingResult();
 
     /// parity: `EnchantmentMenu.slotsChanged`, which rolls all three rows off the player's seed.
@@ -320,6 +321,9 @@ private:
 
     /// The most a slot holds. parity: `PotionSlot.getMaxStackSize`, one, and every other slot's 64.
     [[nodiscard]] std::int32_t slotCapacity(const player::MenuSlot& slot) const;
+
+    /// parity: `Slot.getMaxStackSize(ItemStack)`, the slot's limit and the stack's own, whichever is lower.
+    [[nodiscard]] std::int32_t slotCapacity(const player::MenuSlot& slot, const storage::StoredItemStack& stack) const;
 
     /// Gives the taker the experience a furnace has banked. parity:
     /// `AbstractFurnaceBlockEntity.awardUsedRecipesAndPopExperience`.

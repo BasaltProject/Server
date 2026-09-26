@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/scoreboard/Teams.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
+#include <basalt/server/runtime/world/FluidCurrents.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -45,8 +46,6 @@ constexpr double kCartPushThreshold = static_cast<double>(1.0E-4F);
 constexpr double kArmorStandCartReach = 0.2;
 constexpr float kCrammingDamage = 6.0F;
 
-[[nodiscard]] double centreOf(double min, double max) { return (min + max) / 2.0; }
-
 [[nodiscard]] std::optional<std::int32_t> vehicleOf(const EntityPushSystem::Body& body) {
     return body.mob != nullptr ? body.mob->vehicleId : body.player->vehicleId;
 }
@@ -57,10 +56,6 @@ constexpr float kCrammingDamage = 6.0F;
 
 [[nodiscard]] double xOf(const EntityPushSystem::Body& body) {
     return body.mob != nullptr ? body.mob->x : body.player->x;
-}
-
-[[nodiscard]] double yOf(const EntityPushSystem::Body& body) {
-    return body.mob != nullptr ? body.mob->y : body.player->y;
 }
 
 [[nodiscard]] double zOf(const EntityPushSystem::Body& body) {
@@ -327,6 +322,14 @@ void EntityPushSystem::pushByMob(world::LoadedWorld& world, ServerEntity& mob) {
     }
 }
 
+void EntityPushSystem::pushByFluid(world::LoadedWorld& world, ServerEntity& entity) {
+    static_cast<void>(world::fluidCurrents::carry(world, entity, options_.blockTags));
+}
+
+void EntityPushSystem::pushByFluid(world::LoadedWorld& world, PlayerSession& player) {
+    static_cast<void>(world::fluidCurrents::carry(world, player, options_.blockTags));
+}
+
 void EntityPushSystem::pushByPlayer(world::LoadedWorld& world, PlayerSession& player) {
     const Body self{.player = &player};
     if (player.dead || player.gamemode == Gamemode::Spectator) {
@@ -418,7 +421,7 @@ void EntityPushSystem::entityPush(world::LoadedWorld& world, const Body& target,
     }
 }
 
-void EntityPushSystem::cartPush(world::LoadedWorld& world, ServerEntity& cart, const Body& pusher) {
+void EntityPushSystem::cartPush(world::LoadedWorld& /*world*/, ServerEntity& cart, const Body& pusher) {
     // parity: `AbstractMinecart.push(Entity)`.
     if (noPhysics(pusher) || cart.noPhysics ||
         std::ranges::find(cart.passengerIds, idOf(pusher)) != cart.passengerIds.end()) {

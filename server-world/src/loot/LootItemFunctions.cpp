@@ -357,7 +357,11 @@ ItemStack LootFunction::setComponent(ItemStack stack, random::RandomSource& rand
     case Kind::SetInstrument:
     case Kind::SetRandomPotion: {
         const bool instrument = kind_ == Kind::SetInstrument;
-        const std::vector<Identifier> choices = membersOf(part.options, instrument ? "instrument" : "potion", context);
+        // parity: `Registry.getRandom` over every potion when the function named none.
+        const std::vector<Identifier> choices =
+            !instrument && add_
+                ? (context.registryEntries ? context.registryEntries("potion") : std::vector<Identifier>{})
+                : membersOf(part.options, instrument ? "instrument" : "potion", context);
         if (choices.empty()) {
             return stack;
         }

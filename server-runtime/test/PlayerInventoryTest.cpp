@@ -103,6 +103,43 @@ TEST_CASE("more than a stack's worth at once is spread over slots") {
     CHECK(inventory.at(PlayerInventory::kHotbarStart + 1)->count == 36);
 }
 
+TEST_CASE("each item stacks only as high as its own limit") {
+    PlayerInventory inventory;
+
+    CHECK(inventory.add(stackOf("minecraft:ender_pearl", 20)) == 0);
+    CHECK(inventory.at(PlayerInventory::kHotbarStart)->count == 16);
+    CHECK(inventory.at(PlayerInventory::kHotbarStart + 1)->count == 4);
+
+    StoredItemStack big = stackOf("minecraft:ender_pearl", 10);
+    big.components.putInt("minecraft:max_stack_size", 99);
+    CHECK(inventory.add(big) == 0);
+    CHECK(inventory.at(PlayerInventory::kHotbarStart + 2)->count == 10);
+}
+
+TEST_CASE("a picked-up stack tops up the one in hand before the hotbar") {
+    PlayerInventory inventory;
+    inventory.set(PlayerInventory::kHotbarStart, stackOf("minecraft:stone", 1));
+    inventory.set(PlayerInventory::kHotbarStart + 4, stackOf("minecraft:stone", 1));
+    inventory.setHeldSlot(4);
+
+    CHECK(inventory.add(stackOf("minecraft:stone", 1)) == 0);
+
+    // parity: `Inventory.getSlotWithRemainingSpace` asks the selected slot first.
+    CHECK(inventory.at(PlayerInventory::kHotbarStart + 4)->count == 2);
+    CHECK(inventory.at(PlayerInventory::kHotbarStart)->count == 1);
+}
+
+TEST_CASE("after the hotbar the storage rows fill from the top") {
+    PlayerInventory inventory;
+    for (std::int32_t slot = PlayerInventory::kHotbarStart; slot < PlayerInventory::kMainSlots; slot++) {
+        inventory.set(slot, stackOf("minecraft:dirt", 64));
+    }
+
+    CHECK(inventory.add(stackOf("minecraft:stone", 1)) == 0);
+
+    CHECK(inventory.at(0)->id == "minecraft:stone");
+}
+
 TEST_CASE("counting and taking reach every slot the inventory fills from") {
     PlayerInventory inventory;
     inventory.set(0, stackOf("minecraft:stone", 10));

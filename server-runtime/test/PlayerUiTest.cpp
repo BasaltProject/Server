@@ -99,6 +99,30 @@ TEST_CASE("an interval of zero draws a static panel once and never again") {
     CHECK(fixture.count(play::TabListPacket::kId) == 1);
 }
 
+TEST_CASE("a world change takes the panels down and draws even a static one again") {
+    Fixture fixture;
+    fixture.configs.tabList =
+        TabListConfig{.enabled = true,
+                      .updateIntervalTicks = 0,
+                      .profiles = {TabListProfile{.headerLines = std::vector<std::string>{"Welcome"}}},
+                      .defaultIndex = 0};
+    fixture.configs.scoreboard =
+        ScoreboardConfig{.enabled = true,
+                         .updateIntervalTicks = 0,
+                         .profiles = {ScoreboardProfile{.title = "Board", .lines = std::vector<std::string>{"one"}}},
+                         .defaultIndex = 0};
+    PlayerUi ui = fixture.ui();
+    ui.tick(0, PlaceholderContext{});
+    const std::int32_t objectives = fixture.count(play::SetObjectivePacket::kId);
+
+    ui.worldChanged();
+    ui.tick(1, PlaceholderContext{});
+
+    CHECK(fixture.count(play::TabListPacket::kId) == 2);
+    // One removal and one fresh objective.
+    CHECK(fixture.count(play::SetObjectivePacket::kId) == objectives + 2);
+}
+
 TEST_CASE("a sidebar draws its rows and takes away the ones it lost") {
     Fixture fixture;
     fixture.configs.scoreboard = ScoreboardConfig{

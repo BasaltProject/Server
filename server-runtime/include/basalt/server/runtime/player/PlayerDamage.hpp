@@ -13,6 +13,10 @@ namespace basalt::server::runtime::entity {
 struct DamageSource;
 } // namespace basalt::server::runtime::entity
 
+namespace basalt::server::runtime::scoreboard {
+class Teams;
+} // namespace basalt::server::runtime::scoreboard
+
 namespace basalt::server::runtime::world {
 class AdvancementTriggers;
 class LoadedWorld;
@@ -31,6 +35,8 @@ struct DamageContext {
     PlayerRegistry* registry = nullptr;
     const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
     world::RealEnchantments* enchantments = nullptr;
+    /// Whose friendly fire `canHarmPlayer` asks about.
+    const scoreboard::Teams* teams = nullptr;
     /// Where the player is, for the vibration a hit makes. Answers null when they are nowhere.
     std::function<world::LoadedWorld*()> world;
     /// What a plugin is asked. Answering nothing stops the hit, or the heal, entirely.

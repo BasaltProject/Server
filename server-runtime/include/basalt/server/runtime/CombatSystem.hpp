@@ -155,7 +155,8 @@ private:
     [[nodiscard]] static std::optional<Target> targetAlong(const std::vector<player::PlayerSession*>& watchers,
                                                            const std::vector<entity::ServerEntity*>& living,
                                                            const entity::ServerEntity& projectile, double fromX,
-                                                           double fromY, double fromZ, double margin = 0.0);
+                                                           double fromY, double fromZ, double margin = 0.0,
+                                                           const std::vector<std::int32_t>* spared = nullptr);
 
     /// parity: `LlamaSpit.tick`: it moves on the movement it started the tick with, whatever it hit.
     void tickLlamaSpit(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,

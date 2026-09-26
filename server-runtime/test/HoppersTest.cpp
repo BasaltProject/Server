@@ -437,6 +437,20 @@ TEST_CASE("a hopper eats a whole stack lying above it") {
     CHECK(cooldownOf(world, 8, 64, 8) == 8);
 }
 
+TEST_CASE("a full block over a hopper stops it eating unless the tag lets it through") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    placeHopper(world, 8, 64, 8, empty(hoppers::kSize));
+    REQUIRE(world.setBlockState(8, 65, 8, registry::blocks::named("stone")->stateId));
+    world.spawnItem(DroppedItem{.entityId = 11, .item = item("stone"), .count = 1, .x = 8.5, .y = 64.75, .z = 8.5});
+
+    // parity: `HopperBlockEntity.suckInItems`' `isBlocked`.
+    CHECK_FALSE(hoppers::tick(world, 8, 64, 8, hopperRandom));
+
+    const hoppers::Around around{.doesNotBlockHoppers = [](const auto& block) { return block == item("stone"); }};
+    CHECK(hoppers::tick(world, 8, 64, 8, hopperRandom, around));
+}
+
 TEST_CASE("what a hopper eats goes into the first slot that will take it") {
     Loaded loaded;
     WorldState& world = loaded.state;

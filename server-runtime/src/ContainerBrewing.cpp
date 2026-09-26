@@ -156,7 +156,11 @@ std::int32_t ContainerMenuController::slotCapacity(const MenuSlot& slot) const {
     if (block != nullptr && block->index < 2 && mountOpen()) {
         return 1;
     }
-    return PlayerInventory::kMaxStack;
+    return PlayerInventory::kSlotLimit;
+}
+
+std::int32_t ContainerMenuController::slotCapacity(const MenuSlot& slot, const storage::StoredItemStack& stack) const {
+    return std::min(slotCapacity(slot), PlayerInventory::maxStackIn(stack));
 }
 
 void ContainerMenuController::quickMoveIntoBrewingStand(PlayerSession& session, const MenuSlot& from,
@@ -175,7 +179,7 @@ void ContainerMenuController::quickMoveIntoBrewingStand(PlayerSession& session, 
             if (!there.has_value() || there->id != stack.id || there->components != stack.components) {
                 continue;
             }
-            const std::int32_t moved = std::min(slotCapacity(target) - there->count, remaining);
+            const std::int32_t moved = std::min(slotCapacity(target, stack) - there->count, remaining);
             if (moved > 0) {
                 writeSlot(session, target, counted(*there, there->count + moved));
                 remaining -= moved;
@@ -186,7 +190,7 @@ void ContainerMenuController::quickMoveIntoBrewingStand(PlayerSession& session, 
             if (readSlot(session, target).has_value() || !placeable(index, *item)) {
                 continue;
             }
-            const std::int32_t moved = std::min(slotCapacity(target), remaining);
+            const std::int32_t moved = std::min(slotCapacity(target, stack), remaining);
             writeSlot(session, target, counted(stack, moved));
             remaining -= moved;
             break;

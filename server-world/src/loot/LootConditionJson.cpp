@@ -29,7 +29,9 @@ using wire::common::JsonValue;
     return std::nullopt;
 }
 
-[[nodiscard]] std::optional<EntityTarget> entityTargetOf(const JsonValue* value) {
+} // namespace
+
+std::optional<EntityTarget> entityTargetOf(const JsonValue* value) {
     static const std::map<std::string, EntityTarget, std::less<>> kTargets{
         {"this", EntityTarget::This},
         {"attacker", EntityTarget::Attacker},
@@ -42,8 +44,6 @@ using wire::common::JsonValue;
     const auto found = name.has_value() ? kTargets.find(*name) : kTargets.end();
     return found == kTargets.end() ? std::nullopt : std::optional{found->second};
 }
-
-} // namespace
 
 Parsed<LootCondition> Reader::condition(const JsonValue& value) {
     if (const std::optional<std::string> id = asString(&value); id.has_value()) {
@@ -86,8 +86,20 @@ Parsed<std::vector<LootCondition>> Reader::conditionSet(const JsonValue& value) 
     std::vector<LootCondition> terms;
     const std::vector<JsonValue>* list = value.get<std::vector<JsonValue>>();
     if (list == nullptr) {
+        // parity: `LootItemCondition.LIST_CODEC` takes a `#tag` of the predicate registry too.
         if (const std::optional<std::string> tag = asString(&value); tag.has_value() && tag->starts_with('#')) {
-            return std::unexpected(LootTableParseError{"Unsupported predicate tag: " + *tag});
+            Parsed<std::vector<std::string>> members = tagValues("predicate", tag->substr(1));
+            if (!members.has_value()) {
+                return std::unexpected(members.error());
+            }
+            for (const std::string& member : *members) {
+                Parsed<LootCondition> term = condition(JsonValue::of(member));
+                if (!term.has_value()) {
+                    return std::unexpected(term.error());
+                }
+                terms.push_back(std::move(*term));
+            }
+            return terms;
         }
         Parsed<LootCondition> single = condition(value);
         if (!single.has_value()) {

@@ -14,6 +14,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cmath>
@@ -49,6 +50,15 @@ using server::world::Chunk;
 }
 
 } // namespace
+
+random::RandomSource LoadedWorld::uniqueRandom() {
+    static std::atomic<std::uint64_t> uniquifier{8682522807148012ULL};
+    std::uint64_t seed = uniquifier.load();
+    while (!uniquifier.compare_exchange_weak(seed, seed * 1181783497276652981ULL)) {
+    }
+    const auto nanos = static_cast<std::uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count());
+    return random::RandomSource::legacy(static_cast<std::int64_t>((seed * 1181783497276652981ULL) ^ nanos));
+}
 
 LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSettings settings, WorldMetadata metadata,
                          std::string worldsRoot, wire::common::Logger logger, Options options)

@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/datapack/DataFiles.hpp>
+#include <basalt/server/runtime/world/MobSpawnFinalization.hpp>
 #include <basalt/server/runtime/world/VariantSpawnConditions.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
@@ -9,7 +10,7 @@
 #include <set>
 #include <vector>
 
-namespace basalt::server::runtime::world::variantSpawnConditions {
+namespace basalt::server::runtime::world {
 namespace {
 
 using wire::common::Identifier;
@@ -42,6 +43,7 @@ struct State {
     std::map<std::string, std::vector<Selector>, std::less<>> registries;
     std::map<std::string, std::vector<Identifier>, std::less<>> entries;
     std::map<Identifier, std::set<Identifier>> biomeTags;
+    std::map<Identifier, std::set<Identifier>> structureTags;
 };
 
 [[nodiscard]] State& state() {
@@ -63,8 +65,8 @@ struct State {
         holders.push_back(*one);
     } else if (const auto* list = value->get<std::vector<JsonValue>>(); list != nullptr) {
         for (const JsonValue& element : *list) {
-            if (const auto* one = element.get<std::string>(); one != nullptr) {
-                holders.push_back(*one);
+            if (const auto* holder = element.get<std::string>(); holder != nullptr) {
+                holders.push_back(*holder);
             }
         }
     }
@@ -113,6 +115,21 @@ struct State {
     return condition;
 }
 
+[[nodiscard]] bool inStructure(const Condition& condition, const VariantSpawnFacts& facts) {
+    if (!facts.structureAt) {
+        return false;
+    }
+    return std::ranges::any_of(condition.holders, [&facts](const std::string& holder) {
+        if (!holder.starts_with('#')) {
+            const auto id = Identifier::parse(holder);
+            return id.has_value() && facts.structureAt(*id);
+        }
+        const auto tag = Identifier::parse(std::string_view{holder}.substr(1));
+        const auto found = tag.has_value() ? state().structureTags.find(*tag) : state().structureTags.end();
+        return found != state().structureTags.end() && std::ranges::any_of(found->second, facts.structureAt);
+    });
+}
+
 [[nodiscard]] bool inBiome(const Condition& condition, const VariantSpawnFacts& facts) {
     if (!facts.biome.has_value()) {
         return false;
@@ -132,9 +149,7 @@ struct State {
     case Condition::Kind::Biome:
         return inBiome(condition, facts);
     case Condition::Kind::Structure:
-        return facts.inStructure && std::ranges::any_of(condition.holders, [&facts](const std::string& holder) {
-                   return facts.inStructure(holder);
-               });
+        return inStructure(condition, facts);
     case Condition::Kind::MoonBrightness:
         return (!condition.min.has_value() || facts.moonBrightness >= *condition.min) &&
                (!condition.max.has_value() || facts.moonBrightness <= *condition.max);
@@ -146,6 +161,19 @@ struct State {
 
 } // namespace
 
+VariantSpawnFacts spawnFactsOf(const MobSpawnContext& context, std::int32_t blockX, std::int32_t blockY,
+                               std::int32_t blockZ) {
+    VariantSpawnFacts facts{.biome = context.biome, .moonBrightness = static_cast<double>(context.moonBrightness)};
+    if (context.structureAt) {
+        facts.structureAt = [&context, blockX, blockY, blockZ](const Identifier& structure) {
+            return context.structureAt(structure, blockX, blockY, blockZ);
+        };
+    }
+    return facts;
+}
+
+namespace variantSpawnConditions {
+
 void install(const datapack::EntriesUnder& entriesUnder, const datapack::ReadText& readText) {
     State built;
     if (!entriesUnder) {
@@ -155,6 +183,9 @@ void install(const datapack::EntriesUnder& entriesUnder, const datapack::ReadTex
     }
     built.biomeTags = datapack::resolveTags(
         entriesUnder, readText, "worldgen/biome", [](const Identifier&) { return true; },
+        wire::common::Logger{"Variants"});
+    built.structureTags = datapack::resolveTags(
+        entriesUnder, readText, "worldgen/structure", [](const Identifier&) { return true; },
         wire::common::Logger{"Variants"});
     for (const std::string_view registry : kSoundRegistries) {
         std::vector<Identifier>& ids = built.entries[std::string{registry}];
@@ -246,4 +277,6 @@ std::optional<std::size_t> pick(std::string_view registry, const VariantSpawnFac
     return selected[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(selected.size())))];
 }
 
-} // namespace basalt::server::runtime::world::variantSpawnConditions
+} // namespace variantSpawnConditions
+
+} // namespace basalt::server::runtime::world

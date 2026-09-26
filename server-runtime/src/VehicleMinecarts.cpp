@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/FallLanding.hpp>
+#include <basalt/server/runtime/world/FluidCurrents.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -99,8 +100,9 @@ void VehicleSystem::tickMinecart(world::LoadedWorld& world, ServerEntity& cart) 
     env.landed = [this, &world](ServerEntity& self, double fallDistance) { landed(world, self, fallDistance); };
     carts::tick(world.state(), cart, env);
     // parity: `updateFluidInteraction`, after the move, for next turn's speeds.
-    state.inWater = touchesFluid(world, cart.x, cart.y, cart.z, kCartWidth, kCartHeight, false);
-    state.inLava = touchesFluid(world, cart.x, cart.y, cart.z, kCartWidth, kCartHeight, true);
+    const world::fluidCurrents::Contact contact = world::fluidCurrents::carry(world, cart, options_.blockTags);
+    state.inWater = contact.inWater();
+    state.inLava = contact.inLava();
     if (state.inLava && !cart.removed) {
         cart.fireTicks = std::max(cart.fireTicks, kLavaFireTicks);
         // parity: `lavaHurt`, four points and the burn sound when it lands.

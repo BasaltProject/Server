@@ -115,7 +115,7 @@ void usePotFor(const BreakContext& context, PlayerSession& player, world::Loaded
         held.has_value() ? parsedOrNothing(held->id) : std::optional<wire::common::Identifier>{};
     std::optional<std::vector<world::BlockEffect>> inserted;
     if (entity != nullptr && item.has_value()) {
-        inserted = world::decoratedPots::insert(entity->data(), *item);
+        inserted = world::decoratedPots::insert(entity->data(), *item, held->components);
     }
     // An empty hand, a full pot or the wrong item all end the same way: the pot rocks and takes
     // nothing.

@@ -1,5 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
+#include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -16,6 +18,7 @@
 #include <numbers>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 namespace basalt::server::runtime {
 namespace {
@@ -92,6 +95,57 @@ constexpr float kTurnShare = 0.2F;
     return false;
 }
 
+/// The owner's root vehicle and everything riding it. parity: `getRootVehicle().getSelfAndPassengers()`.
+[[nodiscard]] std::vector<std::int32_t> partyOf(world::WorldState& world, std::int32_t ownerId) {
+    const ServerEntity* root = world.entity(ownerId);
+    if (root == nullptr) {
+        return {ownerId};
+    }
+    while (root->vehicleId.has_value()) {
+        const ServerEntity* vehicle = world.entity(*root->vehicleId);
+        if (vehicle == nullptr) {
+            break;
+        }
+        root = vehicle;
+    }
+    std::vector<std::int32_t> party{root->entityId()};
+    for (std::size_t at = 0; at < party.size(); ++at) {
+        if (const ServerEntity* member = world.entity(party[at]); member != nullptr) {
+            party.insert(party.end(), member->passengerIds.begin(), member->passengerIds.end());
+        }
+    }
+    return party;
+}
+
+/// parity: `Projectile.isOutsideOwnerCollisionRange`: the box swept by this turn's movement and
+/// grown by a block meets nobody of the owner's party.
+[[nodiscard]] bool outsideParty(world::WorldState& world, const std::vector<PlayerSession*>& watchers,
+                                const ServerEntity& spit, const std::vector<std::int32_t>& party) {
+    const entity::Aabb reach = entity::Aabb::of(spit.x, spit.y, spit.z, spit.width(), spit.height())
+                                   .expandTowards(spit.velocityX, spit.velocityY, spit.velocityZ)
+                                   .inflate(1.0);
+    const Identifier playerType = Identifier::vanilla("player");
+    for (const std::int32_t id : party) {
+        if (const ServerEntity* member = world.entity(id); member != nullptr) {
+            if (entity::Aabb::of(member->x, member->y, member->z, member->width(), member->height())
+                    .intersects(reach)) {
+                return false;
+            }
+            continue;
+        }
+        for (const PlayerSession* player : watchers) {
+            if (player->entityId() == id && player->gamemode != wire::protocol::play::Gamemode::Spectator &&
+                entity::Aabb::of(player->x, player->y, player->z,
+                                 server::registry::entityTypeShapes::widthOf(playerType),
+                                 server::registry::entityTypeShapes::heightOf(playerType))
+                    .intersects(reach)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 /// parity: `Projectile.lerpRotation`, the short way round.
 [[nodiscard]] float lerpRotation(float from, float to) {
     while (to - from < -180.0F) {
@@ -109,6 +163,24 @@ void CombatSystem::tickLlamaSpit(world::LoadedWorld& world, const std::vector<Pl
                                  const std::vector<ServerEntity*>& living, ServerEntity& spit,
                                  const entity::projectiles::Kind& kind) {
     ++spit.tickCount;
+    // parity: the owner's `EntityReference`, found again by uuid after a load.
+    if (!spit.ownerId.has_value() && spit.ownerUuid.has_value()) {
+        for (const ServerEntity* one : living) {
+            if (one->uuid() == *spit.ownerUuid && !one->removed) {
+                spit.ownerId = one->entityId();
+                break;
+            }
+        }
+    }
+    // parity: `Projectile.checkLeftOwner`, before the move; until then the owner's party is spared.
+    std::vector<std::int32_t> spared;
+    if (spit.ownerId.has_value() && !spit.leftOwner) {
+        spared = partyOf(world.state(), *spit.ownerId);
+        spit.leftOwner = outsideParty(world.state(), watchers, spit, spared);
+        if (spit.leftOwner) {
+            spared.clear();
+        }
+    }
     // parity: `Projectile.tick` runs first here, so the shot is heard from where it starts.
     if (!spit.announced) {
         spit.announced = true;
@@ -133,7 +205,7 @@ void CombatSystem::tickLlamaSpit(world::LoadedWorld& world, const std::vector<Pl
     const bool turned = deflected(watchers, living, spit, fromX, fromY, fromZ);
     std::optional<Target> target;
     if (!turned) {
-        target = targetAlong(watchers, living, spit, fromX, fromY, fromZ, static_cast<double>(margin));
+        target = targetAlong(watchers, living, spit, fromX, fromY, fromZ, static_cast<double>(margin), &spared);
     }
     spit.x = fromX;
     spit.y = fromY;

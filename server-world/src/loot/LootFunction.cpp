@@ -1,3 +1,4 @@
+#include "LootComponentEdit.hpp"
 #include "LootParts.hpp"
 
 #include <basalt/server/registry/Items.hpp>
@@ -51,6 +52,13 @@ LootFunction LootFunction::smelt(bool useInputCount) {
     LootFunction built;
     built.kind_ = Kind::Smelt;
     built.add_ = useInputCount;
+    return built;
+}
+
+LootFunction LootFunction::editComponents(std::shared_ptr<const ComponentEdit> edit) {
+    LootFunction built;
+    built.kind_ = Kind::EditComponents;
+    built.edit_ = std::move(edit);
     return built;
 }
 
@@ -124,9 +132,10 @@ LootFunction LootFunction::setOminousBottleAmplifier(IntProvider amplifier) {
     return built;
 }
 
-LootFunction LootFunction::setRandomPotion(std::vector<std::string> options) {
+LootFunction LootFunction::setRandomPotion(std::vector<std::string> options, bool everyPotion) {
     LootFunction built;
     built.kind_ = Kind::SetRandomPotion;
+    built.add_ = everyPotion;
     built.parts_ = std::make_shared<const Parts>(Parts{.options = std::move(options)});
     return built;
 }
@@ -242,6 +251,8 @@ ItemStack LootFunction::run(ItemStack stack, random::RandomSource& random, std::
         return setComponent(std::move(stack), random, context);
     case Kind::CopyFromBlock:
         return stack;
+    case Kind::EditComponents:
+        return edit_ == nullptr ? stack : applyComponentEdit(*edit_, std::move(stack), random, context);
     // parity: `ExplorationMapFunction.run`, which needs an origin and leaves an empty stack alone.
     case Kind::ExplorationMap:
         if (stack.count > 0 && context.origin.has_value() && context.explorationMap) {

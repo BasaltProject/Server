@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
+#include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
@@ -246,6 +247,8 @@ player::DamageContext CombatHandler::damageContext() const {
     context.triggers = owner_->options().advancementTriggers;
     context.damageTypeTags = owner_->options().damageTypeTags;
     context.enchantments = owner_->options().enchantments;
+    context.teams =
+        owner_->options().commands == nullptr ? nullptr : owner_->options().commands->environment().options().teams;
     context.world = [this] { return owner_->currentWorld(); };
     context.damaged = hooks_.damaged;
     context.healed = hooks_.healed;

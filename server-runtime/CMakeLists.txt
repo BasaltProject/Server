@@ -140,6 +140,7 @@ basalt_module(server-runtime-core
         src/BasaltServer.cpp
         src/BasaltServerConnections.cpp
         src/BasaltServerLife.cpp
+        src/BasaltServerMelee.cpp
         src/BasaltServerData.cpp
         src/BasaltServerTick.cpp
         src/BasaltServerScores.cpp
@@ -182,6 +183,7 @@ basalt_module(server-runtime-core
         src/ContainerEnchantment.cpp
         src/ContainerSlots.cpp
         src/MobActionSystem.cpp
+        src/ContainerRecipeAwards.cpp
         src/ItemUseTimers.cpp
         src/PlayerLifecycle.cpp
         src/VillagerTradeController.cpp
@@ -290,6 +292,7 @@ basalt_module(server-runtime-core
         src/datapack/PackRepository.cpp
         src/datapack/ResourceStack.cpp
         src/datapack/RegistryValidation.cpp
+        src/datapack/RegistrySchemas.cpp
         src/player/FoodData.cpp
         src/player/PlayerArrowPickup.cpp
         src/player/PlayerMovementStats.cpp
@@ -315,7 +318,7 @@ basalt_module(server-runtime-core
         src/player/PlayerItemPickup.cpp
         src/player/PlayerSleep.cpp
         src/player/PlayerSpawnItems.cpp
-        src/player/PlayerSweep.cpp
+        src/player/PlayerVersusPlayer.cpp
         src/player/PlayerThrown.cpp
         src/player/PlayerSpear.cpp
         src/player/PlayerTrident.cpp
@@ -427,14 +430,17 @@ basalt_module(server-runtime-core
         src/world/Walls.cpp
         src/world/maps/MapData.cpp
         src/world/maps/MapDecorationTypes.cpp
+        src/world/maps/Cartography.cpp
         src/world/maps/MapRenderer.cpp
         src/world/maps/MapStorage.cpp
         src/world/Waxing.cpp
         src/world/CommandPredicates.cpp
+        src/world/EnderEyes.cpp
         src/world/AdvancementTree.cpp
         src/world/PlayerAdvancements.cpp
         src/world/VanillaAdvancementImport.cpp
         src/world/VariantSpawnConditions.cpp
+        src/world/SpawnPlaces.cpp
         src/world/WindBursts.cpp
         src/world/RedstoneWire.cpp
         src/world/Geysers.cpp
@@ -480,6 +486,7 @@ basalt_module(server-runtime-core
         src/world/Looms.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
+        src/world/FluidCurrents.cpp
         src/world/FluidFlow.cpp
         src/world/ItemEnchantability.cpp
         src/world/NaturalSpawnObstruction.cpp
@@ -650,6 +657,7 @@ basalt_module(server-runtime-core
         src/world/poi/PoiManager.cpp
         src/world/poi/PoiStorage.cpp
         src/world/poi/PoiTypes.cpp
+        src/world/PostAttackEffects.cpp
         src/world/PostPiercingEffects.cpp
         src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
@@ -767,6 +775,18 @@ basalt_test(server-runtime-real-enchantments-test
 basalt_test(server-runtime-post-piercing-effects-test
     SOURCES
         test/PostPiercingEffectsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-post-attack-effects-test
+    SOURCES
+        test/PostAttackEffectsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-fluid-currents-test
+    SOURCES
+        test/FluidCurrentsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -1043,6 +1063,12 @@ basalt_test(server-runtime-breeding-test
 basalt_test(server-runtime-controls-test
     SOURCES
         test/ControlsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-ender-eyes-test
+    SOURCES
+        test/EnderEyesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

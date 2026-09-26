@@ -254,12 +254,14 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
             stonecutterInput_ = stack;
             // parity: `slotsChanged`, which clears the choice whenever the input changes.
             stonecutterResult_.reset();
+            recipeUsed_.reset();
         } else if (!stack.has_value()) {
             // parity: `StonecutterMenu`'s result slot `onTake` over `ItemStack.onCraftedBy`.
             if (PlayerSession* crafter = owner_->playerSession();
                 crafter != nullptr && stonecutterResult_.has_value()) {
                 crafter->stats.increment(storage::stats::crafted(stonecutterResult_->id), stonecutterResult_->count);
             }
+            awardRecipeCrafted();
             takeStonecutterResult();
         }
         return;
@@ -392,12 +394,24 @@ void ContainerMenuController::payFurnace(world::LoadedWorld& world, server::worl
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+    std::vector<Identifier> used;
     for (const auto& [name, count] : state.recipesUsed) {
         const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(name);
         const server::world::crafting::Recipe* recipe = id.has_value() ? recipes->recipeFor(*id) : nullptr;
-        if (recipe != nullptr && owner_->options().awardExperience) {
+        if (recipe == nullptr) {
+            continue;
+        }
+        used.push_back(*id);
+        if (owner_->options().awardExperience) {
             owner_->options().awardExperience(world, session->x, session->y, session->z,
                                               world::furnaces::experienceFor(count, recipe->experience, random));
+        }
+    }
+    // parity: `awardUsedRecipesAndPopExperience`: the experience, then the recipes, then each trigger.
+    awardRecipes(*session, used);
+    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
+        for (const Identifier& id : used) {
+            triggers->onRecipeCrafted(session->name(), session->uuid().toString(), id);
         }
     }
     state.recipesUsed.clear();
@@ -545,8 +559,9 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
 }
 
 bool ContainerMenuController::hasBlockSlots() const {
-    return openBlock.has_value() || openEnderChest_ || openEntity_.has_value() || openMerchant_ || openStonecutter_ || openSmithing_ ||
-           openAnvil_ || openGrindstone_ || openEnchantment_ || openBeacon_ || openLoom_ || openCartography_;
+    return openBlock.has_value() || openEnderChest_ || openEntity_.has_value() || openMerchant_ || openStonecutter_ ||
+           openSmithing_ || openAnvil_ || openGrindstone_ || openEnchantment_ || openBeacon_ || openLoom_ ||
+           openCartography_;
 }
 
 bool ContainerMenuController::accepts(const MenuSlot& target, const storage::StoredItemStack& stack) const {
@@ -668,14 +683,20 @@ void ContainerMenuController::selectStonecutterRecipe(std::int32_t button) {
     const std::optional<server::world::loot::ItemStack> input = craftingStackOf(stonecutterInput_);
     if (!input.has_value() || recipes == nullptr) {
         stonecutterResult_.reset();
+        recipeUsed_.reset();
         sendInventory();
         return;
     }
     const std::vector<const server::world::crafting::Recipe*> options = recipes->stonecuttingFor(*input);
     if (button < 0 || static_cast<std::size_t>(button) >= options.size()) {
         stonecutterResult_.reset();
+        recipeUsed_.reset();
     } else {
-        stonecutterResult_ = storedOf(options[static_cast<std::size_t>(button)]->result);
+        const server::world::crafting::Recipe* chosen = options[static_cast<std::size_t>(button)];
+        stonecutterResult_ = storedOf(chosen->result);
+        // parity: `StonecutterMenu.setupResultSlot` sets the recipe used along with the result.
+        const wire::common::Identifier* name = recipes->nameOf(chosen);
+        recipeUsed_ = name != nullptr ? std::optional{*name} : std::nullopt;
     }
     sendInventory();
 }
@@ -687,6 +708,7 @@ void ContainerMenuController::takeStonecutterResult() {
     if (stonecutterInput_->count <= 1) {
         stonecutterInput_.reset();
         stonecutterResult_.reset();
+        recipeUsed_.reset();
     } else {
         stonecutterInput_->count -= 1;
     }
@@ -784,6 +806,10 @@ void ContainerMenuController::awardRecipeCrafted() {
         return;
     }
     triggers->onRecipeCrafted(session->name(), session->uuid().toString(), *recipeUsed_);
+    // parity: `RecipeCraftingHolder.awardUsedRecipes`, the recipe learnt after the trigger.
+    if (PlayerSession* crafter = owner_->playerSession(); crafter != nullptr) {
+        awardRecipes(*crafter, {*recipeUsed_});
+    }
 }
 
 void ContainerMenuController::takeCraftingResult(PlayerSession& session) {
@@ -796,7 +822,7 @@ void ContainerMenuController::takeCraftingResult(PlayerSession& session) {
         if (carriedItem_->id != result.id || carriedItem_->components != result.components) {
             return;
         }
-        if (carriedItem_->count + result.count > PlayerInventory::kMaxStack) {
+        if (carriedItem_->count + result.count > PlayerInventory::maxStackIn(result)) {
             return;
         }
         carriedItem_->count += result.count;

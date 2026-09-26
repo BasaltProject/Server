@@ -18,7 +18,6 @@ namespace {
 constexpr std::int32_t kTriggerDelay = 4;
 constexpr std::int32_t kCraftingTicks = 6;
 constexpr std::int32_t kGrid = 3;
-constexpr std::int32_t kMaxStack = 64;
 
 constexpr std::string_view kCraftingTicksKey = "crafting_ticks_remaining";
 constexpr std::string_view kDisabledSlotsKey = "disabled_slots";
@@ -58,44 +57,96 @@ constexpr std::string_view kTriggeredKey = "triggered";
     return {0, 0, -1};
 }
 
-/// Puts the result into the container in front, answering whether it fitted.
-[[nodiscard]] bool insert(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                          const server::world::loot::ItemStack& stack) {
+[[nodiscard]] std::int32_t maxStackOf(const server::world::loot::ItemStack& stack) {
+    return registry::itemStacking::maxStackSize(stack.item, stack.components);
+}
+
+[[nodiscard]] registry::BlockFace oppositeOf(const std::array<std::int32_t, 3>& step) {
+    if (step[1] != 0) {
+        return step[1] < 0 ? registry::BlockFace::Up : registry::BlockFace::Down;
+    }
+    if (step[0] != 0) {
+        return step[0] < 0 ? registry::BlockFace::East : registry::BlockFace::West;
+    }
+    return step[2] < 0 ? registry::BlockFace::South : registry::BlockFace::North;
+}
+
+/// parity: `HopperBlockEntity.addItem` over `tryMoveInItem`: every slot open to that face in turn,
+/// an empty one taking the whole stack and a matching one topping up to the item's own limit.
+void addItem(std::string_view path, const wire::nbt::NbtCompound& data, blockInventory::Slots& slots,
+             server::world::loot::ItemStack& stack, registry::BlockFace face) {
+    const auto size = static_cast<std::int32_t>(slots.size());
+    for (const std::int32_t slot : containers::slotsForFace(path, size, face)) {
+        if (stack.count <= 0) {
+            return;
+        }
+        std::optional<server::world::loot::ItemStack>& there = slots[static_cast<std::size_t>(slot)];
+        const bool fits = path == "crafter"
+                              ? accepts(data, slots, slot, stack)
+                              : containers::acceptsThroughFace(path, slot, stack.item, !there.has_value());
+        if (!fits) {
+            continue;
+        }
+        if (!there.has_value()) {
+            there = stack;
+            stack.count = 0;
+        } else if (there->count <= maxStackOf(*there) && there->item == stack.item &&
+                   there->components == stack.components) {
+            const std::int32_t moved = std::min(stack.count, maxStackOf(stack) - there->count);
+            if (moved > 0) {
+                there->count += moved;
+                stack.count -= moved;
+            }
+        }
+    }
+}
+
+/// Puts the result into the container in front and answers what is left of it.
+[[nodiscard]] server::world::loot::ItemStack insert(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                    const std::array<std::int32_t, 3>& step,
+                                                    const server::world::loot::ItemStack& stack) {
+    server::world::loot::ItemStack remaining = stack;
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    if (!stateId.has_value()) {
-        return false;
-    }
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
-    if (block == nullptr) {
-        return false;
-    }
+    const wire::common::Identifier* block =
+        stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
     // How big the container in front is. This used to go through a callback that the one production
     // caller never filled in, so `insert` always answered no and a crafter threw every result on the
     // floor instead of putting it in the chest it was pointing at.
-    const std::optional<std::int32_t> size = containers::sizeOf(block->path());
-    if (!size.has_value()) {
-        return false;
-    }
-    server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z);
+    const std::optional<std::int32_t> size = block == nullptr ? std::nullopt : containers::sizeOf(block->path());
+    server::world::ChunkBlockEntity* entity = size.has_value() ? entityAt(world, x, y, z) : nullptr;
     if (entity == nullptr) {
-        return false;
+        return remaining;
     }
-    blockInventory::Slots slots = blockInventory::read(entity->data(), *size);
-    for (std::size_t slot = 0; slot < slots.size(); ++slot) {
-        if (slots[slot].has_value() &&
-            (slots[slot]->item != stack.item || slots[slot]->count + stack.count > kMaxStack)) {
-            continue;
+    const std::string_view path = block->path();
+    const registry::BlockFace face = oppositeOf(step);
+    blockInventory::Slots slots = blockInventory::readFor(path, entity->data(), *size);
+    const std::int32_t cap = std::min(containers::kSlotLimit, containers::maxStackFor(path, stack));
+    // parity: `CrafterBlock.dispenseItem`: into another crafter, or more than one slot takes, one at a time.
+    if (path == "crafter" || stack.count > cap) {
+        while (remaining.count > 0) {
+            server::world::loot::ItemStack one = remaining;
+            one.count = 1;
+            addItem(path, entity->data(), slots, one, face);
+            if (one.count > 0) {
+                break;
+            }
+            remaining.count -= 1;
         }
-        slots[slot] =
-            slots[slot].has_value()
-                ? server::world::loot::ItemStack{.item = slots[slot]->item, .count = slots[slot]->count + stack.count}
-                : stack;
-        blockInventory::write(entity->data(), slots);
+    } else {
+        while (remaining.count > 0) {
+            const std::int32_t before = remaining.count;
+            addItem(path, entity->data(), slots, remaining, face);
+            if (remaining.count == before) {
+                break;
+            }
+        }
+    }
+    if (remaining.count != stack.count) {
+        blockInventory::writeFor(path, entity->data(), slots);
         world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
         redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
-        return true;
     }
-    return false;
+    return remaining;
 }
 
 /// parity: `dispenseItem`, which prefers the container in front and throws it out when there is none.
@@ -105,16 +156,19 @@ void deliver(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, 
     const std::int32_t tx = x + step[0];
     const std::int32_t ty = y + step[1];
     const std::int32_t tz = z + step[2];
-    if (insert(world, tx, ty, tz, result)) {
+    const server::world::loot::ItemStack left = insert(world, tx, ty, tz, step, result);
+    if (left.count <= 0) {
         return;
     }
-    world.spawnItem(DroppedItem{.entityId = hooks.allocateEntityId ? hooks.allocateEntityId() : 0,
-                                .uuid = wire::common::Uuid::random(),
-                                .item = result.item,
-                                .count = result.count,
-                                .x = tx + 0.5,
-                                .y = ty + 0.5,
-                                .z = tz + 0.5});
+    DroppedItem dropped{.entityId = hooks.allocateEntityId ? hooks.allocateEntityId() : 0,
+                        .uuid = wire::common::Uuid::random(),
+                        .item = left.item,
+                        .count = left.count,
+                        .x = tx + 0.5,
+                        .y = ty + 0.5,
+                        .z = tz + 0.5};
+    dropped.components = left.components;
+    world.spawnItem(std::move(dropped));
 }
 
 } // namespace
@@ -294,7 +348,7 @@ bool accepts(const wire::nbt::NbtCompound& data, const blockInventory::Slots& sl
     if (!here.has_value()) {
         return true;
     }
-    if (here->count >= registry::itemStacking::maxStackSize(here->item)) {
+    if (here->count >= maxStackOf(*here)) {
         return false;
     }
     // parity: `smallerStackExist` only looks **forward**, so the grid fills left to right and then

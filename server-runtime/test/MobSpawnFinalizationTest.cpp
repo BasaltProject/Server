@@ -135,7 +135,7 @@ TEST_CASE("a spider that rolls a jockey carries a finalized skeleton rather than
     CHECK(sawJockey);
 }
 
-TEST_CASE("the packs' spawn conditions pick a variant, the highest priority that holds winning") {
+TEST_CASE("the packs' spawn conditions pick a variant by biome, structure and moon, the highest priority winning") {
     const std::map<std::string, std::string, std::less<>> files{
         {"data/minecraft/wolf_variant/pale.json", R"({"spawn_conditions":[{"priority":0}]})"},
         {"data/minecraft/wolf_variant/spotted.json",
@@ -144,6 +144,12 @@ TEST_CASE("the packs' spawn conditions pick a variant, the highest priority that
          R"({"spawn_conditions":[{"condition":{"type":"minecraft:biome","biomes":"minecraft:desert"},"priority":1}]})"},
         {"data/minecraft/tags/worldgen/biome/is_savanna.json", R"({"values":["minecraft:savanna"]})"},
         {"data/minecraft/wolf_sound_variant/classic.json", "{}"},
+        {"data/minecraft/cat_variant/all_black.json",
+         R"({"spawn_conditions":[{"condition":{"type":"minecraft:structure","structures":"#minecraft:cats_spawn_as_black"},"priority":1}]})"},
+        {"data/minecraft/cat_variant/moony.json",
+         R"({"spawn_conditions":[{"condition":{"type":"minecraft:moon_brightness","range":{"min":0.9}},"priority":1}]})"},
+        {"data/minecraft/cat_variant/tabby.json", R"({"spawn_conditions":[{"priority":0}]})"},
+        {"data/minecraft/tags/worldgen/structure/cats_spawn_as_black.json", R"({"values":["minecraft:swamp_hut"]})"},
     };
     namespace variants = basalt::server::runtime::world::variantSpawnConditions;
     variants::install(
@@ -171,6 +177,16 @@ TEST_CASE("the packs' spawn conditions pick a variant, the highest priority that
     CHECK(stringAt(desert.spawn("wolf").main.data, "variant") == "extra:dusty");
     Attempt plains{"plains"};
     CHECK(stringAt(plains.spawn("wolf").main.data, "variant") == "minecraft:pale");
+
+    Attempt hut{"swamp"};
+    hut.context.structureAt = [](const Identifier& structure, std::int32_t, std::int32_t, std::int32_t) {
+        return structure == Identifier::vanilla("swamp_hut");
+    };
+    CHECK(stringAt(hut.spawn("cat").main.data, "variant") == "minecraft:all_black");
+    Attempt fullMoon{"plains"};
+    fullMoon.context.moonBrightness = 1.0F;
+    CHECK(stringAt(fullMoon.spawn("cat").main.data, "variant") == "minecraft:moony");
+    CHECK(stringAt(plains.spawn("cat").main.data, "variant") == "minecraft:tabby");
 
     variants::install({}, {});
     CHECK_FALSE(variants::installed());

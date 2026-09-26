@@ -2,6 +2,10 @@
 
 #include <basalt/wire/common/Identifier.hpp>
 
+namespace basalt::wire::nbt {
+class NbtCompound;
+}
+
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -64,6 +68,13 @@ inline constexpr std::int32_t kDefaultStackSize = 64;
 [[nodiscard]] const ItemStackingEntry* of(const wire::common::Identifier& item);
 
 [[nodiscard]] std::int32_t maxStackSize(const wire::common::Identifier& item);
+
+/// One stack's limit: its own `minecraft:max_stack_size` component first, then the item's default.
+/// parity: `ItemStack.getMaxStackSize`.
+[[nodiscard]] std::int32_t maxStackSize(const wire::common::Identifier& item, const wire::nbt::NbtCompound& components);
+
+/// The same for a stack whose item is still a namespaced string.
+[[nodiscard]] std::int32_t maxStackSize(std::string_view item, const wire::nbt::NbtCompound& components);
 
 /// How long the item is greyed out after a use, or zero when it is never greyed out.
 [[nodiscard]] std::int32_t cooldownTicks(const wire::common::Identifier& item);

@@ -324,7 +324,10 @@ bool AdvancementTriggers::accepts(const adv::GenericCondition& condition, const 
     }
     for (const auto& [field, bounds] : condition.numbers) {
         const auto number = event.numbers.find(field);
-        if (number == event.numbers.end() || !bounds.test(number->second)) {
+        // parity: `UsedEnderEyeTrigger` is the one number held squared, and `matchesSqr` squares the bounds.
+        const bool squared = field == "distance";
+        if (number == event.numbers.end() ||
+            !(squared ? bounds.testSquared(number->second) : bounds.test(number->second))) {
             return false;
         }
     }
@@ -366,7 +369,8 @@ bool AdvancementTriggers::accepts(const adv::GenericCondition& condition, const 
             return false;
         }
         const TriggerDamage& damage = *event.damage;
-        if (!check.dealt.test(damage.dealt) || !check.taken.test(damage.taken) ||
+        if (!check.dealt.test(static_cast<double>(damage.dealt)) ||
+            !check.taken.test(static_cast<double>(damage.taken)) ||
             (check.blocked.has_value() && *check.blocked != damage.blocked) ||
             (check.source != nullptr && !check.source->test(damage.source, tags_, here)) ||
             (check.type.has_value() && !accepts(*check.type, damage, context))) {

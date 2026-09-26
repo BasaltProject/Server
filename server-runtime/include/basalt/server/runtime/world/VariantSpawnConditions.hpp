@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
@@ -15,9 +16,15 @@ namespace basalt::server::runtime::world {
 struct VariantSpawnFacts {
     std::optional<wire::common::Identifier> biome;
     double moonBrightness = 0.0;
-    /// Whether the spot is inside a structure of this holder set (`#tag` or id).
-    std::function<bool(std::string_view structures)> inStructure;
+    /// Whether a piece of this structure covers the spot. parity: `StructureManager.getStructureWithPieceAt`.
+    std::function<bool(const wire::common::Identifier& structure)> structureAt;
 };
+
+struct MobSpawnContext;
+
+/// What a spawn context says about the block a mob is finalized at.
+[[nodiscard]] VariantSpawnFacts spawnFactsOf(const MobSpawnContext& context, std::int32_t blockX, std::int32_t blockY,
+                                             std::int32_t blockZ);
 
 /// The `spawn_conditions` of every mob variant registry, read from the selected packs at startup.
 ///

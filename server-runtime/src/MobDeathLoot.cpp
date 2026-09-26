@@ -21,6 +21,32 @@ namespace {
 using ::basalt::server::world::loot::EntityFacts;
 using entity::ServerEntity;
 using player::PlayerSession;
+
+/// parity: `ResolvableProfile.createResolved(gameProfile)`, as `STORED_GAME_PROFILE` writes it.
+[[nodiscard]] wire::nbt::NbtCompound profileOf(const PlayerSession& player) {
+    wire::nbt::NbtCompound profile;
+    const wire::common::Uuid& uuid = player.uuid();
+    profile.putIntArray("id", {static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.high() >> 32)),
+                               static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.high())),
+                               static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.low() >> 32)),
+                               static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.low()))});
+    profile.putString("name", std::string{player.name()});
+    if (!player.profileProperties.empty()) {
+        wire::nbt::NbtList properties{wire::nbt::NbtType::Compound};
+        for (const wire::protocol::login::GameProfileProperty& property : player.profileProperties) {
+            wire::nbt::NbtCompound entry;
+            entry.putString("name", property.name);
+            entry.putString("value", property.value);
+            if (property.signature.has_value()) {
+                entry.putString("signature", *property.signature);
+            }
+            static_cast<void>(properties.push(wire::nbt::NbtTag::ofCompound(std::move(entry))));
+        }
+        profile.set("properties", wire::nbt::NbtTag::ofList(std::move(properties)));
+    }
+    return profile;
+}
+
 using wire::common::Identifier;
 
 [[nodiscard]] EntityFacts factsOf(const world::LoadedWorld& world, const ServerEntity& entity) {
@@ -81,6 +107,7 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
     const auto playerFacts = [](const PlayerSession& player) {
         EntityFacts facts{.type = Identifier::vanilla("player"), .scoreName = player.name()};
         addHeld(facts, player.inventory.heldItem());
+        facts.profile = profileOf(player);
         return facts;
     };
     const auto playerById = [this](std::int32_t entityId) -> const PlayerSession* {

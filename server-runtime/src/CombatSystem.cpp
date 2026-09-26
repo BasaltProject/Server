@@ -115,11 +115,8 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     const double fromZ = entity.z;
     const std::optional<entity::BlockHit> hit = entity::projectiles::tick(world.state(), entity, kind);
     // parity: `Projectile.tick` announces the shot on the first turn, and a sculk sensor hears it at
-    // frequency three whether anybody fired it or not. It goes **after** the move because every
-    // projectile tick (`AbstractArrow`, `ThrowableProjectile`, `AbstractHurtingProjectile`) moves
-    // first and calls `super.tick()` last, so the shot is announced from where it got to. Measured
-    // in `flechavibra`: the jar reads power eight, which is four squares, and from the square it
-    // appeared in it would be five.
+    // frequency three whether anybody fired it or not. It goes after the move: every projectile tick
+    // moves first and calls `super.tick()` last, so the shot is announced from where it got to.
     if (!entity.announced) {
         entity.announced = true;
         emitVibration(world, "projectile_shoot", entity.x, entity.y, entity.z, entity.uuid());
@@ -534,12 +531,17 @@ void CombatSystem::rememberShooter(const std::vector<PlayerSession*>& watchers, 
 std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<PlayerSession*>& watchers,
                                                               const std::vector<ServerEntity*>& living,
                                                               const ServerEntity& projectile, double fromX,
-                                                              double fromY, double fromZ, double margin) {
+                                                              double fromY, double fromZ, double margin,
+                                                              const std::vector<std::int32_t>* spared) {
     double nearest = std::numeric_limits<double>::max();
     Target found;
+    // parity: `Projectile.canHitEntity`; without `spared` the owner alone is left out.
+    const auto sparedId = [&projectile, spared](std::int32_t id) {
+        return spared != nullptr ? std::ranges::contains(*spared, id)
+                                 : projectile.ownerId.has_value() && id == *projectile.ownerId;
+    };
     for (ServerEntity* candidate : living) {
-        if (candidate->entityId() == projectile.entityId() ||
-            (projectile.ownerId.has_value() && candidate->entityId() == *projectile.ownerId) ||
+        if (candidate->entityId() == projectile.entityId() || sparedId(candidate->entityId()) ||
             std::ranges::contains(projectile.piercedIds, candidate->entityId())) {
             continue;
         }
@@ -576,7 +578,7 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
         found = Target{.mob = candidate, .player = nullptr};
     }
     for (PlayerSession* candidate : watchers) {
-        if ((projectile.ownerId.has_value() && candidate->entityId() == *projectile.ownerId) || candidate->dead ||
+        if (sparedId(candidate->entityId()) || candidate->dead ||
             std::ranges::contains(projectile.piercedIds, candidate->entityId())) {
             continue;
         }

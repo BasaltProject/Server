@@ -4,10 +4,12 @@
 #include <basalt/server/runtime/datapack/DataPacks.hpp>
 #include <basalt/server/runtime/datapack/PackMetadata.hpp>
 #include <basalt/server/runtime/datapack/PackRepository.hpp>
+#include <basalt/server/runtime/datapack/RegistrySchemas.hpp>
 #include <basalt/server/runtime/datapack/ResourceStack.hpp>
 #include <basalt/server/runtime/registry/PackRegistries.hpp>
 #include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <doctest.h>
@@ -185,4 +187,25 @@ TEST_CASE("installed registries go out in id order, a pack's entries among vanil
     CHECK(wolves.front() == "ashen");
     CHECK(wolves[2] == "blue");
     CHECK(std::ranges::is_sorted(wolves));
+}
+
+TEST_CASE("an element missing what its codec requires is refused, and one that has it passes") {
+    namespace datapack = basalt::server::runtime::datapack;
+    const auto object = [](std::string_view text) {
+        return *basalt::wire::common::parseJson(text)->get<basalt::wire::common::JsonObject>();
+    };
+    CHECK_FALSE(datapack::schemaError("wolf_variant", object(R"({"assets":{"wild":"a:b","tame":"a:c","angry":"a:d"},
+        "baby_assets":{"wild":"a:b","tame":"a:c","angry":"a:d"},
+        "spawn_conditions":[{"priority":1,"condition":{"type":"minecraft:biome","biomes":"#minecraft:is_savanna"}}]})"))
+                    .has_value());
+    CHECK(datapack::schemaError("wolf_variant", object(R"({"assets":{"wild":"a:b"}})")) == "assets: No key tame");
+    CHECK(datapack::schemaError(
+              "frog_variant",
+              object(R"({"asset_id":"a:b","spawn_conditions":[{"condition":{"type":"x:y"},"priority":0}]})"))
+              .value_or("")
+              .starts_with("spawn_conditions: condition: Unknown spawn condition type"));
+    CHECK(datapack::schemaError("painting_variant", object(R"({"width":"1","height":1,"asset_id":"a:b"})")) ==
+          "width: Not a number");
+    // A registry without a schema here is not judged.
+    CHECK_FALSE(datapack::schemaError("enchantment", object("{}")).has_value());
 }
