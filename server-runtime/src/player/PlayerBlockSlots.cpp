@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/world/Chunk.hpp>
 
@@ -216,7 +217,7 @@ void useShelfFor(const BreakContext& context, PlayerSession& player, world::Load
     // whose `use_effects` asks for silence, is a component this server does not carry yet.
     if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
         world::vibrations::emit(world.state(), "item_interact_finish", x + 0.5, y + 0.5, z + 0.5, world.gameTime(),
-                                {.entity = player.uuid()});
+                                world::triggerFacts::vibrationSourceOf(player, context.triggers));
     }
     if (context.blocks != nullptr) {
         context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, *stateId, result->effects);

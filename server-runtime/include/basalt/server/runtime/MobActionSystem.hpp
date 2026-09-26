@@ -15,6 +15,7 @@
 #include <basalt/server/world/loot/Loot.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
+#include <basalt/wire/protocol/play/HudPackets.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -47,6 +48,14 @@ struct PiglinState;
 
 namespace basalt::server::runtime::entity::neutralAnger {
 struct Anger;
+}
+
+namespace basalt::server::runtime::entity::frogs {
+struct FrogState;
+}
+
+namespace basalt::server::runtime::entity::goats {
+struct GoatState;
 }
 
 namespace basalt::server::runtime {
@@ -367,6 +376,29 @@ public:
     /// parity: `Piglin.dropCustomDeathLoot`'s inventory.
     void dropPiglinInventory(world::LoadedWorld& world, const entity::ServerEntity& piglin);
 
+    /// parity: `Goat.customServerAiStep` over `GoatAi`.
+    void tickGoat(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// parity: `Goat.mobInteract`'s milking. Answers whether it gave milk.
+    [[nodiscard]] bool milkGoat(world::LoadedWorld& world, player::PlayerSession& player, entity::ServerEntity& goat,
+                                std::int32_t slot);
+
+    /// parity: `Frog.customServerAiStep` over `FrogAi`.
+    void tickFrog(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// parity: `LongJumpToPreferredBlock` and `LongJumpMidJump`, the frog's jumps.
+    void frogJumps(world::LoadedWorld& world, entity::ai::MobContext& context, entity::frogs::FrogState& state);
+
+    /// parity: `ShootTongue`, the frog's tongue activity.
+    void frogTongue(world::LoadedWorld& world, entity::ai::MobContext& context, entity::frogs::FrogState& state);
+
+    /// parity: `TryFindLandNearLiquid` and `TryLaySpawnOnFluidNearLand`, a pregnant frog's own two.
+    void frogLaysSpawn(world::LoadedWorld& world, entity::ai::MobContext& context, entity::frogs::FrogState& state,
+                       bool inWater);
+
+    /// parity: `Tadpole.customServerAiStep` over `TadpoleAi`.
+    void tickTadpole(world::LoadedWorld& world, entity::ai::MobContext& context);
+
     /// parity: `Axolotl.customServerAiStep` over `AxolotlAi`.
     void tickAxolotl(world::LoadedWorld& world, entity::ai::MobContext& context);
 
@@ -437,7 +469,8 @@ private:
                         const wire::protocol::play::SetEntityDataPacket::Entry& entry);
 
     void playSound(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::string_view sound,
-                   float volume = 1.0F, float pitch = 1.0F);
+                   float volume = 1.0F, float pitch = 1.0F,
+                   wire::protocol::play::SoundSource source = wire::protocol::play::SoundSource::Hostile);
 
     /// parity: `EatBlockGoal`: the grass in front becomes air and the block below becomes dirt.
     void eatGrassUnder(world::LoadedWorld& world, const entity::ServerEntity& mob);
@@ -497,6 +530,14 @@ private:
     /// parity: `NeutralMob.updatePersistentAnger`.
     void updateNeutralAnger(world::LoadedWorld& world, entity::ServerEntity& mob, entity::neutralAnger::Anger& anger,
                             random::RandomSource& random, bool stayAngry, std::int32_t minTicks, std::int32_t maxTicks);
+
+    /// The goat brain's ram. parity: `PrepareRamNearestTarget`
+    /// and `RamTarget`.
+    void goatRam(world::LoadedWorld& world, entity::ai::MobContext& context, entity::goats::GoatState& state,
+                 bool screaming);
+    void goatRams(world::LoadedWorld& world, entity::ServerEntity& goat, std::int32_t targetId, bool player,
+                  const std::array<double, 3>& direction);
+    bool goatDropsHorn(world::LoadedWorld& world, entity::ServerEntity& goat, random::RandomSource& random);
 
     /// Whether an item is in an item tag.
     [[nodiscard]] bool itemTagged(std::string_view tag, const wire::common::Identifier& item) const;

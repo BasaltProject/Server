@@ -324,6 +324,16 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
 void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ, std::int32_t stateId,
           const wire::common::Identifier& block, std::string_view event, double x, double y, double z,
           std::int64_t gameTime, const Source& source) {
+    // parity: `Listener.handleGameEvent`: one already on its way comes first, then
+    // `isValidVibration`'s careful step, which a sensor tells the player it let pass.
+    if (source.steppingCarefully && ignoredWhenSneaking(event)) {
+        const wire::nbt::NbtCompound* data = dataOf(world, sensorX, sensorY, sensorZ, block);
+        const wire::nbt::NbtCompound* listener = data == nullptr ? nullptr : data->getCompound(kListenerKey);
+        if ((listener == nullptr || listener->getCompound("event") == nullptr) && source.avoided) {
+            source.avoided();
+        }
+        return;
+    }
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto phase = properties.find("sculk_sensor_phase");
     if (phase == properties.end() || phase->second != "inactive") {
@@ -501,8 +511,7 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
 }
 } // namespace
 
-bool occludedBetween(WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY,
-                     double toZ) {
+bool occludedBetween(WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY, double toZ) {
     return occluded(world, fromX, fromY, fromZ, static_cast<std::int32_t>(std::floor(toX)),
                     static_cast<std::int32_t>(std::floor(toY)), static_cast<std::int32_t>(std::floor(toZ)));
 }
@@ -524,6 +533,11 @@ std::int32_t frequencyOf(std::string_view event) {
     }
     const auto found = frequencies().find(event);
     return found == frequencies().end() ? 0 : found->second;
+}
+
+bool ignoredWhenSneaking(std::string_view event) {
+    return event == "hit_ground" || event == "projectile_shoot" || event == "step" || event == "swim" ||
+           event == "item_interact_start" || event == "item_interact_finish";
 }
 
 void emit(WorldState& world, std::string_view event, double x, double y, double z, std::int64_t gameTime,

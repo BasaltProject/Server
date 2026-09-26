@@ -9,7 +9,9 @@
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
@@ -42,6 +44,9 @@ constexpr std::int8_t kLivingFlagUsingItem = 1;
 /// parity: `LivingEntity.LIVING_ENTITY_FLAG_OFF_HAND`, which hand the item in use is in.
 constexpr std::int8_t kLivingFlagOffhand = 2;
 constexpr std::string_view kShield = "shield";
+constexpr std::string_view kSpyglass = "spyglass";
+/// parity: `SpyglassItem.USE_DURATION`, a minute.
+constexpr std::int32_t kSpyglassUseTicks = 1200;
 
 /// A stored stack's id as an identifier, or nothing when the row holds something unparseable.
 std::optional<Identifier> parsedOrNothing(const std::string& id) {
@@ -222,6 +227,77 @@ bool ItemUseTimers::throwEnderPearl(PlayerSession& session, const Identifier& it
     return true;
 }
 
+bool ItemUseTimers::startSpyglass(PlayerSession& session, const Identifier& item, std::int32_t slot) {
+    if (item.path() != kSpyglass) {
+        return false;
+    }
+    playAroundExceptSelf(session, "item.spyglass.use");
+    player::statAwards::used(session, item.toString());
+    spyglassSlot_ = slot;
+    spyglassTicks_ = kSpyglassUseTicks;
+    setUsingItem(true, item, slot == PlayerInventory::kOffhandSlot);
+    return true;
+}
+
+void ItemUseTimers::stopSpyglass() {
+    if (spyglassSlot_ < 0) {
+        return;
+    }
+    spyglassSlot_ = -1;
+    spyglassTicks_ = 0;
+    if (PlayerSession* session = owner_->playerSession(); session != nullptr) {
+        playAroundExceptSelf(*session, "item.spyglass.stop_using");
+    }
+    setUsingItem(false);
+}
+
+void ItemUseTimers::tickSpyglass(PlayerSession& session) {
+    if (spyglassSlot_ < 0) {
+        return;
+    }
+    const std::optional<storage::StoredItemStack>& held = session.inventory.at(spyglassSlot_);
+    const bool inHand = spyglassSlot_ == PlayerInventory::kOffhandSlot ||
+                        spyglassSlot_ == PlayerInventory::kHotbarStart + session.inventory.heldSlot();
+    if (!held.has_value() || held->id != "minecraft:spyglass" || !inHand) {
+        // parity: `stopUsingItem` on a changed hand ends it without `releaseUsing`, so silently.
+        spyglassSlot_ = -1;
+        spyglassTicks_ = 0;
+        setUsingItem(false);
+        return;
+    }
+    // parity: `finishUsingItem` at the end of the minute, which stops it with the same sound.
+    if (--spyglassTicks_ <= 0) {
+        stopSpyglass();
+    }
+}
+
+void ItemUseTimers::tickUsingTrigger(PlayerSession& session) {
+    world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+    if (triggers == nullptr || !usingItem_ || !usedItem_.has_value() || !triggers->listensTo("using_item")) {
+        return;
+    }
+    const std::int32_t mainHand = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
+    const std::string used = usedItem_->toString();
+    const std::optional<storage::StoredItemStack>& main = session.inventory.at(mainHand);
+    const std::optional<storage::StoredItemStack>& stack =
+        main.has_value() && main->id == used ? main : session.inventory.at(PlayerInventory::kOffhandSlot);
+    if (const std::optional<world::TriggerItem> item = world::triggerFacts::itemOf(stack); item.has_value()) {
+        triggers->fire("using_item", session.name(), session.uuid().toString(),
+                       world::TriggerEvent{.items = {{"item", *item}}});
+    }
+}
+
+void ItemUseTimers::playAroundExceptSelf(const PlayerSession& session, std::string_view sound) {
+    // parity: `Player.playSound`, which everyone but the player hears: their own client plays it.
+    const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
+    for (const PlayerSession* other : owner_->playersInSameWorld()) {
+        if (other->entityId() != session.entityId()) {
+            player::playSoundFor(*other, sound, wire::protocol::play::SoundSource::Players, session.x, session.y,
+                                 session.z, 1.0F, 1.0F, seed);
+        }
+    }
+}
+
 bool ItemUseTimers::onCooldown(const Identifier& item) {
     PlayerSession* session = owner_->playerSession();
     const world::LoadedWorld* world = owner_->currentWorld();
@@ -243,7 +319,7 @@ void ItemUseTimers::emitAt(std::string_view event) {
         return;
     }
     world::vibrations::emit(world->state(), event, session->x, session->y, session->z, world->gameTime(),
-                            {.entity = session->uuid()});
+                            world::triggerFacts::vibrationSourceOf(*session, owner_->options().advancementTriggers));
 }
 
 bool ItemUseTimers::startBlocking(PlayerSession& session, const Identifier& item, std::int32_t slot) {

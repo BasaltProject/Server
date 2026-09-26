@@ -67,6 +67,8 @@ struct RuntimeEntityMetadata {
     /// parity: `FireworkRocketEntity`'s item, who it is stuck to and whether it was shot at an angle.
     std::optional<wire::protocol::play::WireItemStack> fireworkItem;
     std::optional<std::optional<std::int32_t>> fireworkAttached;
+    /// parity: `Frog.DATA_TONGUE_TARGET_ID`.
+    std::optional<std::optional<std::int32_t>> frogTongue;
     std::optional<bool> fireworkShotAtAngle;
     /// parity: `Bee.DATA_FLAGS_ID` and `DATA_ANGER_END_TIME`.
     std::optional<std::int8_t> beeFlags;
@@ -80,6 +82,9 @@ struct RuntimeEntityMetadata {
     std::optional<bool> piglinDancing;
     /// parity: `Axolotl.DATA_PLAYING_DEAD`.
     std::optional<bool> axolotlPlayingDead;
+    /// parity: `Goat`'s horns, which a ram into stone can knock off.
+    std::optional<bool> goatLeftHorn;
+    std::optional<bool> goatRightHorn;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

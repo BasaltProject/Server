@@ -25,6 +25,7 @@
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerAnvil.hpp>
 #include <basalt/server/runtime/player/PlayerArrowPickup.hpp>
+#include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
@@ -828,20 +829,18 @@ void BasaltServer::startBedrockListener() {
                         weapon = *parsed;
                     }
                 }
-                const registry::WeaponStats* stats = weapon.has_value() ? registry::itemWeapons::of(*weapon) : nullptr;
+                world::RealEnchantments* enchantments = &vanillaData_.enchantments;
+                const player::playerAttributes::DefinitionOf definitionOf =
+                    [enchantments](const wire::common::Identifier& id) { return enchantments->definitionOf(id); };
                 const float strength = player::combat::attackStrengthScale(
                     session->ticksSinceSwing,
-                    registry::itemWeapons::kBaseAttackSpeed + (stats == nullptr ? 0.0 : stats->attackSpeed));
+                    player::playerAttributes::valueOf(*session, "minecraft:attack_speed", definitionOf));
                 session->ticksSinceSwing = 0;
-                const auto base = static_cast<float>(registry::itemWeapons::kBaseAttackDamage +
-                                                     (stats == nullptr ? 0.0 : stats->attackDamage));
+                const auto base = static_cast<float>(
+                    player::playerAttributes::valueOf(*session, "minecraft:attack_damage", definitionOf));
                 // parity: what the enchantments add rides on the swing but never on the critical, so
                 // it is worked out here and handed to the same arithmetic the other door uses.
-                world::RealEnchantments* enchantments = &vanillaData_.enchantments;
-                const float enchanted =
-                    world::weaponDamage::of(held, base, [enchantments](const wire::common::Identifier& id) {
-                        return enchantments->definitionOf(id);
-                    });
+                const float enchanted = world::weaponDamage::of(held, base, definitionOf);
                 const player::combat::Swing swing =
                     player::combat::swingOf(strength, base, enchanted, falling, session->onGround, session->sprinting);
                 if (swing.damage <= 0.0F) {

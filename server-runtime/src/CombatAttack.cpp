@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/DragonState.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
+#include <basalt/server/runtime/entity/MobConversions.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Shulkers.hpp>
@@ -21,6 +22,7 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
+#include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
@@ -173,21 +175,20 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
 
     const std::optional<storage::StoredItemStack>& heldStack = session->inventory.heldItem();
     const std::optional<Identifier> weapon = heldStack.has_value() ? parsedOrNothing(heldStack->id) : std::nullopt;
-    const server::registry::WeaponStats* stats =
-        weapon.has_value() ? server::registry::itemWeapons::of(*weapon) : nullptr;
-    const float strength = player::combat::attackStrengthScale(session->ticksSinceSwing,
-                                                               server::registry::itemWeapons::kBaseAttackSpeed +
-                                                                   (stats == nullptr ? 0.0 : stats->attackSpeed));
+    world::RealEnchantments* enchantments = owner_->options().enchantments;
+    const player::playerAttributes::DefinitionOf definitionOf = [enchantments](const Identifier& id) {
+        return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
+    };
+    // parity: `Player.attack` reads the attack damage and speed attributes, weapon and effects in.
+    const float strength = player::combat::attackStrengthScale(
+        session->ticksSinceSwing, player::playerAttributes::valueOf(*session, "minecraft:attack_speed", definitionOf));
     session->ticksSinceSwing = 0;
 
-    const auto base = static_cast<float>(server::registry::itemWeapons::kBaseAttackDamage +
-                                         (stats == nullptr ? 0.0 : stats->attackDamage));
+    const auto base =
+        static_cast<float>(player::playerAttributes::valueOf(*session, "minecraft:attack_damage", definitionOf));
     // parity: what the enchantments add rides on the swing but not on the critical, and is put back
     // on top after the charge and the critical have had the base to themselves.
-    world::RealEnchantments* enchantments = owner_->options().enchantments;
-    const float enchanted = world::weaponDamage::of(heldStack, base, [enchantments](const Identifier& id) {
-        return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
-    });
+    const float enchanted = world::weaponDamage::of(heldStack, base, definitionOf);
     const player::combat::Swing swing =
         player::combat::swingOf(strength, base, enchanted, fallDistance > 0.0, session->onGround, session->sprinting);
     const float damage = swing.damage;
@@ -364,6 +365,16 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             return;
         }
     }
+    // parity: `Goat.mobInteract`'s bucket of milk.
+    if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr && entity->type().path() == "goat") {
+        const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
+        const std::int32_t slot =
+            mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot() : PlayerInventory::kOffhandSlot;
+        if (mobs->milkGoat(*world, *session, *entity, slot)) {
+            owner_->sendInventory();
+            return;
+        }
+    }
     // parity: `PiglinAi.mobInteract`: a gold ingot to admire and barter.
     if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr && entity->type().path() == "piglin") {
         const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
@@ -444,6 +455,19 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             storage::StoredItemStack left = *held;
             left.count = held->count - 1;
             session->inventory.set(heldSlot, left.count <= 0 ? std::nullopt : std::optional{left});
+            owner_->sendInventorySlot(heldSlot);
+        }
+        return;
+    }
+    // parity: `Tadpole.feed`: the frog food takes a tenth of the wait off, in whole seconds.
+    if (item.has_value() && entity->type().path() == "tadpole" && owner_->options().itemTags != nullptr &&
+        world::realItemTags::contains(*owner_->options().itemTags, "minecraft:frog_food", *item)) {
+        const std::int32_t left = std::max(0, entity::mobConversions::kTadpoleTicks - entity->conversionClock);
+        entity->conversionClock += static_cast<std::int32_t>(static_cast<float>(left / 20) * 0.1F) * 20;
+        if (session->gamemode != Gamemode::Creative) {
+            storage::StoredItemStack rest = *held;
+            rest.count = held->count - 1;
+            session->inventory.set(heldSlot, rest.count <= 0 ? std::nullopt : std::optional{rest});
             owner_->sendInventorySlot(heldSlot);
         }
         return;

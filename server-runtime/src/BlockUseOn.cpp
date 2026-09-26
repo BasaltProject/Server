@@ -715,7 +715,9 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
             owner_->options().maps->useEmptyMap(breakContext(), *session, *world, PlayerInventory::kOffhandSlot)) {
             return;
         }
-        static_cast<void>(owner_->itemUseTimers().startBlocking(*session, *other, PlayerInventory::kOffhandSlot));
+        if (!owner_->itemUseTimers().startBlocking(*session, *other, PlayerInventory::kOffhandSlot)) {
+            static_cast<void>(owner_->itemUseTimers().startSpyglass(*session, *other, PlayerInventory::kOffhandSlot));
+        }
         return;
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
@@ -732,6 +734,7 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
         (owner_->options().fireworks != nullptr &&
          player::useRocketFor(breakContext(), *owner_->options().fireworks, *session, *world, heldSlot)) ||
         owner_->itemUseTimers().startBlocking(*session, *item, heldSlot) ||
+        owner_->itemUseTimers().startSpyglass(*session, *item, heldSlot) ||
         (owner_->options().fishing != nullptr &&
          owner_->options().fishing->useRod(breakContext(), *session, *world, heldSlot)) ||
         (owner_->options().maps != nullptr &&

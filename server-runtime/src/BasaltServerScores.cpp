@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
+#include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 
 #include <cmath>
@@ -16,22 +17,11 @@ using wire::protocol::play::DisplaySlot;
 }
 
 /// parity: `LivingEntity.getArmorValue`, the armour attribute the worn pieces add up to.
-[[nodiscard]] std::int32_t armorOf(const PlayerSession& player) {
-    float armor = 0.0F;
-    for (std::int32_t slot = player::PlayerInventory::kArmourStart;
-         slot < player::PlayerInventory::kArmourStart + player::PlayerInventory::kArmourSlots; ++slot) {
-        const std::optional<storage::StoredItemStack>& stack = player.inventory.at(slot);
-        if (!stack.has_value()) {
-            continue;
-        }
-        const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
-            wire::common::Identifier::parse(stack->id);
-        if (const registry::ArmourPiece* piece = id.has_value() ? registry::itemArmour::of(*id) : nullptr;
-            piece != nullptr) {
-            armor += piece->armour;
-        }
-    }
-    return static_cast<std::int32_t>(std::floor(armor));
+/// parity: `LivingEntity.getArmorValue`, the armour attribute floored.
+[[nodiscard]] std::int32_t armorOf(const PlayerSession& player,
+                                   const player::playerAttributes::DefinitionOf& definitionOf) {
+    return static_cast<std::int32_t>(
+        std::floor(player::playerAttributes::valueOf(player, "minecraft:armor", definitionOf)));
 }
 
 } // namespace
@@ -126,7 +116,10 @@ void BasaltServer::tickScoreCriteria() {
             recorded.air = player->airSupply;
             updateCriterion("air", player->name(), set(recorded.air));
         }
-        if (const std::int32_t armor = armorOf(*player); armor != recorded.armor) {
+        if (const std::int32_t armor = armorOf(
+                *player,
+                [this](const wire::common::Identifier& id) { return vanillaData_.enchantments.definitionOf(id); });
+            armor != recorded.armor) {
             recorded.armor = armor;
             updateCriterion("armor", player->name(), set(armor));
         }

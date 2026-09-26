@@ -157,9 +157,9 @@ namespace {
 
 bool buildAnimal(GoalSelector& selector, const wire::common::Identifier& type, std::string_view path) {
     static const Names kSlow{"horse", "donkey", "mule", "llama", "turtle", "panda", "fox", "strider"};
-    // parity: the brains' own speeds, `GoatAi`, `FrogAi`, `ArmadilloAi` and `SnifferAi`: two to flee and
+    // parity: the brains' own speeds, `ArmadilloAi` and `SnifferAi`: two to flee and
     // a quarter more to follow food or a parent; the camel's four, two and a half, and two to idle.
-    static const Names kBrained{"goat", "frog", "armadillo", "sniffer"};
+    static const Names kBrained{"armadillo", "sniffer"};
     if (kBrained.contains(path)) {
         farmAnimal(selector, type, 2.0, 1.25, 1.25);
         return true;
@@ -519,8 +519,8 @@ bool buildFlier(GoalSelector& selector, std::string_view path) {
         add<VexChargeGoal>(selector, 4);
         add<VexRandomMoveGoal>(selector, 8);
         add<LookAtPlayerGoal>(selector, 9, kLookMeet, 1.0F);
-        add<HurtByTargetGoal>(selector, 1,
-                              Names{"pillager", "vindicator", "evoker", "illusioner", "witch", "ravager"}, true);
+        add<HurtByTargetGoal>(selector, 1, Names{"pillager", "vindicator", "evoker", "illusioner", "witch", "ravager"},
+                              true);
         add<NearestAttackablePlayerGoal>(selector, 3);
         return true;
     }

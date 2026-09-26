@@ -23,6 +23,7 @@
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
@@ -131,8 +132,9 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
         // no event, where the jar counts the distance for everyone and only spares the damage.
         if (fallDistance > 0.0) {
             if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
-                world::vibrations::emit(world->state(), "hit_ground", session.x, y, session.z, world->gameTime(),
-                                        {.entity = session.uuid()});
+                world::vibrations::emit(
+                    world->state(), "hit_ground", session.x, y, session.z, world->gameTime(),
+                    world::triggerFacts::vibrationSourceOf(session, owner_->options().advancementTriggers));
                 bounceOn(session, *world, y);
             }
         }

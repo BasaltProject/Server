@@ -4,6 +4,8 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
+#include <basalt/server/runtime/entity/Frogs.hpp>
+#include <basalt/server/runtime/entity/Goats.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/NeutralAnger.hpp>
@@ -390,6 +392,12 @@ NbtCompound encode(const ServerEntity& entity) {
         piglins::write(entity, tag);
     }
     neutralAnger::write(entity, tag);
+    if (path == "goat") {
+        goats::write(entity, tag);
+    }
+    if (path == "frog") {
+        frogs::write(entity, tag);
+    }
     if (patrols(path)) {
         if (entity.patrolTarget.has_value()) {
             tag.putIntArray("patrol_target", {entity.patrolTarget->begin(), entity.patrolTarget->end()});

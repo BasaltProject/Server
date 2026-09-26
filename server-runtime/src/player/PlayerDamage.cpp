@@ -7,11 +7,13 @@
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
+#include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/player/PlayerTotem.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
@@ -30,6 +32,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <numbers>
 #include <random>
 #include <vector>
@@ -253,15 +256,17 @@ void showDamage(const PlayerSession& session, const std::optional<Identifier>& d
 /// parity: `LivingEntity.knockback` as it lands on a player, plus the hurt animation. A blocked hit
 /// first runs `blockedByItem`, whose half-block push points the other way and is halved by the
 /// default one after it; a blocked hit also draws no hurt direction.
-void pushAway(const PlayerSession& session, const entity::DamageSource& source, bool blocked) {
+void pushAway(const PlayerSession& session, const entity::DamageSource& source, bool blocked, double resistance) {
     const double towardsX = source.x - session.x;
     const double towardsZ = source.z - session.z;
     std::array<double, 3> start{0.0, 0.0, 0.0};
     if (blocked) {
-        start = player::combat::knockback(kBlockedPush, -towardsX, -towardsZ, 0.0, 0.0, 0.0, session.onGround);
+        start =
+            player::combat::knockback(kBlockedPush, -towardsX, -towardsZ, 0.0, 0.0, 0.0, session.onGround, resistance);
     }
-    const std::array<double, 3> moved = player::combat::knockback(
-        entity::entityCombat::kDefaultKnockback, towardsX, towardsZ, start[0], start[1], start[2], session.onGround);
+    const std::array<double, 3> moved =
+        player::combat::knockback(entity::entityCombat::kDefaultKnockback, towardsX, towardsZ, start[0], start[1],
+                                  start[2], session.onGround, resistance);
     const auto angle = static_cast<float>(std::atan2(towardsZ, towardsX) * kRadiansToDegrees) - session.yaw;
     if (session.connection().pushBack) {
         session.connection().pushBack(moved[0], moved[1], moved[2], angle);
@@ -325,6 +330,41 @@ void shove(const PlayerSession& session, const entity::shieldBlows::Push& push) 
     return hit;
 }
 
+[[nodiscard]] TotemContext totemContextOf(const DamageContext& context, bool bypassesInvulnerability) {
+    return TotemContext{
+        .registry = context.registry,
+        .bypassesInvulnerability = bypassesInvulnerability,
+        .nextFloat =
+            [] {
+                random::RandomSource random =
+                    random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+                return random.nextFloat();
+            },
+        .slotChanged = context.slotChanged,
+        .usedTotem =
+            [triggers = context.triggers](PlayerSession& player, const storage::StoredItemStack& spent) {
+                const std::optional<world::TriggerItem> item = world::triggerFacts::itemOf(spent);
+                if (triggers != nullptr && item.has_value()) {
+                    triggers->fire("used_totem", player.name(), player.uuid().toString(),
+                                   world::TriggerEvent{.items = {{"item", *item}}});
+                }
+            },
+        .interactFinished =
+            [world = context.world, triggers = context.triggers](const PlayerSession& player) {
+                if (world::LoadedWorld* here = world ? world() : nullptr; here != nullptr) {
+                    world::vibrations::emit(here->state(), "item_interact_finish", player.x, player.y, player.z,
+                                            here->gameTime(), world::triggerFacts::vibrationSourceOf(player, triggers));
+                }
+            }};
+}
+
+[[nodiscard]] playerAttributes::DefinitionOf definitionsOf(const DamageContext& context) {
+    world::RealEnchantments* enchantments = context.enchantments;
+    return [enchantments](const Identifier& id) {
+        return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
+    };
+}
+
 } // namespace
 
 float damageAfterProtection(const PlayerSession& session, const float amount,
@@ -341,21 +381,18 @@ float damageAfterProtection(const PlayerSession& session, const float amount,
         worn.push_back(session.inventory.at(slot));
     }
     if (!world::realDamageTypeTags::isIn(*tags, world::realDamageTypeTags::kBypassesArmour, *damageType)) {
-        float armour = 0.0F;
-        float toughness = 0.0F;
-        for (const std::optional<storage::StoredItemStack>& stack : worn) {
-            if (!stack.has_value()) {
-                continue;
-            }
-            const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(stack->id);
-            const server::registry::ArmourPiece* piece =
-                id.has_value() ? server::registry::itemArmour::of(*id) : nullptr;
-            if (piece == nullptr) {
-                continue;
-            }
-            armour += piece->armour;
-            toughness += piece->toughness;
-        }
+        // parity: `CombatRules.getDamageAfterAbsorb` with `getArmorValue`, the attribute floored, and
+        // the toughness attribute as it is.
+        const playerAttributes::DefinitionOf definitionOf = definitionsOf(context);
+        const playerAttributes::Modifiers modifiers = playerAttributes::modifiersOf(session, definitionOf);
+        const auto attribute = [&session, &modifiers](std::string_view name) {
+            const auto found = modifiers.find(name);
+            return playerAttributes::calculate(name, playerAttributes::baseOf(session, name),
+                                               found == modifiers.end() ? std::vector<playerAttributes::Modifier>{}
+                                                                        : found->second);
+        };
+        const auto armour = static_cast<float>(std::floor(attribute("minecraft:armor")));
+        const auto toughness = static_cast<float>(attribute("minecraft:armor_toughness"));
         if (armour > 0.0F) {
             damage = player::combat::afterArmour(damage, armour, toughness);
         }
@@ -459,7 +496,8 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         // parity: a hit the shield took whole deals no knockback; only the attacker's own shove lands.
         const bool fullyBlocked = blocked.amount > 0.0F && incoming <= 0.0F;
         if (source.has_value() && !fullyBlocked) {
-            pushAway(*session, *source, blocked.pushed);
+            pushAway(*session, *source, blocked.pushed,
+                     playerAttributes::valueOf(*session, "minecraft:knockback_resistance", definitionsOf(context)));
         } else if (blocked.thrown.has_value()) {
             shove(*session, *blocked.thrown);
         }
@@ -467,10 +505,21 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     std::optional<world::TriggerDamage> hit;
     if (context.triggers != nullptr) {
         hit = triggerDamageOf(amount, dealt, blocked.amount > 0.0F, damageType, deathMessageId, source, context);
-        // parity: `hurtServer` ends in `ENTITY_HURT_PLAYER` whatever the shield and armour left.
-        context.triggers->fire("entity_hurt_player", session->name(), session->uuid().toString(),
-                               world::TriggerEvent{.damage = hit});
     }
+
+    // parity: `hurtServer` ends in `ENTITY_HURT_PLAYER` whatever the shield, the armour and a totem
+    // left, so it goes out on every way out from here.
+    struct ScopeExit {
+        std::function<void()> run;
+
+        ~ScopeExit() { run(); }
+    } const hurtTrigger{[&context, session, &hit] {
+        if (context.triggers != nullptr) {
+            context.triggers->fire("entity_hurt_player", session->name(), session->uuid().toString(),
+                                   world::TriggerEvent{.damage = hit});
+        }
+    }};
+
     if (afterArmour <= 0.0F) {
         return;
     }
@@ -516,6 +565,15 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         world::vibrations::emit(world->state(), "entity_damage", session->x, session->y, session->z, world->gameTime());
     }
     session->setHealth(std::max(session->health() - damage, 0.0F));
+    if (session->health() <= 0.0F) {
+        const Identifier type = damageType.value_or(world::triggerFacts::damageTypeOf(deathMessageId));
+        const bool bypasses = context.damageTypeTags != nullptr &&
+                              world::realDamageTypeTags::isIn(
+                                  *context.damageTypeTags, world::realDamageTypeTags::kBypassesInvulnerability, type);
+        if (checkTotemDeathProtection(*session, totemContextOf(context, bypasses))) {
+            return;
+        }
+    }
     // parity: `getKillCredit().awardKillScore`: `ENTITY_KILLED_PLAYER` names the player who hit
     // them last, else the mob, whatever this blow was.
     if (session->health() <= 0.0F && hit.has_value()) {

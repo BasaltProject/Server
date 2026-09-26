@@ -9,7 +9,9 @@
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/FishingHooks.hpp>
+#include <basalt/server/runtime/entity/Frogs.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
+#include <basalt/server/runtime/entity/Goats.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
@@ -483,6 +485,11 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         (previous != nullptr || fireworkAttached->has_value())) {
         entries.push_back(Entry{.index = 9, .value = SetEntityDataPacket::OptionalUnsignedIntValue{*fireworkAttached}});
     }
+    if (frogTongue.has_value() && (previous == nullptr || previous->frogTongue != frogTongue) &&
+        (previous != nullptr || frogTongue->has_value())) {
+        entries.push_back(Entry{.index = frogs::kTongueTargetDataIndex,
+                                .value = SetEntityDataPacket::OptionalUnsignedIntValue{*frogTongue}});
+    }
     if (fireworkShotAtAngle.has_value() &&
         (previous == nullptr || previous->fireworkShotAtAngle != fireworkShotAtAngle) &&
         (previous != nullptr || *fireworkShotAtAngle)) {
@@ -499,6 +506,16 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
     flag(piglinCharging, &RuntimeEntityMetadata::piglinCharging, piglins::kChargingDataIndex);
     flag(piglinDancing, &RuntimeEntityMetadata::piglinDancing, piglins::kDancingDataIndex);
     flag(axolotlPlayingDead, &RuntimeEntityMetadata::axolotlPlayingDead, axolotls::kPlayingDeadDataIndex);
+    // parity: the horns default to there, so the first packet only says which is missing.
+    const auto horn = [&entries, previous](const std::optional<bool>& now,
+                                           const std::optional<bool> RuntimeEntityMetadata::* field,
+                                           std::uint8_t index) {
+        if (now.has_value() && (previous == nullptr || previous->*field != now) && (previous != nullptr || !*now)) {
+            entries.push_back(Entry{.index = index, .value = SetEntityDataPacket::BoolValue{.value = *now}});
+        }
+    };
+    horn(goatLeftHorn, &RuntimeEntityMetadata::goatLeftHorn, goats::kLeftHornDataIndex);
+    horn(goatRightHorn, &RuntimeEntityMetadata::goatRightHorn, goats::kRightHornDataIndex);
     if (allayDancing.has_value() && (previous == nullptr || previous->allayDancing != allayDancing) &&
         (previous != nullptr || *allayDancing)) {
         entries.push_back(
@@ -617,19 +634,22 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
     // parity: `Shulker.defineSynchedData`: down, closed and without a colour.
     if (shulkerFace.has_value() && (previous == nullptr || previous->shulkerFace != shulkerFace) &&
         (previous != nullptr || *shulkerFace != 0)) {
-        entries.push_back(Entry{.index = shulkers::kAttachFaceDataIndex,
-                                .value = SetEntityDataPacket::RegistryIdValue{
-                                    .value = *shulkerFace, .registry = wire::protocol::play::RegistryHolder::Direction}});
+        entries.push_back(
+            Entry{.index = shulkers::kAttachFaceDataIndex,
+                  .value = SetEntityDataPacket::RegistryIdValue{
+                      .value = *shulkerFace, .registry = wire::protocol::play::RegistryHolder::Direction}});
     }
     if (shulkerPeek.has_value() && (previous == nullptr || previous->shulkerPeek != shulkerPeek) &&
         (previous != nullptr || *shulkerPeek != 0)) {
-        entries.push_back(Entry{.index = shulkers::kPeekDataIndex,
-                                .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*shulkerPeek)}});
+        entries.push_back(
+            Entry{.index = shulkers::kPeekDataIndex,
+                  .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*shulkerPeek)}});
     }
     if (shulkerColor.has_value() && (previous == nullptr || previous->shulkerColor != shulkerColor) &&
         (previous != nullptr || *shulkerColor != shulkers::kNoColor)) {
-        entries.push_back(Entry{.index = shulkers::kColorDataIndex,
-                                .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*shulkerColor)}});
+        entries.push_back(
+            Entry{.index = shulkers::kColorDataIndex,
+                  .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*shulkerColor)}});
     }
     // parity: a fresh dragon is defined hovering, so only a different phase is news.
     if (dragonPhase.has_value() && (previous == nullptr || previous->dragonPhase != dragonPhase) &&
@@ -701,6 +721,22 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.dragon != nullptr) {
         live.dragonPhase = static_cast<std::int32_t>(entity.dragon->phase);
+    }
+    if (entity.goat != nullptr) {
+        live.goatLeftHorn = !entity.sourceNbt.has_value() || entity.sourceNbt->getBoolean("HasLeftHorn", true);
+        live.goatRightHorn = !entity.sourceNbt.has_value() || entity.sourceNbt->getBoolean("HasRightHorn", true);
+        if (entity.goat->jump.midJump) {
+            live.pose = wire::protocol::play::Pose::LongJumping;
+        } else {
+            live.pose = wire::protocol::play::Pose::Standing;
+        }
+    }
+    if (entity.frog != nullptr) {
+        live.frogTongue = entity.frog->tongueTarget;
+        static constexpr std::array<wire::protocol::play::Pose, 4> kFrogPoses{
+            wire::protocol::play::Pose::Standing, wire::protocol::play::Pose::Croaking,
+            wire::protocol::play::Pose::UsingTongue, wire::protocol::play::Pose::LongJumping};
+        live.pose = kFrogPoses[static_cast<std::size_t>(entity.frog->pose)];
     }
     if (entity.axolotl != nullptr) {
         live.axolotlPlayingDead = axolotls::playingDead(entity);

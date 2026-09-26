@@ -169,7 +169,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         if (found == worlds.end()) {
             return std::nullopt;
         }
-        return world::triggerFacts::ofPlayerAt(vanillaData_.lootTables, *found->second, *player);
+        return world::triggerFacts::ofPlayerAt(vanillaData_.lootTables, *found->second, *player, &playerRegistry_);
     };
     advancementTriggers_ = std::make_unique<world::AdvancementTriggers>(vanillaData_.advancements, *playerProgress_,
                                                                         std::move(triggerHooks));

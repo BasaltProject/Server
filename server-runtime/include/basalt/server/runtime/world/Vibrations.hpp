@@ -5,6 +5,7 @@
 #include <basalt/wire/common/Uuid.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -56,7 +57,15 @@ inline constexpr std::string_view kTendrilsClicking = "sculk_sensor_tendrils_cli
 struct Source {
     std::optional<wire::common::Uuid> entity;
     std::optional<wire::common::Uuid> projectileOwner;
+    /// parity: `Entity.isSteppingCarefully`, a crouching player, whom no sensor hears for the events
+    /// of `ignore_vibrations_sneaking`.
+    bool steppingCarefully = false;
+    /// parity: `CriteriaTriggers.AVOID_VIBRATION`, for a sensor that would have heard but did not.
+    std::function<void()> avoided;
 };
+
+/// parity: `GameEventTags.IGNORE_VIBRATIONS_SNEAKING`.
+[[nodiscard]] bool ignoredWhenSneaking(std::string_view event);
 
 /// A noise that reached a shrieker, and who made it.
 struct ShriekerArrival {
@@ -73,12 +82,9 @@ struct ShriekerArrival {
 /// The signal this event is worth, or zero for one nothing listens to.
 [[nodiscard]] std::int32_t frequencyOf(std::string_view event);
 
-/// Tells every sensor in range that something happened. Nothing lights up here: the sensor only
-/// writes the noise down and books itself a turn, because a vibration takes a tick per block to
-/// arrive.
-///
-/// parity: `VibrationSystem.Listener.handleGameEvent`, which adds a candidate and returns. The
-/// sensor takes it only while it is inactive and has nothing already on the way.
+/// Tells every sensor in range that something happened; the sensor only notes it and books a turn,
+/// since a vibration takes a tick per block to arrive.
+/// parity: `VibrationSystem.Listener.handleGameEvent`; taken only while inactive and not already busy.
 void emit(WorldState& world, std::string_view event, double x, double y, double z, std::int64_t gameTime,
           const Source& source = {});
 

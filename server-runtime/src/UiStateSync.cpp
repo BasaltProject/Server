@@ -8,9 +8,9 @@
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
+#include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
-#include <basalt/server/runtime/world/EnchantmentAttributes.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
@@ -184,25 +184,48 @@ void UiStateSync::syncHeldAttributes() {
     if (session == nullptr) {
         return;
     }
-    const std::optional<storage::StoredItemStack>& held =
-        session->inventory.at(player::PlayerInventory::kHotbarStart + session->inventory.heldSlot());
+    using Snapshot = wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot;
     world::RealEnchantments* enchantments = owner_->options().enchantments;
-    std::vector<wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot> all =
-        world::enchantmentAttributes::snapshotsFor(held, [enchantments](const Identifier& id) {
+    const player::playerAttributes::Modifiers modifiers =
+        player::playerAttributes::modifiersOf(*session, [enchantments](const Identifier& id) {
             return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
         });
-    // Whatever a plugin set goes out beside them, and wins where both name the same attribute: the
-    // base a plugin chose is the base, and the enchantments are modifiers on top.
-    for (const auto& [name, base] : session->attributeBases) {
+    std::map<std::int32_t, Snapshot> now;
+    const auto record = [&now, session](std::string_view name, std::vector<player::playerAttributes::Modifier> list) {
         const std::optional<std::int32_t> id = server::registry::attributeIds::protocolId(name);
-        if (!id.has_value()) {
-            continue;
+        if (id.has_value()) {
+            now.insert_or_assign(*id, Snapshot{.attribute = *id,
+                                               .base = player::playerAttributes::baseOf(*session, name),
+                                               .modifiers = std::move(list)});
         }
-        std::erase_if(all, [id](const auto& snapshot) { return snapshot.attribute == *id; });
-        all.push_back(wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot{.attribute = *id, .base = base});
+    };
+    for (const auto& [name, base] : session->attributeBases) {
+        record(name, {});
+    }
+    for (const auto& [name, list] : modifiers) {
+        record(name, list);
+    }
+    std::vector<Snapshot> changed;
+    for (const auto& [id, snapshot] : now) {
+        const auto sent = sentAttributes_.find(id);
+        if (sent == sentAttributes_.end() || !(sent->second == snapshot)) {
+            changed.push_back(snapshot);
+        }
+    }
+    // One that lost every modifier goes back to its bare base, which the client has to be told too.
+    for (const auto& [id, snapshot] : sentAttributes_) {
+        if (!now.contains(id)) {
+            changed.push_back(Snapshot{.attribute = id, .base = snapshot.base, .modifiers = {}});
+            now.emplace(id, changed.back());
+        }
+    }
+    sentAttributes_ = std::move(now);
+    if (changed.empty()) {
+        return;
     }
     owner_->sendPlayPacket(wire::protocol::play::UpdateAttributesPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::UpdateAttributesPacket{.entityId = session->entityId(), .attributes = all}.write(buffer);
+        wire::protocol::play::UpdateAttributesPacket{.entityId = session->entityId(), .attributes = changed}.write(
+            buffer);
     });
 }
 
