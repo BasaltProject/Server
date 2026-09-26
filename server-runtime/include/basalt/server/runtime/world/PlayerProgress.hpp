@@ -51,13 +51,8 @@ private:
 };
 
 /// What each player has been granted or taught, kept in memory and written through to `players.db`.
-///
-/// Keyed by UUID rather than by name, which is both what the database stores and what survives a
-/// rename: vanilla keys `advancements/<uuid>.json` the same way. `load` fills a player in at join;
-/// everything else answers from memory, so a lookup on the crafting path costs no query.
-///
-/// The repository is unset where there is no database, which is how the command tests run: the
-/// whole class then behaves as it did before persistence existed.
+/// Keyed by UUID, as vanilla keys `advancements/<uuid>.json`. `load` fills a player in at join and
+/// lookups answer from memory; with no repository (no database) nothing is persisted.
 class PlayerProgress {
 public:
     PlayerProgress() = default;
@@ -70,8 +65,20 @@ public:
     /// Drops a player from memory at quit. Their rows stay in the database.
     void unload(std::string_view uuid);
 
-    /// Marks one criterion as done. Answers false when it already was.
+    /// Told of every change to a player's criteria, so the client can be told in turn.
+    using Changed = std::function<void(std::string_view uuid, const wire::common::Identifier& advancement)>;
+
+    void onChanged(Changed changed) { changed_ = std::move(changed); }
+
+    /// Marks one criterion as done, now. Answers false when it already was.
     bool grantCriterion(std::string_view uuid, const wire::common::Identifier& advancement, std::string_view criterion);
+
+    /// When each granted criterion of an advancement was obtained, in epoch milliseconds.
+    [[nodiscard]] std::map<std::string, std::int64_t, std::less<>>
+    obtained(std::string_view uuid, const wire::common::Identifier& advancement) const;
+
+    /// Every advancement a player has any criterion of.
+    [[nodiscard]] std::vector<wire::common::Identifier> started(std::string_view uuid) const;
 
     bool revokeCriterion(std::string_view uuid, const wire::common::Identifier& advancement,
                          std::string_view criterion);
@@ -89,8 +96,10 @@ public:
 
 private:
     storage::ProgressRepository* repository_ = nullptr;
-    std::map<std::string, std::map<wire::common::Identifier, std::set<std::string, std::less<>>>, std::less<>>
+    std::map<std::string, std::map<wire::common::Identifier, std::map<std::string, std::int64_t, std::less<>>>,
+             std::less<>>
         advancements_;
+    Changed changed_;
     std::map<std::string, std::set<wire::common::Identifier>, std::less<>> recipes_;
 };
 

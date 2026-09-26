@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
+#include <basalt/server/runtime/EntityPushSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
@@ -176,6 +177,8 @@ struct ActionFixture {
                             {},
                             {.nextSeed = [] { return std::int64_t{3}; }, .nextDouble = [] { return 0.5; }}};
 
+    basalt::server::runtime::EntityPushSystem pushes{raid.spawn.base.registry, combat, {}, {}};
+
     explicit ActionFixture(const std::string& root) : raid(root) {}
 
     [[nodiscard]] ServerEntity& spawn(std::string_view type, double x, double y, double z) {
@@ -190,7 +193,7 @@ struct ActionFixture {
 
 TEST_CASE("a passenger is ticked by its vehicle and moved onto it") {
     ActionFixture fixture{scratch("mob-tick-riders")};
-    MobTickSystem ticks{fixture.actions};
+    MobTickSystem ticks{fixture.actions, fixture.pushes};
     ServerEntity& spider = fixture.spawn("spider", 8.0, 64.0, 8.0);
     ServerEntity& skeleton = fixture.spawn("skeleton", 20.0, 70.0, 20.0);
     spider.passengerIds.push_back(skeleton.entityId());

@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -17,6 +18,7 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -78,9 +80,10 @@ const Identifier& playerType() {
 
 /// Where along its flight the projectile met this box, or nothing when it did not.
 std::optional<double> clip(const ServerEntity& arrow, double fromX, double fromY, double fromZ, double x, double y,
-                           double z, double width, double height) {
-    return entity::projectiles::clipBox(fromX, fromY, fromZ, arrow.x, arrow.y, arrow.z, x - (width / 2.0), y,
-                                        z - (width / 2.0), x + (width / 2.0), y + height, z + (width / 2.0));
+                           double z, double width, double height, double margin) {
+    const double half = (width / 2.0) + margin;
+    return entity::projectiles::clipBox(fromX, fromY, fromZ, arrow.x, arrow.y, arrow.z, x - half, y - margin, z - half,
+                                        x + half, y + height + margin, z + half);
 }
 
 } // namespace
@@ -99,6 +102,10 @@ void CombatSystem::emitVibration(world::LoadedWorld& world, std::string_view eve
 void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                   const std::vector<ServerEntity*>& living, ServerEntity& entity,
                                   const entity::projectiles::Kind& kind) {
+    if (kind.type.path() == "llama_spit") {
+        tickLlamaSpit(world, watchers, living, entity, kind);
+        return;
+    }
     const bool trident = kind.type.path() == "trident";
     if (trident && tridentReturns(world, watchers, living, entity)) {
         return;
@@ -135,6 +142,8 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         if (target.has_value()) {
             if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
                 hitCrystal(world, watchers, *target->mob, false);
+            } else if (hitVehicle(world, target->mob, kWindChargeDamage, world::damageTypes::kWindCharge, entity)) {
+                // parity: `AbstractWindCharge.onHitEntity` hurts whatever it met, a vehicle included.
             } else if (target->mob != nullptr && !breezeProof(living, entity, *target->mob)) {
                 if (target->mob->dragon != nullptr) {
                     target->mob->dragon->hitPart = target->dragonPart;
@@ -194,6 +203,11 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         // parity: a small fireball burns whoever it hits for five seconds and takes five off.
+        if (hitVehicle(world, target->mob, kSmallFireballDamage,
+                       Identifier::vanilla(entity.ownerId.has_value() ? "fireball" : "unattributed_fireball"),
+                       entity)) {
+            return;
+        }
         if (target->mob != nullptr) {
             target->mob->fireTicks = kSmallFireballFireTicks;
             entity::entityCombat::blame(*target->mob, entity.ownerId, entity.entityId(), entity.type());
@@ -236,6 +250,20 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         entity.removed = true;
+        // parity: `WitherSkull.onHitEntity` hurts a vehicle like anything else before the blast.
+        if (target.has_value() && target->mob != nullptr &&
+            (world::detectorRails::isMinecart(target->mob->type()) || entity::boats::isBoat(target->mob->type()))) {
+            const ServerEntity* owner = entity.ownerId.has_value() ? world.state().entity(*entity.ownerId) : nullptr;
+            const bool ownedByLiving =
+                owner != nullptr && !owner->removed && server::registry::entityAttributes::isLiving(owner->type());
+            static_cast<void>(hitVehicle(world, target->mob, ownedByLiving ? 8.0F : 5.0F,
+                                         ownedByLiving ? world::damageTypes::kWitherSkull : world::damageTypes::kMagic,
+                                         entity));
+            if (options_.witherSkullLanded) {
+                options_.witherSkullLanded(world, watchers, entity, nullptr, nullptr);
+            }
+            return;
+        }
         if (options_.witherSkullLanded) {
             options_.witherSkullLanded(world, watchers, entity, target.has_value() ? target->mob : nullptr,
                                        target.has_value() ? target->player : nullptr);
@@ -305,32 +333,38 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         entity.pierceLevel = 0;
         entity.piercedIds.clear();
     }
+    hitBlock(world, watchers, entity, *hit, kind.sticks);
+    if (!kind.sticks) {
+        entity.removed = true;
+    }
+}
+
+void CombatSystem::hitBlock(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                            const ServerEntity& projectile, const entity::BlockHit& hit, bool byArrow) {
     // parity: `Projectile.onHitBlock` sends `PROJECTILE_LAND` where it landed.
-    emitVibration(world, "projectile_land", hit->x, hit->y, hit->z, entity.uuid());
+    emitVibration(world, "projectile_land", hit.x, hit.y, hit.z, projectile.uuid());
     // parity: `Entity.isOnFire`, which is what `TntBlock.onProjectileHit` asks the arrow.
     const std::optional<world::BlockChange> change = world::projectileHits::onHit(
-        world.state(), world.gameTime(), *hit, kind.sticks, entity.fireTicks > 0,
+        world.state(), world.gameTime(), hit, byArrow, projectile.fireTicks > 0,
         world.gameRules().get(world::gameRules::kTntExplodes),
         [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             broadcaster_.dropBrokenBlock(world, bx, by, bz, stateId, true);
         });
-    if (change.has_value()) {
-        broadcaster_.announceRedstone(world, watchers, *change);
-        // parity: `TargetBlock.onProjectileHit`, for a projectile a player owns.
-        const Identifier* struck = server::registry::blockStateDefinitions::blockOf(change->stateId);
-        if (struck != nullptr && struck->path() == "target" && entity.ownerId.has_value() && options_.targetHit) {
-            for (PlayerSession* shooter : watchers) {
-                if (shooter->entityId() == *entity.ownerId) {
-                    const std::string power =
-                        server::registry::blockStateDefinitions::propertiesOf(change->stateId)["power"];
-                    options_.targetHit(world, *shooter, entity, power.empty() ? 0 : std::stoi(power));
-                    break;
-                }
+    if (!change.has_value()) {
+        return;
+    }
+    broadcaster_.announceRedstone(world, watchers, *change);
+    // parity: `TargetBlock.onProjectileHit`, for a projectile a player owns.
+    const Identifier* struck = server::registry::blockStateDefinitions::blockOf(change->stateId);
+    if (struck != nullptr && struck->path() == "target" && projectile.ownerId.has_value() && options_.targetHit) {
+        for (PlayerSession* shooter : watchers) {
+            if (shooter->entityId() == *projectile.ownerId) {
+                const std::string power =
+                    server::registry::blockStateDefinitions::propertiesOf(change->stateId)["power"];
+                options_.targetHit(world, *shooter, projectile, power.empty() ? 0 : std::stoi(power));
+                break;
             }
         }
-    }
-    if (!kind.sticks) {
-        entity.removed = true;
     }
 }
 
@@ -498,7 +532,7 @@ void CombatSystem::rememberShooter(const std::vector<PlayerSession*>& watchers, 
 std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<PlayerSession*>& watchers,
                                                               const std::vector<ServerEntity*>& living,
                                                               const ServerEntity& projectile, double fromX,
-                                                              double fromY, double fromZ) {
+                                                              double fromY, double fromZ, double margin) {
     double nearest = std::numeric_limits<double>::max();
     Target found;
     for (ServerEntity* candidate : living) {
@@ -507,9 +541,11 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
             std::ranges::contains(projectile.piercedIds, candidate->entityId())) {
             continue;
         }
-        // parity: `Projectile.canHitEntity` asks `isPickable`, which a crystal is too.
+        // parity: `Projectile.canHitEntity` asks `isPickable`, which a crystal, a minecart and a boat
+        // are too.
         if (!server::registry::entityAttributes::isLiving(candidate->type()) &&
-            !world::endCrystals::isCrystal(candidate->type())) {
+            !world::endCrystals::isCrystal(candidate->type()) && !world::detectorRails::isMinecart(candidate->type()) &&
+            !entity::boats::isBoat(candidate->type())) {
             continue;
         }
         // parity: `EnderDragon.isPickable` is false; what a projectile meets is one of its parts.
@@ -517,8 +553,9 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
             for (std::size_t part = 0; part < entity::enderDragon::kParts; ++part) {
                 const entity::enderDragon::Vec3& centre = candidate->dragon->parts[part];
                 const entity::enderDragon::PartBox& box = entity::enderDragon::kPartBoxes[part];
-                const std::optional<double> at = clip(projectile, fromX, fromY, fromZ, centre.x, centre.y, centre.z,
-                                                      static_cast<double>(box.width), static_cast<double>(box.height));
+                const std::optional<double> at =
+                    clip(projectile, fromX, fromY, fromZ, centre.x, centre.y, centre.z, static_cast<double>(box.width),
+                         static_cast<double>(box.height), margin);
                 if (at.has_value() && *at < nearest) {
                     nearest = *at;
                     found = Target{.mob = candidate,
@@ -529,7 +566,7 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
             continue;
         }
         const std::optional<double> at = clip(projectile, fromX, fromY, fromZ, candidate->x, candidate->y, candidate->z,
-                                              candidate->width(), candidate->height());
+                                              candidate->width(), candidate->height(), margin);
         if (!at.has_value() || *at >= nearest) {
             continue;
         }
@@ -546,7 +583,7 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
         }
         const std::optional<double> at = clip(projectile, fromX, fromY, fromZ, candidate->x, candidate->y, candidate->z,
                                               server::registry::entityTypeShapes::widthOf(playerType()),
-                                              server::registry::entityTypeShapes::heightOf(playerType()));
+                                              server::registry::entityTypeShapes::heightOf(playerType()), margin);
         if (!at.has_value() || *at >= nearest) {
             continue;
         }
@@ -602,6 +639,24 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
             ExperienceOrbSystem::hurt(*entity, world::explosions::damageAt(distance, power, static_cast<float>(reach)));
             continue;
         }
+        // parity: a vehicle takes the blast like anything else, unless a mob set it off with griefing off.
+        if (world::detectorRails::isMinecart(entity->type()) || entity::boats::isBoat(entity->type())) {
+            const ServerEntity* source = world.state().entity(sourceEntityId);
+            const ServerEntity* behind =
+                source != nullptr && source->ownerId.has_value() ? world.state().entity(*source->ownerId) : source;
+            const bool mobSource = behind != nullptr && server::registry::entityAttributes::isLiving(behind->type());
+            const float damage = world::explosions::damageAt(distance, power, static_cast<float>(reach));
+            if (options_.hurtVehicle && !VehicleSystem::ignoresExplosion(world, mobSource) && damage > 0.0F) {
+                static_cast<void>(options_.hurtVehicle(
+                    world, *entity,
+                    VehicleSystem::Hit{.amount = damage,
+                                       .type = world::damageTypes::kExplosion,
+                                       .causeId = behind == nullptr ? std::nullopt : std::optional{behind->entityId()},
+                                       .directId =
+                                           source == nullptr ? std::nullopt : std::optional{source->entityId()}}));
+            }
+            continue;
+        }
         if (!server::registry::entityAttributes::isLiving(entity->type())) {
             continue;
         }
@@ -631,6 +686,23 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
         announceEntityHit(watchers, *entity, world::damageTypes::kExplosion, sourceEntityId, result.died);
         emitVibration(world, "entity_damage", entity->x, entity->y, entity->z, entity->uuid());
     }
+}
+
+bool CombatSystem::hitVehicle(world::LoadedWorld& world, ServerEntity* target, float amount, const Identifier& type,
+                              const ServerEntity& projectile) {
+    if (target == nullptr ||
+        (!world::detectorRails::isMinecart(target->type()) && !entity::boats::isBoat(target->type()))) {
+        return false;
+    }
+    if (options_.hurtVehicle) {
+        static_cast<void>(options_.hurtVehicle(world, *target,
+                                               VehicleSystem::Hit{.amount = amount,
+                                                                  .type = type,
+                                                                  .causeId = projectile.ownerId,
+                                                                  .directId = projectile.entityId(),
+                                                                  .burningProjectile = projectile.fireTicks > 0}));
+    }
+    return true;
 }
 
 void CombatSystem::markWitherFriend(world::LoadedWorld& world, ServerEntity& target,

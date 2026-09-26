@@ -10,6 +10,7 @@
 #include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
 #include <basalt/wire/protocol/play/BlockPos.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
+#include <basalt/wire/protocol/play/VehiclePackets.hpp>
 
 #include <array>
 #include <cstdint>
@@ -104,6 +105,8 @@ public:
     /// parity: `handleSetCommandBlock`, the screen a command block opens. Refused outright for anyone
     /// who is not an operator in creative, which is what `canUseGameMasterBlocks` asks.
     void programCommandBlock(const wire::protocol::play::SetCommandBlockPacket& packet);
+    /// parity: `handleSetCommandMinecart`, a command block cart's line typed in.
+    void programCommandMinecart(const wire::protocol::play::ServerboundSetCommandMinecartPacket& packet);
 
     /// parity: `handleSetStructureBlock`, for a player allowed game master blocks.
     void setStructureBlock(const wire::protocol::play::SetStructureBlockPacket& packet);

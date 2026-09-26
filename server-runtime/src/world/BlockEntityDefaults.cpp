@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/world/BaseSpawnerData.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
@@ -163,6 +164,12 @@ wire::nbt::NbtCompound of(const wire::common::Identifier& block, std::optional<s
     // for a shelf nobody has touched.
     if (shelves::isShelf(path)) {
         data.putBoolean("align_items_to_bottom", false);
+        return data;
+    }
+    // parity: `BaseSpawner.save` of a spawner nobody has set: every field at its default and an
+    // empty `SpawnPotentials`, which is what a fresh one holds, not a list of one empty spawn.
+    if (path == "spawner") {
+        baseSpawnerData::save(BaseSpawnerState{}, data);
         return data;
     }
     return data;

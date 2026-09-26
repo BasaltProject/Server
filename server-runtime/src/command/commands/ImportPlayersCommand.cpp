@@ -35,9 +35,9 @@ void ImportPlayersCommand::build(const CommandNodeBuilder& root) const {
             }
             const auto* asked = context.get<std::string>("path");
             const std::string savePath = tidied(asked == nullptr ? std::string{} : *asked);
-            const std::expected<world::ImportReport, std::string> report =
-                world::importVanillaSave(savePath, *repository, context.environment().options().defaultWorldName,
-                                         nowEpochSeconds_(), context.environment().logger());
+            const std::expected<world::ImportReport, std::string> report = world::importVanillaSave(
+                savePath, *repository, context.environment().options().defaultWorldName, nowEpochSeconds_(),
+                context.environment().logger(), context.environment().options().progressRepository);
             if (!report.has_value()) {
                 return std::unexpected{CommandSyntaxError{.component = Component::text(report.error())}};
             }

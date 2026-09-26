@@ -1,20 +1,21 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
-#include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Armadillos.hpp>
+#include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
+#include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
-#include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/Frogs.hpp>
-#include <basalt/server/runtime/entity/Sniffers.hpp>
 #include <basalt/server/runtime/entity/Goats.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
+#include <basalt/server/runtime/entity/Minecarts.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/NeutralAnger.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Sniffers.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
 #include <basalt/server/runtime/entity/villager/VillagerNbt.hpp>
@@ -340,6 +341,9 @@ NbtCompound encode(const ServerEntity& entity) {
     if (path == "tnt_minecart") {
         tag.putInt("fuse", entity.fuse);
     }
+    if (minecarts::isMinecart(entity.type())) {
+        minecarts::save(entity, tag);
+    }
     // parity: `MinecartHopper.addAdditionalSaveData` writes `Enabled` whether anything has touched
     // it or not, so a cart that has never crossed an activator rail still saves a true.
     if (path == "hopper_minecart" && !tag.contains("Enabled")) {
@@ -578,6 +582,9 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
                                                                                           : numericInt(tag, "Age");
     if (tag.contains("fuse")) {
         entity->fuse = numericInt(tag, "fuse");
+    }
+    if (minecarts::isMinecart(*type)) {
+        minecarts::load(*entity, tag);
     }
     if (tag.contains("Air")) {
         entity->airSupply = static_cast<std::int32_t>(tag.getShort("Air"));

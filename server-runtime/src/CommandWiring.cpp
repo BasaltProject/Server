@@ -2,12 +2,13 @@
 #include <basalt/server/runtime/TickLoop.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
 #include <basalt/server/runtime/command/CommandStorage.hpp>
+#include <basalt/server/runtime/command/CommandTarget.hpp>
+#include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/command/VanillaCommands.hpp>
 #include <basalt/server/runtime/command/commands/AccessCommands.hpp>
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/server/runtime/command/commands/DataCommand.hpp>
 #include <basalt/server/runtime/command/commands/DataPackCommand.hpp>
-#include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/command/commands/ExecuteCommand.hpp>
 #include <basalt/server/runtime/command/commands/FunctionCommands.hpp>
 #include <basalt/server/runtime/command/commands/ProfilingCommands.hpp>
@@ -17,12 +18,11 @@
 #include <basalt/server/runtime/command/commands/SessionCommands.hpp>
 #include <basalt/server/runtime/command/commands/TickCommand.hpp>
 #include <basalt/server/runtime/command/commands/TimingsCommand.hpp>
-#include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
-#include <basalt/server/runtime/world/CommandPredicates.hpp>
-#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/function/FunctionLibrary.hpp>
 #include <basalt/server/runtime/timings/TimingsReport.hpp>
+#include <basalt/server/runtime/world/CommandPredicates.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 
 #include <cstdint>
@@ -69,6 +69,7 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     if (wiring.playerStore != nullptr) {
         options.playerRepository = &wiring.playerStore->players();
         options.access = &wiring.playerStore->access();
+        options.progressRepository = &wiring.playerStore->progress();
     }
     options.worlds = wiring.worlds;
     options.placeholders = wiring.placeholders;
@@ -220,11 +221,12 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
         add(std::make_shared<cmd::FunctionCommand>(*wiring.functionRunner, wired.data.get()));
         add(std::make_shared<cmd::ReturnCommand>(*wiring.functionRunner));
         if (wiring.functionSchedule != nullptr) {
-            add(std::make_shared<cmd::ScheduleCommand>(
-                *wiring.functions, *wiring.functionSchedule, [](const command::CommandContext& context) -> std::int64_t {
-                    const world::LoadedWorld* world = command::worldIn(context.source(), context.environment());
-                    return world == nullptr ? 0 : world->gameTime();
-                }));
+            add(std::make_shared<cmd::ScheduleCommand>(*wiring.functions, *wiring.functionSchedule,
+                                                       [](const command::CommandContext& context) -> std::int64_t {
+                                                           const world::LoadedWorld* world = command::worldIn(
+                                                               context.source(), context.environment());
+                                                           return world == nullptr ? 0 : world->gameTime();
+                                                       }));
         }
     }
     if (wiring.datapacks.packs != nullptr) {

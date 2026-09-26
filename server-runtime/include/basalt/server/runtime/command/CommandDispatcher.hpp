@@ -13,13 +13,9 @@
 
 namespace basalt::server::runtime::command {
 
-/// Result reporting, shared by every command so the surrounding behaviour (who else sees it, what
-/// reaches the log) is decided once rather than per command.
-///
-/// Mirrors `CommandSourceStack.sendSuccess`/`sendFailure`: a successful command with
-/// `broadcastToAdmins` set also reaches every *other* operator as `chat.type.admin`, and the
-/// console log, which is vanilla's `logAdminCommands` game rule. A failure is red and goes only to
-/// whoever ran it.
+/// Result reporting, shared by every command. parity: `CommandSourceStack.sendSuccess`/`sendFailure`:
+/// a success with `broadcastToAdmins` also reaches every *other* operator as `chat.type.admin` and the
+/// console log (`logAdminCommands`); a failure is red and goes only to whoever ran it.
 class CommandFeedback {
 public:
     explicit CommandFeedback(const CommandEnvironment& environment);
@@ -35,15 +31,9 @@ private:
 
 class CommandDispatcher;
 
-/// Everything one running command can see: who ran it, its parsed arguments, and the server around
-/// it.
-///
-/// Values are stored already parsed, so a command body reads `context.get<std::int32_t>("count")`
-/// rather than re-parsing text. Asking for a name the tree never declared answers null, which is a
-/// bug in the command rather than in what the player typed.
-///
-/// This is the whole surface a command is written against, which is why reporting and the two
-/// "there has to be a player here" checks live on it rather than being passed around.
+/// Everything one running command can see: who ran it, its parsed arguments, and the server around it.
+/// Values are stored parsed (`context.get<std::int32_t>("count")`); a name the tree never declared
+/// answers null, which is a bug in the command rather than in the input.
 class CommandContext {
 public:
     CommandContext(const CommandSource& source, const CommandDispatcher& dispatcher, std::string input,
@@ -58,6 +48,17 @@ public:
     [[nodiscard]] const std::string& input() const noexcept { return input_; }
 
     [[nodiscard]] const Arguments& arguments() const noexcept { return arguments_; }
+
+    /// What follows a redirect: the node its tail is parsed from and where, for a modifier that
+    /// continues the line later. Null outside a modifier.
+    [[nodiscard]] const CommandNode* tailNode() const noexcept { return tailNode_; }
+
+    [[nodiscard]] std::int32_t tailCursor() const noexcept { return tailCursor_; }
+
+    void setTail(const CommandNode* node, std::int32_t cursor) {
+        tailNode_ = node;
+        tailCursor_ = cursor;
+    }
 
     [[nodiscard]] bool has(std::string_view name) const;
 
@@ -86,17 +87,13 @@ private:
     const CommandDispatcher* dispatcher_;
     std::string input_;
     Arguments arguments_;
+    const CommandNode* tailNode_ = nullptr;
+    std::int32_t tailCursor_ = 0;
 };
 
 /// One command, as a class: its name, the permission it needs, its aliases, and the tree it builds.
-///
-/// Vanilla gives every command its own class under `net.minecraft.server.commands` and this follows
-/// that split, one file each, for the same reason: a command is a self-contained unit of behaviour
-/// and reads better next to nothing else. It is also the shape plugins need later, since a plugin
-/// contributing a command should have exactly this to fill in and nothing more.
-///
-/// Aliases are registered as redirects onto this command's own node, not as copies, so `/tp` really
-/// is `/teleport` rather than a second tree that can drift from it.
+/// One file each, like vanilla's `net.minecraft.server.commands`, and the shape a plugin fills in.
+/// Aliases are redirects onto this command's node, not copies, so `/tp` cannot drift from `/teleport`.
 class Command {
 public:
     Command(std::string name, std::int32_t level = permissionLevel::kAll, std::vector<std::string> aliases = {},
@@ -128,20 +125,14 @@ private:
 };
 
 /// The one-line syntax summary `/help` prints, e.g. `gamemode <gamemode> [<target>]`.
-///
-/// parity: brigadier's `CommandDispatcher.getSmartUsage`, including its bracket rules: a branch
-/// whose parent is already executable is optional and gets `[...]`, one that is not gets `(...)`,
-/// and several alternatives are joined with `|`. Vanilla's `/help` output is exactly these strings
-/// with a slash in front.
+/// parity: brigadier's `CommandDispatcher.getSmartUsage`: a branch under an executable parent gets
+/// `[...]`, otherwise `(...)`, and alternatives are joined with `|`.
 [[nodiscard]] std::string smartUsage(const CommandNode& node, const CommandSource& source, bool optional = false,
                                      bool deep = false);
 
 /// Parses and runs command lines, and hands out the tree the client needs to parse them itself.
-///
-/// Failure handling follows vanilla's `Commands.performCommand`: the parse error goes back to the
-/// source, followed by the grey "context" line marking where the parser stopped
-/// (`command.context.here`, rendered by the client as `<--[HERE]`). A command that fails reports
-/// `command.failed` instead, and never takes the connection down with it.
+/// parity: `Commands.performCommand`: a parse error is followed by the grey `command.context.here`
+/// line; a command that fails reports `command.failed` and never takes the connection down.
 class CommandDispatcher {
 public:
     /// Brigadier's own literals, which the client shows verbatim: they are not translation keys.
@@ -163,12 +154,9 @@ public:
 
     [[nodiscard]] const CommandNode& rootNode() const noexcept { return root_; }
 
-    /// Builds the tree again from the current `commands.toml`, whole rather than patched:
-    /// permission, aliases and existence are all decided during registration, so diffing would mean
-    /// writing registration a second way. A few dozen nodes cost nothing and cannot drift from what
-    /// a fresh start produces.
-    ///
-    /// The caller sends the new tree to connected clients; until then they autocomplete the old one.
+    /// Builds the tree again from the current `commands.toml`, whole rather than patched: permission,
+    /// aliases and existence are decided at registration, so a rebuild cannot drift from a fresh start.
+    /// The caller sends the new tree to clients; until then they autocomplete the old one.
     void rebuild();
 
     /// Registers a command and every alias it declares, as `commands.toml` says to.
@@ -205,6 +193,19 @@ public:
     /// Parses a line without running it, answering why it does not parse. parity: how
     /// `CommandFunction.fromLines` compiles a function's lines with its compilation source.
     [[nodiscard]] std::optional<CommandSyntaxError> check(const CommandSource& source, const std::string& input) const;
+
+    /// Runs what follows a redirect for one source, later than the line it was on. parity:
+    /// `BuildContexts.Continuation`, what `execute if function` resumes with. Nothing runs when the
+    /// tree was rebuilt since `generation`.
+    std::int32_t continueTail(const CommandNode& node, std::int32_t cursor, const std::string& input,
+                              const CommandSource& source, std::uint64_t generation) const;
+
+    /// Bumped whenever the tree changes, so a held node can be checked before it is used.
+    [[nodiscard]] std::uint64_t generation() const noexcept { return generation_; }
+
+    /// Tells the dispatcher the command that is running answers later, so the stores waiting on
+    /// this line are not told now. What `/function` does when it queues.
+    static void deferResult();
 
     /// parity: `SignableCommand.of`: the message arguments of a line, by node name, with the text a
     /// client signs for each. Empty for a line that does not parse.
@@ -270,6 +271,7 @@ private:
     const CommandEnvironment* environment_;
     CommandNode root_;
     CommandFeedback feedback_;
+    std::uint64_t generation_ = 0;
     /// What was registered from code, so a reload can build the tree again from the same list.
     std::vector<std::shared_ptr<const Command>> registered_;
 };

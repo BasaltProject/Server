@@ -3,10 +3,11 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
-#include <basalt/server/runtime/StructureBlockSystem.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/StructureBlockSystem.hpp>
+#include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -194,6 +195,26 @@ void BlockInteractionHandler::programCommandBlock(const play::SetCommandBlockPac
             wire::text::Component::translatable(works ? "advMode.setCommand.success" : "advMode.setCommand.disabled",
                                                 {wire::text::Component::text(packet.command)}));
     }
+}
+
+void BlockInteractionHandler::programCommandMinecart(const play::ServerboundSetCommandMinecartPacket& packet) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    PlayerSession* session = owner_->playerSession();
+    VehicleSystem* vehicles = owner_->options().vehicles;
+    if (world == nullptr || session == nullptr || vehicles == nullptr) {
+        return;
+    }
+    if (!mayUseGameMasterBlocks(*session)) {
+        session->sendSystemMessage(wire::text::Component::translatable("advMode.notAllowed"));
+        return;
+    }
+    entity::ServerEntity* cart = world->state().entity(packet.entityId);
+    if (cart == nullptr || cart->removed || cart->type().path() != "command_block_minecart") {
+        return;
+    }
+    vehicles->program(*world, *cart, packet.command, packet.trackOutput);
+    session->sendSystemMessage(wire::text::Component::translatable("advMode.setCommand.success",
+                                                                   {wire::text::Component::text(packet.command)}));
 }
 
 void BlockInteractionHandler::setStructureBlock(const play::SetStructureBlockPacket& packet) {

@@ -12,6 +12,9 @@
 #include <basalt/server/runtime/config/ServerListConfig.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/datapack/DataPacks.hpp>
+#include <basalt/server/runtime/datapack/RegistryValidation.hpp>
+#include <basalt/server/runtime/registry/PackRegistries.hpp>
+#include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/world/VanillaWorldGeneratorFactory.hpp>
 #include <basalt/wire/auth/HttpsClient.hpp>
 #include <basalt/wire/auth/MojangSessionService.hpp>
@@ -162,14 +165,43 @@ bool gSafeMode = false;
 
     // The packs come before anything that reads data: the world generators read the worldgen of the
     // selected packs, as vanilla loads its world registries from them.
-    instance->datapacks = std::make_unique<datapack::DataPacks>(datapack::DataPacks::Options{
+    datapack::DataPacks::Options packOptions{
         .jar = VanillaGameData::jarFilesOf(instance->serverJar.get()),
         .worldRoot = std::string{config::WorldsConfig::kDefaultWorldsRoot} + "/" + instance->worlds.defaultWorld().name,
         .initial = datapack::DataPackConfig{.enabled = instance->config.initialEnabledPacks,
                                             .disabled = instance->config.initialDisabledPacks},
         .safeMode = gSafeMode,
-    });
+    };
+    instance->datapacks = std::make_unique<datapack::DataPacks>(packOptions);
+    if (const std::vector<datapack::ElementError> errors = datapack::invalidElements(
+            *instance->datapacks->resources(), datapack::builtInPackIds(instance->datapacks->repository()), true);
+        !errors.empty()) {
+        // parity: vanilla refuses to start here. Starting on vanilla alone, without saving that
+        // choice, is the one way that neither crashes nor loses the operator's pack list.
+        const wire::common::Logger packLogger{"Datapacks"};
+        datapack::logElementErrors(errors, packLogger);
+        packLogger.error([] {
+            return std::string{"Failed to load datapacks, can't proceed with server load. You can either fix your "
+                               "datapacks or reset to vanilla with --safeMode. Starting with vanilla alone."};
+        });
+        packOptions.safeMode = true;
+        packOptions.persist = false;
+        instance->datapacks = std::make_unique<datapack::DataPacks>(packOptions);
+    }
     const VanillaGameData::Jar jarHooks = VanillaGameData::jarOf(instance->datapacks->resources());
+    // The synchronised registries are world registries: laid over by the packs once, here.
+    {
+        std::vector<wire::protocol::configuration::RegistryDataPacket> registries =
+            registry::vanillaConfigurationRegistries::packets();
+        std::vector<std::string> builtIn;
+        for (const datapack::Pack* pack : instance->datapacks->repository().availablePacks()) {
+            if (pack->source != datapack::PackSource::World) {
+                builtIn.push_back(pack->id);
+            }
+        }
+        registry::applyPackRegistries(registries, *instance->datapacks->resources(), builtIn);
+        registry::installRegistries(std::move(registries));
+    }
     instance->generators =
         std::make_unique<world::VanillaWorldGeneratorFactory>(world::VanillaWorldGeneratorFactory::Jar{
             .readText = jarHooks.readText, .readEntry = jarHooks.readEntry, .dataIds = jarHooks.dataIds});

@@ -194,7 +194,7 @@ TEST_CASE("advancement grant only marks every criterion of the one it names") {
     PlayerSession& steve = fixture.add("Steve");
     fixture.dispatcher.registerCommand(std::make_shared<commands::AdvancementCommand>(advancements, progress));
 
-    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve only minecraft:story/mine") == 2);
+    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve only minecraft:story/mine") == 1);
     CHECK(progress.grantedCriteria(steve.uuid().toString(), Identifier::vanilla("story/mine")).contains("stone"));
     CHECK(fixture.source.lastAsText().find("commands.advancement.grant.one.to.one.success") != std::string::npos);
 
@@ -210,16 +210,16 @@ TEST_CASE("the four selection modes pick different parts of the tree") {
     fixture.add("Steve");
     fixture.dispatcher.registerCommand(std::make_shared<commands::AdvancementCommand>(advancements, progress));
 
-    // `until` walks up to the root: mine has one criterion below it and one of its own pair.
-    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve until minecraft:story/mine") == 3);
+    // parity: the count is of advancements, not criteria. `until` walks up to the root.
+    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve until minecraft:story/mine") == 2);
     static_cast<void>(fixture.dispatcher.execute(fixture.source, "advancement revoke Steve everything"));
 
-    // `from` walks down: mine's two plus smelt's one.
-    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve from minecraft:story/mine") == 3);
+    // `from` walks down: mine and smelt.
+    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve from minecraft:story/mine") == 2);
     static_cast<void>(fixture.dispatcher.execute(fixture.source, "advancement revoke Steve everything"));
 
     // `through` is both halves, without counting mine twice.
-    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve through minecraft:story/mine") == 4);
+    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve through minecraft:story/mine") == 3);
 }
 
 TEST_CASE("advancement everything grants the whole book, and revoke takes it back") {
@@ -229,8 +229,8 @@ TEST_CASE("advancement everything grants the whole book, and revoke takes it bac
     fixture.add("Steve");
     fixture.dispatcher.registerCommand(std::make_shared<commands::AdvancementCommand>(advancements, progress));
 
-    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve everything") == 4);
-    // Revoking counts advancements rather than criteria, which is what vanilla's own key says.
+    CHECK(fixture.dispatcher.execute(fixture.source, "advancement grant Steve everything") == 3);
+    // Both count advancements, which is what vanilla's own key says.
     CHECK(fixture.dispatcher.execute(fixture.source, "advancement revoke Steve everything") == 3);
 }
 

@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
 #include <basalt/server/runtime/entity/ai/HorseGoals.hpp>
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
+#include <basalt/server/runtime/entity/ai/LlamaGoals.hpp>
 #include <basalt/server/runtime/entity/ai/LongDistancePatrolGoal.hpp>
 #include <basalt/server/runtime/entity/ai/MobGoals.hpp>
 #include <basalt/server/runtime/entity/ai/NeutralGoals.hpp>
@@ -60,6 +61,13 @@ constexpr std::int32_t kFangCast = 40;
 constexpr std::int32_t kFangCooldown = 100;
 constexpr std::int32_t kBlindCast = 20;
 constexpr std::int32_t kBlindCooldown = 180;
+
+/// parity: `Llama.registerGoals`: the caravan at a float's 2.1, and a spit every two seconds from
+/// twenty blocks.
+constexpr double kCaravanSpeed = static_cast<double>(2.1F);
+constexpr double kSpitSpeed = 1.25;
+constexpr std::int32_t kSpitInterval = 40;
+constexpr float kSpitRange = 20.0F;
 
 /// parity: `WitherBoss.registerGoals`, a shot every two seconds from twenty blocks.
 constexpr std::int32_t kWitherShotInterval = 40;
@@ -159,11 +167,13 @@ std::unique_ptr<GoalSelector> mobGoals::forType(const wire::common::Identifier& 
 namespace {
 
 /// parity: `AbstractHorse.registerGoals` and each kind's `addBehaviourGoals`, and `Llama.registerGoals`
-/// less its caravan and its spit.
+/// with `TraderLlama`'s on top.
 bool buildHorse(GoalSelector& selector, std::string_view path) {
     if (path == "llama" || path == "trader_llama") {
         add<FloatGoal>(selector, 0);
         add<RunAroundLikeCrazyGoal>(selector, 1, 1.2);
+        add<LlamaFollowCaravanGoal>(selector, 2, kCaravanSpeed);
+        add<LlamaSpitGoal>(selector, 3, kSpitSpeed, kSpitInterval, kSpitInterval, kSpitRange);
         add<PanicGoal>(selector, 3, 1.2);
         add<BreedGoal>(selector, 4, 1.0);
         add<TemptGoal>(selector, 5, 1.25, Names{"hay_block"});
@@ -171,8 +181,14 @@ bool buildHorse(GoalSelector& selector, std::string_view path) {
         add<RandomStrollGoal>(selector, 7, 0.7);
         add<LookAtPlayerGoal>(selector, 8, kLookNear);
         add<RandomLookAroundGoal>(selector, 9);
+        add<LlamaHurtByTargetGoal>(selector, 1);
+        add<LlamaAttackWolfGoal>(selector, 2);
         if (path == "trader_llama") {
             add<PanicGoal>(selector, 1, 2.0);
+            add<TraderLlamaDefendTraderGoal>(selector, 1);
+            // parity: every `Zombie` but the zombified piglin, and every `AbstractIllager`.
+            add<NearestAttackableEntityGoal>(selector, 2, Names{"zombie", "husk", "drowned", "zombie_villager"});
+            add<NearestAttackableEntityGoal>(selector, 2, Names{"pillager", "vindicator", "evoker", "illusioner"});
         }
         return true;
     }
@@ -250,6 +266,7 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<FloatGoal>(selector, 1);
         add<PanicGoal>(selector, 1, 1.5);
         add<SitWhenOrderedToGoal>(selector, 2);
+        add<WolfAvoidLlamaGoal>(selector, 3);
         add<LeapAtTargetGoal>(selector, 4, 0.4);
         add<MeleeAttackGoal>(selector, 5, 1.0);
         add<FollowOwnerGoal>(selector, 6, 1.0);

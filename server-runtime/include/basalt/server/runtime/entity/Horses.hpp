@@ -90,6 +90,9 @@ void setChest(ServerEntity& horse, bool chest);
 /// parity: `getInventoryColumns`: five for a donkey or mule with a chest, a llama's strength.
 [[nodiscard]] std::int32_t inventoryColumns(const ServerEntity& horse);
 
+/// parity: `Llama.getStrength`, one to five whatever was saved.
+[[nodiscard]] std::int32_t strength(const ServerEntity& llama);
+
 /// parity: `Mob.isSaddled`.
 [[nodiscard]] bool saddled(const ServerEntity& horse);
 

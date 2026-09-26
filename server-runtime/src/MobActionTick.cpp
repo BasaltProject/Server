@@ -11,10 +11,11 @@
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
-#include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/Camels.hpp>
+#include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
 #include <basalt/server/runtime/entity/Frogs.hpp>
+#include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -218,6 +219,12 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
         mob.velocityY *= 0.6;
     }
     entity::ai::navigation::tick(world.state(), mob);
+    // parity: `CreakingMoveControl` and `CreakingLookControl` do nothing while it is frozen; it still falls.
+    if (mob.creaking != nullptr && !mob.creaking->canMove) {
+        entity::ai::moveControl::stop(mob);
+        entity::ai::moveControl::tick(world.state(), mob, speed);
+        return;
+    }
     entity::ai::moveControl::tick(world.state(), mob, speed);
     entity::ai::lookControl::tick(mob);
 }
@@ -525,10 +532,9 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
                   wire::protocol::play::SoundSource::Neutral);
     } else {
         const server::registry::EntityTypeEntry* childEntry = server::registry::entityTypes::of(childType);
-        auto baby = std::make_unique<ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(),
-                                                   childType, childEntry == nullptr ? entry->protocolId
-                                                                                    : childEntry->protocolId,
-                                                   animal.x, animal.y, animal.z);
+        auto baby = std::make_unique<ServerEntity>(
+            players_->allocateEntityId(), wire::common::Uuid::random(), childType,
+            childEntry == nullptr ? entry->protocolId : childEntry->protocolId, animal.x, animal.y, animal.z);
         baby->age = entity::breeding::kBabyAge;
         if (entity::horses::isHorse(animal.type())) {
             random::RandomSource random = freshRandom();

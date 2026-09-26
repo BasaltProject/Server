@@ -3,6 +3,7 @@
 #include <basalt/server/world/advancement/AdvancementJson.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <expected>
 #include <utility>
 
@@ -11,7 +12,6 @@ namespace {
 
 using wire::common::Identifier;
 using advancement = server::world::advancement::Advancement;
-
 
 } // namespace
 
@@ -89,11 +89,21 @@ void PlayerProgress::load(std::string_view uuid) {
         return;
     }
     const storage::StoredProgress stored = repository_->load(uuid);
-    std::map<Identifier, std::set<std::string, std::less<>>> criteria;
+    std::map<Identifier, std::map<std::string, std::int64_t, std::less<>>> criteria;
     for (const auto& [id, names] : stored.criteria) {
         const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(id);
-        if (parsed.has_value()) {
-            criteria.insert_or_assign(*parsed, names);
+        if (!parsed.has_value()) {
+            continue;
+        }
+        const auto times = stored.obtained.find(id);
+        for (const std::string& name : names) {
+            std::int64_t when = 0;
+            if (times != stored.obtained.end()) {
+                if (const auto found = times->second.find(name); found != times->second.end()) {
+                    when = found->second;
+                }
+            }
+            criteria[*parsed].insert_or_assign(name, when);
         }
     }
     advancements_.insert_or_assign(std::string{uuid}, std::move(criteria));
@@ -121,11 +131,19 @@ bool PlayerProgress::grantCriterion(std::string_view uuid, const Identifier& adv
     auto player = advancements_.find(uuid);
     if (player == advancements_.end()) {
         player =
-            advancements_.emplace(std::string{uuid}, std::map<Identifier, std::set<std::string, std::less<>>>{}).first;
+            advancements_
+                .emplace(std::string{uuid}, std::map<Identifier, std::map<std::string, std::int64_t, std::less<>>>{})
+                .first;
     }
-    const bool added = player->second[advancementId].emplace(criterion).second;
+    const std::int64_t now =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+            .count();
+    const bool added = player->second[advancementId].emplace(criterion, now).second;
     if (added && repository_ != nullptr) {
-        repository_->grantCriterion(uuid, advancementId.toString(), criterion);
+        repository_->grantCriterion(uuid, advancementId.toString(), criterion, now);
+    }
+    if (added && changed_) {
+        changed_(uuid, advancementId);
     }
     return added;
 }
@@ -148,17 +166,41 @@ bool PlayerProgress::revokeCriterion(std::string_view uuid, const Identifier& ad
     if (repository_ != nullptr) {
         repository_->revokeCriterion(uuid, advancementId.toString(), criterion);
     }
+    if (changed_) {
+        changed_(uuid, advancementId);
+    }
     return true;
 }
 
 std::set<std::string, std::less<>> PlayerProgress::grantedCriteria(std::string_view uuid,
                                                                    const Identifier& advancementId) const {
+    std::set<std::string, std::less<>> granted;
+    for (const auto& [name, when] : obtained(uuid, advancementId)) {
+        granted.insert(name);
+    }
+    return granted;
+}
+
+std::map<std::string, std::int64_t, std::less<>> PlayerProgress::obtained(std::string_view uuid,
+                                                                          const Identifier& advancementId) const {
     const auto player = advancements_.find(uuid);
     if (player == advancements_.end()) {
         return {};
     }
     const auto entry = player->second.find(advancementId);
-    return entry == player->second.end() ? std::set<std::string, std::less<>>{} : entry->second;
+    return entry == player->second.end() ? std::map<std::string, std::int64_t, std::less<>>{} : entry->second;
+}
+
+std::vector<Identifier> PlayerProgress::started(std::string_view uuid) const {
+    std::vector<Identifier> ids;
+    if (const auto player = advancements_.find(uuid); player != advancements_.end()) {
+        for (const auto& [id, criteria] : player->second) {
+            if (!criteria.empty()) {
+                ids.push_back(id);
+            }
+        }
+    }
+    return ids;
 }
 
 bool PlayerProgress::revokeAll(std::string_view uuid, const Identifier& advancementId) {
@@ -173,6 +215,9 @@ bool PlayerProgress::revokeAll(std::string_view uuid, const Identifier& advancem
     player->second.erase(entry);
     if (repository_ != nullptr) {
         repository_->revokeAdvancement(uuid, advancementId.toString());
+    }
+    if (changed_) {
+        changed_(uuid, advancementId);
     }
     return true;
 }

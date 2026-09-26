@@ -61,6 +61,13 @@ public:
                                    double z, float yaw = 0.0F, std::string_view reason = "natural",
                                    const std::function<void(entity::ServerEntity&)>& initialize = {});
 
+    /// A mob a spawner placed and turned, finalized with SPAWNER but not yet in the world (the
+    /// spawner equips it first). parity: `Mob.finalizeSpawn(..., SPAWNER, null)` as
+    /// `BaseSpawner.serverTick` calls it, drawing from `random`, the level's own stream.
+    [[nodiscard]] world::MobSpawnForest finalizeForSpawner(world::LoadedWorld& world,
+                                                           const wire::common::Identifier& type, double x, double y,
+                                                           double z, float yaw, random::RandomSource& random);
+
     /// The EVENT horse made by `ServerLevel.tickThunder`; it deliberately skips `finalizeSpawn`.
     entity::ServerEntity* spawnSkeletonTrap(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
@@ -77,11 +84,8 @@ public:
     bool summonVillageGolem(world::LoadedWorld& world, const entity::ServerEntity& villager,
                             random::RandomSource& random);
 
-    /// Fills the world around the players with the mobs their biomes offer.
-    ///
-    /// parity: `NaturalSpawner.spawnForChunk`, once per simulated chunk per tick, under a cap per
-    /// category that scales with how much of the world is being simulated. `doMobSpawning` turns the
-    /// whole thing off, as it does in vanilla.
+    /// parity: `NaturalSpawner.spawnForChunk`, once per simulated chunk per tick, under a per-category
+    /// cap that scales with how much of the world is simulated. `doMobSpawning` turns it off.
     void tickSpawning(world::LoadedWorld& world, const sched::Region& region);
 
 private:

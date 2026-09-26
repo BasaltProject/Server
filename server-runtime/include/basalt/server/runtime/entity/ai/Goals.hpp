@@ -233,6 +233,9 @@ class AvoidEntityGoal final : public Goal {
 public:
     AvoidEntityGoal(std::set<std::string, std::less<>> avoided, double distance, double walkSpeed, double sprintSpeed);
 
+    /// parity: `AvoidEntityGoal.toAvoid`, what the last `canUse` found.
+    [[nodiscard]] const ServerEntity* threat() const noexcept { return threat_; }
+
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
 
     [[nodiscard]] bool canUse(MobContext& mob) override;

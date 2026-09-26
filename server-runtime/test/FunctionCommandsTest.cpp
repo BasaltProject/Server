@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/server/runtime/command/commands/DataCommand.hpp>
+#include <basalt/server/runtime/command/commands/ExecuteCommand.hpp>
 #include <basalt/server/runtime/command/commands/FunctionCommands.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
@@ -13,11 +14,11 @@
 #include <doctest.h>
 
 #include <algorithm>
-#include <map>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -223,8 +224,8 @@ void load(FunctionLibrary& library, const std::map<std::string, std::vector<std:
 }
 
 [[nodiscard]] commands::FunctionRunner runnerOf(const FunctionLibrary& library) {
-    return commands::FunctionRunner{library, commands::FunctionRunner::Settings{.permissionLevel = 2,
-                                                                                .commandLimit = {}}};
+    return commands::FunctionRunner{library,
+                                    commands::FunctionRunner::Settings{.permissionLevel = 2, .commandLimit = {}}};
 }
 
 [[nodiscard]] std::string heard(const std::vector<Component>& lines) {
@@ -318,14 +319,54 @@ TEST_CASE("return ends a function with its value, and outside one only ends the 
     CHECK(all.find("never") == std::string::npos);
 }
 
-TEST_CASE("a function that calls itself stops instead of running forever") {
+TEST_CASE("a function called from a function is queued in front of the rest, however deep it goes") {
     Fixture fixture{scratch("function-recursion")};
     FunctionLibrary library;
-    load(library, {{"loop", {"function test:loop"}}});
-    commands::FunctionRunner runner = runnerOf(library);
+    load(
+        library,
+        {{"loop", {"function test:loop"}}, {"outer", {"function test:inner", "say second"}}, {"inner", {"say first"}}});
+    commands::FunctionRunner runner{
+        library, commands::FunctionRunner::Settings{.permissionLevel = 2,
+                                                    .commandLimit = [](const CommandSource&) { return 5000; }}};
+    fixture.add("Steve");
     fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(runner));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::SayCommand>());
 
+    // parity: only the command quota stops it, thousands of calls past any stack.
     CHECK(fixture.dispatcher.execute(fixture.source, "function test:loop") == 0);
+
+    static_cast<void>(fixture.dispatcher.execute(fixture.source, "function test:outer"));
+    const std::string all = heard(fixture.clients[0]->messages);
+    REQUIRE(all.find("first") != std::string::npos);
+    CHECK(all.find("first") < all.find("second"));
+}
+
+TEST_CASE("a call whose result is waited on is queued too, and the caller goes on once it returns") {
+    Fixture fixture{scratch("function-waited")};
+    FunctionLibrary library;
+    load(library, {{"deep", {"return run function test:deep"}},
+                   {"waits", {"return run function test:seven", "say never"}},
+                   {"seven", {"return 7"}},
+                   {"asks", {"execute if function test:seven run say yes", "say after"}}});
+    commands::FunctionRunner runner{
+        library, commands::FunctionRunner::Settings{.permissionLevel = 2,
+                                                    .commandLimit = [](const CommandSource&) { return 5000; }}};
+    basalt::server::runtime::scoreboard::Scoreboard scoreboard;
+    fixture.add("Steve");
+    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(runner));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::ReturnCommand>(runner));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::SayCommand>());
+    fixture.dispatcher.registerCommand(
+        std::make_shared<commands::ExecuteCommand>(scoreboard, commands::ExecuteCommand::Hooks{.functions = &runner}));
+
+    // parity: no depth cap, the quota ends it without a result.
+    CHECK(fixture.dispatcher.execute(fixture.source, "function test:deep") == 0);
+    CHECK(fixture.dispatcher.execute(fixture.source, "function test:waits") == 7);
+    static_cast<void>(fixture.dispatcher.execute(fixture.source, "function test:asks"));
+    const std::string all = heard(fixture.clients[0]->messages);
+    CHECK(all.find("never") == std::string::npos);
+    REQUIRE(all.find("yes") != std::string::npos);
+    CHECK(all.find("yes") < all.find("after"));
 }
 
 TEST_CASE("the schedule runs what is due, in trigger then schedule order") {

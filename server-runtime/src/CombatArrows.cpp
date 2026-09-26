@@ -1,9 +1,11 @@
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PotionEffects.hpp>
@@ -179,6 +181,29 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         hitCrystal(world, watchers, *target->mob, false, false,
                    firedByPlayer(watchers, arrow) ? arrow.ownerId : std::nullopt);
         return ArrowHit::Stopped;
+    }
+    // parity: `AbstractArrow.onHitEntity` on a vehicle: the hit, a burning arrow's fire, and the
+    // arrow gone unless it pierces.
+    if (target->mob != nullptr &&
+        (world::detectorRails::isMinecart(target->mob->type()) || entity::boats::isBoat(target->mob->type()))) {
+        const double speedSqr = (arrow.velocityX * arrow.velocityX) + (arrow.velocityY * arrow.velocityY) +
+                                (arrow.velocityZ * arrow.velocityZ);
+        const bool counted =
+            options_.hurtVehicle && options_.hurtVehicle(world, *target->mob,
+                                                         VehicleSystem::Hit{.amount = static_cast<float>(damage),
+                                                                            .type = world::damageTypes::kArrow,
+                                                                            .causeId = arrow.ownerId,
+                                                                            .directId = arrow.entityId(),
+                                                                            .burningArrow = arrow.fireTicks > 0,
+                                                                            .arrowSpeedSqr = speedSqr,
+                                                                            .burningProjectile = arrow.fireTicks > 0});
+        if (!counted) {
+            deflectArrow(arrow);
+            return ArrowHit::Stopped;
+        }
+        arrowHitSound(watchers, arrow);
+        arrow.removed = !piercing;
+        return piercing ? ArrowHit::Pierced : ArrowHit::Stopped;
     }
     if (target->mob != nullptr) {
         ServerEntity& mob = *target->mob;

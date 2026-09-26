@@ -5,10 +5,14 @@
 #include <basalt/server/runtime/datapack/PackMetadata.hpp>
 #include <basalt/server/runtime/datapack/PackRepository.hpp>
 #include <basalt/server/runtime/datapack/ResourceStack.hpp>
+#include <basalt/server/runtime/registry/PackRegistries.hpp>
+#include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
+#include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <doctest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <map>
 #include <string>
@@ -165,4 +169,20 @@ TEST_CASE("the repository finds the jar's packs and the world's, and a new world
     DataPacks reopened{DataPacks::Options{.jar = fakeJar(), .worldRoot = root, .initial = {}, .safeMode = false}};
     CHECK(reopened.repository().selectedIds() == std::vector<std::string>{"vanilla", "trade_rebalance", "file/mine"});
     CHECK(reopened.resources()->readText("data/minecraft/loot_table/a.json") == "rebalanced-a");
+}
+
+TEST_CASE("installed registries go out in id order, a pack's entries among vanilla's, and number the server's lists") {
+    std::vector<basalt::wire::protocol::configuration::RegistryDataPacket> packets =
+        basalt::server::runtime::registry::vanillaConfigurationRegistries::packets();
+    for (auto& packet : packets) {
+        if (packet.registryId == "minecraft:wolf_variant") {
+            packet.entries.push_back({.key = "minecraft:blue", .value = std::nullopt});
+        }
+    }
+    basalt::server::runtime::registry::installRegistries(std::move(packets));
+    const std::vector<std::string>& wolves = basalt::server::runtime::registry::vanillaRegistryData::wolfVariants();
+    REQUIRE(wolves.size() == 10);
+    CHECK(wolves.front() == "ashen");
+    CHECK(wolves[2] == "blue");
+    CHECK(std::ranges::is_sorted(wolves));
 }

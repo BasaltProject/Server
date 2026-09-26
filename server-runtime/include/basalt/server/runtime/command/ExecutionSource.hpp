@@ -11,15 +11,13 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <vector>
 
 namespace basalt::server::runtime::command {
 
 /// A command source with pieces swapped out, which is all `/execute` does.
-///
-/// parity: `CommandSourceStack.withEntity`/`withPosition`/`withLevel`. Everything else is delegated
-/// to whoever started the chain, so feedback still reaches them and permissions are still theirs:
-/// `execute as <player>` runs *as* that player but not *with their permissions*, exactly as
-/// vanilla.
+/// parity: `CommandSourceStack.withEntity`/`withPosition`/`withLevel`. The rest is delegated to whoever
+/// started the chain, so `execute as <player>` keeps the original feedback target and permissions.
 class ExecutionSource final : public CommandSource {
 public:
     /// What `/execute store` hangs here: called with the result of whatever the chain ends up
@@ -83,6 +81,13 @@ public:
 
     /// Reports a result to every `store` in the chain, innermost first.
     void report(std::int32_t result) const;
+
+    /// Whether anything in the chain waits for the result, a `store` or a `return run`.
+    [[nodiscard]] bool observesResult() const;
+
+    /// Everything in the chain that waits for the result, innermost first, copied so it can be
+    /// told after the chain itself is gone.
+    [[nodiscard]] std::vector<OnResult> resultCallbacks() const;
 
 private:
     const CommandSource* base_;

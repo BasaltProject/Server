@@ -60,6 +60,9 @@ void CombatSystem::hitByLargeFireball(world::LoadedWorld& world, const std::vect
     // parity: `DamageSources.fireball`, attributed to the owner, or `unattributed_fireball` without one.
     const bool attributed = fireball.ownerId.has_value();
     const Identifier type = Identifier::vanilla(attributed ? "fireball" : "unattributed_fireball");
+    if (hitVehicle(world, target.mob, kLargeFireballDamage, type, fireball)) {
+        return;
+    }
     if (target.mob != nullptr) {
         ServerEntity& mob = *target.mob;
         if (mob.dragon != nullptr) {

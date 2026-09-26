@@ -20,8 +20,10 @@ namespace basalt::server::runtime::entity::ai {
 /// close enough to the current one, and what it hands the move control is that node's middle.
 namespace navigation {
 
-/// parity: `PathNavigation.moveTo`: works out a path and starts walking it.
-bool moveTo(world::WorldState& world, ServerEntity& mob, double x, double y, double z, double speedModifier);
+/// parity: `PathNavigation.moveTo`: works out a path and starts walking it. `reachRange` is how near the
+/// path has to end: one, unless the caller asks otherwise, as `MoveToTargetSink` asks for nought.
+bool moveTo(world::WorldState& world, ServerEntity& mob, double x, double y, double z, double speedModifier,
+            std::int32_t reachRange = 1);
 
 /// Whether a path to there exists at all. parity: `PathNavigation.createPath` before a goal starts.
 [[nodiscard]] bool canReach(world::WorldState& world, ServerEntity& mob, double x, double y, double z);
@@ -37,6 +39,9 @@ void stop(ServerEntity& mob);
 
 /// parity: `PathNavigation.tick` over `followThePath`.
 void tick(world::WorldState& world, ServerEntity& mob);
+
+/// parity: `PathNavigation.doStuckDetection`, from `position` as the navigation sees the mob, at `time`.
+void detectStuck(ServerEntity& mob, const std::array<double, 3>& position, std::int64_t time);
 
 } // namespace navigation
 

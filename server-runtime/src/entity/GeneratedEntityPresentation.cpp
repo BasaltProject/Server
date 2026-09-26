@@ -73,34 +73,6 @@ constexpr std::int32_t kDefaultAirSupply = 300;
 
 using Ids = std::map<std::string, std::int32_t, std::less<>>;
 
-/// The ids of a synced registry are its entry order, which is what the client resolves against.
-Ids registryIds(std::initializer_list<std::string_view> paths) {
-    Ids ids;
-    std::int32_t index = 0;
-    for (const std::string_view path : paths) {
-        ids.emplace("minecraft:" + std::string{path}, index++);
-    }
-    return ids;
-}
-
-const Ids& catVariantIds() {
-    static const Ids kIds{{"minecraft:tabby", 0},
-                          {"minecraft:black", 1},
-                          {"minecraft:red", 2},
-                          {"minecraft:siamese", 3},
-                          {"minecraft:british_shorthair", 4},
-                          {"minecraft:calico", 5},
-                          {"minecraft:persian", 6},
-                          {"minecraft:ragdoll", 7},
-                          {"minecraft:white", 8},
-                          {"minecraft:jellie", 9},
-                          {"minecraft:all_black", 10}};
-    return kIds;
-}
-
-/// Black is the `defineSynchedData` default, so vanilla's initial packet never carries it.
-constexpr std::int32_t kCatVariantBlack = 1;
-
 const Ids& villagerTypeIds() {
     static const Ids kIds{{"minecraft:desert", 0},  {"minecraft:jungle", 1}, {"minecraft:plains", 2},
                           {"minecraft:savanna", 3}, {"minecraft:snow", 4},   {"minecraft:swamp", 5},
@@ -138,12 +110,24 @@ std::optional<std::int32_t> idOf(const Ids& ids, std::string_view name) {
 /// parity: `Entity`'s eight fields, then `HangingEntity.DATA_DIRECTION`, then the painting's own.
 constexpr std::uint8_t kPaintingVariantIndex = 9;
 
+/// A synchronised registry's ids as the client was sent them, which is its installed order.
+Ids syncedIds(const std::vector<std::string>& paths) {
+    Ids ids;
+    std::int32_t index = 0;
+    for (const std::string& path : paths) {
+        ids.emplace(path.find(':') == std::string::npos ? "minecraft:" + path : path, index++);
+    }
+    return ids;
+}
+
+/// parity: `defineSynchedData` starts on `fallback`, so the first packet never carries it.
 void addRegistryMetadata(Entries& into, const NbtCompound& data, std::string_view key, std::uint8_t index,
-                         const Ids& ids, RegistryHolder registry) {
-    const std::optional<std::int32_t> id = idOf(ids, data.getString(key));
-    if (id.has_value() && *id != 0) {
+                         const std::vector<std::string>& registry, std::string_view fallback, RegistryHolder holder) {
+    const std::string_view name = data.getString(key);
+    const std::optional<std::int32_t> id = idOf(syncedIds(registry), name);
+    if (id.has_value() && name != fallback) {
         into.push_back(
-            Entry{.index = index, .value = SetEntityDataPacket::RegistryIdValue{.value = *id, .registry = registry}});
+            Entry{.index = index, .value = SetEntityDataPacket::RegistryIdValue{.value = *id, .registry = holder}});
     }
 }
 
@@ -207,8 +191,9 @@ void addArmorStandMetadata(Entries& into, const NbtCompound& data) {
 }
 
 void addCatMetadata(Entries& into, const NbtCompound& data) {
-    const std::optional<std::int32_t> variant = idOf(catVariantIds(), data.getString("variant"));
-    if (variant.has_value() && *variant != kCatVariantBlack) {
+    const std::optional<std::int32_t> variant =
+        idOf(syncedIds(runtime::registry::vanillaRegistryData::catVariants()), data.getString("variant"));
+    if (variant.has_value() && data.getString("variant") != "minecraft:black") {
         into.push_back(Entry{
             .index = 20,
             .value = SetEntityDataPacket::RegistryIdValue{.value = *variant, .registry = RegistryHolder::CatVariant}});
@@ -217,8 +202,8 @@ void addCatMetadata(Entries& into, const NbtCompound& data) {
     if (collarColor != 14) {
         into.push_back(Entry{.index = 23, .value = SetEntityDataPacket::IntValue{.value = collarColor}});
     }
-    addRegistryMetadata(into, data, "sound_variant", 24, registryIds({"classic", "royal"}),
-                        RegistryHolder::CatSoundVariant);
+    addRegistryMetadata(into, data, "sound_variant", 24, runtime::registry::vanillaRegistryData::catSoundVariants(),
+                        "minecraft:classic", RegistryHolder::CatSoundVariant);
 }
 
 void addVillagerMetadata(Entries& into, const NbtCompound& data, std::uint8_t dataIndex, std::uint8_t finalizedIndex) {
@@ -269,12 +254,10 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
         entries.push_back(
             Entry{.index = kAirSupplyDataIndex, .value = SetEntityDataPacket::IntValue{.value = data.getShort("Air")}});
     }
-    // Read as a number rather than as a float tag: a save written before Health became one, or an
-    // imported world, still has to say how alive the mob is. Zero here is a mob the client lays on
-    // its side and plays the death animation for, however well it is walking around.
-    //
-    // parity: index 9 is `LivingEntity.DATA_HEALTH_ID`, and on an arrow the same slot is
-    // `AbstractArrow.PIERCE_LEVEL`, a byte. Every entity is saved with a Health tag, alive or not.
+    // Read as a number rather than a float tag, so older saves and imported worlds still count. Zero
+    // makes the client play the death animation even for a walking mob.
+    // parity: index 9 is `LivingEntity.DATA_HEALTH_ID` (on an arrow, `AbstractArrow.PIERCE_LEVEL`, a
+    // byte). Every entity is saved with a Health tag, alive or not.
     if (data.contains("Health") && server::registry::entityAttributes::isLiving(typeId)) {
         entries.push_back(Entry{.index = 9,
                                 .value = SetEntityDataPacket::FloatValue{
@@ -369,22 +352,24 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
     } else if (type == "cat") {
         addCatMetadata(entries, data);
     } else if (type == "chicken") {
-        addRegistryMetadata(entries, data, "variant", 18, registryIds({"temperate", "warm", "cold"}),
-                            RegistryHolder::ChickenVariant);
-        addRegistryMetadata(entries, data, "sound_variant", 19, registryIds({"classic", "picky"}),
+        addRegistryMetadata(entries, data, "variant", 18, runtime::registry::vanillaRegistryData::chickenVariants(),
+                            "minecraft:temperate", RegistryHolder::ChickenVariant);
+        addRegistryMetadata(entries, data, "sound_variant", 19,
+                            runtime::registry::vanillaRegistryData::chickenSoundVariants(), "minecraft:classic",
                             RegistryHolder::ChickenSoundVariant);
     } else if (type == "cow") {
-        addRegistryMetadata(entries, data, "variant", 18, registryIds({"temperate", "warm", "cold"}),
-                            RegistryHolder::CowVariant);
-        addRegistryMetadata(entries, data, "sound_variant", 19, registryIds({"classic", "moody"}),
+        addRegistryMetadata(entries, data, "variant", 18, runtime::registry::vanillaRegistryData::cowVariants(),
+                            "minecraft:temperate", RegistryHolder::CowVariant);
+        addRegistryMetadata(entries, data, "sound_variant", 19,
+                            runtime::registry::vanillaRegistryData::cowSoundVariants(), "minecraft:classic",
                             RegistryHolder::CowSoundVariant);
     } else if (type == "fox") {
         if (data.getString("Type") == "snow") {
             entries.push_back(Entry{.index = 19, .value = SetEntityDataPacket::IntValue{.value = 1}});
         }
     } else if (type == "frog") {
-        addRegistryMetadata(entries, data, "variant", 18, registryIds({"temperate", "warm", "cold"}),
-                            RegistryHolder::FrogVariant);
+        addRegistryMetadata(entries, data, "variant", 18, runtime::registry::vanillaRegistryData::frogVariants(),
+                            "minecraft:temperate", RegistryHolder::FrogVariant);
     } else if (type == "goat") {
         if (data.getBoolean("IsScreamingGoat")) {
             entries.push_back(Entry{.index = 18, .value = SetEntityDataPacket::BoolValue{.value = true}});
@@ -417,9 +402,10 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
                 .index = 22, .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*hidden)}});
         }
     } else if (type == "pig") {
-        addRegistryMetadata(entries, data, "variant", 19, registryIds({"temperate", "warm", "cold"}),
-                            RegistryHolder::PigVariant);
-        addRegistryMetadata(entries, data, "sound_variant", 20, registryIds({"classic", "big", "mini"}),
+        addRegistryMetadata(entries, data, "variant", 19, runtime::registry::vanillaRegistryData::pigVariants(),
+                            "minecraft:temperate", RegistryHolder::PigVariant);
+        addRegistryMetadata(entries, data, "sound_variant", 20,
+                            runtime::registry::vanillaRegistryData::pigSoundVariants(), "minecraft:classic",
                             RegistryHolder::PigSoundVariant);
     } else if (type == "rabbit") {
         addIntIfSet(entries, data, "RabbitType", 18);
@@ -444,15 +430,14 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
         }
         addVillagerMetadata(entries, data, 20, 21);
     } else if (type == "wolf") {
-        addRegistryMetadata(
-            entries, data, "variant", 23,
-            registryIds({"pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped"}),
-            RegistryHolder::WolfVariant);
+        addRegistryMetadata(entries, data, "variant", 23, runtime::registry::vanillaRegistryData::wolfVariants(),
+                            "minecraft:pale", RegistryHolder::WolfVariant);
         addRegistryMetadata(entries, data, "sound_variant", 24,
-                            registryIds({"classic", "puglin", "sad", "angry", "grumpy", "big", "cute"}),
+                            runtime::registry::vanillaRegistryData::wolfSoundVariants(), "minecraft:classic",
                             RegistryHolder::WolfSoundVariant);
     } else if (type == "zombie_nautilus") {
-        addRegistryMetadata(entries, data, "variant", 21, registryIds({"temperate", "warm"}),
+        addRegistryMetadata(entries, data, "variant", 21,
+                            runtime::registry::vanillaRegistryData::zombieNautilusVariants(), "minecraft:temperate",
                             RegistryHolder::ZombieNautilusVariant);
     }
     return entries;
@@ -494,6 +479,10 @@ std::vector<GeneratedEquipment> generatedEntityEquipment(const NbtCompound& data
 
 std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadata* previous) const {
     Entries entries;
+    if (vehicle.has_value()) {
+        appendVehicleChanges(entries, *vehicle,
+                             previous == nullptr || !previous->vehicle.has_value() ? nullptr : &*previous->vehicle);
+    }
     // parity: `FireworkRocketEntity`'s three fields, eight to ten.
     if (fireworkItem.has_value() && (previous == nullptr || previous->fireworkItem != fireworkItem)) {
         entries.push_back(Entry{.index = 8, .value = SetEntityDataPacket::ItemValue{.stack = *fireworkItem}});
@@ -761,6 +750,7 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
 
 RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     RuntimeEntityMetadata live{.airSupply = entity.airSupply};
+    live.vehicle = vehicleDataOf(entity);
     if (ageableMobs::hasBabyMetadata(entity.type().path())) {
         live.baby = entity.age < 0;
     }

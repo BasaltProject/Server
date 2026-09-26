@@ -130,7 +130,8 @@ using namespace std::string_view_literals;
     if (path == "cocoa") {
         return PathType::Cocoa;
     }
-    if (path == "wither_rose" || path == "pointed_dripstone") {
+    // parity: `BlockTags.SPELEOTHEMS`, the pointed dripstone and the sulfur spike.
+    if (path == "wither_rose" || path == "pointed_dripstone" || path == "sulfur_spike") {
         return PathType::DamageCautious;
     }
     if (path == "lava") {
@@ -163,6 +164,11 @@ using namespace std::string_view_literals;
 }
 
 } // namespace
+
+bool isPathfindableOnLand(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && pathfindableOnLand(stateId, block->path());
+}
 
 const Maluses& defaults() {
     static const Maluses kDefaults{-1.0F, 0.0F,  0.0F, 0.0F,  0.0F, -1.0F, 0.0F, -1.0F, -1.0F,

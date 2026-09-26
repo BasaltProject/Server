@@ -71,42 +71,140 @@ Parsed<std::optional<FunctionRunner::Returned>> FunctionRunner::call(const Comma
     if (!lines.has_value()) {
         return std::unexpected{lines.error()};
     }
-    if (depth_ >= kMaxDepth) {
-        return std::unexpected{failure(Component::text("Function '" + function.id.toString() + "' nested more than " +
-                                                       std::to_string(kMaxDepth) + " deep and was stopped."))};
-    }
-    if (depth_ == 0) {
+    if (frames_.empty()) {
         quota_ = 0;
         exhausted_ = false;
         limit_ = std::max(1, settings_.commandLimit ? settings_.commandLimit(source) : 65536);
     }
-    // parity: the lines were compiled with the function's permission level, not the caller's.
-    const ExecutionSource running{source, ExecutionSource::Changes{.trusted = true}};
-    ++depth_;
-    const std::optional<Returned> outer = pendingReturn_;
+    const std::size_t base = frames_.size();
+    frames_.push_back(Frame{.source = &source, .owned = nullptr, .lines = std::move(*lines), .onDone = {}});
+    std::vector<Frame> outerDeferred = std::move(deferred_);
+    deferred_.clear();
+    const std::optional<Returned> outerReturn = pendingReturn_;
     pendingReturn_.reset();
-    std::optional<Returned> returned;
-    for (const std::string& line : *lines) {
-        if (exhausted_) {
-            break;
+    const std::optional<Returned> returned = runFrames(dispatcher, base);
+    pendingReturn_ = outerReturn;
+    deferred_ = std::move(outerDeferred);
+    return returned;
+}
+
+std::shared_ptr<const CommandSource> FunctionRunner::keep(const CommandSource& source) const {
+    const ExecutionSource* execution = source.asExecution();
+    const CommandSource& outermost =
+        frames_.front().owned != nullptr ? *frames_.front().owned : *frames_.front().source;
+    return std::make_shared<const ExecutionSource>(
+        outermost,
+        ExecutionSource::Changes{.player = source.player(),
+                                 .position = source.position(),
+                                 .world = execution == nullptr ? std::nullopt : std::optional{execution->world()},
+                                 .rotation = source.rotation(),
+                                 .anchorEyes = execution != nullptr && execution->anchorEyes(),
+                                 .entity = execution == nullptr ? std::nullopt : execution->entity(),
+                                 .onResult = {},
+                                 .permission = source.permissionLevel(),
+                                 .silent = source.silent(),
+                                 .trusted = true});
+}
+
+Parsed<void> FunctionRunner::defer(const CommandDispatcher& dispatcher, const CommandSource& source,
+                                   const function::ServerFunction& function, const NbtCompound* arguments,
+                                   Done onDone) {
+    Parsed<std::vector<std::string>> lines = instantiate(dispatcher, source, function, arguments);
+    if (!lines.has_value()) {
+        return std::unexpected{lines.error()};
+    }
+    // The source this line built dies with the line, so what it says is copied onto the outermost one.
+    deferred_.push_back(
+        Frame{.source = nullptr, .owned = keep(source), .lines = std::move(*lines), .onDone = std::move(onDone)});
+    return {};
+}
+
+void FunctionRunner::deferUntilReturn(const CommandDispatcher& dispatcher, std::shared_ptr<const CommandSource> source,
+                                      std::vector<const function::ServerFunction*> functions, Done onDone) {
+    if (functions.empty()) {
+        onDone(std::nullopt);
+        return;
+    }
+    const function::ServerFunction* first = functions.front();
+    functions.erase(functions.begin());
+    const CommandDispatcher* at = &dispatcher;
+    auto rest = [this, at, source, functions = std::move(functions),
+                 onDone](const std::optional<Returned>& returned) mutable {
+        if (returned.has_value() || functions.empty()) {
+            onDone(returned);
+            return;
+        }
+        deferUntilReturn(*at, source, std::move(functions), std::move(onDone));
+    };
+    // parity: an instantiation failure here is `commands.execute.function.instantiationFailure`,
+    // reported and the source dropped.
+    if (!defer(dispatcher, *source, *first, nullptr, std::move(rest)).has_value()) {
+        onDone(std::nullopt);
+    }
+}
+
+void FunctionRunner::settle(const CommandDispatcher& dispatcher, Frame& finished) {
+    if (!finished.onDone) {
+        return;
+    }
+    const std::optional<Returned> returned = finished.returned;
+    Done onDone = std::move(finished.onDone);
+    pendingReturn_.reset();
+    onDone(returned);
+    static_cast<void>(dispatcher);
+}
+
+std::optional<FunctionRunner::Returned> FunctionRunner::runFrames(const CommandDispatcher& dispatcher,
+                                                                  std::size_t base) {
+    // parity: `ExecutionContext.runCommandQueue`: one command at a time off the top of the stack, a
+    // queued function's commands in front of the rest of its caller's, and what waited on a
+    // function told once it returns.
+    while (frames_.size() > base) {
+        Frame& top = frames_.back();
+        if (exhausted_ || top.returned.has_value() || top.next >= top.lines.size()) {
+            Frame finished = std::move(top);
+            frames_.pop_back();
+            if (frames_.size() == base) {
+                return finished.returned;
+            }
+            if (!exhausted_) {
+                settle(dispatcher, finished);
+                afterCommand();
+            }
+            continue;
         }
         if (quota_ >= limit_) {
             exhausted_ = true;
             dispatcher.environment().logger().info([this] {
                 return "Command execution stopped due to limit (executed " + std::to_string(limit_) + " commands)";
             });
-            break;
+            continue;
         }
         ++quota_;
+        const std::string line = top.lines[top.next++];
+        const std::shared_ptr<const CommandSource> owned = top.owned;
+        const CommandSource& from = owned != nullptr ? *owned : *top.source;
+        // parity: the lines were compiled with the function's permission level, not the caller's.
+        const ExecutionSource running{from, ExecutionSource::Changes{.trusted = true}};
+        pendingReturn_.reset();
         static_cast<void>(dispatcher.execute(running, line));
-        if (pendingReturn_.has_value()) {
-            returned = pendingReturn_;
-            break;
-        }
+        afterCommand();
     }
-    pendingReturn_ = outer;
-    --depth_;
-    return returned;
+    return std::nullopt;
+}
+
+void FunctionRunner::afterCommand() {
+    std::vector<Frame> queued = std::move(deferred_);
+    deferred_.clear();
+    if (pendingReturn_.has_value()) {
+        // parity: a return discards what the returning frame queued.
+        frames_.back().returned = pendingReturn_;
+        pendingReturn_.reset();
+        return;
+    }
+    for (auto frame = queued.rbegin(); frame != queued.rend(); ++frame) {
+        frames_.push_back(std::move(*frame));
+    }
 }
 
 Parsed<std::int32_t> FunctionRunner::run(const CommandDispatcher& dispatcher, const CommandSource& source,

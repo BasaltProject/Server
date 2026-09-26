@@ -376,12 +376,38 @@ namespace parts = loot::lootTableJson::parts;
             announceToChat = false;
         }
     }
+    const auto flag = [&display](std::string_view key, bool fallback) {
+        const JsonValue* value = display.find(key);
+        const bool* set = value == nullptr ? nullptr : value->get<bool>();
+        return set == nullptr ? fallback : *set;
+    };
+    // parity: `ItemStackTemplate.CODEC`, an item id alone or `{id, count, components}`.
+    AdvancementIcon icon;
+    if (const JsonValue* iconValue = display.find("icon"); iconValue != nullptr) {
+        if (const std::optional<Identifier> alone = asIdentifier(iconValue); alone.has_value()) {
+            icon.item = *alone;
+        } else if (const JsonObject* object = asObject(iconValue); object != nullptr) {
+            icon.item = asIdentifier(object->find("id")).value_or(icon.item);
+            if (const JsonValue* count = object->find("count");
+                count != nullptr && count->get<std::int64_t>() != nullptr) {
+                icon.count = static_cast<std::int32_t>(*count->get<std::int64_t>());
+            }
+            if (const JsonValue* components = object->find("components"); components != nullptr) {
+                icon.components = *components;
+            }
+        }
+    }
+    const std::string* background = asString(display.find("background"));
     return AdvancementDisplay{
         .title = wire::text::componentJson::deserialize(*title),
         .description = description == nullptr ? wire::text::Component::empty()
                                               : wire::text::componentJson::deserialize(*description),
         .type = frame == nullptr ? "task" : *frame,
         .announceToChat = announceToChat,
+        .icon = std::move(icon),
+        .background = background == nullptr ? std::nullopt : std::optional{*background},
+        .showToast = flag("show_toast", true),
+        .hidden = flag("hidden", false),
     };
 }
 
@@ -396,7 +422,8 @@ namespace parts = loot::lootTableJson::parts;
     }
     return AdvancementRewards{.experience = experience,
                               .loot = identifiers(rewards.find("loot")),
-                              .recipes = identifiers(rewards.find("recipes"))};
+                              .recipes = identifiers(rewards.find("recipes")),
+                              .function = asIdentifier(rewards.find("function"))};
 }
 
 } // namespace
@@ -455,6 +482,9 @@ std::expected<Advancement, AdvancementParseError> parse(std::string_view json) {
     }
     if (const JsonObject* display = asObject(root->find("display")); display != nullptr) {
         built.display = parseDisplay(*display);
+    }
+    if (const JsonValue* telemetry = root->find("sends_telemetry_event"); telemetry != nullptr) {
+        built.sendsTelemetryEvent = telemetry->get<bool>() != nullptr && *telemetry->get<bool>();
     }
     return built;
 }

@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 namespace basalt::server::runtime::entity {
 
@@ -52,6 +53,13 @@ struct CreakingState {
     /// A hit taken while heart-bound, whose shudder, sound and heart call wait for its own turn.
     bool hurtPending = false;
     bool hurtByPlayer = false;
+    /// parity: `Node.type` of each node of the path its navigation walks, as `PathType` ids.
+    std::vector<std::uint8_t> pathNodeTypes;
+    /// parity: `PathNavigation.targetPos`, where its current path was drawn to.
+    std::optional<std::array<std::int32_t, 3>> pathTarget;
+    /// The game time and difficulty id of its turn, which its navigation reads.
+    std::int64_t gameTime = 0;
+    std::int32_t difficulty = 2;
 };
 
 /// What a heart keeps between turns that it does not save. parity: `CreakingHeartBlockEntity`.

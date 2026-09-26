@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -13,16 +14,11 @@
 namespace basalt::server::runtime::command::commands {
 
 /// Runs functions, and holds what `/return` did while they run. parity: `ServerFunctionManager`
-/// with the execution context `Commands.executeCommandInContext` opens.
-///
-/// Vanilla queues a function's commands and runs the queue flat; here a call nests. The command
-/// quota is the same (`max_command_sequence_length` counted over everything one top-level call
-/// runs), but nesting also has a depth cap, which vanilla has no need of.
+/// with the execution context `Commands.executeCommandInContext` opens. A nested call is queued as in
+/// vanilla, so only `max_command_sequence_length` bounds recursion; whatever waits on its result
+/// (`execute store`, `return run`, `execute if function`) is told when it returns.
 class FunctionRunner {
 public:
-    /// Enough for a recursive raycast, and inside a debug build's stack.
-    static constexpr std::int32_t kMaxDepth = 128;
-
     struct Settings {
         /// parity: `function-permission-level`, what a function's lines parse and run with.
         std::int32_t permissionLevel = 2;
@@ -47,13 +43,29 @@ public:
     /// Set by `/return` while a function is running, and cleared by the runner that reads it.
     void requestReturn(Returned value) { pendingReturn_ = value; }
 
-    [[nodiscard]] bool insideFunction() const noexcept { return depth_ > 0; }
+    [[nodiscard]] bool insideFunction() const noexcept { return !frames_.empty(); }
 
     /// Runs one function as `source`, macro arguments filled in first. An error is an instantiation
     /// failure, already worded as vanilla words it; nothing has run then.
     [[nodiscard]] Parsed<std::optional<Returned>> call(const CommandDispatcher& dispatcher, const CommandSource& source,
                                                        const function::ServerFunction& function,
                                                        const wire::nbt::NbtCompound* arguments = nullptr);
+
+    /// Told when a queued function is done: its return, or nothing when it ran to the end.
+    using Done = std::function<void(const std::optional<Returned>& returned)>;
+
+    /// Queues a function behind the command running now. Only inside a function; the error is an
+    /// instantiation failure, and nothing is queued then.
+    Parsed<void> defer(const CommandDispatcher& dispatcher, const CommandSource& source,
+                       const function::ServerFunction& function, const wire::nbt::NbtCompound* arguments,
+                       Done onDone = {});
+
+    /// parity: `IsolatedCall`: the functions one after another until one returns, then `onDone`.
+    void deferUntilReturn(const CommandDispatcher& dispatcher, std::shared_ptr<const CommandSource> source,
+                          std::vector<const function::ServerFunction*> functions, Done onDone);
+
+    /// A copy of a source that outlives the command it came from, for work queued behind it.
+    [[nodiscard]] std::shared_ptr<const CommandSource> keep(const CommandSource& source) const;
 
     /// A function by id, answering its return value or 0. What `/test` and `/debug function` use.
     [[nodiscard]] Parsed<std::int32_t> run(const CommandDispatcher& dispatcher, const CommandSource& source,
@@ -76,9 +88,26 @@ private:
                                                                const function::ServerFunction& function,
                                                                const wire::nbt::NbtCompound* arguments) const;
 
+    struct Frame {
+        const CommandSource* source = nullptr;
+        std::shared_ptr<const CommandSource> owned;
+        std::vector<std::string> lines;
+        std::size_t next = 0;
+        Done onDone;
+        std::optional<Returned> returned;
+    };
+
+    std::optional<Returned> runFrames(const CommandDispatcher& dispatcher, std::size_t base);
+
+    void settle(const CommandDispatcher& dispatcher, Frame& finished);
+
+    /// What the command that just ran queued goes on top, first queued first run.
+    void afterCommand();
+
     const function::FunctionLibrary* library_;
     Settings settings_;
-    std::int32_t depth_ = 0;
+    std::vector<Frame> frames_;
+    std::vector<Frame> deferred_;
     std::optional<Returned> pendingReturn_;
     std::int32_t quota_ = 0;
     std::int32_t limit_ = 0;

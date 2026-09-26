@@ -4,6 +4,8 @@
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/world/loot/LootTableJson.hpp>
 
+#include <map>
+#include <mutex>
 #include <random>
 
 namespace basalt::server::runtime::world::commandPredicates {
@@ -31,9 +33,17 @@ std::optional<bool> test(RealLootTables& tables, const wire::common::JsonValue& 
     }
     context.hasEntity = self.has_value();
     context.thisEntity = std::move(self);
-    // Not bit for bit: vanilla draws on the level's own random, which nothing here reproduces.
-    random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
-    return condition->test(random, context);
+    // parity: `LootContext.Builder.create(Optional.empty())` draws on the level's own random, one
+    // stream per level seeded when the level was made.
+    static std::mutex mutex;
+    static std::map<const LoadedWorld*, random::RandomSource> levels;
+    const std::scoped_lock lock{mutex};
+    auto found = levels.find(world);
+    if (found == levels.end()) {
+        found = levels.emplace(world, random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}())))
+                    .first;
+    }
+    return condition->test(found->second, context);
 }
 
 } // namespace basalt::server::runtime::world::commandPredicates

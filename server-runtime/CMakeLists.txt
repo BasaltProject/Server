@@ -36,6 +36,7 @@ basalt_module(server-runtime-core
         src/config/ServerListConfig.cpp
         src/config/UiConfigs.cpp
         src/entity/Aabb.cpp
+        src/entity/BlockClip.cpp
         src/entity/BlockRay.cpp
         src/entity/BlockTriggers.cpp
         src/entity/EntityPhysics.cpp
@@ -45,7 +46,10 @@ basalt_module(server-runtime-core
         src/entity/Shulkers.cpp
         src/entity/LivingMovement.cpp
         src/entity/PathFinder.cpp
+        src/entity/WalkNodeEvaluator.cpp
         src/entity/Minecarts.cpp
+        src/entity/MinecartTrack.cpp
+        src/entity/VehiclePresentation.cpp
         src/entity/PrimedTnt.cpp
         src/entity/Projectiles.cpp
         src/entity/EntityNbt.cpp
@@ -163,6 +167,7 @@ basalt_module(server-runtime-core
         src/CombatArrows.cpp
         src/CombatAttack.cpp
         src/CombatFireballs.cpp
+        src/CombatSpit.cpp
         src/CombatHandler.cpp
         src/CombatSystem.cpp
         src/CombatWindCharges.cpp
@@ -211,14 +216,27 @@ basalt_module(server-runtime-core
         src/MobActionPiglinItems.cpp
         src/MobActionCopperGolem.cpp
         src/MobActionShulker.cpp
+        src/MobActionLlama.cpp
         src/MobActionGifts.cpp
         src/MobActionDolphin.cpp
         src/MobActionWardenHearing.cpp
+        src/BasaltServerFeatures.cpp
+        src/EntityPushSystem.cpp
         src/SculkCatalystSystem.cpp
+        src/VehicleBoats.cpp
+        src/VehicleMinecarts.cpp
+        src/VehicleSystem.cpp
         src/ShriekerSystem.cpp
         src/LightningBoltSystem.cpp
         src/NaturalSpawningMaterialize.cpp
         src/NaturalSpawningSystem.cpp
+        src/MobSpawnerSystem.cpp
+        src/MobSpawnerSpawn.cpp
+        src/SpawnerBlockTick.cpp
+        src/world/BaseSpawnerData.cpp
+        src/world/EquipmentTables.cpp
+        src/world/MobSpawnChecks.cpp
+        src/world/SpawnPlacementRules.cpp
         src/RaidSystem.cpp
         src/FireworkSystem.cpp
         src/RaidMembers.cpp
@@ -278,6 +296,7 @@ basalt_module(server-runtime-core
         src/player/PlayerEntityData.cpp
         src/player/PlayerImpulse.cpp
         src/player/PlayerPersistence.cpp
+        src/datapack/RegistryValidation.cpp
         src/player/PlayerBlockUpdates.cpp
         src/player/PlayerDeath.cpp
         src/player/PlayerBeehives.cpp
@@ -419,6 +438,9 @@ basalt_module(server-runtime-core
         src/world/CopperChests.cpp
         src/world/Signs.cpp
         src/world/BiomeZoomSeed.cpp
+        src/world/AdvancementTree.cpp
+        src/world/PlayerAdvancements.cpp
+        src/world/VanillaAdvancementImport.cpp
         src/world/Beds.cpp
         src/world/ClimbingPlantGrowth.cpp
         src/world/Fluids.cpp
@@ -441,6 +463,7 @@ basalt_module(server-runtime-core
         src/world/ContainerDrops.cpp
         src/entity/Boats.cpp
         src/entity/Horses.cpp
+        src/entity/CreakingNavigation.cpp
         src/entity/Creakings.cpp
         src/world/StructureBlocks.cpp
         src/entity/HorseBreeding.cpp
@@ -570,6 +593,7 @@ basalt_module(server-runtime-core
         src/entity/ai/FlyingGoals.cpp
         src/entity/ai/HoverWanderGoal.cpp
         src/entity/ai/HorseGoals.cpp
+        src/entity/ai/LlamaGoals.cpp
         src/entity/ai/PhantomGoals.cpp
         src/entity/ai/ShulkerGoals.cpp
         src/entity/ai/WardenGoals.cpp
@@ -1719,6 +1743,12 @@ basalt_test(server-runtime-natural-spawn-predicates-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-base-spawner-data-test
+    SOURCES
+        test/BaseSpawnerDataTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-biome-tag-loader-test
     SOURCES
         test/BiomeTagLoaderTest.cpp
@@ -2536,6 +2566,12 @@ basalt_test(server-runtime-datapack-test
 )
 
 target_compile_definitions(server-runtime-datapack-test
+basalt_test(server-runtime-player-advancements-test
+    SOURCES
+        test/PlayerAdvancementsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 

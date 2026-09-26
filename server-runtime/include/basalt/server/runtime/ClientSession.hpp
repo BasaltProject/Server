@@ -81,6 +81,7 @@ class RealBlockTransformers;
 class RealEnchantments;
 class PlayerProgress;
 class AdvancementTriggers;
+class PlayerAdvancements;
 class WorldWeather;
 class RealDialogs;
 class RealTimelines;
@@ -97,6 +98,7 @@ class CombatHandler;
 class BlockChangeBroadcaster;
 class ContainerMenuController;
 class CombatSystem;
+class VehicleSystem;
 class EndFightSystem;
 class FishingSystem;
 class MapSystem;
@@ -210,6 +212,9 @@ public:
         std::string difficulty = "easy";
         storage::PlayerStore* playerStore = nullptr;
         bool rememberIp = false;
+        /// parity: `WorldDataConfiguration.enabledFeatures`, which the configuration phase tells the
+        /// client about. Unset is vanilla alone.
+        std::function<std::vector<std::string>()> enabledFeatures;
         std::function<config::UiConfigs()> ui;
         const wire::common::placeholder::PlaceholderRegistry* placeholders = nullptr;
         world::RealLootTables* lootTables = nullptr;
@@ -224,6 +229,8 @@ public:
         const world::realBlockTags::TagMembers* blockTags = nullptr;
         const world::realItemTags::TagMembers* itemTags = nullptr;
         /// Which enchantments will not sit beside each other, which only an anvil asks about.
+        /// What each client has been told about advancements.
+        world::PlayerAdvancements* advancements = nullptr;
         const world::realEnchantmentTags::TagMembers* enchantmentTags = nullptr;
         const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
         const world::realFluidTags::TagMembers* fluidTags = nullptr;
@@ -231,8 +238,6 @@ public:
         const world::realEntityTypeTags::TagMembers* entityTypeTags = nullptr;
         /// Which patterns a loom may offer, in the order its buttons are numbered by.
         const world::realBannerPatterns::TagOrder* bannerPatterns = nullptr;
-        /// What the selected data packs add to or change in the registries sent at configuration.
-        std::function<void(std::vector<wire::protocol::configuration::RegistryDataPacket>&)> packRegistries;
         /// The two registries a client is sent that this build loads from the jar.
         world::RealDialogs* dialogs = nullptr;
         world::RealTimelines* timelines = nullptr;
@@ -261,6 +266,7 @@ public:
         ExplosionSystem* explosions = nullptr;
         /// What a projectile or a melee hit on something that is not a mob goes through.
         CombatSystem* combat = nullptr;
+        VehicleSystem* vehicles = nullptr;
         /// The dragon fight, which a crystal set down beside the exit portal may call back.
         EndFightSystem* endFight = nullptr;
         /// Casting and reeling in.
@@ -553,6 +559,8 @@ private:
 
     /// parity: `ClientboundUpdateRecipesPacket`, of which this sends the stonecutter half.
     void sendStonecutterRecipes();
+
+    void seenAdvancements(wire::io::ByteBuffer& body);
 
     /// The callbacks a `PlayerSession` reaches this connection through.
     [[nodiscard]] player::PlayerConnection playerConnection();

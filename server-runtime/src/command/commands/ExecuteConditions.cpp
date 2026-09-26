@@ -272,9 +272,27 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
                 }
                 const ExecutionSource running{
                     context.source(),
-                    ExecutionSource::Changes{.permission = std::max(context.source().permissionLevel(),
-                                                                    permissionLevel::kGamemasters),
-                                             .silent = true}};
+                    ExecutionSource::Changes{
+                        .permission = std::max(context.source().permissionLevel(), permissionLevel::kGamemasters),
+                        .silent = true}};
+                if (runner->insideFunction() && context.tailNode() != nullptr) {
+                    // parity: `scheduleFunctionConditionsAndTest`: the functions are queued in an
+                    // isolated call, and the rest of the line resumes for this source afterwards.
+                    const CommandDispatcher* dispatcher = &context.dispatcher();
+                    const CommandNode* tail = context.tailNode();
+                    const std::int32_t cursor = context.tailCursor();
+                    const std::uint64_t generation = dispatcher->generation();
+                    std::shared_ptr<const CommandSource> resumed = runner->keep(context.source());
+                    runner->deferUntilReturn(
+                        *dispatcher, runner->keep(running), std::move(functions),
+                        [dispatcher, tail, cursor, generation, resumed, input = context.input(),
+                         positive](const std::optional<FunctionRunner::Returned>& returned) {
+                            if (returned.has_value() && (returned->value != 0) == positive) {
+                                static_cast<void>(dispatcher->continueTail(*tail, cursor, input, *resumed, generation));
+                            }
+                        });
+                    return onwards;
+                }
                 for (const function::ServerFunction* function : functions) {
                     const Parsed<std::optional<FunctionRunner::Returned>> ran =
                         runner->call(context.dispatcher(), running, *function);
@@ -352,28 +370,29 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
     const auto never = [](const CommandContext&) { return std::optional<std::int32_t>{}; };
     // parity: `ExecuteCommand.checkCustomPredicate`, this entity if the source has one, at its spot.
     builder.literal("predicate", [&execute, positive](const CommandNodeBuilder& form) {
-        form.argument("predicate", lootPredicateOrInlineArgument(), [&execute, positive](const CommandNodeBuilder& one) {
-            conditional(one, execute, positive, [](const CommandContext& context) -> std::optional<std::int32_t> {
-                const auto* named = context.get<ResourceOrInline>("predicate");
-                const auto& test = context.environment().options().predicate;
-                if (named == nullptr || !test) {
-                    return std::nullopt;
-                }
-                const wire::common::JsonValue value = named->inlineValue.value_or(
-                    wire::common::JsonValue::of(named->id.has_value() ? named->id->toString() : std::string{}));
-                const ExecutionSource* execution = context.source().asExecution();
-                std::optional<CommandTarget> self;
-                if (execution != nullptr && execution->entity().has_value()) {
-                    self = execution->entity();
-                } else if (context.source().player() != nullptr) {
-                    self = CommandTarget{*context.source().player()};
-                }
-                const std::optional<bool> passed =
-                    test(value, self.has_value() ? &*self : nullptr, worldIn(context.source(), context.environment()),
-                         context.source().position());
-                return passed.value_or(false) ? std::optional{1} : std::nullopt;
+        form.argument(
+            "predicate", lootPredicateOrInlineArgument(), [&execute, positive](const CommandNodeBuilder& one) {
+                conditional(one, execute, positive, [](const CommandContext& context) -> std::optional<std::int32_t> {
+                    const auto* named = context.get<ResourceOrInline>("predicate");
+                    const auto& test = context.environment().options().predicate;
+                    if (named == nullptr || !test) {
+                        return std::nullopt;
+                    }
+                    const wire::common::JsonValue value = named->inlineValue.value_or(
+                        wire::common::JsonValue::of(named->id.has_value() ? named->id->toString() : std::string{}));
+                    const ExecutionSource* execution = context.source().asExecution();
+                    std::optional<CommandTarget> self;
+                    if (execution != nullptr && execution->entity().has_value()) {
+                        self = execution->entity();
+                    } else if (context.source().player() != nullptr) {
+                        self = CommandTarget{*context.source().player()};
+                    }
+                    const std::optional<bool> passed =
+                        test(value, self.has_value() ? &*self : nullptr,
+                             worldIn(context.source(), context.environment()), context.source().position());
+                    return passed.value_or(false) ? std::optional{1} : std::nullopt;
+                });
             });
-        });
     });
     builder.literal("items", [&execute, positive, never](const CommandNodeBuilder& form) {
         const auto tail = [&execute, positive, never](const CommandNodeBuilder& node) {

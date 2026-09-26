@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/registry/PackRegistries.hpp>
 #include <basalt/server/runtime/registry/SyncedTags.hpp>
 #include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/registry/VanillaTagData.hpp>
@@ -398,6 +399,18 @@ void ClientSession::enterConfiguration() {
         wire::protocol::configuration::BrandPacket{.brand = "Basalt " + std::string{buildInfo::kMinecraftVersion}}
             .write(buffer);
     });
+    // parity: `ClientboundUpdateEnabledFeaturesPacket` comes before the known packs. Only a client
+    // on this server's own protocol is told: the older ones take the vanilla flags either way.
+    if (handshake_.has_value() && handshake_->protocolVersion == buildInfo::kProtocolVersion) {
+        std::vector<std::string> features{"minecraft:vanilla"};
+        if (options_.enabledFeatures) {
+            features = options_.enabledFeatures();
+        }
+        sendCompressed(
+            wire::protocol::configuration::UpdateEnabledFeaturesPacket::kId, [&features](wire::io::ByteBuffer& buffer) {
+                wire::protocol::configuration::UpdateEnabledFeaturesPacket{.features = features}.write(buffer);
+            });
+    }
     // Claims the client's own vanilla data pack rather than an empty list. A client older than
     // 1.20.5 has no such packet and would never answer, so it is not asked.
     if (handshake_.has_value() && handshake_->protocolVersion < mv::protocolVersions::kV1_20_5) {
@@ -440,11 +453,7 @@ void ClientSession::sendRegistriesThenFinish() {
     using wire::protocol::configuration::RegistryDataPacket;
     using wire::protocol::configuration::RegistryEntry;
 
-    std::vector<RegistryDataPacket> registries = registry::vanillaConfigurationRegistries::packets();
-    if (options_.packRegistries) {
-        options_.packRegistries(registries);
-    }
-    for (const RegistryDataPacket& packet : registries) {
+    for (const RegistryDataPacket& packet : registry::installedRegistries()) {
         sendCompressed(RegistryDataPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     }
     // The rest of `RegistryDataLoader.SYNCHRONIZED_REGISTRIES`, sent empty: a registry that was

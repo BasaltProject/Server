@@ -127,11 +127,12 @@ std::int32_t inventoryColumns(const ServerEntity& horse) {
     if (!hasChest(horse)) {
         return 0;
     }
-    if (isLlama(horse.type())) {
-        // parity: `Llama.setStrength`, one to five whatever was saved.
-        return std::clamp(horse.sourceNbt.has_value() ? horse.sourceNbt->getInt("Strength") : 0, 1, 5);
-    }
-    return 5;
+    return isLlama(horse.type()) ? strength(horse) : 5;
+}
+
+std::int32_t strength(const ServerEntity& llama) {
+    // parity: `Llama.setStrength`, which clamps whatever it is given.
+    return std::clamp(llama.sourceNbt.has_value() ? llama.sourceNbt->getInt("Strength") : 0, 1, 5);
 }
 
 bool saddled(const ServerEntity& horse) { return mobEquipment::get(horse, mobEquipment::Slot::Saddle).has_value(); }

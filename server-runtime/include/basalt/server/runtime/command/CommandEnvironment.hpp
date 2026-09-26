@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/world/RealTimelines.hpp>
 #include <basalt/server/storage/AccessRepository.hpp>
 #include <basalt/server/storage/PlayerRepository.hpp>
+#include <basalt/server/storage/ProgressRepository.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
@@ -45,12 +46,9 @@ class CommandTarget;
 /// The clock update a world would send right now, for a join or a change.
 [[nodiscard]] wire::protocol::play::SetTimePacket timePacketOf(const world::LoadedWorld& world);
 
-/// Everything commands are allowed to reach, handed to them rather than looked up.
-///
-/// This is the "no `Server.getInstance()`" rule in practice: a command gets the player list, the
-/// operator list and the few server-wide facts it needs through this object, so the same dispatcher
-/// runs unchanged against a test fixture. Nothing here assumes a single tick thread either, which
-/// is what lets a command run on whichever owner holds what it touches.
+/// Everything commands are allowed to reach, handed to them rather than looked up, so the same
+/// dispatcher runs unchanged against a test fixture. Nothing here assumes a single tick thread, so a
+/// command can run on whichever owner holds what it touches.
 class CommandEnvironment {
 public:
     /// What a `#tag` in a predicate resolves to, or nothing for a tag nobody declared.
@@ -104,6 +102,8 @@ public:
         /// Persisted players, as opposed to who is online right now. Null where there is no
         /// database to administer, which is how the dispatcher's own tests run.
         storage::PlayerRepository* playerRepository = nullptr;
+        /// Advancement and recipe rows, which an import fills in beside the players.
+        storage::ProgressRepository* progressRepository = nullptr;
         /// Bans and the whitelist, or null where there is no database to hold them.
         storage::AccessRepository* access = nullptr;
         /// Every loaded world by name, for the commands that move players between them.

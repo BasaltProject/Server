@@ -98,6 +98,9 @@ inline constexpr GameRule kSpawnPatrols = GameRule::boolean("spawn_patrols", tru
 /// parity: `GameRules.SPAWN_WARDENS`, which a shrieker asks before it answers.
 inline constexpr GameRule kSpawnWardens = GameRule::boolean("spawn_wardens", true);
 
+/// parity: `ServerLevel.isSpawnerBlockEnabled`, which a monster spawner asks before it counts down.
+inline constexpr GameRule kSpawnerBlocksWork = GameRule::boolean("spawner_blocks_work", true);
+
 /// parity: the periodic trader spawner's independent switch.
 inline constexpr GameRule kSpawnWanderingTraders = GameRule::boolean("spawn_wandering_traders", true);
 
@@ -124,6 +127,12 @@ inline constexpr GameRule kEntityDrops = GameRule::boolean("entity_drops", true)
 
 /// parity: what a mob leaves when it dies, the dragon's experience included.
 inline constexpr GameRule kMobDrops = GameRule::boolean("mob_drops", true);
+
+/// parity: `LivingEntity.pushEntities`, how many a body may be squeezed against before it hurts.
+inline constexpr GameRule kMaxEntityCramming = GameRule::integer("max_entity_cramming", 24, 0);
+
+/// parity: `NewMinecartBehavior.getMaxSpeed`, blocks a second under `minecart_improvements`.
+inline constexpr GameRule kMaxMinecartSpeed = GameRule::integer("max_minecart_speed", 8, 1, 1000);
 
 /// parity: `ServerPlayer.isPvpAllowed`, whether players may hurt each other at all.
 inline constexpr GameRule kPvp = GameRule::boolean("pvp", true);

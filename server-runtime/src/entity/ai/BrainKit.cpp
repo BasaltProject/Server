@@ -69,8 +69,9 @@ void moveToTarget(MobContext& mob, Motion& motion) {
         return;
     }
     if (moved) {
+        // parity: `MoveToTargetSink.tryComputePath` asks for a path that ends on the target itself.
         if (!navigation::moveTo(mob.world, mob.mob, motion.walk->at[0], motion.walk->at[1], motion.walk->at[2],
-                                motion.walk->speed)) {
+                                static_cast<double>(motion.walk->speed), 0)) {
             if (!motion.cantReachSince.has_value()) {
                 motion.cantReachSince = mob.gameTime;
             }
@@ -482,7 +483,8 @@ void lookAround(MobContext& mob, Look& look, std::int32_t& gazeCooldown, std::in
     const float xCos = -mth::cos(static_cast<double>(-pitch * kRadians));
     const float xSin = mth::sin(static_cast<double>(-pitch * kRadians));
     const double eyes = mob.mob.y + mobBreathing::eyeHeightOf(mob.mob);
-    const Block at{mth::floor(mob.mob.x + static_cast<double>(ySin * xCos)), mth::floor(eyes + xSin),
+    const Block at{mth::floor(mob.mob.x + static_cast<double>(ySin * xCos)),
+                   mth::floor(eyes + static_cast<double>(xSin)),
                    mth::floor(mob.mob.z + static_cast<double>(yCos * xCos))};
     look = Look{.at = Vec{at[0] + 0.5, at[1] + 0.5, at[2] + 0.5}};
     gazeCooldown = min + mob.random.nextInt(max - min + 1);

@@ -2,6 +2,8 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/entity/Aabb.hpp>
+#include <basalt/server/runtime/entity/Minecarts.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -84,6 +86,17 @@ bool placeMinecartFor(const BreakContext& context, PlayerSession& player, world:
         path == "minecart"
             ? item
             : Identifier::vanilla(path.substr(0, path.size() - std::string_view{"_minecart"}.size()) + "_minecart");
+    // parity: under `minecart_improvements` a cart is not placed into another one.
+    if (context.minecartImprovements && context.minecartImprovements()) {
+        const entity::Aabb box = entity::Aabb::of(hit.x + 0.5, hit.y + kMinecartRestHeight + slope, hit.z + 0.5,
+                                                  static_cast<double>(0.98F), static_cast<double>(0.7F));
+        for (const entity::ServerEntity* other : world.state().entities()) {
+            if (!other->removed && entity::minecarts::isMinecart(other->type()) &&
+                entity::Aabb::of(other->x, other->y, other->z, other->width(), other->height()).intersects(box)) {
+                return false;
+            }
+        }
+    }
     if (!spawnFromItem(context, player, world, type, heldSlot, held, hit.x + 0.5, hit.y + kMinecartRestHeight + slope,
                        hit.z + 0.5)) {
         return false;

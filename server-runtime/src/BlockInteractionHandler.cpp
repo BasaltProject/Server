@@ -184,6 +184,13 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.triggers = owner_->options().advancementTriggers;
     context.nextDouble = options_.nextDouble;
     context.nextSeed = options_.nextSeed;
+    context.minecartImprovements = [this] {
+        if (!owner_->options().enabledFeatures) {
+            return false;
+        }
+        const std::vector<std::string> features = owner_->options().enabledFeatures();
+        return std::ranges::contains(features, std::string{"minecraft:minecart_improvements"});
+    };
     context.breakAllowed = hooks_.breakAllowed;
     context.itemSpawnAllowed = hooks_.itemSpawnAllowed;
     context.itemDamageAllowed = hooks_.itemDamageAllowed;

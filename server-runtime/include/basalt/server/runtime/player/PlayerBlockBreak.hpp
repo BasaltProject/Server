@@ -46,6 +46,9 @@ struct BreakContext {
     world::AdvancementTriggers* triggers = nullptr;
     const world::realItemTags::TagMembers* itemTags = nullptr;
 
+    /// parity: `AbstractMinecart.useExperimentalMovement`, which a cart placed by hand asks.
+    std::function<bool()> minecartImprovements;
+
     /// The rolls a break makes, none of which is part of the world's own stream.
     std::function<double()> nextDouble;
     std::function<std::int64_t()> nextSeed;

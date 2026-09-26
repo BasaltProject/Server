@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/CommandWiring.hpp>
 #include <basalt/server/runtime/EndFightSystem.hpp>
+#include <basalt/server/runtime/EntityPushSystem.hpp>
 #include <basalt/server/runtime/EnvironmentTickSystem.hpp>
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
@@ -17,20 +18,22 @@
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/MobSpawnerSystem.hpp>
 #include <basalt/server/runtime/StructureBlockSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/PersistenceCoordinator.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
+#include <basalt/server/runtime/SculkCatalystSystem.hpp>
 #include <basalt/server/runtime/ServerListStatus.hpp>
 #include <basalt/server/runtime/ServerMetrics.hpp>
-#include <basalt/server/runtime/SculkCatalystSystem.hpp>
 #include <basalt/server/runtime/ShriekerSystem.hpp>
 #include <basalt/server/runtime/StatusEffectSystem.hpp>
 #include <basalt/server/runtime/SubstituteLabels.hpp>
 #include <basalt/server/runtime/TickLoop.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
+#include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/WitherSystem.hpp>
 #include <basalt/server/runtime/WorldRegistry.hpp>
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
@@ -51,10 +54,12 @@
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/maps/MapStorage.hpp>
+#include <basalt/server/runtime/world/PlayerAdvancements.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
 #include <basalt/wire/auth/SignatureValidator.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>
+#include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -152,6 +157,10 @@ private:
     /// parity: the sculk catalyst's `CatalystListener` on a death. Answers whether it took the
     /// experience, so none drops.
     bool drinkBySculk(world::LoadedWorld& world, const entity::ServerEntity& dead);
+    /// parity: `WorldDataConfiguration.enabledFeatures`, `minecraft:vanilla` without data packs.
+    [[nodiscard]] std::vector<std::string> enabledFeatures() const;
+    /// parity: `AbstractMinecart.useExperimentalMovement`.
+    [[nodiscard]] bool minecartImprovements() const;
     void tickDeaths(world::LoadedWorld& world, const sched::Region& region);
 
     /// The objectives the server keeps itself: deaths, kills, health, food, air, armour and
@@ -267,9 +276,18 @@ private:
     /// Tells every player what a reload changed. parity: `PlayerList.reloadResources`.
     void resyncAfterReload();
 
-    /// What the selected packs change in the registries a joining client is sent.
-    [[nodiscard]] std::function<void(std::vector<wire::protocol::configuration::RegistryDataPacket>&)>
-    packRegistries() const;
+    /// Builds the advancement sync and wires rewards, loot and functions into the trigger hooks.
+    void addAdvancementHooks(world::AdvancementTriggers::Hooks& hooks);
+
+    /// parity: `AdvancementRewards.grant`'s loot: into the inventory, the rest at the player's feet.
+    void awardAdvancementLoot(std::string_view uuid, const std::vector<wire::common::Identifier>& tables);
+
+    /// parity: `ServerPlayer.tick`'s `flushDirty`, for every player.
+    void flushAdvancements();
+
+    /// The advancement packets reach native clients only: an older one reads another layout.
+    void sendAdvancementPacket(const player::PlayerSession& player, std::int32_t id,
+                               const std::function<void(wire::io::ByteBuffer&)>& write) const;
 
     VanillaGameData vanillaData_;
     ChunkSimulationView chunkSimulation_;
@@ -287,6 +305,7 @@ private:
     wire::common::placeholder::PlaceholderRegistry placeholders_;
     scoreboard::Scoreboard scoreboard_;
     scoreboard::Teams teams_;
+    std::unique_ptr<world::PlayerAdvancements> playerAdvancements_;
     std::mutex pendingKillsLock_;
     std::vector<PendingKill> pendingKills_;
     std::unique_ptr<timings::TimingsReport> timingsReport_;
@@ -322,6 +341,8 @@ private:
     /// Built the first time a Bedrock client asks for it, and the same for every one after.
     std::optional<bedrock::BedrockRecipeList> bedrockRecipes_;
     std::unique_ptr<NaturalSpawningSystem> spawning_;
+    /// The monster spawner, for the block and the minecart alike.
+    std::unique_ptr<MobSpawnerSystem> mobSpawners_;
     std::unique_ptr<ExperienceOrbSystem> orbs_;
     std::unique_ptr<FishingSystem> fishing_;
     world::maps::MapStorage mapStorage_;
@@ -340,6 +361,8 @@ private:
     std::unique_ptr<EnvironmentTickSystem> environment_;
     std::unique_ptr<MobActionSystem> mobActions_;
     std::unique_ptr<MobTickSystem> mobTicks_;
+    std::unique_ptr<EntityPushSystem> pushes_;
+    std::unique_ptr<VehicleSystem> vehicles_;
     std::unique_ptr<StructureBlockSystem> structureBlocks_;
     std::unique_ptr<ServerListStatus> serverList_;
 

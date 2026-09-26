@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/entity/FlyingPathFinder.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
+#include <basalt/server/runtime/entity/WalkNodeEvaluator.hpp>
 
 #include <doctest.h>
 
@@ -385,4 +386,26 @@ TEST_CASE("a flier's path goes over a wall it cannot pass and ends beside the ta
         over = over || node[0] == 6;
     }
     CHECK(over);
+}
+
+TEST_CASE("a creaking's heart keeps its paths within thirty-two blocks of it") {
+    Loaded loaded;
+    loaded.state.getOrGenerateChunk(2, 0);
+    loaded.floor(0, 8, 44, 8);
+    walkNodes::WalkMob mob{
+        .x = 0.5, .y = 64.0, .z = 8.5, .width = 0.9F, .height = 2.7F, .onGround = true, .maxUpStep = 1.0625F};
+    const Position target{40, 64, 8};
+
+    const walkNodes::Path free = walkNodes::findPath(loaded.state, mob, target, 64.0F, 0, 1024);
+    CHECK(free.reached);
+    REQUIRE_FALSE(free.nodes.empty());
+    CHECK(free.nodes.back().at == target);
+
+    // parity: `HomeNodeEvaluator` asks of every square the mob's box fills, so the block over its feet
+    // at x 32 is already past the thirty-two and the path stops a block short.
+    mob.home = Position{0, 64, 8};
+    const walkNodes::Path bound = walkNodes::findPath(loaded.state, mob, target, 64.0F, 0, 1024);
+    CHECK_FALSE(bound.reached);
+    REQUIRE_FALSE(bound.nodes.empty());
+    CHECK(bound.nodes.back().at == Position{31, 64, 8});
 }

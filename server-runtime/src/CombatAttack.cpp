@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Armadillos.hpp>
@@ -50,6 +51,7 @@
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
+#include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
@@ -72,8 +74,6 @@ using wire::protocol::play::SetEntityDataPacket;
 using wire::protocol::play::SoundSource;
 
 /// parity: `VehicleEntity.hurtServer`: a cart takes ten a point and comes apart past forty.
-constexpr float kVehicleDamagePerPoint = 10.0F;
-constexpr float kVehicleBreakDamage = 40.0F;
 
 constexpr double kSprintKnockback = 0.5;
 constexpr double kSweepSpeedLimit = 0.003;
@@ -388,6 +388,24 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             }
         } else if (entity->type().path() == "chest_minecart") {
             owner_->menus().openEntityChest(*session, *entity);
+        } else if (entity->type().path() == "furnace_minecart" && owner_->options().vehicles != nullptr) {
+            // parity: `MinecartFurnace.interact`: a piece of fuel from that hand, spent unless the
+            // player has infinite materials.
+            const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
+            const std::int32_t slot = mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot()
+                                               : PlayerInventory::kOffhandSlot;
+            const std::optional<storage::StoredItemStack> held = session->inventory.at(slot);
+            const std::optional<Identifier> item = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
+            const world::realItemTags::TagMembers* itemTags = owner_->options().itemTags;
+            const bool fuel = item.has_value() && itemTags != nullptr &&
+                              world::realItemTags::contains(*itemTags, "minecraft:furnace_minecart_fuel", *item);
+            if (owner_->options().vehicles->fuel(*world, *session, *entity, fuel) &&
+                session->gamemode != Gamemode::Creative) {
+                storage::StoredItemStack left = *held;
+                left.count -= 1;
+                session->inventory.set(slot, left.count <= 0 ? std::nullopt : std::optional{left});
+                owner_->sendInventorySlot(slot);
+            }
         }
         return;
     }
@@ -735,63 +753,54 @@ void CombatHandler::mount(PlayerSession& session, ServerEntity& vehicle) {
 
 void CombatHandler::breakVehicle(PlayerSession& session, ServerEntity& vehicle) {
     world::LoadedWorld* world = owner_->currentWorld();
-    if (world == nullptr) {
+    VehicleSystem* vehicles = owner_->options().vehicles;
+    if (world == nullptr || vehicles == nullptr) {
         return;
     }
-    broadcastDamageEvent(vehicle, world::damageTypes::kPlayerAttack, session.entityId());
-    // parity: `VehicleEntity.hurtServer`: ten points of damage a point of the hit, `ENTITY_DAMAGE`,
-    // and past forty it is destroyed; a creative player just takes it away.
+    // parity: `Player.attack` against something not alive: the same swing, no critical, and the
+    // hit handed to `VehicleEntity.hurtServer`.
+    const std::optional<storage::StoredItemStack>& heldStack = session.inventory.heldItem();
     world::RealEnchantments* enchantments = owner_->options().enchantments;
-    const auto hit = static_cast<float>(
-        player::playerAttributes::valueOf(session, "minecraft:attack_damage", [enchantments](const Identifier& id) {
-            return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
-        }));
-    vehicle.vehicleDamage += hit * kVehicleDamagePerPoint;
-    world::vibrations::emit(world->state(), "entity_damage", vehicle.x, vehicle.y, vehicle.z, world->gameTime(),
-                            {.entity = session.uuid()});
-    const bool creative = session.gamemode == Gamemode::Creative;
-    if (!creative && vehicle.vehicleDamage <= kVehicleBreakDamage) {
+    const player::playerAttributes::DefinitionOf definitionOf = [enchantments](const Identifier& id) {
+        return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
+    };
+    const float strength = player::combat::attackStrengthScale(
+        session.ticksSinceSwing, player::playerAttributes::valueOf(session, "minecraft:attack_speed", definitionOf));
+    session.ticksSinceSwing = 0;
+    const auto base =
+        static_cast<float>(player::playerAttributes::valueOf(session, "minecraft:attack_damage", definitionOf));
+    const float enchanted = world::weaponDamage::of(heldStack, base, definitionOf);
+    const player::combat::Swing swing =
+        player::combat::swingOf(strength, base, enchanted, false, session.onGround, session.sprinting);
+    if (swing.damage <= 0.0F) {
         return;
     }
-    if (!creative) {
-        // parity: `VehicleEntity.destroy`: killed, then its item with its name, if entities drop.
-        world::vibrations::emit(world->state(), "entity_die", vehicle.x, vehicle.y, vehicle.z, world->gameTime(),
-                                {.entity = vehicle.uuid()});
-        if (world->gameRules().get(world::gameRules::kEntityDrops)) {
-            wire::nbt::NbtCompound components;
-            if (const wire::nbt::NbtTag* name =
-                    vehicle.sourceNbt.has_value() ? vehicle.sourceNbt->find("CustomName") : nullptr;
-                name != nullptr) {
-                components.set("minecraft:custom_name", *name);
-            }
-            owner_->blockInteraction().spawnDroppedItem(vehicle.type(), 1, vehicle.x, vehicle.y, vehicle.z, 0.0, 0.0,
-                                                        0.0, 40, std::move(components));
-        }
+    if (swing.knockbackAttack) {
+        owner_->broadcastSound(kSoundAttackKnockback, session.x, session.y, session.z, SoundSource::Players);
     }
-    // parity: `AbstractChestBoat.remove` and `AbstractMinecartContainer.remove` spill the chest
-    // whatever the rules say, a creative player's discard included.
-    if ((entity::boats::hasChest(vehicle.type()) || vehicle.type().path() == "chest_minecart") &&
-        vehicle.sourceNbt.has_value()) {
-        random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
-        for (const std::optional<server::world::loot::ItemStack>& slot :
-             world::blockInventory::read(*vehicle.sourceNbt, player::Menu::kChestSize)) {
-            if (slot.has_value() && slot->count > 0) {
-                world::containerDrops::dropItemStack(
-                    world->state(), vehicle.x, vehicle.y, vehicle.z, *slot, random,
-                    [this] { return owner_->options().playerRegistry->allocateEntityId(); });
-            }
-        }
-        static_cast<void>(vehicle.sourceNbt->remove("Items"));
+    const bool landed = vehicles->hurt(*world, vehicle,
+                                       VehicleSystem::Hit{.amount = swing.damage,
+                                                          .type = world::damageTypes::kPlayerAttack,
+                                                          .causeId = session.entityId(),
+                                                          .directId = session.entityId(),
+                                                          .creativePlayer = session.gamemode == Gamemode::Creative});
+    if (!landed) {
+        owner_->broadcastSound(kSoundAttackNoDamage, session.x, session.y, session.z, SoundSource::Players);
+        return;
     }
-    for (const std::int32_t passenger : vehicle.passengerIds) {
-        for (PlayerSession* rider : owner_->playersInSameWorld()) {
-            if (rider->entityId() == passenger) {
-                dismount(*rider);
-                break;
-            }
-        }
+    // parity: `causeExtraKnockback`, a push for something that is not alive.
+    if (swing.knockbackAttack && !vehicle.removed) {
+        const float yaw = session.yaw * (std::numbers::pi_v<float> / 180.0F);
+        vehicle.velocityX += static_cast<double>(-wire::common::mth::sin(yaw) * 0.5F);
+        vehicle.velocityY += 0.1;
+        vehicle.velocityZ += static_cast<double>(wire::common::mth::cos(yaw) * 0.5F);
     }
-    vehicle.removed = true;
+    owner_->broadcastSound(swing.fullStrength ? kSoundAttackStrong : kSoundAttackWeak, session.x, session.y, session.z,
+                           SoundSource::Players);
+    if (enchanted - base > 0.0F) {
+        broadcastAnimation(vehicle.entityId(), wire::protocol::play::AnimatePacket::kMagicCriticalHit);
+    }
+    session.food.addExhaustion(kAttackExhaustion);
 }
 
 void CombatHandler::breakCushion(PlayerSession& session, ServerEntity& cushion) {

@@ -193,3 +193,29 @@ TEST_CASE("a diagonal ray meets the block on the side it reaches first") {
     CHECK(hit->blockZ == 10);
     CHECK(hit->face == registry::BlockFace::North);
 }
+
+TEST_CASE("the eye sees through glass, panes and bars, which still stop what collides") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    const blockRay::ClipViewer viewer{.feetY = 63.0};
+    for (const char* block : {"glass", "glass_pane", "iron_bars"}) {
+        REQUIRE(world.setBlockState(10, 64, 8, stateOf(block)));
+        CHECK(blockRay::clips(world, 8.5, 64.5, 8.5, 12.5, 64.5, 8.5, blockRay::ClipShape::Collider, viewer));
+        CHECK_FALSE(blockRay::clips(world, 8.5, 64.5, 8.5, 12.5, 64.5, 8.5, blockRay::ClipShape::Visual, viewer));
+    }
+    REQUIRE(world.setBlockState(10, 64, 8, stateOf("stone")));
+    CHECK(blockRay::clips(world, 8.5, 64.5, 8.5, 12.5, 64.5, 8.5, blockRay::ClipShape::Visual, viewer));
+}
+
+TEST_CASE("the eye sees a fence at its outline, a block high, and over the rest of its collision") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    REQUIRE(world.setBlockState(10, 64, 8, stateOf("oak_fence")));
+    const blockRay::ClipViewer viewer{.feetY = 64.0};
+
+    // A line that enters the fence's block low and meets the post above it, where only the collision
+    // box still reaches.
+    CHECK(blockRay::clips(world, 9.5, 64.5, 8.5, 11.5, 66.1, 8.5, blockRay::ClipShape::Collider, viewer));
+    CHECK_FALSE(blockRay::clips(world, 9.5, 64.5, 8.5, 11.5, 66.1, 8.5, blockRay::ClipShape::Visual, viewer));
+    CHECK(blockRay::clips(world, 8.5, 64.5, 8.5, 12.5, 64.5, 8.5, blockRay::ClipShape::Visual, viewer));
+}

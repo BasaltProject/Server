@@ -261,8 +261,7 @@ double rideHeight(const ServerEntity& boat) {
                                                  : static_cast<double>(height / 3.0F);
 }
 
-TickResult tick(world::WorldState& world, ServerEntity& boat, bool drivenByPlayer,
-                const std::vector<ServerEntity*>& living, const CannotBoard& cannotBoard) {
+TickResult tick(world::WorldState& world, ServerEntity& boat, bool drivenByPlayer) {
     TickResult result;
     if (boat.boat == nullptr) {
         boat.boat = std::make_shared<BoatState>();
@@ -277,6 +276,9 @@ TickResult tick(world::WorldState& world, ServerEntity& boat, bool drivenByPlaye
     }
     result.ejectAll = boat.boatOutOfControl >= kOutOfControlTicks && !boat.passengerIds.empty();
     // parity: `VehicleEntity`'s damage wears off a point a turn.
+    if (boat.vehicleHurtTime > 0) {
+        --boat.vehicleHurtTime;
+    }
     if (boat.vehicleDamage > 0.0F) {
         boat.vehicleDamage -= 1.0F;
     }
@@ -318,26 +320,6 @@ TickResult tick(world::WorldState& world, ServerEntity& boat, bool drivenByPlaye
             }
         }
         state.paddlePositions[side] = position + kStep;
-    }
-    // parity: the entities in the box grown by a fifth sideways, which a boat nobody drives takes
-    // aboard while it has room: living, narrower than the boat and not in the tag.
-    const Aabb box = boxOf(boat);
-    const Aabb reach{box.minX - 0.2, box.minY + 0.01, box.minZ - 0.2, box.maxX + 0.2, box.maxY - 0.01, box.maxZ + 0.2};
-    for (ServerEntity* other : living) {
-        if (drivenByPlayer || other == &boat || other->removed || other->dying || other->vehicleId.has_value() ||
-            static_cast<std::int32_t>(boat.passengerIds.size()) >= maxPassengers(boat.type())) {
-            continue;
-        }
-        if (!registry::entityAttributes::isLiving(other->type()) || other->width() >= boat.width() ||
-            (cannotBoard && cannotBoard(other->type()))) {
-            continue;
-        }
-        if (!Aabb::of(other->x, other->y, other->z, other->width(), other->height()).intersects(reach)) {
-            continue;
-        }
-        other->vehicleId = boat.entityId();
-        boat.passengerIds.push_back(other->entityId());
-        result.boarded.push_back(other);
     }
     return result;
 }

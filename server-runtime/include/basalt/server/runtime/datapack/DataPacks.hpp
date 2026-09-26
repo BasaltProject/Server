@@ -25,6 +25,9 @@ public:
         DataPackConfig initial;
         /// parity: `--safeMode`, vanilla alone whatever the world saved.
         bool safeMode = false;
+        /// Whether the selection is written back. Off for the fallback after packs failed to load,
+        /// so the world keeps the list its operator chose.
+        bool persist = true;
     };
 
     explicit DataPacks(Options options, wire::common::Logger logger = wire::common::Logger{"Datapacks"});

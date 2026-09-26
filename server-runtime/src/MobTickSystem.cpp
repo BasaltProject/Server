@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/EntityPushSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
@@ -129,6 +130,10 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
                             random::RandomSource& random) {
     entity.idleTicks++;
     entity.tickCount++;
+    // parity: `Entity.baseTick`, the boarding cooldown a dismount leaves.
+    if (entity.boardingCooldown > 0) {
+        --entity.boardingCooldown;
+    }
     // parity: `Entity.baseTick` ends in `Leashable.tickLeash`, before the mob's own `aiStep`.
     actions_->tickLeash(world, entity);
     if (entity.removed) {
@@ -250,6 +255,8 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (entity.type().path() == "parrot") {
         actions_->tickParrot(world, entity);
     }
+    // parity: `LivingEntity.aiStep`'s `pushEntities`, after the travel.
+    pushes_->pushByMob(world, entity);
     actions_->emitMovement(world, entity);
     if (entity.removed) {
         return;

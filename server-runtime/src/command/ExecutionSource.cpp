@@ -62,6 +62,24 @@ void ExecutionSource::report(std::int32_t result) const {
     }
 }
 
+bool ExecutionSource::observesResult() const {
+    if (onResult_) {
+        return true;
+    }
+    const ExecutionSource* inner = base_->asExecution();
+    return inner != nullptr && inner->observesResult();
+}
+
+std::vector<ExecutionSource::OnResult> ExecutionSource::resultCallbacks() const {
+    std::vector<OnResult> callbacks;
+    for (const ExecutionSource* at = this; at != nullptr; at = at->base_->asExecution()) {
+        if (at->onResult_) {
+            callbacks.push_back(at->onResult_);
+        }
+    }
+    return callbacks;
+}
+
 world::LoadedWorld* worldIn(const CommandSource& source, const CommandEnvironment& environment) {
     if (const ExecutionSource* execution = source.asExecution();
         execution != nullptr && execution->world() != nullptr) {

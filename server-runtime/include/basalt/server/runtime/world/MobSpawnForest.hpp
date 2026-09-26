@@ -20,6 +20,9 @@ enum class MobSpawnReason : std::uint8_t {
     Jockey,
     Triggered,
     MobSummoned,
+    Reinforcement,
+    Spawner,
+    TrialSpawner,
 };
 
 /// One mob while the tree of vehicles and passengers is still being assembled.
