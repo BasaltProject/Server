@@ -94,7 +94,8 @@ bool LoadedWorldRef::setGameRule(std::string_view name, std::string_view value) 
     } else {
         std::int32_t number = 0;
         const auto* end = value.data() + value.size();
-        if (std::from_chars(value.data(), end, number).ptr != end) {
+        const auto parsed = std::from_chars(value.data(), end, number);
+        if (parsed.ec != std::errc{} || parsed.ptr != end) {
             return false;
         }
     }
