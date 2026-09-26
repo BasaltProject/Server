@@ -225,6 +225,7 @@ basalt_module(server-runtime-core
         src/BasaltServerFeatures.cpp
         src/EntityPushSystem.cpp
         src/SculkCatalystSystem.cpp
+        src/ConduitSystem.cpp
         src/VehicleBoats.cpp
         src/VehicleMinecarts.cpp
         src/VehicleSystem.cpp
@@ -429,8 +430,8 @@ basalt_module(server-runtime-core
         src/world/PotionEffects.cpp
         src/world/Walls.cpp
         src/world/maps/MapData.cpp
-        src/world/maps/MapDecorationTypes.cpp
         src/world/maps/Cartography.cpp
+        src/world/maps/MapDecorationTypes.cpp
         src/world/maps/MapRenderer.cpp
         src/world/maps/MapStorage.cpp
         src/world/Waxing.cpp

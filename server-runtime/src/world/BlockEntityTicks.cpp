@@ -219,6 +219,13 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             if (entity == nullptr) {
                 continue;
             }
+            // parity: `ConduitBlockEntity.serverTick`.
+            if (path == "conduit") {
+                if (hooks.conduit && hooks.conduit(entity->data(), x, y, z)) {
+                    chunk->markDirty();
+                }
+                continue;
+            }
             // parity: `SpawnerBlock.getTicker`, and `BoundTickingBlockEntity`, which only ticks a block
             // entity whose block is still the one it belongs to.
             if (path == "mob_spawner") {

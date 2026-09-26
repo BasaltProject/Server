@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/runtime/world/Beacons.hpp>
+#include <basalt/server/runtime/world/Conduits.hpp>
 
 #include <doctest.h>
 
@@ -118,4 +119,24 @@ TEST_CASE("the beam reaches its own square inflated sideways and open at the top
     CHECK(beacons::reaches(one, 0, 64, 0, 0.5, 300.0, 0.5));
     CHECK(beacons::reaches(one, 0, 64, 0, 0.5, 44.0, 0.5));
     CHECK_FALSE(beacons::reaches(one, 0, 64, 0, 0.5, 43.0, 0.5));
+}
+
+TEST_CASE("a conduit's frame is the three rings around it, and only under water") {
+    namespace conduits = basalt::server::runtime::world::conduits;
+    const auto water = [](std::int32_t, std::int32_t, std::int32_t) { return true; };
+    const auto everything = [](std::int32_t, std::int32_t, std::int32_t) { return true; };
+
+    // parity: `ConduitBlockEntity.updateShape`: three rings of sixteen share their four corners
+    // pairwise, forty-two in all, which is also the size it starts hunting at.
+    CHECK(conduits::frame(water, everything, 0, 64, 0).size() == conduits::kMinKillSize);
+
+    const auto dryCorner = [](std::int32_t x, std::int32_t y, std::int32_t z) {
+        return !(x == 1 && y == 65 && z == 1);
+    };
+    CHECK(conduits::frame(dryCorner, everything, 0, 64, 0).empty());
+
+    CHECK(conduits::effectRange(16) == 32);
+    CHECK(conduits::effectRange(42) == 96);
+    CHECK(conduits::closerThan({0, 0, 0}, {8, 0, 0}, 8.5));
+    CHECK_FALSE(conduits::closerThan({0, 0, 0}, {8, 0, 0}, 8.0));
 }
