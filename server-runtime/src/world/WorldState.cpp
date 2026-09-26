@@ -13,9 +13,11 @@
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
 #include <basalt/server/world/terrain/decoration/BushSurvival.hpp>
 #include <basalt/server/world/terrain/decoration/tree/LeafDistances.hpp>
+#include <basalt/wire/io/Platform.hpp>
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -54,14 +56,9 @@ WorldState::WorldState(std::vector<Chunk> initialChunks, LoadOrGenerate loadOrGe
     for (const auto& [chunkKey, chunk] : chunksByPos_) {
         pendingDecorations_.addPendingGeneratedEntities(chunk->takeGeneratedEntitiesMatching(
             [](const server::world::ChunkGeneratedEntity& entity) { return becomesLive(entity); }));
-        pendingDecorations_.applyPendingGeneratedBlockWrites(*chunk,
-                                                             PendingChunkDecorations::WritePhase::AfterDecoration);
-        pendingDecorations_.applyPendingGeneratedBlockEntityWrites(*chunk);
-        pendingDecorations_.applyPendingGeneratedBlockTicks(*chunk);
-        pendingDecorations_.deliverGeneratedBlockWrites(chunk->takeGeneratedBlockWrites(), chunk->decorationSequence(),
-                                                        chunkAt);
-        pendingDecorations_.deliverGeneratedBlockEntityWrites(chunk->takeGeneratedBlockEntityWrites(), chunkAt);
-        pendingDecorations_.deliverGeneratedBlockTicks(chunk->takeGeneratedBlockTicks(), chunkAt);
+        PendingChunkDecorations::deliverGeneratedBlockWrites(chunk->takeGeneratedBlockWrites(), chunkAt);
+        PendingChunkDecorations::deliverGeneratedBlockEntityWrites(chunk->takeGeneratedBlockEntityWrites(), chunkAt);
+        PendingChunkDecorations::deliverGeneratedBlockTicks(chunk->takeGeneratedBlockTicks(), chunkAt);
     }
 }
 
@@ -169,7 +166,6 @@ std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks) {
         const std::int32_t chunkZ = chunk->chunkZ();
         if (chunksByPos_.erase(chunkKey) != 0) {
             pendingDecorations_.forgetGeneratedEntities(chunkKey);
-            pendingDecorations_.forgetGeneratedWriteSources(chunkKey);
             sculkSensors_.forgetChunk(chunkX, chunkZ);
             ++removed;
         }
@@ -212,16 +208,21 @@ Chunk& WorldState::getOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) 
         return *loaded;
     }
     std::optional<Chunk> generated = generateDetached(chunkX, chunkZ);
-    if (!generated.has_value()) {
-        // It turned up while this was generating, so the one that arrived is the world's.
-        return *chunkIfLoaded(chunkX, chunkZ);
+    if (generated.has_value()) {
+        return install(std::move(*generated));
     }
-    return install(std::move(*generated));
-}
-
-std::optional<std::int32_t> WorldState::queuedWriteAt(const std::int32_t worldX, const std::int32_t y,
-                                                      const std::int32_t worldZ) const {
-    return pendingDecorations_.queuedWriteAt(worldX, y, worldZ);
+    // It turned up while this was generating, or it is already on its way in from a worker: the
+    // install is a task on the owner, so waiting on the owner's own thread has to run it.
+    Chunk* arrived = chunkIfLoaded(chunkX, chunkZ);
+    while (arrived == nullptr) {
+        sched::Owner* target = installOwner_ != nullptr ? installOwner_ : owner_;
+        if (target != nullptr && target->isCurrent()) {
+            static_cast<void>(target->runPending());
+        }
+        wire::io::sleepFor(std::chrono::milliseconds{1});
+        arrived = chunkIfLoaded(chunkX, chunkZ);
+    }
+    return *arrived;
 }
 
 void WorldState::queueBlockEvent(BlockEvent event) {
@@ -240,8 +241,7 @@ void WorldState::queueBlockEvent(BlockEvent event) {
 
 void WorldState::recordGameEvent(GameEventRecord record) {
     const WorldWriteLock lock{mutex_};
-    std::erase_if(gameEvents_,
-                  [&record](const GameEventRecord& kept) { return kept.gameTime < record.gameTime - 1; });
+    std::erase_if(gameEvents_, [&record](const GameEventRecord& kept) { return kept.gameTime < record.gameTime - 1; });
     gameEvents_.push_back(std::move(record));
 }
 
@@ -281,11 +281,6 @@ std::int32_t WorldState::torchToggleCount(const std::int32_t x, const std::int32
     const WorldReadLock lock{mutex_};
     return static_cast<std::int32_t>(std::ranges::count_if(
         torchToggles_, [x, y, z](const TorchToggle& one) { return one.x == x && one.y == y && one.z == z; }));
-}
-
-void WorldState::applyPendingWritesTo(Chunk& chunk) {
-    const WorldWriteLock lock{mutex_};
-    pendingDecorations_.applyPendingGeneratedBlockWrites(chunk, PendingChunkDecorations::WritePhase::BeforeDecoration);
 }
 
 namespace {
@@ -370,13 +365,9 @@ Chunk& WorldState::installLocked(Chunk chunk) {
 
     Chunk& installed = *chunksByPos_.emplace(chunkKey, std::make_unique<Chunk>(std::move(chunk))).first->second;
     const PendingChunkDecorations::ChunkAt chunkAt = [this](std::int64_t otherKey) { return chunkAtLocked(otherKey); };
-    pendingDecorations_.applyPendingGeneratedBlockWrites(installed,
-                                                         PendingChunkDecorations::WritePhase::AfterDecoration);
-    pendingDecorations_.applyPendingGeneratedBlockEntityWrites(installed);
-    pendingDecorations_.applyPendingGeneratedBlockTicks(installed);
     const std::vector<server::world::ChunkGeneratedBlockWrite> spilledWrites = installed.takeGeneratedBlockWrites();
-    pendingDecorations_.deliverGeneratedBlockWrites(spilledWrites, installed.decorationSequence(), chunkAt);
-    pendingDecorations_.deliverGeneratedBlockEntityWrites(installed.takeGeneratedBlockEntityWrites(), chunkAt);
+    PendingChunkDecorations::deliverGeneratedBlockWrites(spilledWrites, chunkAt);
+    PendingChunkDecorations::deliverGeneratedBlockEntityWrites(installed.takeGeneratedBlockEntityWrites(), chunkAt);
     const auto chunkAtPos = [this](std::int32_t otherX, std::int32_t otherZ) {
         return chunkAtLocked(key(otherX, otherZ));
     };
@@ -395,26 +386,29 @@ Chunk& WorldState::installLocked(Chunk chunk) {
             poi_.noteBlockState(poi::BlockPos{write.x, write.y, write.z}, *now);
         }
     }
-    // The leaf distances settle once every write aimed at this chunk has landed, which is here and
-    // not at the end of its own decoration: a neighbour's leaf arrives later and carries a stale one.
-    const server::world::terrain::decoration::tree::leafDistances::BlockAt worldBlockAt =
-        [this](std::int32_t x, std::int32_t y, std::int32_t z) -> std::int32_t {
-        return blockStateLocked(x, y, z).value_or(0);
-    };
-    server::world::terrain::decoration::tree::leafDistances::settle(installed, worldBlockAt);
-    for (const auto& [dx, dz] :
-         std::array<std::pair<std::int32_t, std::int32_t>, 4>{{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}}) {
-        if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz); neighbour != nullptr) {
-            server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldBlockAt);
+    // parity: a debug world places its grid without updates, so nothing is settled after it.
+    if (settlesGeneration_) {
+        // The leaf distances settle once every write aimed at this chunk has landed, which is here and
+        // not at the end of its own decoration: a neighbour's leaf arrives later and carries a stale one.
+        const server::world::terrain::decoration::tree::leafDistances::BlockAt worldBlockAt =
+            [this](std::int32_t x, std::int32_t y, std::int32_t z) -> std::int32_t {
+            return blockStateLocked(x, y, z).value_or(0);
+        };
+        server::world::terrain::decoration::tree::leafDistances::settle(installed, worldBlockAt);
+        for (const auto& [dx, dz] :
+             std::array<std::pair<std::int32_t, std::int32_t>, 4>{{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}}) {
+            if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz); neighbour != nullptr) {
+                server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldBlockAt);
+            }
         }
+        // parity: the same post-processing takes back a bush the finished light leaves too bright. The
+        // features cannot know it while they run, because nothing has lit the chunk yet.
+        const server::world::terrain::decoration::bushSurvival::NeighbourAt neighbourAt =
+            [&chunkAtPos](std::int32_t otherX, std::int32_t otherZ) -> const server::world::Chunk* {
+            return chunkAtPos(otherX, otherZ);
+        };
+        server::world::terrain::decoration::bushSurvival::settle(installed, neighbourAt, hasSkylight_);
     }
-    // parity: the same post-processing takes back a bush the finished light leaves too bright. The
-    // features cannot know it while they run, because nothing has lit the chunk yet.
-    const server::world::terrain::decoration::bushSurvival::NeighbourAt neighbourAt =
-        [&chunkAtPos](std::int32_t otherX, std::int32_t otherZ) -> const server::world::Chunk* {
-        return chunkAtPos(otherX, otherZ);
-    };
-    server::world::terrain::decoration::bushSurvival::settle(installed, neighbourAt, hasSkylight_);
     // parity: `LevelChunk.postProcessGeneration` ticks every fluid the aquifer marked, which is what
     // starts a lake running. Scheduling is this world's way of saying the same thing.
     for (const server::world::ChunkShapeUpdate& mark : installed.fluidUpdates()) {
@@ -438,7 +432,7 @@ Chunk& WorldState::installLocked(Chunk chunk) {
             redoShapes(*neighbour, chunkAtPos);
         }
     }
-    pendingDecorations_.deliverGeneratedBlockTicks(installed.takeGeneratedBlockTicks(), chunkAt);
+    PendingChunkDecorations::deliverGeneratedBlockTicks(installed.takeGeneratedBlockTicks(), chunkAt);
     chunkVersion_.fetch_add(1);
     entityRegistry_.addPendingEntities(installed.takeSavedEntities());
     pendingDecorations_.addPendingGeneratedEntities(installed.takeGeneratedEntitiesMatching(

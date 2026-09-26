@@ -1,12 +1,7 @@
-#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/PendingChunkDecorations.hpp>
 #include <basalt/server/world/GeneratedBlockWrites.hpp>
-#include <basalt/server/world/terrain/decoration/OreBlockRules.hpp>
-#include <basalt/server/world/terrain/decoration/VegetationBlockRules.hpp>
-#include <basalt/server/world/terrain/decoration/tree/TreeBlockRules.hpp>
 
 #include <cstdint>
-#include <unordered_set>
 #include <utility>
 
 namespace basalt::server::runtime::world {
@@ -18,18 +13,9 @@ using server::world::ChunkGeneratedBlockEntityWrite;
 using server::world::ChunkGeneratedBlockTick;
 using server::world::ChunkGeneratedBlockWrite;
 using server::world::ChunkScheduledTick;
-using server::world::GeneratedBlockWritePolicy;
 
 [[nodiscard]] bool insideChunk(const Chunk& chunk, std::int32_t y) {
     return y >= chunk.verticalBounds().minY() && y <= chunk.verticalBounds().maxY();
-}
-
-using server::world::generatedBlockWrites::BatchWritten;
-using server::world::generatedBlockWrites::cellKey;
-
-bool applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& write, bool sourceGoesOnTop,
-                              const BatchWritten* queued = nullptr) {
-    return server::world::generatedBlockWrites::apply(chunk, write, sourceGoesOnTop, queued);
 }
 
 void applyGeneratedBlockEntityWrite(Chunk& chunk, const ChunkGeneratedBlockEntityWrite& write) {
@@ -75,139 +61,34 @@ void PendingChunkDecorations::addPendingGeneratedEntities(std::vector<server::wo
     }
 }
 
-bool PendingChunkDecorations::sourceMayWrite(const std::int64_t chunkKey, const std::int64_t cellKey,
-                                             const std::uint64_t sourceSequence) {
-    auto& cells = writeSourceByCell_[chunkKey];
-    const auto found = cells.find(cellKey);
-    if (found == cells.end()) {
-        cells.emplace(cellKey, sourceSequence);
-        return true;
-    }
-    // The one that decorated last wins, whichever arrived first. Reading the winner off the cell
-    // instead made the result depend on which generation thread got there first.
-    if (sourceSequence < found->second) {
-        return false;
-    }
-    found->second = sourceSequence;
-    return true;
-}
-
-std::optional<std::int32_t> PendingChunkDecorations::queuedWriteAt(const std::int32_t worldX, const std::int32_t y,
-                                                                   const std::int32_t worldZ) const {
-    const WorldReadLock lock{*mutex_};
-    const auto found = pendingGeneratedBlockWrites_.find(key(worldX >> 4, worldZ >> 4));
-    if (found == pendingGeneratedBlockWrites_.end()) {
-        return std::nullopt;
-    }
-    // Later writes to one cell replace earlier ones, so the last match is what the proto chunk holds.
-    std::optional<std::int32_t> held;
-    for (const QueuedBlockWrite& entry : found->second) {
-        if (entry.write.x == worldX && entry.write.y == y && entry.write.z == worldZ) {
-            held = entry.write.stateId;
-        }
-    }
-    return held;
-}
-
-void PendingChunkDecorations::forgetGeneratedWriteSources(const std::int64_t chunkKey) {
-    writeSourceByCell_.erase(chunkKey);
-}
-
 void PendingChunkDecorations::forgetGeneratedEntities(std::int64_t chunkKey) {
     std::erase_if(generatedEntitiesByKey_, [chunkKey](const auto& entry) { return entry.first.chunkKey == chunkKey; });
 }
 
 void PendingChunkDecorations::deliverGeneratedBlockWrites(std::span<const ChunkGeneratedBlockWrite> writes,
-                                                          const std::uint64_t sourceSequence, const ChunkAt& chunkAt) {
+                                                          const ChunkAt& chunkAt) {
     for (const ChunkGeneratedBlockWrite& write : writes) {
-        const std::int64_t targetKey = key(write.x >> 4, write.z >> 4);
-        Chunk* target = chunkAt(targetKey);
-        if (target == nullptr) {
-            pendingGeneratedBlockWrites_[targetKey].push_back(
-                QueuedBlockWrite{.write = write, .sourceSequence = sourceSequence});
-        } else if (sourceMayWrite(targetKey, cellKey(write), sourceSequence)) {
-            applyGeneratedBlockWrite(*target, write, sourceSequence > target->decorationSequence());
+        if (Chunk* target = chunkAt(key(write.x >> 4, write.z >> 4)); target != nullptr) {
+            static_cast<void>(server::world::generatedBlockWrites::apply(*target, write, true));
         }
-    }
-}
-
-void PendingChunkDecorations::applyPendingGeneratedBlockWrites(Chunk& chunk, const WritePhase phase) {
-    const std::int64_t chunkKey = key(chunk.chunkX(), chunk.chunkZ());
-    const auto found = pendingGeneratedBlockWrites_.find(chunkKey);
-    if (found == pendingGeneratedBlockWrites_.end()) {
-        return;
-    }
-    const std::vector<QueuedBlockWrite> writes = std::move(found->second);
-    pendingGeneratedBlockWrites_.erase(found);
-    std::vector<QueuedBlockWrite> notYet;
-    BatchWritten queued;
-    for (const QueuedBlockWrite& entry : writes) {
-        const bool onTop = entry.sourceSequence > chunk.decorationSequence();
-        // What a later chunk wrote has to wait for this one to decorate, or its decoration would
-        // cover a write that in vanilla went on last.
-        if (phase == WritePhase::BeforeDecoration && onTop) {
-            notYet.push_back(entry);
-            continue;
-        }
-        if (!sourceMayWrite(chunkKey, cellKey(entry.write), entry.sourceSequence)) {
-            continue;
-        }
-        if (applyGeneratedBlockWrite(chunk, entry.write, onTop, &queued)) {
-            queued.insert(cellKey(entry.write));
-        }
-    }
-    if (!notYet.empty()) {
-        pendingGeneratedBlockWrites_[chunkKey] = std::move(notYet);
     }
 }
 
 void PendingChunkDecorations::deliverGeneratedBlockEntityWrites(std::span<const ChunkGeneratedBlockEntityWrite> writes,
                                                                 const ChunkAt& chunkAt) {
     for (const ChunkGeneratedBlockEntityWrite& write : writes) {
-        const std::int64_t targetKey = key(write.x >> 4, write.z >> 4);
-        Chunk* target = chunkAt(targetKey);
-        if (target == nullptr) {
-            pendingGeneratedBlockEntityWrites_[targetKey].push_back(write);
-        } else {
+        if (Chunk* target = chunkAt(key(write.x >> 4, write.z >> 4)); target != nullptr) {
             applyGeneratedBlockEntityWrite(*target, write);
         }
-    }
-}
-
-void PendingChunkDecorations::applyPendingGeneratedBlockEntityWrites(Chunk& chunk) {
-    const auto found = pendingGeneratedBlockEntityWrites_.find(key(chunk.chunkX(), chunk.chunkZ()));
-    if (found == pendingGeneratedBlockEntityWrites_.end()) {
-        return;
-    }
-    const std::vector<ChunkGeneratedBlockEntityWrite> writes = std::move(found->second);
-    pendingGeneratedBlockEntityWrites_.erase(found);
-    for (const ChunkGeneratedBlockEntityWrite& write : writes) {
-        applyGeneratedBlockEntityWrite(chunk, write);
     }
 }
 
 void PendingChunkDecorations::deliverGeneratedBlockTicks(std::span<const ChunkGeneratedBlockTick> ticks,
                                                          const ChunkAt& chunkAt) {
     for (const ChunkGeneratedBlockTick& tick : ticks) {
-        const std::int64_t targetKey = key(tick.x >> 4, tick.z >> 4);
-        Chunk* target = chunkAt(targetKey);
-        if (target == nullptr) {
-            pendingGeneratedBlockTicks_[targetKey].push_back(tick);
-        } else {
+        if (Chunk* target = chunkAt(key(tick.x >> 4, tick.z >> 4)); target != nullptr) {
             applyGeneratedBlockTick(*target, tick);
         }
-    }
-}
-
-void PendingChunkDecorations::applyPendingGeneratedBlockTicks(Chunk& chunk) {
-    const auto found = pendingGeneratedBlockTicks_.find(key(chunk.chunkX(), chunk.chunkZ()));
-    if (found == pendingGeneratedBlockTicks_.end()) {
-        return;
-    }
-    const std::vector<ChunkGeneratedBlockTick> ticks = std::move(found->second);
-    pendingGeneratedBlockTicks_.erase(found);
-    for (const ChunkGeneratedBlockTick& tick : ticks) {
-        applyGeneratedBlockTick(chunk, tick);
     }
 }
 

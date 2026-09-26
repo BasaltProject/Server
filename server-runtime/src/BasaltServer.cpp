@@ -207,10 +207,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         logger_.info([world] {
             return "Loading world '" + world->name() + "' (seed " + std::to_string(world->metadata().seed) + ").";
         });
-        world->warmSpawnArea(kSpawnRadiusChunks);
-        // Not parity: the fight builds it the first time a player is in the End, not on load. See
-        // the note on `endPodium`.
-        if (world->declaration().dimension == config::WorldDimension::End) {
+        world->warmSpawnArea();
+        // parity: the fight builds the podium once a player is in the End with the arena loaded.
+        // Only an operator who asked for it open gets it at startup, which is the divergence.
+        if (world->declaration().dimension == config::WorldDimension::End && world->settings().openEndExitPortal) {
             const std::optional<std::array<std::int32_t, 3>> origin =
                 world::endPodium::ensure(world->state(), world->settings().openEndExitPortal);
             if (origin.has_value()) {
@@ -607,6 +607,31 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer) {
                     endFight_->crystalDestroyed(world, watchers, crystal, byPlayer);
+                },
+            .enchantmentDefinition =
+                [this](const wire::common::Identifier& id) { return vanillaData_.enchantments.definitionOf(id); },
+            .summonLightning =
+                [this](world::LoadedWorld& world, double x, double y, double z, std::optional<std::int32_t> cause) {
+                    static_cast<void>(
+                        LightningBoltSystem::spawn(world, x, y, z, playerRegistry_.allocateEntityId(), cause));
+                },
+            // parity: `Entity.spawnAtLocation`, a fresh `ItemEntity` with its little hop and ten
+            // ticks before anyone may take it.
+            .dropItem =
+                [this](world::LoadedWorld& world, double x, double y, double z,
+                       const server::world::loot::ItemStack& stack) {
+                    world.state().spawnItem(world::DroppedItem{.entityId = playerRegistry_.allocateEntityId(),
+                                                               .uuid = wire::common::Uuid::random(),
+                                                               .item = stack.item,
+                                                               .count = stack.count,
+                                                               .x = x,
+                                                               .y = y,
+                                                               .z = z,
+                                                               .velocityX = (scratchDouble() * 0.2) - 0.1,
+                                                               .velocityY = 0.2,
+                                                               .velocityZ = (scratchDouble() * 0.2) - 0.1,
+                                                               .pickupDelay = world::kSpawnedPickupDelay,
+                                                               .components = stack.components});
                 }});
     fireworks_ = std::make_unique<FireworkSystem>(playerRegistry_, *combat_,
                                                   FireworkSystem::Options{.nextSeed = [] { return scratchSeed(); }});

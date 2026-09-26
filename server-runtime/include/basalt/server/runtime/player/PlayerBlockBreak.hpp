@@ -132,6 +132,9 @@ void wearHeldItemOnBreak(const BreakContext& context, PlayerSession& player, con
 /// parity: `ItemStack.hurtAndBreak` on the held item, for a tool used on something other than a block.
 void wearHeldItem(const BreakContext& context, PlayerSession& player, std::int32_t cost);
 
+/// The same for the stack in a hand slot, the main hand or the off hand.
+void wearItemIn(const BreakContext& context, PlayerSession& player, std::int32_t slot, std::int32_t cost);
+
 /// Takes a block away as a player breaking it does: the loot, the neighbours, the statistics and
 /// everything that hears it go. Answers whether the block actually went.
 bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,

@@ -99,6 +99,10 @@ void CombatSystem::emitVibration(world::LoadedWorld& world, std::string_view eve
 void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                   const std::vector<ServerEntity*>& living, ServerEntity& entity,
                                   const entity::projectiles::Kind& kind) {
+    const bool trident = kind.type.path() == "trident";
+    if (trident && tridentReturns(world, watchers, living, entity)) {
+        return;
+    }
     const double fromX = entity.x;
     const double fromY = entity.y;
     const double fromZ = entity.z;
@@ -280,7 +284,8 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     if (kind.sticks) {
         ArrowHit struck = ArrowHit::Missed;
         do {
-            struck = hitEntityAlong(world, watchers, living, entity, fromX, fromY, fromZ);
+            struck = trident ? tridentHitEntity(world, watchers, living, entity, fromX, fromY, fromZ)
+                             : hitEntityAlong(world, watchers, living, entity, fromX, fromY, fromZ);
         } while (struck == ArrowHit::Pierced);
         if (struck == ArrowHit::Stopped) {
             return;
@@ -291,6 +296,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     }
     // parity: `AbstractArrow.onHitBlock` sounds, forgets its piercing once it sticks, and keeps the
     // plain arrow's sound after.
+    if (trident) {
+        channelOnBlock(world, watchers, entity, *hit);
+    }
     if (kind.sticks) {
         arrowHitSound(watchers, entity);
         entity.arrowLanded = true;

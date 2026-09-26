@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/VillagerWorldSystem.hpp>
 #include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/Leashes.hpp>
 #include <basalt/server/runtime/entity/MobConversions.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
@@ -271,6 +272,30 @@ public:
 
     /// parity: the same for every player, whose footsteps and strokes everybody else hears.
     void emitPlayerMovement(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers);
+
+    /// parity: `Leashable.tickLeash`: the holder found again, the rope snapping, pulling or walked.
+    void tickLeash(world::LoadedWorld& world, entity::ServerEntity& leashed);
+
+    /// What a click did with a lead, shears or neither.
+    enum class LeashUse : std::uint8_t { Pass, Done, ConsumeOne, DamageShears };
+
+    /// parity: `Entity.interact`'s leash half, before the mob's own `mobInteract`.
+    LeashUse useOnLeashable(world::LoadedWorld& world, player::PlayerSession& player, entity::ServerEntity& entity,
+                            bool holdingLead, bool holdingShears);
+
+    /// parity: `LeashFenceKnotEntity.interact`.
+    LeashUse useOnKnot(world::LoadedWorld& world, player::PlayerSession& player, entity::ServerEntity& knot,
+                       bool holdingShears);
+
+    /// parity: `LeadItem.bindPlayerMobs`, the player's mobs tied to a knot on this fence.
+    bool bindPlayerMobs(world::LoadedWorld& world, player::PlayerSession& player,
+                        const std::array<std::int32_t, 3>& fence);
+
+    /// parity: `Entity.dropAllLeashConnections(null)` for a player. Answers whether any was held.
+    bool dropAllLeashes(world::LoadedWorld& world, player::PlayerSession& player);
+
+    /// parity: `Leashable.dropLeash` and `removeLeash`, the lead dropped as an item or not.
+    void dropLeash(world::LoadedWorld& world, entity::ServerEntity& leashed, bool dropLead);
 
     /// parity: `Camel.tickRidden`, the rider's forward key standing it up.
     void camelRidden(world::LoadedWorld& world, entity::ServerEntity& camel, const player::PlayerSession& rider);
@@ -788,6 +813,19 @@ private:
     /// parity: `Parrot.imitateNearbyMobs` from a box at `x, y, z`. Answers whether it made a sound.
     bool imitateNearbyMobs(world::LoadedWorld& world, double x, double y, double z, double width, double height,
                            wire::protocol::play::SoundSource source, random::RandomSource& random);
+    [[nodiscard]] player::PlayerSession* playerIn(world::LoadedWorld& world, std::int32_t entityId);
+    void leashSound(world::LoadedWorld& world, std::string_view sound, double x, double y, double z);
+    void setLeashedTo(world::LoadedWorld& world, entity::ServerEntity& leashed, std::int32_t holderId);
+    [[nodiscard]] std::vector<entity::ServerEntity*>
+    leashedTo(world::LoadedWorld& world, const entity::ServerEntity& holder, double x, double y, double z);
+    [[nodiscard]] std::vector<entity::ServerEntity*> leashedToId(world::LoadedWorld& world, std::int32_t holderId,
+                                                                 double x, double y, double z);
+    [[nodiscard]] bool canBeLeashed(const entity::ServerEntity& entity) const;
+    [[nodiscard]] bool canHaveLeashAttachedTo(const entity::ServerEntity& leashed, const entity::leashes::Body& holder,
+                                              std::int32_t holderId) const;
+    entity::ServerEntity* knotAt(world::LoadedWorld& world, const std::array<std::int32_t, 3>& fence, bool create);
+    /// parity: `shearOffAllLeashConnections`.
+    bool cutLeashes(world::LoadedWorld& world, entity::ServerEntity& entity, const player::PlayerSession* player);
     /// parity: `LivingEntity.checkFallDamage` on landing: the dust, `fallOn` and `causeFallDamage`.
     void landMob(world::LoadedWorld& world, entity::ServerEntity& mob);
     /// parity: `walkingStepSound` on the square at `at`.

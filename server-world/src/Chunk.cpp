@@ -5,6 +5,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/terrain/ProtoRegion.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -460,6 +461,9 @@ std::int32_t Chunk::decorationBlockStateId(std::int32_t worldX, std::int32_t y, 
     if ((worldX >> 4) == chunkX_ && (worldZ >> 4) == chunkZ_) {
         return blockStateId(worldX & 15, y, worldZ & 15);
     }
+    if (region_ != nullptr) {
+        return region_->blockStateIdAt(worldX, y, worldZ).value_or(registry::blocks::air().stateId);
+    }
     for (const ChunkGeneratedBlockWrite& write : generatedBlockWrites_) {
         if (write.x == worldX && write.y == y && write.z == worldZ) {
             return write.stateId;
@@ -495,6 +499,17 @@ void Chunk::setDecorationBlockStateId(std::int32_t worldX, std::int32_t y, std::
         return;
     }
 
+    if (region_ != nullptr) {
+        const std::int32_t oldStateId =
+            region_->blockStateIdAt(worldX, y, worldZ).value_or(registry::blocks::air().stateId);
+        if (oldStateId != stateId) {
+            region_->setBlockStateId(worldX, y, worldZ, stateId);
+        }
+        if (blockWriteObserver_) {
+            blockWriteObserver_(worldX - chunkX_ * 16, y, worldZ - chunkZ_ * 16, oldStateId, stateId);
+        }
+        return;
+    }
     const std::int32_t expected = expectedExternalStateId.value_or(registry::blocks::air().stateId);
     ChunkGeneratedBlockWrite* previous = findWrite(generatedBlockWrites_, worldX, y, worldZ);
     // What is really out there beats what the caller assumed: a feature replacing stone rather than
@@ -544,6 +559,10 @@ void Chunk::setDecorationBlockEntity(std::int32_t worldX, std::int32_t y, std::i
         setBlockEntity(ChunkBlockEntity{worldX & 15, y, worldZ & 15, std::move(type), std::move(data)});
         return;
     }
+    if (region_ != nullptr) {
+        region_->setBlockEntity(worldX, y, worldZ, type, std::move(data));
+        return;
+    }
     ChunkGeneratedBlockEntityWrite write{.x = worldX,
                                          .y = y,
                                          .z = worldZ,
@@ -572,6 +591,10 @@ void Chunk::scheduleDecorationBlockTick(std::int32_t worldX, std::int32_t y, std
         if (blockStateId(worldX & 15, y, worldZ & 15) == expectedStateId) {
             scheduleBlockTick(ChunkScheduledTick{std::move(type), worldX & 15, y, worldZ & 15, delay, priority});
         }
+        return;
+    }
+    if (region_ != nullptr) {
+        region_->scheduleBlockTick(worldX, y, worldZ, expectedStateId, std::move(type), delay, priority);
         return;
     }
     ChunkGeneratedBlockTick tick{.x = worldX,
@@ -607,6 +630,12 @@ Chunk::ExternalStateScope::ExternalStateScope(Chunk& chunk, Reader reader)
 }
 
 Chunk::ExternalStateScope::~ExternalStateScope() { chunk_->externalDecorationState_ = std::move(previous_); }
+
+Chunk::RegionScope::RegionScope(Chunk& chunk, terrain::ProtoRegion& region) : chunk_(&chunk), previous_(chunk.region_) {
+    chunk_->region_ = &region;
+}
+
+Chunk::RegionScope::~RegionScope() { chunk_->region_ = previous_; }
 
 Chunk::WritePolicyScope::WritePolicyScope(Chunk& chunk, GeneratedBlockWritePolicy policy)
     : chunk_(&chunk), previous_(chunk.generatedBlockWritePolicy_) {

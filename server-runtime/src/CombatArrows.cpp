@@ -256,7 +256,10 @@ void CombatSystem::arrowHitSound(const std::vector<PlayerSession*>& watchers, co
     }
     const bool crossbow = !arrow.arrowLanded && arrow.firedFromWeapon.has_value() &&
                           *arrow.firedFromWeapon == wire::common::Identifier::vanilla("crossbow");
-    const std::string sound = crossbow ? "item.crossbow.hit" : "entity.arrow.hit";
+    // parity: `ThrownTrident.getDefaultHitGroundSoundEvent`.
+    const std::string sound = arrow.type().path() == "trident" ? "item.trident.hit_ground"
+                              : crossbow                       ? "item.crossbow.hit"
+                                                               : "entity.arrow.hit";
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     const float pitch = 1.2F / ((random.nextFloat() * 0.2F) + 0.9F);
     for (PlayerSession* watcher : watchers) {

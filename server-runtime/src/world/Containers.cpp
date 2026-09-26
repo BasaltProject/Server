@@ -20,8 +20,8 @@
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <algorithm>
-#include <cmath>
 #include <charconv>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <numeric>
@@ -298,7 +298,8 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
             return 0;
         }
         const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
-        const server::world::ChunkBlockEntity* heart = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        const server::world::ChunkBlockEntity* heart =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
         const std::optional<wire::common::Uuid> bound =
             heart == nullptr ? std::nullopt : entity::creakings::heartCreaking(heart->data());
         if (!bound.has_value()) {

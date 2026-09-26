@@ -65,6 +65,8 @@ using RegistryHolder = wire::protocol::play::RegistryHolder;
 /// `AbstractCubeMob.ID_SIZE`: two `AgeableMob` fields follow the common index 16.
 constexpr std::uint8_t kCubeSizeDataIndex = 18;
 constexpr std::uint8_t kAbstractHorseFlagsDataIndex = 18;
+constexpr std::uint8_t kTridentLoyaltyDataIndex = 11;
+constexpr std::uint8_t kTridentFoilDataIndex = 12;
 constexpr std::uint8_t kMobFlagsDataIndex = 15;
 constexpr std::uint8_t kAirSupplyDataIndex = 1;
 constexpr std::int32_t kDefaultAirSupply = 300;
@@ -586,7 +588,8 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
     }
     if (wolfAngerEnd.has_value() && (previous == nullptr || previous->wolfAngerEnd != wolfAngerEnd) &&
         (previous != nullptr || *wolfAngerEnd != -1)) {
-        entries.push_back(Entry{.index = kWolfAngerEndDataIndex, .value = SetEntityDataPacket::LongValue{*wolfAngerEnd}});
+        entries.push_back(
+            Entry{.index = kWolfAngerEndDataIndex, .value = SetEntityDataPacket::LongValue{*wolfAngerEnd}});
     }
     if (endermanCreepy.has_value() && (previous == nullptr || previous->endermanCreepy != endermanCreepy) &&
         (previous != nullptr || *endermanCreepy)) {
@@ -635,6 +638,15 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         if (now.has_value() && (previous == nullptr ? *now == unusual : before != now)) {
             entries.push_back(Entry{.index = index, .value = SetEntityDataPacket::BoolValue{.value = *now}});
         }
+    }
+    if (tridentLoyalty.has_value() &&
+        (previous == nullptr ? *tridentLoyalty != 0 : previous->tridentLoyalty != tridentLoyalty)) {
+        entries.push_back(Entry{.index = kTridentLoyaltyDataIndex,
+                                .value = SetEntityDataPacket::ByteValue{.value = *tridentLoyalty}});
+    }
+    if (tridentFoil.has_value() && (previous == nullptr ? *tridentFoil : previous->tridentFoil != tridentFoil)) {
+        entries.push_back(
+            Entry{.index = kTridentFoilDataIndex, .value = SetEntityDataPacket::BoolValue{.value = *tridentFoil}});
     }
     if (creakingHome.has_value() && (previous == nullptr || previous->creakingHome != creakingHome) &&
         (previous != nullptr || creakingHome->has_value())) {
@@ -918,6 +930,10 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
             }
         }
     }
+    if (entity.type().path() == "trident") {
+        live.tridentLoyalty = std::max<std::int8_t>(entity.tridentLoyalty, 0);
+        live.tridentFoil = entity.tridentFoil;
+    }
     if (creakings::isCreaking(entity.type())) {
         const creakings::CreakingState* state = entity.creaking.get();
         live.creakingCanMove = state == nullptr || state->canMove;
@@ -925,8 +941,8 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         live.creakingTearingDown = state != nullptr && state->tearingDown;
         live.creakingHome = std::nullopt;
         if (state != nullptr && state->home.has_value()) {
-            live.creakingHome = wire::protocol::play::BlockPos{
-                .x = (*state->home)[0], .y = (*state->home)[1], .z = (*state->home)[2]};
+            live.creakingHome =
+                wire::protocol::play::BlockPos{.x = (*state->home)[0], .y = (*state->home)[1], .z = (*state->home)[2]};
         }
     }
     if (world::endCrystals::isCrystal(entity.type())) {

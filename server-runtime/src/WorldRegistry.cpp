@@ -22,7 +22,8 @@ namespace {
 }
 
 [[nodiscard]] bool isNormal(config::WorldType type) {
-    return type == config::WorldType::Normal || type == config::WorldType::Amplified;
+    return type == config::WorldType::Normal || type == config::WorldType::Amplified ||
+           type == config::WorldType::LargeBiomes;
 }
 
 } // namespace
@@ -83,14 +84,8 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         options.structureLocators = built.locators;
         options.strongholdGenerator = built.strongholds;
         options.spawnChunkFinder = built.spawnChunk;
-        if (built.generate) {
-            options.normalGenerator =
-                [generate = built.generate](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
-                                            std::string_view difficulty,
-                                            const std::function<void(server::world::Chunk&)>& beforeDecoration) {
-                    return generate(chunkX, chunkZ, gameTime, std::string{difficulty}, beforeDecoration);
-                };
-        }
+        options.pipeline = built.pipeline;
+        options.spawnMobs = built.spawnMobs;
         built_.insert_or_assign(declaration.name, std::move(built));
     }
     std::unique_ptr<world::LoadedWorld> world =
@@ -125,20 +120,6 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
     }
     if (options_.jukeboxes != nullptr) {
         world->state().setSongOutput([songs = options_.jukeboxes](const std::string& song) { return songs->of(song); });
-    }
-    // parity: a feature reading past the chunk edge has to see what another chunk already wrote
-    // there. In vanilla that write is in the neighbour's proto chunk; here it waits in the queue,
-    // so the neighbour view is taught to look in it first.
-    if (const auto entry = built_.find(declaration.name); entry != built_.end() && entry->second.useQueuedWrites) {
-        entry->second.useQueuedWrites([holder = world.get()](std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
-            return holder->queuedWriteAt(worldX, y, worldZ);
-        });
-        if (entry->second.useInstalledChunks) {
-            entry->second.useInstalledChunks(
-                [holder = world.get()](std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
-                    return holder->installedBlockAt(worldX, y, worldZ);
-                });
-        }
     }
     return world;
 }

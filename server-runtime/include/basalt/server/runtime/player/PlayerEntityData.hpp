@@ -31,6 +31,7 @@ struct PlayerEntityData {
 
     static constexpr std::uint8_t kLivingFlagUsingItem = 0x01;
     static constexpr std::uint8_t kLivingFlagOffhand = 0x02;
+    static constexpr std::uint8_t kLivingFlagSpinAttack = 0x04;
 
     std::uint8_t sharedFlags = 0;
     std::int32_t airSupply = 300;

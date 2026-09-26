@@ -14,8 +14,8 @@ namespace {
 using wire::common::placeholder::lowercaseAscii;
 using wire::common::toml::TomlTable;
 
-constexpr std::array<WorldType, 4> kWorldTypes{WorldType::Normal, WorldType::Flat, WorldType::Void,
-                                               WorldType::Amplified};
+constexpr std::array<WorldType, 6> kWorldTypes{WorldType::Normal,    WorldType::Flat,        WorldType::Void,
+                                               WorldType::Amplified, WorldType::LargeBiomes, WorldType::Debug};
 constexpr std::array<WorldDimension, 3> kDimensions{WorldDimension::Overworld, WorldDimension::Nether,
                                                     WorldDimension::End};
 
@@ -65,6 +65,10 @@ std::string_view worldTypeName(WorldType type) noexcept {
         return "void";
     case WorldType::Amplified:
         return "amplified";
+    case WorldType::LargeBiomes:
+        return "large_biomes";
+    case WorldType::Debug:
+        return "debug";
     case WorldType::Normal:
     default:
         return "normal";
@@ -285,11 +289,6 @@ std::expected<WorldsConfig, std::string> WorldsConfig::load(const ConfigDirector
             if (!type.has_value()) {
                 return std::unexpected("World '" + name + "' declares an unknown type '" + typeName +
                                        "'. Known types: " + everyWorldTypeName() + ".");
-            }
-            if (!isImplemented(*type)) {
-                return std::unexpected("World '" + name + "' declares type '" + typeName +
-                                       "', which is not implemented yet. It needs vanilla's amplified density "
-                                       "functions, which this build does not port; use \"normal\" until it does.");
             }
             const std::string dimensionSpelling{table->string("dimension").value_or("overworld")};
             const std::optional<WorldDimension> dimension = dimensionByName(dimensionSpelling);

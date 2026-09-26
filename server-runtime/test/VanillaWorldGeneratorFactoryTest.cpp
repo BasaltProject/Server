@@ -18,20 +18,20 @@ TEST_CASE("a dimension without the jar's worldgen data says so instead of genera
         WorldMetadata{});
     // A dimension's shape is the jar's own noise settings. Answering an unset generator is what
     // lets the caller fall back; a generator built on missing noise would crash on its first chunk.
-    CHECK_FALSE(overworld.generate);
+    CHECK_FALSE(overworld.pipeline.terrain);
     CHECK(overworld.villages == nullptr);
 
     const VanillaWorldGeneratorFactory::Generators nether = factory.create(
         config::WorldDeclaration{
             .name = "nether", .dimension = config::WorldDimension::Nether, .type = config::WorldType::Normal},
         WorldMetadata{});
-    CHECK_FALSE(nether.generate);
+    CHECK_FALSE(nether.pipeline.terrain);
 
     const VanillaWorldGeneratorFactory::Generators end = factory.create(
         config::WorldDeclaration{
             .name = "end", .dimension = config::WorldDimension::End, .type = config::WorldType::Normal},
         WorldMetadata{});
-    CHECK_FALSE(end.generate);
+    CHECK_FALSE(end.pipeline.terrain);
 
     // Nothing was built, so nothing is cached.
     CHECK(factory.cacheStats().assemblies == 0);

@@ -53,9 +53,7 @@ struct TerrainStructureGenerators {
 /// Chunk shape from an `NoiseRouter`'s final density through `DensityChunkSampler`, then
 /// surface rules, structures and independently seeded decoration dispatchers, in that order.
 /// parity: `ChunkGenerator.applyBiomeDecoration`, whose decoration seed is the plain world seed.
-///
-/// Build the router once per world: it is dozens of nested nodes. Gap: decoration only for the
-/// biomes ported so far.
+/// Build the router once per world. Gap: decoration only for the biomes ported so far.
 namespace realTerrainGenerator {
 
 /// A chunk carrying everything a configured feature may read before decoration runs.
@@ -98,17 +96,15 @@ private:
 void decorate(GeneratedTerrain& terrain, std::int64_t seed = 0, const NeighbourTerrain* neighbours = nullptr,
               const TerrainStructureGenerators& generators = {}, const structure::TemplateLoader& templates = nullptr);
 
-/// Run on the finished terrain, before its decoration. parity: vanilla writes a feature that crosses
-/// a chunk edge straight into the neighbour's proto chunk, so a chunk always decorates on top of what
-/// its neighbours already left there. This is where a write we had to queue gets the same standing.
-using BeforeDecoration = std::function<void(Chunk&)>;
+/// A chunk read back from disk before it decorated, wrapped so it can decorate now. The biome cache
+/// starts empty, which changes nothing but speed.
+[[nodiscard]] GeneratedTerrain adopt(const surface::SurfaceRuleEnvironment& environment, Chunk chunk);
 
+/// One chunk on its own, decorated without neighbours: whatever it writes past its edge is deferred.
 [[nodiscard]] Chunk generate(const NoiseRouter& router, const surface::SurfaceRuleEnvironment& environment,
                              std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed = 0,
                              const TerrainStructureGenerators& generators = {},
-                             NeighbourTerrainCache* neighbours = nullptr,
-                             const structure::TemplateLoader& templates = nullptr,
-                             const BeforeDecoration& beforeDecoration = {});
+                             const structure::TemplateLoader& templates = nullptr);
 
 } // namespace realTerrainGenerator
 

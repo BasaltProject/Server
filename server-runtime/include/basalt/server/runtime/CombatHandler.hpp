@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
+#include <basalt/server/runtime/player/PlayerSpear.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
@@ -13,6 +14,8 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace basalt::server::runtime::player {
 class PlayerSession;
@@ -64,6 +67,22 @@ public:
 
     void handleInteract(const wire::protocol::play::InteractPacket& interact);
 
+    /// parity: `checkAutoSpinAttack` for a riptide, on the move the client reports: the first living
+    /// thing in the way takes the spin's blow and ends it.
+    void spinAttack(player::PlayerSession& session, double toX, double toY, double toZ);
+
+    /// parity: the `STAB` of `handlePlayerAction`: a spear's jab along the look.
+    void jab();
+
+    /// parity: `Item.use` for a `kinetic_weapon`: the spear held up in that hand slot to charge.
+    bool startCharge(player::PlayerSession& session, std::int32_t slot);
+
+    /// parity: `KineticWeapon.damageEntities`, one tick of the charge.
+    void tickCharge(player::PlayerSession& session);
+
+    /// parity: `stopUsingItem`, which forgets whoever the charge struck.
+    void stopCharge();
+
     /// parity: `ServerGamePacketListenerImpl.handleMoveVehicle`: the driver's client moves the vehicle
     /// and the server takes it, unless it went too far at once.
     void handleMoveVehicle(const wire::protocol::play::ServerboundMoveVehiclePacket& packet);
@@ -108,6 +127,19 @@ private:
     void bounceOn(player::PlayerSession& session, world::LoadedWorld& world, double landingY);
 
     void applyFallDamage(player::PlayerSession& session, double landingY);
+
+    /// Whoever a spear may reach from here, mobs and, with pvp on, players.
+    [[nodiscard]] std::vector<player::spear::Candidate> spearTargets(const player::PlayerSession& session,
+                                                                     world::LoadedWorld& world);
+
+    /// parity: `Player.stabAttack`; `strength` is the swing's charge for a jab and nothing for a charge.
+    bool stab(player::PlayerSession& session, world::LoadedWorld& world, std::int32_t targetId, std::int32_t slot,
+              float base, bool dealsDamage, bool dealsKnockback, bool dismounts, std::optional<float> strength);
+
+    /// parity: `LivingEntity.postPiercingAttack`, which is lunge.
+    void postPiercingAttack(player::PlayerSession& session, world::LoadedWorld& world, std::int32_t slot);
+
+    void soundAroundExceptSelf(const player::PlayerSession& session, std::string_view sound);
 
     /// parity: `Player.attack`'s sweep, which hits what is standing beside what was hit.
     void sweepAround(player::PlayerSession& session, const entity::ServerEntity& target, world::LoadedWorld& world,
@@ -180,6 +212,13 @@ private:
     Options options_;
     /// parity: `vehiclePositionLastResetAt`, the turn a vehicle this player does not drive was last put back.
     std::int64_t vehicleResetAt_ = 0;
+    /// Whether the attack under way is a riptide's, which reaches anywhere and hits for the spin.
+    bool spinning_ = false;
+    /// The hand slot a spear is being charged from, the ticks of it so far, and who it struck when.
+    /// parity: `useItemRemaining` and `recentKineticEnemies`.
+    std::optional<std::int32_t> chargeSlot_;
+    std::int32_t chargeTicks_ = 0;
+    std::vector<std::pair<std::int32_t, std::int64_t>> stabbed_;
 };
 
 } // namespace basalt::server::runtime

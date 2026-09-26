@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace basalt::server::random {
@@ -37,6 +38,11 @@ public:
     void tick(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
               const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& bolt,
               random::RandomSource& random);
+
+    /// A bolt put in the world at a point. `cause` is the player a channeled one answers to, and a
+    /// visual one hurts and burns nothing. parity: `LightningBolt` with `setCause` and `setVisualOnly`.
+    static entity::ServerEntity* spawn(world::LoadedWorld& world, double x, double y, double z, std::int32_t entityId,
+                                       std::optional<std::int32_t> cause = std::nullopt, bool visualOnly = false);
 
 private:
     void hitAround(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,

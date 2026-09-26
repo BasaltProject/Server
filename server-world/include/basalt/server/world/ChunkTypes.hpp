@@ -25,12 +25,13 @@ enum class GeneratedBlockWritePolicy : std::uint8_t {
     Geode,
 };
 
-/// One block entity of a chunk: where it sits, what kind it is, and the NBT it carries.
-///
-/// The type is the *block entity type*, not the block. Callers may hand in either, since a block is
-/// what they have: a block that owns a differently named type is translated on construction rather
-/// than at each of the twenty places that build one. Getting that wrong left a copper chest without
-/// a protocol id, so it never reached the client and the block rendered as nothing.
+/// How far a chunk got through generation. parity: `ChunkStatus`, reduced to the three stages a chunk
+/// is kept at: its terrain done, decorated (`features` to `spawn`), and full.
+enum class ChunkStage : std::uint8_t { Full, Terrain, Decorated };
+
+/// One block entity of a chunk: where it sits, what kind it is, and the NBT it carries. The type
+/// is the *block entity type*; a block id is accepted and translated on construction (a copper
+/// chest's type is not its block's name, and without a protocol id it never reaches the client).
 class ChunkBlockEntity {
 public:
     ChunkBlockEntity(std::int32_t localX, std::int32_t y, std::int32_t localZ, const wire::common::Identifier& type,

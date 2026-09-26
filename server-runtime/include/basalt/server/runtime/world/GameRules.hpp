@@ -125,6 +125,9 @@ inline constexpr GameRule kEntityDrops = GameRule::boolean("entity_drops", true)
 /// parity: what a mob leaves when it dies, the dragon's experience included.
 inline constexpr GameRule kMobDrops = GameRule::boolean("mob_drops", true);
 
+/// parity: `ServerPlayer.isPvpAllowed`, whether players may hurt each other at all.
+inline constexpr GameRule kPvp = GameRule::boolean("pvp", true);
+
 /// parity: off in vanilla, which is why lava has no infinite pools.
 inline constexpr GameRule kLavaSourceConversion = GameRule::boolean("lava_source_conversion", false);
 

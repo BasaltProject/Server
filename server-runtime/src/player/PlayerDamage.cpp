@@ -449,6 +449,8 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     if (session->dead || session->invulnerable()) {
         return;
     }
+    // parity: `Player.hurtServer` throws off whatever sits on the shoulders.
+    session->shoulderDropPending = true;
     // A player is an entity too, so it is the same hook; what changes is that the choke point for a
     // player is here rather than in the entity's own combat.
     float incoming = amount;

@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/EnvironmentTickSystem.hpp>
+#include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/player/PlayerEntityData.hpp>
@@ -498,12 +499,6 @@ void EnvironmentTickSystem::strikeLightning(world::LoadedWorld& world) {
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
-    std::vector<PlayerSession*> watchers;
-    for (PlayerSession* player : players_->snapshot()) {
-        if (player->worldName == world.name()) {
-            watchers.push_back(player);
-        }
-    }
     for (const std::array<std::int32_t, 2>& chunk : chunks) {
         if (!world::lightning::shouldStrike(random)) {
             continue;
@@ -522,16 +517,10 @@ void EnvironmentTickSystem::strikeLightning(world::LoadedWorld& world) {
         if (isTrap) {
             static_cast<void>(spawning_->spawnSkeletonTrap(world, (*target)[0], (*target)[1], (*target)[2]));
         }
-        std::vector<world::BlockChange> changes;
-        // parity: `LightningBolt.tick`, where fire is only lit on normal and hard.
-        const bool lightFires = !isTrap && (world.difficulty() == "normal" || world.difficulty() == "hard");
-        world::lightning::strike(world.state(), (*target)[0], (*target)[1], (*target)[2], lightFires, random, changes);
-        // parity: `GameEvent.LIGHTNING_STRIKE`, which a sculk sensor hears as fourteen.
-        world::vibrations::emit(world.state(), "lightning_strike", static_cast<double>((*target)[0]),
-                                static_cast<double>((*target)[1]), static_cast<double>((*target)[2]), world.gameTime());
-        for (const world::BlockChange& change : changes) {
-            broadcaster_->announceRedstone(world, watchers, change);
-        }
+        // parity: `ServerLevel.tickThunder` puts a bolt at the bottom centre of the square, a trap's
+        // only for show; the bolt's own turn does the rod, the fire and the game event.
+        static_cast<void>(LightningBoltSystem::spawn(world, (*target)[0] + 0.5, (*target)[1], (*target)[2] + 0.5,
+                                                     players_->allocateEntityId(), std::nullopt, isTrap));
     }
 }
 

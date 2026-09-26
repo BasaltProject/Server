@@ -17,7 +17,7 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/terrain/BiomeZoomer.hpp>
-#include <basalt/server/world/terrain/NeighbourTerrain.hpp>
+#include <basalt/server/world/terrain/ProtoChunks.hpp>
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
 #include <basalt/server/world/terrain/OverworldBiomeSource.hpp>
 #include <basalt/server/world/terrain/StrongholdStructureGenerator.hpp>
@@ -53,11 +53,11 @@ struct LoadedWorldOptions {
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator = nullptr;
     /// Where the climate search says this world's spawn chunk is; the origin without one.
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder;
-    /// A generator the server built for this dimension, which is what a real server passes.
-    std::function<server::world::Chunk(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
-                                       std::string_view difficulty,
-                                       const std::function<void(server::world::Chunk&)>& beforeDecoration)>
-        normalGenerator;
+    /// The generation steps the server built for this dimension, which is what a real server passes.
+    /// The world fills in the loading, finishing and saving hooks itself.
+    server::world::terrain::ProtoChunks::Hooks pipeline;
+    /// parity: `ChunkGenerator.spawnOriginalMobs`, run as a generated chunk goes full.
+    std::function<void(server::world::Chunk&, std::int64_t gameTime, const std::string& difficulty)> spawnMobs;
     std::int32_t generationWorkers = 1;
     /// Who hands out the regions this world is ticked in. The server passes its own, so every
     /// world shares one scheduler and one global owner.
@@ -85,21 +85,6 @@ public:
     LoadedWorld(LoadedWorld&&) = delete;
     LoadedWorld& operator=(LoadedWorld&&) = delete;
     ~LoadedWorld();
-
-    /// What a neighbour already queued for a cell of a chunk that has not generated yet, so a
-    /// feature reading past the edge sees it instead of undecorated terrain.
-    [[nodiscard]] std::optional<std::int32_t> queuedWriteAt(std::int32_t worldX, std::int32_t y,
-                                                            std::int32_t worldZ) const {
-        return state_.queuedWriteAt(worldX, y, worldZ);
-    }
-
-    /// parity: what a neighbour that has already decorated really has at a cell. Vanilla reads the
-    /// neighbour's proto chunk, decoration included; the terrain cache only ever serves the chunk as
-    /// it was before decorating.
-    [[nodiscard]] std::optional<std::int32_t> installedBlockAt(std::int32_t worldX, std::int32_t y,
-                                                               std::int32_t worldZ) const {
-        return state_.blockState(worldX, y, worldZ);
-    }
 
     [[nodiscard]] const config::WorldDeclaration& declaration() const noexcept { return declaration_; }
 
@@ -265,13 +250,13 @@ public:
     /// Rewrites `level.nbt` with the state as it stands now.
     void saveMetadata();
 
-    /// Generates the small warm cache around spawn and picks the spawn block out of it.
+    /// Picks the spawn block, generating only the chunks that search reads.
     ///
     /// A void world skips the search: its spawn is whatever the metadata says, because there is no
     /// terrain to stand on other than the platform placed under exactly that point. A world whose
     /// spawn was moved by `/setworldspawn` skips it too: the point of moving it is that it is no
     /// longer wherever the terrain happens to be.
-    void warmSpawnArea(std::int32_t spawnRadiusChunks);
+    void warmSpawnArea();
 
     void save(const std::vector<server::world::Chunk*>& chunks);
 
@@ -295,7 +280,7 @@ public:
 private:
     [[nodiscard]] server::world::Chunk generateChunk(std::int32_t chunkX, std::int32_t chunkZ);
 
-    [[nodiscard]] server::world::Chunk loadOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ);
+    [[nodiscard]] std::optional<server::world::Chunk> loadOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ);
 
     [[nodiscard]] std::pair<std::int32_t, std::int32_t> climateSpawnChunk();
 
@@ -319,9 +304,7 @@ private:
     std::vector<StructureLocator> structureLocators_;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator_ = nullptr;
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder_;
-    std::function<server::world::Chunk(std::int32_t, std::int32_t, std::int64_t, std::string_view,
-                                       const std::function<void(server::world::Chunk&)>&)>
-        normalGenerator_;
+    std::function<void(server::world::Chunk&, std::int64_t, const std::string&)> spawnMobs_;
     sched::RegionScheduler ownScheduler_;
     sched::RegionScheduler& scheduler_;
     sched::Region* region_ = nullptr;
@@ -329,6 +312,8 @@ private:
     std::string worldRoot_;
     RegionStore regions_;
     PortalIndex portals_;
+    /// Declared ahead of the queue whose workers step it, so it outlives them.
+    std::unique_ptr<server::world::terrain::ProtoChunks> protoChunks_;
     WorldState state_;
     ChunkGenerationQueue generationQueue_;
     std::array<double, 3> spawn_{8.5, 64.0, 8.5};
@@ -351,9 +336,6 @@ private:
     std::string difficulty_;
     bool difficultyLocked_ = false;
     std::optional<std::string> defaultGamemode_;
-    // Without this the step-1 bodies read the outside as air, and a lake preflight then rejects
-    // every volume that is not perfectly centred, so no lake would ever generate here.
-    std::unique_ptr<server::world::terrain::NeighbourTerrainCache> fallbackNeighbours_;
 };
 
 } // namespace basalt::server::runtime::world

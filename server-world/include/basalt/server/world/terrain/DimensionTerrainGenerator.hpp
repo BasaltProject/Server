@@ -15,26 +15,32 @@
 
 namespace basalt::server::world::terrain::dimensionTerrainGenerator {
 
-/// parity: `noise_settings/nether.json` base shape, block and fluid defaults and cell sizes.
-/// `neighbours` lets a decoration body read past the chunk edge. Without it the outside reads as
-/// nothing, a spring that counts five rocks around itself never finds them on a border, and every
-/// cross-chunk write is refused on delivery because its guard was filled in with air.
-[[nodiscard]] Chunk nether(const NoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
-                           std::int32_t chunkZ, std::int64_t seed = 0,
-                           NetherStructureGenerator* structureGenerator = nullptr,
-                           NeighbourTerrainCache* neighbours = nullptr,
-                           const realTerrainGenerator::BeforeDecoration& beforeDecoration = {});
-
-/// The same chunk stopped before decoration, which is what a neighbour read is allowed to see.
-/// Generating a decorated neighbour would recurse.
+/// parity: `noise_settings/nether.json` base shape, block and fluid defaults and cell sizes, with its
+/// structures: everything a chunk holds before it decorates.
 [[nodiscard]] Chunk netherTerrain(const NoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
                                   std::int32_t chunkZ, std::int64_t seed = 0,
                                   NetherStructureGenerator* structureGenerator = nullptr);
 
-/// parity: `noise_settings/end.json` base shape, block default and cell sizes.
+/// The Nether's decoration steps. `neighbours` answers past the chunk edge; without it the outside
+/// reads as nothing and what is written there is deferred.
+void decorateNether(Chunk& chunk, const NetherBiomeSource& biomeSource, std::int64_t seed,
+                    const NeighbourTerrain* neighbours = nullptr);
+
+/// One Nether chunk decorated on its own.
+[[nodiscard]] Chunk nether(const NoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
+                           std::int32_t chunkZ, std::int64_t seed = 0,
+                           NetherStructureGenerator* structureGenerator = nullptr);
+
+/// parity: `noise_settings/end.json` base shape, block default and cell sizes, with the End cities.
+[[nodiscard]] Chunk endTerrain(const NoiseRouter& router, const TheEndBiomeSource& biomeSource, std::int32_t chunkX,
+                               std::int32_t chunkZ, std::int64_t seed = 0,
+                               EndCityStructureGenerator* structureGenerator = nullptr);
+
+void decorateEnd(Chunk& chunk, const NoiseRouter& router, const TheEndBiomeSource& biomeSource, std::int64_t seed);
+
+/// One End chunk decorated on its own.
 [[nodiscard]] Chunk end(const NoiseRouter& router, const TheEndBiomeSource& biomeSource, std::int32_t chunkX,
                         std::int32_t chunkZ, std::int64_t seed = 0,
-                        EndCityStructureGenerator* structureGenerator = nullptr,
-                        const realTerrainGenerator::BeforeDecoration& beforeDecoration = {});
+                        EndCityStructureGenerator* structureGenerator = nullptr);
 
 } // namespace basalt::server::world::terrain::dimensionTerrainGenerator

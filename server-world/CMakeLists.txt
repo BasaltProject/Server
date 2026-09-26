@@ -214,6 +214,8 @@ basalt_module(server-world
     src/terrain/NetherRuinedPortalGenerator.cpp
     src/terrain/NetherStructureGenerator.cpp
     src/terrain/NeighbourTerrain.cpp
+    src/terrain/ProtoRegion.cpp
+    src/terrain/ProtoChunks.cpp
     src/terrain/NoiseColumnHeights.cpp
     src/terrain/RuinedPortalStructureGenerator.cpp
     src/terrain/RealTerrainGenerator.cpp
@@ -665,6 +667,12 @@ basalt_test(server-world-generation-metrics-test
 basalt_test(server-world-neighbour-terrain-test
     SOURCES
         test/NeighbourTerrainTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-proto-chunks-test
+    SOURCES
+        test/ProtoChunksTest.cpp
     DEPENDS basalt::server-world
 )
 

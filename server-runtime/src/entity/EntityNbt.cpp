@@ -45,7 +45,7 @@ constexpr std::array<std::string_view, 6> kPatrollingTypes{"pillager",   "vindic
 
 [[nodiscard]] bool isArrow(const Identifier& type) {
     return type.namespaceName() == Identifier::kVanillaNamespace &&
-           (type.path() == "arrow" || type.path() == "spectral_arrow");
+           (type.path() == "arrow" || type.path() == "spectral_arrow" || type.path() == "trident");
 }
 
 [[nodiscard]] bool patrols(std::string_view path) {
@@ -288,6 +288,12 @@ NbtCompound encode(const ServerEntity& entity) {
     if (arrow) {
         tag.putByte("pickup", static_cast<std::int8_t>(entity.arrowPickup));
         tag.putByte("PierceLevel", entity.pierceLevel);
+        tag.putShort("life", static_cast<std::int16_t>(entity.arrowLife));
+        tag.putBoolean("inGround", entity.onGround);
+        // parity: `ThrownTrident.addAdditionalSaveData`.
+        if (entity.type().path() == "trident") {
+            tag.putBoolean("DealtDamage", entity.tridentDealtDamage);
+        }
     }
     // parity: `Ravager.addAdditionalSaveData`.
     if (entity.type().path() == "ravager") {
@@ -445,7 +451,11 @@ NbtCompound encode(const ServerEntity& entity) {
     if (horses::isHorse(entity.type())) {
         tag.putBoolean("Tame", entity.tamedHorse);
     }
-    if (entity.leashHolderUuid.has_value()) {
+    // parity: `LeashData.CODEC`: a knot is its fence's position, anything else its holder's uuid.
+    tag.remove("leash");
+    if (entity.leashKnotAt.has_value()) {
+        tag.putIntArray("leash", {(*entity.leashKnotAt)[0], (*entity.leashKnotAt)[1], (*entity.leashKnotAt)[2]});
+    } else if (entity.leashHolderUuid.has_value()) {
         NbtCompound leash;
         // parity: `Leashable.LeashData.CODEC` uses the same four ints for who holds the rope.
         if (const std::optional<wire::common::Uuid> held = wire::common::Uuid::parse(*entity.leashHolderUuid);
@@ -554,6 +564,9 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
         entity->arrowPickup = pickup >= 0 && pickup <= 2 ? static_cast<ServerEntity::ArrowPickup>(pickup)
                                                          : ServerEntity::ArrowPickup::Disallowed;
         entity->pierceLevel = tag.getByte("PierceLevel");
+        entity->arrowLife = tag.getShort("life");
+        entity->onGround = numericBoolean(tag, "inGround");
+        entity->tridentDealtDamage = numericBoolean(tag, "DealtDamage");
     }
     if (type->path() == "ravager") {
         entity->ravagerAttackTicks = numericInt(tag, "AttackTick");
@@ -639,6 +652,9 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     if (const std::optional<Uuid> leash = uuidIn(compoundOf(tag, "leash"), "UUID");
         leash.has_value() && !leash->isNil()) {
         entity->leashHolderUuid = leash->toString();
+    }
+    if (const std::span<const std::int32_t> knot = tag.getIntArray("leash"); knot.size() == 3) {
+        entity->leashKnotAt = std::array<std::int32_t, 3>{knot[0], knot[1], knot[2]};
     }
     const NbtCompound& villagerData = compoundOf(tag, "VillagerData");
     if (const std::string_view profession = villagerData.getString("profession"); !profession.empty()) {

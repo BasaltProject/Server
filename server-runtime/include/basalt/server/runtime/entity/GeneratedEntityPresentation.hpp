@@ -37,6 +37,9 @@ struct RuntimeEntityMetadata {
     /// parity: `AbstractChestedHorse.DATA_ID_CHEST` and `Camel.DASH`, both the byte after the flags.
     std::optional<bool> horseChest;
     std::optional<bool> camelDash;
+    /// parity: `ThrownTrident.ID_LOYALTY` and `ID_FOIL`, after `AbstractArrow`'s three.
+    std::optional<std::int8_t> tridentLoyalty;
+    std::optional<bool> tridentFoil;
     /// parity: `Creaking.CAN_MOVE`, `IS_ACTIVE`, `IS_TEARING_DOWN` and `HOME_POS`.
     std::optional<bool> creakingCanMove;
     std::optional<bool> creakingActive;

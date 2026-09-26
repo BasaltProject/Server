@@ -57,7 +57,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       overworldRouter_(options.overworldRouter), surfaceEnvironment_(options.surfaceEnvironment),
       villageGenerator_(options.villageGenerator), campGenerator_(options.campGenerator),
       structureLocators_(std::move(options.structureLocators)), strongholdGenerator_(options.strongholdGenerator),
-      spawnChunkFinder_(std::move(options.spawnChunkFinder)), normalGenerator_(std::move(options.normalGenerator)),
+      spawnChunkFinder_(std::move(options.spawnChunkFinder)), spawnMobs_(std::move(options.spawnMobs)),
       scheduler_(options.scheduler == nullptr ? ownScheduler_ : *options.scheduler),
       region_(&scheduler_.regionFor(declaration_.name)), levelKey_(levelKeyOf(declaration_, options.vanillaKey)),
       worldRoot_(worldsRoot + "/" + declaration_.name),
@@ -69,7 +69,37 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       biomeZoomSeed_(obfuscateBiomeSeed(metadata_.seed)), biomeZoomer_(biomeZoomSeed_), gameTime_(metadata_.gameTime),
       difficulty_(metadata_.difficulty.value_or(settings_.difficulty)), difficultyLocked_(metadata_.difficultyLocked),
       defaultGamemode_(metadata_.defaultGamemode) {
+    if (options.pipeline.terrain) {
+        server::world::terrain::ProtoChunks::Hooks hooks = std::move(options.pipeline);
+        hooks.load = [this](std::int32_t chunkX,
+                            std::int32_t chunkZ) -> std::optional<server::world::terrain::ProtoChunks::Stored> {
+            std::optional<Chunk> stored = regions_.loadChunk(chunkX, chunkZ);
+            if (!stored.has_value()) {
+                return std::nullopt;
+            }
+            const server::world::ChunkStage stage = stored->stage();
+            return server::world::terrain::ProtoChunks::Stored{.chunk = std::move(*stored), .stage = stage};
+        };
+        hooks.finish = [this](Chunk& chunk, bool generated) {
+            if (generated && spawnMobs_) {
+                spawnMobs_(chunk, gameTime_, difficulty_);
+            }
+            portals_.scan(chunk);
+            server::world::leafDistances::assign(chunk);
+        };
+        hooks.persist = [this](std::vector<Chunk> chunks) {
+            std::vector<Chunk*> held;
+            held.reserve(chunks.size());
+            for (Chunk& chunk : chunks) {
+                held.push_back(&chunk);
+            }
+            static_cast<void>(regions_.saveChunks(held, static_cast<std::int32_t>(epochSeconds())));
+        };
+        protoChunks_ = std::make_unique<server::world::terrain::ProtoChunks>(std::move(hooks));
+        generationQueue_.usePipeline(protoChunks_.get());
+    }
     state_.setHasSkylight(config::dimensionFacts(declaration_.dimension).hasSkylight);
+    state_.setSettlesGeneration(declaration_.type != config::WorldType::Debug);
     state_.poi().configure(worldRoot_ + "/poi", config::dimensionFacts(declaration_.dimension).chunkHeight);
     // Said rather than migrated: a world that looks empty is worse than a line in the log.
     if (wire::io::fileIO::isDirectory(worldRoot_ + "/dimensions")) {
@@ -215,32 +245,13 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
             return server::world::voidWorldGenerator::generate(
                 chunkX, chunkZ, metadata_.spawnX, metadata_.spawnY, metadata_.spawnZ,
                 server::world::voidWorldGenerator::kDefaultPlatformRadius, facts.chunkHeight);
+        case config::WorldType::Debug:
+            return server::world::debugWorldGenerator::generate(chunkX, chunkZ, facts.chunkHeight);
         case config::WorldType::Normal:
         case config::WorldType::Amplified:
+        case config::WorldType::LargeBiomes:
         default:
             break;
-        }
-        // What a neighbour queued for this chunk belongs in it before it decorates, not after it is
-        // installed: a feature that reads the block next to it has to see the same world vanilla does.
-        const auto deliverQueued = [this](server::world::Chunk& generated) { state_.applyPendingWritesTo(generated); };
-        if (normalGenerator_) {
-            return normalGenerator_(chunkX, chunkZ, gameTime_, difficulty_, deliverQueued);
-        }
-        if (overworldRouter_ != nullptr && surfaceEnvironment_ != nullptr) {
-            if (fallbackNeighbours_ == nullptr) {
-                fallbackNeighbours_ = std::make_unique<terrain::NeighbourTerrainCache>(
-                    [this](std::int32_t neighbourX, std::int32_t neighbourZ) {
-                        terrain::realTerrainGenerator::GeneratedTerrain generated =
-                            terrain::realTerrainGenerator::generateTerrain(
-                                *overworldRouter_, *surfaceEnvironment_, neighbourX, neighbourZ, metadata_.seed,
-                                terrain::TerrainStructureGenerators{.village = villageGenerator_});
-                        return std::move(generated.chunk());
-                    });
-            }
-            return terrain::realTerrainGenerator::generate(
-                *overworldRouter_, *surfaceEnvironment_, chunkX, chunkZ, metadata_.seed,
-                terrain::TerrainStructureGenerators{.village = villageGenerator_}, fallbackNeighbours_.get(), nullptr,
-                deliverQueued);
         }
         // Nothing to generate a real Nether or End with, and a noise approximation of one would be
         // a different world rather than a cheaper one.
@@ -252,14 +263,27 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     return chunk;
 }
 
-Chunk LoadedWorld::loadOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+std::optional<Chunk> LoadedWorld::loadOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     std::optional<Chunk> stored = regions_.loadChunk(chunkX, chunkZ);
+    if (protoChunks_ != nullptr && (!stored.has_value() || stored->stage() != server::world::ChunkStage::Full)) {
+        // A proto chunk on disk is the pipeline's to finish, and it reads it back itself.
+        const auto started = std::chrono::steady_clock::now();
+        std::optional<Chunk> made = protoChunks_->generateNow(chunkX, chunkZ);
+        timings_.of("world.generate")
+            .record(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - started)
+                        .count());
+        return made;
+    }
     Chunk chunk = stored.has_value() ? std::move(*stored) : generateChunk(chunkX, chunkZ);
+    chunk.setStage(server::world::ChunkStage::Full);
     // What a chunk in memory says about its portals is always the truth; the index only has to
     // remember the chunks that are not.
     portals_.scan(chunk);
-    // Off the tick thread, and once: from here on a leaf knows its own distance.
-    server::world::leafDistances::assign(chunk);
+    // Off the tick thread, and once: from here on a leaf knows its own distance. parity: not in a debug
+    // world, whose grid keeps every state as it was listed.
+    if (declaration_.type != config::WorldType::Debug) {
+        server::world::leafDistances::assign(chunk);
+    }
     return chunk;
 }
 
@@ -289,7 +313,7 @@ std::array<double, 3> LoadedWorld::spawnBlock(std::int32_t chunkX, std::int32_t 
     return {(chunkX * 16) + 8.5, static_cast<double>(kDefaultSpawnHeight), (chunkZ * 16) + 8.5};
 }
 
-void LoadedWorld::warmSpawnArea(std::int32_t spawnRadiusChunks) {
+void LoadedWorld::warmSpawnArea() {
     // parity: `MinecraftServer.prepareLevels` prepares the overworld and nothing else, so no other
     // dimension has a chunk generated before whatever asks for one first. Its spawn is the recorded
     // one, which needs no chunk to answer.
@@ -298,14 +322,9 @@ void LoadedWorld::warmSpawnArea(std::int32_t spawnRadiusChunks) {
         return;
     }
     const bool fixedSpawn = declaration_.type == config::WorldType::Void || movedSpawn_;
+    // parity: vanilla keeps no spawn chunks. The only chunks it makes full before anyone joins are
+    // the ones the spawn search reads, and each of those decorates its own 3x3 first.
     const std::pair<std::int32_t, std::int32_t> centre = fixedSpawn ? std::pair{0, 0} : climateSpawnChunk();
-    std::vector<std::pair<std::int32_t, std::int32_t>> positions;
-    for (std::int32_t x = centre.first - spawnRadiusChunks; x <= centre.first + spawnRadiusChunks; x++) {
-        for (std::int32_t z = centre.second - spawnRadiusChunks; z <= centre.second + spawnRadiusChunks; z++) {
-            positions.emplace_back(x, z);
-        }
-    }
-    static_cast<void>(generationQueue_.awaitAll(positions));
     if (fixedSpawn) {
         spawn_ = {metadata_.spawnX + 0.5, static_cast<double>(metadata_.spawnY), metadata_.spawnZ + 0.5};
         return;
@@ -444,6 +463,10 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
 void LoadedWorld::stopGenerating(std::int64_t drainTimeoutMillis) {
     generationQueue_.stop();
     generationQueue_.awaitIdle(drainTimeoutMillis);
+    // A proto chunk a neighbour already wrote into cannot be made again from the seed alone.
+    if (protoChunks_ != nullptr) {
+        protoChunks_->persistAll();
+    }
     // Whatever the workers handed over on their way out still belongs in the world, so it is run
     // rather than dropped: a chunk installed here is one the save below writes out.
     static_cast<void>(owner().runPending([this](const std::exception& failure) {

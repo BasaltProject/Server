@@ -70,6 +70,15 @@ public:
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer)>
             crystalDestroyed;
+        /// An enchantment's definition, which a trident's loyalty, impaling and channeling read.
+        std::function<const wire::nbt::NbtCompound*(const wire::common::Identifier& id)> enchantmentDefinition;
+        /// A lightning bolt at a point, answering to that player if any. parity: `summon_entity`.
+        std::function<void(world::LoadedWorld& world, double x, double y, double z, std::optional<std::int32_t> cause)>
+            summonLightning;
+        /// A stack dropped where something stood. parity: `Entity.spawnAtLocation`.
+        std::function<void(world::LoadedWorld& world, double x, double y, double z,
+                           const server::world::loot::ItemStack& stack)>
+            dropItem;
     };
 
     CombatSystem(BlockChangeBroadcaster& broadcaster, ExplosionSystem& explosions, Hooks hooks, Options options);
@@ -190,6 +199,26 @@ private:
     /// What a bottle leaves where it broke.
     void splashPotion(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                       const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& bottle);
+
+    /// parity: `ThrownTrident.tick`'s loyalty: home to its owner once it has hit, dropped where it is
+    /// when the owner is gone. Answers whether it is gone.
+    bool tridentReturns(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                        const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& trident);
+
+    /// parity: `ThrownTrident.onHitEntity`.
+    ArrowHit tridentHitEntity(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                              const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& trident,
+                              double fromX, double fromY, double fromZ);
+
+    /// parity: channeling's `hit_block` effect, a bolt on a lightning rod the trident struck in a storm.
+    void channelOnBlock(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                        const entity::ServerEntity& trident, const entity::BlockHit& hit);
+
+    /// A trident's loyalty, read from its stack the first time it is asked.
+    std::int32_t tridentLoyalty(entity::ServerEntity& trident);
+
+    void tridentSound(const std::vector<player::PlayerSession*>& watchers, const entity::ServerEntity& trident,
+                      std::string_view sound, float volume);
 
     /// Where a thrown pearl puts whoever threw it.
     void landEnderPearl(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& pearl);

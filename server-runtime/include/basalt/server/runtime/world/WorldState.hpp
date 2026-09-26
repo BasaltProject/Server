@@ -73,7 +73,8 @@ struct GameEventRecord {
 class WorldState {
 public:
     /// How a chunk that is not loaded is produced: read from disk if it is there, generated if not.
-    using LoadOrGenerate = std::function<server::world::Chunk(std::int32_t chunkX, std::int32_t chunkZ)>;
+    /// Nothing when it is already finished and on its way into the world from a generation worker.
+    using LoadOrGenerate = std::function<std::optional<server::world::Chunk>(std::int32_t chunkX, std::int32_t chunkZ)>;
 
     /// What every loaded chunk keeps resident, for the timings report's memory breakdown.
     struct ChunkMemory {
@@ -90,6 +91,9 @@ public:
 
     /// Whether the dimension has a sky, which decides half of `getRawBrightness`.
     void setHasSkylight(bool hasSkylight) noexcept { hasSkylight_ = hasSkylight; }
+
+    /// Whether an installed chunk's leaves and plants are settled against its neighbours.
+    void setSettlesGeneration(bool settles) noexcept { settlesGeneration_ = settles; }
 
     WorldState(const WorldState&) = delete;
     WorldState& operator=(const WorldState&) = delete;
@@ -226,12 +230,6 @@ public:
     /// already there if two workers raced on the same position.
     server::world::Chunk& install(server::world::Chunk chunk);
 
-    /// Delivers whatever a neighbour queued for this chunk while it did not exist. parity: vanilla
-    /// writes a feature that crosses a chunk edge straight into the neighbour's proto chunk, so the
-    /// chunk decorates on top of it and reads it while doing so. Called between terrain and
-    /// decoration, which is the same point.
-    void applyPendingWritesTo(server::world::Chunk& chunk);
-
     /// Books one, to be run by whoever ticks this world.
     void queueBlockEvent(BlockEvent event);
 
@@ -257,10 +255,6 @@ public:
 
     /// How many of the toggles still in the list happened at this square.
     [[nodiscard]] std::int32_t torchToggleCount(std::int32_t x, std::int32_t y, std::int32_t z) const;
-
-    /// What a neighbour already queued for a cell of a chunk that has not generated yet.
-    [[nodiscard]] std::optional<std::int32_t> queuedWriteAt(std::int32_t worldX, std::int32_t y,
-                                                            std::int32_t worldZ) const;
 
     /// Hands the chunk over to be installed, or installs it here when nobody owns this world.
     /// `installed` runs once the chunk is really in the world, which is not when this returns.
@@ -427,6 +421,7 @@ public:
 
 private:
     bool hasSkylight_ = true;
+    bool settlesGeneration_ = true;
     /// Refuses an access from anywhere but the owner, and only while strict ownership is on.
     ///
     /// Skipped while a world is split: the owner is the first region's, and a block out in the

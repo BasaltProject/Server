@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
+#include <basalt/server/runtime/player/PlayerTrident.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -149,6 +150,18 @@ bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item,
         setUsingItem(true, item, slot == PlayerInventory::kOffhandSlot);
         return true;
     }
+    // parity: `TridentItem.use`, raised for as long as it is held and thrown on release.
+    if (item.path() == "trident") {
+        const std::optional<storage::StoredItemStack>& held = session.inventory.at(slot);
+        world::LoadedWorld* world = owner_->currentWorld();
+        if (held.has_value() && world != nullptr &&
+            player::trident::canRaise(owner_->blockInteraction().breakContext(), *world, session, *held)) {
+            drawingSlot_ = slot;
+            drawingTicks_ = 0;
+            setUsingItem(true, item, slot == PlayerInventory::kOffhandSlot);
+        }
+        return true;
+    }
     if (item.path() != kBow) {
         return false;
     }
@@ -175,7 +188,7 @@ void ItemUseTimers::tickDrawing(PlayerSession& session) {
     }
     const std::optional<storage::StoredItemStack>& held = session.inventory.at(drawingSlot_);
     const std::optional<Identifier> id = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    if (!id.has_value() || (id->path() != kBow && id->path() != kCrossbow) ||
+    if (!id.has_value() || (id->path() != kBow && id->path() != kCrossbow && id->path() != "trident") ||
         (drawingSlot_ != PlayerInventory::kOffhandSlot &&
          drawingSlot_ != PlayerInventory::kHotbarStart + session.inventory.heldSlot())) {
         stopDrawing();
@@ -204,7 +217,12 @@ void ItemUseTimers::releaseBow() {
     const std::optional<storage::StoredItemStack>& drawnItem = session->inventory.at(slot);
     // parity: `CrossbowItem.releaseUsing` only ends the use; the load happened while charging.
     const bool crossbow = drawnItem.has_value() && player::crossbow::isCrossbow(*drawnItem);
+    const bool trident = drawnItem.has_value() && player::trident::isTrident(*drawnItem);
     stopDrawing();
+    if (world != nullptr && trident) {
+        player::trident::release(owner_->blockInteraction().breakContext(), *session, *world, slot, drawn);
+        return;
+    }
     if (world != nullptr && !crossbow) {
         player::shootBowFor(owner_->blockInteraction().breakContext(), *session, *world, slot, drawn,
                             hooks_.shootAllowed);

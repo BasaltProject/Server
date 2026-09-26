@@ -119,10 +119,8 @@ TEST_CASE("a dimension is named by any of the three spellings an operator might 
     CHECK(worldTypeByName("FLAT") == WorldType::Flat);
     CHECK(worldTypeByName("void") == WorldType::Void);
     CHECK_FALSE(worldTypeByName("superflat").has_value());
-    // Declared, and refused where it is selected rather than quietly generating something else.
     CHECK(worldTypeByName("amplified") == WorldType::Amplified);
-    CHECK_FALSE(isImplemented(WorldType::Amplified));
-    CHECK(isImplemented(WorldType::Normal));
+    CHECK(worldTypeByName("large_biomes") == WorldType::LargeBiomes);
 }
 
 TEST_CASE("the commented default is a vanilla server's three worlds") {
@@ -256,10 +254,7 @@ linked_to = "other"
 TEST_CASE("a world nobody can generate stops the server rather than generating something else") {
     CHECK(failure("worlds-unknown-type", "[worlds.world]\ntype = \"superflat\"\n")
               .starts_with("World 'world' declares an unknown type 'superflat'. Known types: normal, flat, void, "
-                           "amplified."));
-    // Declared and not implemented is its own message, because it is not a typo.
-    CHECK(failure("worlds-amplified", "[worlds.world]\ntype = \"amplified\"\n")
-              .starts_with("World 'world' declares type 'amplified', which is not implemented yet."));
+                           "amplified, large_biomes, debug."));
     CHECK(failure("worlds-unknown-dimension", "[worlds.world]\ndimension = \"aether\"\n")
               .starts_with("World 'world' declares an unknown dimension 'aether'. Known dimensions: overworld, "
                            "nether, end."));

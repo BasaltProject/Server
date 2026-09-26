@@ -36,6 +36,9 @@ constexpr double kAcceleration = 0.1;
 /// the same number as `0.05`. The arrow ends up a fraction off otherwise.
 constexpr double kStuckBackoff = static_cast<double>(0.05F);
 
+/// parity: `AbstractArrow.tickDespawn`'s twelve hundred turns.
+constexpr std::int32_t kDespawnTicks = 1200;
+
 /// parity: `Vec3.normalize`, which answers zero rather than dividing when the vector is this short.
 constexpr double kNormalizeFloor = 1.0E-4;
 
@@ -122,8 +125,10 @@ const Kind& snowball() {
 }
 
 std::span<const Kind> all() {
-    static const std::array<Kind, 13> kinds{
-        arrow(), make("spectral_arrow", 0.05, 0.99, true), snowball(), make("egg", 0.03, 0.99, false),
+    static const std::array<Kind, 14> kinds{
+        arrow(), make("spectral_arrow", 0.05, 0.99, true),
+        // parity: `ThrownTrident` is an arrow whose water inertia is its air drag.
+        make("trident", 0.05, 0.99, true), snowball(), make("egg", 0.03, 0.99, false),
         make("ender_pearl", 0.03, 0.99, false), make("experience_bottle", 0.07, 0.99, false),
         make("potion", 0.05, 0.99, false), fireball(), make("small_fireball", 0.0, 0.95, false, kAcceleration),
         // parity: `AbstractWindCharge` neither slows down nor speeds up: inertia one, acceleration
@@ -156,7 +161,9 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
     constexpr double kChargeReach = 1.0;
     constexpr float kChargePower = 1.0F;
     constexpr float kChargeUncertainty = 6.6666665F;
-    static const std::array<Entry, 11> table{
+    static const std::array<Entry, 12> table{
+        // parity: `TridentItem.asProjectile`, the default dispense config.
+        Entry{.item = "trident", .kind = "trident"},
         Entry{.item = "arrow", .kind = "arrow", .carries = false},
         Entry{.item = "tipped_arrow", .kind = "arrow", .carries = false},
         Entry{.item = "spectral_arrow", .kind = "spectral_arrow", .carries = false},
@@ -225,12 +232,39 @@ void shoot(ServerEntity& entity, double dirX, double dirY, double dirZ, float po
 
 std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, const Kind& kind) {
     ++entity.age;
+    // parity: `AbstractArrow.tick` without physics: straight through everything, slowed and never
+    // falling, facing back along the way it came.
+    if (kind.sticks && entity.noPhysics) {
+        entity.onGround = false;
+        entity.inGroundTime = 0;
+        entity.x += entity.velocityX;
+        entity.y += entity.velocityY;
+        entity.z += entity.velocityZ;
+        entity.velocityX *= kind.drag;
+        entity.velocityY *= kind.drag;
+        entity.velocityZ *= kind.drag;
+        const double horizontal =
+            std::sqrt((entity.velocityX * entity.velocityX) + (entity.velocityZ * entity.velocityZ));
+        entity.yaw = static_cast<float>(std::atan2(-entity.velocityX, -entity.velocityZ) * kDegrees);
+        entity.pitch = static_cast<float>(std::atan2(entity.velocityY, horizontal) * kDegrees);
+        return std::nullopt;
+    }
     if (entity.onGround) {
         // parity: `AbstractArrow.tick` asks every turn whether what it is stuck in is still there,
         // and `startFalling` lets it go: an arrow in a block a piston took away falls rather than
         // hanging in the air. The movement it leaves with is its own times a random fraction, and
         // a stuck arrow's is zero, so it drops straight down.
-        if (!kind.sticks || !nothingHolds(world, entity.x, entity.y, entity.z)) {
+        if (!kind.sticks) {
+            return std::nullopt;
+        }
+        if (!nothingHolds(world, entity.x, entity.y, entity.z)) {
+            // parity: `tickDespawn`, a minute in the ground and gone, save a trident that comes home.
+            const bool keeps = entity.type().path() == "trident" && entity.tridentLoyalty > 0 &&
+                               entity.arrowPickup == ServerEntity::ArrowPickup::Allowed;
+            if (!keeps && ++entity.arrowLife >= kDespawnTicks) {
+                entity.removed = true;
+            }
+            ++entity.inGroundTime;
             return std::nullopt;
         }
         // parity: the whole in-ground branch ends the turn, so the tick an arrow lets go on is a
@@ -284,6 +318,7 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
         slow();
     }
 
+    entity.inGroundTime = 0;
     const std::optional<BlockHit> hit = blockRay::cast(world, entity.x, entity.y, entity.z, entity.x + entity.velocityX,
                                                        entity.y + entity.velocityY, entity.z + entity.velocityZ);
     if (hit.has_value()) {

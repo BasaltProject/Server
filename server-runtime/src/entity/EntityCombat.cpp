@@ -3,11 +3,11 @@
 #include <basalt/server/runtime/entity/Armadillos.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
-#include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
@@ -115,8 +115,8 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     if (creakings::isCreaking(entity.type()) && creakings::heartBound(entity) && cause != "out_of_world" &&
         cause != "generic_kill") {
         const bool living = blamed.directType.has_value() && reg::entityAttributes::isLiving(*blamed.directType);
-        const bool projectile = blamed.directType.has_value() && !living &&
-                                blamed.directType->path() != "tnt" && blamed.directType->path() != "tnt_minecart" &&
+        const bool projectile = blamed.directType.has_value() && !living && blamed.directType->path() != "tnt" &&
+                                blamed.directType->path() != "tnt_minecart" &&
                                 blamed.directType->path() != "falling_block" &&
                                 blamed.directType->path() != "end_crystal";
         return {.landed = creakings::hurtBound(entity, living || projectile, byPlayer)};

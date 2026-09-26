@@ -129,6 +129,11 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
                             random::RandomSource& random) {
     entity.idleTicks++;
     entity.tickCount++;
+    // parity: `Entity.baseTick` ends in `Leashable.tickLeash`, before the mob's own `aiStep`.
+    actions_->tickLeash(world, entity);
+    if (entity.removed) {
+        return;
+    }
     entity::entityCombat::tick(entity);
     actions_->tickAmbientSound(world, entity, random);
     // parity: `LivingEntity.tick`: one arrow or stinger falls out every twenty times thirty less the count.

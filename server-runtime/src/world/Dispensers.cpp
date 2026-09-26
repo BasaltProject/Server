@@ -958,6 +958,12 @@ void shoot(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, st
         shot.heldItem = stack.item.path();
         shot.heldItemComponents = stack.components;
         shot.arrowPickup = entity::ServerEntity::ArrowPickup::Allowed;
+        // parity: `ThrownTrident`'s `ID_FOIL`, the stack's glint.
+        const wire::nbt::NbtTag* glint = stack.components.find("minecraft:enchantment_glint_override");
+        const wire::nbt::NbtCompound* enchanted = stack.components.getCompound("minecraft:enchantments");
+        shot.tridentFoil = glint != nullptr && glint->get<std::int8_t>() != nullptr
+                               ? *glint->get<std::int8_t>() != 0
+                               : enchanted != nullptr && !enchanted->empty();
     }
 }
 

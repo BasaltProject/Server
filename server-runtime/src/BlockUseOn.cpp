@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/EndFightSystem.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
@@ -54,6 +55,7 @@
 #include <basalt/server/runtime/world/NetherPortals.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/RedstoneWire.hpp>
 #include <basalt/server/runtime/world/RespawnAnchors.hpp>
@@ -268,6 +270,15 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
                     notifyNeighbours(hit.pos);
                 }
             }
+        }
+        // parity: `FenceBlock.useWithoutItem`, the player's mobs tied to a knot on it.
+        if (clicked != nullptr && owner_->options().mobs != nullptr && owner_->options().blockTags != nullptr &&
+            owner_->currentWorld() != nullptr &&
+            world::realBlockTags::contains(*owner_->options().blockTags, "minecraft:fences", *clicked) &&
+            owner_->options().mobs->bindPlayerMobs(*owner_->currentWorld(), *session,
+                                                   {hit.pos.x, hit.pos.y, hit.pos.z})) {
+            blockUsed();
+            return;
         }
         if (path == "crafting_table") {
             owner_->menus().openCraftingTable(*session);
@@ -746,6 +757,10 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
             owner_->options().maps->useEmptyMap(breakContext(), *session, *world, PlayerInventory::kOffhandSlot)) {
             return;
         }
+        // parity: `Item.use` charges a `kinetic_weapon` from either hand.
+        if (owner_->combat().startCharge(*session, PlayerInventory::kOffhandSlot)) {
+            return;
+        }
         if (!owner_->itemUseTimers().startBlocking(*session, *other, PlayerInventory::kOffhandSlot)) {
             static_cast<void>(owner_->itemUseTimers().startSpyglass(*session, *other, PlayerInventory::kOffhandSlot));
         }
@@ -757,6 +772,12 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     if (!item.has_value()) {
         return;
     }
+    // parity: `FireworkRocketItem.use` on a glider lets go of every lead first, snapping.
+    if (session->fallFlying && item->path() == "firework_rocket" && !owner_->itemUseTimers().onCooldown(*item) &&
+        owner_->options().mobs != nullptr && owner_->options().mobs->dropAllLeashes(*world, *session)) {
+        owner_->broadcastSound("minecraft:entity.lead.break", session->x, session->y, session->z,
+                               play::SoundSource::Neutral);
+    }
     // parity: `ItemCooldowns.isOnCooldown`, which refuses the use outright rather than letting it
     // through and greying the slot afterwards.
     if (owner_->itemUseTimers().onCooldown(*item) || owner_->itemUseTimers().startEating(*session, *item, heldSlot) ||
@@ -765,6 +786,7 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
         (owner_->options().fireworks != nullptr &&
          player::useRocketFor(breakContext(), *owner_->options().fireworks, *session, *world, heldSlot)) ||
         owner_->itemUseTimers().startBlocking(*session, *item, heldSlot) ||
+        owner_->combat().startCharge(*session, heldSlot) ||
         owner_->itemUseTimers().startSpyglass(*session, *item, heldSlot) ||
         (owner_->options().fishing != nullptr &&
          owner_->options().fishing->useRod(breakContext(), *session, *world, heldSlot)) ||

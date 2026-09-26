@@ -97,6 +97,11 @@ public:
     std::int32_t blockingTicks = 0;
     /// parity: `LivingEntity.getUsedItemHand`, whether what is in use is in the off hand.
     bool usingOffhand = false;
+    /// parity: `LivingEntity.autoSpinAttackTicks`, `autoSpinAttackDmg` and the trident that started
+    /// it, a riptide's spin.
+    std::int32_t autoSpinTicks = 0;
+    float autoSpinDamage = 0.0F;
+    std::optional<storage::StoredItemStack> autoSpinItem;
 
     /// parity: `Entity.FLAG_SWIMMING` as `updateSwimming` sets it, and `Player.updatePlayerPose`.
     bool swimming = false;
@@ -112,6 +117,22 @@ public:
     std::optional<wire::nbt::NbtCompound> shoulderLeft;
     std::optional<wire::nbt::NbtCompound> shoulderRight;
     std::int64_t timeEntitySatOnShoulder = 0;
+    /// parity: `removeEntitiesOnShoulder` asked for by a hit, a death or spectating, done on the tick.
+    bool shoulderDropPending = false;
+    /// parity: `Entity.fallDistance`, as the movement the client reports counts it.
+    double fallDistance = 0.0;
+    /// parity: `Entity.moveDist` and `nextStep` for the footsteps everyone else hears, where they
+    /// were last heard from, and `walkingStepSound`'s amethyst chime clock.
+    std::optional<std::array<double, 3>> emittedFrom;
+    /// parity: `ServerPlayer.getKnownMovement`, what the client moved it by last tick.
+    std::array<double, 3> knownMovement{};
+    float moveDist = 0.0F;
+    float nextStep = 1.0F;
+    std::int64_t lastCrystalSoundTime = 0;
+    float crystalSoundIntensity = 0.0F;
+    /// parity: `LivingEntity.currentImpulseImpactPos` and its grace, see `impulse`.
+    std::optional<std::array<double, 3>> impulseImpact;
+    std::int32_t impulseGraceTicks = 0;
 
     /// What they are riding, by entity id. parity: `Entity.vehicle`.
     std::optional<std::int32_t> vehicleId;

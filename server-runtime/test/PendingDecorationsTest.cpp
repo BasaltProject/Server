@@ -49,8 +49,6 @@ private:
 } // namespace
 
 TEST_CASE("a write that crossed a border lands in the chunk it was aimed at") {
-    WorldMutex mutex;
-    PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
 
@@ -62,37 +60,11 @@ TEST_CASE("a write that crossed a border lands in the chunk it was aimed at") {
                                                 .stateId = stateOf("oak_log"),
                                                 .replaceAnyState = false,
                                                 .policy = world::GeneratedBlockWritePolicy::Exact};
-    pending.deliverGeneratedBlockWrites(std::array{write}, 1, chunks.accessor());
+    PendingChunkDecorations::deliverGeneratedBlockWrites(std::array{write}, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == stateOf("oak_log"));
-}
-
-TEST_CASE("a write for a chunk nobody has loaded waits for it") {
-    WorldMutex mutex;
-    PendingChunkDecorations pending{mutex};
-    LoadedChunks chunks;
-
-    const world::ChunkGeneratedBlockWrite write{
-        .x = 16, .y = 64, .z = 3, .expectedStateId = registry::blocks::air().stateId, .stateId = stateOf("oak_log")};
-    // Nothing is loaded there yet, so nothing is written and nothing is lost.
-    pending.deliverGeneratedBlockWrites(std::array{write}, 1, chunks.accessor());
-
-    world::Chunk& east = chunks.add(1, 0);
-    // It decorates after the chunk that left the write, which is the only way one can be waiting.
-    east.setDecorationSequence(9);
-    CHECK(east.blockStateId(0, 64, 3) == registry::blocks::air().stateId);
-    pending.applyPendingGeneratedBlockWrites(east, PendingChunkDecorations::WritePhase::BeforeDecoration);
-    CHECK(east.blockStateId(0, 64, 3) == stateOf("oak_log"));
-
-    // And it is applied once: the second install of the same chunk finds nothing waiting.
-    world::Chunk again{1, 0};
-    again.setDecorationSequence(9);
-    pending.applyPendingGeneratedBlockWrites(again, PendingChunkDecorations::WritePhase::BeforeDecoration);
-    CHECK(again.blockStateId(0, 64, 3) == registry::blocks::air().stateId);
 }
 
 TEST_CASE("a write only lands where the block it expected is still there") {
-    WorldMutex mutex;
-    PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
     east.setBlockStateId(0, 64, 3, stateOf("stone"));
@@ -101,19 +73,17 @@ TEST_CASE("a write only lands where the block it expected is still there") {
     // carving a hole in whatever arrived first.
     const world::ChunkGeneratedBlockWrite exact{
         .x = 16, .y = 64, .z = 3, .expectedStateId = registry::blocks::air().stateId, .stateId = stateOf("oak_log")};
-    pending.deliverGeneratedBlockWrites(std::array{exact}, 1, chunks.accessor());
+    PendingChunkDecorations::deliverGeneratedBlockWrites(std::array{exact}, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == stateOf("stone"));
 
     // Unless it was told to write over anything, which is what a structure does.
     world::ChunkGeneratedBlockWrite anything = exact;
     anything.replaceAnyState = true;
-    pending.deliverGeneratedBlockWrites(std::array{anything}, 1, chunks.accessor());
+    PendingChunkDecorations::deliverGeneratedBlockWrites(std::array{anything}, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == stateOf("oak_log"));
 }
 
 TEST_CASE("a write outside the chunk's own height is not written at all") {
-    WorldMutex mutex;
-    PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
 
@@ -125,13 +95,11 @@ TEST_CASE("a write outside the chunk's own height is not written at all") {
                                                   .replaceAnyState = true};
     // Nothing thrown and nothing written: a decoration that overshot the world is not the world's
     // problem to store.
-    pending.deliverGeneratedBlockWrites(std::array{tooHigh}, 1, chunks.accessor());
+    PendingChunkDecorations::deliverGeneratedBlockWrites(std::array{tooHigh}, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == registry::blocks::air().stateId);
 }
 
 TEST_CASE("a block entity needs the block it belongs to") {
-    WorldMutex mutex;
-    PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
     east.setBlockStateId(0, 64, 3, stateOf("chest"));
@@ -144,20 +112,18 @@ TEST_CASE("a block entity needs the block it belongs to") {
                                                       .expectedStateId = stateOf("chest"),
                                                       .type = Identifier::vanilla("chest"),
                                                       .data = data};
-    pending.deliverGeneratedBlockEntityWrites(std::array{write}, chunks.accessor());
+    PendingChunkDecorations::deliverGeneratedBlockEntityWrites(std::array{write}, chunks.accessor());
     CHECK(east.blockEntityAt(0, 64, 3) != nullptr);
 
     // A chest with no chest under it is worse than no chest: the write is dropped.
     world::Chunk& west = chunks.add(-1, 0);
     world::ChunkGeneratedBlockEntityWrite orphan = write;
     orphan.x = -1;
-    pending.deliverGeneratedBlockEntityWrites(std::array{orphan}, chunks.accessor());
+    PendingChunkDecorations::deliverGeneratedBlockEntityWrites(std::array{orphan}, chunks.accessor());
     CHECK(west.blockEntityAt(15, 64, 3) == nullptr);
 }
 
 TEST_CASE("a scheduled tick crosses the border with the block it belongs to") {
-    WorldMutex mutex;
-    PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
     east.setBlockStateId(0, 64, 3, stateOf("water"));
@@ -169,7 +135,7 @@ TEST_CASE("a scheduled tick crosses the border with the block it belongs to") {
                                               .type = Identifier::vanilla("water"),
                                               .delay = 5,
                                               .priority = 0};
-    pending.deliverGeneratedBlockTicks(std::array{tick}, chunks.accessor());
+    PendingChunkDecorations::deliverGeneratedBlockTicks(std::array{tick}, chunks.accessor());
     REQUIRE(east.scheduledBlockTicks().size() == 1);
     CHECK(east.scheduledBlockTicks()[0].localX == 0);
     CHECK(east.scheduledBlockTicks()[0].delay == 5);
@@ -178,7 +144,7 @@ TEST_CASE("a scheduled tick crosses the border with the block it belongs to") {
     world::Chunk& west = chunks.add(-1, 0);
     world::ChunkGeneratedBlockTick orphan = tick;
     orphan.x = -1;
-    pending.deliverGeneratedBlockTicks(std::array{orphan}, chunks.accessor());
+    PendingChunkDecorations::deliverGeneratedBlockTicks(std::array{orphan}, chunks.accessor());
     CHECK(west.scheduledBlockTicks().empty());
 }
 
@@ -241,29 +207,4 @@ TEST_CASE("the key a chunk is filed under is the one the map uses") {
     // Negative coordinates survive it, which is most of the world.
     CHECK(PendingChunkDecorations::key(-1, -1) != PendingChunkDecorations::key(-1, 1));
     CHECK(PendingChunkDecorations::key(-3, 7) == PendingChunkDecorations::key(-3, 7));
-}
-
-TEST_CASE("which chunk decorates last decides whose block stays") {
-    WorldMutex mutex;
-    PendingChunkDecorations pending{mutex};
-    LoadedChunks chunks;
-    world::Chunk& east = chunks.add(1, 0);
-    east.setDecorationSequence(5);
-    // Already decorated: something of its own is in the cell, not the stone the write expected.
-    east.setBlockStateId(0, 64, 3, stateOf("andesite"));
-
-    const world::ChunkGeneratedBlockWrite granite{.x = 16,
-                                                  .y = 64,
-                                                  .z = 3,
-                                                  .expectedStateId = stateOf("stone"),
-                                                  .stateId = stateOf("granite"),
-                                                  .policy = world::GeneratedBlockWritePolicy::OreBaseStone};
-
-    // From a chunk that decorated before this one: its vein went under this one's.
-    pending.deliverGeneratedBlockWrites(std::array{granite}, 3, chunks.accessor());
-    CHECK(east.blockStateId(0, 64, 3) == stateOf("andesite"));
-
-    // From one that decorated after: its vein goes on top.
-    pending.deliverGeneratedBlockWrites(std::array{granite}, 9, chunks.accessor());
-    CHECK(east.blockStateId(0, 64, 3) == stateOf("granite"));
 }

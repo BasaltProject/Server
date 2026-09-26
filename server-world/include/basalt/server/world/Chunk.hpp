@@ -17,6 +17,10 @@
 
 namespace basalt::server::world {
 
+namespace terrain {
+class ProtoRegion;
+} // namespace terrain
+
 /// Which blocks each heightmap counts.
 enum class HeightmapType : std::uint8_t {
     /// parity: `Heightmap.Types.WORLD_SURFACE(_WG)`, every non-air block and fluid.
@@ -198,6 +202,11 @@ public:
     [[nodiscard]] std::vector<ChunkGeneratedEntity>
     takeGeneratedEntitiesMatching(const std::function<bool(const ChunkGeneratedEntity&)>& predicate);
 
+    /// Full once it is in a world; a proto chunk still waiting on its neighbours says how far it got.
+    [[nodiscard]] ChunkStage stage() const noexcept { return stage_; }
+
+    void setStage(ChunkStage stage) noexcept { stage_ = stage; }
+
     /// Approximate bytes the packed sections and heightmaps keep resident; attachments are counted,
     /// not sized.
     [[nodiscard]] std::size_t residentBytes() const;
@@ -232,13 +241,6 @@ public:
 
     /// Hands deferred cross-chunk decoration writes to the runtime exactly once.
     [[nodiscard]] std::vector<ChunkGeneratedBlockWrite> takeGeneratedBlockWrites();
-
-    /// When this chunk decorated, counted by the world. parity: vanilla has no precedence rule for a
-    /// cell two chunks write, the one that decorates later simply lands on top. Zero means it has
-    /// not decorated yet, which is earlier than anything that has.
-    [[nodiscard]] std::uint64_t decorationSequence() const noexcept { return decorationSequence_; }
-
-    void setDecorationSequence(std::uint64_t sequence) noexcept { decorationSequence_ = sequence; }
 
     /// Keeps a decoration's block entity beside an external block until the target chunk arrives.
     /// `expectedStateId` is the block the feature just placed, so a rejected block write cannot
@@ -288,6 +290,22 @@ public:
     private:
         Chunk* chunk_;
         Reader previous_;
+    };
+
+    /// parity: `WorldGenRegion`. While it is set, a decoration read or write outside this chunk goes
+    /// straight into the neighbour's proto chunk instead of being deferred.
+    class RegionScope {
+    public:
+        RegionScope(Chunk& chunk, terrain::ProtoRegion& region);
+        ~RegionScope();
+        RegionScope(const RegionScope&) = delete;
+        RegionScope& operator=(const RegionScope&) = delete;
+        RegionScope(RegionScope&&) = delete;
+        RegionScope& operator=(RegionScope&&) = delete;
+
+    private:
+        Chunk* chunk_;
+        terrain::ProtoRegion* previous_;
     };
 
     /// Marks deferred writes from one configured feature with their delivery replacement rule.
@@ -354,12 +372,13 @@ private:
     std::vector<ChunkShapeUpdate> shapeUpdates_;
     std::vector<ChunkShapeUpdate> fluidUpdates_;
     std::vector<ChunkGeneratedBlockWrite> generatedBlockWrites_;
-    std::uint64_t decorationSequence_ = 0;
     std::vector<ChunkGeneratedBlockEntityWrite> generatedBlockEntityWrites_;
     std::vector<ChunkGeneratedBlockTick> generatedBlockTicks_;
     std::function<void(std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t)> blockWriteObserver_;
     std::function<std::optional<std::int32_t>(std::int32_t, std::int32_t, std::int32_t)> externalDecorationState_;
     GeneratedBlockWritePolicy generatedBlockWritePolicy_ = GeneratedBlockWritePolicy::Exact;
+    terrain::ProtoRegion* region_ = nullptr;
+    ChunkStage stage_ = ChunkStage::Full;
     /// Guards the two below, which the thread sending a chunk reads and the thread writing blocks
     /// throws away. Behind a pointer because a chunk is moved (out of a generator, into the map)
     /// and a lock is not movable; the pointer is, and a moved-from chunk is nobody's.

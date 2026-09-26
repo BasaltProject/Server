@@ -14,10 +14,9 @@ default = true
 # flat      the vanilla superflat preset: bedrock, two dirt, grass
 # void      nothing but air, with a small stone platform under the spawn so a
 #           fresh world is standable. For lobbies and hubs.
-# amplified vanilla's amplified terrain. NOT IMPLEMENTED YET: it needs a second
-#           set of density functions that this build does not port, and pretending
-#           normal terrain is amplified would be a silent lie, so declaring it
-#           stops the server instead.
+# amplified    vanilla's amplified terrain
+# large_biomes vanilla's large biomes
+# debug        every block state in a grid, as vanilla's debug world
 type = "normal"
 # Leave the seed out to have one generated on first creation. Once a world exists,
 # the seed it was generated with wins over this value and a mismatch is logged:

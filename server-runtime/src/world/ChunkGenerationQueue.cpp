@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
+#include <basalt/server/world/terrain/ProtoChunks.hpp>
 #include <basalt/wire/io/Platform.hpp>
 
 #include <algorithm>
@@ -26,8 +27,7 @@ constexpr std::chrono::milliseconds kIdleBackoff{20};
 constexpr std::chrono::milliseconds kBetweenChunks{1};
 
 // A forceload asks for every chunk with priority 0, so most picks are ties. Left to the map they
-// were resolved by hash iteration order, which depends on how the requests happened to interleave:
-// same seed, different world. Ties go to the chunk that decorates first.
+// would go by hash iteration order, which depends on how the requests happened to interleave.
 [[nodiscard]] bool rasterBefore(const std::int64_t key, const std::int64_t other) {
     const std::int32_t x = ChunkGenerationQueue::unpackX(key);
     const std::int32_t otherX = ChunkGenerationQueue::unpackX(other);
@@ -116,6 +116,12 @@ void ChunkGenerationQueue::request(std::int32_t chunkX, std::int32_t chunkZ, std
     if (inProgress_.contains(key)) {
         return;
     }
+    if (pipeline_ != nullptr) {
+        if (pipeline_->pendingCount() < kCapacity) {
+            pipeline_->demand(chunkX, chunkZ, priority);
+        }
+        return;
+    }
     if (const auto existing = queued_.find(key); existing != queued_.end()) {
         // A closer player asking for the same chunk should move it up, never back.
         if (priority < existing->second) {
@@ -145,6 +151,9 @@ void ChunkGenerationQueue::request(std::int32_t chunkX, std::int32_t chunkZ, std
 
 std::size_t
 ChunkGenerationQueue::retainWhere(const std::function<bool(std::int32_t chunkX, std::int32_t chunkZ)>& shouldKeep) {
+    if (pipeline_ != nullptr) {
+        return pipeline_->retainWhere(shouldKeep);
+    }
     const std::lock_guard<std::mutex> lock{mutex_};
     std::size_t forgotten = 0;
     for (auto at = queued_.begin(); at != queued_.end();) {
@@ -160,7 +169,7 @@ ChunkGenerationQueue::retainWhere(const std::function<bool(std::int32_t chunkX, 
 
 std::size_t ChunkGenerationQueue::pendingCount() const {
     const std::lock_guard<std::mutex> lock{mutex_};
-    return queued_.size() + inProgress_.size();
+    return queued_.size() + inProgress_.size() + (pipeline_ != nullptr ? pipeline_->pendingCount() : 0);
 }
 
 std::unordered_set<std::int64_t> ChunkGenerationQueue::pendingKeys() const {
@@ -172,6 +181,9 @@ std::unordered_set<std::int64_t> ChunkGenerationQueue::pendingKeys() const {
     for (const auto& [key, priority] : queued_) {
         keys.insert(key);
     }
+    if (pipeline_ != nullptr) {
+        keys.merge(pipeline_->pendingKeys());
+    }
     return keys;
 }
 
@@ -180,10 +192,6 @@ ChunkGenerationQueue::awaitAll(const std::vector<std::pair<std::int32_t, std::in
     if (positions.empty()) {
         return {};
     }
-    // parity: the jar takes a prepared square from its corner, x outermost, and because a chunk only
-    // decorates once its 3x3 reached the previous stage its turns come out in 3x3 blocks rather than
-    // in columns. Adopting that shape was measured on five windows and moves nothing, so the raster
-    // tie-break stays: it is the same order with the blocks flattened.
     for (const auto& [chunkX, chunkZ] : positions) {
         request(chunkX, chunkZ, 0);
     }
@@ -213,6 +221,9 @@ void ChunkGenerationQueue::stop() {
     running_.store(false);
     const std::lock_guard<std::mutex> lock{mutex_};
     queued_.clear();
+    if (pipeline_ != nullptr) {
+        pipeline_->clearDemands();
+    }
 }
 
 void ChunkGenerationQueue::awaitIdle(std::int64_t timeoutMillis) {
@@ -220,43 +231,13 @@ void ChunkGenerationQueue::awaitIdle(std::int64_t timeoutMillis) {
     while (waited < timeoutMillis) {
         {
             const std::lock_guard<std::mutex> lock{mutex_};
-            if (inProgress_.empty()) {
+            if (inProgress_.empty() && (pipeline_ == nullptr || !pipeline_->busy())) {
                 return;
             }
         }
         wire::io::sleepFor(kIdlePoll);
         waited += kIdlePoll.count();
     }
-}
-
-/// parity: vanilla decorates a chunk only once its 3x3 neighbourhood reached the previous stage.
-/// Here that is expressed as an order, and the order is the one the requests carry: lower priority
-/// first, ties by raster. A chunk waits for the neighbours that come before it in that order, which
-/// is what keeps the result the same from one run to the next.
-[[nodiscard]] bool earlierNeighboursDone(const std::unordered_map<std::int64_t, std::int32_t>& queued,
-                                         const std::unordered_map<std::int64_t, std::int32_t>& inProgress,
-                                         std::int32_t chunkX, std::int32_t chunkZ, std::int32_t priority) {
-    const std::int64_t self = ChunkGenerationQueue::pack(chunkX, chunkZ);
-    for (std::int32_t dx = -1; dx <= 1; ++dx) {
-        for (std::int32_t dz = -1; dz <= 1; ++dz) {
-            if (dx == 0 && dz == 0) {
-                continue;
-            }
-            const std::int64_t key = ChunkGenerationQueue::pack(chunkX + dx, chunkZ + dz);
-            const auto running = inProgress.find(key);
-            const auto waiting = running != inProgress.end() ? running : queued.find(key);
-            if (waiting == queued.end() && running == inProgress.end()) {
-                continue;
-            }
-            const std::int32_t theirs = running != inProgress.end() ? running->second : waiting->second;
-            // Only an earlier neighbour is waited for. Waiting for a later one instead lets it stamp
-            // itself first, which is exactly the precedence this order is meant to fix.
-            if (theirs < priority || (theirs == priority && rasterBefore(key, self))) {
-                return false;
-            }
-        }
-    }
-    return true;
 }
 
 std::optional<std::int64_t> ChunkGenerationQueue::takeNext() {
@@ -268,9 +249,6 @@ std::optional<std::int64_t> ChunkGenerationQueue::takeNext() {
     std::int32_t bestPriority = std::numeric_limits<std::int32_t>::max();
     bool found = false;
     for (const auto& [key, priority] : queued_) {
-        if (!earlierNeighboursDone(queued_, inProgress_, unpackX(key), unpackZ(key), priority)) {
-            continue;
-        }
         if (priority > bestPriority) {
             continue;
         }
@@ -289,17 +267,42 @@ std::optional<std::int64_t> ChunkGenerationQueue::takeNext() {
     return bestKey;
 }
 
+bool ChunkGenerationQueue::generatePiped() {
+    const bool worked = pipeline_->step();
+    std::vector<Chunk> finished;
+    {
+        // Under the lock with the keys marked, so a request between the two cannot find the chunk
+        // neither in the pipeline nor on its way in, and ask for it all over again.
+        const std::lock_guard<std::mutex> lock{mutex_};
+        finished = pipeline_->takeFinished();
+        for (const Chunk& chunk : finished) {
+            inProgress_.emplace(pack(chunk.chunkX(), chunk.chunkZ()), 0);
+        }
+    }
+    for (Chunk& chunk : finished) {
+        const std::int64_t key = pack(chunk.chunkX(), chunk.chunkZ());
+        world_->installLater(std::move(chunk), [live = live_, key]() {
+            const std::lock_guard<std::mutex> lock{live->mutex};
+            if (live->queue != nullptr) {
+                live->queue->markInstalled(key);
+            }
+        });
+    }
+    return worked || !finished.empty();
+}
+
 bool ChunkGenerationQueue::generateNext() {
+    if (pipeline_ != nullptr) {
+        return generatePiped();
+    }
     const std::optional<std::int64_t> next = takeNext();
     if (!next.has_value()) {
         return false;
     }
     const std::int64_t key = *next;
 
-    // A chunk stays in progress until it is really in the world, not until it is generated. The
-    // barrier below is what makes a neighbour wait, and installing is a task the world owner runs
-    // later: releasing the key here let the next chunk start while this one was still in flight, and
-    // then its cross border write landed either on the chunk or in the queue depending on timing.
+    // A chunk stays in progress until it is really in the world, not until it is generated:
+    // installing is a task the world owner runs later, and a request in between would make it twice.
     struct Finally {
         ChunkGenerationQueue* queue;
         std::int64_t key;
