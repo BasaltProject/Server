@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/command/CommandStorage.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
+#include <basalt/server/runtime/command/commands/DataPackCommand.hpp>
 #include <basalt/server/runtime/command/commands/FunctionCommands.hpp>
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
 #include <basalt/server/runtime/command/commands/StopwatchCommand.hpp>
@@ -50,6 +51,8 @@ struct CommandWiring {
     function::FunctionLibrary* functions = nullptr;
     command::commands::FunctionRunner* functionRunner = nullptr;
     command::commands::FunctionSchedule* functionSchedule = nullptr;
+    /// The packs `/reload` and `/datapack` work on, and how a selection is loaded.
+    command::commands::DataPackControl datapacks;
     command::commands::BossBarRegistry* bossBars = nullptr;
     command::CommandStorage* commandStorage = nullptr;
     command::commands::Stopwatches* stopwatches = nullptr;

@@ -50,6 +50,8 @@ struct HorseState {
     /// parity: `Camel.dashCooldown` and `DASH`.
     std::int32_t dashCooldown = 0;
     bool dashing = false;
+    /// A hit that landed since its last turn, whose one-in-three rear is rolled on that turn.
+    bool hurt = false;
 };
 
 /// Every `AbstractHorse`, camels included.

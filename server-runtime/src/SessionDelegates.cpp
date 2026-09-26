@@ -20,6 +20,7 @@
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/ThrownItemTriggers.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -324,6 +325,11 @@ void ClientSession::tryPickupNearbyItems() {
                                                    .pickupItemCount = row.picked};
         sendTo(watchers, play::TakeItemEntityPacket::kId,
                [&collected](wire::io::ByteBuffer& buffer) { collected.write(buffer); });
+        // parity: `ServerPlayer.onItemPickup`, with what is left of the stack, or all of it once gone.
+        if (world::LoadedWorld* loaded = currentWorld(); loaded != nullptr) {
+            world::thrownItems::pickedUpByPlayer(options_.advancementTriggers, *loaded, watchers, row.item,
+                                                 row.leftover > 0 ? row.leftover : row.picked, *session);
+        }
     }
 }
 

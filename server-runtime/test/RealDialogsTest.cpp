@@ -124,7 +124,8 @@ TEST_CASE("one dialog that cannot be converted leaves no registry at all") {
 
     // One warning, naming the file and exactly why it could not travel as NBT.
     REQUIRE(log.lines.size() == 1);
-    CHECK(log.lines[0].find("Dialog 'server_links' could not be converted (" + reason + ");") != std::string::npos);
+    CHECK(log.lines[0].find("Dialog 'minecraft:server_links' could not be converted (" + reason + ");") !=
+          std::string::npos);
 
     // The good file sorts first, so a partial registry would have kept it.
     CHECK(dialogs.size() == 0);

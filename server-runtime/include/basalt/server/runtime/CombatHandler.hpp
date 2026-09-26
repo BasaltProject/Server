@@ -141,6 +141,10 @@ private:
 
     void soundAroundExceptSelf(const player::PlayerSession& session, std::string_view sound);
 
+    /// parity: `Mob.attemptToShearEquipment` with the shears in that hand slot. Answers whether a
+    /// piece came off.
+    bool shearEquipment(player::PlayerSession& session, entity::ServerEntity& mob, std::int32_t handSlot);
+
     /// parity: `Player.attack`'s sweep, which hits what is standing beside what was hit.
     void sweepAround(player::PlayerSession& session, const entity::ServerEntity& target, world::LoadedWorld& world,
                      float strength);

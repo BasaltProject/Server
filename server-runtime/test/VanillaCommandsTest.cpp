@@ -228,7 +228,7 @@ TEST_CASE("no two commands claim the same name") {
     }
 }
 
-TEST_CASE("reload re-reads the files it can and says which it will not") {
+TEST_CASE("reload re-reads the configuration and reloads the data packs") {
     Fixture fixture{scratch("vanilla-commands-reload")};
     const std::string root = scratch("vanilla-commands-reload-config");
     std::error_code ignored;
@@ -239,20 +239,23 @@ TEST_CASE("reload re-reads the files it can and says which it will not") {
     REQUIRE(initial.has_value());
     config::LiveConfigs live{std::move(*initial)};
     std::int32_t reloads = 0;
-    fixture.dispatcher.registerCommand(
-        std::make_shared<commands::ReloadCommand>(live, [&reloads] { reloads++; }, [] { return 3; }, directory));
+    std::int32_t packReloads = 0;
+    fixture.dispatcher.registerCommand(std::make_shared<commands::ReloadCommand>(
+        live, [&reloads] { reloads++; },
+        commands::DataPackControl{.packs = nullptr,
+                                  .reload =
+                                      [&packReloads](const std::vector<std::string>&) {
+                                          packReloads++;
+                                          return packReloads == 1;
+                                      }},
+        directory));
 
-    CHECK(fixture.dispatcher.execute(fixture.source, "reload") ==
-          static_cast<std::int32_t>(config::LiveConfigs::kReloadableFiles.size()));
+    CHECK(fixture.dispatcher.execute(fixture.source, "reload") == 0);
     CHECK(reloads == 1);
-    std::string all;
-    for (const Component& line : fixture.source.said) {
-        all += flatten(line);
-    }
-    CHECK(all.find("3 function(s)") != std::string::npos);
-    CHECK(all.find("server.toml and worlds.toml are NOT reloaded") != std::string::npos);
+    CHECK(packReloads == 1);
+    CHECK(flatten(fixture.source.said.back()).find("commands.reload.success") != std::string::npos);
 
-    // The `confirm` form is the same thing, since nothing here needs confirming.
-    CHECK(fixture.dispatcher.execute(fixture.source, "reload confirm") > 0);
-    CHECK(reloads == 2);
+    // parity: a load that fails says so, and keeps what was there.
+    static_cast<void>(fixture.dispatcher.execute(fixture.source, "reload"));
+    CHECK(flatten(fixture.source.said.back()).find("commands.reload.failure") != std::string::npos);
 }

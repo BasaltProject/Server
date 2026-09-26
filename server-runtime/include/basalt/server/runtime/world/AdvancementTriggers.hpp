@@ -95,6 +95,9 @@ public:
 
     AdvancementTriggers(const RealAdvancements& advancements, PlayerProgress& progress, Hooks hooks = {});
 
+    /// Indexes the criteria again, after `/reload` replaced the advancements.
+    void reindex();
+
     /// Fires any trigger read field by field, by its id. parity: `SimpleCriterionTrigger.trigger`.
     void fire(std::string_view trigger, std::string_view player, std::string_view uuid, const TriggerEvent& event = {});
 

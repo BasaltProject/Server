@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/datapack/DataFiles.hpp>
 #include <basalt/server/runtime/world/RealTimelines.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/nbt/JsonToNbt.hpp>
@@ -12,8 +13,6 @@ namespace {
 using wire::common::Identifier;
 using wire::nbt::NbtCompound;
 
-constexpr std::string_view kPrefix = "data/minecraft/timeline/";
-constexpr std::string_view kJsonSuffix = ".json";
 constexpr std::string_view kVanillaPrefix = "minecraft:";
 
 /// parity: the `EnvironmentAttributes` that were built with `syncable()`, and only those.
@@ -50,17 +49,6 @@ constexpr auto kSyncableAttributes = std::to_array<std::string_view>({"audio/amb
                                                                       "visual/water_fog_color",
                                                                       "visual/water_fog_end_distance",
                                                                       "visual/water_fog_start_distance"});
-
-[[nodiscard]] std::string stripped(const std::string& entry) {
-    std::string path = entry;
-    if (path.starts_with(kPrefix)) {
-        path.erase(0, kPrefix.size());
-    }
-    if (path.ends_with(kJsonSuffix)) {
-        path.resize(path.size() - kJsonSuffix.size());
-    }
-    return path;
-}
 
 /// parity: `Timeline.filterSyncableTracks`, which is the only thing `NETWORK_CODEC` changes.
 [[nodiscard]] NbtCompound syncable(const NbtCompound& root) {
@@ -116,13 +104,8 @@ RealTimelines::RealTimelines(const Jar& jar, wire::common::Logger logger) : logg
     if (!jar.entriesUnder || !jar.readText) {
         return;
     }
-    std::vector<std::string> names = jar.entriesUnder(kPrefix);
-    std::sort(names.begin(), names.end());
-    for (const std::string& entry : names) {
-        if (!entry.ends_with(kJsonSuffix)) {
-            continue;
-        }
-        const std::string path = stripped(entry);
+    for (const auto& [id, entry] : datapack::dataFiles(jar.entriesUnder, "timeline")) {
+        const std::string path = id.toString();
         std::expected<NbtCompound, std::string> converted = convert(jar.readText(entry));
         if (!converted.has_value()) {
             logger_.warn([&] {
@@ -132,7 +115,7 @@ RealTimelines::RealTimelines(const Jar& jar, wire::common::Logger logger) : logg
             entries_.clear();
             return;
         }
-        entries_.emplace_back(Identifier::vanilla(path), std::move(*converted));
+        entries_.emplace_back(id, std::move(*converted));
     }
     if (!entries_.empty()) {
         logger_.info([&] { return "Loaded " + std::to_string(entries_.size()) + " timeline(s)."; });

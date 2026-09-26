@@ -411,15 +411,23 @@ std::optional<CommandSyntaxError> SelectorParser::readOption(const std::string& 
         return std::nullopt;
     }
     if (key == "predicate") {
-        // `predicate=` resolves against the `minecraft:predicate` registry. Vanilla ships none of
-        // its own (they are datapack content), and an unknown predicate is false there even when
-        // negated, so with no datapack loaded nothing matches either way.
-        static_cast<void>(shouldInvert());
+        // parity: an id no pack declares is false, negated or not.
+        const bool inverted = shouldInvert();
         const Parsed<Identifier> id = readIdentifier(reader_->cursor());
         if (!id.has_value()) {
             return id.error();
         }
-        parts_.predicates.emplace_back([](const CommandTarget&) { return false; });
+        parts_.predicates.emplace_back([environment = environment_, id = *id, inverted](const CommandTarget& target) {
+            if (!environment->options().predicate) {
+                return false;
+            }
+            const auto& worlds = environment->options().worlds;
+            const auto found = worlds.find(target.worldName());
+            const std::optional<bool> passed = environment->options().predicate(
+                wire::common::JsonValue::of(id.toString()), &target, found == worlds.end() ? nullptr : found->second,
+                {target.x(), target.y(), target.z()});
+            return passed.has_value() && *passed != inverted;
+        });
         return std::nullopt;
     }
     reader_->setCursor(start);

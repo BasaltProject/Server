@@ -6,6 +6,7 @@
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
+#include <optional>
 
 namespace basalt::server::runtime::world {
 
@@ -43,9 +44,8 @@ struct DroppedItem {
 
     /// How far it has fallen without landing.
     ///
-    /// parity: `Entity.fallDistance`, which powder snow is the one block to read: over two and a
-    /// half blocks it turns into a lid the thing lands on. `makeStuckInBlock` puts it back to zero,
-    /// which is what lets the item through on the very next tick.
+    /// parity: `Entity.fallDistance`, read only by powder snow: over two and a half blocks it is a lid
+    /// the item lands on. `makeStuckInBlock` zeroes it, which lets the item through the next tick.
     double fallDistance = 0.0;
 
     /// Ticks before anyone may pick this up.
@@ -56,9 +56,8 @@ struct DroppedItem {
 
     /// What is left of the five hits an item entity takes before it is gone.
     ///
-    /// parity: `ItemEntity.health`, which starts at five and goes down one per point of damage.
-    /// Only a cactus spends it here; fire and lava need the fire clock and the item's own
-    /// `damage_resistant` component, neither of which this build has.
+    /// parity: `ItemEntity.health`, one per point of damage. Only a cactus spends it here: fire and
+    /// lava need the fire clock and `damage_resistant`, which this build lacks.
     std::int32_t health = kItemHealth;
 
     /// What the stack carries besides its id and count, as a shulker box carries its contents.
@@ -67,12 +66,13 @@ struct DroppedItem {
     /// there travels this way today, which is enough for a box picked up and put back down.
     wire::nbt::NbtCompound components;
 
+    /// parity: `ItemEntity.thrower`, who let go of it, for the criteria its pickup fires.
+    std::optional<wire::common::Uuid> thrower;
+
     /// Where it was when this tick began.
     ///
-    /// parity: vanilla presses a plate from inside `Entity.move`, so the count it takes is of who is
-    /// on the plate **at that instant**: whoever has not taken their turn yet is still where they
-    /// were. Four items landing together therefore read one and not four, until the plate's own turn
-    /// ten ticks later reads all of them. Measured in `placas`. Never saved.
+    /// parity: vanilla presses a plate from inside `Entity.move`, counting who is on it **at that
+    /// instant**: four items landing together read one until the plate's own turn reads all. Never saved.
     double previousX = 0.0;
     double previousY = 0.0;
     double previousZ = 0.0;

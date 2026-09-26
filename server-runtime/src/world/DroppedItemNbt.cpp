@@ -48,6 +48,13 @@ NbtCompound encode(const DroppedItem& item) {
     tag.putShort("Age", static_cast<std::int16_t>(item.age));
     tag.putShort("PickupDelay", static_cast<std::int16_t>(item.pickupDelay));
     tag.set("Item", NbtTag::ofCompound(std::move(stack)));
+    // parity: `EntityReference.store`, the thrower's UUID as four ints.
+    if (item.thrower.has_value()) {
+        const std::uint64_t high = item.thrower->high();
+        const std::uint64_t low = item.thrower->low();
+        tag.putIntArray("Thrower", {static_cast<std::int32_t>(high >> 32U), static_cast<std::int32_t>(high),
+                                    static_cast<std::int32_t>(low >> 32U), static_cast<std::int32_t>(low)});
+    }
     return tag;
 }
 
@@ -83,6 +90,13 @@ std::optional<DroppedItem> decode(const NbtCompound& tag, const std::function<st
     dropped.health = tag.getShort("Health", static_cast<std::int16_t>(kItemHealth));
     if (const NbtCompound* components = stack->getCompound("components"); components != nullptr) {
         dropped.components = *components;
+    }
+    if (const std::span<const std::int32_t> thrower = tag.getIntArray("Thrower"); thrower.size() == 4) {
+        const auto half = [](std::int32_t upper, std::int32_t lower) {
+            return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(upper)) << 32U) |
+                   static_cast<std::uint32_t>(lower);
+        };
+        dropped.thrower = wire::common::Uuid{half(thrower[0], thrower[1]), half(thrower[2], thrower[3])};
     }
     return dropped;
 }

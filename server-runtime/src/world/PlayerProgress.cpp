@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/datapack/DataFiles.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/world/advancement/AdvancementJson.hpp>
 
@@ -11,8 +12,6 @@ namespace {
 using wire::common::Identifier;
 using advancement = server::world::advancement::Advancement;
 
-constexpr std::string_view kAdvancementPrefix = "data/minecraft/advancement/";
-constexpr std::string_view kJsonSuffix = ".json";
 
 } // namespace
 
@@ -23,10 +22,7 @@ RealAdvancements::RealAdvancements(const Jar& jar, wire::common::Logger logger) 
     if (!jar.entriesUnder || !jar.readText) {
         return;
     }
-    for (const std::string& entry : jar.entriesUnder(kAdvancementPrefix)) {
-        if (!entry.ends_with(kJsonSuffix)) {
-            continue;
-        }
+    for (const auto& [id, entry] : datapack::dataFiles(jar.entriesUnder, "advancement")) {
         const std::optional<std::string> text = jar.readText(entry);
         if (!text.has_value()) {
             logger.debug([&] { return "Skipped advancement " + entry + ": unreadable"; });
@@ -35,13 +31,10 @@ RealAdvancements::RealAdvancements(const Jar& jar, wire::common::Logger logger) 
         const std::expected<advancement, server::world::advancement::AdvancementParseError> parsed =
             server::world::advancement::advancementJson::parse(*text);
         if (!parsed.has_value()) {
-            logger.debug([&] { return "Skipped advancement " + entry + ": malformed"; });
+            logger.error([&] { return "Couldn't parse advancement " + id.toString(); });
             continue;
         }
-        std::string_view path = entry;
-        path.remove_prefix(kAdvancementPrefix.size());
-        path.remove_suffix(kJsonSuffix.size());
-        advancements_.insert_or_assign(Identifier::vanilla(std::string{path}), *parsed);
+        advancements_.insert_or_assign(id, *parsed);
     }
     logger.info([this] { return "Loaded " + std::to_string(advancements_.size()) + " advancement(s)."; });
 }

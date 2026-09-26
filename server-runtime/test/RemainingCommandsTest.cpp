@@ -188,22 +188,6 @@ struct TextJar {
     }
 };
 
-/// A datapack on disk with one function in it, which is the only way the library reads any.
-[[nodiscard]] std::string packWith(const std::string& root, const std::string& name,
-                                   const std::vector<std::string>& lines) {
-    const std::string directory = root + "/pack/data/test/function";
-    std::error_code ignored;
-    std::filesystem::create_directories(directory, ignored);
-    std::ofstream meta{root + "/pack/pack.mcmeta"};
-    meta << R"({"pack":{"pack_format":81,"description":"test"}})";
-    meta.close();
-    std::ofstream file{directory + "/" + name + ".mcfunction"};
-    for (const std::string& line : lines) {
-        file << line << "\n";
-    }
-    return root;
-}
-
 } // namespace
 
 TEST_CASE("waypoint tracks an entity once it has an icon, and pushes it to everyone") {
@@ -304,10 +288,12 @@ TEST_CASE("test runs a function test, skips one of another type, and remembers w
     Fixture fixture{scratch("test-command")};
     // `/say` reaches players rather than the caller, so a test function needs one to have an effect.
     fixture.add("Steve");
-    const std::string root = packWith(scratch("test-command-packs"), "passes", {"say hello"});
-    FunctionLibrary library{root};
-    library.reload();
-    FunctionRunner runner{library};
+    TextJar functions;
+    functions.entries["data/test/function/passes.mcfunction"] = "say hello\n";
+    FunctionLibrary library;
+    static_cast<void>(library.load([&functions](std::string_view prefix) { return functions.under(prefix); },
+                                   [&functions](std::string_view name) { return functions.read(name); }));
+    FunctionRunner runner{library, FunctionRunner::Settings{.permissionLevel = 2, .commandLimit = {}}};
 
     TextJar jar;
     jar.entries["data/minecraft/test_instance/passes.json"] =

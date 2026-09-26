@@ -42,6 +42,25 @@ private:
     std::string registry_;
 };
 
+/// parity: `FunctionArgument.parse`: a leading `#` names a tag of functions.
+class FunctionNameArgument final : public ArgumentType {
+public:
+    [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource& source,
+                                              const CommandEnvironment& environment) const override {
+        const bool isTag = reader.canRead() && reader.peek() == '#';
+        if (isTag) {
+            reader.skip();
+        }
+        Parsed<ArgumentValue> id = resourceLocationArgument()->parse(reader, source, environment);
+        if (!id.has_value()) {
+            return id;
+        }
+        return ArgumentValue::of(FunctionName{.id = *id->as<wire::common::Identifier>(), .isTag = isTag});
+    }
+
+    [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kFunction}; }
+};
+
 /// A name the client already keeps a list of: read as a brigadier string, declared as its own
 /// parser so the client completes it without asking.
 class NameArgument final : public ArgumentType {
@@ -216,7 +235,7 @@ std::shared_ptr<const ArgumentType> resourceSelectorArgument(std::string registr
 }
 
 std::shared_ptr<const ArgumentType> functionArgument() {
-    static const auto type = std::make_shared<const RegistryArgument>(parserId::kFunction, std::string{});
+    static const auto type = std::make_shared<const FunctionNameArgument>();
     return type;
 }
 

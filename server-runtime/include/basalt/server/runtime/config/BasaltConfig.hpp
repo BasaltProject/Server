@@ -21,12 +21,9 @@ enum class ColorMode : std::uint8_t { Auto, Always, Never };
 
 [[nodiscard]] std::string_view colorModeName(ColorMode mode) noexcept;
 
-/// Parsed `config/server.toml`. Only the fields Basalt currently reads are exposed; everything else
-/// is a documented placeholder in the file itself.
-///
-/// What is left here is what has no larger domain of its own. Worlds left for `worlds.toml`, the
-/// message of the day for `server_list.toml`, and operators for `groups.toml` plus a column in
-/// `players.db`.
+/// Parsed `config/server.toml`. Only the fields read are exposed; the rest are documented placeholders
+/// in the file. Worlds live in `worlds.toml`, the message of the day in `server_list.toml`, operators
+/// in `groups.toml` plus a column in `players.db`.
 struct BasaltConfig {
     /// The file this configuration lives in, inside a `ConfigDirectory`.
     static constexpr std::string_view kFileName = "server.toml";
@@ -81,6 +78,14 @@ struct BasaltConfig {
     std::string orphanData = "warn";
     /// How many copies of each plugin run. One on a server; more is a development switch.
     std::int32_t pluginLanes = 1;
+
+    /// parity: `initial-enabled-packs` and `initial-disabled-packs`, read only when the default
+    /// world is created. See `[datapacks]`.
+    std::vector<std::string> initialEnabledPacks{"vanilla"};
+    std::vector<std::string> initialDisabledPacks;
+
+    /// parity: `function-permission-level`, what a function's commands may do.
+    std::int32_t functionPermissionLevel = 2;
 
     /// Reads what the file says, leaving every option it does not mention at its default.
     [[nodiscard]] static std::expected<BasaltConfig, std::string> fromToml(const wire::common::toml::TomlTable& root,

@@ -19,6 +19,7 @@
 #include <basalt/server/runtime/world/RealFluidTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/RealTimelineTags.hpp>
+#include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/auth/Cfb8Cipher.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
 #include <basalt/wire/auth/SessionProfile.hpp>
@@ -230,6 +231,8 @@ public:
         const world::realEntityTypeTags::TagMembers* entityTypeTags = nullptr;
         /// Which patterns a loom may offer, in the order its buttons are numbered by.
         const world::realBannerPatterns::TagOrder* bannerPatterns = nullptr;
+        /// What the selected data packs add to or change in the registries sent at configuration.
+        std::function<void(std::vector<wire::protocol::configuration::RegistryDataPacket>&)> packRegistries;
         /// The two registries a client is sent that this build loads from the jar.
         world::RealDialogs* dialogs = nullptr;
         world::RealTimelines* timelines = nullptr;
@@ -583,7 +586,6 @@ private:
     void sendRegistriesThenFinish();
 
     /// The numeric members of one tag, or empty where this build has no real data for it.
-    [[nodiscard]] std::vector<std::int32_t> tagMembers(std::string_view registryId, std::string_view tagName) const;
 
     wire::io::TcpConnection connection_;
     Options options_;

@@ -95,6 +95,10 @@ public:
     /// stands in, every tick, which is what the boat recipes and the gateway advancement wait for.
     void tickInsideBlocks(world::LoadedWorld& world);
 
+    /// parity: `HoneyBlock.entityInside` for a player: the slide, its criterion and its effects.
+    void honeySlide(world::LoadedWorld& world, player::PlayerSession& player, std::int32_t x, std::int32_t y,
+                    std::int32_t z, std::int32_t state);
+
     /// parity: `ServerPlayer.doTick`'s `tickCount % 20`, where the biome and structure criteria are
     /// asked about once a second rather than every tick.
     void tickLocation(world::LoadedWorld& world);

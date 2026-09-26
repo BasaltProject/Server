@@ -23,6 +23,9 @@ namespace basalt::server::runtime::command {
 /// A single word, `brigadier:string` in its `SINGLE_WORD` form.
 [[nodiscard]] std::shared_ptr<const ArgumentType> wordArgument();
 
+/// `brigadier:string` in its `QUOTABLE_PHRASE` form: a word, or anything in double quotes.
+[[nodiscard]] std::shared_ptr<const ArgumentType> stringArgument();
+
 /// `brigadier:bool`, which accepts exactly `true` and `false`.
 [[nodiscard]] std::shared_ptr<const ArgumentType> boolArgument();
 

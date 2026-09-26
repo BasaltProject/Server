@@ -138,7 +138,7 @@ TEST_CASE("one timeline that cannot be read costs the whole registry") {
 
     CHECK(timelines.size() == 0);
     CHECK(timelines.ids().empty());
-    CHECK(mentions(log.lines, "Timeline 'nether'"));
+    CHECK(mentions(log.lines, "Timeline 'minecraft:nether'"));
     CHECK(mentions(log.lines, "malformed JSON"));
 }
 

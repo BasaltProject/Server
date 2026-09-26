@@ -1,4 +1,4 @@
-#include <basalt/server/world/terrain/decoration/AquaticDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/AquaticPatchDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/BambooDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/BiomeFlowerFeatures.hpp>
 #include <basalt/server/world/terrain/decoration/BushPatchDecoration.hpp>
@@ -260,8 +260,8 @@ void putFlowersAndVines(Registry& registry) {
 }
 
 void putCavesAndOceans(Registry& registry) {
-    for (const std::string& name : aquaticDecoration::placedIds()) {
-        put(registry, name, byName(aquaticDecoration::placeAt, name));
+    for (const std::string& name : aquaticPatchDecoration::placedIds()) {
+        put(registry, name, byName(aquaticPatchDecoration::placeAt, name));
     }
     for (const std::string& name : coralDecoration::placedIds()) {
         put(registry, name, byPos(coralDecoration::placeAt));

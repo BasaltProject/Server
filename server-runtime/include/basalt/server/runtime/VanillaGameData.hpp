@@ -34,14 +34,16 @@ namespace basalt::server::assets {
 class ServerJarAssets;
 }
 
+namespace basalt::server::runtime::datapack {
+class ResourceStack;
+struct PackFiles;
+} // namespace basalt::server::runtime::datapack
+
 namespace basalt::server::runtime {
 
 /// Every read-only registry this server reads straight out of the operator's own `server.jar`.
-///
-/// Built once, before anything that could depend on it: no chunk generates, no player loads and no
-/// command registers before this exists. Where each table comes from (loot, tags, recipes...) is
-/// exactly what vanilla's own `server.jar` holds, so no jar (as in most tests, which never break a
-/// block in survival) leaves every table empty rather than absent.
+/// Built once, before any chunk generates, player loads or command registers. With no jar (most
+/// tests) every table is empty rather than absent.
 class VanillaGameData {
 public:
     /// The three ways anything here reads the jar. Callbacks rather than the jar itself, because
@@ -57,7 +59,19 @@ public:
     /// The jar as callbacks over the real archive, or an empty one when there is none.
     [[nodiscard]] static Jar jarOf(const assets::ServerJarAssets* assets);
 
+    /// The whole unpacked jar as the pack repository lists it, empty when there is none.
+    [[nodiscard]] static datapack::PackFiles jarFilesOf(const assets::ServerJarAssets* assets);
+
+    /// The same callbacks over the selected data packs, which is what everything here reads.
+    [[nodiscard]] static Jar jarOf(std::shared_ptr<const datapack::ResourceStack> resources);
+
     explicit VanillaGameData(const Jar& jar, wire::common::Logger logger = wire::common::Logger{"GameData"});
+
+    /// parity: `ReloadableServerResources` plus the tags `TagLoader.loadTagsForExistingRegistries`
+    /// reloads: loot tables, predicates and item modifiers, recipes, advancements, every tag and the
+    /// structure templates. Enchantments, dialogs, trades, timelines and the rest stay as the world
+    /// loaded them, as vanilla's world registries do.
+    void reload(const Jar& jar, const wire::common::Logger& logger = wire::common::Logger{"GameData"});
 
     world::RealLootTables lootTables;
     /// What each biome offers the spawner, out of the operator's own jar.
@@ -89,6 +103,9 @@ public:
     world::RealTestInstances testInstances;
     /// Structure files, loaded on demand: what `/place template` puts down.
     world::StructureTemplates structureTemplates;
+
+private:
+    void useBrewingRecipes() const;
 };
 
 } // namespace basalt::server::runtime

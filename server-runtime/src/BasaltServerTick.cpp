@@ -101,15 +101,10 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
         server::plugins::emit(bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::serverTick(),
                               [this](server::plugins::PluginEvent& event) { event.set(0, tickLoop_->ticksRun()); }));
 
-    // Scheduled functions first, so one that changes the world does it before this tick's own work
-    // reads it. parity: vanilla ticks its function timer before the levels.
-    for (const wire::common::Identifier& id : functionSchedule_.tick()) {
-        try {
-            static_cast<void>(functionRunner_->run(*wired_.dispatcher, *consoleSource_, id));
-        } catch (const std::exception& error) {
-            logger_.error(
-                [&id, &error] { return "Scheduled function '" + id.toString() + "' failed: " + error.what(); });
-        }
+    // Functions first, so one that changes the world does it before this tick's own work reads it.
+    // parity: `tickChildren` runs the function manager before the levels.
+    if (worldRuns) {
+        tickFunctions();
     }
 
     // What the world has loaded decides what its regions are, and it is worked out here, at the tick
@@ -405,6 +400,32 @@ void BasaltServer::tickBoat(world::LoadedWorld& world, const std::vector<player:
     }
 }
 
+bool BasaltServer::drinkBySculk(world::LoadedWorld& world, const entity::ServerEntity& dead) {
+    // parity: `ENTITY_DIE` reaches the nearest catalyst before the drops, and only the first one
+    // finds the experience still there; it drinks it whoever or whatever did the killing.
+    const std::optional<std::array<std::int32_t, 3>> catalyst =
+        sculkCatalysts_ == nullptr ? std::nullopt : sculkCatalysts_->nearest(world, dead.x, dead.y, dead.z);
+    if (!catalyst.has_value()) {
+        return false;
+    }
+    random::RandomSource random = random::RandomSource::legacy(scratchSeed());
+    const std::int32_t reward =
+        entity::deathDrops::shouldDropExperience(dead) ? entity::deathDrops::experienceReward(dead, random) : 0;
+    sculkCatalysts_->drink(world, *catalyst, dead.x, dead.y, dead.z, reward > 0 ? std::optional{reward} : std::nullopt);
+    // parity: `tryAwardItSpreadsAdvancement`, for a player that was the last to hurt it.
+    if (reward > 0 && dead.hurtBy.has_value() && advancementTriggers_ != nullptr) {
+        for (const player::PlayerSession* player : playerRegistry_.snapshot()) {
+            if (player->entityId() == *dead.hurtBy && player->worldName == world.name()) {
+                advancementTriggers_->fire(
+                    "kill_mob_near_sculk_catalyst", player->name(), player->uuid().toString(),
+                    world::TriggerEvent{.entities = {{"entity", world::triggerFacts::ofEntity(world, dead)}},
+                                        .damage = killingBlowOf(world, dead)});
+            }
+        }
+    }
+    return true;
+}
+
 void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& region) {
     for (entity::ServerEntity* dead : world.state().entities()) {
         if (!dead->killed || !region.ownsPosition(dead->x, dead->z)) {
@@ -449,16 +470,17 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
                                                 .victimFacts = world::triggerFacts::ofEntity(world, *dead),
                                                 .killingBlow = killingBlowOf(world, *dead)});
         }
+        const bool living = registry::entityAttributes::isLiving(dead->type());
+        const bool experienceTaken = living && drinkBySculk(world, *dead);
         // parity: `Entity.die` drops the entity's own loot table where it stood.
         const bool mobDrops = world.gameRules().get(world::gameRules::kMobDrops);
-        const bool living = registry::entityAttributes::isLiving(dead->type());
         if (!living || entity::deathDrops::dropsLoot(*dead, mobDrops)) {
             mobActions_->dropDeathLoot(world, *dead);
             if (WitherSystem::isWither(*dead)) {
                 withers_->dropStar(world, *dead);
             }
         }
-        if (living && entity::deathDrops::dropsExperience(*dead, mobDrops)) {
+        if (living && !experienceTaken && entity::deathDrops::dropsExperience(*dead, mobDrops)) {
             random::RandomSource random = random::RandomSource::legacy(scratchSeed());
             orbs_->award(world, dead->x, dead->y, dead->z, entity::deathDrops::experienceReward(*dead, random));
         }

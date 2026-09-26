@@ -188,6 +188,17 @@ orphan-data = "warn"
 # arena = ["packets"]
 # lobby = ["network", "commands"]
 
+[datapacks]
+# The data packs a brand new world starts with, and the ones it leaves off: vanilla's
+# initial-enabled-packs and initial-disabled-packs. Read once, when the default world is
+# created; from then on the world keeps its own list, changed with /datapack. Packs go in
+# the default world's datapacks folder, as a folder or a .zip, and are named file/<name>.
+initial-enabled = ["vanilla"]
+initial-disabled = []
+
+# What the commands in a function may do, 1 to 4. Vanilla's function-permission-level.
+function-permission-level = 2
+
 [logging]
 # One of: trace, debug, info, warn, error.
 level = "info"

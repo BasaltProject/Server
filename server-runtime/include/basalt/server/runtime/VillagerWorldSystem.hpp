@@ -2,6 +2,7 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -94,7 +95,7 @@ private:
     [[nodiscard]] std::vector<player::PlayerSession*> watchers() const;
     [[nodiscard]] player::PlayerSession* playerById(std::int32_t playerId) const;
     void spawnItem(const server::world::loot::ItemStack& stack, double x, double y, double z, double velocityX,
-                   double velocityY, double velocityZ);
+                   double velocityY, double velocityZ, std::optional<wire::common::Uuid> thrower = std::nullopt);
     void announce(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, bool neighbours);
 
     player::PlayerRegistry* players_;

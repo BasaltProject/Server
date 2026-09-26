@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/registry/SyncedTags.hpp>
 #include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/registry/VanillaTagData.hpp>
 #include <basalt/server/runtime/world/RealDialogs.hpp>
@@ -435,75 +436,15 @@ void ClientSession::handleConfiguration(std::int32_t packetId, wire::io::ByteBuf
     }
 }
 
-std::vector<std::int32_t> ClientSession::tagMembers(std::string_view registryId, std::string_view tagName) const {
-    // Members are registry ids of the tagged thing: a block tag carries `minecraft:block` ids, not
-    // block *state* ids, which are a different numbering entirely.
-    std::vector<std::int32_t> ids;
-    if (registryId == "minecraft:block" && options_.blockTags != nullptr) {
-        for (const Identifier& member : world::realBlockTags::membersOf(*options_.blockTags, tagName)) {
-            const std::optional<std::int32_t> id = reg::blocks::blockIdOf(member);
-            if (id.has_value()) {
-                ids.push_back(*id);
-            }
-        }
-        return ids;
-    }
-    if (registryId == "minecraft:item" && options_.itemTags != nullptr) {
-        for (const Identifier& member : world::realItemTags::membersOf(*options_.itemTags, tagName)) {
-            const reg::Item* item = reg::items::registry().byName(member);
-            if (item != nullptr) {
-                ids.push_back(item->protocolId);
-            }
-        }
-        return ids;
-    }
-    const std::optional<Identifier> tagId = ([tagName] {
-        const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(std::string{tagName});
-        return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
-    })();
-    if (!tagId.has_value()) {
-        return ids;
-    }
-    if (registryId == "minecraft:fluid" && options_.fluidTags != nullptr) {
-        for (const Identifier& member : world::realFluidTags::membersOf(*options_.fluidTags, *tagId)) {
-            const std::optional<std::int32_t> id = ([&member] {
-                const auto& ids = world::realFluidTags::protocolIds();
-                const auto found = ids.find(member);
-                return found == ids.end() ? std::nullopt : std::optional{found->second};
-            })();
-            if (id.has_value()) {
-                ids.push_back(*id);
-            }
-        }
-        return ids;
-    }
-    // The ids are indices into the timeline registry this server sent, in that same order.
-    if (registryId == "minecraft:timeline" && options_.timelineTags != nullptr && options_.timelines != nullptr) {
-        const std::vector<Identifier> order = options_.timelines->ids();
-        for (const Identifier& member : world::realTimelineTags::membersOf(*options_.timelineTags, *tagId)) {
-            const auto found = std::ranges::find(order, member);
-            if (found != order.end()) {
-                ids.push_back(static_cast<std::int32_t>(std::distance(order.begin(), found)));
-            }
-        }
-        return ids;
-    }
-    if (registryId == "minecraft:entity_type" && options_.entityTypeTags != nullptr) {
-        for (const Identifier& member : world::realEntityTypeTags::membersOf(*options_.entityTypeTags, *tagId)) {
-            const reg::EntityTypeEntry* type = reg::entityTypes::of(member);
-            if (type != nullptr) {
-                ids.push_back(type->protocolId);
-            }
-        }
-    }
-    return ids;
-}
-
 void ClientSession::sendRegistriesThenFinish() {
     using wire::protocol::configuration::RegistryDataPacket;
     using wire::protocol::configuration::RegistryEntry;
 
-    for (const RegistryDataPacket& packet : registry::vanillaConfigurationRegistries::packets()) {
+    std::vector<RegistryDataPacket> registries = registry::vanillaConfigurationRegistries::packets();
+    if (options_.packRegistries) {
+        options_.packRegistries(registries);
+    }
+    for (const RegistryDataPacket& packet : registries) {
         sendCompressed(RegistryDataPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     }
     // The rest of `RegistryDataLoader.SYNCHRONIZED_REGISTRIES`, sent empty: a registry that was
@@ -540,20 +481,16 @@ void ClientSession::sendRegistriesThenFinish() {
             RegistryDataPacket{.registryId = std::string{emptyRegistryId}, .entries = {}}.write(buffer);
         });
     }
-    // Every tag name the jar ships goes out: the client looks tags up by key whether or not their
-    // registry is loaded. Members matter separately, because it runs its own tool rules against them
-    // and an empty `mineable/pickaxe` means bare-hand speed.
-    std::vector<wire::protocol::configuration::TagGroup> groups;
-    for (const auto& [registryId, tagNames] : registry::vanillaTagData::tagsByRegistry()) {
-        std::vector<wire::protocol::configuration::TagEntry> entries;
-        entries.reserve(tagNames.size());
-        for (const std::string_view tagName : tagNames) {
-            entries.push_back(wire::protocol::configuration::TagEntry{.name = std::string{tagName},
-                                                                      .ids = tagMembers(registryId, tagName)});
-        }
-        groups.push_back(
-            wire::protocol::configuration::TagGroup{.registryId = std::string{registryId}, .tags = std::move(entries)});
-    }
+    // Every tag name goes out: the client looks tags up by key whether or not their registry is
+    // loaded. Members matter separately, because it runs its own tool rules against them and an
+    // empty `mineable/pickaxe` means bare-hand speed.
+    const std::vector<wire::protocol::configuration::TagGroup> groups =
+        registry::syncedTags(registry::TagSources{.blocks = options_.blockTags,
+                                                  .items = options_.itemTags,
+                                                  .fluids = options_.fluidTags,
+                                                  .entityTypes = options_.entityTypeTags,
+                                                  .timelines = options_.timelineTags,
+                                                  .timelineOrder = options_.timelines});
     sendCompressed(wire::protocol::configuration::TagsPacket::kId, [&groups](wire::io::ByteBuffer& buffer) {
         wire::protocol::configuration::TagsPacket{.groups = groups}.write(buffer);
     });

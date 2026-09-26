@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/ThrownItemTriggers.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -306,7 +307,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
                 state.walk.reset();
                 state.lastPathTarget.reset();
             } else {
-                static_cast<void>(nav::follow(context, route, state.walk->speed));
+                static_cast<void>(nav::follow(context, route, static_cast<double>(state.walk->speed)));
                 state.lastPathTarget =
                     Vec{static_cast<double>(target[0]), static_cast<double>(target[1]), static_cast<double>(target[2])};
             }
@@ -393,7 +394,7 @@ void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay,
     if (!state.vibrationTravelling.has_value() && state.vibrationCandidate.has_value() &&
         state.vibrationCandidate->tick < now) {
         state.vibrationTravelling = std::exchange(state.vibrationCandidate, std::nullopt);
-        state.vibrationTicks = mth::floor(state.vibrationTravelling->distance);
+        state.vibrationTicks = mth::floor(static_cast<double>(state.vibrationTravelling->distance));
     }
     if (state.vibrationTravelling.has_value()) {
         state.vibrationTicks = std::max(0, state.vibrationTicks - 1);
@@ -443,6 +444,7 @@ void MobActionSystem::allayThrows(world::LoadedWorld& world, ServerEntity& allay
     dropped.velocityY = ty * scale * static_cast<double>(0.3F);
     dropped.velocityZ = tz * scale * static_cast<double>(0.2F);
     dropped.pickupDelay = world::kSpawnedPickupDelay;
+    dropped.thrower = allay.uuid();
     world.state().spawnItem(std::move(dropped));
     // parity: `AllayAi.throwItem` tells the liked player, under the square the item was aimed at.
     const player::PlayerSession* liked = state.likedPlayer.has_value() ? players_->get(*state.likedPlayer) : nullptr;
@@ -487,6 +489,9 @@ void MobActionSystem::allayPicksUp(world::LoadedWorld& world, ServerEntity& alla
         if (room <= 0 || !allays::considersEqual(*hand, stack)) {
             continue;
         }
+        // parity: `InventoryCarrier.pickUpItem`, the thrower told before the stack is split.
+        world::thrownItems::pickedUpByMob(options_.advancementTriggers, world, watchersOf(world), item, item.count,
+                                          allay);
         if (state.inventory.has_value()) {
             state.inventory->count += room;
         } else {
@@ -554,6 +559,7 @@ MobActionSystem::AllayUse MobActionSystem::useOnAllay(world::LoadedWorld& world,
                                        .z = allay.z,
                                        .components = state.inventory->components};
             dropped.pickupDelay = world::kSpawnedPickupDelay;
+            dropped.thrower = allay.uuid();
             world.state().spawnItem(std::move(dropped));
             state.inventory.reset();
         }

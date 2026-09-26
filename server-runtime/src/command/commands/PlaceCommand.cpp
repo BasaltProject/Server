@@ -4,10 +4,12 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/RemainingCommands.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/world/terrain/ProtoRegion.hpp>
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 #include <basalt/server/world/terrain/decoration/PlacedFeatures.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -189,6 +191,17 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
 
         random::RandomSource random =
             random::RandomSource::worldgen(random::RandomSource::xoroshiro(nextSeed_ ? nextSeed_() : 0));
+        // parity: the feature runs in the level itself, so what it reads and writes past the chunk is
+        // the loaded neighbour, through the same region the generation decorates with.
+        std::array<server::world::Chunk*, 9> around{};
+        for (std::int32_t dx = -1; dx <= 1; ++dx) {
+            for (std::int32_t dz = -1; dz <= 1; ++dz) {
+                around[static_cast<std::size_t>(((dx + 1) * 3) + dz + 1)] =
+                    (*world)->state().chunkIfLoaded((at[0] >> 4) + dx, (at[2] >> 4) + dz);
+            }
+        }
+        terrain::ProtoRegion region{at[0] >> 4, at[2] >> 4, around};
+        const server::world::Chunk::RegionScope scope{*chunk, region};
         if (placement != nullptr) {
             (*placement)(*chunk, random, at[0], at[1], at[2]);
         } else {
@@ -210,7 +223,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
                         "downloaded server.jar).")}};
             }
         }
-        context.environment().syncChunks(**world, at[0], at[2], at[0], at[2]);
+        context.environment().syncChunks(**world, at[0] - 16, at[2] - 16, at[0] + 16, at[2] + 16);
         context.success(
             Component::translatable("commands.place.feature.success",
                                     {Component::text(id->toString()), Component::text(std::to_string(at[0])),

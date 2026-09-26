@@ -6,6 +6,8 @@
 #include <basalt/server/runtime/command/commands/AccessCommands.hpp>
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/server/runtime/command/commands/DataCommand.hpp>
+#include <basalt/server/runtime/command/commands/DataPackCommand.hpp>
+#include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/command/commands/ExecuteCommand.hpp>
 #include <basalt/server/runtime/command/commands/FunctionCommands.hpp>
 #include <basalt/server/runtime/command/commands/ProfilingCommands.hpp>
@@ -15,7 +17,10 @@
 #include <basalt/server/runtime/command/commands/SessionCommands.hpp>
 #include <basalt/server/runtime/command/commands/TickCommand.hpp>
 #include <basalt/server/runtime/command/commands/TimingsCommand.hpp>
+#include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
+#include <basalt/server/runtime/world/CommandPredicates.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/function/FunctionLibrary.hpp>
 #include <basalt/server/runtime/timings/TimingsReport.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
@@ -94,6 +99,20 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
                 world::realEntityTypeTags::membersOf(data->entityTags, tag);
             return members.empty() ? std::nullopt : std::optional{members};
         };
+        options.predicate = [data](const wire::common::JsonValue& predicate, const command::CommandTarget* self,
+                                   world::LoadedWorld* world,
+                                   const std::array<double, 3>& origin) -> std::optional<bool> {
+            std::optional<server::world::loot::EntityFacts> facts;
+            if (self != nullptr && self->player() != nullptr) {
+                facts = world::triggerFacts::ofPlayer(*self->player());
+            } else if (self != nullptr && self->entity() != nullptr) {
+                facts = world == nullptr ? world::triggerFacts::ofEntity(*self->entity())
+                                         : world::triggerFacts::ofEntity(*world, *self->entity());
+            } else if (self != nullptr) {
+                facts = server::world::loot::EntityFacts{.type = self->type(), .scoreName = self->uuid()};
+            }
+            return world::commandPredicates::test(data->lootTables, predicate, world, origin, std::move(facts));
+        };
     }
 
     if (wiring.players == nullptr) {
@@ -141,10 +160,7 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
         static_cast<void>(dispatcher->registerCommand(std::move(command)));
     };
     if (wiring.live != nullptr) {
-        function::FunctionLibrary* functions = wiring.functions;
-        add(std::make_shared<cmd::ReloadCommand>(
-            *wiring.live, wiring.onConfigsReloaded,
-            functions == nullptr ? std::function<std::int32_t()>{} : [functions] { return functions->reload(); }));
+        add(std::make_shared<cmd::ReloadCommand>(*wiring.live, wiring.onConfigsReloaded, wiring.datapacks));
     }
     if (wiring.requestRestart) {
         add(std::make_shared<cmd::RestartCommand>(wiring.requestRestart));
@@ -201,12 +217,18 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
         add(std::make_shared<cmd::FetchProfileCommand>(wiring.fetchMojangUuid));
     }
     if (wiring.functions != nullptr && wiring.functionRunner != nullptr) {
-        add(std::make_shared<cmd::FunctionCommand>(*wiring.functions, *wiring.functionRunner, wired.data.get()));
+        add(std::make_shared<cmd::FunctionCommand>(*wiring.functionRunner, wired.data.get()));
         add(std::make_shared<cmd::ReturnCommand>(*wiring.functionRunner));
-        add(std::make_shared<cmd::DataPackCommand>(*wiring.functions));
         if (wiring.functionSchedule != nullptr) {
-            add(std::make_shared<cmd::ScheduleCommand>(*wiring.functions, *wiring.functionSchedule));
+            add(std::make_shared<cmd::ScheduleCommand>(
+                *wiring.functions, *wiring.functionSchedule, [](const command::CommandContext& context) -> std::int64_t {
+                    const world::LoadedWorld* world = command::worldIn(context.source(), context.environment());
+                    return world == nullptr ? 0 : world->gameTime();
+                }));
         }
+    }
+    if (wiring.datapacks.packs != nullptr) {
+        add(std::make_shared<cmd::DataPackCommand>(wiring.datapacks));
     }
     if (wiring.commandStorage != nullptr) {
         add(std::make_shared<cmd::DataCommand>(*wiring.commandStorage));

@@ -40,6 +40,11 @@ public:
     explicit StructureTemplates(Jar jar, wire::common::Logger logger = wire::common::Logger{"Structures"})
         : jar_(std::move(jar)), logger_(std::move(logger)) {}
 
+    /// Reads from `jar` from now on and forgets every template read or stored. parity:
+    /// `StructureTemplateManager.onResourceManagerReload`. What was handed out before stays valid
+    /// until the reload after.
+    void reload(Jar jar);
+
     /// The named structure, or nothing when the jar ships no such file.
     ///
     /// The answer is kept either way, so a name that is not there is only looked for once.
@@ -73,6 +78,7 @@ private:
     /// A map rather than a vector: a pointer handed out has to survive the next read.
     std::map<wire::common::Identifier, std::optional<server::world::structure::StructureTemplate>> cache_;
     std::map<std::string, std::vector<wire::common::Identifier>> listings_;
+    std::map<wire::common::Identifier, std::optional<server::world::structure::StructureTemplate>> retired_;
 };
 
 } // namespace basalt::server::runtime::world

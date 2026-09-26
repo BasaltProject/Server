@@ -20,6 +20,14 @@ using Template = server::world::structure::StructureTemplate;
 
 } // namespace
 
+void StructureTemplates::reload(Jar jar) {
+    const std::scoped_lock lock{mutex_};
+    retired_ = std::move(cache_);
+    cache_.clear();
+    listings_.clear();
+    jar_ = std::move(jar);
+}
+
 const Template* StructureTemplates::find(const Identifier& id) {
     {
         const std::scoped_lock lock{mutex_};

@@ -125,7 +125,8 @@ TEST_CASE("one entry that cannot be converted leaves no registry at all") {
 
     // One warning, naming the file and exactly why it could not travel as NBT.
     REQUIRE(log.lines.size() == 1);
-    CHECK(log.lines[0].find("Enchantment 'sharpness' could not be converted (" + reason + ");") != std::string::npos);
+    CHECK(log.lines[0].find("Enchantment 'minecraft:sharpness' could not be converted (" + reason + ");") !=
+          std::string::npos);
 
     // The good file sorts first, so a partial registry would have kept it.
     CHECK(enchantments.size() == 0);

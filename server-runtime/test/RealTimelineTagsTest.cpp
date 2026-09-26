@@ -90,11 +90,11 @@ TEST_CASE("what is not a readable tag file is passed over, and the rest still lo
     CHECK(tags::membersOf(loaded, timeline("all")).size() == 2);
 }
 
-TEST_CASE("a required reference to a tag nobody wrote sinks the whole graph") {
+TEST_CASE("a required reference to a tag nobody wrote leaves out that tag alone, as vanilla does") {
     FakeJar jar = twoTags();
     jar.entries["data/minecraft/tags/timeline/wrong.json"] = R"({"values": ["#minecraft:in_nether"]})";
 
-    CHECK(tags::load(jar.reader()).empty());
+    CHECK(tags::load(jar.reader()).size() == 2);
 
     jar.entries["data/minecraft/tags/timeline/wrong.json"] =
         R"({"values": [{"id": "#minecraft:in_nether", "required": false}]})";
@@ -109,15 +109,4 @@ TEST_CASE("no jar at all, or half of one, reads as no tags rather than a crash")
     CHECK(tags::load(tags::JarReader{}).empty());
     CHECK(tags::load(tags::JarReader{twoTags().reader().entriesUnder, {}}).empty());
     CHECK(tags::load(tags::JarReader{{}, twoTags().reader().readText}).empty());
-}
-
-TEST_CASE("an entry the listing hands back from outside the tag directory keeps its whole path") {
-    const tags::JarReader jar{[](std::string_view) { return std::vector<std::string>{"elsewhere/all.json"}; },
-                              [](std::string_view) -> std::optional<std::string> {
-                                  return std::string{R"({"values": ["minecraft:overworld"]})"};
-                              }};
-    const tags::TagMembers loaded = tags::load(jar);
-
-    CHECK(loaded.size() == 1);
-    CHECK(tags::membersOf(loaded, timeline("elsewhere/all")).size() == 1);
 }

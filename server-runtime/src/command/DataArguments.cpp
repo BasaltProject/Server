@@ -116,6 +116,11 @@ std::shared_ptr<const ArgumentType> lootModifierOrInlineArgument() {
     return type;
 }
 
+std::shared_ptr<const ArgumentType> lootPredicateOrInlineArgument() {
+    static const auto type = std::make_shared<const ResourceOrInlineArgument>(parserId::kLootPredicate);
+    return type;
+}
+
 std::shared_ptr<const ArgumentType> contextIntProviderArgument() {
     static const auto type = std::make_shared<const ResourceOrInlineArgument>(parserId::kContextIntProvider);
     return type;

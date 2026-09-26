@@ -153,6 +153,37 @@ std::string mergeLegacyProperties(std::string_view templateText,
             replaceOnce("enforce-secure-profile = true", "enforce-secure-profile = " + std::string{*enforce});
         }
     }
+    // parity: `DedicatedServerProperties.getDatapackConfig`, comma-separated and trimmed.
+    const auto packList = [](std::string_view listed) {
+        std::string toml = "[";
+        std::size_t start = 0;
+        while (start <= listed.size()) {
+            const std::size_t comma = std::min(listed.find(',', start), listed.size());
+            std::string_view one = listed.substr(start, comma - start);
+            while (!one.empty() && one.front() == ' ') {
+                one.remove_prefix(1);
+            }
+            while (!one.empty() && one.back() == ' ') {
+                one.remove_suffix(1);
+            }
+            if (!one.empty()) {
+                toml += (toml.size() > 1 ? ", \"" : "\"") + std::string{one} + "\"";
+            }
+            start = comma + 1;
+        }
+        return toml + "]";
+    };
+    if (const auto enabled = imported("initial-enabled-packs"); enabled.has_value()) {
+        replaceOnce("initial-enabled = [\"vanilla\"]", "initial-enabled = " + packList(*enabled));
+    }
+    if (const auto disabled = imported("initial-disabled-packs"); disabled.has_value()) {
+        replaceOnce("initial-disabled = []", "initial-disabled = " + packList(*disabled));
+    }
+    if (const auto level = imported("function-permission-level"); level.has_value()) {
+        if (const std::optional<std::int64_t> number = asInteger(*level); number.has_value()) {
+            replaceOnce("function-permission-level = 2", "function-permission-level = " + std::to_string(*number));
+        }
+    }
     // The view distance is not imported here because it no longer lives in this file: it is a
     // per-world setting and belongs to `worlds.toml`, which is where importing it goes when it
     // does.
@@ -229,6 +260,19 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
         config.generationMetrics = performance->boolean("generation-metrics").value_or(defaults.generationMetrics);
         config.regional = performance->boolean("regional").value_or(defaults.regional);
         config.regionThreads = regionThreadsOf(performance->string("region-threads"));
+    }
+
+    if (const TomlTable* datapacks = root.table("datapacks"); datapacks != nullptr) {
+        if (datapacks->find("initial-enabled") != nullptr) {
+            config.initialEnabledPacks = datapacks->stringList("initial-enabled");
+        }
+        config.initialDisabledPacks = datapacks->stringList("initial-disabled");
+        const std::int64_t level =
+            datapacks->integer("function-permission-level").value_or(defaults.functionPermissionLevel);
+        if (level < 1 || level > 4) {
+            return std::unexpected(std::string{path} + ": function-permission-level must be between 1 and 4");
+        }
+        config.functionPermissionLevel = static_cast<std::int32_t>(level);
     }
 
     if (plugins != nullptr) {

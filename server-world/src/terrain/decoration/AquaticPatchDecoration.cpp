@@ -9,6 +9,7 @@
 #include <basalt/server/world/terrain/decoration/Placement.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
@@ -323,6 +324,58 @@ void aquaticPatchDecoration::decorateFeature(Chunk& chunk, std::int64_t seed,
         throw std::invalid_argument{"unknown aquatic patch '" + std::string{name} + "'"};
     }
     decorateSpecs(chunk, seed, environment, chosen, std::move(externalBlockState), std::move(observer));
+}
+
+const std::set<std::string, std::less<>>& aquaticPatchDecoration::placedIds() {
+    static const std::set<std::string, std::less<>> ids = [] {
+        std::set<std::string, std::less<>> all{
+            "seagrass_short", "seagrass_slightly_less_short", "seagrass_mid", "seagrass_tall", "sea_pickle", "kelp"};
+        for (const AquaticSpec& spec : specs()) {
+            all.emplace(spec.name);
+        }
+        return all;
+    }();
+    return ids;
+}
+
+bool aquaticPatchDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin,
+                                     std::string_view name) {
+    // parity: the four seagrass features are one selector with the tall entry weighted 30, 40, 60 or 80.
+    static constexpr std::array<std::pair<std::string_view, std::int32_t>, 4> kSeagrass{
+        {{"seagrass_short", 30}, {"seagrass_slightly_less_short", 40}, {"seagrass_mid", 60}, {"seagrass_tall", 80}}};
+    AquaticKind kind = AquaticKind::Seagrass;
+    std::int32_t tallWeight = 0;
+    if (const auto seagrass = std::ranges::find(kSeagrass, name, &std::pair<std::string_view, std::int32_t>::first);
+        seagrass != kSeagrass.end()) {
+        tallWeight = seagrass->second;
+    } else if (name == "kelp") {
+        kind = AquaticKind::Kelp;
+    } else {
+        const auto spec = std::ranges::find(specs(), name, &AquaticSpec::name);
+        if (spec == specs().end()) {
+            return false;
+        }
+        kind = spec->kind;
+        tallWeight = spec->tallWeight;
+    }
+    AquaticRegion region{chunk, nullptr, nullptr};
+    const ChunkHeight bounds = chunk.verticalBounds();
+    const std::int32_t before = region.get(origin);
+    switch (kind) {
+    case AquaticKind::Seagrass:
+        placeSeagrass(region, random, origin, tallWeight, bounds);
+        break;
+    case AquaticKind::SeaPickle:
+        placeSeaPickle(region, random, origin, bounds);
+        break;
+    case AquaticKind::Kelp:
+        if (!kelpCanStart(region, origin, bounds)) {
+            return false;
+        }
+        placeKelp(region, random, origin);
+        break;
+    }
+    return region.get(origin) != before;
 }
 
 } // namespace basalt::server::world::terrain::decoration

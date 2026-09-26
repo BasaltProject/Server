@@ -39,6 +39,7 @@
 #include <basalt/server/runtime/world/RedstoneReactors.hpp>
 #include <basalt/server/runtime/world/ScheduledBlocks.hpp>
 #include <basalt/server/runtime/world/SculkShriekers.hpp>
+#include <basalt/server/runtime/world/SculkSpreading.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
@@ -283,7 +284,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z, containerSignal);
         }
         // parity: `SculkShriekerBlock.tick`, the end of a shriek and the warden's answer to it.
-        if (here != 0 && world::sculkShriekers::isShrieker(here) && options_.foreignTick) {
+        // parity: `SculkCatalystBlock.tick`, the bloom let go of.
+        if (here != 0 &&
+            (world::sculkShriekers::isShrieker(here) || world::sculkSpreading::unbloomed(here).has_value()) &&
+            options_.foreignTick) {
             options_.foreignTick(world, watchers, x, y, z);
         }
         // parity: `SculkSensorBlock.tick`: thirty ticks awake, then ten of cooldown, plus the turn

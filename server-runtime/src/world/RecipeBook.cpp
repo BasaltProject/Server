@@ -117,6 +117,31 @@ std::optional<RecipeBookEntry> entryFor(const RealRecipes& recipes, const Identi
                            .craftingRequirements = std::move(requirements)};
 }
 
+namespace {
+
+void send(const player::PlayerSession& target, const RealRecipes& recipes, const std::vector<Identifier>& ids,
+          bool replace) {
+    std::vector<RecipeBookEntry> entries;
+    for (const Identifier& id : ids) {
+        std::optional<RecipeBookEntry> entry = entryFor(recipes, id);
+        if (entry.has_value()) {
+            entries.push_back(std::move(*entry));
+        }
+    }
+    if ((entries.empty() && !replace) || !target.connection().sendPlayPacket) {
+        return;
+    }
+    const wire::protocol::play::RecipeBookAddPacket packet{.entries = std::move(entries), .replace = replace};
+    target.connection().sendPlayPacket(wire::protocol::play::RecipeBookAddPacket::kId,
+                                       [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+}
+
+} // namespace
+
+void resend(const player::PlayerSession& target, const RealRecipes& recipes, const std::vector<Identifier>& ids) {
+    send(target, recipes, ids, true);
+}
+
 void add(const player::PlayerSession& target, const RealRecipes& recipes, const std::vector<Identifier>& ids) {
     std::vector<RecipeBookEntry> entries;
     for (const Identifier& id : ids) {

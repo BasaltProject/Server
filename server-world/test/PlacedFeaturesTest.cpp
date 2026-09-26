@@ -27,7 +27,7 @@ constexpr std::array<std::string_view, 7> kContextualIds{"chorus_plant",        
                                                          "fossil_lower",        "fossil_upper", "freeze_top_layer",
                                                          "rooted_sulfur_spring"};
 
-constexpr std::array<std::string_view, 269> kIds{"acacia",
+constexpr std::array<std::string_view, 274> kIds{"acacia",
                                                  "acacia_checked",
                                                  "amethyst_geode",
                                                  "bamboo",
@@ -103,6 +103,7 @@ constexpr std::array<std::string_view, 269> kIds{"acacia",
                                                  "iceberg_packed",
                                                  "jungle_bush",
                                                  "jungle_tree",
+                                                 "kelp",
                                                  "kelp_cold",
                                                  "kelp_warm",
                                                  "lake_lava_surface",
@@ -239,9 +240,13 @@ constexpr std::array<std::string_view, 269> kIds{"acacia",
                                                  "seagrass_deep",
                                                  "seagrass_deep_cold",
                                                  "seagrass_deep_warm",
+                                                 "seagrass_mid",
                                                  "seagrass_normal",
                                                  "seagrass_river",
+                                                 "seagrass_short",
+                                                 "seagrass_slightly_less_short",
                                                  "seagrass_swamp",
+                                                 "seagrass_tall",
                                                  "seagrass_warm",
                                                  "small_basalt_columns",
                                                  "spore_blossom",
@@ -396,7 +401,7 @@ TEST_CASE("every placed feature places what the jar places") {
         deferred += chunk.takeGeneratedBlockWrites().size();
         after = random.nextInt();
     }
-    CHECK(deferred == 53);
-    CHECK(static_cast<std::int64_t>(checksum) == 3825584282172770931LL);
-    CHECK(after == 1740841542);
+    CHECK(deferred == 69);
+    CHECK(static_cast<std::int64_t>(checksum) == -7203370067836646546LL);
+    CHECK(after == -1613238895);
 }

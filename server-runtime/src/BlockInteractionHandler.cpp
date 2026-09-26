@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
+#include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MiscGrowth.hpp>
@@ -60,7 +61,7 @@ constexpr double kTossLiftSpread = 0.1;
 constexpr double kTossSpread = 0.02;
 constexpr double kThrowSpeed = 0.3;
 constexpr double kThrowLift = 0.1;
-constexpr double kThrowEyeHeight = 1.5;
+constexpr double kHandBelowEyes = static_cast<double>(0.3F);
 
 /// parity: `ClientboundPlayerActionPacket`'s own off-hand number.
 
@@ -230,10 +231,11 @@ void BlockInteractionHandler::heardBySculk(std::string_view event, const BlockPo
 
 void BlockInteractionHandler::spawnDroppedItem(const Identifier& item, std::int32_t count, double x, double y, double z,
                                                double velocityX, double velocityY, double velocityZ,
-                                               std::int32_t pickupDelay, wire::nbt::NbtCompound components) {
+                                               std::int32_t pickupDelay, wire::nbt::NbtCompound components,
+                                               std::optional<wire::common::Uuid> thrower) {
     if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
         player::spawnDroppedItem(breakContext(), *world, item, count, x, y, z, velocityX, velocityY, velocityZ,
-                                 pickupDelay, std::move(components));
+                                 pickupDelay, std::move(components), thrower);
     }
 }
 
@@ -289,10 +291,14 @@ void BlockInteractionHandler::dropHeldItem(bool all) {
     const double pitch = static_cast<double>(session->pitch) * std::numbers::pi / 180.0;
     const double tossAngle = nextDouble() * 2 * std::numbers::pi;
     const double tossSpread = kTossSpread * nextDouble();
-    spawnDroppedItem(*item, dropCount, session->x, session->y + kThrowEyeHeight, session->z,
+    // parity: `createItemStackToDrop`, from the hand three tenths under the eyes, the stack whole and
+    // the thrower kept.
+    spawnDroppedItem(*item, dropCount, session->x,
+                     session->y + world::fluids::eyeHeight(session->sneaking) - kHandBelowEyes, session->z,
                      (-std::sin(yaw) * std::cos(pitch) * kThrowSpeed) + (std::cos(tossAngle) * tossSpread),
                      (-std::sin(pitch) * kThrowSpeed) + kThrowLift + tossLift(),
-                     (std::cos(yaw) * std::cos(pitch) * kThrowSpeed) + (std::sin(tossAngle) * tossSpread));
+                     (std::cos(yaw) * std::cos(pitch) * kThrowSpeed) + (std::sin(tossAngle) * tossSpread),
+                     world::kDefaultPickupDelay, held->components, session->uuid());
     player::statAwards::awardThrown(*session, held->id, dropCount);
 }
 

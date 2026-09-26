@@ -49,6 +49,10 @@ public:
     RealLootTables(const RealLootTables&) = delete;
     RealLootTables& operator=(const RealLootTables&) = delete;
 
+    /// Reads every table and reference from `jar` from now on. parity: `/reload` replaces the
+    /// loot registries, and a table handed out before stays valid until the reload after.
+    void reload(Jar jar);
+
     /// Any table by its own id, which is what `/loot ... loot <table>` rolls.
     [[nodiscard]] const server::world::loot::LootTable* byId(const wire::common::Identifier& id);
 
@@ -98,6 +102,8 @@ private:
     // this lock. Map nodes never move, so a table handed out stays valid while another thread reads.
     std::mutex mutex_;
     std::map<wire::common::Identifier, std::optional<server::world::loot::LootTable>> cache_;
+    /// The cache before the last reload, kept so a roll already under way finishes on it.
+    std::map<wire::common::Identifier, std::optional<server::world::loot::LootTable>> retired_;
 };
 
 } // namespace basalt::server::runtime::world

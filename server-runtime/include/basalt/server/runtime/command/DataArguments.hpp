@@ -22,6 +22,9 @@ struct ResourceOrInline {
 /// `minecraft:loot_modifier` in its 26.3 form, id or inline. The value is a `ResourceOrInline`.
 [[nodiscard]] std::shared_ptr<const ArgumentType> lootModifierOrInlineArgument();
 
+/// `minecraft:loot_predicate`, id or inline. The value is a `ResourceOrInline`.
+[[nodiscard]] std::shared_ptr<const ArgumentType> lootPredicateOrInlineArgument();
+
 /// `minecraft:context_int_provider` and `minecraft:context_float_provider`, likewise.
 [[nodiscard]] std::shared_ptr<const ArgumentType> contextIntProviderArgument();
 [[nodiscard]] std::shared_ptr<const ArgumentType> contextFloatProviderArgument();

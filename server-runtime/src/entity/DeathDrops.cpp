@@ -109,10 +109,13 @@ bool dropsLoot(const ServerEntity& entity, bool mobDrops) {
     return mobDrops && (in(kMonsters, entity.type().path()) || !isBaby(entity));
 }
 
-bool dropsExperience(const ServerEntity& entity, bool mobDrops) {
+bool shouldDropExperience(const ServerEntity& entity) {
     const std::string_view path = entity.type().path();
-    const bool should = path != "tadpole" && (in(kMonsters, path) || path == "hoglin" || !isBaby(entity));
-    return entity.lastHurtByPlayerTime > 0 && should && mobDrops;
+    return path != "tadpole" && (in(kMonsters, path) || path == "hoglin" || !isBaby(entity));
+}
+
+bool dropsExperience(const ServerEntity& entity, bool mobDrops) {
+    return entity.lastHurtByPlayerTime > 0 && shouldDropExperience(entity) && mobDrops;
 }
 
 std::int32_t experienceReward(const ServerEntity& entity, random::RandomSource& random) {

@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/datapack/DataFiles.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/nbt/JsonToNbt.hpp>
@@ -11,20 +12,6 @@ namespace {
 
 using wire::common::Identifier;
 using wire::nbt::NbtCompound;
-
-constexpr std::string_view kPrefix = "data/minecraft/enchantment/";
-constexpr std::string_view kJsonSuffix = ".json";
-
-[[nodiscard]] std::string stripped(const std::string& entry) {
-    std::string path = entry;
-    if (path.starts_with(kPrefix)) {
-        path.erase(0, kPrefix.size());
-    }
-    if (path.ends_with(kJsonSuffix)) {
-        path.resize(path.size() - kJsonSuffix.size());
-    }
-    return path;
-}
 
 /// One entry as the registry packet wants it, or why it cannot travel as NBT.
 [[nodiscard]] std::expected<NbtCompound, std::string> convert(const std::optional<std::string>& text) {
@@ -54,13 +41,8 @@ RealEnchantments::RealEnchantments(const Jar& jar, wire::common::Logger logger) 
     if (!jar.entriesUnder || !jar.readText) {
         return;
     }
-    std::vector<std::string> names = jar.entriesUnder(kPrefix);
-    std::sort(names.begin(), names.end());
-    for (const std::string& entry : names) {
-        if (!entry.ends_with(kJsonSuffix)) {
-            continue;
-        }
-        const std::string path = stripped(entry);
+    for (const auto& [id, entry] : datapack::dataFiles(jar.entriesUnder, "enchantment")) {
+        const std::string path = id.toString();
         std::expected<NbtCompound, std::string> converted = convert(jar.readText(entry));
         if (!converted.has_value()) {
             logger_.warn([&] {
@@ -72,8 +54,8 @@ RealEnchantments::RealEnchantments(const Jar& jar, wire::common::Logger logger) 
             indices_.clear();
             return;
         }
-        indices_.emplace(Identifier::vanilla(path), static_cast<std::int32_t>(entries_.size()));
-        entries_.emplace_back(Identifier::vanilla(path), std::move(*converted));
+        indices_.emplace(id, static_cast<std::int32_t>(entries_.size()));
+        entries_.emplace_back(id, std::move(*converted));
     }
     if (!entries_.empty()) {
         logger_.info([&] { return "Loaded " + std::to_string(entries_.size()) + " enchantment(s)."; });

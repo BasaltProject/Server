@@ -26,6 +26,12 @@ void LootReferences::remember(const std::string& key, Entry entry) {
     cache_.try_emplace(key, std::move(entry));
 }
 
+void LootReferences::replace(ReadEntry read) {
+    const std::lock_guard<std::mutex> guard(mutex_);
+    read_ = std::move(read);
+    cache_.clear();
+}
+
 namespace lootTableJson {
 namespace parts {
 namespace {

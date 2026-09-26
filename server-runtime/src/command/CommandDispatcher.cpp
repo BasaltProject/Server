@@ -6,6 +6,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <set>
 #include <utility>
@@ -39,6 +40,8 @@ public:
 
     [[nodiscard]] bool defersSelectors() const override { return true; }
 
+    [[nodiscard]] bool silent() const override { return typist_->silent(); }
+
 private:
     const CommandSource* typist_;
 };
@@ -71,6 +74,9 @@ CommandFeedback::CommandFeedback(const CommandEnvironment& environment)
                  environment.placeholders(), environment.lang()) {}
 
 void CommandFeedback::success(const CommandSource& source, const Component& rawMessage, bool broadcastToAdmins) const {
+    if (source.silent()) {
+        return;
+    }
     const Component message = overrides_.apply(rawMessage, source.player());
     source.sendSystemMessage(message);
     if (!broadcastToAdmins) {
@@ -325,6 +331,27 @@ std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::
     return result;
 }
 
+std::optional<CommandSyntaxError> CommandDispatcher::check(const CommandSource& source, const std::string& input) const {
+    StringReader reader{input};
+    const DeferredSource deferred{source};
+    const Parsed<std::vector<Link>> links = parse(reader, root_, deferred, {});
+    if (!links.has_value()) {
+        return links.error();
+    }
+    if (links->empty() || !links->back().executor) {
+        return reader.syntaxError(std::string{kUnknownCommand});
+    }
+    // parity: a function is compiled with its permission level, so a command above it does not parse.
+    const std::string name = lowered(firstWord(input));
+    for (const std::unique_ptr<CommandNode>& child : root_.children()) {
+        if (child->name() == name && child->requiredLevel > source.permissionLevel()) {
+            StringReader start{input};
+            return start.syntaxError(std::string{kUnknownCommand});
+        }
+    }
+    return std::nullopt;
+}
+
 std::vector<std::pair<std::string, std::string>> CommandDispatcher::signableArguments(const CommandSource& source,
                                                                                       const std::string& input) const {
     StringReader reader{input};
@@ -375,6 +402,16 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
             return 0;
         }
         return runTail(link, *sources.front(), input, successes);
+    }
+    // parity: `max_command_forks`, which stops a fork that would hand on that many sources.
+    const world::LoadedWorld* world = worldIn(source, *environment_);
+    const std::int32_t forkLimit =
+        world == nullptr ? std::numeric_limits<std::int32_t>::max()
+                         : world->gameRules().number(world::gameRules::kMaxCommandForks);
+    if (std::cmp_greater_equal(sources.size(), forkLimit)) {
+        return std::unexpected{CommandSyntaxError{
+            .component = wire::text::Component::translatable("command.forkLimit",
+                                                             {wire::text::Component::text(std::to_string(forkLimit))})}};
     }
     std::int32_t worked = 0;
     for (const std::shared_ptr<const CommandSource>& next : sources) {

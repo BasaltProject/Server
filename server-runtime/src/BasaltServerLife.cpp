@@ -306,6 +306,7 @@ void BasaltServer::shutdown() {
         world->flushRegions();
     }
     maps_->save();
+    saveSchedule();
     // Nothing else runs anywhere: what was queued is cancelled rather than run against a world that
     // is already written out.
     worldRegistry_->scheduler().close();

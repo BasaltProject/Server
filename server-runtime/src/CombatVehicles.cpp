@@ -178,14 +178,15 @@ constexpr std::int64_t kResetIntervalTicks = 20;
 }
 
 /// parity: `AbstractHorse.getDismountLocationForPassenger`: the main arm's side, then the other, then
-/// where the mount stands. The right arm, which is every player's until the client says otherwise.
-[[nodiscard]] std::array<double, 3> horseDismount(world::LoadedWorld& world, const ServerEntity& horse) {
-    constexpr float kQuarterTurn = 90.0F;
-    if (const auto right = horseDismountToward(world, horse, horse.yaw + kQuarterTurn); right.has_value()) {
-        return *right;
+/// where the mount stands, the arm being the one the client's settings name.
+[[nodiscard]] std::array<double, 3> horseDismount(world::LoadedWorld& world, const ServerEntity& horse,
+                                                  const PlayerSession& rider) {
+    const float quarterTurn = rider.mainArm == 1 ? 90.0F : -90.0F;
+    if (const auto main = horseDismountToward(world, horse, horse.yaw + quarterTurn); main.has_value()) {
+        return *main;
     }
-    if (const auto left = horseDismountToward(world, horse, horse.yaw - kQuarterTurn); left.has_value()) {
-        return *left;
+    if (const auto off = horseDismountToward(world, horse, horse.yaw - quarterTurn); off.has_value()) {
+        return *off;
     }
     return {horse.x, horse.y, horse.z};
 }
@@ -199,7 +200,7 @@ std::optional<std::array<double, 3>> CombatHandler::dismountSpot(const PlayerSes
         return std::nullopt;
     }
     if (entity::horses::isHorse(vehicle.type())) {
-        return horseDismount(*world, vehicle);
+        return horseDismount(*world, vehicle, session);
     }
     if (!entity::boats::isBoat(vehicle.type())) {
         return std::nullopt;

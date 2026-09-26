@@ -8,7 +8,8 @@ namespace basalt::server::runtime::command {
 
 ExecutionSource::ExecutionSource(const CommandSource& base, Changes changes)
     : base_(&base), player_(changes.player.value_or(base.player())),
-      position_(changes.position.value_or(base.position())), onResult_(std::move(changes.onResult)) {
+      position_(changes.position.value_or(base.position())), onResult_(std::move(changes.onResult)),
+      permission_(changes.permission), silent_(changes.silent || base.silent()), trusted_(changes.trusted) {
     const ExecutionSource* inner = base.asExecution();
     world_ = changes.world.value_or(inner == nullptr ? nullptr : inner->world());
     rotation_ = changes.rotation.value_or(base.rotation());
@@ -34,13 +35,18 @@ wire::text::Component ExecutionSource::displayName() const {
     return entity_.has_value() ? wire::text::Component::text(entity_->name()) : base_->displayName();
 }
 
-std::int32_t ExecutionSource::permissionLevel() const { return base_->permissionLevel(); }
+std::int32_t ExecutionSource::permissionLevel() const { return permission_.value_or(base_->permissionLevel()); }
 
 void ExecutionSource::sendSystemMessage(const wire::text::Component& message) const {
-    base_->sendSystemMessage(message);
+    // parity: `sendFailure` and `sendSuccess` both stay quiet on a silent source.
+    if (!silent_) {
+        base_->sendSystemMessage(message);
+    }
 }
 
-bool ExecutionSource::hasPermission(std::optional<std::string_view> node) const { return base_->hasPermission(node); }
+bool ExecutionSource::hasPermission(std::optional<std::string_view> node) const {
+    return trusted_ || base_->hasPermission(node);
+}
 
 const CommandSource& ExecutionSource::root() const {
     const ExecutionSource* inner = base_->asExecution();

@@ -279,7 +279,7 @@ void VillagerWorldSystem::composterExtract(ServerEntity& /*mob*/, const BlockPos
     announce(change->x, change->y, change->z, change->stateId, true);
     random::RandomSource random = random::RandomSource::legacy(nextSeed_ ? nextSeed_() : 0);
     // parity: `ComposterBlock.extractProduce`, a bone meal popped out just above, scattered by 0.7.
-    const auto offset = [&random] { return (random.nextFloat() - 0.5) * 0.7; };
+    const auto offset = [&random] { return (static_cast<double>(random.nextFloat()) - 0.5) * 0.7; };
     const double x = pos.x + 0.5 + offset();
     const double y = pos.y + 1.01 + offset();
     const double z = pos.z + 0.5 + offset();
@@ -305,7 +305,8 @@ bool VillagerWorldSystem::growCrop(ServerEntity& /*mob*/, const BlockPos& pos) {
 }
 
 void VillagerWorldSystem::spawnItem(const server::world::loot::ItemStack& stack, double x, double y, double z,
-                                    double velocityX, double velocityY, double velocityZ) {
+                                    double velocityX, double velocityY, double velocityZ,
+                                    std::optional<wire::common::Uuid> thrower) {
     if (world_ == nullptr || reg::items::registry().byName(stack.item) == nullptr || stack.count <= 0) {
         return;
     }
@@ -321,6 +322,7 @@ void VillagerWorldSystem::spawnItem(const server::world::loot::ItemStack& stack,
                                .velocityZ = velocityZ};
     dropped.pickupDelay = kPickUpDelay;
     dropped.components = stack.components;
+    dropped.thrower = thrower;
     static_cast<void>(world_->state().spawnItem(std::move(dropped)));
 }
 
@@ -340,8 +342,9 @@ void VillagerWorldSystem::throwItem(ServerEntity& mob, const server::world::loot
         dy = 0.0;
         dz = 0.0;
     }
-    constexpr double kThrow = 0.3F;
-    spawnItem(stack, mob.x, mob.y + kVillagerEye - kThrowDrop, mob.z, dx * kThrow, dy * kThrow, dz * kThrow);
+    constexpr double kThrow = static_cast<double>(0.3F);
+    spawnItem(stack, mob.x, mob.y + kVillagerEye - kThrowDrop, mob.z, dx * kThrow, dy * kThrow, dz * kThrow,
+              mob.uuid());
 }
 
 void VillagerWorldSystem::dropItem(ServerEntity& mob, const server::world::loot::ItemStack& stack, float offsetY) {
