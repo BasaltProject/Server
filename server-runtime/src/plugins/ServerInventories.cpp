@@ -152,7 +152,8 @@ std::vector<std::string> ServerInventories::enchantmentIds() const {
 
 std::optional<std::vector<std::uint8_t>> ServerInventories::craft(std::int32_t width, std::int32_t height,
                                                                   std::span<const std::uint8_t> items) const {
-    if (!data_ || width <= 0 || height <= 0) {
+    constexpr std::int32_t kMaxGridSide = 16;
+    if (!data_ || width <= 0 || height <= 0 || width > kMaxGridSide || height > kMaxGridSide) {
         return std::nullopt;
     }
     const std::expected<wire::nbt::AnonymousTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::readAnonymous(items);
