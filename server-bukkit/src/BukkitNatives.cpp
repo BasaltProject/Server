@@ -1,3 +1,4 @@
+#include "AsyncGuard.hpp"
 #include "BridgeInternal.hpp"
 
 #include <array>
@@ -102,6 +103,9 @@ jboolean JNICALL nativeChannelSend(JNIEnv* env, jclass, jstring uuid, jstring ch
 }
 
 jboolean JNICALL nativeConsole(JNIEnv* env, jclass, jstring line) {
+    if (jni::refuseAsync(env, "command dispatch")) {
+        return JNI_FALSE;
+    }
     return BukkitBridge::current().services().commands().runAsConsole(toStd(env, line)) ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -146,25 +150,34 @@ jdoubleArray JNICALL nativePlayerNumbers(JNIEnv* env, jclass, jstring uuid) {
 }
 
 void JNICALL nativePlayerSend(JNIEnv* env, jclass, jstring uuid, jstring message) {
-    if (const auto player = playerOf(env, uuid); player != nullptr) {
-        player->send(toStd(env, message));
-    }
+    jni::postToServer([who = toStd(env, uuid), text = toStd(env, message)] {
+        if (const auto player = BukkitBridge::current().services().players().byUuid(who); player != nullptr) {
+            player->send(text);
+        }
+    });
 }
 
 void JNICALL nativePlayerActionBar(JNIEnv* env, jclass, jstring uuid, jstring message) {
-    if (const auto player = playerOf(env, uuid); player != nullptr) {
-        player->actionBar(toStd(env, message));
-    }
+    jni::postToServer([who = toStd(env, uuid), text = toStd(env, message)] {
+        if (const auto player = BukkitBridge::current().services().players().byUuid(who); player != nullptr) {
+            player->actionBar(text);
+        }
+    });
 }
 
 void JNICALL nativePlayerKick(JNIEnv* env, jclass, jstring uuid, jstring reason) {
-    if (const auto player = playerOf(env, uuid); player != nullptr) {
-        player->kick(toStd(env, reason));
-    }
+    jni::postToServer([who = toStd(env, uuid), text = toStd(env, reason)] {
+        if (const auto player = BukkitBridge::current().services().players().byUuid(who); player != nullptr) {
+            player->kick(text);
+        }
+    });
 }
 
 jboolean JNICALL nativePlayerTeleport(JNIEnv* env, jclass, jstring uuid, jstring world, jdouble x, jdouble y,
                                       jdouble z) {
+    if (jni::refuseAsync(env, "teleport")) {
+        return JNI_FALSE;
+    }
     const auto player = playerOf(env, uuid);
     return player != nullptr && player->teleport(toStd(env, world), x, y, z) ? JNI_TRUE : JNI_FALSE;
 }
@@ -175,24 +188,36 @@ jboolean JNICALL nativePlayerMay(JNIEnv* env, jclass, jstring uuid, jstring perm
 }
 
 void JNICALL nativePlayerSetHealth(JNIEnv* env, jclass, jstring uuid, jdouble value) {
+    if (jni::refuseAsync(env, "health change")) {
+        return;
+    }
     if (const auto player = playerOf(env, uuid); player != nullptr) {
         player->setHealth(value);
     }
 }
 
 void JNICALL nativePlayerSetFood(JNIEnv* env, jclass, jstring uuid, jint value) {
+    if (jni::refuseAsync(env, "food change")) {
+        return;
+    }
     if (const auto player = playerOf(env, uuid); player != nullptr) {
         player->setFood(value);
     }
 }
 
 void JNICALL nativePlayerSetGamemode(JNIEnv* env, jclass, jstring uuid, jstring mode) {
+    if (jni::refuseAsync(env, "gamemode change")) {
+        return;
+    }
     if (const auto player = playerOf(env, uuid); player != nullptr) {
         player->setGamemode(toStd(env, mode));
     }
 }
 
 jboolean JNICALL nativePlayerGive(JNIEnv* env, jclass, jstring uuid, jstring item, jint count) {
+    if (jni::refuseAsync(env, "inventory change")) {
+        return JNI_FALSE;
+    }
     const auto player = playerOf(env, uuid);
     return player != nullptr && player->give(toStd(env, item), count) ? JNI_TRUE : JNI_FALSE;
 }
@@ -215,6 +240,9 @@ jstring JNICALL nativeBlock(JNIEnv* env, jclass, jstring world, jint x, jint y, 
 }
 
 jboolean JNICALL nativeSetBlock(JNIEnv* env, jclass, jstring world, jint x, jint y, jint z, jstring block) {
+    if (jni::refuseAsync(env, "block change")) {
+        return JNI_FALSE;
+    }
     const auto found = BukkitBridge::current().services().worlds().byName(toStd(env, world));
     return found != nullptr && found->setBlock(x, y, z, toStd(env, block)) ? JNI_TRUE : JNI_FALSE;
 }

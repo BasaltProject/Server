@@ -1,3 +1,4 @@
+#include "AsyncGuard.hpp"
 #include "BukkitWorldNativesShared.hpp"
 
 namespace basalt::server::bukkit {
@@ -52,6 +53,9 @@ jdoubleArray JNICALL nativeEntityNumbers(JNIEnv* env, jclass, jstring name, jint
 
 jboolean JNICALL nativeEntityMove(JNIEnv* env, jclass, jstring name, jint id, jdouble x, jdouble y, jdouble z,
                                   jfloat yaw, jfloat pitch) {
+    if (jni::refuseAsync(env, "entity teleport")) {
+        return JNI_FALSE;
+    }
     const auto world = worldOf(env, name);
     const auto entity = world == nullptr ? nullptr : world->entityById(id);
     if (entity == nullptr || !entity->teleport(x, y, z)) {
@@ -62,6 +66,9 @@ jboolean JNICALL nativeEntityMove(JNIEnv* env, jclass, jstring name, jint id, jd
 }
 
 void JNICALL nativeEntityVelocity(JNIEnv* env, jclass, jstring name, jint id, jdouble x, jdouble y, jdouble z) {
+    if (jni::refuseAsync(env, "entity velocity change")) {
+        return;
+    }
     const auto world = worldOf(env, name);
     if (const auto entity = world == nullptr ? nullptr : world->entityById(id); entity != nullptr) {
         entity->setVelocity(x, y, z);
@@ -69,6 +76,9 @@ void JNICALL nativeEntityVelocity(JNIEnv* env, jclass, jstring name, jint id, jd
 }
 
 void JNICALL nativeEntityHealth(JNIEnv* env, jclass, jstring name, jint id, jdouble health) {
+    if (jni::refuseAsync(env, "entity health change")) {
+        return;
+    }
     const auto world = worldOf(env, name);
     if (const auto entity = world == nullptr ? nullptr : world->entityById(id); entity != nullptr) {
         entity->setHealth(health);
@@ -76,6 +86,9 @@ void JNICALL nativeEntityHealth(JNIEnv* env, jclass, jstring name, jint id, jdou
 }
 
 void JNICALL nativeEntityRemove(JNIEnv* env, jclass, jstring name, jint id) {
+    if (jni::refuseAsync(env, "entity remove")) {
+        return;
+    }
     const auto world = worldOf(env, name);
     if (const auto entity = world == nullptr ? nullptr : world->entityById(id); entity != nullptr) {
         entity->remove();
@@ -95,6 +108,9 @@ jint JNICALL nativeSpawn(JNIEnv* env, jclass, jstring name, jstring type, jdoubl
 
 jboolean JNICALL nativePlayerMove(JNIEnv* env, jclass, jstring uuid, jstring world, jdouble x, jdouble y, jdouble z,
                                   jfloat yaw, jfloat pitch) {
+    if (jni::refuseAsync(env, "teleport")) {
+        return JNI_FALSE;
+    }
     const auto player = playerOf(env, uuid);
     return player != nullptr && player->teleport(toStd(env, world), x, y, z, yaw, pitch) ? JNI_TRUE : JNI_FALSE;
 }
@@ -125,18 +141,27 @@ jstring JNICALL nativePlayerAddress(JNIEnv* env, jclass, jstring uuid) {
 }
 
 void JNICALL nativePlayerShowBlock(JNIEnv* env, jclass, jstring uuid, jint x, jint y, jint z, jint state) {
+    if (jni::refuseAsync(env, "block change")) {
+        return;
+    }
     if (const auto player = playerOf(env, uuid); player != nullptr) {
         player->showBlock(x, y, z, state);
     }
 }
 
 void JNICALL nativePlayerExperience(JNIEnv* env, jclass, jstring uuid, jfloat progress, jint level) {
+    if (jni::refuseAsync(env, "experience change")) {
+        return;
+    }
     if (const auto player = playerOf(env, uuid); player != nullptr) {
         player->setExperience(progress, level);
     }
 }
 
 jboolean JNICALL nativePlayerCommand(JNIEnv* env, jclass, jstring uuid, jstring line) {
+    if (jni::refuseAsync(env, "command dispatch")) {
+        return JNI_FALSE;
+    }
     const auto player = playerOf(env, uuid);
     return player != nullptr && BukkitBridge::current().services().commands().runAsPlayer(*player, toStd(env, line))
                ? JNI_TRUE
@@ -145,15 +170,20 @@ jboolean JNICALL nativePlayerCommand(JNIEnv* env, jclass, jstring uuid, jstring 
 
 void JNICALL nativePlayerTitle(JNIEnv* env, jclass, jstring uuid, jstring title, jstring subtitle, jint fadeIn,
                                jint stay, jint fadeOut) {
-    if (const auto player = playerOf(env, uuid); player != nullptr) {
-        player->title(toStd(env, title), toStd(env, subtitle), fadeIn, stay, fadeOut);
-    }
+    jni::postToServer(
+        [who = toStd(env, uuid), head = toStd(env, title), sub = toStd(env, subtitle), fadeIn, stay, fadeOut] {
+            if (const auto player = BukkitBridge::current().services().players().byUuid(who); player != nullptr) {
+                player->title(head, sub, fadeIn, stay, fadeOut);
+            }
+        });
 }
 
 void JNICALL nativePlayerSound(JNIEnv* env, jclass, jstring uuid, jstring sound, jfloat volume, jfloat pitch) {
-    if (const auto player = playerOf(env, uuid); player != nullptr) {
-        player->sound(toStd(env, sound), volume, pitch);
-    }
+    jni::postToServer([who = toStd(env, uuid), name = toStd(env, sound), volume, pitch] {
+        if (const auto player = BukkitBridge::current().services().players().byUuid(who); player != nullptr) {
+            player->sound(name, volume, pitch);
+        }
+    });
 }
 
 // An item crosses as strings: id, count, damage, name (null when none), lore joined by newlines, then `id=level` pairs.
@@ -190,6 +220,9 @@ jobjectArray JNICALL nativeInventoryGet(JNIEnv* env, jclass, jstring uuid, jint 
 }
 
 void JNICALL nativeInventorySet(JNIEnv* env, jclass, jstring uuid, jint slot, jobjectArray item) {
+    if (jni::refuseAsync(env, "inventory change")) {
+        return;
+    }
     const auto player = playerOf(env, uuid);
     if (player == nullptr) {
         return;
@@ -227,6 +260,9 @@ void JNICALL nativeInventorySet(JNIEnv* env, jclass, jstring uuid, jint slot, jo
 }
 
 void JNICALL nativeInventoryClear(JNIEnv* env, jclass, jstring uuid) {
+    if (jni::refuseAsync(env, "inventory change")) {
+        return;
+    }
     if (const auto player = playerOf(env, uuid); player != nullptr) {
         player->inventory().clear();
     }
