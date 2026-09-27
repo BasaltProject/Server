@@ -89,6 +89,9 @@ void pushData(LuaArgs& lua, const std::string& folder) {
     lua.pushTable();
     wire::lua::pushHostFunction(lua, "data.json", [folder, loaded](LuaArgs& args) {
         const std::string name = args.checkString(firstArgument(args));
+        if (name.starts_with('/') || name.find("..") != std::string::npos) {
+            args.raise("'" + name + "' is outside the plugin folder");
+        }
         if (const auto held = loaded->find(name); held != loaded->end()) {
             held->second.push(args);
             return 1;

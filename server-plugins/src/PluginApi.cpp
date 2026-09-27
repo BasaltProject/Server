@@ -41,11 +41,19 @@ void installIdentity(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugi
     lua.setGlobal("config");
 }
 
+[[nodiscard]] std::string insideFolder(LuaArgs& args, std::int32_t index) {
+    std::string path = args.checkString(index);
+    if (path.starts_with('/') || path.find('\\') != std::string::npos || path.find("..") != std::string::npos) {
+        args.raise("'" + path + "' is outside the plugin folder");
+    }
+    return path;
+}
+
 void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
     LoadedPlugin* target = &plugin;
     lua.pushTable();
     wire::lua::pushHostFunction(lua, "files.read", [target](LuaArgs& args) {
-        const std::string path = args.checkString(1);
+        const std::string path = insideFolder(args, 1);
         std::optional<std::string> text = wire::io::fileIO::readText(target->folder + "/" + path);
         if (!text.has_value()) {
             text = target->pkg->readText(std::string{wire::plugins::packageLayout::kResources} + path);
@@ -59,7 +67,7 @@ void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
     });
     lua.setField("read");
     wire::lua::pushHostFunction(lua, "files.exists", [target](LuaArgs& args) {
-        const std::string path = args.checkString(1);
+        const std::string path = insideFolder(args, 1);
         args.pushBoolean(wire::io::fileIO::exists(target->folder + "/" + path) ||
                          target->pkg->exists(std::string{wire::plugins::packageLayout::kResources} + path));
         return 1;
@@ -79,7 +87,7 @@ void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
     });
     lua.setField("list");
     wire::lua::pushHostFunction(lua, "files.write", [target](LuaArgs& args) {
-        const std::string path = args.checkString(1);
+        const std::string path = insideFolder(args, 1);
         const std::string text = args.checkString(2);
         const std::string live = target->folder + "/" + path;
         const std::size_t slash = live.rfind('/');
