@@ -304,14 +304,15 @@ void BukkitBridge::runTask(std::int64_t id) {
 }
 
 void BukkitBridge::scheduleAfter(std::int64_t id, std::int32_t delay) {
+    const std::lock_guard<std::mutex> lock{tasksMutex_};
+    tasks_.insert_or_assign(id, plugins::PluginHandle{});
     plugins::PluginHandle handle = services().tasks().after(delay, [this, id] {
         {
-            const std::lock_guard<std::mutex> lock{tasksMutex_};
+            const std::lock_guard<std::mutex> inner{tasksMutex_};
             tasks_.erase(id);
         }
         runTask(id);
     });
-    const std::lock_guard<std::mutex> lock{tasksMutex_};
     tasks_.insert_or_assign(id, std::move(handle));
 }
 
