@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockConnections.hpp>
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -592,6 +593,16 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     const bool changed = chunk->setBlockStateId(x & 15, y, z & 15, stateId);
     if (changed) {
         poi_.noteBlockChange(poi::BlockPos{x, y, z}, was, stateId);
+        const std::span<const std::int32_t> before = registry::blockShapes::collisionBoxes(was);
+        const std::span<const std::int32_t> after = registry::blockShapes::collisionBoxes(stateId);
+        const auto moving = [](std::int32_t state) {
+            const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(state);
+            return block != nullptr && block->path() == "moving_piston";
+        };
+        if (!std::ranges::equal(before, after) || moving(was) || moving(stateId)) {
+            shapeChanges_[shapeChangeCount_ % kShapeChangeMemory] = {x, y, z};
+            ++shapeChangeCount_;
+        }
         // A skylight opening or a torch reaches across chunk borders. Cached whole-chunk light is
         // cheaper than incremental light here, but every cached neighbour that could have read the
         // old block must be discarded together.
@@ -606,6 +617,16 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     }
     sculkSensors_.remember(x, y, z, stateId);
     return true;
+}
+
+std::uint64_t WorldState::shapeChangesSince(std::uint64_t seen, std::vector<std::array<std::int32_t, 3>>& changed,
+                                            bool& overflowed) const {
+    const WorldReadLock lock{mutex_};
+    overflowed = shapeChangeCount_ - seen > kShapeChangeMemory;
+    for (std::uint64_t at = overflowed ? shapeChangeCount_ - kShapeChangeMemory : seen; at < shapeChangeCount_; ++at) {
+        changed.push_back(shapeChanges_[at % kShapeChangeMemory]);
+    }
+    return shapeChangeCount_;
 }
 
 bool WorldState::hasSculkSensorNear(double x, double y, double z, std::int32_t range) const {

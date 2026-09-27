@@ -15,6 +15,7 @@
 #include <basalt/server/world/loot/Loot.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <deque>
@@ -64,10 +65,8 @@ struct GameEventRecord {
     std::optional<wire::common::Uuid> projectileOwner;
 };
 
-/// Shared view over the loaded chunks.
-///
-/// The owner writes blocks without waiting for anybody: what the lock guards is the *set* of
-/// chunks, which the generation pool adds to from its own threads, and a block read takes it
+/// Shared view over the loaded chunks. The owner writes blocks without waiting: the lock guards the
+/// *set* of chunks, which the generation pool adds to from its own threads, and a block read takes it
 /// shared. `loadOrGenerate` must read the region files before generating, or a visited chunk comes
 /// back regenerated with the player's edits gone.
 class WorldState {
@@ -104,11 +103,8 @@ public:
     /// The packed key a chunk is filed under, which is what the region scheduler reasons about.
     [[nodiscard]] static std::int64_t key(std::int32_t chunkX, std::int32_t chunkZ);
 
-    /// Who owns this state, once somebody does.
-    ///
-    /// Null for the bare world a test builds, which is single threaded by construction. What it
-    /// buys is the ownership check: with one region an access from the wrong thread works by luck,
-    /// and luck is what stops working the day regions are turned on.
+    /// Who owns this state, once somebody does; null for a test's single-threaded world. It backs the
+    /// ownership check, since with one region a wrong-thread access only works by luck.
     void setOwner(sched::Owner* owner) { owner_ = owner; }
 
     [[nodiscard]] sched::Owner* owner() const noexcept { return owner_; }
@@ -117,38 +113,27 @@ public:
     /// anything useful.
     void setRegionCount(std::function<std::int32_t()> regionCount) { regionCount_ = std::move(regionCount); }
 
-    /// Who installs the chunks the generation pool produces.
-    ///
-    /// The global owner rather than a region's: a chunk that has just been generated belongs to no
-    /// region yet, so handing it to one of them meant every install in the world piling onto
-    /// whichever region was first.
+    /// Who installs the chunks the generation pool produces: the global owner, since a fresh chunk
+    /// belongs to no region yet and a region's would take every install in the world.
     void setInstallOwner(sched::Owner* installOwner) { installOwner_ = installOwner; }
 
-    /// Told when a chunk arrives, which is where the chunk-load event is fired from.
-    ///
-    /// A hook rather than the bus itself: this module is below the plugin one, and a world knowing
-    /// what a plugin is would be an arrow pointing the wrong way.
+    /// Told when a chunk arrives, which is where the chunk-load event is fired from. A hook rather
+    /// than the bus, since this module sits below the plugin one.
     void setOnChunkInstalled(std::function<void(server::world::Chunk&)> handler) {
         const std::scoped_lock lock{chunkInstalledMutex_};
         onChunkInstalled_ = std::move(handler);
     }
 
-    /// What a comparator reads off a jukebox playing this song.
-    ///
-    /// parity: `JukeboxSong.comparatorOutput`, a number that lives in the jar's own data and not in
-    /// the world, so it arrives as a callback the same way the chunk source does. Without one every
-    /// jukebox reads zero, which is what a world with no jar installed can honestly say.
+    /// What a comparator reads off a jukebox playing this song. parity: `JukeboxSong.comparatorOutput`,
+    /// which lives in the jar's data, hence a callback; without one every jukebox reads zero.
     using SongOutput = std::function<std::int32_t(const std::string& song)>;
 
     void setSongOutput(SongOutput songOutput) { songOutput_ = std::move(songOutput); }
 
     [[nodiscard]] std::int32_t songOutput(const std::string& song) const { return songOutput_ ? songOutput_(song) : 0; }
 
-    /// Rolls a container's pending loot table into it. The tables are the runtime's, so this is a
-    /// callback; unset, a container keeps its table and stays empty.
-    ///
-    /// parity: `RandomizableContainer.unpackLootTable`, which every read of the container's slots
-    /// runs first.
+    /// Rolls a container's pending loot table into it; unset, a container keeps its table and stays
+    /// empty. parity: `RandomizableContainer.unpackLootTable`, run before every read of its slots.
     using LootUnpacker = std::function<void(std::int32_t x, std::int32_t y, std::int32_t z,
                                             const std::optional<wire::common::Uuid>& player)>;
 
@@ -162,11 +147,9 @@ public:
         }
     }
 
-    /// Whether the entity behind a noise leads back to a player.
-    ///
-    /// parity: `SculkShriekerBlockEntity.tryGetPlayer`, which also follows a rider, a projectile's
-    /// owner and a thrown item's thrower. The world knows none of those, so the answer is the
-    /// runtime's; without one no noise ever counts as a player's.
+    /// Whether the entity behind a noise leads back to a player, answered by the runtime; without one
+    /// no noise counts as a player's. parity: `SculkShriekerBlockEntity.tryGetPlayer`, which also
+    /// follows a rider, a projectile's owner and a thrown item's thrower.
     using PlayerCheck = std::function<bool(const wire::common::Uuid& entity)>;
 
     void setPlayerCheck(PlayerCheck playerCheck) { playerCheck_ = std::move(playerCheck); }
@@ -204,11 +187,8 @@ public:
     /// rather than about its contents.
     [[nodiscard]] std::vector<std::int64_t> loadedChunkKeys() const;
 
-    /// Bumped whenever a chunk arrives or goes.
-    ///
-    /// What the region scheduler asks before working out the regions again: the shape of a world
-    /// only changes when its chunks do, and walking every loaded chunk on a tick where none of them
-    /// moved was pure cost.
+    /// Bumped whenever a chunk arrives or goes, so the region scheduler only works out the regions
+    /// again when the chunk set changed.
     [[nodiscard]] std::int64_t chunkSetVersion() const noexcept { return chunkVersion_.load(); }
 
     [[nodiscard]] bool isLoaded(std::int32_t chunkX, std::int32_t chunkZ) const;
@@ -219,11 +199,9 @@ public:
     /// The chunk at this position, generating (but not sending or persisting) it first if unseen.
     server::world::Chunk& getOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ);
 
-    /// Reads or generates one chunk without putting it anywhere.
-    ///
-    /// The expensive half, and the half that touches nothing shared: a generation worker runs this
-    /// on its own thread and then hands the result over. Answers nothing when the chunk turned up
-    /// in the meantime, so the caller reads it instead.
+    /// Reads or generates one chunk without putting it anywhere, touching nothing shared, so a
+    /// generation worker runs it on its own thread. Answers nothing when the chunk turned up in the
+    /// meantime, so the caller reads it instead.
     [[nodiscard]] std::optional<server::world::Chunk> generateDetached(std::int32_t chunkX, std::int32_t chunkZ);
 
     /// Puts a generated chunk into the world, answering whichever chunk ends up in it: the one
@@ -276,6 +254,15 @@ public:
                        SideEffects sideEffects = SideEffects::kRun);
 
     [[nodiscard]] bool hasSculkSensorNear(double x, double y, double z, std::int32_t range) const;
+
+    /// How many recent squares `shapeChangesSince` remembers.
+    static constexpr std::size_t kShapeChangeMemory = 64;
+
+    /// The squares whose collision shape changed since `seen` changes ago, into `changed`, and the
+    /// count to pass next time. Answers with `overflowed` set when more changed than it remembers.
+    /// parity: what `ServerLevel.sendBlockUpdated` hands `PathNavigation.shouldRecomputePath`.
+    [[nodiscard]] std::uint64_t shapeChangesSince(std::uint64_t seen, std::vector<std::array<std::int32_t, 3>>& changed,
+                                                  bool& overflowed) const;
 
     /// Queues a fluid tick that many ticks from now, doing nothing if the chunk is not loaded.
     ///
@@ -392,11 +379,9 @@ public:
 
     [[nodiscard]] std::vector<PrimedTntQueue::Primed> takePrimedTnt();
 
-    /// What a container had in it when its block went, waiting to be turned into items.
-    ///
-    /// parity: `BlockEntity.preRemoveSideEffects`, which drops the contents of **any** block entity
-    /// that is a container, from every block replacement that did not ask to skip it. It is queued
-    /// rather than spawned on the spot because the block write already holds this world's lock.
+    /// What a container had in it when its block went, waiting to be turned into items. Queued
+    /// because the block write already holds this world's lock. parity:
+    /// `BlockEntity.preRemoveSideEffects`, for **any** container, on every replacement not skipping it.
     struct Spilled {
         std::int32_t x = 0;
         std::int32_t y = 0;
@@ -490,6 +475,8 @@ private:
     std::vector<GameEventRecord> gameEvents_;
     std::deque<TorchToggle> torchToggles_;
     SculkSensorTracker sculkSensors_;
+    std::array<std::array<std::int32_t, 3>, kShapeChangeMemory> shapeChanges_{};
+    std::uint64_t shapeChangeCount_ = 0;
     mutable poi::PoiManager poi_;
     EntityRegistry entityRegistry_;
     DroppedItemPhysics itemPhysics_;

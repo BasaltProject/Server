@@ -19,7 +19,6 @@
 #include <basalt/server/runtime/world/RealFluidTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/RealTimelineTags.hpp>
-#include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/auth/Cfb8Cipher.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
 #include <basalt/wire/auth/SessionProfile.hpp>
@@ -32,6 +31,7 @@
 #include <basalt/wire/multiversion/SubstitutionLabels.hpp>
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
 #include <basalt/wire/protocol/ProtocolState.hpp>
+#include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/protocol/handshake/HandshakePacket.hpp>
 #include <basalt/wire/protocol/login/LoginPackets.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -225,12 +225,12 @@ public:
         std::function<bool()> whitelistEnforced;
         world::RealEnchantments* enchantments = nullptr;
         world::PlayerProgress* progress = nullptr;
+        /// What each client has been told about advancements.
+        world::PlayerAdvancements* advancements = nullptr;
         world::AdvancementTriggers* advancementTriggers = nullptr;
         const world::realBlockTags::TagMembers* blockTags = nullptr;
         const world::realItemTags::TagMembers* itemTags = nullptr;
         /// Which enchantments will not sit beside each other, which only an anvil asks about.
-        /// What each client has been told about advancements.
-        world::PlayerAdvancements* advancements = nullptr;
         const world::realEnchantmentTags::TagMembers* enchantmentTags = nullptr;
         const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
         const world::realFluidTags::TagMembers* fluidTags = nullptr;
@@ -628,13 +628,9 @@ private:
     std::atomic<bool> closeWhenDrained_{false};
     std::jthread outbound_;
 
-    /// What every task this session hands another owner carries with it.
-    ///
-    /// A task queued on the world's owner runs on the tick thread one turn later, and the client
-    /// can be gone by then: the socket closes on its own thread and this session is destroyed the
-    /// moment `run` returns. The task asks `alive` before touching anything of this session's, and
-    /// the destructor waits for whoever is already inside one, which is the half a flag alone
-    /// cannot do.
+    /// What every task this session hands another owner carries. Such a task runs a turn later, when
+    /// this session may already be destroyed: it checks `alive` first, and the destructor waits for
+    /// any task already inside (`running`), which a flag alone cannot do.
     struct OwnerWork {
         std::atomic<bool> alive{true};
         std::atomic<std::int32_t> running{0};

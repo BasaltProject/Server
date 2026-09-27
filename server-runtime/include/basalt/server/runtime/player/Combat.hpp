@@ -18,8 +18,9 @@ inline constexpr double kSafeFallDistance = 3.0;
 /// parity: `Player.attack`, where a critical hit is worth half again.
 inline constexpr float kCriticalMultiplier = 1.5F;
 
-/// parity: `CombatRules.getDamageAfterAbsorb`.
-[[nodiscard]] float afterArmour(float damage, float armour, float toughness);
+/// parity: `CombatRules.getDamageAfterAbsorb`. `fractionAdd` is what the weapon's
+/// `armor_effectiveness` adds to the armour's share, which is how breach bites through it.
+[[nodiscard]] float afterArmour(float damage, float armour, float toughness, float fractionAdd = 0.0F);
 
 /// parity: `CombatRules.getDamageAfterMagicAbsorb`, the enchantment half of the same idea.
 [[nodiscard]] float afterProtection(float damage, float protection);
@@ -77,7 +78,9 @@ struct Swing {
 
 /// parity: `Player.attack`'s own arithmetic: the charge scales the base, a critical takes half again
 /// of that, and what the enchantments add rides on the swing but never on the critical.
-[[nodiscard]] Swing swingOf(float strength, float base, float enchanted, bool falling, bool onGround, bool sprinting);
+/// `bonus` is the weapon's own `getAttackDamageBonus`, the mace's smash, which the critical scales too.
+[[nodiscard]] Swing swingOf(float strength, float base, float enchanted, bool falling, bool onGround, bool sprinting,
+                            float bonus = 0.0F);
 
 /// parity: `LivingEntity.getDamageAfterMagicAbsorb`'s resistance case, which counts in fifths and
 /// floors at zero rather than going negative at level four and above.

@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -56,12 +57,26 @@ struct ItemWear {
     std::int32_t amount = 0;
 };
 
+/// parity: `ExplodeEffect`, a blast at whoever it lands on: wind burst's gust.
+struct Explosion {
+    Side target = Side::kAttacker;
+    float radius = 0.0F;
+    std::optional<float> knockbackMultiplier;
+    /// `block_interaction` is `trigger`: buttons, levers and the like answer it.
+    bool triggersBlocks = false;
+    std::string immuneBlocks;
+    std::string smallParticle;
+    std::string largeParticle;
+    std::string sound;
+};
+
 /// Everything the entries that passed their requirements asked for, in the order they ran.
 struct Outcome {
     std::vector<Ignite> ignites;
     std::vector<Damage> damages;
     std::vector<MobEffect> effects;
     std::vector<ItemWear> wear;
+    std::vector<Explosion> explosions;
 };
 
 struct Hit {
@@ -72,6 +87,9 @@ struct Hit {
     const weaponDamage::Victim* victim = nullptr;
     /// parity: `DamageSource.isDirect`, which a melee blow is.
     bool direct = true;
+    /// The attacker as `entity_properties` on `attacker` and `direct_attacker` reads it.
+    double attackerFallDistance = 0.0;
+    bool attackerFlying = false;
 };
 
 [[nodiscard]] Outcome of(const Hit& hit, const weaponDamage::DefinitionOf& definitionOf, random::RandomSource& random);

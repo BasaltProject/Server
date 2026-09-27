@@ -48,17 +48,14 @@ struct Hooks {
 /// which came last.
 [[nodiscard]] std::int64_t nextRaidBarStamp();
 
-/// Hurts `entity` for `amount`, pushed away from the source, answering what happened.
-///
-/// parity: `LivingEntity.hurtServer`. The cooldown is the part worth naming: inside it only a bigger
-/// hit lands, and only by the difference, which is what stops a fast weapon from being strictly
-/// better than a strong one.
-///
-/// `byPlayer` is whether a player is behind the hit, which is all an ender dragon listens to
-/// besides explosions.
+/// Hurts `entity` for `amount`, pushed away from the source, answering what happened. `byPlayer` is
+/// whether a player is behind the hit, all an ender dragon listens to besides explosions.
+/// parity: `LivingEntity.hurtServer`: inside the cooldown only a bigger hit lands, and only by the
+/// difference.
 Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX = std::nullopt,
             std::optional<double> sourceZ = std::nullopt, const Hooks& hooks = {}, std::string_view cause = "attack",
-            const std::optional<std::string>& attackerName = std::nullopt, bool byPlayer = false);
+            const std::optional<std::string>& attackerName = std::nullopt, bool byPlayer = false,
+            float armorFractionAdd = 0.0F);
 
 /// Names who is behind the next `hurt` of `target` and what lands it, for its death roll.
 void blame(ServerEntity& target, std::optional<std::int32_t> causingId, std::int32_t directId,
@@ -109,6 +106,8 @@ struct DamageSource {
     std::optional<std::int32_t> ownerId;
     /// An arrow with a pierce level, which no shield stops. parity: `LivingEntity.applyItemBlocking`.
     bool piercing = false;
+    /// What the weapon's `armor_effectiveness` adds to the victim's armour share. parity: breach.
+    float armorFractionAdd = 0.0F;
 };
 
 } // namespace basalt::server::runtime::entity

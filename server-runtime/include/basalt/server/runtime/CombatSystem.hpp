@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/PostAttackEffects.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
 #include <basalt/wire/common/Identifier.hpp>
@@ -98,6 +99,34 @@ public:
     void tickProjectile(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& entity,
                         const entity::projectiles::Kind& kind);
+
+    /// A blast that only pushes: a wind charge's, or wind burst's. parity: `ServerExplosion` with a
+    /// calculator that hurts nobody.
+    struct Gust {
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        float radius = 0.0F;
+        /// parity: `getKnockbackMultiplier`, the same for everything the blast reaches.
+        float knockbackMultiplier = 1.0F;
+        /// The entity the blast comes from, which it leaves out. Nothing for wind burst.
+        std::optional<std::int32_t> sourceId;
+        /// parity: `ServerPlayer.onExplosionHit`: a player's own wind charge spares the fall after.
+        bool windCharge = false;
+        /// parity: `block_interaction: trigger`; `immuneTag` is what it leaves alone.
+        bool triggersBlocks = true;
+        std::string immuneTag = "minecraft:blocks_wind_charge_explosions";
+        std::string particle;
+        std::string sound;
+        bool silent = false;
+    };
+
+    void gust(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+              const std::vector<entity::ServerEntity*>& living, const Gust& blast);
+
+    /// A post-attack `ExplodeEffect` as a gust at that point. parity: `ServerLevel.explode`, whose
+    /// particle is the large one for a blast of two or more that touches blocks.
+    [[nodiscard]] static Gust gustOf(const world::postAttack::Explosion& blast, double x, double y, double z);
 
     /// A hit on an end crystal, which destroys it whatever the damage. `byExplosion` leaves it
     /// gone without a blast of its own. parity: `EndCrystal.hurtServer`.

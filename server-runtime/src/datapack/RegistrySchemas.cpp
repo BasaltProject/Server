@@ -20,6 +20,13 @@ enum class Kind : std::uint8_t {
     Id,
     String,
     Number,
+    Bool,
+    /// A holder set: an id, a `#tag`, or a list of ids.
+    HolderSet,
+    /// `IntProviders.CODEC`: a number or a typed provider.
+    IntProvider,
+    /// A string or a list of them.
+    Strings,
     Object,
     /// `ComponentSerialization.CODEC`: a string, a list or an object.
     Text,
@@ -220,6 +227,27 @@ std::optional<std::string> check(const JsonValue& value, Kind kind) {
         return value.get<std::int64_t>() != nullptr || value.get<double>() != nullptr
                    ? std::nullopt
                    : std::optional<std::string>{"Not a number"};
+    case Kind::Bool:
+        return value.get<bool>() != nullptr ? std::nullopt : std::optional<std::string>{"Not a boolean"};
+    case Kind::HolderSet:
+        return holderSet(value);
+    case Kind::IntProvider:
+        return value.get<JsonObject>() != nullptr ? std::nullopt : check(value, Kind::Number);
+    case Kind::Strings: {
+        if (value.get<std::string>() != nullptr) {
+            return std::nullopt;
+        }
+        const auto* list = value.get<std::vector<JsonValue>>();
+        if (list == nullptr) {
+            return "Not a string or a list";
+        }
+        for (const JsonValue& element : *list) {
+            if (element.get<std::string>() == nullptr) {
+                return "Not a string";
+            }
+        }
+        return std::nullopt;
+    }
     case Kind::Object:
         return value.get<JsonObject>() != nullptr ? std::nullopt : std::optional<std::string>{"Not a map"};
     case Kind::Text:
@@ -264,9 +292,273 @@ std::optional<std::string> check(const JsonValue& value, Kind kind) {
     return std::nullopt;
 }
 
+/// parity: the id lists of the dispatch registries, which a typed element must name.
+constexpr std::array<std::string_view, 30> kEnchantmentEffects{"ammo_use",
+                                                               "armor_effectiveness",
+                                                               "attributes",
+                                                               "block_experience",
+                                                               "crossbow_charge_time",
+                                                               "crossbow_charging_sounds",
+                                                               "damage",
+                                                               "damage_immunity",
+                                                               "damage_protection",
+                                                               "equipment_drops",
+                                                               "fishing_luck_bonus",
+                                                               "fishing_time_reduction",
+                                                               "hit_block",
+                                                               "item_damage",
+                                                               "knockback",
+                                                               "location_changed",
+                                                               "mob_experience",
+                                                               "post_attack",
+                                                               "post_piercing_attack",
+                                                               "prevent_armor_change",
+                                                               "prevent_equipment_drop",
+                                                               "projectile_count",
+                                                               "projectile_piercing",
+                                                               "projectile_spawned",
+                                                               "projectile_spread",
+                                                               "repair_with_xp",
+                                                               "smash_damage_per_fallen_block",
+                                                               "tick",
+                                                               "trident_return_acceleration",
+                                                               "trident_sound"};
+constexpr std::string_view kTridentSpin = "trident_spin_attack_strength";
+
+/// parity: every entity, location and value effect type an enchantment effect may name.
+constexpr std::array<std::string_view, 23> kEffectTypes{"add",
+                                                        "all_of",
+                                                        "apply_exhaustion",
+                                                        "apply_impulse",
+                                                        "apply_mob_effect",
+                                                        "attribute",
+                                                        "change_item_damage",
+                                                        "damage_entity",
+                                                        "exponential",
+                                                        "explode",
+                                                        "ignite",
+                                                        "multiply",
+                                                        "play_sound",
+                                                        "remove_binomial",
+                                                        "replace_block",
+                                                        "replace_disk",
+                                                        "run_function",
+                                                        "set",
+                                                        "set_block_properties",
+                                                        "spawn_particles",
+                                                        "summon_entity",
+                                                        "apply_impulse",
+                                                        "all_of"};
+
+[[nodiscard]] std::string vanillaPath(std::string_view id);
+
+/// Every `effect` object inside the effects map must name a type vanilla registers.
+std::optional<std::string> effectTypes(const JsonValue& value) {
+    if (const auto* list = value.get<std::vector<JsonValue>>(); list != nullptr) {
+        for (const JsonValue& element : *list) {
+            if (auto error = effectTypes(element); error.has_value()) {
+                return error;
+            }
+        }
+        return std::nullopt;
+    }
+    const auto* object = value.get<JsonObject>();
+    if (object == nullptr) {
+        return std::nullopt;
+    }
+    if (const JsonValue* effect = object->find("effect"); effect != nullptr) {
+        if (const auto* typed = effect->get<JsonObject>(); typed != nullptr) {
+            const JsonValue* type = typed->find("type");
+            const auto* name = type == nullptr ? nullptr : type->get<std::string>();
+            if (name == nullptr) {
+                return std::string{"effect: No key type"};
+            }
+            if (std::ranges::find(kEffectTypes, vanillaPath(*name)) == kEffectTypes.end()) {
+                return "effect: Unknown effect type " + *name;
+            }
+            if (const JsonValue* inner = typed->find("effects"); inner != nullptr) {
+                return effectTypes(*inner);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+[[nodiscard]] std::string vanillaPath(std::string_view id) {
+    const auto parsed = Identifier::parse(id);
+    return parsed.has_value() && parsed->namespaceName() == "minecraft" ? parsed->path() : std::string{};
+}
+
+std::optional<std::string> costs(const JsonObject& element) {
+    for (const std::string_view key : {std::string_view{"min_cost"}, std::string_view{"max_cost"}}) {
+        const JsonValue* cost = element.find(key);
+        const auto* object = cost == nullptr ? nullptr : cost->get<JsonObject>();
+        if (object == nullptr) {
+            return cost == nullptr ? "No key " + std::string{key} : std::string{key} + ": Not a map";
+        }
+        if (auto error = fields(*object, {{"base", Kind::Number}, {"per_level_above_first", Kind::Number}});
+            error.has_value()) {
+            return std::string{key} + ": " + *error;
+        }
+    }
+    return std::nullopt;
+}
+
+/// parity: `Enchantment.DIRECT_CODEC`; the effects are keyed by effect component type.
+std::optional<std::string> enchantment(const JsonObject& element) {
+    if (auto error = fields(element, {{"description", Kind::Text},
+                                      {"supported_items", Kind::HolderSet},
+                                      {"weight", Kind::Number},
+                                      {"max_level", Kind::Number},
+                                      {"anvil_cost", Kind::Number},
+                                      {"slots", Kind::Strings}});
+        error.has_value()) {
+        return error;
+    }
+    if (auto error = costs(element); error.has_value()) {
+        return error;
+    }
+    for (const std::string_view key : {std::string_view{"primary_items"}, std::string_view{"exclusive_set"}}) {
+        if (const JsonValue* set = element.find(key); set != nullptr) {
+            if (auto error = holderSet(*set); error.has_value()) {
+                return std::string{key} + ": " + *error;
+            }
+        }
+    }
+    if (const JsonValue* effects = element.find("effects"); effects != nullptr) {
+        const auto* object = effects->get<JsonObject>();
+        if (object == nullptr) {
+            return std::string{"effects: Not a map"};
+        }
+        for (const std::string& name : object->names()) {
+            const std::string path = vanillaPath(name);
+            if (path != kTridentSpin && std::ranges::find(kEnchantmentEffects, path) == kEnchantmentEffects.end()) {
+                return "effects: Unknown effect component type " + name;
+            }
+        }
+        for (const JsonValue& component : object->values()) {
+            if (auto error = effectTypes(component); error.has_value()) {
+                return "effects: " + *error;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+/// parity: `DimensionType.DIRECT_CODEC`.
+std::optional<std::string> dimensionType(const JsonObject& element) {
+    return fields(element, {{"has_skylight", Kind::Bool},
+                            {"has_ceiling", Kind::Bool},
+                            {"coordinate_scale", Kind::Number},
+                            {"min_y", Kind::Number},
+                            {"height", Kind::Number},
+                            {"logical_height", Kind::Number},
+                            {"infiniburn", Kind::String},
+                            {"ambient_light", Kind::Number},
+                            {"monster_spawn_light_level", Kind::IntProvider},
+                            {"monster_spawn_block_light_limit", Kind::Number}});
+}
+
+/// parity: `Biome.DIRECT_CODEC`: climate, the effects' water colour, carvers and features.
+std::optional<std::string> biome(const JsonObject& element) {
+    if (auto error = fields(element, {{"has_precipitation", Kind::Bool},
+                                      {"temperature", Kind::Number},
+                                      {"downfall", Kind::Number},
+                                      {"effects", Kind::Object}});
+        error.has_value()) {
+        return error;
+    }
+    if (element.find("effects")->get<JsonObject>()->find("water_color") == nullptr) {
+        return std::string{"effects: No key water_color"};
+    }
+    for (const std::string_view key : {std::string_view{"carvers"}, std::string_view{"features"}}) {
+        const JsonValue* value = element.find(key);
+        if (value == nullptr) {
+            return "No key " + std::string{key};
+        }
+        if (value->get<std::vector<JsonValue>>() == nullptr && value->get<std::string>() == nullptr) {
+            return std::string{key} + ": Not a list";
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> button(const JsonValue& value) {
+    const auto* object = value.get<JsonObject>();
+    return object == nullptr ? std::optional<std::string>{"Not a map"} : fields(*object, {{"label", Kind::Text}});
+}
+
+/// parity: `Dialog.DIRECT_CODEC`, dispatched on `type`, every one with a title.
+std::optional<std::string> dialog(const JsonObject& element) {
+    const JsonValue* type = element.find("type");
+    const auto* name = type == nullptr ? nullptr : type->get<std::string>();
+    if (name == nullptr) {
+        return std::string{"No key type"};
+    }
+    const std::string kind = vanillaPath(*name);
+    if (auto error = fields(element, {{"title", Kind::Text}}); error.has_value()) {
+        return error;
+    }
+    const auto buttonAt = [&element](std::string_view key, bool required) -> std::optional<std::string> {
+        const JsonValue* value = element.find(key);
+        if (value == nullptr) {
+            return required ? std::optional<std::string>{"No key " + std::string{key}} : std::nullopt;
+        }
+        auto error = button(*value);
+        return error.has_value() ? std::optional<std::string>{std::string{key} + ": " + *error} : std::nullopt;
+    };
+    if (kind == "notice") {
+        return buttonAt("action", false);
+    }
+    if (kind == "server_links") {
+        return buttonAt("exit_action", false);
+    }
+    if (kind == "confirmation") {
+        auto error = buttonAt("yes", true);
+        return error.has_value() ? error : buttonAt("no", true);
+    }
+    if (kind == "multi_action") {
+        const JsonValue* actions = element.find("actions");
+        const auto* list = actions == nullptr ? nullptr : actions->get<std::vector<JsonValue>>();
+        if (list == nullptr || list->empty()) {
+            return std::string{"actions: Not a non-empty list"};
+        }
+        for (const JsonValue& action : *list) {
+            if (auto error = button(action); error.has_value()) {
+                return "actions: " + *error;
+            }
+        }
+        return buttonAt("exit_action", false);
+    }
+    if (kind == "dialog_list") {
+        const JsonValue* dialogs = element.find("dialogs");
+        if (dialogs == nullptr) {
+            return std::string{"No key dialogs"};
+        }
+        if (dialogs->get<JsonObject>() != nullptr || dialogs->get<std::vector<JsonValue>>() != nullptr) {
+            return std::nullopt;
+        }
+        auto error = holderSet(*dialogs);
+        return error.has_value() ? std::optional<std::string>{"dialogs: " + *error} : std::nullopt;
+    }
+    return "Unknown dialog type: " + *name;
+}
+
 } // namespace
 
 std::optional<std::string> schemaError(std::string_view registry, const JsonObject& element) {
+    if (registry == "enchantment") {
+        return enchantment(element);
+    }
+    if (registry == "dimension_type") {
+        return dimensionType(element);
+    }
+    if (registry == "worldgen/biome") {
+        return biome(element);
+    }
+    if (registry == "dialog") {
+        return dialog(element);
+    }
     const auto& all = schemas();
     const auto found = std::ranges::find(all, registry, &Schema::registry);
     return found == all.end() ? std::nullopt : fields(element, found->fields);

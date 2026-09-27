@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/datapack/PackRepository.hpp>
 #include <basalt/server/runtime/datapack/RegistrySchemas.hpp>
 #include <basalt/server/runtime/datapack/RegistryValidation.hpp>
+#include <basalt/server/runtime/datapack/ReloadableElements.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
 #include <algorithm>
@@ -13,11 +14,12 @@ namespace {
 
 /// Every registry a pack's JSON elements are loaded into. parity: `RELOADABLE_REGISTRIES` and the
 /// data-driven part of `WORLD_REGISTRIES`.
-constexpr std::array<std::string_view, 40> kRegistries{"loot_table",
+constexpr std::array<std::string_view, 58> kRegistries{"loot_table",
                                                        "predicate",
                                                        "item_modifier",
                                                        "context_int_provider",
                                                        "context_float_provider",
+                                                       "slot_source",
                                                        "recipe",
                                                        "advancement",
                                                        "damage_type",
@@ -52,10 +54,27 @@ constexpr std::array<std::string_view, 40> kRegistries{"loot_table",
                                                        "chat_type",
                                                        "decorated_pot_pattern",
                                                        "block_transformer",
-                                                       "worldgen/biome"};
+                                                       "worldgen/biome",
+                                                       "trial_spawner",
+                                                       "sulfur_cube_archetype",
+                                                       "worldgen/block_state_provider",
+                                                       "worldgen/carver",
+                                                       "worldgen/configured_feature",
+                                                       "worldgen/placed_feature",
+                                                       "worldgen/structure",
+                                                       "worldgen/structure_set",
+                                                       "worldgen/processor_list",
+                                                       "worldgen/template_pool",
+                                                       "worldgen/noise_settings",
+                                                       "worldgen/noise",
+                                                       "worldgen/density_function",
+                                                       "worldgen/world_preset",
+                                                       "worldgen/flat_level_generator_preset",
+                                                       "worldgen/multi_noise_biome_source_parameter_list",
+                                                       "dimension"};
 
-/// The first seven are `RELOADABLE_REGISTRIES`; the rest are only read at a start.
-constexpr std::size_t kReloadable = 7;
+/// The first eight are `RELOADABLE_REGISTRIES`; the rest are only read at a start.
+constexpr std::size_t kReloadable = 8;
 
 } // namespace
 
@@ -74,6 +93,13 @@ std::vector<ElementError> invalidElements(const ResourceStack& resources, const 
     std::vector<ElementError> errors;
     std::size_t index = 0;
     const EntriesUnder entriesUnder = [&resources](std::string_view prefix) { return resources.entriesUnder(prefix); };
+    std::optional<ItemTags> itemTags;
+    const auto tagsFor = [&]() -> const ItemTags& {
+        if (!itemTags.has_value()) {
+            itemTags = itemTagsOf(resources);
+        }
+        return *itemTags;
+    };
     for (const std::string_view registry : kRegistries) {
         if (index++ >= kReloadable && !worldRegistries) {
             break;
@@ -97,7 +123,8 @@ std::vector<ElementError> invalidElements(const ResourceStack& resources, const 
                                  .element = id.toString(),
                                  .message = "Not a JSON object: " + id.toString() + " from pack " + *pack});
             } else if (const std::optional<std::string> schema =
-                           schemaError(registry, *json->get<wire::common::JsonObject>());
+                           index <= kReloadable ? reloadableElementError(registry, *text, resources, tagsFor())
+                                                : schemaError(registry, *json->get<wire::common::JsonObject>());
                        schema.has_value()) {
                 errors.push_back(ElementError{.registry = "minecraft:" + std::string{registry},
                                               .element = id.toString(),

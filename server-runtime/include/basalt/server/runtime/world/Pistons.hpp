@@ -2,6 +2,7 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
+#include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -15,14 +16,9 @@
 namespace basalt::server::runtime::world {
 
 /// What a piston can move, and what happens when it does.
-///
-/// parity: `PistonStructureResolver` for the shape of the push (a line of at most twelve, plus every
-/// branch a slime block drags with it) and `PistonBaseBlock.isPushable` for what refuses to move at
-/// all. Obsidian stops it, a torch breaks, bedrock is unbreakable and a block that is `IGNORE` is
-/// left where it stands.
-///
-/// The two-tick slide is a `moving_piston` carrying the state it will become, as in vanilla; what is
-/// not drawn is the sliding itself, only the tick it lands on.
+/// parity: `PistonStructureResolver` (a line of at most twelve, plus slime branches) and
+/// `PistonBaseBlock.isPushable`. The slide is a `moving_piston` carrying its final state, as vanilla;
+/// only the landing tick is drawn, not the sliding.
 namespace pistons {
 
 /// parity: `PistonStructureResolver`'s own twelve.
@@ -77,6 +73,12 @@ struct Context {
 
 [[nodiscard]] const wire::common::Identifier& block();
 
+/// The collision a `moving_piston` offers where it stands: the block it carries (or the head it
+/// is), moved along by how far the slide has come, and the arm a retracting base keeps behind it.
+/// parity: `PistonMovingBlockEntity.getCollisionShape`, outside a piston's own move.
+[[nodiscard]] std::vector<entity::Aabb> movingCollision(const WorldState& world, std::int32_t x, std::int32_t y,
+                                                        std::int32_t z);
+
 /// What a booked half-way turn is filed under, which is the sliding block's own name so it can sit
 /// beside the piston's landing turn on the same square.
 [[nodiscard]] const wire::common::Identifier& slideTickType();
@@ -116,8 +118,6 @@ void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_
 /// which is `doBlockEvent` checking `state.is(eventData.block())`.
 void runEvent(const Context& context, const BlockEvent& event, std::vector<BlockChange>& effects);
 
-/// The move landing: the blocks go one along, the head appears or goes, and a sticky piston takes the
-/// block in front of it back with it.
 /// One turn of a sliding square, which in the jar is the block entity's own ticker: the first moves
 /// the progress along and the second lands it.
 ///
@@ -127,6 +127,8 @@ void runEvent(const Context& context, const BlockEvent& event, std::vector<Block
                                                  const std::vector<PlayerPosition>& players,
                                                  const std::function<void(const PlayerPosition&)>& onPlayerPushed);
 
+/// The slide ending, whichever way it went: each `moving_piston` becomes the state it carries, where it
+/// stands. parity: `PistonMovingBlockEntity.finalTick`.
 [[nodiscard]] std::vector<BlockChange> finish(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                                               const std::vector<PlayerPosition>& players = {},
                                               const std::function<void(const PlayerPosition&)>& onPlayerPushed = {});

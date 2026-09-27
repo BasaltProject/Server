@@ -1,9 +1,11 @@
 #include <basalt/server/registry/BlockShapes.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/WalkNodeEvaluator.hpp>
+#include <basalt/server/runtime/world/Pistons.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -170,7 +172,7 @@ private:
 class Search {
 public:
     Search(world::WorldState& world, const WalkMob& mob)
-        : world_(&world), mob_(&mob), blocks_(world.blockAccessor()),
+        : world_(&world), mob_(&mob),
           mobAt_{static_cast<std::int32_t>(std::floor(mob.x)), static_cast<std::int32_t>(std::floor(mob.y)),
                  static_cast<std::int32_t>(std::floor(mob.z))},
           entityWidth_(static_cast<std::int32_t>(std::floor(mob.width + 1.0F))),
@@ -208,6 +210,10 @@ private:
     [[nodiscard]] PathType cachedPathType(std::int32_t x, std::int32_t y, std::int32_t z);
     [[nodiscard]] double floorLevel(std::int32_t x, std::int32_t y, std::int32_t z) const;
     [[nodiscard]] bool hasCollisions(const Aabb& box);
+    [[nodiscard]] bool borderStops(const Aabb& box) const;
+    [[nodiscard]] bool blocksStop(const Aabb& box) const;
+    [[nodiscard]] std::optional<Aabb> powderSnow(std::int32_t x, std::int32_t y, std::int32_t z) const;
+    [[nodiscard]] static bool largeShape(std::int32_t stateId);
     [[nodiscard]] bool canReachWithoutCollision(const SearchNode& to);
     [[nodiscard]] bool canStartAt(std::int32_t x, std::int32_t y, std::int32_t z);
     SearchNode* startNode(std::int32_t x, std::int32_t y, std::int32_t z);
@@ -225,7 +231,6 @@ private:
 
     world::WorldState* world_;
     const WalkMob* mob_;
-    entityCollision::BlockAt blocks_;
     Position mobAt_;
     std::int32_t entityWidth_;
     std::int32_t entityHeight_;
@@ -370,14 +375,113 @@ double Search::floorLevel(std::int32_t x, std::int32_t y, std::int32_t z) const 
 }
 
 bool Search::hasCollisions(const Aabb& box) {
-    // parity: `Level.noCollision(mob, box)`, inverted and remembered per box.
+    // parity: `Level.noCollision(mob, box)`, inverted and remembered per box. `PathNavigationRegion`
+    // answers no entity collisions at all, so only the blocks and the border count.
     const std::array<double, 6> key{box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ};
     if (const auto found = collisionCache_.find(key); found != collisionCache_.end()) {
         return found->second;
     }
-    const bool collides = entityCollision::collides(blocks_, box);
+    const bool collides = borderStops(box) || blocksStop(box);
     collisionCache_.emplace(key, collides);
     return collides;
+}
+
+bool Search::borderStops(const Aabb& box) const {
+    if (!mob_->border.has_value()) {
+        return false;
+    }
+    const auto [minX, minZ, maxX, maxZ] = *mob_->border;
+    // parity: `WorldBorder.isInsideCloseToBorder`: only a mob inside and near it meets it at all.
+    const double xSize = box.maxX - box.minX;
+    const double zSize = box.maxZ - box.minZ;
+    const double margin = std::max(std::abs(xSize) > std::abs(zSize) ? xSize : zSize, 1.0);
+    const double distance = std::min({mob_->x - minX, maxX - mob_->x, mob_->z - minZ, maxZ - mob_->z});
+    const bool close = distance < margin * 2.0 && mob_->x >= minX - margin && mob_->x < maxX + margin &&
+                       mob_->z >= minZ - margin && mob_->z < maxZ + margin;
+    return close && (box.minX < minX || box.maxX > maxX || box.minZ < minZ || box.maxZ > maxZ);
+}
+
+bool Search::blocksStop(const Aabb& box) const {
+    // parity: `BlockCollisions` walks a square further out, where only a large shape such as a
+    // sliding block can still reach in.
+    const auto low = [](double value) { return static_cast<std::int32_t>(std::floor(value - 1.0E-7)) - 1; };
+    const auto high = [](double value) { return static_cast<std::int32_t>(std::floor(value + 1.0E-7)) + 1; };
+    const std::int32_t x0 = low(box.minX);
+    const std::int32_t y0 = low(box.minY);
+    const std::int32_t z0 = low(box.minZ);
+    const std::int32_t x1 = high(box.maxX);
+    const std::int32_t y1 = high(box.maxY);
+    const std::int32_t z1 = high(box.maxZ);
+    for (std::int32_t y = y0; y <= y1; ++y) {
+        for (std::int32_t z = z0; z <= z1; ++z) {
+            for (std::int32_t x = x0; x <= x1; ++x) {
+                const std::optional<std::int32_t> state = stateAt(x, y, z);
+                if (!state.has_value()) {
+                    continue;
+                }
+                const std::int32_t edges = static_cast<std::int32_t>(x == x0 || x == x1) +
+                                           static_cast<std::int32_t>(y == y0 || y == y1) +
+                                           static_cast<std::int32_t>(z == z0 || z == z1);
+                const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*state);
+                const std::string_view path = block == nullptr ? std::string_view{} : block->path();
+                if (path == "moving_piston") {
+                    if (edges == 3) {
+                        continue;
+                    }
+                    for (const Aabb& collider : world::pistons::movingCollision(*world_, x, y, z)) {
+                        if (collider.intersects(box)) {
+                            return true;
+                        }
+                    }
+                    continue;
+                }
+                if (edges >= 2 || (edges == 1 && !largeShape(*state))) {
+                    continue;
+                }
+                if (path == "powder_snow") {
+                    if (const std::optional<Aabb> snow = powderSnow(x, y, z);
+                        snow.has_value() && snow->intersects(box)) {
+                        return true;
+                    }
+                    continue;
+                }
+                constexpr double kUnits = registry::blockShapes::kUnits;
+                const std::span<const std::int32_t> shapes = registry::blockShapes::collisionBoxes(*state);
+                for (std::size_t at = 0; at + 5 < shapes.size(); at += registry::blockShapes::kCorners) {
+                    const Aabb collider{.minX = x + (shapes[at] / kUnits),
+                                        .minY = y + (shapes[at + 1] / kUnits),
+                                        .minZ = z + (shapes[at + 2] / kUnits),
+                                        .maxX = x + (shapes[at + 3] / kUnits),
+                                        .maxY = y + (shapes[at + 4] / kUnits),
+                                        .maxZ = z + (shapes[at + 5] / kUnits)};
+                    if (collider.intersects(box)) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool Search::largeShape(std::int32_t stateId) {
+    // parity: `hasLargeCollisionShape`, a shape reaching out of its own square.
+    const std::span<const std::int32_t> shapes = registry::blockShapes::collisionBoxes(stateId);
+    return std::ranges::any_of(shapes, [](std::int32_t at) { return at < 0 || at > registry::blockShapes::kUnits; });
+}
+
+std::optional<Aabb> Search::powderSnow(std::int32_t x, std::int32_t y, std::int32_t z) const {
+    // parity: `PowderSnowBlock.getCollisionShape` for the mob the context was made of.
+    const double blockX = x;
+    const double blockY = y;
+    const double blockZ = z;
+    if (mob_->fallDistance > 2.5) {
+        return Aabb{blockX, blockY, blockZ, blockX + 1.0, blockY + 0.9, blockZ + 1.0};
+    }
+    if (mob_->walksOnPowderSnow && mob_->y > blockY + 1.0 - static_cast<double>(1.0E-5F) && !mob_->descending) {
+        return Aabb{blockX, blockY, blockZ, blockX + 1.0, blockY + 1.0, blockZ + 1.0};
+    }
+    return std::nullopt;
 }
 
 bool Search::canReachWithoutCollision(const SearchNode& to) {

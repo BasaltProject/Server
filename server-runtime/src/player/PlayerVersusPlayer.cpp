@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerMace.hpp>
 #include <basalt/server/runtime/player/PlayerMovementStats.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -168,12 +169,54 @@ void wearSlot(const Context& context, PlayerSession& owner, std::int32_t slot, s
     wearItemIn(blocks, owner, slot, amount);
 }
 
+/// Whether the attacker's team is also theirs. parity: `Entity.isAlliedTo`.
+[[nodiscard]] bool allied(const Context& context, const PlayerSession& attacker, std::string_view member) {
+    const scoreboard::Team* own = context.teams == nullptr ? nullptr : context.teams->teamOf(attacker.name());
+    return own != nullptr && own == context.teams->teamOf(member);
+}
+
+[[nodiscard]] double distanceSquared(const PlayerSession& attacker, double x, double y, double z) {
+    const double dx = x - attacker.x;
+    const double dy = y - attacker.y;
+    const double dz = z - attacker.z;
+    return (dx * dx) + (dy * dy) + (dz * dz);
+}
+
+/// parity: `itemAttackInteraction`'s `hurtEnemy`: a `weapon` counts as used, and wears.
+void wearWeapon(const Context& context, PlayerSession& attacker, const std::optional<storage::StoredItemStack>& weapon,
+                std::int32_t slot) {
+    if (!weapon.has_value() || item::itemWear::costPerAttack(*weapon) <= 0) {
+        return;
+    }
+    statAwards::used(attacker, weapon->id);
+    if (context.blocks != nullptr) {
+        wearItemIn(*context.blocks, attacker, slot, item::itemWear::costPerAttack(*weapon));
+    }
+}
+
+[[nodiscard]] bool isSword(const Context& context, const std::optional<storage::StoredItemStack>& weapon) {
+    if (!weapon.has_value()) {
+        return false;
+    }
+    const auto id = Identifier::parse(weapon->id);
+    if (!id.has_value()) {
+        return false;
+    }
+    if (context.blocks != nullptr && context.blocks->itemTags != nullptr) {
+        return world::realItemTags::contains(*context.blocks->itemTags, "minecraft:swords", *id);
+    }
+    return id->path().ends_with("_sword");
+}
+
+} // namespace
+
 /// parity: `EnchantmentHelper.doPostAttackEffectsWithItemSource` after a player's melee blow on
 /// `victim`, a player, or on `mob`.
-void postAttack(const Context& context, PlayerSession& attacker, PlayerSession* victim, ServerEntity* mob,
-                const std::optional<storage::StoredItemStack>& weapon, std::int32_t weaponSlot) {
+void postAttack(const Context& context, world::LoadedWorld& world, PlayerSession& attacker, PlayerSession* victim,
+                ServerEntity* mob, const std::optional<storage::StoredItemStack>& weapon, std::int32_t weaponSlot) {
     const world::weaponDamage::Victim facts = victimOf(context, victim != nullptr ? playerType() : mob->type());
-    world::postAttack::Hit hit{.victim = &facts};
+    world::postAttack::Hit hit{
+        .victim = &facts, .attackerFallDistance = attacker.fallDistance, .attackerFlying = attacker.fallFlying};
     if (victim != nullptr) {
         hit.victimEquipment = equipmentOf(*victim);
     }
@@ -221,48 +264,63 @@ void postAttack(const Context& context, PlayerSession& attacker, PlayerSession* 
             wearSlot(context, *owner, wear.slot, wear.amount);
         }
     }
+    for (const world::postAttack::Explosion& blast : outcome.explosions) {
+        if (!context.explode) {
+            break;
+        }
+        if (blast.target == Side::kAttacker) {
+            context.explode(world, blast, attacker.x, attacker.y, attacker.z);
+        } else if (victim != nullptr) {
+            context.explode(world, blast, victim->x, victim->y, victim->z);
+        } else {
+            context.explode(world, blast, mob->x, mob->y, mob->z);
+        }
+    }
 }
 
-/// Whether the attacker's team is also theirs. parity: `Entity.isAlliedTo`.
-[[nodiscard]] bool allied(const Context& context, const PlayerSession& attacker, std::string_view member) {
-    const scoreboard::Team* own = context.teams == nullptr ? nullptr : context.teams->teamOf(attacker.name());
-    return own != nullptr && own == context.teams->teamOf(member);
+void itemAttackInteraction(const Context& context, world::LoadedWorld& world, PlayerSession& attacker,
+                           PlayerSession* victim, ServerEntity* mob,
+                           const std::optional<storage::StoredItemStack>& weapon, std::int32_t weaponSlot) {
+    const bool smash = mace::smashes(attacker, weapon);
+    if (smash) {
+        const mace::Struck struck = victim != nullptr ? mace::Struck{.entityId = victim->entityId(),
+                                                                     .x = victim->x,
+                                                                     .y = victim->y,
+                                                                     .z = victim->z,
+                                                                     .onGround = victim->onGround,
+                                                                     .uuid = victim->uuid().toString()}
+                                                      : mace::Struck{.entityId = mob->entityId(),
+                                                                     .x = mob->x,
+                                                                     .y = mob->y,
+                                                                     .z = mob->z,
+                                                                     .onGround = mob->onGround,
+                                                                     .uuid = mob->uuid().toString()};
+        mace::hurtEnemy(context, world, attacker, struck);
+    }
+    postAttack(context, world, attacker, victim, mob, weapon, weaponSlot);
+    if (smash) {
+        mace::postHurtEnemy(attacker);
+    }
+    wearWeapon(context, attacker, weapon, weaponSlot);
 }
 
-[[nodiscard]] double distanceSquared(const PlayerSession& attacker, double x, double y, double z) {
-    const double dx = x - attacker.x;
-    const double dy = y - attacker.y;
-    const double dz = z - attacker.z;
-    return (dx * dx) + (dy * dy) + (dz * dz);
+float knockbackOf(const Context& context, const PlayerSession& attacker,
+                  const std::optional<storage::StoredItemStack>& weapon) {
+    const world::weaponDamage::DefinitionOf definitionOf = definitionsOf(context);
+    return (static_cast<float>(playerAttributes::valueOf(attacker, "minecraft:attack_knockback", definitionOf)) +
+            (weapon.has_value() ? world::weaponDamage::valueEffect(*weapon, "minecraft:knockback", 0.0F, definitionOf)
+                                : 0.0F)) /
+           2.0F;
 }
 
-/// parity: `itemAttackInteraction`'s `hurtEnemy`: a `weapon` counts as used, and wears.
-void wearWeapon(const Context& context, PlayerSession& attacker, const std::optional<storage::StoredItemStack>& weapon,
-                std::int32_t slot) {
-    if (!weapon.has_value() || item::itemWear::costPerAttack(*weapon) <= 0) {
+void knockMob(PlayerSession& attacker, ServerEntity& mob, float power) {
+    if (power <= 0.0F) {
         return;
     }
-    statAwards::used(attacker, weapon->id);
-    if (context.blocks != nullptr) {
-        wearItemIn(*context.blocks, attacker, slot, item::itemWear::costPerAttack(*weapon));
-    }
+    const std::array<double, 2> towards = facing(attacker);
+    entity::entityCombat::knockback(mob, static_cast<double>(power), towards[0], towards[1]);
+    attacker.sprinting = false;
 }
-
-[[nodiscard]] bool isSword(const Context& context, const std::optional<storage::StoredItemStack>& weapon) {
-    if (!weapon.has_value()) {
-        return false;
-    }
-    const auto id = Identifier::parse(weapon->id);
-    if (!id.has_value()) {
-        return false;
-    }
-    if (context.blocks != nullptr && context.blocks->itemTags != nullptr) {
-        return world::realItemTags::contains(*context.blocks->itemTags, "minecraft:swords", *id);
-    }
-    return id->path().ends_with("_sword");
-}
-
-} // namespace
 
 bool criticalPossible(const PlayerSession& attacker, world::LoadedWorld& world, bool falling) {
     if (!falling || attacker.onGround || attacker.vehicleId.has_value() ||
@@ -333,12 +391,15 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
     const world::weaponDamage::DefinitionOf definitionOf = definitionsOf(context);
     const world::weaponDamage::Victim facts = victimOf(context, playerType());
     const float enchanted = world::weaponDamage::of(swing.weapon, swing.base, definitionOf, &facts);
-    const combat::Swing blow =
-        combat::swingOf(swing.strength, swing.base, enchanted, swing.falling, attacker.onGround, attacker.sprinting);
     const float magic = swing.strength * (enchanted - swing.base);
-    if (blow.damage <= 0.0F) {
+    // parity: the charged base or the enchantments have to be worth something before any bonus.
+    if (swing.base * combat::chargeScale(swing.strength) <= 0.0F && magic <= 0.0F) {
         return false;
     }
+    const bool smash = mace::smashes(attacker, swing.weapon);
+    const float bonus = mace::damageBonus(attacker, swing.weapon, definitionOf);
+    const combat::Swing blow = combat::swingOf(swing.strength, swing.base, enchanted, swing.falling, attacker.onGround,
+                                               attacker.sprinting, bonus);
     if (blow.knockbackAttack) {
         soundAt(context, attacker, "entity.player.attack.knockback");
     }
@@ -348,12 +409,16 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
     const std::array<double, 3> oldMovement = victim.deltaMovement;
     victim.lastHurtLanded = false;
     if (victim.connection().hurt) {
-        victim.connection().hurt(blow.damage, "player", world::damageTypes::kPlayerAttack,
-                                 entity::DamageSource{.entityId = attacker.entityId(),
-                                                      .x = attacker.x,
-                                                      .z = attacker.z,
-                                                      .name = wire::text::Component::text(attacker.name()),
-                                                      .ownerId = attacker.entityId()});
+        // parity: `MaceItem.getItemDamageSource`, `mace_smash` for a smash.
+        victim.connection().hurt(
+            blow.damage, smash ? "mace_smash" : "player",
+            smash ? world::damageTypes::kMaceSmash : world::damageTypes::kPlayerAttack,
+            entity::DamageSource{.entityId = attacker.entityId(),
+                                 .x = attacker.x,
+                                 .z = attacker.z,
+                                 .name = wire::text::Component::text(attacker.name()),
+                                 .ownerId = attacker.entityId(),
+                                 .armorFractionAdd = mace::armorFractionAdd(swing.weapon, definitionOf)});
     }
     if (!victim.lastHurtLanded) {
         soundAt(context, attacker, "entity.player.attack.nodamage");
@@ -362,12 +427,7 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
     // parity: `causeExtraKnockback`: the attribute and the knockback enchantment halved, the sprint
     // on top; the victim's motion goes out and the server keeps the one from before the blow.
     const float knockback =
-        ((static_cast<float>(playerAttributes::valueOf(attacker, "minecraft:attack_knockback", definitionOf)) +
-          (swing.weapon.has_value()
-               ? world::weaponDamage::valueEffect(*swing.weapon, "minecraft:knockback", 0.0F, definitionOf)
-               : 0.0F)) /
-         2.0F) +
-        (blow.knockbackAttack ? kSprintKnockback : 0.0F);
+        knockbackOf(context, attacker, swing.weapon) + (blow.knockbackAttack ? kSprintKnockback : 0.0F);
     if (knockback > 0.0F) {
         pushPlayer(context, attacker, victim, static_cast<double>(knockback));
         attacker.sprinting = false;
@@ -375,7 +435,7 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
     victim.deltaMovement = oldMovement;
     if (sweeping) {
         sweep(attacker, world, context, victim.entityId(), boxOf(victim),
-              swing.base * combat::chargeScale(swing.strength), swing.strength, swing.weapon);
+              (swing.base * combat::chargeScale(swing.strength)) + bonus, swing.strength, swing.weapon);
     }
     // parity: `attackVisualEffects`.
     if (blow.critical) {
@@ -394,8 +454,7 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
             pet->ownerHurt = victim.entityId();
         }
     }
-    wearWeapon(context, attacker, swing.weapon, swing.weaponSlot);
-    postAttack(context, attacker, &victim, nullptr, swing.weapon, swing.weaponSlot);
+    itemAttackInteraction(context, world, attacker, &victim, nullptr, swing.weapon, swing.weaponSlot);
     const float lost = before - std::max(victim.health(), 0.0F);
     attacker.stats.addDamageDealt(lost);
     showDamageIndicator(playersIn(context, attacker.worldName), victim.x, victim.y + (playerHeight() * 0.5), victim.z,
@@ -450,7 +509,7 @@ void sweep(PlayerSession& attacker, world::LoadedWorld& world, const Context& co
                 MobActionSystem::wardenStruck(*nearby, attacker.entityId(), true, 0.0);
             }
             nearby->panicTicks = kPanicTicks;
-            postAttack(context, attacker, nullptr, nearby, weapon, weaponSlot);
+            postAttack(context, world, attacker, nullptr, nearby, weapon, weaponSlot);
         }
         if (context.sweptMob) {
             context.sweptMob(*nearby, result.died);
@@ -479,7 +538,7 @@ void sweep(PlayerSession& attacker, world::LoadedWorld& world, const Context& co
         }
         pushPlayer(context, attacker, *nearby, kSweepKnockback);
         nearby->deltaMovement = oldMovement;
-        postAttack(context, attacker, nearby, nullptr, weapon, weaponSlot);
+        postAttack(context, world, attacker, nearby, nullptr, weapon, weaponSlot);
     }
     // parity: the sweep's particle a block ahead of the attacker, at half their height.
     const server::registry::ParticleType* type =

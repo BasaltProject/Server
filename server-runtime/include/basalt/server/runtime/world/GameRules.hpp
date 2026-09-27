@@ -117,6 +117,11 @@ inline constexpr GameRule kFallDamage = GameRule::boolean("fall_damage", true);
 /// is: nothing lights and nothing is removed.
 inline constexpr GameRule kTntExplodes = GameRule::boolean("tnt_explodes", true);
 
+/// parity: `ServerLevel.canSpreadFireAround`: fire and lightning act only this near a player, and
+/// everywhere at -1.
+inline constexpr GameRule kFireSpreadRadiusAroundPlayer =
+    GameRule::integer("fire_spread_radius_around_player", 128, -1);
+
 /// parity: `Block.popResource` and `Block.popExperience`, which are what every block break ends in.
 /// With this off a block still breaks and still goes: what it drops is what stops.
 inline constexpr GameRule kBlockDrops = GameRule::boolean("block_drops", true);
@@ -148,12 +153,8 @@ inline constexpr GameRule kLavaSourceConversion = GameRule::boolean("lava_source
 
 } // namespace gameRules
 
-/// The values one world runs with. Everything not set explicitly answers with the vanilla default,
-/// so a fresh world stores nothing and a `level.nbt` from an older build keeps working.
-///
-/// Only the rules something already reads change behaviour; the rest are stored and reported so an
-/// operator can set them before the system that honours them exists, which is what vanilla's own
-/// data does across versions.
+/// The values one world runs with; anything unset answers the vanilla default, so an older `level.nbt`
+/// keeps working. Rules nothing reads yet are still stored, so an operator can set them ahead.
 class GameRuleValues {
 public:
     [[nodiscard]] bool get(const GameRule& rule) const;

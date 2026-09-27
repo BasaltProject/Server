@@ -182,8 +182,8 @@ basalt_module(server-runtime-core
         src/ContainerGrindstone.cpp
         src/ContainerEnchantment.cpp
         src/ContainerSlots.cpp
-        src/MobActionSystem.cpp
         src/ContainerRecipeAwards.cpp
+        src/MobActionSystem.cpp
         src/ItemUseTimers.cpp
         src/PlayerLifecycle.cpp
         src/VillagerTradeController.cpp
@@ -294,6 +294,7 @@ basalt_module(server-runtime-core
         src/datapack/ResourceStack.cpp
         src/datapack/RegistryValidation.cpp
         src/datapack/RegistrySchemas.cpp
+        src/datapack/ReloadableElements.cpp
         src/player/FoodData.cpp
         src/player/PlayerArrowPickup.cpp
         src/player/PlayerMovementStats.cpp
@@ -320,6 +321,7 @@ basalt_module(server-runtime-core
         src/player/PlayerSleep.cpp
         src/player/PlayerSpawnItems.cpp
         src/player/PlayerVersusPlayer.cpp
+        src/player/PlayerMace.cpp
         src/player/PlayerThrown.cpp
         src/player/PlayerSpear.cpp
         src/player/PlayerTrident.cpp

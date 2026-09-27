@@ -374,8 +374,8 @@ void shove(PlayerSession& session, const entity::shieldBlows::Push& push) {
 } // namespace
 
 float damageAfterProtection(const PlayerSession& session, const float amount,
-                            const std::optional<Identifier>& damageType, const DamageContext& context,
-                            float* resisted) {
+                            const std::optional<Identifier>& damageType, const DamageContext& context, float* resisted,
+                            float armorFractionAdd) {
     const world::realDamageTypeTags::TagMembers* tags = context.damageTypeTags;
     if (tags == nullptr || !damageType.has_value()) {
         return amount;
@@ -400,7 +400,7 @@ float damageAfterProtection(const PlayerSession& session, const float amount,
         const auto armour = static_cast<float>(std::floor(attribute("minecraft:armor")));
         const auto toughness = static_cast<float>(attribute("minecraft:armor_toughness"));
         if (armour > 0.0F) {
-            damage = player::combat::afterArmour(damage, armour, toughness);
+            damage = player::combat::afterArmour(damage, armour, toughness, armorFractionAdd);
         }
     }
     if (world::realDamageTypeTags::isIn(*tags, world::realDamageTypeTags::kBypassesEffects, *damageType)) {
@@ -507,7 +507,8 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         ++session->arrowCount;
     }
     float resisted = 0.0F;
-    const float afterArmour = damageAfterProtection(*session, incoming, damageType, context, &resisted);
+    const float afterArmour = damageAfterProtection(*session, incoming, damageType, context, &resisted,
+                                                    source.has_value() ? source->armorFractionAdd : 0.0F);
     // parity: `getDamageAfterMagicAbsorb` and `hurtServer`, both in tenths of a heart.
     if (resisted > 0.0F && resisted < kLargestCountedDamage) {
         statAwards::award(*session, "damage_resisted", std::lround(resisted * 10.0F));

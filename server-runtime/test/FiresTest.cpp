@@ -70,6 +70,17 @@ void floor(WorldState& world, const std::string& block = "stone") {
     return found;
 }
 
+/// A stone roof six up over the fire's square and the four beside it, all of what `isNearRain` asks.
+void roof(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool overFire = true) {
+    for (const auto& [dx, dz] :
+         std::array<std::pair<std::int32_t, std::int32_t>, 5>{{{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}}}) {
+        if (dx == 0 && dz == 0 && !overFire) {
+            continue;
+        }
+        REQUIRE(world.setBlockState(x + dx, y + 6, z + dz, stateOf("stone")));
+    }
+}
+
 const WorldWeather kDry{};
 
 [[nodiscard]] WorldWeather rain() {
@@ -172,7 +183,7 @@ TEST_CASE("a fire over stone with nothing to burn ages and then dies") {
         ++turns;
     }
     // Ageing is one step every other turn on average, and death waits for age to pass three.
-    CHECK(turns == 15);
+    CHECK(turns == 16);
     CHECK(world.blockState(8, 64, 8) == registry::blocks::air().stateId);
 }
 
@@ -183,8 +194,11 @@ TEST_CASE("a fire whose floor was taken away goes out at once") {
     REQUIRE(world.setBlockState(8, 63, 8, registry::blocks::air().stateId));
     rng::RandomSource random = rng::RandomSource::legacy(3);
 
+    // parity: `FireBlock.tick` removes it and carries on, so a fire that ages on that same turn is
+    // written back before the missing floor takes it again.
     const std::vector<BlockChange> changes = fires::tick(world, kDry, "normal", 8, 64, 8, random);
-    CHECK(changes.size() == 1);
+    CHECK_FALSE(changes.empty());
+    CHECK(changes.back().stateId == registry::blocks::air().stateId);
     CHECK(world.blockState(8, 64, 8) == registry::blocks::air().stateId);
 }
 
@@ -201,14 +215,14 @@ TEST_CASE("rain on an open sky puts a fire out") {
     }
     // A fresh fire is doused on a roll of one in five, so it never lasts the fifteen turns it takes
     // to die of old age.
-    CHECK(turns == 2);
+    CHECK(turns == 4);
 }
 
 TEST_CASE("a roof keeps the rain off") {
     WorldState world = emptyWorld();
     floor(world);
     REQUIRE(world.setBlockState(8, 64, 8, fireAged(0)));
-    REQUIRE(world.setBlockState(8, 70, 8, stateOf("stone")));
+    roof(world, 8, 64, 8);
     rng::RandomSource random = rng::RandomSource::legacy(11);
 
     std::int32_t turns = 0;
@@ -216,7 +230,7 @@ TEST_CASE("a roof keeps the rain off") {
         static_cast<void>(fires::tick(world, rain(), "normal", 8, 64, 8, random));
         ++turns;
     }
-    CHECK(turns == 11);
+    CHECK(turns == 8);
 }
 
 TEST_CASE("fire on netherrack never goes out") {
@@ -234,26 +248,30 @@ TEST_CASE("fire on netherrack never goes out") {
 }
 
 TEST_CASE("fire eats the planks beside it and spreads through them") {
-    WorldState world = emptyWorld();
-    floor(world);
-    for (std::int32_t x = 4; x < 13; ++x) {
-        for (std::int32_t z = 4; z < 13; ++z) {
-            REQUIRE(world.setBlockState(x, 64, z, stateOf("oak_planks")));
-        }
-    }
-    REQUIRE(world.setBlockState(8, 64, 8, fireAged(0)));
-    rng::RandomSource random = rng::RandomSource::legacy(5);
-
     std::int32_t burned = 0;
-    for (std::int32_t turn = 0; turn < 60; ++turn) {
-        for (const BlockChange& change : fires::tick(world, kDry, "normal", 8, 64, 8, random)) {
-            if (change.stateId == registry::blocks::air().stateId || fires::isFire(change.stateId)) {
-                ++burned;
+    std::int32_t fires = 0;
+    for (std::int64_t seed = 0; seed < 10; ++seed) {
+        WorldState world = emptyWorld();
+        floor(world);
+        for (std::int32_t x = 4; x < 13; ++x) {
+            for (std::int32_t z = 4; z < 13; ++z) {
+                REQUIRE(world.setBlockState(x, 64, z, stateOf("oak_planks")));
             }
         }
+        REQUIRE(world.setBlockState(8, 64, 8, fireAged(0)));
+        rng::RandomSource random = rng::RandomSource::legacy(seed);
+        for (std::int32_t turn = 0; turn < 60; ++turn) {
+            for (const BlockChange& change : fires::tick(world, kDry, "normal", 8, 64, 8, random)) {
+                if (change.stateId == registry::blocks::air().stateId || fires::isFire(change.stateId)) {
+                    ++burned;
+                }
+            }
+        }
+        fires += firesAround(world, 8, 64, 8);
     }
     CHECK(burned > 0);
-    CHECK(firesAround(world, 8, 64, 8) > 1);
+    // More fires than the ten it started with.
+    CHECK(fires > 10);
 }
 
 TEST_CASE("fire over soul soil burns as soul fire") {
@@ -308,32 +326,36 @@ TEST_CASE("nothing catches where there is nothing to burn") {
 
 TEST_CASE("a harder world spreads fire further") {
     const auto spreadsUnder = [](const std::string& difficulty) {
-        WorldState world = emptyWorld();
-        floor(world, "netherrack");
-        for (std::int32_t x = 0; x < 16; ++x) {
-            for (std::int32_t z = 0; z < 16; ++z) {
-                REQUIRE(world.setBlockState(x, 65, z, stateOf("oak_planks")));
+        std::int32_t total = 0;
+        for (std::int64_t seed = 0; seed < 40; ++seed) {
+            WorldState world = emptyWorld();
+            floor(world, "netherrack");
+            for (std::int32_t x = 0; x < 16; ++x) {
+                for (std::int32_t z = 0; z < 16; ++z) {
+                    REQUIRE(world.setBlockState(x, 65, z, stateOf("oak_planks")));
+                }
             }
+            REQUIRE(world.setBlockState(8, 64, 8, fireAged(0)));
+            rng::RandomSource random = rng::RandomSource::legacy(seed);
+            for (std::int32_t turn = 0; turn < 4; ++turn) {
+                static_cast<void>(fires::tick(world, kDry, difficulty, 8, 64, 8, random));
+            }
+            total += firesAround(world, 8, 64, 8);
         }
-        REQUIRE(world.setBlockState(8, 64, 8, fireAged(0)));
-        rng::RandomSource random = rng::RandomSource::legacy(2);
-        for (std::int32_t turn = 0; turn < 12; ++turn) {
-            static_cast<void>(fires::tick(world, kDry, difficulty, 8, 64, 8, random));
-        }
-        return firesAround(world, 8, 64, 8);
+        return total;
     };
 
     // The three gentler settings share a bucket because the weight is divided away, exactly as it is
-    // in vanilla: only hard clears the next step.
-    CHECK(spreadsUnder("peaceful") == 6);
-    CHECK(spreadsUnder("easy") == 6);
-    CHECK(spreadsUnder("normal") == 6);
-    CHECK(spreadsUnder("hard") == 7);
+    // in vanilla: only hard clears the next step, and only while the fire is young.
+    const std::int32_t gentle = spreadsUnder("peaceful");
+    CHECK(spreadsUnder("easy") == gentle);
+    CHECK(spreadsUnder("normal") == gentle);
+    CHECK(spreadsUnder("hard") > gentle);
 }
 
 TEST_CASE("what catches is read off all six sides of the empty space") {
     // One plank on each side of the same candidate in turn, so every lookup is exercised on its own.
-    CHECK(firstCatch({9, 65, 8}, {9, 66, 8}) == 110);
+    CHECK(firstCatch({9, 65, 8}, {9, 66, 8}) == 124);
     CHECK(firstCatch({9, 67, 8}, {9, 66, 8}) == 316);
     CHECK(firstCatch({9, 66, 7}, {9, 66, 8}) == 46);
     CHECK(firstCatch({9, 66, 9}, {9, 66, 8}) == 83);
@@ -411,27 +433,36 @@ TEST_CASE("a plank beside the fire is either taken or left burning") {
         }
         totalTurns += outcome.first;
     }
-    CHECK(leftBurning == 10);
+    CHECK(leftBurning == 16);
     CHECK(totalTurns == 557);
     // The age a left-behind fire starts at is the burning fire's own plus a fifth of a step, so the
     // ages together say more than any single one of them.
-    CHECK(totalAge == 59);
+    CHECK(totalAge == 39);
 }
 
-TEST_CASE("the roof that counts is the one over the fire's own column") {
-    // The roof sits over an odd column, so reading the heightmap one block off answers wrongly.
-    WorldState world = emptyWorld();
-    floor(world);
-    REQUIRE(world.setBlockState(9, 64, 9, fireAged(0)));
-    REQUIRE(world.setBlockState(9, 70, 9, stateOf("stone")));
-    rng::RandomSource random = rng::RandomSource::legacy(11);
-
-    std::int32_t turns = 0;
-    while (world.blockState(9, 64, 9) != registry::blocks::air().stateId && turns < 100) {
-        static_cast<void>(fires::tick(world, rain(), "normal", 9, 64, 9, random));
-        ++turns;
-    }
-    CHECK(turns == 11);
+TEST_CASE("rain beside a fire reaches it under a roof over its own square alone") {
+    // parity: `FireBlock.isNearRain` asks the four squares beside it too, so a roof keeps a fire only
+    // when it covers all five. The odd column catches a heightmap read one block off.
+    const auto turnsUnder = [](bool overFire, bool beside) {
+        WorldState world = emptyWorld();
+        floor(world);
+        REQUIRE(world.setBlockState(9, 64, 9, fireAged(0)));
+        if (beside) {
+            roof(world, 9, 64, 9, overFire);
+        } else {
+            REQUIRE(world.setBlockState(9, 70, 9, stateOf("stone")));
+        }
+        rng::RandomSource random = rng::RandomSource::legacy(11);
+        std::int32_t turns = 0;
+        while (world.blockState(9, 64, 9) != registry::blocks::air().stateId && turns < 100) {
+            static_cast<void>(fires::tick(world, rain(), "normal", 9, 64, 9, random));
+            ++turns;
+        }
+        return turns;
+    };
+    CHECK(turnsUnder(true, true) == 8);
+    CHECK(turnsUnder(true, false) == 4);
+    CHECK(turnsUnder(false, true) == 4);
 }
 
 TEST_CASE("the fire works on all six blocks touching it") {
@@ -524,7 +555,7 @@ TEST_CASE("the column the roof is read from is the one in the fire's own chunk")
         }
     }
     REQUIRE(world.setBlockState(20, 64, 9, fireAged(0)));
-    REQUIRE(world.setBlockState(20, 70, 9, stateOf("stone")));
+    roof(world, 20, 64, 9);
     rng::RandomSource random = rng::RandomSource::legacy(11);
 
     std::int32_t turns = 0;
@@ -532,24 +563,27 @@ TEST_CASE("the column the roof is read from is the one in the fire's own chunk")
         static_cast<void>(fires::tick(world, rain(), "normal", 20, 64, 9, random));
         ++turns;
     }
-    // Reading the heightmap from the chunk next door would find no roof and douse it in two.
-    CHECK(turns == 11);
+    // Reading the heightmap from the chunk next door would find no roof and douse it in four.
+    CHECK(turns == 8);
 }
 
 TEST_CASE("fire on magma and on bedrock burns forever too") {
-    const auto survives = [](const std::string& floorBlock) {
+    const auto survives = [](const std::string& floorBlock, bool end) {
         WorldState world = emptyWorld();
         floor(world, floorBlock);
         REQUIRE(world.setBlockState(8, 64, 8, fireAged(0)));
         rng::RandomSource random = rng::RandomSource::legacy(3);
         for (std::int32_t turn = 0; turn < 200; ++turn) {
-            static_cast<void>(fires::tick(world, kDry, "normal", 8, 64, 8, random));
+            static_cast<void>(fires::tick(world, kDry, "normal", 8, 64, 8, random, {}, true,
+                                          fires::Surroundings{.bedrockBurnsForever = end}));
         }
         const std::optional<std::int32_t> stateId = world.blockState(8, 64, 8);
         return stateId.has_value() && fires::isFire(*stateId);
     };
 
-    CHECK(survives("magma_block"));
-    CHECK(survives("bedrock"));
-    CHECK_FALSE(survives("stone"));
+    CHECK(survives("magma_block", false));
+    // parity: bedrock is only in the End's `infiniburn` tag.
+    CHECK(survives("bedrock", true));
+    CHECK_FALSE(survives("bedrock", false));
+    CHECK_FALSE(survives("stone", false));
 }

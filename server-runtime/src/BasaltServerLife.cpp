@@ -43,6 +43,7 @@
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
+#include <basalt/server/runtime/player/PlayerMace.hpp>
 #include <basalt/server/runtime/player/PlayerPick.hpp>
 #include <basalt/server/runtime/player/PlayerSigns.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
@@ -243,12 +244,8 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
 }
 
 void BasaltServer::shutdown() {
-    // Runs wherever it was asked from, which is nearly always the tick thread: a signal is noticed
-    // inside the tick and `/stop` runs on the owner of a world. That is deliberate rather than
-    // tolerated. Saving a world drains its owner, and an owner may only be drained by the thread
-    // that owns it, so moving this off the tick thread trades a join for a far worse bug.
-    // Once only: `/stop` and a signal can arrive together, and running this twice means two
-    // concurrent saves of the same regions.
+    // Runs on whichever thread asked, nearly always the tick thread: saving drains a world's owner,
+    // which only that owner's thread may do. Once only, since `/stop` and a signal can arrive together.
     bool expected = false;
     if (!shuttingDown_.compare_exchange_strong(expected, true)) {
         return;
@@ -858,10 +855,12 @@ void BasaltServer::startBedrockListener() {
                         return world::realEntityTypeTags::membersOf(*entityTags, tag).contains(target->type());
                     }};
                 const float enchanted = world::weaponDamage::of(held, base, definitionOf, &victim);
-                const player::combat::Swing swing =
-                    player::combat::swingOf(strength, base, enchanted,
-                                            player::pvp::criticalPossible(*session, world, falling), session->onGround,
-                                            session->sprinting);
+                // parity: `MaceItem.getAttackDamageBonus` and its `mace_smash` source.
+                const bool smash = player::mace::smashes(*session, held);
+                const float bonus = player::mace::damageBonus(*session, held, definitionOf);
+                const player::combat::Swing swing = player::combat::swingOf(
+                    strength, base, enchanted, player::pvp::criticalPossible(*session, world, falling),
+                    session->onGround, session->sprinting, bonus);
                 if (swing.damage <= 0.0F) {
                     return;
                 }
@@ -869,26 +868,30 @@ void BasaltServer::startBedrockListener() {
                 entity::entityCombat::blame(*target, session->entityId(), session->entityId(),
                                             wire::common::Identifier::vanilla("player"));
                 const entity::entityCombat::Result result = entity::entityCombat::hurt(
-                    *target, swing.damage, session->x, session->z, {}, "attack", session->name());
+                    *target, swing.damage, session->x, session->z, {}, smash ? "mace_smash" : "attack", session->name(),
+                    true, player::mace::armorFractionAdd(held, definitionOf));
                 if (!result.landed) {
                     return;
                 }
                 if (advancementTriggers_ != nullptr) {
                     world::triggerFacts::playerHurtEntity(*advancementTriggers_, world, *session, *target, swing.damage,
-                                                          wire::common::Identifier::vanilla("player_attack"));
+                                                          smash ? world::damageTypes::kMaceSmash
+                                                                : world::damageTypes::kPlayerAttack);
                 }
-                if (swing.knockbackAttack) {
-                    entity::entityCombat::knockback(*target, 0.5, session->x - target->x, session->z - target->z);
-                }
+                const player::BreakContext blocks = breakContext();
+                const player::pvp::Context melee = meleeContext(blocks);
+                // parity: `causeExtraKnockback`, the weapon's and the sprint's, along the facing.
+                player::pvp::knockMob(*session, *target,
+                                      player::pvp::knockbackOf(melee, *session, held) +
+                                          (swing.knockbackAttack ? 0.5F : 0.0F));
                 // parity: `isSweepAttack`: a sword, on the ground, a swing that is neither critical
                 // nor a sprinting one. The sweep itself is the same code the other door runs.
                 if (swing.fullStrength && !swing.critical && !swing.knockbackAttack && session->onGround &&
                     weapon.has_value() && weapon->path().ends_with("_sword")) {
-                    const player::BreakContext blocks = breakContext();
-                    player::pvp::Context melee = meleeContext(blocks);
+                    player::pvp::Context sweeping = melee;
                     const std::string worldName = session->worldName;
                     // Everything the sweep caught sounds for itself: a silent sweep looks like a miss.
-                    melee.sweptMob = [this, worldName](entity::ServerEntity& struck, bool died) {
+                    sweeping.sweptMob = [this, worldName](entity::ServerEntity& struck, bool died) {
                         for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
                             if (watcher->worldName == worldName && watcher->connection().playSound) {
                                 watcher->connection().playSound(died ? entity::entityCombat::deathSound(struck)
@@ -897,42 +900,18 @@ void BasaltServer::startBedrockListener() {
                             }
                         }
                     };
-                    player::pvp::sweep(*session, world, melee, target->entityId(),
-                                       entity::Aabb::of(target->x, target->y, target->z, target->width(),
-                                                        target->height()),
-                                       base * player::combat::chargeScale(strength), strength, held);
+                    player::pvp::sweep(
+                        *session, world, sweeping, target->entityId(),
+                        entity::Aabb::of(target->x, target->y, target->z, target->width(), target->height()),
+                        (base * player::combat::chargeScale(strength)) + bonus, strength, held);
                 }
                 // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
                 target->hurtBy = session->entityId();
                 entity::entityCombat::rememberPlayer(*target, session->uuid());
-                // parity: `Player.attack` wears the weapon by one point per hit, and unbreaking
-                // gets its say before the wear lands rather than repairing it afterwards.
-                // parity: `ItemStack.hurtEnemy`, which counts a `weapon` as used.
-                if (held.has_value() && item::itemWear::costPerAttack(*held) > 0) {
-                    player::statAwards::used(*session, held->id);
-                }
-                if (session->gamemode != wire::protocol::play::Gamemode::Creative && held.has_value() &&
-                    item::itemWear::isDamageable(*held)) {
-                    item::ItemDamageEffects effects{
-                        [enchantments](const wire::common::Identifier& id) { return enchantments->definitionOf(id); }};
-                    random::RandomSource wear =
-                        random::RandomSource::legacy(static_cast<std::int64_t>(scratchRandom()()));
-                    const std::optional<storage::StoredItemStack> worn = item::itemWear::hurt(
-                        *held, item::itemWear::costPerAttack(*held), wear,
-                        [&effects](const storage::StoredItemStack& stack, const std::int32_t amount,
-                                   random::RandomSource& source) { return effects.process(stack, amount, source); });
-                    if (worn != held) {
-                        session->inventory.set(player::PlayerInventory::kHotbarStart + session->inventory.heldSlot(),
-                                               worn);
-                        if (!worn.has_value()) {
-                            player::statAwards::itemBroken(*session, held->id, player::statAwards::kBreakMainHand,
-                                                           &playerRegistry_);
-                        }
-                        if (session->connection().sendInventoryAll) {
-                            session->connection().sendInventoryAll();
-                        }
-                    }
-                }
+                // parity: `itemAttackInteraction`: the mace's smash, the post-attack enchantments, the wear.
+                player::pvp::itemAttackInteraction(melee, world, *session, nullptr, target, held,
+                                                   player::PlayerInventory::kHotbarStart +
+                                                       session->inventory.heldSlot());
                 world::vibrations::emit(world.state(), "entity_damage", target->x, target->y, target->z,
                                         world.gameTime(), {.entity = target->uuid()});
                 for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
@@ -1981,12 +1960,12 @@ void BasaltServer::startBedrockListener() {
                             }
                             return world::looms::weave(banner, named, *colour);
                         },
-                        .cartographyResult = [this](const storage::StoredItemStack& map,
-                                                    const storage::StoredItemStack& additional) {
-                            return maps_ == nullptr ? std::nullopt
-                                                    : world::maps::cartographyResult(map, additional, *maps_,
-                                                                                     &vanillaData_.itemTags);
-                        }});
+                        .cartographyResult =
+                            [this](const storage::StoredItemStack& map, const storage::StoredItemStack& additional) {
+                                return maps_ == nullptr ? std::nullopt
+                                                        : world::maps::cartographyResult(map, additional, *maps_,
+                                                                                         &vanillaData_.itemTags);
+                            }});
                 answer(applied.accepted, applied.containers);
                 if (!applied.accepted && session->connection().sendInventoryAll) {
                     session->connection().sendInventoryAll();

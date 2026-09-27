@@ -29,6 +29,7 @@
 #include <basalt/server/runtime/world/MiscGrowth.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
+#include <basalt/server/runtime/world/Precipitation.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
@@ -47,6 +48,7 @@
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 
@@ -58,6 +60,27 @@ using wire::protocol::play::BlockPos;
 using wire::protocol::play::ClientboundBlockUpdatePacket;
 using wire::protocol::play::SoundPacket;
 using wire::protocol::play::SoundSource;
+
+/// parity: `ServerLevel.canSpreadFireAround`: the rule off, or somebody not spectating near enough.
+[[nodiscard]] bool canSpreadFireAround(const world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                       std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::int32_t radius = world.gameRules().number(world::gameRules::kFireSpreadRadiusAroundPlayer);
+    if (radius == -1) {
+        return true;
+    }
+    for (const PlayerSession* player : watchers) {
+        if (player->gamemode == wire::protocol::play::Gamemode::Spectator) {
+            continue;
+        }
+        const double dx = player->x - x;
+        const double dy = player->y - y;
+        const double dz = player->z - z;
+        if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) < static_cast<double>(radius)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void sendBlockUpdates(const std::vector<PlayerSession*>& watchers, const std::vector<world::BlockChange>& changes) {
     for (const world::BlockChange& change : changes) {
@@ -140,8 +163,14 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 continue;
             }
             random::RandomSource random = freshRandom();
+            const world::fires::Surroundings surroundings{
+                .rainingAt = [&world](std::int32_t rx, std::int32_t ry,
+                                      std::int32_t rz) { return world::precipitation::rainingAt(world, rx, ry, rz); },
+                .increasedBurnout = world::precipitation::increasedFireBurnout(world, x, y, z),
+                .canSpread = canSpreadFireAround(world, watchers, x, y, z),
+                .bedrockBurnsForever = world.declaration().dimension == config::WorldDimension::End};
             sendBlockUpdates(watchers, world::fires::tick(world.state(), world.weather(), world.difficulty(), x, y, z,
-                                                          random, {}, hasSkylight));
+                                                          random, {}, hasSkylight, surroundings));
             continue;
         }
         // A block that lost its footing turns into an entity; everything else here is a button.
@@ -243,12 +272,9 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 broadcaster_->announceRedstone(world, watchers, moved);
             }
         }
-        // parity: `TripWireHookBlock.tick`, the look the hook booked when a wire told it something.
-        // Ten ticks later the string it was handed is gone for real, and the hook lets go.
-        //
-        // Every square `calculateState` writes goes out with flag 3 and the two hooks run
-        // `notifyNeighbors` on top, so this settles the dust around what moved instead of only
-        // redrawing it for the clients, which is what it used to do.
+        // parity: `TripWireHookBlock.tick`, booked when a wire changed: ten ticks later the hook lets
+        // go. `calculateState` writes with flag 3 and both hooks `notifyNeighbors`, so the dust
+        // around them updates too.
         if (here != 0 && world::tripwires::isHook(here)) {
             std::vector<world::BlockChange> hook;
             world::tripwires::calculateHook(world.state(), x, y, z, world.gameTime(), hook);

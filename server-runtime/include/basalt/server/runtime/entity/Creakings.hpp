@@ -60,6 +60,14 @@ struct CreakingState {
     /// The game time and difficulty id of its turn, which its navigation reads.
     std::int64_t gameTime = 0;
     std::int32_t difficulty = 2;
+    /// The level's border as min x, min z, max x, max z, refreshed each turn for its navigation.
+    std::optional<std::array<double, 4>> border;
+    /// parity: `PathNavigation.reachRange`, `timeLastRecompute` and `hasDelayedRecomputation`, and how
+    /// many of the level's shape changes it has already looked at.
+    std::int32_t pathReach = 0;
+    std::int64_t lastRecompute = 0;
+    bool delayedRecompute = false;
+    std::uint64_t shapeChangesSeen = 0;
 };
 
 /// What a heart keeps between turns that it does not save. parity: `CreakingHeartBlockEntity`.

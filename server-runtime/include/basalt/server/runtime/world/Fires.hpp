@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <string_view>
 #include <vector>
 
@@ -14,12 +15,8 @@ namespace basalt::server::runtime::world {
 
 /// Fire burning out and spreading.
 ///
-/// parity: `FireBlock.tick`, whose numbers are all vanilla's: how readily each block catches and
-/// burns away comes from the two tables that class builds at bootstrap, and the rest is its own
-/// arithmetic over the fire's age.
-///
-/// What is not here: rain putting fire out asks whether the sky is open above rather than whether
-/// this biome has rain at all, since biome precipitation is not modelled yet.
+/// parity: `FireBlock.tick`: how readily each block catches and burns away comes from the two tables
+/// that class builds at bootstrap, the rest is its own arithmetic over the fire's age.
 namespace fires {
 
 /// parity: `FireBlock.getFireTickDelay`.
@@ -52,15 +49,26 @@ bool igniteOnImpact(WorldState& world, std::int32_t x, std::int32_t y, std::int3
 /// Asks for the fire at these coordinates to act after the usual delay.
 void schedule(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random);
 
+/// What a fire's turn asks of the world beyond the blocks.
+struct Surroundings {
+    /// parity: `Level.isRainingAt`, biome and all. Unset, rain falls wherever the sky is open.
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> rainingAt;
+    /// parity: the `increased_fire_burnout` attribute where the fire is.
+    bool increasedBurnout = false;
+    /// parity: `ServerLevel.canSpreadFireAround`, the `fire_spread_radius_around_player` rule.
+    bool canSpread = true;
+    /// parity: the End's `infiniburn` tag, the only one with bedrock in it.
+    bool bedrockBurnsForever = false;
+};
+
 /// One fire's turn: age it, put it out if it has nothing left to burn, burn what is beside it and
-/// try to set light to what is near. Answers every block that changed.
-///
-/// `difficulty` is what `/difficulty` last set, since a harder world spreads fire further.
+/// try to set light to what is near. Answers every block that changed. `difficulty` is what
+/// `/difficulty` last set, since a harder world spreads fire further.
 [[nodiscard]] std::vector<BlockChange> tick(WorldState& world, const WorldWeather& weather, std::string_view difficulty,
                                             std::int32_t x, std::int32_t y, std::int32_t z,
                                             random::RandomSource& random,
                                             const blockSurvival::ScaffoldingHasFallen& scaffoldingHasFallen = {},
-                                            bool hasSkylight = true);
+                                            bool hasSkylight = true, const Surroundings& surroundings = {});
 
 } // namespace fires
 
