@@ -77,6 +77,8 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
             args.pushTable();
             args.pushString(link.kind);
             args.setField("kind");
+            args.pushString(link.label);
+            args.setField("label");
             args.pushString(link.url);
             args.setField("url");
             args.setIndex(position++);
