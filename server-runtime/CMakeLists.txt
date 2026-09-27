@@ -512,6 +512,8 @@ basalt_module(server-runtime-core
         src/world/Composters.cpp
         src/world/DecoratedPots.cpp
         src/world/DetectorRails.cpp
+        src/world/Conduits.cpp
+        src/world/StalactiteDrips.cpp
         src/world/Crafters.cpp
         src/world/Cushions.cpp
         src/world/AttachedEntities.cpp

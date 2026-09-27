@@ -3,7 +3,9 @@
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/DripstoneGrowth.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
+#include <basalt/server/runtime/world/StalactiteDrips.hpp>
 
 #include <algorithm>
 #include <array>
@@ -50,15 +52,38 @@ void placeTip(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
 } // namespace
 
 void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
-               random::RandomSource& random, std::vector<BlockChange>& changes) {
-    if (random.nextFloat() >= kChance) {
-        return;
-    }
+               random::RandomSource& random, std::vector<BlockChange>& changes, const bool evaporates,
+               const LevelEvent& levelEvent) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
         return;
     }
     const std::string spike{block->path()};
+    if (spike == "pointed_dripstone") {
+        // parity: the float for the drip is drawn on every turn, before the growth's own.
+        const float drip = random.nextFloat();
+        if (const std::optional<stalactiteDrips::Transfer> transfer =
+                stalactiteDrips::transfer(world, x, y, z, stateId, drip, evaporates);
+            transfer.has_value()) {
+            if (transfer->clay.has_value()) {
+                const auto [cx, cy, cz] = *transfer->clay;
+                growthSupport::set(world, cx, cy, cz, registry::blocks::named("clay")->stateId, changes);
+            } else if (transfer->cauldron.has_value()) {
+                const auto [cx, cy, cz] = *transfer->cauldron;
+                const wire::common::Identifier* cauldron =
+                    registry::blockStateDefinitions::blockOf(world.blockState(cx, cy, cz).value_or(0));
+                if (cauldron != nullptr) {
+                    world.scheduleBlockTick(cx, cy, cz, *cauldron, transfer->delay);
+                }
+            }
+            if (levelEvent) {
+                levelEvent(transfer->tip[0], transfer->tip[1], transfer->tip[2], stalactiteDrips::kDripEvent);
+            }
+        }
+    }
+    if (random.nextFloat() >= kChance) {
+        return;
+    }
     const auto grownOn = std::ranges::find(kGrowsOn, spike, &std::pair<std::string_view, std::string_view>::first);
     if (grownOn == kGrowsOn.end()) {
         return;
@@ -72,9 +97,16 @@ void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
     if (pathAt(world, x, y + 1, z) == spike) {
         return;
     }
-    // parity: `canGrow`, which asks for the block it hangs from.
+    // parity: `canGrow`, which asks for the block it hangs from, and a pointed dripstone for a water
+    // source over that.
     if (pathAt(world, x, y + 1, z) != grownOn->second) {
         return;
+    }
+    if (spike == "pointed_dripstone") {
+        const std::int32_t twoUp = world.blockState(x, y + 2, z).value_or(0);
+        if (fluidFlow::kindOf(twoUp) != FluidKind::Water || !isSourceFluid(twoUp)) {
+            return;
+        }
     }
 
     const auto reachOf = std::ranges::find(kReachOf, spike, &std::pair<std::string_view, std::int32_t>::first);

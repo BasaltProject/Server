@@ -40,6 +40,7 @@
 #include <basalt/server/runtime/world/ScheduledBlocks.hpp>
 #include <basalt/server/runtime/world/SculkShriekers.hpp>
 #include <basalt/server/runtime/world/SculkSpreading.hpp>
+#include <basalt/server/runtime/world/StalactiteDrips.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
@@ -648,6 +649,17 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             dead.has_value()) {
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *dead});
             broadcaster_->reshapeAround(world, watchers, x, y, z);
+        }
+        // parity: `AbstractCauldronBlock.tick`, the turn a stalactite's drip booked, written with
+        // `setBlockAndUpdate`.
+        if (const std::optional<world::stalactiteDrips::Fill> fill =
+                world::stalactiteDrips::fillCauldron(world.state(), x, y, z, !hasSkylight);
+            fill.has_value()) {
+            world.state().setBlockState(x, y, z, fill->stateId);
+            scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = fill->stateId});
+            broadcaster_->sendEffects(watchers, x, y, z, fill->stateId,
+                                      {world::blockEffect::Effect{.type = fill->levelEvent}});
+            broadcaster_->notifyAround(world, watchers, x, y, z, here);
         }
         // parity: `CreakingHeartBlock.tick` over `updateState`, written with `setBlock(..., 3)`. The
         // jar asks `EnvironmentAttributes.CREAKING_ACTIVE`, whose track runs 12600 to 23401: a
