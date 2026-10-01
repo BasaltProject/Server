@@ -2,6 +2,7 @@
 
 #include <basalt/server/plugins/PluginServices.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
+#include <basalt/wire/text/Component.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -56,6 +57,10 @@ public:
         playerRunner_ = std::move(runner);
     }
 
+    void setPlayerReplier(std::function<void(const std::string& uuid, const wire::text::Component&)> replier) {
+        playerReplier_ = std::move(replier);
+    }
+
     void refresh();
 
 private:
@@ -72,6 +77,7 @@ private:
     command::CommandDispatcher* dispatcher_;
     std::function<const command::CommandSource*()> console_;
     std::function<bool(const std::string& uuid, const std::string& line)> playerRunner_;
+    std::function<void(const std::string& uuid, const wire::text::Component&)> playerReplier_;
     std::vector<std::unique_ptr<Entry>> entries_;
 };
 
@@ -187,6 +193,10 @@ public:
 
     void setPlayerRunner(std::function<bool(const std::string& uuid, const std::string& line)> runner) {
         commands_.setPlayerRunner(std::move(runner));
+    }
+
+    void setPlayerReplier(std::function<void(const std::string& uuid, const wire::text::Component&)> replier) {
+        commands_.setPlayerReplier(std::move(replier));
     }
 
 private:
