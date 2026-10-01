@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <thread>
 
@@ -85,6 +86,9 @@ TickRates TickLoop::tickRates() const {
 }
 
 void TickLoop::setTickRate(float rate) {
+    if (std::isnan(rate)) {
+        return;
+    }
     targetRate_.store(std::clamp(rate, kMinTickRate, kMaxTickRate), std::memory_order_relaxed);
 }
 
