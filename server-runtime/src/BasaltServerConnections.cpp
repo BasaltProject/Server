@@ -236,6 +236,14 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.enchantments = &vanillaData_.enchantments;
     options.progress = playerProgress_.get();
     options.advancements = playerAdvancements_.get();
+    options.departed = [this](const player::PlayerSession& who) {
+        if (miscServices_.bossBars != nullptr) {
+            miscServices_.bossBars->left(who.uuid().toString());
+        }
+        if (miscServices_.scoreboards != nullptr) {
+            miscServices_.scoreboards->left(who.uuid().toString());
+        }
+    };
     options.advancementTriggers = advancementTriggers_.get();
     options.blockTags = &vanillaData_.blockTags;
     options.itemTags = &vanillaData_.itemTags;

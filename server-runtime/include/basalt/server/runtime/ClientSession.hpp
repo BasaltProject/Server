@@ -241,6 +241,7 @@ public:
         world::RealEnchantments* enchantments = nullptr;
         world::PlayerProgress* progress = nullptr;
         world::PlayerAdvancements* advancements = nullptr;
+        std::function<void(const player::PlayerSession& player)> departed;
         world::AdvancementTriggers* advancementTriggers = nullptr;
         const world::realBlockTags::TagMembers* blockTags = nullptr;
         const world::realItemTags::TagMembers* itemTags = nullptr;

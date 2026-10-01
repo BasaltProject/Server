@@ -312,6 +312,12 @@ void ServerBossBars::clearPlayers(std::string_view id) {
     }
 }
 
+void ServerBossBars::left(const std::string& uuid) {
+    for (auto& [id, bar] : transient_) {
+        bar.players.erase(uuid);
+    }
+}
+
 std::vector<std::string> ServerBossBars::players(std::string_view id) {
     std::vector<std::string> found;
     for (const player::PlayerSession* session : watching(id)) {

@@ -529,6 +529,9 @@ void PlayerLifecycle::leavePlayIfPresent() {
     if (owner_->options().advancements != nullptr) {
         owner_->options().advancements->leave(session->uuid().toString());
     }
+    if (owner_->options().departed) {
+        owner_->options().departed(*session);
+    }
     owner_->logger().info([&] { return session->name() + " left the game"; });
     Announcement farewell;
     if (hooks_.quit) {
