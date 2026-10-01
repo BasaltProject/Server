@@ -762,6 +762,14 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         return false;
     });
 
+    pluginServices_->setPlayerReplier([this](const std::string& uuid, const wire::text::Component& message) {
+        for (player::PlayerSession* session : playerRegistry_.snapshot()) {
+            if (session->uuid().toString() == uuid && session->connection().sendSystemMessage) {
+                session->connection().sendSystemMessage(message);
+            }
+        }
+    });
+
     // Read once, not swapped by a reload: the limits are baked into a plugin's state when it loads.
     plugins_ = std::make_unique<server::plugins::PluginHost>(
         *pluginServices_, config.pluginLanes,
@@ -769,7 +777,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                              .memoryBytes = static_cast<std::size_t>(config.pluginMemoryBytes)});
     plugins_->setApiInstaller(&server::plugins::pluginApi::install);
     static_cast<void>(wired_.dispatcher->registerCommand(std::make_shared<plugins::PluginsCommand>(
-        *plugins_, [this]() -> std::optional<std::string> { return options_.playersDatabasePath; },
+        *plugins_,
+        [this]() -> std::optional<std::string> {
+            if (playerStore_ != nullptr && playerStore_->isOpen()) {
+                static_cast<void>(playerStore_->database().exec("PRAGMA wal_checkpoint(TRUNCATE)"));
+            }
+            return options_.playersDatabasePath;
+        },
         [this] { return javaPlugins_; })));
     // A decider may only run on the owner plugins live on; unclaimed counts as ours, before the first tick.
     plugins_->setOnPluginThread([this] {
