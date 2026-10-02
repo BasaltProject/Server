@@ -165,9 +165,10 @@ private:
 
 class SessionPlayerRef final : public PluginPlayerRef {
 public:
-    SessionPlayerRef(player::PlayerRegistry& registry, std::string uuid, std::string fallbackName, ModelHooks hooks)
-        : registry_(&registry), uuid_(std::move(uuid)), fallbackName_(std::move(fallbackName)),
-          hooks_(std::move(hooks)), inventory_([this] { return session(); }) {}
+    SessionPlayerRef(player::PlayerRegistry& registry, std::string uuid, std::string fallbackName,
+                     std::shared_ptr<const ModelHooks> hooks)
+        : registry_(&registry), uuid_(std::move(uuid)), id_(wire::common::Uuid::parse(uuid_)),
+          fallbackName_(std::move(fallbackName)), hooks_(std::move(hooks)), inventory_([this] { return session(); }) {}
 
     [[nodiscard]] std::string name() const override {
         const player::PlayerSession* player = session();
@@ -290,7 +291,7 @@ public:
             return false;
         }
         if (world != player->worldName) {
-            world::LoadedWorld* target = hooks_.worldFor ? hooks_.worldFor(std::string{world}) : nullptr;
+            world::LoadedWorld* target = hooks_->worldFor ? hooks_->worldFor(std::string{world}) : nullptr;
             if (target == nullptr || !player->connection().switchWorld) {
                 return false;
             }
@@ -312,10 +313,10 @@ public:
 
     [[nodiscard]] bool may(std::string_view permission) const override {
         const player::PlayerSession* player = session();
-        if (player == nullptr || !hooks_.groups) {
+        if (player == nullptr || !hooks_->groups) {
             return false;
         }
-        return player->permissionGrant(permission).value_or(hooks_.groups().resolve(player->group, permission));
+        return player->permissionGrant(permission).value_or(hooks_->groups().resolve(player->group, permission));
     }
 
     void setPermission(std::string_view source, std::string_view node, std::optional<bool> granted) override {
@@ -526,10 +527,10 @@ public:
 
     [[nodiscard]] std::int32_t permissionLevel() const override {
         player::PlayerSession* player = session();
-        if (player == nullptr || !hooks_.groups) {
+        if (player == nullptr || !hooks_->groups) {
             return 0;
         }
-        return command::PlayerCommandSource{*player, hooks_.groups()}.permissionLevel();
+        return command::PlayerCommandSource{*player, hooks_->groups()}.permissionLevel();
     }
 
     [[nodiscard]] bool flying() const override {
@@ -590,7 +591,7 @@ public:
         if (player == nullptr) {
             return std::nullopt;
         }
-        playerOps::Context context{*player, *registry_, hooks_};
+        playerOps::Context context{*player, *registry_, *hooks_};
         return playerOps::dispatch(context, playerOps::Verb::Get, name, {});
     }
 
@@ -599,7 +600,7 @@ public:
         if (player == nullptr) {
             return false;
         }
-        playerOps::Context context{*player, *registry_, hooks_};
+        playerOps::Context context{*player, *registry_, *hooks_};
         const auto done = playerOps::dispatch(context, playerOps::Verb::Set, name, {value});
         return done.has_value() && playerOps::asBool(*done);
     }
@@ -610,12 +611,15 @@ public:
         if (player == nullptr) {
             return std::nullopt;
         }
-        playerOps::Context context{*player, *registry_, hooks_};
+        playerOps::Context context{*player, *registry_, *hooks_};
         return playerOps::dispatch(context, playerOps::Verb::Call, operation, arguments);
     }
 
 private:
     [[nodiscard]] player::PlayerSession* session() const {
+        if (id_.has_value()) {
+            return registry_->get(*id_);
+        }
         for (player::PlayerSession* player : registry_->snapshot()) {
             if (player->uuid().toString() == uuid_) {
                 return player;
@@ -626,15 +630,16 @@ private:
 
     player::PlayerRegistry* registry_;
     std::string uuid_;
+    std::optional<wire::common::Uuid> id_;
     std::string fallbackName_;
-    ModelHooks hooks_;
+    std::shared_ptr<const ModelHooks> hooks_;
     SessionInventoryRef inventory_;
 };
 
 } // namespace
 
 std::shared_ptr<PluginPlayerRef> playerRefFor(player::PlayerRegistry& registry, std::string uuid, std::string name,
-                                              ModelHooks hooks) {
+                                              std::shared_ptr<const ModelHooks> hooks) {
     return std::make_shared<SessionPlayerRef>(registry, std::move(uuid), std::move(name), std::move(hooks));
 }
 
