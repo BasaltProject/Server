@@ -20,12 +20,7 @@ using Value = PluginEntityValue;
 constexpr double kItemSize = 0.25;
 
 [[nodiscard]] std::optional<DroppedItem> find(world::LoadedWorld& world, std::int32_t entityId) {
-    for (const DroppedItem& item : world.state().items()) {
-        if (item.entityId == entityId) {
-            return item;
-        }
-    }
-    return std::nullopt;
+    return world.state().itemById(entityId);
 }
 
 [[nodiscard]] NbtCompound encode(const DroppedItem& item) {

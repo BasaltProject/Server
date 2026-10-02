@@ -239,6 +239,8 @@ DroppedItem& WorldState::spawnItem(DroppedItem dropped) {
 
 std::vector<DroppedItem> WorldState::items() const { return itemPhysics_.items(); }
 
+std::optional<DroppedItem> WorldState::itemById(std::int32_t entityId) const { return itemPhysics_.itemById(entityId); }
+
 std::vector<DroppedItem> WorldState::nearbyItems(double x, double y, double z, double radius) const {
     return itemPhysics_.nearbyItems(x, y, z, radius);
 }
