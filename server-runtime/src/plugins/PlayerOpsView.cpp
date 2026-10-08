@@ -28,6 +28,18 @@ namespace play = wire::protocol::play;
     return nullptr;
 }
 
+template <typename Ids>
+void forgetGone(Context& context, Ids& ids) {
+    constexpr std::size_t kPruneAbove = 256;
+    if (ids.size() <= kPruneAbove) {
+        return;
+    }
+    const world::LoadedWorld* world = worldOf(context);
+    std::erase_if(ids, [&](std::int32_t id) {
+        return playerWithEntity(context, id) == nullptr && (world == nullptr || world->state().entity(id) == nullptr);
+    });
+}
+
 [[nodiscard]] std::vector<std::string> linesOf(const std::string& text) {
     std::vector<std::string> lines;
     std::size_t at = 0;
@@ -131,12 +143,16 @@ std::optional<Value> view(Context& context, const Verb verb, const std::string_v
         if (id == session.entityId()) {
             return false;
         }
+        forgetGone(context, extras.hiddenEntities);
+        forgetGone(context, extras.shownEntities);
         extras.hiddenEntities.insert(id);
         extras.shownEntities.erase(id);
         return true;
     }
     if (name == "show_entity") {
         const auto id = static_cast<std::int32_t>(asInt(first, -1));
+        forgetGone(context, extras.hiddenEntities);
+        forgetGone(context, extras.shownEntities);
         extras.hiddenEntities.erase(id);
         extras.shownEntities.insert(id);
         world::LoadedWorld* world = worldOf(context);
@@ -221,6 +237,7 @@ std::optional<Value> view(Context& context, const Verb verb, const std::string_v
         if (asBool(arg(args, 1), true)) {
             extras.unlistedPlayers.erase(id);
         } else {
+            forgetGone(context, extras.unlistedPlayers);
             extras.unlistedPlayers.insert(id);
         }
         player::sendListEntry(session, *other, !extras.unlistedPlayers.contains(id));
