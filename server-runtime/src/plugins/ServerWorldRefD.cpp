@@ -120,8 +120,8 @@ bool LoadedWorldRef::unloadChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     if (players_) {
         for (const player::PlayerSession* player : players_()) {
             if (player->worldName == world_->name() &&
-                std::abs(static_cast<std::int32_t>(std::floor(player->x)) / 16 - chunkX) <= reach &&
-                std::abs(static_cast<std::int32_t>(std::floor(player->z)) / 16 - chunkZ) <= reach) {
+                std::abs((static_cast<std::int32_t>(std::floor(player->x)) >> 4) - chunkX) <= reach &&
+                std::abs((static_cast<std::int32_t>(std::floor(player->z)) >> 4) - chunkZ) <= reach) {
                 return false;
             }
         }
