@@ -538,7 +538,9 @@ void RemoteService::Impl::service(Connection& connection, bool readable, bool wr
     }
     if (readable && !connection.transport->handshaking() && !connection.closeAfterFlush) {
         const std::size_t before = connection.in.size();
-        const IoState state = connection.transport->readInto(connection.in, 1 << 20);
+        const IoState state = connection.transport->readInto(
+            connection.in,
+            std::max<std::size_t>(1 << 20, static_cast<std::size_t>(settings.api.maxBodyBytes) + (1 << 16)));
         if (connection.in.size() != before) {
             connection.lastReceived = Clock::now();
         }
@@ -613,6 +615,7 @@ void RemoteService::Impl::drainMailbox() {
 void RemoteService::Impl::sweep() {
     const Clock::time_point now = Clock::now();
     std::vector<std::uint64_t> stale;
+    std::vector<std::uint64_t> pinged;
     for (auto& [id, connection] : connections) {
         const std::int32_t idle = connection.kind == Kind::Rcon && !connection.authed ? kRconIdleSeconds
                                   : connection.kind == Kind::Rcon                     ? settings.api.idleSeconds * 10
@@ -625,7 +628,12 @@ void RemoteService::Impl::sweep() {
                        std::max(1, idle / 2)) {
             connection.lastPing = now;
             websocket::encode(connection.out, websocket::opcode::kPing, {});
-            service(connection, false, true);
+            pinged.push_back(id);
+        }
+    }
+    for (const std::uint64_t id : pinged) {
+        if (const auto found = connections.find(id); found != connections.end()) {
+            service(found->second, false, true);
         }
     }
     for (const std::uint64_t id : stale) {

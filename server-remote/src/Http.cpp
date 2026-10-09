@@ -100,6 +100,9 @@ ParseResult take(std::string& buffer, Request& into, std::size_t maxBody) {
         return ParseResult::Unsupported;
     }
     std::size_t length = 0;
+    if (std::ranges::count(request.headers, "content-length", &std::pair<std::string, std::string>::first) > 1) {
+        return ParseResult::Malformed;
+    }
     if (const auto written = request.header("content-length"); written.has_value()) {
         const auto parsed = std::from_chars(written->data(), written->data() + written->size(), length);
         if (parsed.ec != std::errc{} || parsed.ptr != written->data() + written->size()) {
