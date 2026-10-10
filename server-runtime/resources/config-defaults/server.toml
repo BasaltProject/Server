@@ -249,8 +249,9 @@ lockout-seconds = 30
 
 [network.api]
 # The management API: REST under /v1 and a WebSocket console at /v1/console, JSON everywhere. Every route
-# needs "Authorization: Bearer <token>". The token is generated on the first run, printed once in the log and
-# kept in .basalt/remote-token (state, readable only by its owner). Only loopback by default.
+# needs "Authorization: Bearer <token>". The token is generated on the first run and
+# kept in .basalt/remote-token (state, readable only by its owner); it is never written to the log.
+# Only loopback by default.
 enabled = true
 bind = "127.0.0.1"
 port = 25580
