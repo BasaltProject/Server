@@ -246,6 +246,8 @@ password = ""
 # Every further lockout of the same address doubles it, up to a day.
 max-failures = 5
 lockout-seconds = 30
+# Connections open at once from one address, 1 to 16.
+max-connections-per-address = 8
 
 [network.api]
 # The management API: REST under /v1 and a WebSocket console at /v1/console, JSON everywhere. Every route
@@ -266,6 +268,8 @@ lockout-seconds = 30
 # seconds a connection may stay silent before it is dropped.
 requests-per-minute = 120
 max-connections = 32
+# Connections open at once from one address.
+max-connections-per-address = 8
 max-body-bytes = 65536
 idle-seconds = 60
 

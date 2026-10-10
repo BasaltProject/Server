@@ -12,6 +12,7 @@ struct RconSettings {
     std::string password;
     std::int32_t maxFailures = 5;
     std::int32_t lockoutSeconds = 30;
+    std::int32_t maxConnectionsPerAddress = 8;
 };
 
 struct ApiSettings {
@@ -26,6 +27,7 @@ struct ApiSettings {
     std::int32_t lockoutSeconds = 30;
     std::int32_t requestsPerMinute = 120;
     std::int32_t maxConnections = 32;
+    std::int32_t maxConnectionsPerAddress = 8;
     std::int32_t maxBodyBytes = 65536;
     std::int32_t idleSeconds = 60;
 };
