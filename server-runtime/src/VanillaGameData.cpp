@@ -62,6 +62,7 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
     : lootTables({.readText = jar.readText, .entriesUnder = jar.entriesUnder}), biomeSpawns({.readText = jar.readText}),
       villagerTrades({.readText = jar.readText}), blockTransformers(jar.readText), jukeboxSongs(jar.readText),
       recipes({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
+      potionTags(world::realPotionTags::load(readerOf<world::realPotionTags::JarReader>(jar), logger)),
       blockTags(world::realBlockTags::load(readerOf<world::realBlockTags::JarReader>(jar), logger)),
       itemTags(world::realItemTags::load(readerOf<world::realItemTags::JarReader>(jar), logger)),
       fluidTags(world::realFluidTags::load(readerOf<world::realFluidTags::JarReader>(jar), logger)),
@@ -99,7 +100,10 @@ void VanillaGameData::useBrewingRecipes() const {
     for (const server::world::crafting::Recipe* recipe : recipes.brewing()) {
         brews.push_back(*recipe);
     }
-    world::brewingStands::useRecipes(std::move(brews));
+    world::brewingStands::useRecipes(std::move(brews), [this](const Identifier& tag) {
+        const std::set<Identifier>& members = world::realPotionTags::membersOf(potionTags, tag);
+        return std::vector<Identifier>{members.begin(), members.end()};
+    });
 }
 
 void VanillaGameData::reload(const Jar& jar, const wire::common::Logger& logger) {
@@ -120,6 +124,7 @@ void VanillaGameData::reload(const Jar& jar, const wire::common::Logger& logger)
                       enchantments, logger);
     lootTables.reload({.readText = jar.readText, .entriesUnder = jar.entriesUnder});
     recipes = world::RealRecipes({.readText = jar.readText, .entriesUnder = jar.entriesUnder});
+    potionTags = world::realPotionTags::load(readerOf<world::realPotionTags::JarReader>(jar), logger);
     useBrewingRecipes();
     advancements = world::RealAdvancements(
         world::RealAdvancements::Jar{.entriesUnder = jar.entriesUnder, .readText = jar.readText});

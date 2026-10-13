@@ -381,6 +381,7 @@ basalt_module(server-runtime-core
         src/world/ContainerLoot.cpp
         src/world/RealEnchantments.cpp
         src/world/RealEnchantmentTags.cpp
+        src/world/RealPotionTags.cpp
         src/world/RealDamageTypeTags.cpp
         src/world/Dialogs.cpp
         src/world/RealDialogs.cpp

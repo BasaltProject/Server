@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/world/RealFluidTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
+#include <basalt/server/runtime/world/RealPotionTags.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/RealTestInstances.hpp>
 #include <basalt/server/runtime/world/RealTimelineTags.hpp>
@@ -83,6 +84,8 @@ public:
     /// The song data a comparator reads off a playing jukebox.
     world::jukeboxes::SongOutputs jukeboxSongs;
     world::RealRecipes recipes;
+    /// The potion tags a brewing recipe's `#tag` resolves through.
+    world::realPotionTags::TagMembers potionTags;
     world::realBlockTags::TagMembers blockTags;
     world::realItemTags::TagMembers itemTags;
     world::realFluidTags::TagMembers fluidTags;
