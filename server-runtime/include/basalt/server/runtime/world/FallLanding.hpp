@@ -1,5 +1,7 @@
 #pragma once
 
+#include <basalt/wire/common/Identifier.hpp>
+
 #include <cstdint>
 #include <string_view>
 
@@ -32,6 +34,10 @@ struct Landing {
 /// floored.
 [[nodiscard]] std::int32_t damage(double fallDistance, const Landing& landing, double safeFallDistance,
                                   double fallDamageMultiplier = 1.0);
+
+/// parity: `ShelfMushroomBlock.bounceOn`, whose bounce sound leaves out exactly the two entities it
+/// checks for, the item entity and primed tnt.
+[[nodiscard]] bool isSilentBouncer(const wire::common::Identifier& entityType);
 
 } // namespace fallLanding
 
