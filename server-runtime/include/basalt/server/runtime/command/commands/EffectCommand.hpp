@@ -21,6 +21,9 @@ public:
 /// of one world, reached by building a portal. `/execute in <dimension>` is the closest thing and
 /// it is a different idea. So this is Basalt's, like `import-players`.
 ///
+/// The bare form keeps the traveller's coordinates, which is what vanilla's dimension change
+/// (`/execute in <dim> run tp @s ~ ~ ~`) does; `spawn` lands on the world's spawn instead.
+///
 /// Travel itself is not reimplemented here: it is the same `switchWorld` that `/tp ... <world>`
 /// uses, which is what keeps one way of changing world rather than two that can drift.
 class WorldCommand final : public Command {
