@@ -4,6 +4,8 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
+#include <basalt/server/world/terrain/BiomeClimateData.hpp>
+#include <basalt/server/world/terrain/BiomeTemperature.hpp>
 
 #include <algorithm>
 #include <charconv>
@@ -66,7 +68,21 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
     if (chunk == nullptr) {
         return false;
     }
-    return chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::MotionBlocking) <= y;
+    if (chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::MotionBlocking) > y) {
+        return false;
+    }
+    // parity: `Level.isRainingAt` also asks the biome, which neither precipitates in the desert nor
+    // rains where it is cold enough to snow: a dry or snowy biome leaves the fire alone.
+    const server::world::ChunkHeight bounds = chunk->verticalBounds();
+    const std::int32_t localQuartY = std::clamp((y >> 2) - (bounds.minY() >> 2), 0, bounds.height() / 4 - 1);
+    const server::registry::Biome* biome =
+        server::registry::biomes::registry().byId(chunk->biomeId((x >> 2) & 3, localQuartY, (z >> 2) & 3));
+    if (biome == nullptr) {
+        return false;
+    }
+    const std::string id = biome->id.toString();
+    return server::world::terrain::biomeClimateFor(id).hasPrecipitation &&
+           !server::world::terrain::biomeTemperature::coldEnoughToSnow(id, x, y, z);
 }
 
 /// parity: `FireBlock.isNearRain`, the block and the four beside it.
