@@ -141,6 +141,14 @@ std::expected<CommandsConfig, std::string> CommandsConfig::load(const ConfigDire
     }
     CommandOptions options;
     if (const TomlTable* declared = root->table("options"); declared != nullptr) {
+        for (const std::string_view key : {"log-commands", "silent-commandblock-console"}) {
+            if (declared->find(key) != nullptr && !declared->boolean(key).has_value()) {
+                return std::unexpected(path + ": " + std::string{key} + " must be true or false");
+            }
+        }
+        if (declared->find("tab-complete-min-length") != nullptr && !declared->integer("tab-complete-min-length")) {
+            return std::unexpected(path + ": tab-complete-min-length must be a whole number");
+        }
         options.logCommands = declared->boolean("log-commands").value_or(options.logCommands);
         options.silentCommandBlockConsole =
             declared->boolean("silent-commandblock-console").value_or(options.silentCommandBlockConsole);

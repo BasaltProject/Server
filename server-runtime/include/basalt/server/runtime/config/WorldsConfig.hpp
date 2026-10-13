@@ -51,6 +51,10 @@ struct WorldSettings {
 
     [[nodiscard]] static WorldSettings vanilla() { return WorldSettings{}; }
 
+    /// Like `from`, but a bad value in a newer key is an error naming `file` instead of a silent default.
+    [[nodiscard]] static std::expected<WorldSettings, std::string>
+    parse(const wire::common::toml::TomlTable* table, const WorldSettings& inherited, std::string_view file);
+
     [[nodiscard]] static WorldSettings from(const wire::common::toml::TomlTable* table, const WorldSettings& inherited);
 
     friend bool operator==(const WorldSettings&, const WorldSettings&) = default;

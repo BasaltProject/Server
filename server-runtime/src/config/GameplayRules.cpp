@@ -1,3 +1,5 @@
+#include "RuleErrors.hpp"
+
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 
@@ -10,25 +12,29 @@ using wire::common::toml::TomlTable;
 
 [[nodiscard]] std::int32_t whole(const TomlTable& table, std::string_view key, std::int32_t fallback,
                                  std::int64_t least) {
-    return static_cast<std::int32_t>(std::clamp<std::int64_t>(table.integer(key).value_or(fallback), least, 1 << 20));
+    return ruleErrors::whole(table, key, fallback, least, 1 << 20);
 }
 
 [[nodiscard]] float decimal(const TomlTable& table, std::string_view key, float fallback, double least) {
-    return static_cast<float>(std::max(table.real(key).value_or(fallback), least));
+    return static_cast<float>(ruleErrors::real(table, key, fallback, least, 1.0E9));
 }
 
 [[nodiscard]] std::int32_t tristate(const TomlTable& table, std::string_view key, std::int32_t fallback) {
+    if (table.find(key) == nullptr) {
+        return fallback;
+    }
     if (const std::optional<bool> truth = table.boolean(key); truth.has_value()) {
         return *truth ? 1 : 2;
     }
     if (const std::optional<std::string_view> word = table.string(key); word.has_value()) {
         return *word == "true" ? 1 : (*word == "false" ? 2 : 0);
     }
+    ruleErrors::report(key, "must be true, false or \"default\"");
     return fallback;
 }
 
 [[nodiscard]] bool flag(const TomlTable& table, std::string_view key, bool fallback) {
-    return table.boolean(key).value_or(fallback);
+    return ruleErrors::flag(table, key, fallback);
 }
 
 } // namespace

@@ -1,3 +1,5 @@
+#include "RuleErrors.hpp"
+
 #include <basalt/server/runtime/config/WorldRules.hpp>
 
 #include <algorithm>
@@ -108,27 +110,13 @@ lava-obscures = false
 use-permission = false
 )";
 
-[[nodiscard]] std::optional<double> numberOf(const TomlTable& table, std::string_view key) {
-    const TomlValue* value = table.find(key);
-    if (value == nullptr) {
-        return std::nullopt;
-    }
-    if (const auto* real = value->get<double>(); real != nullptr) {
-        return *real;
-    }
-    if (const auto* whole = value->get<std::int64_t>(); whole != nullptr) {
-        return static_cast<double>(*whole);
-    }
-    return std::nullopt;
-}
-
 [[nodiscard]] std::int32_t whole(const TomlTable& table, std::string_view key, std::int32_t fallback,
                                  std::int64_t least, std::int64_t most) {
-    return static_cast<std::int32_t>(std::clamp(table.integer(key).value_or(fallback), least, most));
+    return ruleErrors::whole(table, key, fallback, least, most);
 }
 
 [[nodiscard]] double real(const TomlTable& table, std::string_view key, double fallback, double least, double most) {
-    return std::clamp(numberOf(table, key).value_or(fallback), least, most);
+    return ruleErrors::real(table, key, fallback, least, most);
 }
 
 void readGrowth(const TomlTable& table, GrowthPercents& growth) {
@@ -165,13 +153,13 @@ void readEnvironment(const TomlTable& table, EnvironmentRules& environment) {
     environment.thunderChance = whole(table, "thunder-chance", environment.thunderChance, 1, 1 << 30);
     environment.portalSearchRadius = whole(table, "portal-search-radius", environment.portalSearchRadius, 1, 512);
     environment.portalCreateRadius = whole(table, "portal-create-radius", environment.portalCreateRadius, 1, 128);
-    environment.voidDamage = table.boolean("void-damage").value_or(environment.voidDamage);
+    environment.voidDamage = ruleErrors::flag(table, "void-damage", environment.voidDamage);
     environment.netherCeilingVoidDamageHeight =
         whole(table, "nether-ceiling-void-damage-height", environment.netherCeilingVoidDamageHeight, 0, 4096);
-    environment.disableIceAndSnow = table.boolean("disable-ice-and-snow").value_or(environment.disableIceAndSnow);
+    environment.disableIceAndSnow = ruleErrors::flag(table, "disable-ice-and-snow", environment.disableIceAndSnow);
     environment.disableExplosionKnockback =
-        table.boolean("disable-explosion-knockback").value_or(environment.disableExplosionKnockback);
-    environment.disableThunder = table.boolean("disable-thunder").value_or(environment.disableThunder);
+        ruleErrors::flag(table, "disable-explosion-knockback", environment.disableExplosionKnockback);
+    environment.disableThunder = ruleErrors::flag(table, "disable-thunder", environment.disableThunder);
     environment.fishingMinWaitTicks = whole(table, "fishing-min-wait-ticks", environment.fishingMinWaitTicks, 1, 72000);
     environment.fishingMaxWaitTicks =
         std::max(whole(table, "fishing-max-wait-ticks", environment.fishingMaxWaitTicks, 1, 72000),
@@ -179,7 +167,7 @@ void readEnvironment(const TomlTable& table, EnvironmentRules& environment) {
 }
 
 void readAntiXray(const TomlTable& table, AntiXrayRules& rules) {
-    rules.enabled = table.boolean("enabled").value_or(rules.enabled);
+    rules.enabled = ruleErrors::flag(table, "enabled", rules.enabled);
     rules.engineMode = whole(table, "engine-mode", rules.engineMode, 1, 3);
     if (table.find("hidden-blocks") != nullptr) {
         rules.hiddenBlocks = table.stringList("hidden-blocks");
@@ -189,8 +177,8 @@ void readAntiXray(const TomlTable& table, AntiXrayRules& rules) {
     }
     rules.maxBlockHeight = whole(table, "max-block-height", rules.maxBlockHeight, 0, 4096);
     rules.updateRadius = whole(table, "update-radius", rules.updateRadius, 0, 2);
-    rules.lavaObscures = table.boolean("lava-obscures").value_or(rules.lavaObscures);
-    rules.usePermission = table.boolean("use-permission").value_or(rules.usePermission);
+    rules.lavaObscures = ruleErrors::flag(table, "lava-obscures", rules.lavaObscures);
+    rules.usePermission = ruleErrors::flag(table, "use-permission", rules.usePermission);
 }
 
 void readGameRules(const TomlTable& table, std::map<std::string, std::string>& rules) {
@@ -203,6 +191,8 @@ void readGameRules(const TomlTable& table, std::map<std::string, std::string>& r
             rules.insert_or_assign(name, *flag ? "true" : "false");
         } else if (const auto* number = value->get<std::int64_t>(); number != nullptr) {
             rules.insert_or_assign(name, std::to_string(*number));
+        } else {
+            ruleErrors::report("gamerules." + name, "must be true, false or a whole number");
         }
     }
 }
@@ -289,7 +279,7 @@ WorldRules WorldRules::from(const TomlTable* table, const WorldRules& inherited)
         return inherited;
     }
     WorldRules rules = inherited;
-    rules.generateStructures = table->boolean("generate-structures").value_or(inherited.generateStructures);
+    rules.generateStructures = ruleErrors::flag(table, "generate-structures", inherited.generateStructures);
     rules.maxWorldSize = whole(*table, "max-world-size", inherited.maxWorldSize, 1, 29999984);
     if (const TomlTable* section = table->table("gamerules"); section != nullptr) {
         readGameRules(*section, rules.gameRules);

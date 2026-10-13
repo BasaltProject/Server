@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/config/ServerTuning.hpp>
 
+#include <initializer_list>
 #include <regex>
 
 namespace basalt::server::runtime::config {
@@ -21,11 +22,29 @@ using wire::common::toml::TomlTable;
     return static_cast<std::int32_t>(value);
 }
 
+[[nodiscard]] std::expected<void, std::string>
+booleans(const TomlTable& table, std::initializer_list<std::string_view> keys, std::string_view path) {
+    for (const std::string_view key : keys) {
+        if (table.find(key) != nullptr && !table.boolean(key).has_value()) {
+            return std::unexpected(std::string{path} + ": " + std::string{key} + " must be true or false");
+        }
+    }
+    return {};
+}
+
 } // namespace
 
 std::expected<ServerTuning, std::string> ServerTuning::fromToml(const TomlTable& root, std::string_view path) {
     ServerTuning tuning;
     if (const TomlTable* server = root.table("server"); server != nullptr) {
+        if (auto checked =
+                booleans(*server,
+                         {"broadcast-console-to-ops", "broadcast-rcon-to-ops", "force-gamemode", "accepts-transfers",
+                          "allow-flight", "prevent-proxy-connections", "enforce-whitelist"},
+                         path);
+            !checked.has_value()) {
+            return std::unexpected(checked.error());
+        }
         tuning.brand = std::string{server->string("brand").value_or(tuning.brand)};
         tuning.startupCommands = server->stringList("startup-commands");
         tuning.usernamePattern = std::string{server->string("username-pattern").value_or(tuning.usernamePattern)};
@@ -95,6 +114,10 @@ std::expected<ServerTuning, std::string> ServerTuning::fromToml(const TomlTable&
                 return std::unexpected(level.error());
             }
             tuning.compressionLevel = *level;
+            if (auto checked = booleans(*java, {"status-replies", "proxy-protocol", "tcp-no-delay"}, path);
+                !checked.has_value()) {
+                return std::unexpected(checked.error());
+            }
             tuning.statusReplies = java->boolean("status-replies").value_or(tuning.statusReplies);
             tuning.proxyProtocol = java->boolean("proxy-protocol").value_or(tuning.proxyProtocol);
             tuning.tcpNoDelay = java->boolean("tcp-no-delay").value_or(tuning.tcpNoDelay);
@@ -111,6 +134,9 @@ std::expected<ServerTuning, std::string> ServerTuning::fromToml(const TomlTable&
     }
     if (const TomlTable* network = root.table("network"); network != nullptr) {
         if (const TomlTable* query = network->table("query"); query != nullptr) {
+            if (auto checked = booleans(*query, {"enabled"}, path); !checked.has_value()) {
+                return std::unexpected(checked.error());
+            }
             tuning.queryEnabled = query->boolean("enabled").value_or(tuning.queryEnabled);
             const auto port = ranged(*query, "port", tuning.queryPort, 1, 65535, path);
             if (!port.has_value()) {
@@ -132,6 +158,9 @@ std::expected<ServerTuning, std::string> ServerTuning::fromToml(const TomlTable&
         tuning.chunkSendRate = *chunkRate;
     }
     if (const TomlTable* logging = root.table("logging"); logging != nullptr) {
+        if (auto checked = booleans(*logging, {"log-ips"}, path); !checked.has_value()) {
+            return std::unexpected(checked.error());
+        }
         tuning.logIps = logging->boolean("log-ips").value_or(tuning.logIps);
     }
     return tuning;

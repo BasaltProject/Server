@@ -1,3 +1,5 @@
+#include "RuleErrors.hpp"
+
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
@@ -44,6 +46,16 @@ constexpr std::array<WorldDimension, 3> kDimensions{WorldDimension::Overworld, W
 
 } // namespace
 
+std::expected<WorldSettings, std::string> WorldSettings::parse(const TomlTable* table, const WorldSettings& inherited,
+                                                               std::string_view file) {
+    const ruleErrors::Scope scope;
+    WorldSettings settings = from(table, inherited);
+    if (scope.error().has_value()) {
+        return std::unexpected(std::string{file} + ": " + *scope.error());
+    }
+    return settings;
+}
+
 WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& inherited) {
     if (table == nullptr) {
         return inherited;
@@ -52,21 +64,21 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
     settings.difficulty = std::string{table->string("difficulty").value_or(inherited.difficulty)};
     settings.viewDistance = static_cast<std::int32_t>(table->integer("view-distance").value_or(inherited.viewDistance));
     // parity: `PlayerList.setSimulationDistance`, clamped as `setViewDistance` is.
-    settings.simulationDistance = static_cast<std::int32_t>(
-        std::clamp<std::int64_t>(table->integer("simulation-distance").value_or(inherited.simulationDistance), 2, 32));
+    settings.simulationDistance = ruleErrors::whole(*table, "simulation-distance", inherited.simulationDistance, 2, 32);
     settings.saveIntervalSeconds = static_cast<std::int32_t>(
         std::max<std::int64_t>(table->integer("save-interval-seconds").value_or(inherited.saveIntervalSeconds), 0));
     settings.openEndExitPortal = table->boolean("open-end-exit-portal").value_or(inherited.openEndExitPortal);
-    settings.hardcore = table->boolean("hardcore").value_or(inherited.hardcore);
-    settings.lootRefill = table->boolean("loot-refill").value_or(inherited.lootRefill);
-    const auto whole = [table](std::string_view key, std::int32_t fallback, std::int64_t least) {
-        return static_cast<std::int32_t>(std::max<std::int64_t>(table->integer(key).value_or(fallback), least));
-    };
-    settings.lootRefillMinSeconds = whole("loot-refill-min-seconds", inherited.lootRefillMinSeconds, 0);
+    settings.hardcore = ruleErrors::flag(*table, "hardcore", inherited.hardcore);
+    settings.lootRefill = ruleErrors::flag(*table, "loot-refill", inherited.lootRefill);
+    constexpr std::int64_t kMost = 1 << 30;
+    settings.lootRefillMinSeconds =
+        ruleErrors::whole(*table, "loot-refill-min-seconds", inherited.lootRefillMinSeconds, 0, kMost);
     settings.lootRefillMaxSeconds =
-        std::max(whole("loot-refill-max-seconds", inherited.lootRefillMaxSeconds, 0), settings.lootRefillMinSeconds);
-    settings.lootMaxRefills = whole("loot-max-refills", inherited.lootMaxRefills, -1);
-    settings.lootRelootSeconds = whole("loot-reloot-seconds", inherited.lootRelootSeconds, -1);
+        std::max(ruleErrors::whole(*table, "loot-refill-max-seconds", inherited.lootRefillMaxSeconds, 0, kMost),
+                 settings.lootRefillMinSeconds);
+    settings.lootMaxRefills = ruleErrors::whole(*table, "loot-max-refills", inherited.lootMaxRefills, -1, kMost);
+    settings.lootRelootSeconds =
+        ruleErrors::whole(*table, "loot-reloot-seconds", inherited.lootRelootSeconds, -1, kMost);
     settings.rules = WorldRules::from(table, inherited.rules);
     const GameplayRules inheritedRules = inherited.gameplay.ptr != nullptr ? *inherited.gameplay.ptr : GameplayRules{};
     settings.gameplay =
@@ -225,7 +237,16 @@ WorldSettings WorldsConfig::settingsFor(const WorldDeclaration& world) const {
     }
     const std::expected<TomlTable, wire::common::toml::TomlError> parsed = wire::common::toml::parse(*text);
     // An unparsable settings file loses one world's preferences, not the server's configuration.
-    return parsed.has_value() ? WorldSettings::from(&*parsed, settings) : settings;
+    if (!parsed.has_value()) {
+        return settings;
+    }
+    std::expected<WorldSettings, std::string> checked = WorldSettings::parse(&*parsed, settings, path);
+    if (!checked.has_value()) {
+        const wire::common::Logger logger{"Config"};
+        logger.warn([&checked] { return checked.error() + " This world keeps the default settings."; });
+        return settings;
+    }
+    return *std::move(checked);
 }
 
 namespace {
@@ -287,7 +308,12 @@ std::expected<WorldsConfig, std::string> WorldsConfig::load(const ConfigDirector
     if (!root.has_value()) {
         return std::unexpected(root.error());
     }
-    WorldSettings defaults = WorldSettings::from(root->table("defaults"), WorldSettings::vanilla());
+    std::expected<WorldSettings, std::string> parsedDefaults =
+        WorldSettings::parse(root->table("defaults"), WorldSettings::vanilla(), path);
+    if (!parsedDefaults.has_value()) {
+        return std::unexpected(parsedDefaults.error());
+    }
+    WorldSettings defaults = *std::move(parsedDefaults);
     std::expected<MobSettings, std::string> mobs = loadMobDefaults(directory);
     if (!mobs.has_value()) {
         return std::unexpected(mobs.error());
