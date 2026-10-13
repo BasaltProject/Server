@@ -233,11 +233,11 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
             break;
         }
         auto finished = std::make_shared<std::atomic<bool>>(false);
-        connections_.push_back(ConnectionThread{
-            finished, std::jthread{[this, finished, connection = std::move(*accepted)]() mutable {
-                serveConnection(std::move(connection));
-                finished->store(true);
-            }}});
+        connections_.push_back(
+            ConnectionThread{finished, std::jthread{[this, finished, connection = std::move(*accepted)]() mutable {
+                                 serveConnection(std::move(connection));
+                                 finished->store(true);
+                             }}});
         std::erase_if(connections_, [](const ConnectionThread& entry) { return entry.finished->load(); });
     }
 
@@ -693,18 +693,31 @@ void BasaltServer::startBedrockListener() {
             emitOnOwner(server::plugins::pluginEventTypes::playerQuit(), player);
         };
         // Chunks are read and written on the region's owner; only finished bytes cross to the Bedrock thread.
-        context.sendChunks = [this](std::vector<std::pair<std::int32_t, std::int32_t>> columns, const int protocol,
+        context.sendChunks = [this](const player::PlayerSession* viewer,
+                                    std::vector<std::pair<std::int32_t, std::int32_t>> columns, const int protocol,
                                     std::function<void(std::vector<std::uint8_t>)> send, std::function<void()> done) {
             if (worldRegistry_ == nullptr) {
                 return;
             }
-            worldRegistry_->scheduler().global().submit([this, columns = std::move(columns), protocol,
-                                                         send = std::move(send), done = std::move(done)] {
-                world::LoadedWorld& world = worldRegistry_->defaultWorld();
+            std::string worldName = viewer == nullptr ? std::string{} : viewer->worldName;
+            std::optional<std::string> group = viewer == nullptr ? std::nullopt : viewer->group;
+            const std::optional<bool> grant =
+                viewer == nullptr ? std::nullopt : viewer->permissionGrant("basalt.antixray.bypass");
+            worldRegistry_->scheduler().global().submit([this, worldName = std::move(worldName),
+                                                         group = std::move(group), grant, columns = std::move(columns),
+                                                         protocol, send = std::move(send), done = std::move(done)] {
+                const auto worlds = namedWorlds();
+                const auto named = worlds.find(worldName);
+                world::LoadedWorld& world =
+                    named != worlds.end() && named->second != nullptr ? *named->second : worldRegistry_->defaultWorld();
+                const world::AntiXray* antiXray = world.antiXray();
+                const bool bypass =
+                    antiXray != nullptr && antiXray->usePermission() &&
+                    grant.value_or(wired_.dispatcher->environment().groups().resolve(group, "basalt.antixray.bypass"));
                 for (const auto& [x, z] : columns) {
                     const server::world::Chunk& chunk = world.state().getOrGenerateChunk(x, z);
                     std::vector<std::vector<std::int32_t>> hidden;
-                    if (const world::AntiXray* antiXray = world.antiXray(); antiXray != nullptr) {
+                    if (antiXray != nullptr && !bypass) {
                         hidden =
                             antiXray->obfuscate(chunk, [&world](const std::int32_t chunkX, const std::int32_t chunkZ) {
                                 return static_cast<const server::world::Chunk*>(
