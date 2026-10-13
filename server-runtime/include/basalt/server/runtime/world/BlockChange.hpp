@@ -35,10 +35,19 @@ struct Event {
 
 /// parity: `Level.levelEvent`, the numbered one-off effects (`LevelEvent`).
 struct Effect {
+    /// parity: `LevelEvent.SOUND_DISPENSER_DISPENSE`, the clunk of a successful dispense.
+    static constexpr std::int32_t kDispenserDispense = 1000;
     /// parity: `LevelEvent.SOUND_DISPENSER_FAIL`, the click of a dispenser with nothing in it.
     static constexpr std::int32_t kDispenserFail = 1001;
+    /// parity: `LevelEvent.SOUND_DISPENSER_PROJECTILE_LAUNCH`, the crack every shot plays unless its
+    /// item overrides it.
+    static constexpr std::int32_t kDispenserShoot = 1002;
     /// parity: `LevelEvent.SOUND_FIREWORK_SHOOT`, the dispense sound a rocket plays instead.
     static constexpr std::int32_t kFireworkShoot = 1004;
+    /// parity: `LevelEvent.SOUND_BLAZE_FIREBALL`, the dispense sound of a fire charge.
+    static constexpr std::int32_t kFireChargeShoot = 1018;
+    /// parity: `LevelEvent.SOUND_WIND_CHARGE_SHOOT`, the dispense sound of a wind charge.
+    static constexpr std::int32_t kWindChargeShoot = 1051;
     /// parity: `LevelEvent.PARTICLES_SHOOT_SMOKE`, the puff out of the face, whose data is the face.
     static constexpr std::int32_t kDispenserSmoke = 2000;
     /// parity: `LevelEvent.PARTICLES_AND_SOUND_BRUSH_BLOCK_COMPLETE`'s neighbour in the list, the

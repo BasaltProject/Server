@@ -283,6 +283,25 @@ TEST_CASE("a minecart lands on the rail in front, or on the one a step below") {
     CHECK(dispensedOnto("ascending_north", 63) == doctest::Approx(63.6));
 }
 
+TEST_CASE("a minecart placed on a rail plays the dispense sound and the smoke") {
+    Fixture fixture;
+    WorldState& world = fixture.world;
+    oneItem(world, "north", ItemStack{.item = item("minecart"), .count = 1});
+    const std::optional<std::int32_t> rail = registry::blockStateDefinitions::stateIdOf(
+        item("rail"), {{"shape", "north_south"}, {"waterlogged", "false"}}, std::nullopt);
+    REQUIRE(rail.has_value());
+    REQUIRE(world.setBlockState(8, 64, 7, *rail));
+
+    const dispensers::Result result = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+
+    CHECK(result.fired);
+    REQUIRE(result.effects.size() == 2);
+    CHECK(result.effects[0] ==
+          BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserDispense, .data = 0}});
+    CHECK(result.effects[1] ==
+          BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = 2}});
+}
+
 TEST_CASE("an empty dispenser clicks and nothing goes out") {
     Fixture fixture;
     WorldState& world = fixture.world;
@@ -296,6 +315,75 @@ TEST_CASE("an empty dispenser clicks and nothing goes out") {
     CHECK(result.effects[0] ==
           BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserFail, .data = 0}});
     CHECK(world.items().empty());
+}
+
+TEST_CASE("a thrown item plays the dispense sound and the smoke out of the facing") {
+    Fixture fixture;
+    WorldState& world = fixture.world;
+    oneItem(world, "north", ItemStack{.item = item("stone"), .count = 2});
+
+    const dispensers::Result result = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+
+    CHECK(result.fired);
+    REQUIRE(result.effects.size() == 2);
+    CHECK(result.effects[0] ==
+          BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserDispense, .data = 0}});
+    CHECK(result.effects[1] ==
+          BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = 2}});
+}
+
+TEST_CASE("a dropper throwing an item plays the same sound and smoke as a dispenser") {
+    Fixture fixture;
+    WorldState& world = fixture.world;
+    oneItem(world, "up", ItemStack{.item = item("stone"), .count = 2}, 0, "dropper");
+
+    const dispensers::Result result = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+
+    CHECK(result.fired);
+    REQUIRE(result.effects.size() == 2);
+    CHECK(result.effects[0] ==
+          BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserDispense, .data = 0}});
+    CHECK(result.effects[1] ==
+          BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = 1}});
+}
+
+TEST_CASE("a shot plays the launch sound of its item and the smoke") {
+    const auto effectsOf = [](const std::string& path) {
+        Fixture fixture;
+        oneItem(fixture.world, "north", ItemStack{.item = item(path), .count = 2});
+        return dispensers::fire(fixture.context(), 8, 64, 8, ids()).effects;
+    };
+
+    const std::vector<BlockEffect> arrow = effectsOf("arrow");
+    REQUIRE(arrow.size() == 2);
+    CHECK(arrow[0] == BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserShoot, .data = 0}});
+    CHECK(arrow[1] == BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = 2}});
+
+    const std::vector<BlockEffect> fireCharge = effectsOf("fire_charge");
+    REQUIRE(fireCharge.size() == 2);
+    CHECK(fireCharge[0] == BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kFireChargeShoot, .data = 0}});
+
+    const std::vector<BlockEffect> windCharge = effectsOf("wind_charge");
+    REQUIRE(windCharge.size() == 2);
+    CHECK(windCharge[0] == BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kWindChargeShoot, .data = 0}});
+}
+
+TEST_CASE("a boat with no water plays the dispense pair twice") {
+    Fixture fixture;
+    WorldState& world = fixture.world;
+    oneItem(world, "north", ItemStack{.item = item("oak_boat"), .count = 1});
+
+    const dispensers::Result result = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+
+    CHECK(result.fired);
+    REQUIRE(result.effects.size() == 4);
+    for (std::size_t i = 0; i < 2; ++i) {
+        CHECK(result.effects[i * 2] ==
+              BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserDispense, .data = 0}});
+        CHECK(result.effects[(i * 2) + 1] ==
+              BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = 2}});
+    }
+    CHECK(world.items().size() == 1);
 }
 
 TEST_CASE("a dispenser with no block entity does nothing at all") {
@@ -759,6 +847,13 @@ TEST_CASE("bone meal grows the crop in front and is spent doing it") {
     CHECK(world.blockState(8, 64, 7) == grown);
     CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0]->count == 2);
     CHECK(world.items().empty());
+    // parity: `DefaultDispenseItemBehavior.dispense`, the sound and the smoke after a successful
+    // behaviour just the same as after a throw.
+    REQUIRE(result.effects.size() == 2);
+    CHECK(result.effects[0] ==
+          BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserDispense, .data = 0}});
+    CHECK(result.effects[1] ==
+          BlockEffect{blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = 2}});
     REQUIRE(result.changes.size() == 1);
     CHECK(result.changes[0].x == 8);
     CHECK(result.changes[0].z == 7);
@@ -770,8 +865,10 @@ TEST_CASE("bone meal grows the crop in front and is spent doing it") {
     CHECK_FALSE(again.fired);
     CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0]->count == 2);
     CHECK(world.items().empty());
-    REQUIRE(again.effects.size() == 1);
+    REQUIRE(again.effects.size() == 2);
     CHECK(std::get<blockEffect::Effect>(again.effects[0]).type == blockEffect::Effect::kDispenserFail);
+    CHECK(std::get<blockEffect::Effect>(again.effects[1]) ==
+          blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = 2});
 }
 
 TEST_CASE("a honeycomb waxes the copper chest in front without emptying it") {

@@ -1040,6 +1040,22 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     // item is: a dropper never shoots and never pours, it only throws or hands over.
     const bool dropper = block->path() == "dropper";
 
+    // parity: `DefaultDispenseItemBehavior.dispense`, which plays the sound and the smoke out of
+    // the facing after every behaviour. `ProjectileDispenseBehavior` swaps the sound for the
+    // item's own launch event, an `OptionalDispenseItemBehavior` that failed plays the fail click
+    // instead, and handing a stack into a container is not a behaviour's dispense and makes none.
+    const auto dispenseSound = [&result](std::int32_t type) {
+        result.effects.emplace_back(blockEffect::Effect{.type = type, .data = 0});
+    };
+    const auto dispenseSmoke = [&result, out] {
+        result.effects.emplace_back(
+            blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = static_cast<std::int32_t>(*out)});
+    };
+    // parity: `BoatDispenseItemBehavior` and `MinecartDispenseItemBehavior` fall back to the
+    // default behaviour's own dispense when there is no water or rail, and the outer dispense
+    // then plays the sound and the animation a second time.
+    const bool replayed = !dropper && (isBoat(stack.item.path()) || stack.item.path().ends_with("minecart"));
+
     // parity: `FireworkRocketItem`'s dispense config: half a block and a hair out of the face, a
     // power of a half and a spread of one, and the firework's own launch sound.
     if (!dropper && stack.item.path() == "firework_rocket" && hooks.launchFirework) {
@@ -1063,6 +1079,12 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         dropper ? std::nullopt : entity::projectiles::dispensed(stack.item);
     if (projectile.has_value()) {
         shoot(context, x, y, z, *out, *projectile, stack, hooks);
+        // parity: `ProjectileDispenseBehavior.playSound`, the item's override or the launch crack,
+        // and the default animation's smoke either way.
+        dispenseSound(stack.item.path() == "wind_charge"   ? blockEffect::Effect::kWindChargeShoot
+                      : stack.item.path() == "fire_charge" ? blockEffect::Effect::kFireChargeShoot
+                                                           : blockEffect::Effect::kDispenserShoot);
+        dispenseSmoke();
         slots[*slot] = minusOne(stack);
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();
@@ -1075,13 +1097,18 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     // through to being thrown.
     const Special special = dropper ? Special{} : dispenseOnBlock(context, x, y, z, *out, stack, hooks);
     if (special.refused) {
-        result.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kDispenserFail, .data = 0});
+        // parity: `OptionalDispenseItemBehavior.playSound`, the fail click, and the default
+        // animation's smoke, which a refusal still plays.
+        dispenseSound(blockEffect::Effect::kDispenserFail);
+        dispenseSmoke();
         // parity: `DispenserBlock.dispenseFrom` writes the slot back whatever the behaviour answered,
         // and `setItem` calls `setChanged`, so even a refused turn leaves the chunk dirty.
         chunk->markDirty();
         return result;
     }
     if (special.handled) {
+        dispenseSound(blockEffect::Effect::kDispenserDispense);
+        dispenseSmoke();
         if (special.change.has_value()) {
             result.changes.push_back(*special.change);
         }
@@ -1095,6 +1122,8 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
 
     // parity: a minecart goes on the rail rather than into a container or the air.
     if (!dropper && stack.item.path().ends_with("minecart") && dispenseMinecart(world, x, y, z, *out, stack, hooks)) {
+        dispenseSound(blockEffect::Effect::kDispenserDispense);
+        dispenseSmoke();
         slots[*slot] = minusOne(stack);
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();
@@ -1112,6 +1141,12 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         }
     } else {
         throwOut(world, x, y, z, *out, stack, context.random, hooks);
+        dispenseSound(blockEffect::Effect::kDispenserDispense);
+        dispenseSmoke();
+        if (replayed) {
+            dispenseSound(blockEffect::Effect::kDispenserDispense);
+            dispenseSmoke();
+        }
     }
     slots[*slot] = minusOne(stack);
     blockInventory::write(blockEntity->data(), slots);
