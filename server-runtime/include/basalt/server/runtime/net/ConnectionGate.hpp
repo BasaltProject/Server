@@ -49,6 +49,7 @@ private:
     std::int32_t joinsInWindow_ = 0;
     std::map<std::string, std::int32_t, std::less<>> open_;
     std::map<std::string, std::chrono::steady_clock::time_point, std::less<>> lastLogin_;
+    std::chrono::steady_clock::time_point lastPrune_{};
 };
 
 } // namespace basalt::server::runtime::net
