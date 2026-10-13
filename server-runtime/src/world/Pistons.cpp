@@ -177,6 +177,13 @@ private:
             return true;
         }
     }
+    // parity: `hasSignal(pos, Direction.DOWN)`, the question about the piston's own square. It
+    // never answers in 26.3 (`Blocks.pistonProperties()` marks the piston `isRedstoneConductor`
+    // false, so the strong signal a diode pumps into its face goes nowhere), but the jar asks it,
+    // between the two loops and ahead of the `else` that skips the squares above. Kept as asked.
+    if (redstone::signalFrom(context.world, context.worldName, x, y, z, BlockFace::Down) > 0) {
+        return true;
+    }
     // parity: the block above is asked twice, once for itself and once for what is over it, which is
     // the quirk that makes a piston fire from a signal two blocks up.
     if (redstone::signalFrom(context.world, context.worldName, x, y + 1, z, BlockFace::Up) > 0) {
