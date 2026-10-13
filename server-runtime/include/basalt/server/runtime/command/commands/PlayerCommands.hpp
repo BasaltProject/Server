@@ -35,10 +35,9 @@ public:
 
 /// parity: `HelpCommand`. Prints brigadier's own smart usage, one line per command, slash included.
 ///
-/// Vanilla's form takes a whole command line and describes wherever that line lands in the tree;
-/// this one takes a command name and describes the command. The narrower form is a declared gap,
-/// not an accident: describing a partially typed line needs the parser to report where it stopped
-/// even on success, which the dispatcher does not expose yet.
+/// The argument form parses the whole greedy line against the tree and describes the node it
+/// reached, the input echoed before each usage line, so `/help give @s dirt` continues past
+/// `give` exactly like vanilla.
 class HelpCommand final : public Command {
 public:
     HelpCommand();

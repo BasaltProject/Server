@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/server/runtime/command/commands/PlayerCommands.hpp>
+#include <basalt/server/runtime/command/commands/TeleportCommand.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 
 #include <doctest.h>
@@ -232,4 +233,50 @@ TEST_CASE("help on a command nobody registered says so") {
     fixture.dispatcher.registerCommand(std::make_shared<commands::HelpCommand>());
 
     CHECK(fixture.dispatcher.execute(fixture.source, "help nonsense") == 0);
+}
+
+TEST_CASE("help on a full line describes the node the line reaches") {
+    Fixture fixture{scratch("player-commands-help-line")};
+    fixture.dispatcher.registerCommand(std::make_shared<commands::HelpCommand>());
+    fixture.dispatcher.registerCommand(std::make_shared<commands::GameModeCommand>());
+
+    // parity: vanilla parses the greedy line and describes where it lands, the input echoed back.
+    CHECK(fixture.dispatcher.execute(fixture.source, "help gamemode survival") == 1);
+
+    const std::string usage = basalt::wire::text::toPlainText(fixture.source.said.back());
+    CHECK(usage == "/gamemode survival [<target>]");
+}
+
+TEST_CASE("help echoes the input even when the rest of the line does not parse") {
+    Fixture fixture{scratch("player-commands-help-garbage")};
+    fixture.dispatcher.registerCommand(std::make_shared<commands::HelpCommand>());
+    fixture.dispatcher.registerCommand(std::make_shared<commands::GameModeCommand>());
+
+    CHECK(fixture.dispatcher.execute(fixture.source, "help gamemode blah") == 1);
+
+    const std::string usage = basalt::wire::text::toPlainText(fixture.source.said.back());
+    CHECK(usage == "/gamemode blah <gamemode> [<target>]");
+}
+
+TEST_CASE("help on a command without children prints nothing, like vanilla") {
+    Fixture fixture{scratch("player-commands-help-leaf")};
+    fixture.dispatcher.registerCommand(std::make_shared<commands::HelpCommand>());
+    fixture.dispatcher.registerCommand(std::make_shared<commands::SeedCommand>());
+
+    CHECK(fixture.dispatcher.execute(fixture.source, "help seed") == 0);
+    CHECK(fixture.source.said.empty());
+}
+
+TEST_CASE("help on a branching command prints one line per branch") {
+    Fixture fixture{scratch("player-commands-help-branches")};
+    fixture.dispatcher.registerCommand(std::make_shared<commands::HelpCommand>());
+    fixture.dispatcher.registerCommand(std::make_shared<commands::TeleportCommand>());
+
+    // parity: `getSmartUsage` answers one entry per usable child of the reached node.
+    CHECK(fixture.dispatcher.execute(fixture.source, "help teleport") == 3);
+
+    REQUIRE(fixture.source.said.size() == 3);
+    for (const Component& line : fixture.source.said) {
+        CHECK(basalt::wire::text::toPlainText(line).starts_with("/teleport "));
+    }
 }
