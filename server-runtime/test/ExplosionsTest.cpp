@@ -2,9 +2,11 @@
 
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
+#include <basalt/server/runtime/world/Jukeboxes.hpp>
 
 #include <doctest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <set>
@@ -12,6 +14,7 @@
 
 using namespace basalt::server::runtime::world;
 using basalt::server::world::Chunk;
+using basalt::server::world::ChunkBlockEntity;
 namespace registry = basalt::server::registry;
 namespace rng = basalt::server::random;
 
@@ -343,4 +346,47 @@ TEST_CASE("a primed cart spares the rails it ran on and what holds them up") {
     rng::RandomSource other = rng::RandomSource::legacy(3);
     static_cast<void>(explosions::explode(loose.state, -64, 319, 8.5, 9.5, 8.5, 5.0F, other));
     CHECK(loose.state.blockState(8, 9, 8) == registry::blocks::air().stateId);
+}
+
+TEST_CASE("a blast that takes out a playing jukebox reports the song stopped") {
+    Loaded loaded;
+    loaded.fill("stone", 0, 15);
+    REQUIRE(loaded.state.setBlockState(8, 8, 8, stateOf("jukebox")));
+    // The block a playing jukebox shows is its has_record one, which is the state the blast reports.
+    const std::optional<BlockChange> started =
+        jukeboxes::insert(loaded.state, 8, 8, 8, basalt::wire::common::Identifier::vanilla("music_disc_13"));
+    REQUIRE(started.has_value());
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+
+    const std::vector<explosions::Broken> broken =
+        explosions::explode(loaded.state, -64, 319, 8.5, 8.5, 8.5, 5.0F, random);
+
+    const auto jukebox = std::ranges::find_if(
+        broken, [&started](const explosions::Broken& block) { return block.stateId == started->stateId; });
+    REQUIRE(jukebox != broken.end());
+    CHECK(jukebox->songWasPlaying);
+}
+
+TEST_CASE("a jukebox whose song already ended says nothing") {
+    Loaded loaded;
+    loaded.fill("stone", 0, 15);
+    REQUIRE(loaded.state.setBlockState(8, 8, 8, stateOf("jukebox")));
+    const std::optional<BlockChange> started =
+        jukeboxes::insert(loaded.state, 8, 8, 8, basalt::wire::common::Identifier::vanilla("music_disc_13"));
+    REQUIRE(started.has_value());
+    // A finished song leaves the disc in but takes the counter out, which is what says it is playing.
+    Chunk* chunk = loaded.state.chunkIfLoaded(0, 0);
+    REQUIRE(chunk != nullptr);
+    ChunkBlockEntity* entity = chunk->blockEntityAt(8, 8, 8);
+    REQUIRE(entity != nullptr);
+    static_cast<void>(entity->data().remove("ticks_since_song_started"));
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+
+    const std::vector<explosions::Broken> broken =
+        explosions::explode(loaded.state, -64, 319, 8.5, 8.5, 8.5, 5.0F, random);
+
+    const auto jukebox = std::ranges::find_if(
+        broken, [&started](const explosions::Broken& block) { return block.stateId == started->stateId; });
+    REQUIRE(jukebox != broken.end());
+    CHECK_FALSE(jukebox->songWasPlaying);
 }

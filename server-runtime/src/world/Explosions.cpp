@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
+#include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
 
 #include <cmath>
@@ -204,10 +205,19 @@ std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t m
                 hive = entity->data();
             }
         }
+        bool songWasPlaying = false;
+        if (const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+            block != nullptr && *block == jukeboxes::block()) {
+            const server::world::Chunk* chunk = world.chunkIfLoaded(bx >> 4, bz >> 4);
+            const server::world::ChunkBlockEntity* entity =
+                chunk == nullptr ? nullptr : chunk->blockEntityAt(bx & 15, by, bz & 15);
+            songWasPlaying = entity != nullptr && jukeboxes::isPlaying(entity->data());
+        }
         if (!world.setBlockState(bx, by, bz, registry::blocks::air().stateId)) {
             continue;
         }
-        broken.push_back(Broken{.x = bx, .y = by, .z = bz, .stateId = *stateId, .hive = std::move(hive)});
+        broken.push_back(Broken{
+            .x = bx, .y = by, .z = bz, .stateId = *stateId, .hive = std::move(hive), .songWasPlaying = songWasPlaying});
     }
     return broken;
 }
