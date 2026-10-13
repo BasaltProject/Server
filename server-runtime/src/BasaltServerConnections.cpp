@@ -163,6 +163,10 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     if (!net::setTcpNoDelay(connection.nativeHandle(), config_->tuning.tcpNoDelay)) {
         logger_.debug([] { return std::string{"The system refused TCP_NODELAY on a new connection."}; });
     }
+    // parity: `ReadTimeoutHandler`, which gives a silent connection thirty seconds.
+    if (!net::setReceiveTimeout(connection.nativeHandle(), 30'000)) {
+        logger_.debug([] { return std::string{"The system refused a read timeout on a new connection."}; });
+    }
     if (config_->tuning.proxyProtocol) {
         const std::expected<net::proxyProtocol::Parsed, std::string> header =
             net::proxyProtocol::readHeader([&connection](std::span<std::uint8_t> into) -> std::size_t {
