@@ -3,6 +3,9 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/item/ItemComponentPayloads.hpp>
+#include <basalt/wire/io/ByteBuffer.hpp>
+#include <basalt/wire/protocol/ProtocolBuffer.hpp>
+#include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/text/ComponentNbt.hpp>
 
 #include <doctest.h>
@@ -324,4 +327,50 @@ TEST_CASE("everything the payload table can write is reported as sent") {
     CHECK(codecs::isSent("minecraft:tool"));
     CHECK(codecs::isSent("minecraft:damage"));
     CHECK_FALSE(payloads::supported().contains("minecraft:damage"));
+}
+
+TEST_CASE("a pottery sherd with components of its own travels with its patch") {
+    NbtCompound components;
+    components.putInt("minecraft:max_stack_size", 16);
+    NbtCompound sherd;
+    sherd.putString("id", "minecraft:brick");
+    sherd.set("components", NbtTag::ofCompound(components));
+    NbtCompound sides;
+    sides.set("back", NbtTag::ofCompound(sherd));
+    const std::optional<ItemComponent> encoded =
+        payloads::encode("minecraft:pot_decorations", NbtTag::ofCompound(sides));
+
+    REQUIRE(encoded.has_value());
+    basalt::wire::io::ByteBuffer buffer =
+        basalt::wire::io::ByteBuffer::wrap(encoded->as<ItemComponent::Raw>()->payload);
+    namespace varInt = basalt::wire::protocol::varInt;
+    // parity: `PotDecorations.STREAM_CODEC`, back alone: present, item, count, patch of one, none
+    // removed, and the other three sides absent.
+    CHECK(basalt::wire::protocol::readBoolean(buffer));
+    CHECK(varInt::read(buffer) == reg::items::registry().byName(Identifier::vanilla("brick"))->protocolId);
+    CHECK(varInt::read(buffer) == 1);
+    CHECK(varInt::read(buffer) == 1);
+    CHECK(varInt::read(buffer) == 0);
+    CHECK(varInt::read(buffer) == dataComponent::kMaxStackSize);
+    CHECK(varInt::read(buffer) == 16);
+    CHECK_FALSE(basalt::wire::protocol::readBoolean(buffer));
+    CHECK_FALSE(basalt::wire::protocol::readBoolean(buffer));
+    CHECK_FALSE(basalt::wire::protocol::readBoolean(buffer));
+    CHECK(buffer.readableBytes() == 0);
+
+    // A bare string side, the 26.2 list's shape, writes the same with an empty patch.
+    sides.set("back", NbtTag::ofString("minecraft:brick"));
+    const std::optional<ItemComponent> legacy =
+        payloads::encode("minecraft:pot_decorations", NbtTag::ofCompound(sides));
+    REQUIRE(legacy.has_value());
+    basalt::wire::io::ByteBuffer old = basalt::wire::io::ByteBuffer::wrap(legacy->as<ItemComponent::Raw>()->payload);
+    CHECK(basalt::wire::protocol::readBoolean(old));
+    CHECK(varInt::read(old) == reg::items::registry().byName(Identifier::vanilla("brick"))->protocolId);
+    CHECK(varInt::read(old) == 1);
+    CHECK(varInt::read(old) == 0);
+    CHECK(varInt::read(old) == 0);
+
+    // A side naming an item nobody knows still refuses the whole component.
+    sides.set("back", NbtTag::ofString("minecraft:not_a_sherd"));
+    CHECK_FALSE(payloads::encode("minecraft:pot_decorations", NbtTag::ofCompound(sides)).has_value());
 }
