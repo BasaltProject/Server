@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
+#include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 
 #include <doctest.h>
@@ -103,6 +104,47 @@ struct Book {
 };
 
 } // namespace
+
+TEST_CASE("an end gateway ages and flashes its beam every attention interval") {
+    Loaded loaded;
+    ChunkBlockEntity* entity = loaded.place("end_gateway", stateOf("end_gateway"), kX, 64, kZ);
+    entity->data().putLong("Age", 0);
+    std::int32_t beams = 0;
+    const blockEntityTicks::Hooks hooks{.gatewayBeam = [&beams](std::int32_t, std::int32_t, std::int32_t) { ++beams; }};
+
+    // parity: `TheEndGatewayBlockEntity.portalTick` counts a year every turn, quietly.
+    static_cast<void>(loaded.tick(hooks));
+    CHECK(entity->data().getLong("Age", -1) == 1);
+    CHECK(beams == 0);
+
+    // parity: `ATTENTION_INTERVAL`, the two minutes after which the beam goes out once more.
+    for (std::int32_t tick = 1; tick < endGateways::kAttentionIntervalTicks; ++tick) {
+        static_cast<void>(loaded.tick(hooks));
+    }
+    CHECK(entity->data().getLong("Age", -1) == endGateways::kAttentionIntervalTicks);
+    CHECK(beams == 1);
+
+    for (std::int32_t tick = 0; tick < endGateways::kAttentionIntervalTicks; ++tick) {
+        static_cast<void>(loaded.tick(hooks));
+    }
+    CHECK(entity->data().getLong("Age", -1) == 2 * endGateways::kAttentionIntervalTicks);
+    CHECK(beams == 2);
+}
+
+TEST_CASE("an end gateway whose block is gone ages no more") {
+    Loaded loaded;
+    ChunkBlockEntity* entity = loaded.place("end_gateway", stateOf("end_gateway"), kX, 64, kZ);
+    entity->data().putLong("Age", 0);
+    // Replacing the block takes the block entity with it, which is `BoundTickingBlockEntity`'s
+    // "the block is still its own" made total: there is nothing left to tick.
+    REQUIRE(loaded.state.setBlockState(kX, 64, kZ, stateOf("stone")));
+    REQUIRE(loaded.state.chunkIfLoaded(kChunkX, kChunkZ)->blockEntityAt(kX & 15, 64, kZ & 15) == nullptr);
+    std::int32_t beams = 0;
+
+    static_cast<void>(loaded.tick({.gatewayBeam = [&beams](std::int32_t, std::int32_t, std::int32_t) { ++beams; }}));
+
+    CHECK(beams == 0);
+}
 
 TEST_CASE("a lit furnace cooks and puts what it is doing on the block itself") {
     Loaded loaded;

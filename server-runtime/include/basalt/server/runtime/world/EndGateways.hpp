@@ -16,6 +16,9 @@ namespace endGateways {
 /// parity: `TheEndGatewayBlockEntity.COOLDOWN_TIME`, the two seconds a used gateway rests.
 inline constexpr std::int32_t kCooldownTicks = 40;
 
+/// parity: `TheEndGatewayBlockEntity.ATTENTION_INTERVAL`, how often a quiet gateway flashes its beam.
+inline constexpr std::int64_t kAttentionIntervalTicks = 2400;
+
 /// parity: `Player.getDimensionChangingDelay`, the ticks before a player can use a portal again.
 inline constexpr std::int32_t kPlayerDelayTicks = 10;
 

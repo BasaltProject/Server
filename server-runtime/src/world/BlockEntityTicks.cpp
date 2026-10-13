@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
+#include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Geysers.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
@@ -217,6 +218,25 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             }
             server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(stored.localX(), y, stored.localZ());
             if (entity == nullptr) {
+                continue;
+            }
+            // parity: `TheEndGatewayBlockEntity.portalTick`, one year older every turn, and the beam
+            // event every attention interval; only while its own block is still the gateway, which is
+            // `BoundTickingBlockEntity`'s check that the block still matches the type.
+            if (path == "end_gateway") {
+                const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+                if (!stateId.has_value() || !endGateways::isGateway(*stateId)) {
+                    continue;
+                }
+                const std::int64_t age = entity->data().getLong("Age", 0) + 1;
+                entity->data().putLong("Age", age);
+                if (age % endGateways::kAttentionIntervalTicks == 0) {
+                    // parity: `triggerCooldown`'s `setChanged` along with the block event.
+                    chunk->markDirty();
+                    if (hooks.gatewayBeam) {
+                        hooks.gatewayBeam(x, y, z);
+                    }
+                }
                 continue;
             }
             // parity: `ConduitBlockEntity.serverTick`.
