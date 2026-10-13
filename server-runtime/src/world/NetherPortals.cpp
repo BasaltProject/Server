@@ -174,8 +174,8 @@ void reindex(LoadedWorld& world, const std::vector<std::array<std::int32_t, 3>>&
             !world.border().contains(column[0] + stepX, column[1] + stepZ)) {
             continue;
         }
-        const std::int32_t px = column[0] - stepX;
-        const std::int32_t pz = column[1] - stepZ;
+        const std::int32_t px = column[0];
+        const std::int32_t pz = column[1];
         for (std::int32_t scan = height; scan >= lowest; scan--) {
             if (!canPortalReplace(world, px, scan, pz)) {
                 continue;
