@@ -176,7 +176,6 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     // parity: `ServerExplosion.createDrops`.
     std::vector<Drop> drops;
     // parity: `ServerLevel.explode`.
-    // parity: `ServerLevel.explode`.
     const entity::ServerEntity* source = sourceEntityId == 0 ? nullptr : world.state().entity(sourceEntityId);
     const bool silent = source != nullptr && source->sourceNbt.has_value() && source->sourceNbt->getBoolean("Silent");
     const play::ExplodePacket explode{

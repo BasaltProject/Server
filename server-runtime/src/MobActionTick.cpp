@@ -381,8 +381,6 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                    .seaLevel = config::dimensionFacts(world.declaration().dimension).seaLevel,
                                    .minY = config::dimensionFacts(world.declaration().dimension).chunkHeight.minY()};
     // parity: `Allay.customServerAiStep`.
-    // parity: `customServerAiStep`.
-    // parity: `AbstractFish`.
     const bool goalsToo =
         mob.goals != nullptr && (mob.type().path() == "tadpole" || (brain != nullptr && mob.goals->hasPluginGoals()));
     if (brain != nullptr && !goalsToo) {
