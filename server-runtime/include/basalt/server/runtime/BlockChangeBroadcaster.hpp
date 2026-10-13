@@ -18,6 +18,10 @@ namespace basalt::server::runtime::world {
 struct BlockEvent;
 class LoadedWorld;
 class RealLootTables;
+
+namespace redstone {
+enum class Asked : std::uint8_t;
+} // namespace redstone
 } // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
@@ -111,9 +115,12 @@ public:
 private:
     /// The half of `announceRedstone` that is about a square rather than about a block: the dust
     /// around it settles, what reacts reacts, and the components nearby book their turn. `arrived`
-    /// is `scheduleAround`'s, which only the square the change happened on can claim.
+    /// is `scheduleAround`'s, which only the square the change happened on can claim, and `asked`
+    /// is `settle`'s own: the jar's `updateNeighborsAt` only ever tells the six around a square,
+    /// never the square itself, so the extra square a rod or a hook reaches settles
+    /// `NeighboursOnly`.
     void settleFrom(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
-                    std::int32_t y, std::int32_t z, bool arrived) const;
+                    std::int32_t y, std::int32_t z, bool arrived, world::redstone::Asked asked) const;
 
     [[nodiscard]] std::int64_t nextSeed() const;
 

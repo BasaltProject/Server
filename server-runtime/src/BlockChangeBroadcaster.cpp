@@ -209,20 +209,23 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
                                               const std::vector<player::PlayerSession*>& watchers,
                                               const world::BlockChange& change) const {
     announceBlock(watchers, change);
-    settleFrom(world, watchers, change.x, change.y, change.z, true);
+    settleFrom(world, watchers, change.x, change.y, change.z, true, world::redstone::Asked::WithSelf);
     // parity: a rod and a hook reach one square further than their own write does, and what is on
-    // the far side of the wall they hang on only hears them through that second update.
+    // the far side of the wall they hang on only hears them through that second update. What
+    // answers is `updateNeighborsAt` on the square behind, which tells the six around it and never
+    // the square itself, so the dust there settles `NeighboursOnly`.
     for (const registry::BlockFace behind : world::redstone::alsoTells(change.stateId)) {
         settleFrom(world, watchers, change.x + registry::stepX(behind), change.y + registry::stepY(behind),
-                   change.z + registry::stepZ(behind), false);
+                   change.z + registry::stepZ(behind), false, world::redstone::Asked::NeighboursOnly);
     }
 }
 
 void BlockChangeBroadcaster::settleFrom(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                                         const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                                        const bool arrived) const {
+                                        const bool arrived, const world::redstone::Asked asked) const {
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    const std::vector<world::BlockChange> settled = world::redstone::settle(world.state(), world.name(), x, y, z);
+    const std::vector<world::BlockChange> settled =
+        world::redstone::settle(world.state(), world.name(), x, y, z, {}, asked);
     for (const world::BlockChange& moved : settled) {
         announceBlock(watchers, moved);
     }
