@@ -156,6 +156,14 @@ std::int32_t PlayerInventory::add(const storage::StoredItemStack& stack) {
     return remaining;
 }
 
+bool PlayerInventory::hasRoomForOne(const storage::StoredItemStack& stack) const {
+    if (!(item::itemWear::isDamageable(stack) && item::itemWear::damage(stack) > 0) && slotWithRoomFor(stack)) {
+        return true;
+    }
+    return std::ranges::any_of(fillOrder(),
+                               [this](std::int32_t slot) { return !slots_[static_cast<std::size_t>(slot)]; });
+}
+
 std::optional<std::int32_t> PlayerInventory::slotWithRoomFor(const storage::StoredItemStack& stack) const {
     // parity: `Inventory.getSlotWithRemainingSpace`.
     const auto hasRoom = [&](std::int32_t slot) {

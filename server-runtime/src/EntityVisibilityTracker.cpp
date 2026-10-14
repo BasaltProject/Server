@@ -152,8 +152,7 @@ std::size_t trackingCategory(const ServerEntity& entity) {
 
 /// parity: `ChunkMap.TrackedEntity.updatePlayer`, the horizontal range an entity is drawn within.
 bool inTrackingRange(const ServerEntity& entity, double viewerX, double viewerZ, std::int32_t viewDistanceChunks,
-                     std::int32_t broadcastPercentage,
-                     const config::MobSettings& mobs) {
+                     std::int32_t broadcastPercentage, const config::MobSettings& mobs) {
     const server::registry::entityTypeShapes::Shape* shape = server::registry::entityTypeShapes::of(entity.type());
     if (shape == nullptr || shape->trackingRange <= 0) {
         return true;
@@ -185,6 +184,7 @@ void EntityVisibilityTracker::forgetEverythingDrawn() {
     sentSourceVersion_.clear();
     lastPassengers_.clear();
     lastMobEquipment_.clear();
+    lastEquipmentNbt_.clear();
     lastDisplayText_.clear();
 }
 
@@ -211,6 +211,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                 lastPassengers_.erase(entity->entityId());
                 lastLeashHolders_.erase(entity->entityId());
                 lastMobEquipment_.erase(entity->entityId());
+                lastEquipmentNbt_.erase(entity->entityId());
                 lastDisplayText_.erase(entity->entityId());
                 owner_->sendPlayPacket(RemoveEntitiesPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                     RemoveEntitiesPacket{.entityIds = {entity->entityId()}}.write(buffer);
@@ -394,6 +395,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             lastPassengers_.erase(entityId);
             lastLeashHolders_.erase(entityId);
             lastMobEquipment_.erase(entityId);
+            lastEquipmentNbt_.erase(entityId);
             lastDisplayText_.erase(entityId);
         }
     }
@@ -469,6 +471,14 @@ void EntityVisibilityTracker::syncLeash(const ServerEntity& entity) {
 }
 
 void EntityVisibilityTracker::syncMobEquipment(const entity::ServerEntity& entity) {
+    const wire::nbt::NbtCompound* raw =
+        entity.sourceNbt.has_value() ? entity.sourceNbt->getCompound("equipment") : nullptr;
+    const auto seen = lastEquipmentNbt_.find(entity.entityId());
+    if (seen != lastEquipmentNbt_.end() ? (raw != nullptr ? seen->second == *raw : seen->second.empty())
+                                        : raw == nullptr) {
+        return;
+    }
+    lastEquipmentNbt_.insert_or_assign(entity.entityId(), raw != nullptr ? *raw : wire::nbt::NbtCompound{});
     std::vector<entity::GeneratedEquipment> worn;
     if (entity.sourceNbt.has_value()) {
         worn = entity::generatedEntityEquipment(*entity.sourceNbt);

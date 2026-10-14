@@ -97,6 +97,7 @@ private:
     std::map<std::int32_t, std::vector<std::int32_t>> lastPassengers_;
     std::map<std::int32_t, std::int32_t> lastLeashHolders_;
     std::map<std::int32_t, std::vector<entity::GeneratedEquipment>> lastMobEquipment_;
+    std::map<std::int32_t, wire::nbt::NbtCompound> lastEquipmentNbt_;
     std::map<std::int32_t, std::string> lastDisplayText_;
     std::set<std::int32_t> trackedPlayers_;
     std::map<std::int32_t, std::int64_t> profileSeen_;
