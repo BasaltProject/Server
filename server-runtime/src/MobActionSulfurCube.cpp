@@ -63,6 +63,14 @@ void MobActionSystem::tickSulfurCube(world::LoadedWorld& world, ServerEntity& cu
     }
     refreshSulfurBody(cube);
     entity::mobMisc::State& misc = entity::mobMisc::of(cube);
+    // parity: `SulfurCube.primeTime`, which never lights a fuse while `tnt_explodes` is off.
+    if (cube.fuse >= 0 && !world.gameRules().get(world::gameRules::kTntExplodes)) {
+        cube.fuse = -1;
+        if (cube.sourceNbt.has_value()) {
+            cube.sourceNbt->putBoolean("Invulnerable", false);
+            ++cube.sourceNbtVersion;
+        }
+    }
     // parity: `SulfurCube.tickFuse`.
     if (cube.fuse > 0) {
         --cube.fuse;
