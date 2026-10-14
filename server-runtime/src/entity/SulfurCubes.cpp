@@ -14,13 +14,38 @@ namespace {
            cause == "fireball" || cause == "unattributed_fireball" || cause == "sulfur_cube_hot";
 }
 
+[[nodiscard]] bool explosionCause(std::string_view cause) {
+    return cause == "fireworks" || cause == "explosion" || cause == "player_explosion" || cause == "bad_respawn_point";
+}
+
+// `attack` and `projectile` are the engine's own names for melee and arrow hits.
 [[nodiscard]] bool immuneCause(std::string_view cause) {
-    static constexpr std::array<std::string_view, 24> kCauses{
-        "arrow",           "cactus",           "dry_out",   "fall",       "falling_anvil",       "falling_block",
-        "freeze",          "mace_smash",       "hot_floor", "mob_attack", "mob_attack_no_aggro", "mob_projectile",
-        "attack",          "player_attack",    "spear",     "spit",       "stalagmite",          "sting",
-        "sulfur_cube_hot", "sweet_berry_bush", "thrown",    "trident",    "wind_charge",         "projectile"};
-    return std::ranges::find(kCauses, cause) != kCauses.end() || cause == "explosion" || cause == "player_explosion";
+    static constexpr std::array<std::string_view, 25> kCauses{"arrow",
+                                                              "cactus",
+                                                              "dry_out",
+                                                              "fall",
+                                                              "falling_anvil",
+                                                              "falling_block",
+                                                              "falling_stalactite",
+                                                              "freeze",
+                                                              "mace_smash",
+                                                              "hot_floor",
+                                                              "mob_attack",
+                                                              "mob_attack_no_aggro",
+                                                              "mob_projectile",
+                                                              "player_attack",
+                                                              "spear",
+                                                              "spit",
+                                                              "stalagmite",
+                                                              "sting",
+                                                              "sulfur_cube_hot",
+                                                              "sweet_berry_bush",
+                                                              "thrown",
+                                                              "trident",
+                                                              "wind_charge",
+                                                              "attack",
+                                                              "projectile"};
+    return std::ranges::find(kCauses, cause) != kCauses.end() || explosionCause(cause);
 }
 
 } // namespace
@@ -61,7 +86,7 @@ void primeOnHit(ServerEntity& cube, std::string_view cause) {
         return;
     }
     const bool fire = fireCause(cause);
-    if (!fire && cause != "explosion" && cause != "player_explosion") {
+    if (!fire && !explosionCause(cause)) {
         return;
     }
     random::RandomSource random = random::RandomSource::legacy((static_cast<std::int64_t>(cube.entityId()) * 31) +
