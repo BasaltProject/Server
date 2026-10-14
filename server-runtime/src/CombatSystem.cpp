@@ -209,7 +209,10 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                                    world.gameRules().get(world::gameRules::kMobGriefing))));
             return;
         }
-        if (hit.has_value() && entity.incendiary.value_or(true)) {
+        // parity: `SmallFireball.onHitBlock` lights nothing for a mob owner when mobs may not grief.
+        const bool mobOwner = entity.ownerId.has_value() && world.state().entity(*entity.ownerId) != nullptr;
+        if (hit.has_value() && entity.incendiary.value_or(true) &&
+            (!mobOwner || world.gameRules().get(world::gameRules::kMobGriefing))) {
             lightWhereItLanded(world, watchers, *hit);
         }
         if (!target.has_value()) {
