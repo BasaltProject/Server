@@ -345,6 +345,12 @@ public:
     /// everything.
     std::int32_t cubeSize = 1;
 
+    /// How far a pufferfish has puffed up, 0 to 2, and the clocks its tick counts.
+    /// parity: `Pufferfish`'s PUFF_STATE, `inflateCounter` and `deflateTimer`.
+    std::int32_t puffState = 0;
+    std::int32_t puffInflateCounter = 0;
+    std::int32_t puffDeflateTimer = 0;
+
     /// Whether it is winding up a shot. parity: `Ghast.setCharging`/`Blaze.setCharged`.
     bool charging = false;
 

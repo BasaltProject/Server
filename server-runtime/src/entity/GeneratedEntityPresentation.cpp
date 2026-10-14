@@ -55,6 +55,9 @@ constexpr std::uint8_t kStingerCountDataIndex = 13;
 /// parity: `ExperienceOrb.DATA_VALUE`.
 constexpr std::uint8_t kOrbValueDataIndex = 8;
 
+/// parity: `Pufferfish.PUFF_STATE`, the integer right after `AbstractFish`'s moving flag.
+constexpr std::uint8_t kPufferfishPuffDataIndex = 17;
+
 using wire::nbt::NbtCompound;
 using wire::protocol::play::SetEntityDataPacket;
 using wire::protocol::play::SetEquipmentPacket;
@@ -409,6 +412,9 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
                             RegistryHolder::PigSoundVariant);
     } else if (type == "rabbit") {
         addIntIfSet(entries, data, "RabbitType", 18);
+    } else if (type == "pufferfish") {
+        // parity: `Pufferfish.PUFF_STATE`, counted the same as the salmon's variant beside it.
+        addIntIfSet(entries, data, "PuffState", kPufferfishPuffDataIndex);
     } else if (type == "salmon") {
         const std::int32_t variant = idOf(salmonVariants(), data.getString("type")).value_or(kSalmonMedium);
         if (variant != kSalmonMedium) {
@@ -519,6 +525,12 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         (previous != nullptr || *snifferDropSeed != 0)) {
         entries.push_back(Entry{.index = sniffers::kDropSeedDataIndex,
                                 .value = SetEntityDataPacket::IntValue{.value = *snifferDropSeed}});
+    }
+    // parity: `Pufferfish.PUFF_STATE`, defined as zero, so only a puffed one is news.
+    if (pufferfishPuff.has_value() && (previous == nullptr || previous->pufferfishPuff != pufferfishPuff) &&
+        (previous != nullptr || *pufferfishPuff != 0)) {
+        entries.push_back(
+            Entry{.index = kPufferfishPuffDataIndex, .value = SetEntityDataPacket::IntValue{.value = *pufferfishPuff}});
     }
     if (camelPoseTick.has_value() && (previous == nullptr || previous->camelPoseTick != camelPoseTick) &&
         (previous != nullptr || *camelPoseTick != 0)) {
@@ -768,6 +780,9 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.type().path() == "experience_orb" && entity.sourceNbt.has_value()) {
         live.orbValue = entity.sourceNbt->getShort("Value");
+    }
+    if (entity.type().path() == "pufferfish") {
+        live.pufferfishPuff = entity.puffState;
     }
     if (server::registry::entityAttributes::isLiving(entity.type())) {
         const mobStatusEffects::Swirl swirl = mobStatusEffects::swirlOf(entity.effects);
