@@ -184,7 +184,8 @@ std::vector<world::trades::Offer>& offersOf(world::RealVillagerTrades& trades, S
 std::int32_t addTrades(world::RealVillagerTrades& trades, ServerEntity& villager, world::LoadedWorld& world,
                        std::int32_t amount) {
     const std::size_t before = offersOf(trades, villager, world).size();
-    rollTrades(trades, villager, world, villager.offers->level, amount);
+    constexpr std::int32_t kMaxAdded = 64;
+    rollTrades(trades, villager, world, villager.offers->level, std::clamp(amount, 0, kMaxAdded));
     return static_cast<std::int32_t>(villager.offers->list.size() - before);
 }
 
