@@ -386,12 +386,13 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
         return true;
     }
     if (operation == "add_effect") {
-        const world::ActiveEffect effect{.effect = idOf(asText(at(arguments, 0)).value_or("")),
-                                         .amplifier = static_cast<std::int32_t>(asInt(at(arguments, 2))),
-                                         .remainingTicks = static_cast<std::int32_t>(asInt(at(arguments, 1))),
-                                         .ambient = asBool(at(arguments, 3)),
-                                         .visible = asBool(at(arguments, 4), true),
-                                         .showIcon = asBool(at(arguments, 5), true)};
+        const world::ActiveEffect effect{
+            .effect = idOf(asText(at(arguments, 0)).value_or("")),
+            .amplifier = static_cast<std::int32_t>(std::clamp<std::int64_t>(asInt(at(arguments, 2)), 0, 255)),
+            .remainingTicks = static_cast<std::int32_t>(asInt(at(arguments, 1))),
+            .ambient = asBool(at(arguments, 3)),
+            .visible = asBool(at(arguments, 4), true),
+            .showIcon = asBool(at(arguments, 5), true)};
         if (!world::mobEffects::protocolIdOf(effect.effect).has_value()) {
             return false;
         }
