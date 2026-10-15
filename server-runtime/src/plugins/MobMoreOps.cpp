@@ -441,6 +441,13 @@ void addBars(Operations& operations) {
                                const Arguments& arguments) -> std::optional<Value> {
         const std::string field = asText(at(arguments, 0)).value_or("");
         const std::string text = asText(at(arguments, 1)).value_or("");
+        constexpr std::array<std::string_view, 8> kFields{"title", "color", "overlay",  "darken",
+                                                          "music", "fog",   "progress", "visible"};
+        if (std::ranges::find(kFields, field) == kFields.end() ||
+            (field == "color" && std::ranges::find(kBarColors, text) == kBarColors.end()) ||
+            (field == "overlay" && std::ranges::find(kBarOverlays, text) == kBarOverlays.end())) {
+            return false;
+        }
         return withBar(environment, entity, [&](BossBarView& view, player::PlayerRegistry& registry) {
             const auto style = view.style();
             if (field == "title") {

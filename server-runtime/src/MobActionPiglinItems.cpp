@@ -337,10 +337,10 @@ void MobActionSystem::piglinStopHoldingOffhand(world::LoadedWorld& world, Server
                     from = end + 1;
                     const std::size_t bar = line.find('|');
                     const auto id = wire::common::Identifier::parse(line.substr(0, bar));
-                    if (bar != std::string::npos && id.has_value()) {
-                        result.push_back(ItemStack{
-                            .item = *id,
-                            .count = static_cast<std::int32_t>(std::strtol(line.c_str() + bar + 1, nullptr, 10))});
+                    const long count = bar == std::string::npos ? 0 : std::strtol(line.c_str() + bar + 1, nullptr, 10);
+                    if (id.has_value() && count > 0) {
+                        result.push_back(
+                            ItemStack{.item = *id, .count = static_cast<std::int32_t>(std::min(count, 99L))});
                     }
                 }
             }

@@ -107,6 +107,16 @@ constexpr std::array<IntField, 14> kIntFields{{
     {"spawn-max-y", &MobOverride::spawnMaxY, -2048.0},
 }};
 
+[[nodiscard]] std::int64_t intFieldMost(std::string_view name) {
+    if (name.starts_with("offspring-") || name == "explosion-radius") {
+        return 128;
+    }
+    if (name.ends_with("-light")) {
+        return 15;
+    }
+    return name.ends_with("-y") ? 2048 : 100'000'000;
+}
+
 constexpr std::array<std::string_view, 106> kGoalNames{"anger_target",
                                                        "angry_at_player",
                                                        "avoid_entity",
@@ -419,10 +429,10 @@ void readOverrideFields(const TomlTable& table, MobOverride& into, std::string_v
             continue;
         }
         const std::optional<std::int64_t> number = table.integer(spelled);
-        if (!number.has_value() || *number < static_cast<std::int64_t>(field.least) ||
-            *number > std::numeric_limits<std::int32_t>::max()) {
-            error = std::string{file} + ": overrides." + type + "." + spelled + " must be a whole number of at least " +
-                    std::to_string(static_cast<std::int64_t>(field.least)) + ".";
+        const std::int64_t most = intFieldMost(field.name);
+        if (!number.has_value() || *number < static_cast<std::int64_t>(field.least) || *number > most) {
+            error = std::string{file} + ": overrides." + type + "." + spelled + " must be a whole number from " +
+                    std::to_string(static_cast<std::int64_t>(field.least)) + " to " + std::to_string(most) + ".";
             return;
         }
         into.*(field.member) = static_cast<std::int32_t>(*number);
