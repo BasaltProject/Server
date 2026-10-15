@@ -12,14 +12,10 @@ namespace basalt::server::runtime::entity {
 
 class ServerEntity;
 
-/// How something that flies moves: its own move control, then its own travel.
-///
-/// parity: `FlyingMoveControl` over `travelInAir` (wither, parrot, bee, allay), `GhastMoveControl`
-/// over `travelFlying`, `VexMoveControl`, `PhantomMoveControl` and the bat's `customServerAiStep`.
+/// parity: `FlyingMoveControl`.
 namespace flyingMovement {
 
 enum class Control : std::uint8_t {
-    /// Nothing steers it: the drift of `travelFlying` with no input.
     Drift,
     /// parity: `FlyingMoveControl`.
     Flying,
@@ -35,21 +31,17 @@ enum class Control : std::uint8_t {
 
 [[nodiscard]] Control controlOf(const wire::common::Identifier& type);
 
-/// parity: the fliers whose navigation is `FlyingPathNavigation`, so their paths are flown.
+/// parity: the fliers whose navigation is `FlyingPathNavigation`.
 [[nodiscard]] bool usesFlyingPath(const wire::common::Identifier& type);
 
-/// parity: `GhastMoveControl.canReach`, not careful: no block's shape along the way is in the box's
-/// path, those it starts in aside.
+/// parity: `GhastMoveControl.canReach`.
 [[nodiscard]] bool ghastCanReach(world::WorldState& world, const ServerEntity& mob, double dx, double dy, double dz);
 
-/// One tick of the flier's move control and travel. `target` is where its attack target stands,
-/// which the vex turns to face.
 void tick(world::WorldState& world, ServerEntity& entity, random::RandomSource& random,
           const std::optional<std::array<double, 3>>& target = std::nullopt);
 
 } // namespace flyingMovement
 
-/// The mobs that fly rather than walk, which is what decides how they are moved every tick.
 namespace flyers {
 
 [[nodiscard]] bool flies(const wire::common::Identifier& type);

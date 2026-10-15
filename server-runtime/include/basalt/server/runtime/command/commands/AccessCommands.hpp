@@ -6,7 +6,7 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// parity: `BanPlayerCommands`. A banned player is disconnected on the spot, as vanilla does.
+/// parity: `BanPlayerCommands`.
 class BanCommand final : public Command {
 public:
     explicit BanCommand(std::function<std::int64_t()> nowEpochSeconds);
@@ -28,7 +28,7 @@ private:
     std::function<std::int64_t()> nowEpochSeconds_;
 };
 
-/// parity: `PardonCommand` and `PardonIpCommand`, which refuse when there was nothing to lift.
+/// parity: `PardonCommand` and `PardonIpCommand`.
 class PardonCommand final : public Command {
 public:
     explicit PardonCommand(bool ip);
@@ -48,10 +48,6 @@ public:
 };
 
 /// parity: `WhitelistCommand`.
-///
-/// Whether the whitelist is enforced is `server.toml`'s `whitelist`, so `on` and `off` report that
-/// the file decides rather than silently disagreeing with it: an operator who turns it on here and
-/// restarts would otherwise find it off again.
 class WhitelistCommand final : public Command {
 public:
     WhitelistCommand(std::function<bool()> enforced, std::function<void(bool)> setEnforced,

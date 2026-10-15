@@ -4,8 +4,7 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// parity: 26.3 `PostEffectCommand`: add, clear, list and remove the post-processing shaders a
-/// player's client runs. The list is sent whole whenever it changes, as `ServerPlayer` does.
+/// parity: 26.3 `PostEffectCommand`.
 class PostEffectCommand final : public Command {
 public:
     PostEffectCommand();

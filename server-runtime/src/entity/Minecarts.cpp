@@ -36,10 +36,10 @@ constexpr double kSlopePush = static_cast<double>(0.0078125F);
 /// parity: what a powered rail adds, and the nudge it gives a cart standing still.
 constexpr double kBoost = 0.06;
 constexpr double kNudge = 0.02;
-/// parity: `getPos`'s sixteenth of a block, and the twentieth of the drop it turns into speed.
+/// parity: `getPos`'s sixteenth of a block.
 constexpr double kRailLift = static_cast<double>(0.0625F);
 constexpr double kSlopeSpeed = 0.05;
-/// parity: `comeOffTrack`: half the speed on the ground, and `getAirDrag`'s 0.95 in the air.
+/// parity: `comeOffTrack`.
 constexpr double kGroundDrag = 0.5;
 constexpr double kAirDrag = static_cast<double>(0.95F);
 /// parity: under this, an unpowered powered rail stops the cart dead.
@@ -328,7 +328,7 @@ void moveAndPush(world::WorldState& world, ServerEntity& cart, const Env& env, d
 }
 
 bool isConductor(const world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    // parity: `BlockState.isRedstoneConductor`, which is a full solid cube for nearly every block.
+    // parity: `BlockState.isRedstoneConductor`.
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     return stateId.has_value() && registry::blockSupport::conductsRedstone(*stateId);
 }
@@ -340,7 +340,7 @@ double gravityOf(const ServerEntity& cart) {
 std::array<double, 3> naturalSlowdown(ServerEntity& cart, const Env& env, const std::array<double, 3>& movement) {
     CartState& state = stateOf(cart);
     std::array<double, 3> base = movement;
-    // parity: `MinecartFurnace.applyNaturalSlowdown`, the push along the rails before the usual one.
+    // parity: `MinecartFurnace.applyNaturalSlowdown`.
     if (isFurnace(cart)) {
         if ((state.pushX * state.pushX) + (state.pushZ * state.pushZ) > 1.0E-7) {
             const double pushLength = horizontal(state.pushX, state.pushZ);
@@ -504,7 +504,7 @@ void tick(world::WorldState& world, ServerEntity& cart, const Env& env) {
 
 void move(world::WorldState& world, ServerEntity& cart, const Env& env, double dx, double dy, double dz) {
     CartState& state = stateOf(cart);
-    // parity: `Entity.move`: a cobweb's hold is spent on this move and takes the speed with it.
+    // parity: `Entity.move`.
     if ((state.stuck[0] * state.stuck[0]) + (state.stuck[1] * state.stuck[1]) + (state.stuck[2] * state.stuck[2]) >
         1.0E-7) {
         dx *= state.stuck[0];
@@ -534,7 +534,7 @@ void move(world::WorldState& world, ServerEntity& cart, const Env& env, double d
     state.verticalCollision = dy != moved[1];
     const bool below = state.verticalCollision && dy < 0.0;
     cart.onGround = below;
-    // parity: `checkFallDamage`, out of water the fall counts, and landing hands it to the block.
+    // parity: `checkFallDamage`.
     const std::int32_t effectX = mth::floor(cart.x);
     const std::int32_t effectY = mth::floor(cart.y - 0.2);
     const std::int32_t effectZ = mth::floor(cart.z);
@@ -551,8 +551,7 @@ void move(world::WorldState& world, ServerEntity& cart, const Env& env, double d
     if (cart.removed) {
         return;
     }
-    // parity: `restituteMovementAfterCollisions`: nothing bounces off a wall, and the floor gives
-    // back only what a bouncy block below lends a thing that is not alive.
+    // parity: `restituteMovementAfterCollisions`.
     if ((dy != 0.0 && state.verticalCollision) || state.horizontalCollision) {
         if (xCollision) {
             cart.velocityX = -cart.velocityX * 0.0;
@@ -575,7 +574,7 @@ void move(world::WorldState& world, ServerEntity& cart, const Env& env, double d
             cart.velocityY = (compensation - cart.velocityY) * drag * restitution;
         }
     }
-    // parity: `AbstractMinecart.getBlockSpeedFactor`, whole on a rail and the block's own elsewhere.
+    // parity: `AbstractMinecart.getBlockSpeedFactor`.
     const std::optional<std::int32_t> here =
         world.blockState(mth::floor(cart.x), mth::floor(cart.y), mth::floor(cart.z));
     if (!isRail(world, mth::floor(cart.x), mth::floor(cart.y), mth::floor(cart.z))) {

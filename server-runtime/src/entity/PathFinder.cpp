@@ -16,7 +16,7 @@ namespace {
 
 using Position = std::array<std::int32_t, 3>;
 
-/// parity: `PathFinder`'s own 1.5 on the heuristic, which is what makes it take the direct way.
+/// parity: `PathFinder`'s own 1.5 on the heuristic.
 constexpr double kHeuristicWeight = 1.5;
 
 /// parity: `WalkNodeEvaluator.getPathTypeStatic`'s malus for water and for what burns.
@@ -91,8 +91,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return 0.0;
 }
 
-/// parity: `AmphibiousNodeEvaluator.getPathType` with its `prepare` malus: water free, water beside
-/// a blocked square four, anything walkable six.
+/// parity: `AmphibiousNodeEvaluator.getPathType` with its `prepare` malus.
 [[nodiscard]] double amphibiousMalus(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     if (isWater(world, x, y, z)) {
         constexpr std::array<std::array<std::int32_t, 3>, 6> kAround{
@@ -108,10 +107,9 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return danger > 0.0 ? danger : kAmphibiousWalkableMalus;
 }
 
-/// Where a step in this direction lands: the same height, one up, or up to three down.
 [[nodiscard]] std::optional<Position> step(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                            bool doors = false, bool amphibious = false) {
-    // parity: `findAcceptedNode` hands an amphibious mob the water node as it is, floor or not.
+    // parity: `findAcceptedNode` hands an amphibious mob the water node as it is.
     if (standable(world, x, y, z, doors) || (amphibious && isWater(world, x, y, z))) {
         return Position{x, y, z};
     }
@@ -126,8 +124,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return std::nullopt;
 }
 
-/// parity: `WalkNodeEvaluator.getNeighbors`: the four sides and the four corners, up one or down
-/// three.
+/// parity: `WalkNodeEvaluator.getNeighbors`.
 [[nodiscard]] std::vector<Position> neighbours(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                bool doors = false, bool amphibious = false) {
     std::vector<Position> found;
@@ -138,8 +135,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
             found.push_back(*landed);
         }
     }
-    // parity: a corner is only walkable when both sides of it are, which is what stops a mob cutting
-    // through the inside of a corner.
+    // parity: a corner is walkable only when both its sides are, so a mob cannot cut an inside corner.
     for (const std::int32_t dx : {-1, 1}) {
         for (const std::int32_t dz : {-1, 1}) {
             if (!isOpen(world, x + dx, y, z, doors) || !isOpen(world, x, y, z + dz, doors)) {
@@ -151,7 +147,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
             }
         }
     }
-    // parity: `AmphibiousNodeEvaluator.getNeighbors`: straight up and down as well, into water only.
+    // parity: `AmphibiousNodeEvaluator.getNeighbors`.
     if (amphibious) {
         if (isWater(world, x, y + 1, z)) {
             found.push_back(Position{x, y + 1, z});
@@ -176,7 +172,6 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
         current = found->second;
     }
     std::ranges::reverse(path);
-    // The first entry is where it already is, which is not a step.
     if (!path.empty()) {
         path.erase(path.begin());
     }
@@ -200,7 +195,7 @@ std::array<std::int32_t, 3> amphibiousStartOf(world::WorldState& world, double x
 }
 
 bool isMobDoor(std::int32_t stateId) {
-    // parity: `BlockTags.MOB_INTERACTABLE_DOORS`, every wooden and copper door, never the iron one.
+    // parity: `BlockTags.MOB_INTERACTABLE_DOORS`.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     return block != nullptr && block->path().ends_with("_door") && block->path() != "iron_door";
 }
@@ -386,8 +381,7 @@ std::optional<std::vector<Position>> find(world::WorldState& world, std::int32_t
 
     std::int32_t examined = 0;
     while (!open.empty() && examined++ < kMaxNodes) {
-        // A plain scan for the cheapest open node: a path this short never has enough of them for a
-        // heap to pay for itself.
+        // A plain scan for the cheapest open node: a path this short never pays for a heap.
         const auto cheapest = std::ranges::min_element(
             open, [&scoreOf](std::int64_t one, std::int64_t other) { return scoreOf(one) < scoreOf(other); });
         const std::int64_t current = *cheapest;

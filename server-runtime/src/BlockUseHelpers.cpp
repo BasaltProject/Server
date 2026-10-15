@@ -81,8 +81,7 @@ void BlockInteractionHandler::broadcastSound(const BlockPos& pos, const std::str
         if (session != nullptr && other->entityId() == session->entityId()) {
             continue;
         }
-        // A door, a chest or a button on the other edition: told by name, since that client has no
-        // packet of this shape and hears nothing at all without it.
+        // That client has no packet of this shape, so it is told by name and hears nothing without it.
         if (other->connection().playSound) {
             other->connection().playSound(sound, pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, volume, pitch);
             continue;
@@ -127,8 +126,7 @@ bool BlockInteractionHandler::editSign(const BlockPos& pos) {
     if (existing == nullptr || session == nullptr || !stateId.has_value() || world::signs::isWaxed(existing->data())) {
         return false;
     }
-    // parity: `SignBlock.useWithoutItem`: the side the player is facing, and only while a player
-    // could have typed what is on it.
+    // parity: `SignBlock.useWithoutItem`.
     const bool front = world::signs::facesFront(*stateId, pos.x, pos.z, session->x, session->z);
     if (!world::signs::hasEditableText(existing->data(), front)) {
         return false;
@@ -155,14 +153,12 @@ void BlockInteractionHandler::writeSign(const play::SignUpdatePacket& update) {
 }
 
 bool BlockInteractionHandler::mayUseGameMasterBlocks(PlayerSession& session) const {
-    // parity: `Player.canUseGameMasterBlocks`, which is permission two **and** creative. Here the
-    // permission is the admin group, which is what a player's command source resolves to.
+    // parity: `Player.canUseGameMasterBlocks`.
     const command::CommandDispatcher* dispatcher = owner_->options().commands;
     if (dispatcher == nullptr || session.gamemode != Gamemode::Creative) {
         return false;
     }
-    // Asked through the player's own command source, so "operator" means here exactly what it means
-    // when they type a command.
+    // Asked through the player's command source, so operator means what it means when they type a command.
     const command::PlayerCommandSource source{session, dispatcher->environment().groups()};
     return source.permissionLevel() >= command::permissionLevel::kGamemasters;
 }
@@ -441,9 +437,7 @@ void BlockInteractionHandler::useBucketOn(PlayerSession& session, const Identifi
     if (!result.has_value()) {
         return;
     }
-    // parity: `BucketItem` raises `FLUID_PICKUP` where it took the fluid from and `FLUID_PLACE`
-    // where it put it, and a sculk sensor hears both. Which of the two it is comes from the item:
-    // an empty bucket is the one that picks up.
+    // parity: `BucketItem`.
     if (!result->changes.empty()) {
         const world::FluidChange& at = result->changes.front();
         if (world->state().hasSculkSensorNear(at.x, at.y, at.z, world::vibrations::kCalibratedRange)) {
@@ -478,7 +472,7 @@ std::vector<std::array<double, 6>> BlockInteractionHandler::buildersInTheWay() c
     }
     std::vector<std::array<double, 6>> boxes;
     for (const PlayerSession* player : players) {
-        // parity: `Entity.blocksBuilding`, which is off for spectators, who are built straight through.
+        // parity: `Entity.blocksBuilding`.
         if (player->gamemode == Gamemode::Spectator) {
             continue;
         }

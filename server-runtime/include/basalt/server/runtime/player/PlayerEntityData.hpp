@@ -12,11 +12,6 @@ namespace basalt::server::runtime::player {
 
 class PlayerSession;
 
-/// Everything a player synchronizes to the clients that see them, and to their own.
-///
-/// parity: the `SynchedEntityData` of `Entity`, `LivingEntity`, `Avatar` and `Player`, in that
-/// order. Diffed per viewer the way `ServerEntity.sendDirtyEntityData` sends the dirty ones, and
-/// compared against the defined defaults for the pairing, as `getNonDefaultValues` does.
 struct PlayerEntityData {
     static constexpr std::uint8_t kTicksFrozenIndex = 7;
     static constexpr std::uint8_t kHealthIndex = 9;
@@ -51,21 +46,16 @@ struct PlayerEntityData {
     std::optional<std::int32_t> shoulderLeft;
     std::optional<std::int32_t> shoulderRight;
 
-    /// What the player's own values are now.
     [[nodiscard]] static PlayerEntityData of(const PlayerSession& session);
 
-    /// The entries that differ from `previous`, or from the defined defaults when there is none.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>
     changesFrom(const PlayerEntityData* previous) const;
 
     friend bool operator==(const PlayerEntityData&, const PlayerEntityData&) = default;
 };
 
-/// parity: `Player.extractParrotVariant`, the variant of a parrot's saved tag, or nothing.
 [[nodiscard]] std::optional<std::int32_t> parrotVariantOf(const std::optional<wire::nbt::NbtCompound>& tag);
 
-/// A tick of the player's body: shedding arrows and stingers, `updateSwimming` and
-/// `updatePlayerPose`, with `blockAt` answering what is where.
 void tickBody(PlayerSession& session, const entity::entityCollision::BlockAt& blockAt);
 
 } // namespace basalt::server::runtime::player

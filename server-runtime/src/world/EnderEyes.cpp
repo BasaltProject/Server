@@ -73,8 +73,7 @@ constexpr double kPiOver180 = 0.017453292519943295;
     }
 }
 
-/// parity: `getPlayerPOVHitResult(..., Fluid.NONE)` landing on an end portal frame, which leaves the
-/// use to `useOn`. The frame's collision box is its outline, so the collider clip answers the same.
+/// parity: `getPlayerPOVHitResult(..., Fluid.NONE)` landing on an end portal frame.
 [[nodiscard]] bool lookingAtFrame(WorldState& state, const player::PlayerSession& player) {
     const double reach = player.gamemode == Gamemode::Creative ? kCreativeReach : kReach;
     const double yaw = static_cast<double>(player.yaw) * kPiOver180;

@@ -126,7 +126,7 @@ ServerEntity* MobActionSystem::heartProtector(world::LoadedWorld& world, const P
 
 void MobActionSystem::heartParticles(world::LoadedWorld& world, const Pos& at, const ServerEntity& creaking,
                                      std::int32_t count, bool towardsCreaking, random::RandomSource& random) {
-    // parity: `emitParticles`: trails between a point in the creaking's box and one in the heart.
+    // parity: `emitParticles`.
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     const double halfWidth = creaking.width() / 2.0;
     for (std::int32_t index = 0; index < count; ++index) {
@@ -260,7 +260,7 @@ void MobActionSystem::removeCreakingProtector(world::LoadedWorld& world, const P
         if (breaker == nullptr) {
             tearDownCreaking(world, *creaking);
         } else {
-            // parity: `creakingDeathEffects`: it dies at the breaker's hand and twitches for its last
+            // parity: `creakingDeathEffects`: it dies at the breaker's hand and twitches for its last.
             // forty-five ticks before it comes apart.
             creaking->lastBlame.causingId = breaker->entityId();
             entity::entityCombat::rememberPlayer(*creaking, breaker->uuid());
@@ -336,7 +336,7 @@ bool MobActionSystem::tickCreakingHeart(world::LoadedWorld& world, std::int32_t 
     heart.ticker = random.nextInt(5) + 20;
     const bool active = world::scheduledBlocks::creakingIsActive(
         world.clock().totalTicks(), config::dimensionFacts(world.declaration().dimension).hasDayTimeline);
-    // parity: `updateCreakingState`: uprooted without its logs and its creaking, else awake by night.
+    // parity: `updateCreakingState`.
     const server::world::ChunkBlockEntity* entity = heartEntity(world, at);
     const bool bound = entity != nullptr && creakings::heartCreaking(entity->data()).has_value();
     const std::string axis = property(*stateId, "axis");

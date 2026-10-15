@@ -18,7 +18,6 @@ const common::Logger& logger() {
     return instance;
 }
 
-/// Writes one packet id and hands the body builder the buffer to fill in behind it.
 template <typename Body>
 void sendPacket(Connection& connection, std::int32_t id, Body&& body) {
     io::ByteBuffer& buffer = connection.scratch();
@@ -86,7 +85,7 @@ bool LoginHandler::handleStatus(Connection& connection, io::ByteBuffer& packet) 
         }
         sendPacket(connection, protocol::status::PingPacket::kId,
                    [&ping](io::ByteBuffer& buffer) { ping->write(buffer); });
-        // The client closes right after the pong, which is not an error: it got what it asked for.
+        // The client closes right after the pong, which is not an error.
         return false;
     }
     return false;
@@ -105,8 +104,7 @@ bool LoginHandler::handleLogin(Connection& connection, io::ByteBuffer& packet) {
             sendPacket(connection, protocol::login::LoginCompressionPacket::kId, [this](io::ByteBuffer& buffer) {
                 protocol::login::LoginCompressionPacket{settings_.compressionThreshold}.write(buffer);
             });
-            // Every packet after this one is framed the compressed way, this one included on the
-            // client's side, so the threshold is applied only once the packet has left.
+            // Every packet after this one is framed compressed, so the threshold applies only once it has left.
             connection.setCompressionThreshold(settings_.compressionThreshold);
         }
 
@@ -153,8 +151,6 @@ void LoginHandler::run(Connection& connection) {
                 break;
             case ProtocolState::Configuration:
             case ProtocolState::Play:
-                // Nothing past the login handshake is implemented yet, so the connection is held
-                // open and idle rather than fed packets nothing can answer.
                 keepGoing = true;
                 break;
             }

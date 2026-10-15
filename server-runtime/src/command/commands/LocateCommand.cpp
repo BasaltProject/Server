@@ -89,13 +89,11 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                 const std::int32_t startY = rounded(origin[1]);
                 const std::int32_t startZ = rounded(origin[2]);
 
-                // parity: `BiomeSource.findClosestBiome3d`, which steps in quarts and
-                // gives up at 6400.
+                // parity: `BiomeSource.findClosestBiome3d`, which steps in quarts and gives up at 6400.
                 for (std::int32_t radius = 0; radius <= kMaxRadiusBlocks; radius += kStepBlocks) {
                     for (std::int32_t dx = -radius; dx <= radius; dx += kStepBlocks) {
                         for (std::int32_t dz = -radius; dz <= radius; dz += kStepBlocks) {
-                            // Only the ring just added, so a hit is the closest one
-                            // found so far.
+                            // Only the ring just added, so a hit is the closest one found so far.
                             if (radius > 0 && dx * dx != radius * radius && dz * dz != radius * radius) {
                                 continue;
                             }
@@ -149,9 +147,7 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                     std::int32_t x = 0;
                     std::int32_t z = 0;
                     if (*wanted == stronghold()) {
-                        // parity: the concentric rings path of `findNearestMapStructure`,
-                        // which is not a search: the whole ring list is walked and the
-                        // nearest chunk centre wins.
+                        // parity: the concentric rings path of `findNearestMapStructure`, which is not a search.
                         terrain::StrongholdStructureGenerator* strongholds = (*world)->strongholdGenerator();
                         const std::optional<std::pair<std::int32_t, std::int32_t>> found =
                             strongholds == nullptr ? std::nullopt : strongholds->locate(startX, startZ);
@@ -191,9 +187,7 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                         if (!found.has_value()) {
                             return std::unexpected{notFound("commands.locate.structure.not_found", *wanted)};
                         }
-                        // parity: `StructurePlacement.getLocatePos`, which names the
-                        // chunk's minimum corner plus the set's own `locate_offset`; every
-                        // set that has one leaves it at zero.
+                        // parity: `StructurePlacement.getLocatePos`.
                         x = found->chunkX * 16;
                         z = found->chunkZ * 16;
                     }
@@ -207,8 +201,7 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
             });
     });
 
-    /// parity: `LocateCommand.locatePoi`, which searches 256 blocks around the runner and takes the
-    /// nearest.
+    /// parity: `LocateCommand.locatePoi`.
     root.literal("poi", [](const CommandNodeBuilder& form) {
         form.argument(
             "poi", resourceOrTagArgument("minecraft:point_of_interest_type"), [](const CommandNodeBuilder& named) {

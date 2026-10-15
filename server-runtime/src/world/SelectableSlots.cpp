@@ -7,7 +7,7 @@
 namespace basalt::server::runtime::world::selectableSlots {
 namespace {
 
-/// parity: `getSection`, which counts in sixteenths of a block however many slots there are.
+/// parity: `getSection`.
 [[nodiscard]] std::int32_t section(float along, std::int32_t sections) {
     const float pixel = along * 16.0F;
     const float size = 16.0F / static_cast<float>(sections);
@@ -31,7 +31,6 @@ std::optional<std::int32_t> hitSlot(std::string_view facing, std::string_view fa
     } else if (face == "east") {
         across = 1.0F - clickZ;
     } else {
-        // Up and down are not faces a shelf looks out of, so nothing was clicked.
         return std::nullopt;
     }
     const std::int32_t row = section(1.0F - clickY, rows);

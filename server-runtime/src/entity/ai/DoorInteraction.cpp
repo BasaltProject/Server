@@ -69,7 +69,7 @@ void tick(world::WorldState& world, ServerEntity& mob, State& state, const std::
         setDoor(to, true);
         remember(to);
     }
-    // parity: `closeDoorsThatIHaveOpenedOrPassedThrough`, which keeps the two it is stepping between.
+    // parity: `closeDoorsThatIHaveOpenedOrPassedThrough`.
     for (auto door = state.doorsToClose.begin(); door != state.doorsToClose.end();) {
         if (*door == from || *door == to) {
             ++door;

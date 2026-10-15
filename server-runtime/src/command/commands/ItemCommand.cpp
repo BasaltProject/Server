@@ -32,15 +32,13 @@ using Stack = std::optional<storage::StoredItemStack>;
 /// parity: `ItemCommands`' `with <item> <count>`, one to ninety-nine.
 constexpr std::int32_t kMaxCount = 99;
 
-/// parity: `SlotRanges`' offsets for a player: the hotbar at 0, the rest of the inventory at 9, the
-/// held hand at 98, the armour at 100 and the ender chest at 200.
+/// parity: `SlotRanges`' offsets for a player.
 constexpr std::int32_t kMainhand = 98;
 constexpr std::int32_t kOffhand = 99;
 constexpr std::int32_t kFeet = 100;
 constexpr std::int32_t kHead = 103;
 constexpr std::int32_t kEnderChest = 200;
 
-/// One slot of whatever holds items, read and written by its vanilla id.
 struct Slots {
     std::function<std::optional<Stack>(std::int32_t id)> read;
     std::function<bool(std::int32_t id, const Stack& stack)> write;
@@ -106,14 +104,12 @@ struct Slots {
                      }};
 }
 
-/// A container's slots, with every write gathered and sent through `writeContainer` at the end.
 struct BlockSlots {
     std::vector<std::pair<std::int32_t, storage::StoredItemStack>> held;
     std::vector<std::pair<std::int32_t, storage::StoredItemStack>> written;
     std::int32_t size = 0;
 };
 
-/// The one ItemCommands flow: where the slots are, whose they are, and what to call them.
 struct Target {
     std::string name;
     std::optional<std::array<std::int32_t, 3>> block;
@@ -125,7 +121,7 @@ struct Target {
     return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
 }
 
-/// parity: `BlockItemAccessor.getContainer`: a block entity that is a container, or the error.
+/// parity: `BlockItemAccessor.getContainer`.
 [[nodiscard]] Parsed<std::int32_t> containerSize(const CommandContext& context, const std::array<std::int32_t, 3>& at,
                                                  std::string_view error) {
     const Parsed<world::LoadedWorld*> world = context.world();
@@ -144,7 +140,6 @@ struct Target {
     return *size;
 }
 
-/// The targets or sources a `block <pos>` or `entity <targets>` argument names.
 [[nodiscard]] Parsed<std::vector<Target>> targetsOf(const CommandContext& context, const std::string& name,
                                                     bool asSource) {
     if (context.get<BlockCoordinates>(name) != nullptr) {
@@ -166,7 +161,6 @@ struct Target {
     return targets;
 }
 
-/// Runs `body` over one target's slots, and writes what changed back.
 template <typename Body>
 void withSlots(const CommandContext& context, const Target& target, world::RealRecipes* recipes, Body&& body) {
     if (target.player != nullptr) {
@@ -216,11 +210,9 @@ void withSlots(const CommandContext& context, const Target& target, world::RealR
     }
 }
 
-/// parity: `ItemProvider`: `of` stops when the items run out, `cycle` starts over, and `override`
-/// empties every slot after the last one.
+/// parity: `ItemProvider`: `of` stops when the items run out, `cycle` starts over.
 enum class Distribution : std::uint8_t { Replace, Fill, Override };
 
-/// The modifier the command names, as the functions to run.
 [[nodiscard]] Parsed<std::vector<server::world::loot::LootFunction>> modifierOf(const CommandContext& context,
                                                                                 world::RealLootTables* tables) {
     const auto* named = context.get<ResourceOrInline>("modifier");
@@ -237,8 +229,7 @@ enum class Distribution : std::uint8_t { Replace, Fill, Override };
     return std::move(*parsed);
 }
 
-/// parity: `ItemCommands.applyModifier`: the functions in a command's loot context, the result cut
-/// to what the item stacks to.
+/// parity: `ItemCommands.applyModifier`: the functions in a command's loot context.
 [[nodiscard]] Stack modify(const CommandContext& context, world::RealLootTables* tables,
                            const std::vector<server::world::loot::LootFunction>& functions, const Stack& stack) {
     if (functions.empty() || isEmpty(stack)) {
@@ -266,8 +257,7 @@ enum class Distribution : std::uint8_t { Replace, Fill, Override };
     return storage::StoredItemStack{.id = item.item.toString(), .count = item.count, .components = item.components};
 }
 
-/// parity: `CommandResponseTracker.sendFeedback`: fail when nothing changed, name the one target
-/// that did, count them otherwise; the answer is every slot changed.
+/// parity: `CommandResponseTracker.sendFeedback`.
 [[nodiscard]] Parsed<std::int32_t> feedback(const CommandContext& context, const std::vector<Target>& targets,
                                             const std::vector<std::int32_t>& counts, std::string_view action,
                                             const std::optional<std::string>& knownItem) {
@@ -324,8 +314,7 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
     world::RealRecipes* recipes = recipes_;
     world::RealLootTables* tables = lootTables_;
 
-    /// parity: `ItemCommands.getItems`: every slot the source names, empty ones included, through
-    /// the modifier when there is one.
+    /// parity: `ItemCommands.getItems`: every slot the source names, empty ones included.
     const auto sourceItems = [recipes, tables](const CommandContext& context) -> Parsed<std::vector<Stack>> {
         const Parsed<std::vector<Target>> sources = targetsOf(context, "source", true);
         if (!sources.has_value()) {
@@ -352,7 +341,7 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         return items;
     };
 
-    /// parity: `ItemCommands.setItems`: each target gets the items from the start, one per slot.
+    /// parity: `ItemCommands.setItems`.
     const auto setItems = [recipes](const CommandContext& context, Distribution distribution,
                                     const std::vector<Stack>& items,
                                     const std::optional<std::string>& knownItem) -> Parsed<std::int32_t> {
@@ -433,7 +422,6 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         return feedback(context, *targets, counts, "modify", std::nullopt);
     };
 
-    /// `block <pos>` or `entity <targets>`, each leading on to the same `then`.
     const auto provider = [](const CommandNodeBuilder& node, const std::string& name,
                              const std::function<void(const CommandNodeBuilder&)>& then) {
         node.literal("block", [&](const CommandNodeBuilder& block) { block.argument(name, blockPosArgument(), then); });

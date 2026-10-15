@@ -281,7 +281,6 @@ void ClientSession::broadcastChat(const chat::PlayerChatMessage& message) {
     if (session == nullptr) {
         return;
     }
-    // A plugin's rewrite is this server's chat decorator: it becomes the unsigned content.
     std::string spoken = message.body.content;
     if (options_.plugins.chatAllowed && !options_.plugins.chatAllowed(*session, spoken)) {
         return;
@@ -299,7 +298,6 @@ void ClientSession::broadcastChat(const chat::PlayerChatMessage& message) {
 }
 
 void ClientSession::deliverChat(const chat::PlayerChatMessage& message, const chat::BoundChatType& chatType) {
-    // An older client gets the line its own chat type would have drawn: its chain is not this one.
     if (translatedClient() || secureChat_ == nullptr) {
         const Component line = chatType.decorate(message.decoratedContent());
         sendPlayPacket(play::SystemChatPacket::kId, [&line](wire::io::ByteBuffer& buffer) {
@@ -307,7 +305,7 @@ void ClientSession::deliverChat(const chat::PlayerChatMessage& message, const ch
         });
         return;
     }
-    // parity: `OutgoingChatMessage.create`: the nil sender is disguised, anyone else is a player.
+    // parity: `OutgoingChatMessage.create`.
     if (message.isSystem()) {
         const play::DisguisedChatPacket packet{.message = message.decoratedContent(), .chatType = chatType.toWire()};
         sendPlayPacket(play::DisguisedChatPacket::kId,

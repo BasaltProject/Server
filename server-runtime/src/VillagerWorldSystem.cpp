@@ -278,7 +278,7 @@ void VillagerWorldSystem::composterExtract(ServerEntity& /*mob*/, const BlockPos
     }
     announce(change->x, change->y, change->z, change->stateId, true);
     random::RandomSource random = random::RandomSource::legacy(nextSeed_ ? nextSeed_() : 0);
-    // parity: `ComposterBlock.extractProduce`, a bone meal popped out just above, scattered by 0.7.
+    // parity: `ComposterBlock.extractProduce`.
     const auto offset = [&random] { return (static_cast<double>(random.nextFloat()) - 0.5) * 0.7; };
     const double x = pos.x + 0.5 + offset();
     const double y = pos.y + 1.01 + offset();
@@ -328,7 +328,7 @@ void VillagerWorldSystem::spawnItem(const server::world::loot::ItemStack& stack,
 
 void VillagerWorldSystem::throwItem(ServerEntity& mob, const server::world::loot::ItemStack& stack, double towardsX,
                                     double towardsY, double towardsZ) {
-    // parity: `BehaviorUtils.throwItem`, a third of a block a tick along the line to the target.
+    // parity: `BehaviorUtils.throwItem`.
     double dx = towardsX - mob.x;
     double dy = towardsY - mob.y;
     double dz = towardsZ - mob.z;
@@ -548,7 +548,7 @@ ServerEntity* VillagerWorldSystem::spawnChild(ServerEntity& mob, ServerEntity& p
         const std::string_view type = data == nullptr ? std::string_view{} : data->getString("type");
         return type.empty() ? std::string{"minecraft:plains"} : std::string{type};
     };
-    // parity: `Villager.getBreedOffspring`: half the time the biome's type, else either parent's.
+    // parity: `Villager.getBreedOffspring`.
     const double roll = random.nextDouble();
     std::string type = roll < 0.75 ? typeOf(mob) : typeOf(partner);
     if (roll < 0.5) {

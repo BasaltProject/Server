@@ -26,7 +26,7 @@ using player::PlayerSession;
 using wire::common::Identifier;
 namespace play = wire::protocol::play;
 
-/// parity: `WindCharge`'s calculator pushes 1.22 times harder; the breeze's is the default one.
+/// parity: `WindCharge`'s calculator pushes 1.22 times harder.
 constexpr float kPlayerChargeKnockback = 1.22F;
 constexpr double kPlayerEyes = 1.62;
 constexpr double kPlayerWidth = 0.6;
@@ -34,7 +34,7 @@ constexpr double kPlayerHeight = 1.8;
 /// parity: `ServerLevel.explode` tells only the players within sixty-four blocks.
 constexpr double kPacketRangeSquared = 4096.0;
 
-/// parity: `ServerExplosion.getSeenPercent`: the share of points across the box with a clear line
+/// parity: `ServerExplosion.getSeenPercent`.
 /// to the centre.
 [[nodiscard]] float seenPercent(world::WorldState& world, double cx, double cy, double cz, const entity::Aabb& box) {
     const double xs = 1.0 / ((box.maxX - box.minX) * 2.0 + 1.0);
@@ -60,7 +60,7 @@ constexpr double kPacketRangeSquared = 4096.0;
     return count == 0 ? 0.0F : static_cast<float>(hits) / static_cast<float>(count);
 }
 
-/// parity: `ServerExplosion.hurtEntities`' push for something at `feet` with its eyes at `eyes`, or
+/// parity: `ServerExplosion.hurtEntities`' push for something at `feet` with its eyes at `eyes`.
 /// nothing when it is out of reach.
 [[nodiscard]] std::optional<std::array<double, 3>> pushFor(world::WorldState& world, double cx, double cy, double cz,
                                                            float radius, const std::array<double, 3>& feet, double eyes,
@@ -145,7 +145,7 @@ void CombatSystem::gust(world::LoadedWorld& world, const std::vector<PlayerSessi
     const float radius = blast.radius;
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    // parity: `hurtEntities` runs before the blocks: the push, which is all this blast does to what
+    // parity: `hurtEntities` runs before the blocks.
     // it reaches.
     for (ServerEntity* mob : living) {
         if (mob->entityId() == blast.sourceId || mob->removed || mob->dying ||
@@ -177,7 +177,7 @@ void CombatSystem::gust(world::LoadedWorld& world, const std::vector<PlayerSessi
     }
     for (const world::BlockChange& change : knocked) {
         broadcaster_.announceRedstone(world, watchers, change);
-        // parity: `updateNeighbours` tells the wall a button or a lever is stuck to, which is what
+        // parity: `updateNeighbours` tells the wall a button or a lever is stuck to.
         // carries the signal into whatever is behind it.
         if (const std::optional<std::array<std::int32_t, 3>> wall =
                 world::blockInteractions::attachmentOf(change.stateId, change.x, change.y, change.z);
@@ -191,13 +191,13 @@ void CombatSystem::gust(world::LoadedWorld& world, const std::vector<PlayerSessi
                                        world.state().blockState((*wall)[0], (*wall)[1], (*wall)[2]).value_or(0)});
         }
     }
-    // parity: `ServerLevel.explode`'s packet: the gust, its burst sound, and each player's own push,
+    // parity: `ServerLevel.explode`'s packet.
     // which the client applies to itself.
     for (PlayerSession* player : watchers) {
         const double dx = player->x - x;
         const double dy = player->y - y;
         const double dz = player->z - z;
-        // parity: `ServerExplosion.hurtEntities`' `onExplosionHit`, which only a player's own wind
+        // parity: `ServerExplosion.hurtEntities`' `onExplosionHit`.
         // charge makes an impulse that spares the fall.
         if (player->gamemode != play::Gamemode::Spectator && player->entityId() != blast.sourceId &&
             std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) / (static_cast<double>(radius) * 2.0) <= 1.0) {

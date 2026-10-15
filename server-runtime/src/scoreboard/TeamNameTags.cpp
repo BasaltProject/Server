@@ -28,7 +28,7 @@ wire::text::Component nameTagFor(const Teams& teams, const std::string_view memb
     if (team == nullptr) {
         return Component::text(std::string{member});
     }
-    // parity: `Team.Visibility`, which is about who is looking rather than about the name itself.
+    // parity: `Team.Visibility`.
     const bool together = team->hasMember(viewer);
     const bool hidden = team->nameTagVisibility == NameTagVisibility::Never ||
                         (team->nameTagVisibility == NameTagVisibility::HideForOtherTeams && !together) ||

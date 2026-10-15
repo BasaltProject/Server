@@ -11,7 +11,6 @@
 
 namespace basalt::server::runtime::world {
 
-/// The Nether's biome lookup, the same shape as `RealSurfaceEnvironment` over its own biome source.
 class NetherSurfaceEnvironment final : public server::world::terrain::surface::SurfaceRuleEnvironment {
 public:
     /// The biome source is borrowed: it is shared by every generation worker and outlives this.

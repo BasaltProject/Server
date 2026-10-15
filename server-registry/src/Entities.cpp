@@ -10,22 +10,18 @@
 
 namespace basalt::server::registry {
 namespace {
-
 using wire::common::Identifier;
 
 [[nodiscard]] Identifier vanilla(std::string_view path) { return Identifier::vanilla(std::string{path}); }
 
-/// The names travel with and without the namespace, because a plugin will write both.
 [[nodiscard]] std::string_view unqualified(std::string_view name) {
     const std::size_t colon = name.find(':');
     return colon == std::string_view::npos ? name : name.substr(colon + 1);
 }
-
 } // namespace
 
 namespace entityAttributes {
 namespace {
-
 [[nodiscard]] const std::unordered_map<Identifier, std::map<std::string, double>>& table() {
     static const std::unordered_map<Identifier, std::map<std::string, double>> built = [] {
         std::unordered_map<Identifier, std::map<std::string, double>> table;
@@ -36,7 +32,6 @@ namespace {
     }();
     return built;
 }
-
 } // namespace
 
 std::optional<double> baseValue(const Identifier& type, std::string_view attribute) {
@@ -55,13 +50,11 @@ const std::map<std::string, double>& of(const Identifier& type) {
 }
 
 bool isLiving(const Identifier& type) { return table().contains(type); }
-
 } // namespace entityAttributes
 
 namespace attributeIds {
 namespace {
-
-/// parity: the `minecraft:attribute` registry's own order in the jar's report.
+// parity: the `minecraft:attribute` registry's own order in the jar's report.
 constexpr std::array<std::string_view, 40> kNames = {
     "air_drag_modifier",
     "armor",
@@ -104,7 +97,6 @@ constexpr std::array<std::string_view, 40> kNames = {
     "waypoint_transmit_range",
     "waypoint_receive_range",
 };
-
 } // namespace
 
 std::optional<std::int32_t> protocolId(std::string_view name) {
@@ -119,13 +111,10 @@ std::vector<std::string_view> all() {
     std::ranges::sort(names);
     return names;
 }
-
 } // namespace attributeIds
 
 namespace brewing {
 namespace {
-
-/// Whether one of the comma-separated ingredients of a mix is this item.
 [[nodiscard]] bool mentions(std::string_view ingredients, std::string_view item) {
     while (!ingredients.empty()) {
         const std::size_t comma = ingredients.find(',');
@@ -139,7 +128,6 @@ namespace {
     }
     return false;
 }
-
 } // namespace
 
 const Identifier& fuel() {
@@ -155,7 +143,6 @@ bool isIngredient(const Identifier& item) {
 std::optional<Brew> mix(const Identifier& bottle, const std::optional<std::string>& potion,
                         const Identifier& ingredient) {
     for (const BrewingMix& one : brewingMixesTable()) {
-        // The bottle itself changing: a potion into a splash potion.
         if (one.kind != "containerMixes" || one.from != bottle.path() ||
             !mentions(one.ingredients, ingredient.path())) {
             continue;
@@ -166,7 +153,6 @@ std::optional<Brew> mix(const Identifier& bottle, const std::optional<std::strin
         return std::nullopt;
     }
     for (const BrewingMix& one : brewingMixesTable()) {
-        // What is inside it changing, the bottle staying as it is.
         if (one.kind != "potionMixes" || one.from != *potion || !mentions(one.ingredients, ingredient.path())) {
             continue;
         }
@@ -174,13 +160,10 @@ std::optional<Brew> mix(const Identifier& bottle, const std::optional<std::strin
     }
     return std::nullopt;
 }
-
 } // namespace brewing
 
 namespace entityTypeShapes {
 namespace {
-
-/// What an unknown type is assumed to fill, which is the size of a slime ball of nothing.
 constexpr float kDefaultSize = 1.0F;
 
 [[nodiscard]] const std::unordered_map<Identifier, Shape>& table() {
@@ -196,14 +179,13 @@ constexpr float kDefaultSize = 1.0F;
     return built;
 }
 
-/// parity: the cube mobs carry a builder-only safety scale on the box a spawn is checked against.
+// parity: the cube mobs carry a builder-only safety scale on the box a spawn is checked against.
 [[nodiscard]] double spawnDimensionsScale(const Identifier& type) {
     if (type.path() == "magma_cube" || type.path() == "slime") {
         return 4.0;
     }
     return type.path() == "sulfur_cube" ? 2.0 : 1.0;
 }
-
 } // namespace
 
 const Shape* of(const Identifier& type) {
@@ -253,7 +235,5 @@ bool canSpawnFarFromPlayer(const Identifier& type) {
     const Shape* shape = of(type);
     return shape == nullptr || shape->farFromPlayer;
 }
-
 } // namespace entityTypeShapes
-
 } // namespace basalt::server::registry

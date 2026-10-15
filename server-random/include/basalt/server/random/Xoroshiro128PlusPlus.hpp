@@ -6,8 +6,7 @@
 #include <cstdint>
 
 namespace basalt::server::random {
-
-/// parity: net.minecraft.world.level.levelgen.Xoroshiro128PlusPlus.
+// parity: net.minecraft.world.level.levelgen.Xoroshiro128PlusPlus.
 class Xoroshiro128PlusPlus {
 public:
     constexpr Xoroshiro128PlusPlus() = default;
@@ -24,7 +23,6 @@ public:
 
     constexpr explicit Xoroshiro128PlusPlus(Seed128bit seed) noexcept : Xoroshiro128PlusPlus(seed.lo, seed.hi) {}
 
-    /// The live state, which is what a saved sequence has to carry.
     [[nodiscard]] constexpr Seed128bit state() const noexcept {
         return Seed128bit{static_cast<std::int64_t>(lo_), static_cast<std::int64_t>(hi_)};
     }
@@ -43,5 +41,4 @@ private:
     std::uint64_t lo_ = static_cast<std::uint64_t>(kGoldenRatio64);
     std::uint64_t hi_ = static_cast<std::uint64_t>(kSilverRatio64);
 };
-
 } // namespace basalt::server::random

@@ -15,17 +15,10 @@ namespace basalt::server::runtime::sched {
 
 class Region;
 
-/// A fixed set of threads that tick regions at the same time, with a barrier at the end.
-///
-/// Every region has to finish before the next tick starts: a region that ran ahead would see a
-/// world a tick older than its neighbour's, and what crosses a border between them would be read
-/// twice or not at all. parity of intent with `TickRegionScheduler`, minus its earliest-deadline
-/// ordering, which is worth having only once there are more regions than threads to measure it
-/// with.
+/// A fixed set of threads ticking regions at once, with a barrier: a region running ahead would see an older neighbour.
 class RegionWorkers {
 public:
-    /// A turn that takes this long has already gone wrong. The barrier is a safety net, not a
-    /// deadline: waiting a little longer is better than carrying on with half a tick.
+    /// A turn this long has already gone wrong; the barrier is a safety net, not a deadline.
     static constexpr std::chrono::seconds kTurnLimit{30};
 
     explicit RegionWorkers(std::int32_t threads);
@@ -45,9 +38,7 @@ private:
     void workerLoop();
 
     mutable std::mutex mutex_;
-    /// Woken when a turn starts or the pool stops, which is what replaces polling for work.
     std::condition_variable wake_;
-    /// Woken as each region finishes, which is what the barrier waits on.
     std::condition_variable done_;
 
     bool running_ = true;

@@ -85,7 +85,7 @@ void ContainerMenuController::rollEnchantmentOffers() {
         sendEnchantmentNumbers();
         return;
     }
-    // parity: `EnchantingTableBlock.isValidBookShelf`: a shelf two out with nothing between it
+    // parity: `EnchantingTableBlock.isValidBookShelf`.
     // and the table.
     const world::realBlockTags::TagMembers* tags = owner_->options().blockTags;
     const std::int32_t shelves = world::enchanting::bookshelvesAround(
@@ -128,7 +128,7 @@ void ContainerMenuController::takeEnchantmentOffer(PlayerSession& session, const
     const bool free = session.gamemode == wire::protocol::play::Gamemode::Creative;
     std::optional<storage::StoredItemStack>& input = enchantmentSlots_[Menu::kEnchantmentInput];
     std::optional<storage::StoredItemStack>& lapis = enchantmentSlots_[Menu::kEnchantmentLapis];
-    // parity: `clickMenuButton`: the lapis, the levels and a row that is offering anything at all.
+    // parity: `clickMenuButton`.
     if (!free && (!lapis.has_value() || lapis->count < price)) {
         return;
     }
@@ -142,7 +142,7 @@ void ContainerMenuController::takeEnchantmentOffer(PlayerSession& session, const
     const world::EnchantmentBooks books{.enchantments = owner_->options().enchantments,
                                         .itemTags = owner_->options().itemTags,
                                         .enchantmentTags = owner_->options().enchantmentTags};
-    // parity: the row is worked out again from the same seed, which is what makes what was shown
+    // parity: the row is worked out again from the same seed, which is what makes what was shown.
     // and what goes on the item the same thing.
     const std::array<world::enchanting::Row, 3> rows =
         world::enchanting::roll(books, *input, session.enchantmentSeed, shelvesAround_);

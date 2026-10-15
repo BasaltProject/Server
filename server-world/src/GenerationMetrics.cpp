@@ -34,7 +34,6 @@ Counters& counters() {
     return out;
 }
 
-/// Three decimals without a locale or a stream, which is what the frozen Kotlin printed.
 [[nodiscard]] std::string format(double value) {
     const auto scaled = static_cast<std::int64_t>(value * 1000.0);
     std::string fraction = std::to_string(scaled % 1000);

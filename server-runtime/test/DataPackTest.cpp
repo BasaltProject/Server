@@ -42,7 +42,6 @@ void write(const std::string& path, std::string_view text) {
     fileIO::writeText(path, text);
 }
 
-/// A jar stand-in: a map of entry names to their text.
 [[nodiscard]] PackFiles memoryFiles(std::map<std::string, std::string> entries) {
     auto shared = std::make_shared<const std::map<std::string, std::string>>(std::move(entries));
     return PackFiles{
@@ -80,16 +79,13 @@ void write(const std::string& path, std::string_view text) {
 TEST_CASE("pack.mcmeta formats are checked the way 26.3 checks them") {
     CHECK(parsePackMetadata(kCurrentMeta)->supported.min == PackFormat{121, 0});
     CHECK(compatibilityOf(parsePackMetadata(kCurrentMeta)->supported) == Compatibility::Compatible);
-    // A pre-minor pack_format alone is its own single version, too old for 121.
     CHECK(compatibilityOf(parsePackMetadata(R"({"pack":{"description":"","pack_format":48}})")->supported) ==
           Compatibility::TooOld);
-    // A missing min/max pair falls back to the description: listed, of unknown compatibility.
     CHECK(compatibilityOf(parsePackMetadata(R"({"pack":{"description":"","min_format":121}})")->supported) ==
           Compatibility::Unknown);
     CHECK(compatibilityOf(
               parsePackMetadata(R"({"pack":{"description":"","min_format":[122,1],"max_format":200}})")->supported) ==
           Compatibility::TooNew);
-    // Spanning the pre-minor versions needs supported_formats and pack_format to agree with them.
     CHECK(compatibilityOf(parsePackMetadata(R"({"pack":{"description":"","min_format":71,"max_format":121,
         "supported_formats":[71,81],"pack_format":71}})")
                               ->supported) == Compatibility::Compatible);
@@ -157,13 +153,11 @@ TEST_CASE("the repository finds the jar's packs and the world's, and a new world
     DataPacks packs{DataPacks::Options{.jar = fakeJar(), .worldRoot = root, .initial = {}, .safeMode = false}};
     CHECK(packs.repository().availableIds() ==
           std::vector<std::string>{"file/flagged", "file/mine", "trade_rebalance", "vanilla"});
-    // A new world may use any feature, so the flagged pack loads; the feature pack never adds itself.
     CHECK(packs.repository().selectedIds() == std::vector<std::string>{"vanilla", "file/flagged", "file/mine"});
     CHECK(packs.configuration().dataPacks.disabled == std::vector<std::string>{"trade_rebalance"});
     CHECK(packs.resources()->readText("data/minecraft/loot_table/b.json") == "mine-b");
     CHECK(packs.resources()->readText("data/minecraft/loot_table/a.json") == "vanilla-a");
 
-    // The selection is saved, and an existing world only keeps packs its features allow.
     WorldDataConfiguration saved = *WorldDataConfiguration::read(root);
     saved.enabledFeatures = {Identifier::vanilla("vanilla"), Identifier::vanilla("trade_rebalance")};
     saved.dataPacks.enabled = {"vanilla", "file/flagged", "trade_rebalance"};
@@ -207,7 +201,6 @@ TEST_CASE("an element missing what its codec requires is refused, and one that h
               .starts_with("spawn_conditions: condition: Unknown spawn condition type"));
     CHECK(datapack::schemaError("painting_variant", object(R"({"width":"1","height":1,"asset_id":"a:b"})")) ==
           "width: Not a number");
-    // A registry without a schema here is not judged.
     CHECK_FALSE(datapack::schemaError("timeline", object("{}")).has_value());
 }
 

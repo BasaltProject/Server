@@ -143,15 +143,14 @@ Parsed<LootCondition> Reader::typedCondition(const JsonObject& object) {
         return predicate == nullptr ? LootCondition::matchTool()
                                     : LootCondition::matchTool(parseItemPredicate(*predicate));
     }
-    // parity: `MatchBlock`, the `BlockPredicate` fields written inline: which blocks, and the state.
+    // parity: `MatchBlock`.
     if (*type == "minecraft:match_block") {
         return LootCondition::matchBlock(idsOrTag(object.find("blocks")),
                                          parseStateMatcher(asObject(object.find("state"))),
                                          object.find("nbt") != nullptr || object.find("components") != nullptr ||
                                              object.find("predicates") != nullptr);
     }
-    // parity: `LootItemEntityPropertyCondition`: no predicate passes, an empty one asks only that the
-    // entity be there, and the fishing hook is the one type-specific predicate modelled on its own.
+    // parity: `LootItemEntityPropertyCondition`.
     if (*type == "minecraft:entity_properties") {
         const std::optional<LootCondition::Target> target = targetOf(object);
         const JsonObject* predicate = asObject(object.find("predicate"));
@@ -210,7 +209,7 @@ Parsed<LootCondition> Reader::typedCondition(const JsonObject& object) {
         return *type == "minecraft:any_of" ? LootCondition::anyOf(std::move(*terms))
                                            : LootCondition::allOf(std::move(*terms));
     }
-    // parity: `LocationCheck`, a `LocationPredicate` at the origin moved by the three offsets.
+    // parity: `LocationCheck`.
     if (*type == "minecraft:location_check") {
         const auto offset = [&object](std::string_view key) {
             return static_cast<double>(static_cast<std::int32_t>(asNumber(object.find(key)).value_or(0.0)));
@@ -243,7 +242,7 @@ Parsed<LootCondition> Reader::typedCondition(const JsonObject& object) {
 }
 
 Parsed<LootCondition> Reader::typedWorldCondition(const std::string& type, const JsonObject& object) {
-    // parity: `IntValueCheck` and `FloatValueCheck`, which split 26.2's `value_check` by kind.
+    // parity: `IntValueCheck` and `FloatValueCheck`.
     if (type == "minecraft:int_value_check" || type == "minecraft:float_value_check") {
         const JsonValue* value = object.find("value");
         const JsonValue* test = object.find("test");

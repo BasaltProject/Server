@@ -26,7 +26,6 @@ using wire::text::Component;
                               .cursor = start};
 }
 
-/// The separator between two coordinates, which is always exactly one space.
 [[nodiscard]] std::optional<CommandSyntaxError> expectSeparator(StringReader& reader, std::int32_t start,
                                                                 bool threeDimensional) {
     if (!reader.canRead() || reader.peek() != ' ') {
@@ -117,7 +116,6 @@ using wire::text::Component;
             static_cast<std::int32_t>(std::floor(at[2]))};
 }
 
-/// The four coordinate types differ in how many numbers they read and whether they centre-correct.
 class CoordinatesArgument final : public ArgumentType {
 public:
     enum class Shape : std::uint8_t { Vec3, Vec2, BlockPos, ColumnPos };

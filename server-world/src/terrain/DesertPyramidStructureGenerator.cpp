@@ -151,7 +151,7 @@ std::optional<DesertPyramidPiece> DesertPyramidStructureGenerator::startPiece(st
         return std::nullopt;
     }
 
-    // parity: `Structure.GenerationContext`'s own random, which is what the orientation comes off.
+    // parity: `Structure.GenerationContext`'s own random.
     random::RandomSource startRandom = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(startRandom, seed, chunkX, chunkZ);
 
@@ -161,8 +161,7 @@ std::optional<DesertPyramidPiece> DesertPyramidStructureGenerator::startPiece(st
     if (!forPlacement && biomePath(biomeAt_(centreX, stubY, centreZ)) != kBiome) {
         return std::nullopt;
     }
-    // parity: `SinglePieceStructure.findGenerationPoint` refuses a start whose lowest corner, over
-    // the piece's 21 by 21 footprint measured one past its far edges, is below sea level.
+    // parity: `SinglePieceStructure.findGenerationPoint` rejects a start below sea level at its lowest corner.
     const std::int32_t minX = chunkX * 16;
     const std::int32_t minZ = chunkZ * 16;
     const auto occupied = [this](std::int32_t x, std::int32_t z) { return surfaceHeightAt_(x, z) - 1; };

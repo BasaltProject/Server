@@ -19,8 +19,7 @@ using BlockSet = std::set<std::string, std::less<>>;
 struct Target {
     const BlockSet* replaceable;
     std::int32_t stateId;
-    /// parity: 26.3's `height_match` on `#height_specific_ore_replaceables`: the inclusive y range in
-    /// which this target takes those blocks instead of its tag.
+    /// parity: 26.3's `height_match` on `#height_specific_ore_replaceables`.
     std::optional<std::pair<std::int32_t, std::int32_t>> heightSpecific;
 };
 

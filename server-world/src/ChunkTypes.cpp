@@ -10,7 +10,6 @@ namespace {
 
 using wire::common::Identifier;
 
-/// The block entity type a block owns, or the name itself when it already is one.
 [[nodiscard]] Identifier typeOf(const Identifier& given) {
     const Identifier* owned = registry::blockEntityTypes::ofBlock(given);
     return owned == nullptr ? given : *owned;

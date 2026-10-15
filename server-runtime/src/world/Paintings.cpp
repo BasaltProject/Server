@@ -14,8 +14,7 @@ namespace reg = ::basalt::server::registry;
 
 using Painting = registry::vanillaRegistryData::Painting;
 
-/// parity: `Direction.getCounterClockWise`, the horizontal turn a hanging entity measures its width
-/// along. Only the four sides hang anything, and the two vertical ones answer themselves.
+/// parity: `Direction.getCounterClockWise`.
 [[nodiscard]] reg::BlockFace leftOf(const reg::BlockFace facing) {
     switch (facing) {
     case reg::BlockFace::North:
@@ -31,8 +30,7 @@ using Painting = registry::vanillaRegistryData::Painting;
     }
 }
 
-/// parity: `HangingEntity.survives`, block by block: every square behind the art holds it up, every
-/// square it covers is clear, and nothing else hangs in any of them.
+/// parity: `HangingEntity.survives`.
 [[nodiscard]] bool fits(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                         const reg::BlockFace facing, const Painting& painting) {
     const reg::BlockFace left = leftOf(facing);
@@ -92,7 +90,6 @@ std::optional<Painting> fitting(const WorldState& world, const std::int32_t x, c
 }
 
 bool survives(const WorldState& world, const entity::ServerEntity& painting) {
-    // A painting whose facing this build did not write is left to hang.
     if (!painting.sourceNbt.has_value() || !painting.sourceNbt->contains("Facing")) {
         return true;
     }
@@ -118,7 +115,7 @@ bool survives(const WorldState& world, const entity::ServerEntity& painting) {
 
 std::array<double, 3> hangingAt(const std::int32_t x, const std::int32_t y, const std::int32_t z,
                                 const reg::BlockFace facing, const std::int32_t width, const std::int32_t height) {
-    // parity: `shiftToBlockWall`, the art sitting just off the wall rather than in the square's middle.
+    // parity: `shiftToBlockWall`.
     constexpr double kAgainstWall = 0.46875;
     const reg::BlockFace left = leftOf(facing);
     const double across = width % 2 == 0 ? 0.5 : 0.0;

@@ -24,7 +24,6 @@ using wire::nbt::NbtTag;
     return value;
 }
 
-/// The sound names of one animal, which every variant of it derives from a prefix.
 [[nodiscard]] NbtCompound soundsOf(std::string_view prefix, const std::vector<std::string_view>& kinds,
                                    std::string_view stepPrefix) {
     NbtCompound value;
@@ -80,13 +79,11 @@ using wire::nbt::NbtTag;
     return value;
 }
 
-/// The synchronised registries as installed from the selected packs, or nothing before that.
 struct Installed {
     std::map<std::string, std::vector<std::string>, std::less<>> paths;
     std::map<std::string, std::vector<Entry>, std::less<>> entries;
     std::optional<std::vector<Painting>> paintings;
     std::optional<std::vector<std::pair<std::string, std::int32_t>>> trims;
-    /// Owns the ids the installed paintings view.
     std::deque<std::string> names;
 };
 
@@ -179,7 +176,6 @@ const std::vector<std::string>& wolfVariants() {
 }
 
 NbtCompound wolfVariant(std::string_view id) {
-    // The default variant's files are just `wolf`, not `wolf_pale`.
     const std::string fileName = id == "pale" ? "wolf" : "wolf_" + std::string{id};
     NbtCompound value;
     value.set("assets", NbtTag::ofCompound(wolfAssets("minecraft:entity/wolf/" + fileName,
@@ -199,7 +195,6 @@ const std::vector<std::string>& wolfSoundVariants() {
 NbtCompound wolfSoundVariant(std::string_view id) {
     static const std::vector<std::string_view> kKinds{"ambient", "death", "growl", "hurt", "pant", "whine"};
     const std::string adultPrefix = id == "classic" ? "wolf" : "wolf_" + std::string{id};
-    // Every variant steps like a plain wolf, however it sounds otherwise.
     return adultAndBaby(soundsOf(adultPrefix, kKinds, "wolf"), soundsOf("baby_wolf", kKinds, "baby_wolf"));
 }
 
@@ -261,8 +256,7 @@ const std::vector<std::string>& catSoundVariants() {
 NbtCompound catSoundVariant(std::string_view id) {
     static const std::vector<std::string_view> kKinds{"ambient", "beg_for_food", "death",   "eat",          "hiss",
                                                       "hurt",    "purr",         "purreow", "stray_ambient"};
-    // The cat is the one animal whose sounds are not keyed on a `step`, so what would be the step
-    // prefix is written as another named sound instead.
+    // The cat is the one animal whose sounds are not keyed on a `step`, so that prefix is another named sound.
     NbtCompound adult;
     const std::string adultPrefix = id == "royal" ? "cat_royal" : "cat";
     for (const std::string_view kind : kKinds) {
@@ -296,7 +290,6 @@ const std::vector<std::string>& cowSoundVariants() {
 }
 
 NbtCompound cowSoundVariant(std::string_view id) {
-    // The cow is flat rather than split into adult and baby.
     const std::string prefix = id == "classic" ? "cow" : "cow_" + std::string{id};
     NbtCompound value;
     value.putString("ambient_sound", "minecraft:entity." + prefix + ".ambient");
@@ -348,8 +341,6 @@ NbtCompound zombieNautilusVariant(std::string_view id) {
 }
 
 const std::vector<Painting>& paintingVariants() {
-    // The jar's `painting_variant` folder, whose entries are all the same shape: the file name is
-    // also the art and the stem of both translation keys.
     static const std::vector<Painting> built{
         {"alban", 1, 1},        {"aztec", 1, 1},       {"aztec2", 1, 1},       {"backyard", 3, 4},
         {"baroque", 2, 2},      {"bomb", 1, 1},        {"bouquet", 3, 3},      {"burning_skull", 4, 4},

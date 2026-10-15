@@ -22,8 +22,6 @@ constexpr std::array<BossBarOverlay, 5> kOverlays{BossBarOverlay::Progress, Boss
                                                   BossBarOverlay::Notched10, BossBarOverlay::Notched12,
                                                   BossBarOverlay::Notched20};
 
-/// A header for the profile a disabled file stands in with: it exists so that asking a switched-off
-/// file for its default is an answer rather than a crash.
 [[nodiscard]] ProfileHeader emptyDefault() {
     return ProfileHeader{.name = "default", .priority = 0, .isDefault = true, .isActive = false, .conditions = {}};
 }
@@ -55,8 +53,6 @@ std::string_view bossBarColorName(BossBarColor color) noexcept {
 }
 
 TabListProfile TabListProfile::inheriting(const TabListProfile& fallback) const {
-    // Inheriting from itself is what the default profile does, and copying its own absent fields
-    // over its own absent fields would answer the same; this only saves the copy.
     if (&fallback == this) {
         return *this;
     }
@@ -198,8 +194,7 @@ std::expected<BossBarConfig, std::string> BossBarConfig::load(const ConfigDirect
             const std::string lowercase = lowercaseAscii(*written);
             const auto found = std::ranges::find_if(
                 kColors, [&lowercase](BossBarColor candidate) { return bossBarColorName(candidate) == lowercase; });
-            // An unknown colour is reported and falls back rather than stopping the server: it is
-            // one wrong word in decoration, not a file that cannot be understood.
+            // An unknown colour is reported and falls back: one wrong decoration word is not an unreadable file.
             if (found == kColors.end()) {
                 const std::string name = header.name;
                 const std::string value{*written};

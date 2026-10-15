@@ -59,7 +59,6 @@ struct Bottom {
     std::int32_t z;
 };
 
-/// Falls to the floor of the empty column, then walks left until the frame stops holding it.
 [[nodiscard]] std::optional<Bottom> calculateBottomLeft(const BlockStateView& view, PortalAxis axis, std::int32_t x,
                                                         std::int32_t y, std::int32_t z, std::int32_t worldMinY) {
     const std::int32_t minY = std::max(worldMinY, y - PortalShape::kMaxHeight);

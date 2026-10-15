@@ -16,10 +16,7 @@ const PathSet& allBiomes() {
     return paths;
 }
 
-/// parity: the four main nether biomes list `spring_lava`, and that one is the **overworld's**
-/// configured feature, so it validates against the overworld rock list. `spring_lava_nether` is a
-/// different configured feature, netherrack and friends, and only `basalt_deltas` reaches it through
-/// `spring_delta`.
+/// parity: the four main nether biomes list the overworld's `spring_lava`.
 const PathSet& springRocks() {
     static const PathSet paths = {"stone", "granite", "diorite", "andesite", "deepslate", "tuff", "calcite", "dirt"};
     return paths;
@@ -75,8 +72,7 @@ void placeLavaSpring(Chunk& chunk, const std::int32_t x, const std::int32_t y, c
     }
     if (rocks == 4 && holes == 1) {
         setBlock(chunk, x, y, z, registry::blocks::named("lava")->stateId);
-        // parity: `SpringFeature` schedules the fluid the moment it places it, which is what makes a
-        // spring run. Without it the Nether's lava never leaves the block it was put in.
+        // parity: `SpringFeature` schedules the fluid when it places it.
         chunk.scheduleFluidTick(ChunkScheduledTick{.type = wire::common::Identifier::vanilla("lava"),
                                                    .localX = x & 15,
                                                    .y = y,

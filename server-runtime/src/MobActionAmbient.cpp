@@ -30,7 +30,7 @@ using entity::ServerEntity;
 namespace mth = wire::common::mth;
 using namespace std::string_view_literals;
 
-/// parity: `Parrot.MOB_SOUND_MAP`'s sounds, in the order of the mobs' names: the jar keeps them in a
+/// parity: `Parrot.MOB_SOUND_MAP`'s sounds.
 /// hash map whose order depends on object identities, so no order is the jar's. The happy ghast's
 /// is the empty one.
 constexpr std::array kImitations{"blaze"sv,
@@ -84,7 +84,7 @@ constexpr std::array kImitations{"blaze"sv,
     return state.has_value() && world::fluids::of(*state) == world::Submersion::Water;
 }
 
-/// parity: `Panda.Gene.getVariantFromGenes`: a recessive main gene shows only when doubled.
+/// parity: `Panda.Gene.getVariantFromGenes`.
 [[nodiscard]] std::string_view pandaVariant(const ServerEntity& panda) {
     if (!panda.sourceNbt.has_value()) {
         return "normal";
@@ -109,7 +109,7 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
         return entity::mobSounds::variantSound(mob, "ambient");
     }
     if (path == "cat") {
-        // parity: `Cat.getAmbientSound`: a stray's call, or a purr in love, a purreow one time in four.
+        // parity: `Cat.getAmbientSound`.
         if (!mob.owner.has_value()) {
             return entity::mobSounds::variantSound(mob, "stray_ambient");
         }
@@ -119,7 +119,7 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
         return entity::mobSounds::variantSound(mob, random.nextInt(4) == 0 ? "purreow" : "ambient");
     }
     if (path == "wolf") {
-        // parity: `Wolf.getAmbientSound`: a growl when angry, else a pant or a whine one time in three.
+        // parity: `Wolf.getAmbientSound`.
         const bool angry = mob.neutral != nullptr && entity::neutralAnger::isAngry(*mob.neutral, now);
         if (angry) {
             return entity::mobSounds::variantSound(mob, "growl");
@@ -130,7 +130,7 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
         return entity::mobSounds::variantSound(mob, "ambient");
     }
     if (path == "fox") {
-        // parity: `Fox.getAmbientSound`: asleep, or a screech at night with no player within sixteen.
+        // parity: `Fox.getAmbientSound`.
         if (mob.sleeping) {
             return own("sleep");
         }
@@ -151,7 +151,7 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
         return own("ambient");
     }
     if (path == "parrot") {
-        // parity: `Parrot.getAmbient`: one call in a thousand borrowed from a monster, never in peace.
+        // parity: `Parrot.getAmbient`.
         if (world.difficulty() != "peaceful" && random.nextInt(1000) == 0) {
             const std::string_view imitated =
                 kImitations[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(kImitations.size())))];
@@ -168,7 +168,7 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
         return own(trading ? "trade" : "ambient");
     }
     if (path == "warden") {
-        // parity: `Warden.getAmbientSound`: nothing while roaring, digging or emerging, else by anger.
+        // parity: `Warden.getAmbientSound`.
         if (entity::wardenBrain::poseOf(mob) == wire::protocol::play::Pose::Roaring ||
             entity::wardenBrain::isDiggingOrEmerging(mob)) {
             return std::nullopt;
@@ -182,7 +182,7 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
         return own(anger >= 80 ? "angry" : anger >= 40 ? "agitated" : "ambient");
     }
     if (path == "piglin" || path == "piglin_brute") {
-        // parity: `AbstractPiglin.playAmbientSound`, idle only, and the idle activity's own sound.
+        // parity: `AbstractPiglin.playAmbientSound`.
         if (mob.piglin != nullptr && mob.piglin->activity != entity::piglins::Activity::Idle) {
             return std::nullopt;
         }
@@ -295,7 +295,7 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
 }
 
 void MobActionSystem::tickAmbientSound(world::LoadedWorld& world, ServerEntity& mob, random::RandomSource& random) {
-    // parity: `Mob.baseTick`: the odds climb a thousandth a tick until it speaks, then start over.
+    // parity: `Mob.baseTick`.
     if (mob.dying || mob.health <= 0.0 || random.nextInt(1000) >= mob.ambientSoundTime++) {
         return;
     }

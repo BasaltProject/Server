@@ -21,13 +21,11 @@ bool placeColumn(PatchRegion& region, random::RandomSource& random, const Decora
 
 } // namespace cactusFeature
 
-/// Exact step-9 placement for the desert and decorated badlands cactus patches.
 namespace cactusPatchDecoration {
 
 void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
               ExternalStateReader externalBlockState = nullptr, BlockWriteObserver observer = nullptr);
 
-/// One named patch on its own, for `/place feature`.
 void decorateFeature(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
                      std::string_view name, ExternalStateReader externalBlockState = nullptr,
                      BlockWriteObserver observer = nullptr);

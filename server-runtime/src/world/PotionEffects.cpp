@@ -19,7 +19,7 @@ struct Entry {
     std::int32_t amplifier;
 };
 
-/// parity: `Potions`, what each registered potion holds. Turtle master is the one with two.
+/// parity: `Potions`.
 constexpr std::array<Entry, 45> kPotions{{
     {"night_vision", "night_vision", 3600, 0},
     {"long_night_vision", "night_vision", 9600, 0},
@@ -80,8 +80,7 @@ constexpr std::array<Entry, 45> kPotions{{
 } // namespace
 
 std::vector<Identifier> ids() {
-    // parity: the three that carry nothing come first, then every potion in `kPotions`, which is
-    // in registration order with turtle master's two effects side by side.
+    // parity: the three that carry nothing come first, then every potion in `kPotions`.
     std::vector<Identifier> all{Identifier::vanilla("water"), Identifier::vanilla("mundane"),
                                 Identifier::vanilla("thick"), Identifier::vanilla("awkward")};
     for (const Entry& entry : kPotions) {

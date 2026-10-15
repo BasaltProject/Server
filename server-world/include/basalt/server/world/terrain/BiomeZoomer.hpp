@@ -11,7 +11,6 @@ class BiomeZoomer {
 public:
     explicit constexpr BiomeZoomer(std::int64_t seed) noexcept : seed_(seed) {}
 
-    /// `noiseBiomeAt` is called exactly once, with the winning quart coordinate.
     template <typename Lookup>
     [[nodiscard]] decltype(auto) biomeAt(std::int32_t blockX, std::int32_t blockY, std::int32_t blockZ,
                                          Lookup&& noiseBiomeAt) const {

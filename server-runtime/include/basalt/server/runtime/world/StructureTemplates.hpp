@@ -16,22 +16,14 @@
 
 namespace basalt::server::runtime::world {
 
-/// Structure files out of the operator's own `server.jar`, by id.
-///
-/// The same files world generation already reads for villages and bastions; this is what lets
-/// `/place template` put one down on demand. Read lazily and kept, because there are hundreds of
-/// them and a server that never runs the command should not pay for any.
 class StructureTemplates {
 public:
-    /// One jar entry as bytes, or nothing when the jar has no such entry.
     using ReadEntry = std::function<std::optional<std::vector<std::uint8_t>>(std::string_view name)>;
 
-    /// Every id under a data directory with a given extension, which is a walk of the jar.
     using DataIds =
         std::function<std::vector<wire::common::Identifier>(std::string_view directory, std::string_view extension)>;
 
-    /// The jar arrives as callbacks rather than as `ServerJarAssets`: this needs the operator's own
-    /// copy of the game, and a test has no jar to hand it.
+    /// Callbacks rather than `ServerJarAssets`: only this needs the operator's copy of the game, and a test has none.
     struct Jar {
         ReadEntry readEntry;
         DataIds dataIds;
@@ -40,28 +32,21 @@ public:
     explicit StructureTemplates(Jar jar, wire::common::Logger logger = wire::common::Logger{"Structures"})
         : jar_(std::move(jar)), logger_(std::move(logger)) {}
 
-    /// Reads from `jar` from now on and forgets every template read or stored. parity:
-    /// `StructureTemplateManager.onResourceManagerReload`. What was handed out before stays valid
-    /// until the reload after.
+    /// parity: `StructureTemplateManager.onResourceManagerReload`.
     void reload(Jar jar);
 
-    /// The named structure, or nothing when the jar ships no such file.
-    ///
-    /// The answer is kept either way, so a name that is not there is only looked for once.
+    /// The answer is kept either way, so a missing name is only looked for once.
     [[nodiscard]] const server::world::structure::StructureTemplate* find(const wire::common::Identifier& id);
 
     /// Every structure file the jar ships. parity: `PlaceCommand.SUGGEST_TEMPLATES`.
     [[nodiscard]] const std::vector<wire::common::Identifier>& templateIds();
 
-    /// Every template pool the jar ships, which is what `/place jigsaw` grows one of.
     [[nodiscard]] const std::vector<wire::common::Identifier>& poolIds();
 
-    /// Where the structures a structure block saves go, `<root>/<namespace>/structure/<path>.nbt`.
-    /// parity: `LevelResource.GENERATED_DIR`, read before the jar. Unset, nothing is read or written.
+    /// parity: `LevelResource.GENERATED_DIR`.
     void setGeneratedRoot(std::filesystem::path root);
 
-    /// parity: `StructureTemplateManager.getOrCreate` filled by a structure block, and `save` when
-    /// `toDisk`. Answers whether it was kept, and written when asked.
+    /// parity: `StructureTemplateManager.getOrCreate`.
     bool store(const wire::common::Identifier& id, const wire::nbt::NbtCompound& structure, bool toDisk);
 
     /// parity: `StructureTemplateManager.remove`, which a corner block's signal asks for.

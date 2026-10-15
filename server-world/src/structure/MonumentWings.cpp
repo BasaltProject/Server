@@ -6,7 +6,6 @@
 namespace basalt::server::world::structure {
 namespace {
 
-/// Design 0: the long hall, its roof stepping down to the entrance and lanterns down both walls.
 void wingHall(const MonumentBrush& brush) {
     const std::int32_t light = monumentPalette::baseLight();
     const std::int32_t black = monumentPalette::baseBlack();
@@ -51,7 +50,6 @@ void wingHall(const MonumentBrush& brush) {
     brush.spawnElder(11, 2, 16);
 }
 
-/// Design 1: the open gallery, four lantern pillars under a flat ceiling.
 void wingGallery(const MonumentBrush& brush) {
     const std::int32_t light = monumentPalette::baseLight();
     const std::int32_t black = monumentPalette::baseBlack();

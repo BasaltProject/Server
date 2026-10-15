@@ -13,7 +13,7 @@
 namespace basalt::server::world::loot {
 namespace {
 
-/// parity: `DataComponents.ADDITIONAL_TRADE_COST`, which a villager takes off again as it prices.
+/// parity: `DataComponents.ADDITIONAL_TRADE_COST`.
 constexpr std::string_view kAdditionalTradeCost = "minecraft:additional_trade_cost";
 
 using wire::common::Identifier;
@@ -24,13 +24,13 @@ using wire::nbt::NbtTag;
 constexpr std::int32_t kMaxEnchantmentLevel = 255;
 constexpr std::int32_t kAdditionalEnchantmentBound = 50;
 constexpr float kCostRandomSpan = 0.15F;
-/// parity: `SuspiciousStewEffects.DEFAULT_DURATION`, left out of the component when it matches.
+/// parity: `SuspiciousStewEffects.DEFAULT_DURATION`.
 constexpr std::int32_t kDefaultStewDuration = 160;
 constexpr std::int32_t kTicksPerSecond = 20;
 
 [[nodiscard]] bool isBook(const Identifier& item) { return item == Identifier::vanilla("book"); }
 
-/// parity: `EnchantmentHelper.getComponentType`, stored on a book and applied on anything else.
+/// parity: `EnchantmentHelper.getComponentType`.
 [[nodiscard]] std::string_view enchantmentKey(const Identifier& item) {
     return item == Identifier::vanilla("enchanted_book") ? "minecraft:stored_enchantments" : "minecraft:enchantments";
 }
@@ -96,7 +96,7 @@ struct Pick {
     // parity: `Math.round(float)`, half up, then clamped to at least one.
     cost = std::max(
         1, static_cast<std::int32_t>(std::floor(static_cast<float>(cost) + (static_cast<float>(cost) * span) + 0.5F)));
-    // parity: `getAvailableEnchantmentResults`, the highest level whose cost band holds the cost.
+    // parity: `getAvailableEnchantmentResults`.
     std::vector<Pick> available;
     const bool book = isBook(item);
     for (const EnchantmentEntry* entry : enchanting.candidates(options)) {
@@ -148,7 +148,6 @@ constexpr std::array<std::string_view, 16> kDyeColours{"white", "orange", "magen
                                                        "pink",  "gray",   "light_gray", "cyan",       "purple", "blue",
                                                        "brown", "green",  "red",        "black"};
 
-/// The members of a registry holder set: ids written out, or one `#tag` in the tag's own order.
 [[nodiscard]] std::vector<Identifier> membersOf(const std::vector<std::string>& options, std::string_view registry,
                                                 const LootContext& context) {
     std::vector<Identifier> members;
@@ -383,8 +382,7 @@ ItemStack LootFunction::setComponent(ItemStack stack, random::RandomSource& rand
         stack.components.putInt("minecraft:ominous_bottle_amplifier",
                                 std::clamp(part.count.get(random, context), 0, kMaxOminousAmplifier));
         return stack;
-    // parity: `SetRandomDyesFunction`: that many dyes drawn from the sixteen, then mixed in as a
-    // crafting grid would, into a single item.
+    // parity: `SetRandomDyesFunction`.
     case Kind::SetRandomDyes: {
         const std::int32_t rolls = part.count.get(random, context);
         if (rolls <= 0) {

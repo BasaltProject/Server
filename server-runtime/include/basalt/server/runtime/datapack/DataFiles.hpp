@@ -18,29 +18,24 @@ namespace basalt::server::runtime::datapack {
 using EntriesUnder = std::function<std::vector<std::string>(std::string_view prefix)>;
 using ReadText = std::function<std::optional<std::string>(std::string_view name)>;
 
-/// Every `data/<namespace>/<directory>/<path><extension>` entry, as its id and entry name, over
-/// every namespace. parity: `FileToIdConverter.listMatchingResources`, in `registryFileOrder`.
+/// parity: `FileToIdConverter.listMatchingResources`, in `registryFileOrder`.
 [[nodiscard]] std::vector<std::pair<wire::common::Identifier, std::string>>
 dataFiles(const EntriesUnder& entriesUnder, std::string_view directory, std::string_view extension = ".json");
 
-/// parity: `ResourceManagerRegistryLoadTask` registers by file id (`Identifier.compareTo`): the
-/// path with its extension first, the namespace only on a tie.
+/// parity: `ResourceManagerRegistryLoadTask`.
 [[nodiscard]] bool registryFileOrder(const wire::common::Identifier& left, const wire::common::Identifier& right,
                                      std::string_view extension = ".json");
 
-/// Every tag file of one registry (`item`, `worldgen/biome`...), read and parsed, by tag id. A file
-/// that does not parse is logged and skipped. parity: `TagLoader.load`.
+/// parity: `TagLoader.load`.
 [[nodiscard]] std::map<wire::common::Identifier, registry::tags::TagFile> tagFiles(const EntriesUnder& entriesUnder,
                                                                                    const ReadText& readText,
                                                                                    std::string_view registry,
                                                                                    const wire::common::Logger& logger);
 
-/// The same, built: a tag with a missing required reference is logged and left out.
 [[nodiscard]] std::map<wire::common::Identifier, std::set<wire::common::Identifier>>
 resolveTags(const EntriesUnder& entriesUnder, const ReadText& readText, std::string_view registry,
             const registry::tags::ElementExists& exists, const wire::common::Logger& logger);
 
-/// The same, each tag in file order.
 [[nodiscard]] std::map<wire::common::Identifier, std::vector<wire::common::Identifier>>
 resolveTagsOrdered(const EntriesUnder& entriesUnder, const ReadText& readText, std::string_view registry,
                    const registry::tags::ElementExists& exists, const wire::common::Logger& logger);

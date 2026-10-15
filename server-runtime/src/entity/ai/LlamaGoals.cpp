@@ -24,9 +24,9 @@ namespace {
 namespace reg = server::registry;
 namespace mth = wire::common::mth;
 
-/// parity: `LlamaFollowCaravanGoal.CARAVAN_LIMIT`, how far up the line it looks for a lead.
+/// parity: `LlamaFollowCaravanGoal.CARAVAN_LIMIT`.
 constexpr std::int32_t kCaravanLimit = 8;
-/// parity: the speed `stop` puts back, the double literal and not the float it started from.
+/// parity: the speed `stop` puts back.
 constexpr double kCaravanRestSpeed = 2.1;
 /// parity: past twenty-six blocks a follower hurries, by a fifth at a time up to three.
 constexpr double kCaravanStretch = 676.0;
@@ -42,23 +42,23 @@ constexpr double kCaravanReachUp = 4.0;
 /// parity: `Vec3.normalize`'s floor, a float widened.
 constexpr double kNormalizeFloor = static_cast<double>(1.0E-5F);
 
-/// parity: `Player`'s eye standing and crouching, and `LivingEntity.hasLineOfSight`'s reach.
+/// parity: `Player`'s eye standing and crouching.
 constexpr double kPlayerEye = 1.62;
 constexpr double kPlayerCrouchingEye = 1.27;
 constexpr double kSightRange = 128.0;
-/// parity: `RangedAttackGoal`'s five ticks of sight before it stands still, and its look speed.
+/// parity: `RangedAttackGoal`'s five ticks of sight before it stands still.
 constexpr std::int32_t kSeeTime = 5;
 constexpr float kLookSpeed = 30.0F;
 
 constexpr double kDefaultFollowRange = 16.0;
-/// parity: `LlamaAttackWolfGoal`: one roll in sixteen, a quarter of the follow range, four up.
+/// parity: `LlamaAttackWolfGoal`.
 constexpr std::int32_t kWolfInterval = 16;
 constexpr double kWolfRangeShare = 0.25;
 constexpr double kSearchUp = 4.0;
 /// parity: `TargetingConditions.test`, which never shrinks the range under two blocks.
 constexpr double kMinTargetRange = 2.0;
 
-/// parity: `Wolf.registerGoals`, twenty-four blocks at one and a half, and a strength roll of five.
+/// parity: `Wolf.registerGoals`.
 constexpr double kWolfAvoidRange = 24.0;
 constexpr double kWolfAvoidSpeed = 1.5;
 constexpr std::int32_t kStrengthRoll = 5;
@@ -108,7 +108,6 @@ constexpr std::int32_t kStrengthRoll = 5;
         .value_or(kDefaultFollowRange);
 }
 
-/// Where something the mob is after stands, and where its eyes are.
 struct Seen {
     double x = 0.0;
     double y = 0.0;
@@ -117,7 +116,6 @@ struct Seen {
     double eyeY = 0.0;
 };
 
-/// The entity or player by that id while it is alive and may be fought.
 [[nodiscard]] std::optional<Seen> resolve(const MobContext& mob, std::int32_t id) {
     if (const PlayerView* player = mob.playerById(id); player != nullptr) {
         if (!player->targetable) {
@@ -152,8 +150,7 @@ struct Seen {
     return !blockRay::cast(mob.world, mob.mob.x, eyeY, mob.mob.z, target.x, target.eyeY, target.z).has_value();
 }
 
-/// parity: `TargetGoal.canContinueToUse`, without a sight check: the mob's target, else the one
-/// the goal remembers, alive and inside the follow distance.
+/// parity: `TargetGoal.canContinueToUse` without a sight check.
 [[nodiscard]] bool keepTarget(MobContext& mob, std::optional<std::int32_t> remembered, double within) {
     const std::optional<std::int32_t> id = mob.mob.targetId.has_value() ? mob.mob.targetId : remembered;
     if (!id.has_value()) {
@@ -167,8 +164,7 @@ struct Seen {
     return true;
 }
 
-/// parity: `TargetGoal.canAttack` with `TargetingConditions.DEFAULT`: alive, fair game, and inside
-/// the home a lead gives the mob.
+/// parity: `TargetGoal.canAttack` with `TargetingConditions.DEFAULT`.
 [[nodiscard]] bool canAttack(const MobContext& mob, std::optional<std::int32_t> id) {
     if (!id.has_value() || *id == mob.mob.entityId()) {
         return false;
@@ -346,7 +342,7 @@ void LlamaSpitGoal::tick(MobContext& mob) {
         if (!sight) {
             return;
         }
-        // parity: `Llama.performRangedAttack` spits whatever the power, so only the clock reads it.
+        // parity: `Llama.performRangedAttack` spits whatever the power.
         const float reach = static_cast<float>(std::sqrt(distanceSquared)) / attackRadius_;
         mob.actions.llamaSpit(mob.mob, target->x, target->y, target->z, target->height);
         attackTime_ = mth::floor(static_cast<double>((reach * spread) + static_cast<float>(attackIntervalMin_)));

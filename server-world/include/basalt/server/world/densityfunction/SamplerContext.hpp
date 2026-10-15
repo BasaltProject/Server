@@ -14,7 +14,6 @@ namespace basalt::server::world::densityfunction {
 
 class SamplerContext;
 
-/// A pooled float buffer, handed back to its context when it goes out of scope.
 class ScopedBuffer {
 public:
     ScopedBuffer(SamplerContext& owner, std::int32_t size);
@@ -34,13 +33,11 @@ private:
     DensityBuffer view_;
 };
 
-/// parity: `SamplerContext`. Per-use state for compiled samplers: the cache cells, the user fields
-/// (the beardifier), and a buffer pool. One per chunk and thread, never shared.
+/// parity: `SamplerContext`.
 class SamplerContext {
 public:
     struct Options {
         bool enableCaches = false;
-        /// The `beardifier` user field. Null samples it as its fallback, zero.
         Sampler beardifier;
     };
 
@@ -54,8 +51,7 @@ public:
     void sampleVolumeCached(std::int32_t cacheId, const DensitySampler& input, DensityBuffer& output,
                             const DensityVolume& volume);
 
-    /// parity: `SamplerContext.sampleValueCached`. A cell whose volume covers the block answers
-    /// from that buffer, which can differ in the last bit from sampling the point.
+    /// parity: `SamplerContext.sampleValueCached`.
     [[nodiscard]] float sampleValueCached(std::int32_t cacheId, const DensitySampler& input, std::int32_t x,
                                           std::int32_t y, std::int32_t z);
 
@@ -78,8 +74,7 @@ private:
     std::vector<std::vector<float>> pool_;
 };
 
-/// parity: `DensityFunctionCompiler`, which inlines references, deduplicates caches by structural
-/// equality of their inputs, slices away the axes a subtree ignores, and compiles.
+/// parity: `DensityFunctionCompiler`.
 class DensityCompiler {
 public:
     explicit DensityCompiler(std::unique_ptr<CompileContext> context);
@@ -89,12 +84,10 @@ public:
     DensityCompiler(DensityCompiler&&) = delete;
     DensityCompiler& operator=(DensityCompiler&&) = delete;
 
-    /// Safe from any thread: compiled samplers are immutable and shared.
     [[nodiscard]] Sampler sampler(const Function& function);
 
     [[nodiscard]] CompileContext& context() noexcept { return *context_; }
 
-    /// The rewrite the compiler applies before compiling, exposed for the prepared caches.
     [[nodiscard]] Function optimize(const Function& function);
 
 private:
@@ -117,7 +110,6 @@ private:
     std::int32_t nextCacheId_ = 0;
 };
 
-/// Samples a function at one block with no cache, the way vanilla's debug path does.
 [[nodiscard]] float sampleUncached(const DensitySampler& sampler, std::int32_t x, std::int32_t y, std::int32_t z);
 
 } // namespace basalt::server::world::densityfunction

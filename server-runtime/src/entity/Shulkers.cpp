@@ -98,7 +98,7 @@ float physicalPeek(float amount) {
 Aabb progressAabb(float size, BlockFace towards, float progress, double x, double y, double z) {
     const auto half = static_cast<double>(size) * 0.5;
     Aabb box{-half, 0.0, -half, half, static_cast<double>(size), half};
-    // parity: `getProgressDeltaAabb` from -1, which grows the box and contracts it by nothing.
+    // parity: `getProgressDeltaAabb` from -1.
     const double grow = static_cast<double>(std::max(-1.0F, progress)) * static_cast<double>(size);
     box = box.expandTowards(registry::stepX(towards) * grow, registry::stepY(towards) * grow,
                             registry::stepZ(towards) * grow);

@@ -37,7 +37,7 @@ constexpr std::int8_t kPushUpEvent = 72;
 void VehicleSystem::tickBoatBubbles(world::LoadedWorld& world, ServerEntity& boat, bool driverIsPlayer) {
     entity::boats::BoatState& state = *boat.boat;
     const bool simulated = !driverIsPlayer;
-    // parity: `applyEffectsFromBlocks`, twice a turn, and the bubble column's `entityInside`: over
+    // parity: `applyEffectsFromBlocks`.
     // open water it is `onAboveBubbleColumn`, the boat's own; under something it is the default push.
     const Aabb box = boxOf(boat).inflate(-static_cast<double>(1.0E-5F));
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
@@ -104,7 +104,7 @@ void VehicleSystem::tickBoatBubbles(world::LoadedWorld& world, ServerEntity& boa
 }
 
 void VehicleSystem::boatPushes(world::LoadedWorld& world, ServerEntity& boat, bool driverIsPlayer) {
-    // parity: the end of `AbstractBoat.tick`: the box grown a fifth sideways and shrunk a hundredth
+    // parity: the end of `AbstractBoat.tick`.
     // up and down, a mob taken aboard while nobody steers it, anything else pushed away.
     const EntityPushSystem::Body self{.mob = &boat};
     const Aabb box = boxOf(boat);

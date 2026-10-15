@@ -14,7 +14,6 @@
 
 namespace basalt::server::world::loot {
 
-/// What a function carries beyond its kind, shared between copies.
 struct LootFunction::Parts {
     IntProvider count;
     FloatProvider fraction;
@@ -32,7 +31,6 @@ struct LootFunction::Parts {
     ExplorationMapRequest exploration;
 };
 
-/// The `minecraft:enchantments` component of a stack, by id, which is what an item predicate reads.
 [[nodiscard]] std::map<std::string, std::int32_t, std::less<>> enchantmentsOf(const ItemStack& stack);
 
 namespace lootMath {

@@ -13,8 +13,7 @@
 namespace basalt::server::runtime::world::arrowButtons {
 namespace {
 
-/// parity: `Block.boxZ(6, 4, 8, 16)` is `box(5, 6, 8, 11, 10, 16)`: six wide, four tall and reaching
-/// the wall. Only the part outside the cube survives the cut, so what is left is the depth below.
+/// parity: `Block.boxZ(6, 4, 8, 16)` is `box(5.
 constexpr double kWide = 6.0;
 constexpr double kTall = 4.0;
 constexpr double kDeep = 2.0;
@@ -27,10 +26,8 @@ constexpr double kBlock = 16.0;
     return found == properties.end() ? std::string{} : found->second;
 }
 
-/// The two ends of a centred span of this width.
 [[nodiscard]] std::array<double, 2> centred(double width) { return {(kBlock - width) / 2.0, (kBlock + width) / 2.0}; }
 
-/// The two ends of the depth, against the low or the high face.
 [[nodiscard]] std::array<double, 2> against(bool high, double depth) {
     return high ? std::array<double, 2>{kBlock - depth, kBlock} : std::array<double, 2>{0.0, depth};
 }
@@ -47,15 +44,11 @@ std::array<double, 6> outline(std::int32_t stateId) {
     const double depth = propertyOf(stateId, "powered") == "true" ? kDeepPressed : kDeep;
     const bool alongX = facing == "east" || facing == "west";
     if (face == "floor" || face == "ceiling") {
-        // Turned onto the floor, the four-tall side lies along the ground and the six-wide one stays
-        // across the way the button looks.
         const std::array<double, 2> x = centred(alongX ? kTall : kWide);
         const std::array<double, 2> z = centred(alongX ? kWide : kTall);
         const std::array<double, 2> y = against(face == "ceiling", depth);
         return {x[0], y[0], z[0], x[1], y[1], z[1]};
     }
-    // On a wall the button sticks out of the face **opposite** the one it looks at, which is the
-    // wall it is stuck to.
     const std::array<double, 2> y = centred(kTall);
     if (alongX) {
         const std::array<double, 2> x = against(facing == "west", depth);

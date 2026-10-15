@@ -74,8 +74,7 @@ constexpr std::int32_t kVerticalLimit = 20000000;
     return tallest.value_or(around);
 }
 
-/// parity: `TheEndGatewayBlockEntity.findValidSpawnInChunk`, the end stone nearest the origin with
-/// two open blocks above it. `BlockPos.betweenClosed` walks x fastest, then y, then z.
+/// parity: `TheEndGatewayBlockEntity.findValidSpawnInChunk`.
 [[nodiscard]] std::optional<BlockPos> findValidSpawnInChunk(const Chunk& chunk) {
     const std::optional<std::size_t> highest = highestFilledSection(chunk);
     const std::int32_t sectionBottom =

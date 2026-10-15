@@ -14,13 +14,11 @@ struct FallenTreeConfiguration {
     std::int32_t logStateId = 0;
     IntProvider logLength;
     bool stumpVines = false;
-    /// The attached mushroom is always brown, which draws nothing for its kind.
     bool brownMushroomsOnly = false;
     /// parity: a `shelf_mushroom` log decorator after the attached mushrooms.
     std::optional<float> shelfMushroom;
 };
 
-/// The vanilla fallen-tree configurations the Overworld biome selectors use.
 namespace fallenTreeConfigs {
 
 [[nodiscard]] const FallenTreeConfiguration& oak();

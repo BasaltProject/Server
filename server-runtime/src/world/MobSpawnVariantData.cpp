@@ -7,7 +7,6 @@
 namespace basalt::server::runtime::world {
 namespace {
 
-/// Name, wire id and whether it is recessive, in the enum's own order.
 constexpr std::array<std::pair<std::string_view, std::int32_t>, 7> kGenes{
     {{"normal", 0}, {"lazy", 1}, {"worried", 2}, {"playful", 3}, {"brown", 4}, {"weak", 5}, {"aggressive", 6}}};
 
@@ -57,8 +56,7 @@ const std::vector<std::string>& wolfSoundVariants() {
 }
 
 const std::vector<std::int32_t>& tropicalCommonVariants() {
-    // parity: `TropicalFish.COMMON_VARIANTS`, already packed: the low bit is the large body, then
-    // the pattern, the base colour and the pattern colour, one byte each.
+    // parity: `TropicalFish.COMMON_VARIANTS`.
     static const std::vector<std::int32_t> all{117506305, 117899265, 185008129, 117441793, 118161664, 65536,
                                                50726144,  67764993,  234882305, 67110144,  117441025, 16778497,
                                                101253888, 50660352,  918529,    235340288, 918273,    67108865,

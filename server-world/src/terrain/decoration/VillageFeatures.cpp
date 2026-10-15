@@ -44,7 +44,7 @@ const PathSet& supportsVegetationPaths() {
     return paths;
 }
 
-/// parity: `RotatedBlockProvider.getState` over `Direction.Axis`, whose enum order is X, Y, Z.
+/// parity: `RotatedBlockProvider.getState` over `Direction.Axis`.
 const std::vector<std::int32_t>& hayAxisStates() {
     static const std::vector<std::int32_t> states = [] {
         std::vector<std::int32_t> built;
@@ -126,8 +126,6 @@ bool placeBlockPile(Chunk& chunk, random::RandomSource& random, std::int32_t x, 
 using PatchPredicate = std::function<bool(Chunk&, const DecorationPos&)>;
 using PatchPlace = std::function<void(Chunk&, random::RandomSource&, const DecorationPos&)>;
 
-/// The shape the three patch features share: `count` attempts at the piece position with a
-/// trapezoid(7, 3) offset each, then the configured feature, which does its own target checks.
 void placePatch(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z,
                 std::int32_t count, const PatchPredicate& predicate, const PatchPlace& place) {
     const std::vector<PlacementModifier> modifiers = {
@@ -234,8 +232,7 @@ void villageFeatures::place(const std::string_view feature, Chunk& chunk, const 
             });
         return;
     }
-    // parity: any other `feature_pool_element`, such as the 26.3 camps' trees, is its placed
-    // feature run from the piece's own position.
+    // parity: any other `feature_pool_element` is its placed feature run from the piece position.
     if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
             wire::common::Identifier::parse(feature);
         id.has_value()) {

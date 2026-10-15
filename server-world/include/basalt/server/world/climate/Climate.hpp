@@ -9,14 +9,9 @@
 
 namespace basalt::server::world::climate {
 
-/// The seven quantised climate axes: temperature, humidity, continentalness, erosion, depth,
-/// weirdness, and the offset every target implicitly asks for at zero.
 inline constexpr std::size_t kDimensions = 7;
 
 /// parity: `Climate.Parameter`, a quantised span along one axis.
-///
-/// Values are pre-multiplied by the quantisation factor and truncated to an integer, matching
-/// vanilla exactly, its rounding included: truncation toward zero rather than to nearest.
 struct Parameter {
     std::int64_t min = 0;
     std::int64_t max = 0;
@@ -63,8 +58,6 @@ struct TargetPoint {
     std::int64_t depth = 0;
     std::int64_t weirdness = 0;
 
-    /// The offset axis has no target value: it is always compared against zero, which is vanilla's
-    /// own seventh entry.
     [[nodiscard]] std::array<std::int64_t, kDimensions> toArray() const noexcept {
         return {temperature, humidity, continentalness, erosion, depth, weirdness, 0};
     }
@@ -85,7 +78,6 @@ struct ParameterPoint {
     Parameter weirdness;
     std::int64_t offset = 0;
 
-    /// Squared distance to a target: lower is a better match.
     [[nodiscard]] std::int64_t fitness(const TargetPoint& point) const;
 
     [[nodiscard]] std::array<Parameter, kDimensions> parameterSpace() const;
@@ -96,18 +88,10 @@ struct ParameterPoint {
 [[nodiscard]] ParameterPoint parameters(float temperature, float humidity, float continentalness, float erosion,
                                         float depth, float weirdness, float offset);
 
-/// parity: `Climate.RTree`, a bounding-volume tree over the seven axes so the closest parameter
-/// point is a descent rather than a full scan.
-///
-/// The tree is built once and read-only after, so it needs no lock. Each search is seeded with the
-/// last leaf *this thread* found, as vanilla's own thread local does. That is not only faster: a
-/// search seeded differently resolves *tied* targets differently, and a tie between two equally
-/// distant regions is decided by whichever the descent reaches first.
+/// parity: `Climate.RTree`.
 template <typename T>
 class RTree {
 public:
-    /// Refuses an empty list or a point of the wrong arity: both are table bugs, and a tree with no
-    /// leaves has no biome to answer with.
     [[nodiscard]] static std::unique_ptr<RTree> create(std::vector<std::pair<ParameterPoint, T>> values);
 
     [[nodiscard]] const T& search(const std::array<std::int64_t, kDimensions>& target) const;
@@ -154,7 +138,6 @@ private:
     explicit RTree(std::unique_ptr<Node> root) : root_(std::move(root)) {}
 
     std::unique_ptr<Node> root_;
-    /// The previous leaf this thread found in this tree, which is what seeds the next search.
     mutable std::size_t slot_;
 };
 

@@ -28,7 +28,7 @@ constexpr double kPlayerWidth = 0.6;
 constexpr double kPlayerHeight = 1.8;
 /// parity: `handleShoulderEntities`, the fall that throws a parrot off.
 constexpr double kShoulderFall = 0.5;
-/// parity: `removeEntitiesOnShoulder`, a second on the shoulder before it can be thrown off.
+/// parity: `removeEntitiesOnShoulder`.
 constexpr std::int64_t kShoulderSettleTicks = 20;
 /// parity: `respawnEntityOnShoulder`, put back 0.7 above the player's feet.
 constexpr double kShoulderHeight = static_cast<double>(0.7F);
@@ -83,7 +83,7 @@ bool MobActionSystem::imitateNearbyMobs(world::LoadedWorld& world, double x, dou
 }
 
 void MobActionSystem::tickParrot(world::LoadedWorld& world, ServerEntity& parrot) {
-    // parity: `Parrot.aiStep` rolls the level's own random, and an imitation needs the parrot alive
+    // parity: `Parrot.aiStep` rolls the level's own random.
     // and not silenced.
     random::RandomSource random = freshRandom();
     if (random.nextInt(400) != 0 || parrot.dying || parrot.health <= 0.0 ||
@@ -105,7 +105,7 @@ bool MobActionSystem::sitOnShoulder(ServerEntity& parrot, std::int32_t playerId)
             player = candidate;
         }
     }
-    // parity: `ServerPlayer.setEntityOnShoulder`: on foot, on the ground and dry, left before right.
+    // parity: `ServerPlayer.setEntityOnShoulder`.
     if (player == nullptr || player->vehicleId.has_value() || !player->onGround || feetInWater(*world, *player)) {
         return false;
     }
@@ -155,7 +155,7 @@ void MobActionSystem::tickShoulders(world::LoadedWorld& world, const std::vector
             player->shoulderDropPending = false;
             continue;
         }
-        // parity: `playShoulderEntityAmbientSound`, one in two hundred a shoulder, an imitation first.
+        // parity: `playShoulderEntityAmbientSound`.
         if (!player->dead) {
             for (const std::optional<wire::nbt::NbtCompound>* shoulder :
                  {&player->shoulderLeft, &player->shoulderRight}) {

@@ -77,7 +77,7 @@ using FloatKind = FloatProvider::Kind;
     return std::nullopt;
 }
 
-/// parity: `ScoreboardNameProviders.CODEC`: an entity target by name, or `fixed` and `context`.
+/// parity: `ScoreboardNameProviders.CODEC`.
 [[nodiscard]] std::optional<ScoreTarget> scoreTargetOf(const JsonValue* value) {
     static const std::map<std::string, EntityTarget, std::less<>> kTargets{
         {"this", EntityTarget::This},
@@ -516,7 +516,7 @@ Parsed<FloatProvider> Reader::typedFloatOps(const std::string& type, const JsonO
     return std::unexpected(LootTableParseError{"Unsupported number provider type: " + type});
 }
 
-/// parity: `IntRangePredicate.CODEC`, a provider to equal tried before a `{min, max}` line.
+/// parity: `IntRangePredicate.CODEC`.
 Parsed<IntRange> Reader::intRange(const JsonValue& value) {
     const JsonObject* object = value.get<JsonObject>();
     if (object == nullptr || object->find("type") != nullptr) {

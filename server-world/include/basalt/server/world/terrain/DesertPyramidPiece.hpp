@@ -12,9 +12,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// parity: `DesertPyramidPiece`. Twenty-one blocks square, so unlike the swamp hut it spills into its
-/// neighbours and the clip decides what lands, as vanilla's `chunkBB` does. The suspicious sand is
-/// not written here: `suspiciousSandPositions` only collects candidates.
+/// parity: `DesertPyramidPiece`.
 class DesertPyramidPiece {
 public:
     static constexpr std::int32_t kWidth = 21;
@@ -26,18 +24,15 @@ public:
 
     [[nodiscard]] const structure::StructureBoundingBox& bounds() const noexcept { return bounds_; }
 
-    /// World positions vanilla records as candidates for suspicious sand, in its own order.
     [[nodiscard]] const std::vector<structure::StructurePos>& suspiciousSandPositions() const noexcept {
         return suspiciousSand_;
     }
 
-    /// The one collapsed-roof block that is always suspicious, whichever else is picked.
     [[nodiscard]] const std::optional<structure::StructurePos>& collapsedRoofPos() const noexcept {
         return collapsedRoof_;
     }
 
-    /// parity: `updateHeightPositionToLowestGroundHeight`, the lowest ground under the whole
-    /// footprint rather than the mean the hut uses, then dropped by up to two more.
+    /// parity: `updateHeightPositionToLowestGroundHeight`, the lowest ground under the whole.
     bool settleOnGround(const std::function<std::int32_t(std::int32_t, std::int32_t)>& groundAt);
 
     void place(Chunk& chunk, const structure::StructureBoundingBox& clip, std::int64_t worldSeed,
@@ -55,22 +50,19 @@ private:
     void addCellarStairs() const;
     void addCellarRoom();
 
-    /// parity: `placeCollapsedRoof`. The material is another draw off the level's own random, so it
-    /// gets the same positional stand-in as the ramp; the block that is always suspicious is not,
-    /// and comes off the world seed exactly as vanilla forks it.
+    /// parity: `placeCollapsedRoof`.
     void placeCollapsedRoof(std::int32_t x0, std::int32_t y0, std::int32_t z0, std::int32_t x1, std::int32_t z1);
 
     void recordSandBox(std::int32_t x0, std::int32_t y0, std::int32_t z0, std::int32_t x1, std::int32_t y1,
                        std::int32_t z1);
 
-    /// parity: `placeSand`, which writes nothing: it only offers the position to the sand pass.
+    /// parity: `placeSand`.
     void recordSand(std::int32_t x, std::int32_t y, std::int32_t z);
 
     void createChest(random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z) const;
 
     void fillColumnDown(std::int32_t stateId, std::int32_t x, std::int32_t startY, std::int32_t z) const;
 
-    /// A per-position stand-in for vanilla's level random, which no seed can reproduce.
     [[nodiscard]] random::RandomSource positionalAt(std::int32_t x, std::int32_t y, std::int32_t z) const;
 
     void set(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) const;

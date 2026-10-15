@@ -47,8 +47,6 @@ void mansionRoomFiller::addRoom1x1(std::vector<MansionPiece>& pieces, random::Ra
                                    StructurePos position, StructureRotation rotation,
                                    std::optional<StructureDirection> doorDirection, std::size_t floor) {
     const MansionRoomCollection& rooms = MansionRoomCollection::byFloor()[floor];
-    // The draw for an ordinary room happens first and is thrown away when the door turns out to be
-    // the secret one, so a secret room costs two rolls, not one.
     std::string templateName = rooms.room1x1(random);
     StructureRotation pieceRotation = StructureRotation::None;
     if (doorDirection != StructureDirection::East) {

@@ -8,7 +8,6 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using wire::common::toml::TomlTable;
 using wire::common::toml::TomlValue;
 
@@ -36,7 +35,6 @@ void flatten(const TomlTable& table, const std::string& prefix, std::map<std::st
     }
     return out;
 }
-
 } // namespace
 
 void PluginText::load() {
@@ -70,8 +68,6 @@ std::optional<std::string> PluginText::translation(std::string_view key) const {
             return found->second;
         }
     }
-    // Any locale will do rather than nothing: a plugin that shipped only Spanish still says
-    // something, and what it says is better than the raw key.
     for (const auto& [locale, entries] : locales_) {
         if (const auto found = entries.find(key); found != entries.end()) {
             return found->second;
@@ -107,13 +103,10 @@ std::string PluginText::resolve(std::string_view message, lua::LuaArgs* lua, std
             break;
         }
         const std::string name = text.substr(index + 1, close - index - 1);
-        // An argument that was not passed stays as it was written: `{name}` on the screen is a bug
-        // report, an empty gap is a mystery.
         const std::optional<std::string> value = lua->fieldAsText(arguments, name);
         out += value.value_or("{" + name + "}");
         index = close + 1;
     }
     return out;
 }
-
 } // namespace basalt::server::plugins

@@ -8,7 +8,6 @@
 
 namespace basalt::server::registry::blocks {
 namespace {
-
 using wire::common::Identifier;
 
 struct Tables {
@@ -32,7 +31,6 @@ struct Tables {
     for (const auto& [id, path] : blockIdsTable()) {
         tables.blockIdsByName.emplace(Identifier::vanilla(std::string{path}), id);
     }
-    // The last block's states run to the end of the palette, so the count is where they stop.
     const auto& [lastStateId, lastPath] = defaultBlockStatesTable().back();
     const blockStateDefinitions::Definition* last =
         blockStateDefinitions::of(Identifier::vanilla(std::string{lastPath}));
@@ -45,14 +43,11 @@ struct Tables {
     return built;
 }
 
-/// The path of a named constant, resolved once. Absent means the table does not have it, which is a
-/// table bug rather than something to paper over at the call site.
 [[nodiscard]] const BlockState& require(std::string_view path) {
     const BlockState* found = named(path);
     static const BlockState missing{Identifier::vanilla("air"), 0, {}};
     return found == nullptr ? missing : *found;
 }
-
 } // namespace
 
 const Registry<BlockState>& registry() { return tables().registry; }
@@ -138,5 +133,4 @@ const BlockState& caveAir() {
     static const BlockState& state = require("cave_air");
     return state;
 }
-
 } // namespace basalt::server::registry::blocks

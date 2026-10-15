@@ -17,12 +17,8 @@
 
 namespace basalt::server::runtime::world {
 
-/// The block entities that do something on their own, ticked once each per tick. parity:
-/// `LevelChunk.tickersInLevel`. Only the chunks the caller passes are visited, so a far furnace is
-/// as still as vanilla's.
 namespace blockEntityTicks {
 
-/// Something a block entity handed back to the world, which the caller has to spawn.
 struct Dropped {
     std::int32_t x = 0;
     std::int32_t y = 0;
@@ -30,9 +26,6 @@ struct Dropped {
     server::world::loot::ItemStack stack;
 };
 
-/// What each machine needs from outside this file. `recipeFor` asks the world's recipe book; the two
-/// event hooks live in `server-plugins`, which the core does not depend on. An unset hook means nobody
-/// is listening.
 struct Hooks {
     std::function<const server::world::crafting::Recipe*(server::world::crafting::Cooker,
                                                          const server::world::loot::ItemStack&)>
@@ -40,63 +33,31 @@ struct Hooks {
     std::function<void(const Dropped&)> onDropped;
     /// parity: the Bukkit `InventoryMoveItemEvent` a hopper fires before it moves anything.
     std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z)> allowHopperMove;
-    /// parity: `InventorySmeltEvent`, which carries what goes in and what comes out.
     std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view cooker,
                        const server::world::loot::ItemStack* input, const server::world::loot::ItemStack* result)>
         allowSmelt;
-    /// parity: `ChiseledBookShelfBlockEntity.acceptsItemType`, which asks the `bookshelf_books`
-    /// item tag: the tags are the datapack's, and this file has no business loading one.
     std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
-    /// parity: the `does_not_block_hoppers` block tag, the datapack's like the one above.
     std::function<bool(const wire::common::Identifier& block)> doesNotBlockHoppers;
-    /// A gateway whose age reached the attention interval: the beam it flashes then is a block event,
-    /// which takes the players, and so goes through the caller. parity:
-    /// `TheEndGatewayBlockEntity.triggerCooldown`'s `level.blockEvent`.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> gatewayBeam;
-    /// parity: `JukeboxSong.lengthInTicks`, which is data in the operator's own jar.
     std::function<std::int64_t(const std::string& song)> songLength;
-    /// parity: the `beacon_base_blocks` block tag, which is the datapack's and not this file's.
+    /// parity: the `beacon_base_blocks` block tag.
     std::function<bool(const wire::common::Identifier& block)> isBeaconBase;
-    /// A beacon that just counted its pyramid and has an effect to hand out. Who is standing in it
-    /// is the caller's business: this module knows no players.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t levels, const std::string& primary,
                        const std::string& secondary)>
         beaconPulse;
-    /// A beacon that was dark and is now lit, with the tiers it stands on. parity:
-    /// `BeaconBlockEntity.tick`, which raises the criterion only on that edge.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t levels)> beaconLit;
-    /// The turn a song ran out on: the block keeps its disc but stops feeding the redstone, so
-    /// whatever it was powering has to be told. parity: `JukeboxBlockEntity.onSongChanged`.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> songStopped;
-    /// A noise that reached a shrieker: whether it shrieks depends on the players, which this
     /// module does not know. parity: `VibrationSystem.Ticker.tick`'s `receiveVibration`, which
-    /// answers on the shrieker's own turn, inside the walk.
     std::function<void(const vibrations::ShriekerArrival& arrival)> shriekerHeard;
-    /// parity: `BeehiveBlockEntity.serverTick`, which lets bees out and so needs the entities. The
-    /// honey it adds goes in `pending`, set once every block entity has had its turn; answers whether
-    /// the hive changed.
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& pending)> beehive;
-    /// parity: `CreakingHeartBlockEntity.serverTick`, which spawns and watches its creaking. Its new
-    /// state goes in `pending` like a hive's; answers whether the heart's tag changed.
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& pending)>
         creakingHeart;
-    /// parity: `SculkCatalystBlockEntity.serverTick`, run once every block entity has had its turn
-    /// because it rewrites blocks and their block entities; answers whether its cursors changed.
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> sculkCatalyst;
-    /// parity: `ConduitBlockEntity.serverTick`, over its own saved fields; answers whether they changed.
     std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> conduit;
-    /// The chunks that tick this turn, which a shrieker's noise waits on. Unset, every loaded one.
     WorldState::Ticking ticking;
-    /// A monster spawner's turn, over its own saved fields: spawning takes the players and the mobs,
-    /// which this module does not know. Answers whether the data changed. parity:
-    /// `SpawnerBlockEntity.serverTick`.
     std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> spawnerTick;
 };
 
-/// Ticks every block entity in `chunks` that has something to do, answering the blocks that changed.
-/// `random` is the world's, needed by the one that rolls for anything: a hopper feeding a composter.
-/// `gameTime` is the turn counter, not the time of day. `worldSeed` is what a geyser forks its
-/// rhythm from, and `skyDarken` is the world's stored reading. parity: `Level.getSkyDarken`.
 [[nodiscard]] std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,
                                             std::int32_t skyDarken, std::int64_t gameTime,
                                             const std::vector<std::array<std::int32_t, 2>>& chunks,

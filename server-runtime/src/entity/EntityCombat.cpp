@@ -33,7 +33,7 @@ constexpr std::int32_t kCooldownHalfTicks = kHurtCooldownTicks / 2;
     return base.has_value() ? static_cast<float>(*base) : 0.0F;
 }
 
-/// parity: a mob's own `armor` and `armor_toughness` attributes, which most leave at zero.
+/// parity: a mob's own `armor` and `armor_toughness` attributes.
 [[nodiscard]] float afterArmour(const ServerEntity& entity, float amount, float fractionAdd) {
     const float armour = attributeOf(entity.type(), reg::entityAttributes::kArmor);
     if (armour <= 0.0F) {
@@ -93,8 +93,7 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     if (entity.bee != nullptr) {
         entity.bee->pollinating = false;
     }
-    // parity: `EnderDragon.hurtServer` is a hit on the body, and only a player or an explosion
-    // (`always_hurts_ender_dragons`) takes health off. Anything else still counts as having hit.
+    // parity: `EnderDragon.hurtServer`.
     if (entity.dragon != nullptr) {
         const enderDragon::Part part = entity.dragon->hitPart.value_or(enderDragon::Part::Body);
         entity.dragon->hitPart.reset();
@@ -123,7 +122,6 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         return {.landed = creakings::hurtBound(entity, living || projectile, byPlayer)};
     }
     if (entity.wither != nullptr) {
-        // A mob's melee names its type; a projectile or blast owned by one sets the flag instead.
         const std::string_view attacker = attackerName.has_value() ? std::string_view{*attackerName} : "";
         const bool friendly = std::exchange(entity.wither->nextHitFromFriend, false) ||
                               (cause == "mob_attack" && attacker.starts_with("minecraft:") &&
@@ -141,9 +139,7 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         (blamed.directType->path() == "arrow" || blamed.directType->path() == "spectral_arrow")) {
         return {};
     }
-    // Every hit a mob takes comes through here, so this is the one place that has to ask. A plugin
-    // may stop it or change how much it is worth; what it cannot do is see a hit that was never
-    // going to land, which is why this is below the checks above.
+    // Every mob hit comes through here; a plugin may veto or scale it but never sees a hit that was not going to land.
     if (hooks.damaged) {
         const std::optional<float> allowed = hooks.damaged(entity, amount, cause, attackerName);
         if (!allowed.has_value() || *allowed <= 0.0F) {
@@ -195,9 +191,8 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         }
         enderDragon::afterHurt(*entity.dragon, static_cast<float>(before), static_cast<float>(entity.health));
     }
-    // parity: the 0.4 every hit is worth, taken before the attacker's own extra knockback.
-    // parity: `EnderDragon.knockback`, which a sitting dragon ignores.
-    // parity: a shulker's `setDeltaMovement` does nothing, so it takes no knockback either.
+    // parity: `EnderDragon.knockback`.
+    // parity: `setDeltaMovement`.
     const bool planted =
         (entity.dragon != nullptr && enderDragon::isSitting(entity.dragon->phase)) || entity.shulker != nullptr;
     if (!cooling && !planted) {

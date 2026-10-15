@@ -29,17 +29,12 @@ class BlockChangeBroadcaster;
 class NaturalSpawningSystem;
 class RaidSystem;
 
-/// What a villager's brain does to the world, for the one world it is ticking in.
-///
-/// The brain only ever hands over the villager, so the world is bound before each turn rather than
-/// looked up on every call.
 class VillagerWorldSystem final : public entity::villager::VillagerWorld {
 public:
     /// parity: `LivingEntity.addEffect`, which the mob machinery owns.
     using AddEffect = std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                                          entity::ServerEntity& mob, const world::ActiveEffect& effect)>;
 
-    /// A firework rocket put in the world, from the item it was made of.
     using LaunchFirework = std::function<void(world::LoadedWorld& world, wire::nbt::NbtCompound item, double x,
                                               double y, double z, std::int32_t ownerId)>;
 
@@ -48,7 +43,6 @@ public:
                         world::RealVillagerTrades* trades, std::function<std::int64_t()> nextSeed,
                         AddEffect addEffect = {}, LaunchFirework launchFirework = {});
 
-    /// The world the calls that follow are about.
     void bind(world::LoadedWorld& world) { world_ = &world; }
 
     [[nodiscard]] std::optional<entity::villager::RaidView> raidAt(const entity::ServerEntity& villager) override;
@@ -88,7 +82,6 @@ public:
     void itemsNear(entity::ServerEntity& mob, double horizontal, double vertical, std::vector<ItemView>& out) override;
     std::int32_t takeItem(entity::ServerEntity& mob, std::int32_t itemId, std::int32_t count) override;
 
-    /// parity: `BellBlockEntity`'s alarm: every villager within thirty-two blocks hears it.
     static void alertVillagers(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 private:

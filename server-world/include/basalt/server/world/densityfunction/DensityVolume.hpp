@@ -10,7 +10,7 @@
 
 namespace basalt::server::world::densityfunction {
 
-/// parity: `DensityVolume`, a box of sample points with a step per axis, y fastest, then x, then z.
+/// parity: `DensityVolume`.
 struct DensityVolume {
     static constexpr std::int32_t kNoBlock = -1;
 
@@ -42,7 +42,6 @@ struct DensityVolume {
 
     [[nodiscard]] constexpr std::int32_t size() const noexcept { return sizeX * sizeY * sizeZ; }
 
-    /// The index of a block in this volume, or `kNoBlock` when it is not one of its sample points.
     [[nodiscard]] std::int32_t indexOfBlock(std::int32_t x, std::int32_t y, std::int32_t z) const noexcept {
         const std::int32_t rx = x - minBlockX;
         const std::int32_t ry = y - minBlockY;
@@ -66,7 +65,7 @@ struct DensityVolume {
     friend constexpr bool operator==(const DensityVolume&, const DensityVolume&) = default;
 };
 
-/// parity: `DensityBuffer`. A view over floats someone else owns: a pooled vector or a cache cell.
+/// parity: `DensityBuffer`.
 class DensityBuffer {
 public:
     DensityBuffer() = default;

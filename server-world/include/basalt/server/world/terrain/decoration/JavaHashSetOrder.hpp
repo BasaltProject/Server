@@ -7,12 +7,7 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// parity: worldgen iterates block positions out of a `Sets.newHashSet()`, so the order is the map's
-/// and not the insertion order. It shows wherever the first match wins: which leaf takes a distance,
-/// where a beehive ends up.
-///
-/// Modelled as the map behind the set, minus the tree a bucket of eight becomes in Java: positions
-/// spread over a feature's own box never pile up like that. `Pos` needs `x`, `y`, `z` and equality.
+/// parity: worldgen iterates block positions out of a `Sets.newHashSet()`.
 template <typename Pos>
 class JavaHashSetOrder {
 public:
@@ -56,7 +51,6 @@ public:
 
     [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
 
-    /// What the set's own iterator would answer first, which is what the jar takes and removes.
     [[nodiscard]] Pos first() const {
         for (const std::vector<Pos>& bucket : buckets_) {
             if (!bucket.empty()) {
@@ -66,7 +60,6 @@ public:
         return Pos{};
     }
 
-    /// Takes the first entry out, which is the only removal the jar's iterator performs.
     [[nodiscard]] Pos takeFirst() {
         const Pos position = first();
         static_cast<void>(remove(position));
@@ -103,9 +96,6 @@ private:
     std::size_t size_ = 0;
 };
 
-/// The same order for positions already collected in the order they were added. Whatever is handed
-/// in comes back out, repeats included: the caller decides what belongs in its set, and a repeat
-/// here would be one the jar's own set never had.
 template <typename Pos>
 [[nodiscard]] std::vector<Pos> javaHashSetOrder(const std::vector<Pos>& positions) {
     if (positions.empty()) {

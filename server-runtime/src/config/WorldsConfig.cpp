@@ -50,7 +50,6 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
     WorldSettings settings = inherited;
     settings.difficulty = std::string{table->string("difficulty").value_or(inherited.difficulty)};
     settings.viewDistance = static_cast<std::int32_t>(table->integer("view-distance").value_or(inherited.viewDistance));
-    // A negative interval is not "save into the past": zero is what turns it off.
     settings.saveIntervalSeconds = static_cast<std::int32_t>(
         std::max<std::int64_t>(table->integer("save-interval-seconds").value_or(inherited.saveIntervalSeconds), 0));
     settings.openEndExitPortal = table->boolean("open-end-exit-portal").value_or(inherited.openEndExitPortal);
@@ -152,8 +151,6 @@ std::optional<WorldDimension> dimensionByName(std::string_view name) {
 
 bool canHaveWeather(WorldDimension dimension) noexcept {
     const DimensionFacts& facts = dimensionFacts(dimension);
-    // All three halves matter to the rule even though only two of them decide it among the three
-    // dimensions there are: what vanilla asks is exactly this.
     return facts.hasSkylight && !facts.hasCeiling && dimension != WorldDimension::End;
 }
 
@@ -176,8 +173,7 @@ const WorldDeclaration& WorldsConfig::overworldOf(const WorldDeclaration& world)
             return candidate;
         }
     }
-    // `load` refuses a link to a world nobody declared, so this is for a configuration built in
-    // code: belonging to the default world beats belonging to nothing.
+    // `load` refuses links to undeclared worlds, so this covers a configuration built in code.
     return defaultWorld();
 }
 
@@ -200,26 +196,20 @@ WorldSettings WorldsConfig::settingsFor(const WorldDeclaration& world) const {
     const std::string path = directory + "/settings.toml";
     const std::optional<std::string> text = wire::io::fileIO::readText(path);
     if (!text.has_value()) {
-        // Asked rather than left to the write failing on its own, because what is being decided
-        // is whether the world exists, not whether the file can be opened.
+        // Asked rather than left to the write failing: what is being decided is whether the world exists.
         if (wire::io::fileIO::isDirectory(directory)) {
             wire::io::fileIO::writeText(path, kWorldSettingsDefaultToml);
         }
         return defaults_;
     }
     const std::expected<TomlTable, wire::common::toml::TomlError> parsed = wire::common::toml::parse(*text);
-    // A settings file that does not parse is one world's worth of preferences, not the server's
-    // configuration: what it says is lost, what it inherits is not.
+    // An unparsable settings file loses one world's preferences, not the server's configuration.
     return parsed.has_value() ? WorldSettings::from(&*parsed, defaults_) : defaults_;
 }
 
 namespace {
 
-/// Refuses a set of links that cannot mean one thing: an unknown target, a target that is not an
-/// overworld, or two worlds of the same dimension claiming the same one.
-///
-/// Refusing rather than picking is the point. A server that silently sent every portal to one of
-/// two Nethers would be the same guessing game Paper leaves to a plugin.
+// Refuses links that cannot mean one thing, instead of silently sending every portal to one of two Nethers.
 [[nodiscard]] std::optional<std::string> validateLinks(const std::vector<WorldDeclaration>& worlds,
                                                        const std::string& path) {
     const auto byName = [&worlds](std::string_view name) -> const WorldDeclaration* {

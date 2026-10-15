@@ -36,12 +36,9 @@
 namespace basalt::server::runtime {
 namespace {
 
-/// Beyond the view distance, so a chunk already requested by a session is still there when that
-/// session gets round to sending it.
+// Beyond the view distance, so a requested chunk is still there when its session gets round to sending it.
 constexpr std::int32_t kRetainMarginChunks = 4;
 
-/// One source for everything that needs a number nobody is checking bit for bit: a sound's seed,
-/// a scatter, a loot roll outside a world's own stream.
 [[nodiscard]] std::mt19937_64& scratchRandom() {
     static thread_local std::mt19937_64 kRandom{std::random_device{}()};
     return kRandom;
@@ -51,8 +48,6 @@ constexpr std::int32_t kRetainMarginChunks = 4;
 
 [[nodiscard]] double scratchDouble() { return std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()); }
 
-/// A copper golem a pattern just built takes its weathering from the chest it leaves behind, and
-/// whoever is standing around gets the advancement for it.
 void golemSpawned(entity::ServerEntity* golem, world::AdvancementTriggers* triggers,
                   const std::vector<player::PlayerSession*>& players, std::string_view worldName) {
     if (golem == nullptr) {
@@ -91,20 +86,16 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     // A percentage needs two readings; this is the first, so nobody asking later gets nothing.
     cpuMeter_.prime();
 
-    // Player state, deliberately outside every world directory: the database sits beside `worlds/`,
-    // so a world can be deleted, copied or reset without touching a single row.
+    // Player state sits beside `worlds/`, so a world can be deleted, copied or reset without touching a row.
     std::expected<std::unique_ptr<storage::PlayerStore>, storage::PlayerDatabaseSchemaError> store =
         storage::PlayerStore::open(options_.playersDatabasePath);
     if (!store.has_value()) {
-        // Nothing downstream can run without it, and there are no migrations to fall back on.
         throw std::runtime_error("players.db: " + store.error().message);
     }
     playerStore_ = std::move(*store);
     playerProgress_ = std::make_unique<world::PlayerProgress>(&playerStore_->progress());
 
-    // What turns playing into an advancement. The announcement goes to everyone, and only when the
-    // default world's rule allows it: game rules are per world, and an advancement belongs to the
-    // player rather than to the world they happen to stand in.
+    // The announcement goes to everyone only when the default world's rule allows it; advancements are per player.
     world::AdvancementTriggers::Hooks triggerHooks;
     triggerHooks.itemTagMembers = [this](const wire::common::Identifier& tag) {
         return world::realItemTags::membersOf(vanillaData_.itemTags, tag.toString());
@@ -217,8 +208,6 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             return "Loading world '" + world->name() + "' (seed " + std::to_string(world->metadata().seed) + ").";
         });
         world->warmSpawnArea();
-        // parity: the fight builds the podium once a player is in the End with the arena loaded.
-        // Only an operator who asked for it open gets it at startup, which is the divergence.
         if (world->declaration().dimension == config::WorldDimension::End && world->settings().openEndExitPortal) {
             const std::optional<std::array<std::int32_t, 3>> origin =
                 world::endPodium::ensure(world->state(), world->settings().openEndExitPortal);
@@ -233,8 +222,6 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         world->saveDirty();
     }
 
-    // Every placeholder this server answers, in one registry shared by everything that renders
-    // operator-written text.
     placeholders_.registerProvider(
         "basalt_player",
         placeholder::playerPlaceholders(placeholder::PlayerPlaceholderSources{
@@ -432,8 +419,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wired_ = buildCommands(wiring);
     loadFunctions();
 
-    // The seam the plugins see the server through. Everything they run goes on the global owner: it
-    // is the one owner that exists in both scheduler modes and is a single thread in both.
+    // Plugins run on the global owner: the one owner that exists in both scheduler modes, as a single thread.
     plugins::ModelHooks model;
     model.worldFor = [this](const std::string& name) -> world::LoadedWorld* {
         const std::map<std::string, world::LoadedWorld*> loaded = worldRegistry_->worlds();
@@ -475,7 +461,6 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     parts.menus = pluginMenus_.get();
     parts.packets = pluginPackets_.get();
     parts.channels = pluginChannels_.get();
-    // The owner of a position, which with regions off is the world's one.
     parts.ownerAt = [this](const std::string& name, double x, double z) -> sched::Owner* {
         const std::map<std::string, world::LoadedWorld*> loaded = worldRegistry_->worlds();
         const auto found = loaded.find(name);
@@ -492,8 +477,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         [this]() -> const command::CommandSource* { return consoleSource_.get(); }, options_.pluginsRoot,
         std::move(parts));
 
-    // Read once rather than on every use, and not part of what a reload swaps: the limits are baked
-    // into a plugin's state when it loads.
+    // Read once, not swapped by a reload: the limits are baked into a plugin's state when it loads.
     plugins_ = std::make_unique<server::plugins::PluginHost>(
         *pluginServices_, config.pluginLanes,
         lua::LuaLimits{.instructionsPerTurn = config.pluginInstructionsPerTurn,
@@ -501,8 +485,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     plugins_->setApiInstaller(&server::plugins::pluginApi::install);
     static_cast<void>(wired_.dispatcher->registerCommand(std::make_shared<plugins::PluginsCommand>(
         *plugins_, [this]() -> std::optional<std::string> { return options_.playersDatabasePath; })));
-    // A decider answers where the question was asked, so it may only run on the owner plugins live
-    // on. Unclaimed counts as ours: before the first tick nothing else is running.
+    // A decider may only run on the owner plugins live on; unclaimed counts as ours, before the first tick.
     plugins_->setOnPluginThread([this] {
         return worldRegistry_->scheduler().global().isCurrent() || !worldRegistry_->scheduler().global().isClaimed();
     });
@@ -525,7 +508,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
 
     broadcaster_ = std::make_unique<BlockChangeBroadcaster>(
         playerRegistry_, vanillaData_.lootTables,
-        // parity: `spawnGolemInWorld`, which is `EntitySpawnReason.TRIGGERED` and no rotation at all.
+        // parity: `spawnGolemInWorld`.
         BlockChangeBroadcaster::Hooks{
             .summonGolem =
                 [this](world::LoadedWorld& world, std::string_view type, double x, double y, double z) {
@@ -669,8 +652,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     static_cast<void>(
                         LightningBoltSystem::spawn(world, x, y, z, playerRegistry_.allocateEntityId(), cause));
                 },
-            // parity: `Entity.spawnAtLocation`, a fresh `ItemEntity` with its little hop and ten
-            // ticks before anyone may take it.
+            // parity: `Entity.spawnAtLocation`.
             .dropItem =
                 [this](world::LoadedWorld& world, double x, double y, double z,
                        const server::world::loot::ItemStack& stack) {
@@ -700,8 +682,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                       std::int32_t amount) { orbs_->award(world, x, y, z, amount); }});
     redstone_ = std::make_unique<RedstoneTickSystem>(
         playerRegistry_, vanillaData_.recipes, *broadcaster_, chunkSimulation_,
-        // parity: `BaseCommandBlock.performCommand`, which stands the source at the middle of the
-        // block with permission two, and only lets it speak while `commandBlockOutput` is on.
+        // parity: `BaseCommandBlock.performCommand`.
         [this](std::int32_t x, std::int32_t y, std::int32_t z, const std::string& line) {
             command::CommandDispatcher* dispatcher = commands();
             if (dispatcher == nullptr) {
@@ -805,7 +786,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     }
                 },
             .mobSpawners = mobSpawners_.get()});
-    // parity: `Raid.absorbRaidOmen` and `Raid.tick`'s victory, each a statistic and a trigger.
+    // parity: `Raid.absorbRaidOmen` and `Raid.tick`'s victory.
     RaidSystem::Hooks raidHooks;
     raidHooks.raidTriggered = [this](player::PlayerSession& player) {
         player::statAwards::award(player, "raid_trigger");
@@ -839,7 +820,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                       return mobActions_ != nullptr &&
                                              mobActions_->addMobEffect(world, watchers, mob, effect);
                                   }});
-    // parity: `ContainerOpenersCounter` over a chest a copper golem works: the lid and its sound.
+    // parity: `ContainerOpenersCounter` over a chest a copper golem works.
     mobHooks.openersChanged = [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                      std::int32_t openers) {
         const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
@@ -910,7 +891,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             }
         }
     };
-    // parity: `LevelResource.GENERATED_DIR`, beside the worlds rather than inside one of them.
+    // parity: `LevelResource.GENERATED_DIR`.
     vanillaData_.structureTemplates.setGeneratedRoot(std::filesystem::path{options_.worldsRoot}.parent_path() /
                                                      "generated");
     structureBlocks_ = std::make_unique<StructureBlockSystem>(vanillaData_.structureTemplates, playerRegistry_);
@@ -982,8 +963,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             .blockTags = &vanillaData_.blockTags,
             .damageTypeTags = &vanillaData_.damageTypeTags,
             .entityTags = &vanillaData_.entityTags,
-            // parity: `MinecartCommandBlock.MinecartCommandBase.createCommandSourceStack`, at the cart
-            // with permission two, speaking under `command_block_output` like a block.
+            // parity: `MinecartCommandBlock.MinecartCommandBase.createCommandSourceStack`.
             .runCommand =
                 [this](world::LoadedWorld& world, entity::ServerEntity& cart, const std::string& line) {
                     static_cast<void>(world);
@@ -1006,9 +986,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 }});
     mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_, *pushes_);
 
-    // The online count comes from the registry rather than from a counter kept alongside it: a
-    // second source of truth for "how many players are connected" is how a server ends up
-    // advertising numbers that never come back down.
+    // The online count comes from the registry, not a second counter that could advertise numbers that never come down.
     ServerListStatus::Hooks listHooks;
     listHooks.playerByAddress = [this](const std::string& address) {
         return playerStore_->players().findNameByAddress(address);

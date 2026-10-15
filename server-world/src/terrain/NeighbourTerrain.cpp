@@ -13,7 +13,6 @@ namespace {
     return (static_cast<std::int64_t>(chunkX) << 32) | (static_cast<std::int64_t>(chunkZ) & 0xFFFFFFFFLL);
 }
 
-/// The view handed to one decorating chunk: it only answers for positions within `radius`.
 class BoundedView final : public NeighbourTerrain {
 public:
     BoundedView(NeighbourTerrainCache& cache, std::int32_t chunkX, std::int32_t chunkZ)
@@ -78,8 +77,7 @@ decltype(auto) NeighbourTerrainCache::withChunk(const std::int64_t key, const st
             return reader(found->second);
         }
     }
-    // Generated outside the lock, so one slow neighbour does not stall every other decorating chunk.
-    // The loser of a race throws its own copy away and reads the winner's.
+    // The loser of a race discards its copy and reads the winner's.
     Chunk generated = generationMetrics::measure(generationMetrics::Phase::Neighbours,
                                                  [&] { return generateTerrain_(neighbourX, neighbourZ); });
     const std::scoped_lock lock{mutex_};
@@ -119,11 +117,7 @@ std::int32_t NeighbourTerrainCache::worldgenHeightAt(const std::int32_t worldX, 
 std::int32_t NeighbourTerrainCache::oceanFloorAt(const std::int32_t neighbourX, const std::int32_t neighbourZ,
                                                  const std::int32_t worldX, const std::int32_t worldZ) {
     return withChunk(keyOf(neighbourX, neighbourZ), neighbourX, neighbourZ, [&](const Chunk& chunk) {
-        // The frozen one: whoever asks a neighbour for its floor is standing in for a `_WG` read,
-        // and the live map already has that neighbour's own structures piled on it.
-        // parity: the jar answers decorated in a few percent of cases, and not because of the order.
-        // A save at `CARVERS` or later drops the `_WG` maps, so a neighbour that went through disk
-        // has none and the first `getHeight` primes it from whatever is there by then.
+        // parity: a neighbour that went through disk lost its `_WG` maps.
         return chunk.worldgenHeightAt(worldX & 15, worldZ & 15, HeightmapType::OceanFloor);
     });
 }

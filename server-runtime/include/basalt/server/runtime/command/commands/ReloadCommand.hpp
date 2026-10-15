@@ -8,9 +8,7 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// parity: `ReloadCommand`: finds new data packs and reloads them. It also re-reads the configuration
-/// files that are read on every use; what is already a bound socket, a thread pool or a loaded world
-/// is not, and every file is read before any is applied so nothing is half-done.
+/// parity: `ReloadCommand`: finds new data packs and reloads them.
 class ReloadCommand final : public Command {
 public:
     ReloadCommand(config::LiveConfigs& live, std::function<void()> onReloaded, DataPackControl packs = {},

@@ -18,15 +18,13 @@ using structure::StructurePos;
 using structure::StructureRotation;
 using structure::StructureTemplate;
 
-/// parity: `FossilFeature`'s own two structure lists, lower and upper. They hold the same pieces,
-/// and are still two lists because the two features draw their index separately.
+/// parity: `FossilFeature`'s lower and upper lists hold the same pieces but draw their index separately.
 constexpr std::array<std::string_view, 8> kFossilLower{"fossil/spine_1", "fossil/spine_2", "fossil/spine_3",
                                                        "fossil/spine_4", "fossil/skull_1", "fossil/skull_2",
                                                        "fossil/skull_3", "fossil/skull_4"};
 constexpr std::array<std::string_view, 8> kFossilUpper = kFossilLower;
 
-/// parity: `FossilFeature`, which picks one of its structures and buries it. The pieces are
-/// structure files from the operator's own jar, so this needs the template loader.
+/// parity: `FossilFeature` picks one structure and buries it, needs the template loader.
 [[nodiscard]] placedFeatures::ContextualPlacement fossil(const std::array<std::string_view, 8>& structures) {
     return [&structures](Chunk& chunk, random::RandomSource& random, std::int32_t localX, std::int32_t y,
                          std::int32_t localZ, const placedFeatures::FeatureContext& context) {

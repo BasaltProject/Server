@@ -28,7 +28,7 @@ using wire::protocol::play::MerchantOffer;
 using wire::protocol::play::MerchantOffersPacket;
 using wire::protocol::play::OpenScreenPacket;
 
-/// parity: the player's `entity_interaction_range` and eye heights, and the villager's box.
+/// parity: the player's `entity_interaction_range` and eye heights.
 constexpr double kEntityInteractionRange = 3.0;
 constexpr double kStillValidBuffer = 4.0;
 constexpr double kStandingEye = 1.62;
@@ -49,7 +49,7 @@ void VillagerTradeController::openTrades(entity::ServerEntity& villager, bool ma
         villager.removed) {
         return;
     }
-    // parity: `Villager.mobInteract`: a baby or a villager with nothing to offer shakes its head, one
+    // parity: `Villager.mobInteract`.
     // already trading or asleep does nothing, and the rest open with this buyer's prices.
     entity::villager::VillagerWorld& villagers = owner_->options().mobs->villagersIn(*world);
     bool talked = false;
@@ -150,7 +150,7 @@ void VillagerTradeController::selectTrade(std::int32_t index) {
     }
     selectionHint_ = index;
     updateSellItem();
-    // parity: `tryMoveItems`: what is in the payment slots goes back, then the offer's costs come in.
+    // parity: `tryMoveItems`.
     if (index < 0 || static_cast<std::size_t>(index) >= openOffers_->list.size()) {
         return;
     }
@@ -190,7 +190,7 @@ void VillagerTradeController::menuClosed() {
             }
         }
     }
-    // parity: `MerchantMenu.removed`: the payments back into the inventory, or on the ground for a
+    // parity: `MerchantMenu.removed`.
     // player who is dead.
     if (session != nullptr) {
         for (const std::int32_t payment : {kPaymentA, kPaymentB}) {
@@ -230,7 +230,7 @@ bool VillagerTradeController::tradingStillValid() {
         entity::villager::villagerBrain::stateOf(*villager).tradingPlayer != session->entityId()) {
         return false;
     }
-    // parity: `isWithinEntityInteractionRange(this, 4.0)`, from the eyes to the villager's box.
+    // parity: `isWithinEntityInteractionRange(this, 4.0)`.
     const double eyeY = session->y + (session->sneaking ? kSneakingEye : kStandingEye);
     const double halfWidth = kVillagerWidth / 2.0;
     const double dx = std::max({villager->x - halfWidth - session->x, 0.0, session->x - (villager->x + halfWidth)});

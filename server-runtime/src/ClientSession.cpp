@@ -27,14 +27,11 @@ namespace {
 
 namespace play = wire::protocol::play;
 
-/// How long the outbound thread waits between passes. One tick.
 constexpr std::chrono::milliseconds kOutboundInterval{50};
 
-/// A client that has been idle cannot then be handed an enormous burst at once.
+// An idle client cannot then be handed an enormous burst at once.
 constexpr float kMaxBurstChunks = 64.0F;
 
-/// The per-player half of the surface hooks: `PlayerUi` draws one player and asks about that one,
-/// while a claim is made on the server as a whole.
 [[nodiscard]] ui::PlayerUi::Plugin surfacesOf(ClientSession& session) {
     const ClientSession::PluginHooks::Surfaces& surfaces = session.options().plugins.surfaces;
     ui::PlayerUi::Plugin plugin;
@@ -71,8 +68,7 @@ ClientSession::ClientSession(wire::io::TcpConnection connection, Options options
           *this, ContainerMenuController::Hooks{},
           ContainerMenuController::Options{
               .nextDouble = options_.nextDouble, .nextFloat = options_.nextFloat, .nextSeed = options_.nextSeed})),
-      // The rolls a dig or a place makes are the session's own, not any world's stream. Left unset
-      // they were a constant: every broken block rolled its loot from seed zero.
+      // Left unset, every broken block rolled its loot from seed zero.
       blockInteraction_(std::make_unique<BlockInteractionHandler>(
           *this, BlockInteractionHandler::Hooks{},
           BlockInteractionHandler::Options{
@@ -91,15 +87,12 @@ ClientSession::ClientSession(wire::io::TcpConnection connection, Options options
 ClientSession::~ClientSession() {
     streaming_.store(false);
     outbox_.close();
-    // Joined here rather than left to the member's own destructor: it is the thread that hands work
-    // to the world's owner, so nothing below means anything while it is still running.
+    // Joined here: this thread hands work to the world's owner, so nothing below means anything while it runs.
     if (outbound_.joinable()) {
         outbound_.request_stop();
         outbound_.join();
     }
-    // Nothing queued will run from here on, and whatever is already inside a task is waited for.
-    // The tick thread is holding a pointer to this session while it runs one, and it does not get a
-    // second chance to be right about it.
+    // Nothing queued runs from here on and running tasks are waited for: the tick thread holds this session.
     ownerWork_->alive.store(false);
     while (ownerWork_->running.load() > 0) {
         std::this_thread::yield();
@@ -114,7 +107,6 @@ std::optional<std::string> ClientSession::remoteAddress() const {
 }
 
 void ClientSession::onOwner(std::function<void()> work) {
-    // Before the join finishes there is no world to own anything, and after it there always is.
     world::LoadedWorld* world = currentWorld_;
     if (world == nullptr) {
         work();
@@ -122,8 +114,7 @@ void ClientSession::onOwner(std::function<void()> work) {
     }
     sched::Owner& owner = regionOwner_ == nullptr ? world->owner() : *regionOwner_;
     static_cast<void>(owner.submit([work = std::move(work), guard = ownerWork_] {
-        // Counted before the question is asked, so a destructor that has already asked its own sees
-        // this one and waits, rather than freeing the session out from under it.
+        // Counted before the question is asked, so a destructor that already asked sees it and waits.
         guard->running.fetch_add(1);
         if (guard->alive.load()) {
             work();
@@ -133,8 +124,7 @@ void ClientSession::onOwner(std::function<void()> work) {
 }
 
 void ClientSession::handOverToRegionOf(world::LoadedWorld& world) {
-    // Called from the global phase, where no region is running, which is the safe point for it: a
-    // player who walks across a border must not change owner mid-tick.
+    // Called from the global phase: a player walking across a border must not change owner mid-tick.
     const player::PlayerSession* session = playerSession_.get();
     if (session == nullptr || session->worldName != world.name()) {
         return;
@@ -147,19 +137,14 @@ void ClientSession::startOutboundLoop() {
     if (!streaming_.compare_exchange_strong(expected, true)) {
         return;
     }
-    // From here on this thread owns the socket: everything else queues. Sockets here block, so a
-    // client that stops draining would otherwise park whoever writes to it.
+    // From here this thread owns the socket; sockets block, so a client that stops draining would park any writer.
     outbox_.open();
     outbound_ = std::jthread([this] {
         while (streaming_.load()) {
             bool idle = false;
             if (tickTaskPending_.compare_exchange_strong(idle, true)) {
-                // The player's own turn goes to the owner of the world they are in: what they
-                // produce is a packet, and a packet is queued rather than written, so the owner
-                // never waits on a socket.
+                // The player's turn goes to the world's owner; it only queues packets, so it never waits on a socket.
                 onOwner([this] {
-                    // A tick's worth of chunk allowance. Reading and serializing a chunk is the
-                    // world's business; writing the bytes is still this thread's.
                     chunkStreamer_->sendBudget =
                         std::min(chunkStreamer_->sendBudget + chunkStreamer_->desiredChunksPerTick, kMaxBurstChunks);
                     const auto allowed = static_cast<std::int32_t>(chunkStreamer_->sendBudget);
@@ -207,17 +192,13 @@ void ClientSession::run() {
         }
         incoming_.writeBytes(chunk);
         drainFrames();
-        // Whatever answering those frames queued goes out now: this is a thread of this connection,
-        // so it may write, and waiting for the outbound loop would add its whole interval to every
-        // reply.
+        // Flushed now: waiting for the outbound loop would add its whole interval to every reply.
         if (outbox_.isOpen()) {
             flushOutbox();
         }
     }
     streaming_.store(false);
     lifecycle_->leavePlayIfPresent();
-    // Whatever the leaving player's own thread had queued for others is already theirs; what was
-    // queued for this socket has nowhere to go.
     outbox_.close();
     connection_.close();
 }
@@ -229,7 +210,6 @@ void ClientSession::drainFrames() {
         const std::expected<bool, wire::protocol::FramingError> read = wire::protocol::packetFraming::tryReadFrame(
             incoming_, compressionEnabled_, frame, options_.compressionThreshold);
         if (!read.has_value()) {
-            // One malformed frame costs one connection, not the thread reading it.
             logger_.debug([] { return "Dropping a connection whose frame could not be read."; });
             connection_.close();
             return;
@@ -252,8 +232,7 @@ void ClientSession::handleFrame(wire::io::ByteBuffer& body) {
         handleFrameBody(packetId, body);
         return;
     }
-    // An older client's packet is brought up to what this server reads before anything here looks at
-    // it, so nothing past this line knows there is more than one version.
+    // Older client packets are brought up to what this server reads before anything looks at them.
     const std::span<const std::uint8_t> readable = body.readable();
     const std::vector<std::uint8_t> rest(readable.begin(), readable.end());
     translation_->chain().serverbound(state_, packetId, rest,
@@ -294,24 +273,19 @@ void ClientSession::handleFrameBody(std::int32_t packetId, wire::io::ByteBuffer&
     case wire::protocol::ProtocolState::Play:
         break;
     }
-    // parity: `PacketUtils.ensureRunningOnSameThread`, which is what vanilla does with every play
-    // packet: the network thread reads it and the server thread runs it. Here that is the world's
-    // owner, so everything a packet touches is touched by whoever owns it.
+    // parity: `PacketUtils.ensureRunningOnSameThread`.
     wire::io::ByteBuffer owned;
     owned.writeBytes(body.readable());
     onOwner([this, packetId, moved = std::move(owned)]() mutable { handlePlay(packetId, moved); });
 }
 
 void ClientSession::sendPlayPacket(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody) {
-    // A write failure is swallowed on purpose: the owning read loop already notices the close, and
-    // letting it propagate used to abort a broadcast partway through whenever one recipient had
-    // just disconnected.
+    // A write failure is swallowed on purpose: the read loop notices the close, and propagating aborted broadcasts.
     sendCompressed(id, writeBody);
 }
 
 void ClientSession::sendKeepAliveIfDue() {
-    // Vanilla's own 15-second interval, driven from this connection rather than a shared timer, so
-    // a client that has stopped draining its socket delays nothing but itself.
+    // Vanilla's 15-second interval, driven per connection so a client that stops draining delays only itself.
     const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
     if (std::chrono::duration_cast<std::chrono::seconds>(now - lastKeepAlive_).count() < kKeepAliveIntervalSeconds) {
         return;
@@ -327,9 +301,7 @@ void ClientSession::disconnect(const wire::text::Component& reason) {
     sendCompressed(play::PlayDisconnectPacket::kId, [&reason](wire::io::ByteBuffer& buffer) {
         play::PlayDisconnectPacket{.reason = reason}.write(buffer);
     });
-    // Everything queued has to be on the wire before the socket goes, or the client is left guessing
-    // why it was dropped. Whoever asked for the kick is often the world's owner, and the owner must
-    // not park on a socket, so the closing is left to this connection's own thread.
+    // Queued frames must reach the wire first; the owner must not park on a socket, so closing is left to this thread.
     closeWhenDrained_.store(true);
     if (!outbox_.isOpen()) {
         outbox_.close();
@@ -356,7 +328,6 @@ void ClientSession::sendCompressed(std::int32_t id, const std::function<void(wir
     std::vector<std::uint8_t> bytes(body.readable().begin(), body.readable().end());
     const std::size_t idBytes = static_cast<std::size_t>(wire::protocol::varInt::sizeOf(id));
     if (options_.plugins.outgoing) {
-        // The id is in front of the body, and a plugin is shown the packet without it.
         const std::optional<std::vector<std::uint8_t>> edited =
             options_.plugins.outgoing(state_, id, std::span{bytes}.subspan(idBytes));
         if (!edited.has_value()) {
@@ -367,8 +338,7 @@ void ClientSession::sendCompressed(std::int32_t id, const std::function<void(wir
         bytes = std::move(rebuilt);
     }
     if (translation_ != nullptr) {
-        // After the plugins on purpose: a plugin's packet API is this server's version, so it sees
-        // and edits the 26.2 shape and the translation happens on the way out of here.
+        // After the plugins on purpose: they see the server's own version shape and translation happens on the way out.
         sendTranslated(translation_->chain(), id, std::span{bytes}.subspan(idBytes));
         return;
     }
@@ -379,8 +349,7 @@ void ClientSession::sendCompressed(std::int32_t id, const std::function<void(wir
 
 void ClientSession::sendTranslated(const wire::multiversion::ProtocolChain& chain, std::int32_t id,
                                    std::span<const std::uint8_t> body) {
-    // Its own buffers rather than a shared scratch: a link may answer with more than one packet, and
-    // reusing one would have the second overwrite the first before it is on the wire.
+    // Own buffers, not a shared scratch: a link may answer with several packets and reuse would overwrite the first.
     chain.clientbound(state_, id, body, [this](std::int32_t translatedId, std::span<const std::uint8_t> translated) {
         wire::io::ByteBuffer whole;
         wire::protocol::varInt::write(whole, translatedId);
@@ -393,9 +362,7 @@ void ClientSession::sendTranslated(const wire::multiversion::ProtocolChain& chai
 }
 
 void ClientSession::handleCustomPayload(wire::io::ByteBuffer& body) {
-    // Read only when somebody is listening on that name: a modded client chatters on channels this
-    // server has no opinion about, and decoding all of it to throw it away would be a cost every
-    // server pays for the few that use one.
+    // Read only when somebody listens on that name: decoding modded channel chatter just to drop it is a cost for all.
     if (!options_.plugins.channelMessage || !options_.plugins.listensOn) {
         return;
     }
@@ -408,17 +375,13 @@ void ClientSession::handleCustomPayload(wire::io::ByteBuffer& body) {
 }
 
 void ClientSession::writeToSocket(const wire::io::ByteBuffer& frame) {
-    // Once this connection has its own outbound thread, every frame goes through the outbox and that
-    // thread is the only writer. Before then (login and configuration) there is no other thread to
-    // hand it to, so it goes straight out.
+    // With an outbound thread every frame goes through the outbox; during login and configuration writes go direct.
     const std::span<const std::uint8_t> bytes = frame.readable();
     if (outbox_.isOpen()) {
         static_cast<void>(outbox_.offer(std::vector<std::uint8_t>(bytes.begin(), bytes.end())));
         return;
     }
-    // One packet reaches the socket at a time: other threads broadcast into this session too, and
-    // without the lock their writes interleave mid-packet. The cipher sits inside the same lock
-    // because CFB8 is stateful and concurrent encryption would corrupt both packets.
+    // One packet at a time: broadcasts from other threads would interleave mid-packet, and CFB8 is stateful.
     const std::lock_guard<std::mutex> guard{sendMutex_};
     writeFrame(bytes);
 }
@@ -434,9 +397,7 @@ void ClientSession::writeFrame(std::span<const std::uint8_t> frame) {
 }
 
 void ClientSession::flushOutbox() {
-    // parity of intent with vanilla's own outbound queue: a client that stops draining delays only
-    // itself, and past the outbox's limit it is disconnected rather than left growing a queue nobody
-    // will ever read.
+    // Like vanilla's outbound queue: a stalled client delays only itself and past the limit is disconnected.
     if (closeWhenDrained_.load()) {
         {
             const std::lock_guard<std::mutex> guard{sendMutex_};
@@ -453,8 +414,7 @@ void ClientSession::flushOutbox() {
         connection_.close();
         return;
     }
-    // Taking and writing under the same lock, because two flushers that took their frames first and
-    // queued for the socket afterwards would write them in whichever order they woke up.
+    // Taking and writing under one lock, or two flushers would write their frames in whichever order they woke.
     const std::lock_guard<std::mutex> guard{sendMutex_};
     for (const std::vector<std::uint8_t>& frame : outbox_.drain()) {
         writeFrame(frame);

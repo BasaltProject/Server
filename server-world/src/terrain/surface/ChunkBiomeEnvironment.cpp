@@ -31,8 +31,7 @@ const std::string& ChunkBiomeEnvironment::noiseBiomeAt(std::int32_t quartX, std:
     if (found != noiseBiomes_.end()) {
         return found->second;
     }
-    // References into an unordered_map stay valid across later inserts, which is what lets this
-    // hand back a reference at all.
+    // References into an unordered_map stay valid across inserts.
     return noiseBiomes_.emplace(key, delegate_->noiseBiomeAt(quartX, quartY, quartZ, context_)).first->second;
 }
 

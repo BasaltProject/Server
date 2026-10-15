@@ -12,10 +12,7 @@
 
 namespace basalt::server::runtime::entity {
 
-/// The goat: its long jumps, its ram, its horns and its scream.
-///
-/// parity: `Goat`, `GoatAi`, `RamTarget`, `PrepareRamNearestTarget`, `LongJumpToRandomPos` and
-/// `LongJumpMidJump`.
+/// parity: `Goat`.
 namespace goats {
 
 inline constexpr std::array<std::int32_t, 2> kTimeBetweenLongJumps{600, 1200};

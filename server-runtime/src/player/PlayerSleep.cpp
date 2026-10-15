@@ -16,14 +16,13 @@
 namespace basalt::server::runtime::player {
 namespace {
 
-/// Says why the bed refused, on that player's own screen.
 void refuse(PlayerSession& player, const std::string_view key) {
     if (player.connection().sendActionBar) {
         player.connection().sendActionBar(wire::text::Component::translatable(std::string{key}));
     }
 }
 
-/// parity: `Player.freeAt` over `isSuffocating`: `causes_suffocation` and a full collision cube.
+/// parity: `Player.freeAt` over `isSuffocating`.
 [[nodiscard]] bool suffocatesAt(const BreakContext& context, world::LoadedWorld& world, const std::int32_t x,
                                 const std::int32_t y, const std::int32_t z) {
     const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
@@ -34,7 +33,7 @@ void refuse(PlayerSession& player, const std::string_view key) {
            server::registry::blockShapes::isFullCube(*state);
 }
 
-/// parity: `StrawBedBlock.destroyBed`: its sound, then the head gone and the foot after it, no drops.
+/// parity: `StrawBedBlock.destroyBed`.
 void destroyStrawBed(const BreakContext& context, world::LoadedWorld& world, const std::array<std::int32_t, 3>& head) {
     for (const PlayerSession* listener : playersIn(context, world.name())) {
         playSoundFor(*listener, "minecraft:block.straw_bed.break_leave", wire::protocol::play::SoundSource::Blocks,
@@ -46,7 +45,6 @@ void destroyStrawBed(const BreakContext& context, world::LoadedWorld& world, con
     }
 }
 
-/// Draws this player lying down, or standing up, on every screen in their world including their own.
 void showSleeping(const BreakContext& context, const PlayerSession& player, world::LoadedWorld& world,
                   const std::optional<std::array<std::int32_t, 3>>& bed) {
     for (const PlayerSession* watcher : playersIn(context, world.name())) {
@@ -72,8 +70,7 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
     const bool straw = world::beds::isStrawBed(*headState);
     const world::beds::Rule rule = world::beds::ruleFor(world.declaration().dimension, straw);
 
-    // parity: `AbstractBedBlock.useWithoutItem` asks the rule before anything else: a bed that goes
-    // on use goes, a straw bed quietly and any other with an explosion of five where it stood.
+    // parity: `AbstractBedBlock.useWithoutItem`.
     if (rule.destroyOnUse) {
         if (!rule.errorKey.empty()) {
             refuse(player, rule.errorKey);
@@ -95,8 +92,7 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
         return world::BedProblem::Occupied;
     }
 
-    // parity: `ServerPlayer.startSleepInBed`: reach, then room above both halves, then the spawn
-    // point, and only then whether the rule lets anyone sleep.
+    // parity: `ServerPlayer.startSleepInBed`.
     const std::array<std::int32_t, 3> foot{head[0] - step[0], head[1] - step[1], head[2] - step[2]};
     if (!world::beds::reachable(player.x, player.y, player.z, head[0], head[1], head[2]) &&
         !world::beds::reachable(player.x, player.y, player.z, foot[0], foot[1], foot[2])) {
@@ -129,8 +125,7 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
     player.sleepingBed = head;
     player.sleepTicks = 0;
     player.stats.reset(storage::stats::timeSinceRest());
-    // parity: `AbstractBedBlock.getSleptInBedStatType`, and `SLEPT_IN_BED` only where the bed is a
-    // spawn point: a straw bed counts the night and grants nothing.
+    // parity: `AbstractBedBlock.getSleptInBedStatType`.
     player.stats.increment(storage::stats::custom(straw ? "sleep_in_straw_bed" : "sleep_in_bed"));
     if (setsSpawn && context.blocks.triggers != nullptr) {
         context.blocks.triggers->fire("slept_in_bed", player.name(), player.uuid().toString());
@@ -160,13 +155,12 @@ void wakeUpFor(const BreakContext& context, PlayerSession& player, world::Loaded
     }
     const std::array<std::int32_t, 3> bed = *player.sleepingBed;
     player.sleepingBed.reset();
-    // parity: `stopSleepInBed(false, ...)`, the way out of bed that is not forced, leaves it at 100.
+    // parity: `stopSleepInBed(false, ...)`.
     player.sleepTicks = 100;
     if (world != nullptr) {
         freeBedAt(context, *world, bed[0], bed[1], bed[2]);
     }
     if (world != nullptr) {
-        // Nobody was moved into the bed, so nobody moves out.
         showSleeping(context, player, *world, std::nullopt);
     }
 }

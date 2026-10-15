@@ -4,7 +4,6 @@
 
 namespace basalt::server::registry::tags {
 namespace {
-
 using wire::common::Identifier;
 
 using Resolved = std::map<Identifier, std::set<Identifier>>;
@@ -12,14 +11,13 @@ using ResolvedOrder = std::map<Identifier, std::vector<Identifier>>;
 
 void addTo(std::set<Identifier>& values, const Identifier& id) { values.insert(id); }
 
-/// parity: the jar's `LinkedHashSet`, first occurrence wins.
+// parity: the jar's `LinkedHashSet`, first occurrence wins.
 void addTo(std::vector<Identifier>& values, const Identifier& id) {
     if (std::ranges::find(values, id) == values.end()) {
         values.push_back(id);
     }
 }
 
-/// Depth-first with the answer remembered, which is what makes each tag resolve exactly once.
 template <typename Values>
 struct Resolver {
     const std::map<Identifier, TagFile>& files;
@@ -69,7 +67,6 @@ struct Resolver {
         return &resolved.emplace(id, std::move(values)).first->second;
     }
 };
-
 } // namespace
 
 std::string TagError::message() const {
@@ -86,7 +83,6 @@ std::string TagError::message() const {
 }
 
 namespace {
-
 template <typename Values>
 [[nodiscard]] std::expected<std::map<Identifier, Values>, TagError>
 resolveAll(const std::map<Identifier, TagFile>& files, const ElementExists& elementExists) {
@@ -99,7 +95,6 @@ resolveAll(const std::map<Identifier, TagFile>& files, const ElementExists& elem
     }
     return std::move(resolver.resolved);
 }
-
 } // namespace
 
 std::expected<Resolved, TagError> resolve(const std::map<Identifier, TagFile>& files,
@@ -113,8 +108,6 @@ std::expected<ResolvedOrder, TagError> resolveOrdered(const std::map<Identifier,
 }
 
 namespace {
-
-/// Builds each tag once, after the ones it refers to; a failure is remembered as an absence.
 template <typename Values>
 struct LenientResolver {
     const std::map<Identifier, TagFile>& files;
@@ -171,7 +164,6 @@ template <typename Values>
     }
     return std::move(resolver.resolved);
 }
-
 } // namespace
 
 std::string TagFailure::message() const {
@@ -195,8 +187,6 @@ std::map<Identifier, std::vector<Identifier>> resolveEachOrdered(const std::map<
 
 namespace tagFileJson {
 namespace {
-
-/// A leading `#` is what makes an entry a reference to another tag rather than an element.
 [[nodiscard]] std::expected<TagEntry, ParseError> idOrTag(std::string_view raw, bool required) {
     const bool isTag = raw.starts_with('#');
     const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(isTag ? raw.substr(1) : raw);
@@ -226,7 +216,6 @@ namespace {
     const bool* flag = required == nullptr ? nullptr : required->get<bool>();
     return idOrTag(*text, flag == nullptr || *flag);
 }
-
 } // namespace
 
 std::expected<TagFile, ParseError> parse(const wire::common::JsonValue& root) {
@@ -264,7 +253,5 @@ std::expected<TagFile, ParseError> parse(std::string_view json) {
     }
     return parse(*root);
 }
-
 } // namespace tagFileJson
-
 } // namespace basalt::server::registry::tags

@@ -110,8 +110,6 @@ constexpr std::array<float, 14> kNetherrackByDistance{1.0F, 1.0F, 1.0F, 1.0F, 1.
     return (value % divisor != 0 && ((value < 0) != (divisor < 0))) ? quotient - 1 : quotient;
 }
 
-/// A block as the portal's processors see it: a path plus whatever properties the template carries,
-/// which is the only shape the rule, ageing and blackstone passes can rewrite.
 struct PortalState {
     std::string path;
     std::map<std::string, std::string> properties;
@@ -290,7 +288,6 @@ struct PortalState {
 
 } // namespace
 
-/// The portal's start, kept whole because every later step reads it.
 struct NetherRuinedPortalGenerator::PortalStart {
     std::string templateName;
     const structure::StructureTemplate* piece = nullptr;
@@ -308,7 +305,6 @@ struct NetherRuinedPortalGenerator::PortalStart {
     }
 };
 
-/// The neighbourhood the one global placement runs against, before its writes are clipped per chunk.
 struct NetherRuinedPortalGenerator::PortalWorld {
     std::map<std::pair<std::int32_t, std::int32_t>, Chunk>* chunks = nullptr;
     const BaseStateAt* baseStateAt = nullptr;
@@ -394,7 +390,7 @@ NetherRuinedPortalGenerator::createStart(std::int64_t seed, std::int32_t candida
                                          bool forPlacement) const {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
-    // parity: 26.3 sets the Nether portal's `air_pocket_probability` to 0, and a zero draws nothing.
+    // parity: 26.3 sets the Nether portal's `air_pocket_probability` to 0.
     const bool airPocket = false;
     const std::string templateName =
         random.nextFloat() < kGiantPortalProbability
@@ -462,8 +458,7 @@ void NetherRuinedPortalGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::
     if (!start.has_value() || !start->effectIntersects(clip)) {
         return;
     }
-    // The replay is cached per (seed, chunk, ...), and a placed start equals the worldgen start
-    // wherever worldgen found one, so the cache cannot serve a different answer afterwards.
+    // The cache cannot serve a different answer, a placed start equals the worldgen start.
     applyReplay(chunk, replay(seed, chunkX, chunkZ, *start));
 }
 
@@ -534,8 +529,7 @@ void NetherRuinedPortalGenerator::placeTemplate(const PortalStart& start, Portal
         }
     }
 
-    // parity: `TemplateStructurePiece` performs this second pass after `placeInWorld`, outside the
-    // processor chain, so even a processor-rejected jigsaw position receives its final state.
+    // parity: `TemplateStructurePiece` runs this second pass outside the processor chain.
     for (const structure::StructureBlockInfo& blockInfo : start.piece->blocks()) {
         if (PortalState::from(blockInfo.stateId, blockInfo.properties).path != "jigsaw") {
             continue;

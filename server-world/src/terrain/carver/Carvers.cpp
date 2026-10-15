@@ -549,7 +549,7 @@ void carve(Chunk& chunk, std::int64_t seed, NoiseChunk& noiseChunk, const NoiseR
             }
         }
     }
-    // parity: `applyCarvingMask`, run lengths of set bits in column order, each filled top down.
+    // parity: `applyCarvingMask`.
     const std::int32_t height = mask.height();
     const std::int32_t bedrock = registry::blocks::bedrock().stateId;
     const std::int32_t dirt = registry::blocks::named("dirt")->stateId;

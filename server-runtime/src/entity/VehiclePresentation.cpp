@@ -9,7 +9,7 @@ namespace {
 using wire::protocol::play::SetEntityDataPacket;
 using Entry = SetEntityDataPacket::Entry;
 
-/// parity: `VehicleEntity`'s three fields, eight to ten, and each vehicle's own thirteenth.
+/// parity: `VehicleEntity`'s three fields.
 constexpr std::uint8_t kHurtIndex = 8;
 constexpr std::uint8_t kHurtDirIndex = 9;
 constexpr std::uint8_t kDamageIndex = 10;
@@ -38,7 +38,6 @@ std::optional<VehicleData> vehicleDataOf(const ServerEntity& entity) {
 }
 
 void appendVehicleChanges(std::vector<Entry>& entries, const VehicleData& now, const VehicleData* before) {
-    // A new viewer is told only what differs from the defaults: still, facing one way and whole.
     if (before == nullptr ? now.hurtTime != 0 : before->hurtTime != now.hurtTime) {
         entries.push_back(Entry{.index = kHurtIndex, .value = SetEntityDataPacket::IntValue{.value = now.hurtTime}});
     }

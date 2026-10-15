@@ -10,15 +10,9 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// The small vanilla features that are one block, one column or one pile: what is left of the
-/// `/place feature` registry once the big decoration steps have their own bodies.
-///
-/// parity: `SimpleBlockFeature`, `BlockColumnFeature` and `BlockPileFeature`, each rolled at the
-/// position it was given. The placement modifiers that decide *where* generation puts one are the
-/// command's business, not theirs.
+/// parity: `SimpleBlockFeature`.
 namespace smallFeatures {
 
-/// Every vanilla placed feature name this file answers, and what it places.
 [[nodiscard]] const std::set<std::string, std::less<>>& placedIds();
 
 bool placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin, std::string_view placedFeature);

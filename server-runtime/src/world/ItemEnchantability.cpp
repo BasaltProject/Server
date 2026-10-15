@@ -16,8 +16,7 @@ constexpr std::array<std::pair<std::string_view, std::int32_t>, 7> kSpecial{{
     {"fishing_rod", 1},
     {"mace", 15},
     {"trident", 1},
-    // parity: `ArmorMaterials.TURTLE_SCUTE`, which is the only armour whose name has no material
-    // prefix.
+    // parity: `ArmorMaterials.TURTLE_SCUTE`.
     {"turtle_helmet", 9},
 }};
 
@@ -35,8 +34,7 @@ constexpr std::array<std::pair<std::string_view, std::int32_t>, 7> kArmourMateri
     {"netherite_", 15},
 }};
 
-/// parity: `ToolMaterial`'s own `enchantmentValue`, which is a different table from the armour's:
-/// a golden pickaxe takes enchantments better than a golden helmet does.
+/// parity: `ToolMaterial`'s own `enchantmentValue`.
 constexpr std::array<std::pair<std::string_view, std::int32_t>, 7> kToolMaterials{{
     {"wooden_", 15},
     {"stone_", 5},

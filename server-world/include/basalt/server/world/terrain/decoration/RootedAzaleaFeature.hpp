@@ -6,7 +6,7 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// parity: `RootSystemFeature`, the root body and the bending azalea tree `rooted_azalea_tree` grows.
+/// parity: `RootSystemFeature`.
 namespace rootedAzaleaFeature {
 
 bool place(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin);

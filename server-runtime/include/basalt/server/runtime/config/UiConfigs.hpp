@@ -14,7 +14,6 @@
 
 namespace basalt::server::runtime::config {
 
-/// One look for the player list. Anything left out is taken from the default profile.
 struct TabListProfile {
     ProfileHeader header;
     std::optional<std::vector<std::string>> headerLines;
@@ -23,7 +22,6 @@ struct TabListProfile {
     [[nodiscard]] TabListProfile inheriting(const TabListProfile& fallback) const;
 };
 
-/// `config/tab_list.toml`.
 struct TabListConfig {
     static constexpr std::string_view kFileName = "tab_list.toml";
 
@@ -32,7 +30,6 @@ struct TabListConfig {
     std::vector<TabListProfile> profiles;
     std::size_t defaultIndex = 0;
 
-    /// What a server that never read the file has: nothing drawn and nothing to draw.
     [[nodiscard]] static TabListConfig disabled();
 
     [[nodiscard]] static std::expected<TabListConfig, std::string>
@@ -42,7 +39,6 @@ struct TabListConfig {
     [[nodiscard]] const TabListProfile& defaultProfile() const { return profiles[defaultIndex]; }
 };
 
-/// One board: a title and its rows. Anything left out is taken from the default profile.
 struct ScoreboardProfile {
     ProfileHeader header;
     std::optional<std::string> title;
@@ -51,7 +47,6 @@ struct ScoreboardProfile {
     [[nodiscard]] ScoreboardProfile inheriting(const ScoreboardProfile& fallback) const;
 };
 
-/// `config/scoreboard.toml`.
 struct ScoreboardConfig {
     static constexpr std::string_view kFileName = "scoreboard.toml";
 
@@ -72,19 +67,16 @@ struct ScoreboardConfig {
     [[nodiscard]] const ScoreboardProfile& defaultProfile() const { return profiles[defaultIndex]; }
 };
 
-/// One bar. Anything left out is taken from the default profile.
 struct BossBarProfile {
     ProfileHeader header;
     std::optional<std::string> text;
     std::optional<wire::protocol::play::BossBarColor> color;
     std::optional<wire::protocol::play::BossBarOverlay> overlay;
-    /// Kept as written so it can be a placeholder; resolved and clamped when the bar is drawn.
     std::optional<std::string> progress;
 
     [[nodiscard]] BossBarProfile inheriting(const BossBarProfile& fallback) const;
 };
 
-/// `config/boss_bar.toml`.
 struct BossBarConfig {
     static constexpr std::string_view kFileName = "boss_bar.toml";
 
@@ -102,10 +94,8 @@ struct BossBarConfig {
     [[nodiscard]] const BossBarProfile& defaultProfile() const { return profiles[defaultIndex]; }
 };
 
-/// What `/bossbar set <id> color` takes, which is the enum's own name in lower case.
 [[nodiscard]] std::string_view bossBarColorName(wire::protocol::play::BossBarColor color) noexcept;
 
-/// The three UI files as one thing, because they are read, reloaded and handed around together.
 struct UiConfigs {
     TabListConfig tabList = TabListConfig::disabled();
     ScoreboardConfig scoreboard = ScoreboardConfig::disabled();

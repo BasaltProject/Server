@@ -27,7 +27,7 @@ constexpr std::int32_t kSurfaceStructuresStep = 4;
 constexpr std::int32_t kReturnGatewayIndex = 0;
 constexpr std::int32_t kEndSpikeIndex = 1;
 
-/// parity: `EndSpike.isCenterWithinChunk`'s neighbour: whether any of the spike's column lands here.
+/// parity: `EndSpike.isCenterWithinChunk`'s neighbour.
 [[nodiscard]] bool intersects(const EndSpike& spike, const Chunk& chunk) {
     const std::int32_t minX = chunk.chunkX() * 16;
     const std::int32_t minZ = chunk.chunkZ() * 16;
@@ -100,8 +100,6 @@ void placeSpike(Chunk& chunk, const EndSpike& spike, std::int64_t seed) {
     return x + 1 >= minX && x - 1 <= minX + 15 && z + 1 >= minZ && z - 1 <= minZ + 15;
 }
 
-/// A gateway can be rolled in a neighbouring chunk and still reach into this one, and its height
-/// comes from that chunk's own terrain, so the neighbour has to be generated to ask.
 [[nodiscard]] Chunk generateRawSourceChunk(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed,
                                            const NoiseRouter& router, const TheEndBiomeSource& biomeSource) {
     Chunk chunk{chunkX, chunkZ, kEndHeight};

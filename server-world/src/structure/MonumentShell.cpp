@@ -306,7 +306,6 @@ void upperWall(const MonumentBrush& brush) {
     }
 }
 
-/// The seven by seven grid of legs, minus the one the entrance stands in.
 void pillars(const MonumentBrush& brush) {
     const std::int32_t light = monumentPalette::baseLight();
     for (std::int32_t pillarX = 0; pillarX < 7; ++pillarX) {
@@ -346,8 +345,6 @@ void monumentShell::place(const MonumentBrush& brush, std::int32_t seaLevel) {
     middleWall(brush);
     upperWall(brush);
     pillars(brush);
-    // Five skirts of water stepping outward and upward, which is what keeps the sea bed from
-    // pressing against the walls.
     for (std::int32_t step = 0; step < 5; ++step) {
         brush.waterBox(-1 - step, step * 2, -1 - step, -1 - step, 23, 58 + step);
         brush.waterBox(58 + step, step * 2, -1 - step, 58 + step, 23, 58 + step);

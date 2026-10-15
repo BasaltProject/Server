@@ -43,8 +43,7 @@ constexpr std::array<std::pair<std::int32_t, std::int32_t>, 5> kSandOffsets{{{0,
     return chunk.decorationBlockStateId(x, y, z);
 }
 
-/// parity: the rule the two suspicious sand templates carry: the sand keeps its state and gains the
-/// well's archaeology loot table.
+/// parity: the suspicious sand templates keep the state and gain the well's archaeology loot table.
 const structure::StructureProcessorList& suspiciousSandProcessors() {
     static const structure::StructureProcessorList list{{structure::StructureProcessorRule{
         .inputTest = structure::StructureRuleTest::blockMatch(stateIdOf("suspicious_sand")),
@@ -70,8 +69,7 @@ const structure::StructureProcessorList& suspiciousSandProcessors() {
     return {dx, dz};
 }
 
-/// parity: `TemplateFeature`: a weighted pick of its one template, a random rotation, and the
-/// template centred on the origin by half its size along the rotated west and north.
+/// parity: `TemplateFeature` centres the template by half its size along the rotated west and north.
 void placeTemplate(Chunk& chunk, random::RandomSource& random, StructurePos origin, std::string_view name,
                    const structure::TemplateLoader& templates, const structure::StructureProcessorList* processors) {
     static_cast<void>(random.nextInt(1));
@@ -106,7 +104,7 @@ void desertWellDecoration::placeAt(Chunk& chunk, random::RandomSource& random, s
     if (!templates) {
         return;
     }
-    // parity: the 26.3 `desert_well`, an `overlay` of the well and two suspicious sand blocks.
+    // parity: the 26.3 `desert_well`.
     placeTemplate(chunk, random, StructurePos{x, y - 2, z}, "desert_well/well", templates, nullptr);
     for (const std::int32_t depth : {1, 2}) {
         const auto [dx, dz] = kSandOffsets[static_cast<std::size_t>(random.nextInt(kSandOffsets.size()))];
@@ -133,8 +131,7 @@ void desertWellDecoration::decorate(Chunk& chunk, std::int64_t seed, const surfa
     const std::int32_t x = chunk.chunkX() * 16 + localX;
     const std::int32_t y = height - 1;
     const std::int32_t z = chunk.chunkZ() * 16 + localZ;
-    // parity: the placement's own filter: sand here, and nothing but solid ground in the 5 by 5 by 2
-    // box under it.
+    // parity: sand here and solid ground in the 5 by 5 by 2 box under it.
     if (get(chunk, x, y, z) != stateIdOf("sand")) {
         return;
     }

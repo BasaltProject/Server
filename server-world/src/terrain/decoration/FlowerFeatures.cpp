@@ -58,8 +58,7 @@ void paleGardenDecoration::placeSingleAt(Chunk& chunk, random::RandomSource& ran
 }
 
 std::int32_t cherryGroveDecoration::pinkPetalsStateId(std::int32_t choice) {
-    // parity: the weighted provider walks amount 1 through 4 crossed with the horizontal plane order
-    // north, east, south, west, and those facings are not four consecutive state ids.
+    // parity: the weighted provider's facings are not four consecutive state ids.
     static constexpr std::array<std::int32_t, 4> kHorizontalFacingStateOffsets = {0, 12, 4, 8};
     const std::int32_t amountOffset = choice / 4;
     const std::int32_t facingOffset = kHorizontalFacingStateOffsets[static_cast<std::size_t>(choice % 4)];

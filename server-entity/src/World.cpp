@@ -4,7 +4,6 @@
 #include <cstdint>
 
 namespace basalt::server::entity::ecs {
-
 EntityId World::create() {
     std::int32_t index = 0;
     if (!freeIndices_.empty()) {
@@ -45,5 +44,4 @@ void World::ensureCapacity(std::int32_t minSize) {
     generations_.resize(newSize, 0);
     alive_.resize(newSize, false);
 }
-
 } // namespace basalt::server::entity::ecs

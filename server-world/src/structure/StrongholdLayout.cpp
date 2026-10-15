@@ -52,7 +52,6 @@ struct PieceWeight {
             PieceWeight{.kind = StrongholdPieceKind::PortalRoom, .weight = 20, .maxPlaceCount = 1, .minDepth = 5}};
 }
 
-/// One attempt at the maze: the pieces placed so far, plus the weights they have used up.
 class Walk {
 public:
     explicit Walk(random::RandomSource& random) : random_(&random), weights_(defaultWeights()) {}
@@ -66,23 +65,22 @@ public:
     void addChildren(std::size_t index);
 
 private:
-    /// parity: `generateSmallDoorChildForward`, which leaves through the face the piece points at.
+    /// parity: `generateSmallDoorChildForward`.
     void forward(std::size_t index, std::int32_t xOff, std::int32_t yOff);
-    /// parity: `generateSmallDoorChildLeft`. North and south both leave through the west face.
+    /// parity: `generateSmallDoorChildLeft`.
     void left(std::size_t index, std::int32_t yOff, std::int32_t zOff);
     /// parity: `generateSmallDoorChildRight`, the mirror of the one above.
     void right(std::size_t index, std::int32_t yOff, std::int32_t zOff);
     /// parity: `generateAndAddPiece`, with its 112-block leash and its depth ceiling.
     void grow(std::int32_t footX, std::int32_t footY, std::int32_t footZ, StructureDirection direction,
               std::int32_t depth);
-    /// parity: `generatePieceFromSmallDoor`. Five attempts at the weighted table, each of which gives
-    /// up the moment its chosen kind is refused, and then a filler corridor.
+    /// parity: `generatePieceFromSmallDoor`.
     [[nodiscard]] std::optional<StrongholdPiece> pieceFromSmallDoor(std::int32_t footX, std::int32_t footY,
                                                                     std::int32_t footZ, StructureDirection direction,
                                                                     std::int32_t depth);
     /// parity: `updatePieceWeight`, which also refuses to go on once no capped kind is left.
     [[nodiscard]] bool updateWeights();
-    /// parity: each kind's `createPiece`: build the box, refuse it below y 10 or on a collision.
+    /// parity: each kind's `createPiece`.
     [[nodiscard]] std::optional<StrongholdPiece> create(StrongholdPieceKind kind, std::int32_t footX,
                                                         std::int32_t footY, std::int32_t footZ,
                                                         StructureDirection direction, std::int32_t depth);
@@ -90,8 +88,7 @@ private:
                                                         StructureDirection direction, std::int32_t depth);
     /// parity: `randomSmallDoor`: two of the five draws are the plain opening.
     [[nodiscard]] StrongholdDoor randomDoor();
-    /// parity: `FillerCorridor.findPieceBox`. A filler is only laid where something is already in the
-    /// way at the same height, and it is shortened until it just touches it.
+    /// parity: `FillerCorridor.findPieceBox`.
     [[nodiscard]] std::optional<StructureBoundingBox> fillerBox(std::int32_t footX, std::int32_t footY,
                                                                 std::int32_t footZ, StructureDirection direction);
     [[nodiscard]] std::optional<StructureBoundingBox> collision(const StructureBoundingBox& box) const;
@@ -287,8 +284,7 @@ std::optional<StrongholdPiece> Walk::pieceFromSmallDoor(std::int32_t footX, std:
             if (!weights_[index].doPlace(depth) || previous_ == weights_[index].kind) {
                 break;
             }
-            // parity: a kind that does not fit does not end the attempt. The running total stays
-            // negative, so every remaining kind is tried in table order until one fits.
+            // parity: a kind that does not fit does not end the attempt.
             std::optional<StrongholdPiece> piece = create(weights_[index].kind, footX, footY, footZ, direction, depth);
             if (!piece.has_value()) {
                 continue;
@@ -402,8 +398,7 @@ std::optional<StrongholdPiece> Walk::create(StrongholdPieceKind kind, std::int32
     case StrongholdPieceKind::ChestCorridor:
         return simple(kind, box(-1, -1, 5, 5, 7), direction, depth);
     case StrongholdPieceKind::Library: {
-        // parity: the tall library is tried first and the short one is the fallback, so a library
-        // that fits only at six blocks still counts against the cap.
+        // parity: the tall library is tried first and the short one is the fallback, so a library that fits only at.
         StructureBoundingBox candidate = box(-4, -1, 14, 11, 15);
         if (!free(candidate)) {
             candidate = box(-4, -1, 14, 6, 15);
@@ -462,8 +457,7 @@ std::optional<StructureBoundingBox> Walk::collision(const StructureBoundingBox& 
     return std::nullopt;
 }
 
-/// parity: `StructurePiecesBuilder.moveBelowSeaLevel`, which drops the whole maze so that its top
-/// sits ten blocks under the sea, or lower still when there is room to spare.
+/// parity: `StructurePiecesBuilder.moveBelowSeaLevel`.
 void moveBelowSeaLevel(std::vector<StrongholdPiece>& pieces, random::RandomSource& random, std::int32_t seaLevel,
                        std::int32_t minY) {
     if (pieces.empty()) {

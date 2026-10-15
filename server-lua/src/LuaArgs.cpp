@@ -9,7 +9,6 @@ extern "C" {
 #include <cstdlib>
 
 namespace basalt::server::lua {
-
 std::int32_t LuaArgs::count() const { return lua_gettop(state_); }
 
 bool LuaArgs::isNil(std::int32_t index) const { return lua_isnoneornil(state_, index); }
@@ -67,7 +66,6 @@ std::optional<std::string> LuaArgs::fieldAsText(std::int32_t index, std::string_
     std::size_t length = 0;
     const char* text = luaL_tolstring(state_, -1, &length);
     std::string value{text, length};
-    // Two: what `luaL_tolstring` pushed, and the field itself.
     lua_pop(state_, 2);
     return value;
 }
@@ -139,5 +137,4 @@ void LuaArgs::pushMetatable(std::int32_t index) {
 }
 
 std::int32_t LuaArgs::top() const { return lua_gettop(state_); }
-
 } // namespace basalt::server::lua

@@ -125,14 +125,12 @@ bool cactusFeature::canPlace(Chunk& chunk, const DecorationPos& origin) {
 
 bool cactusFeature::placeColumn(PatchRegion& region, random::RandomSource& random, const DecorationPos& origin,
                                 ChunkHeight bounds) {
-    // parity: BiasedToBottomInt.sample is min + nextInt(nextInt(max - min + 1) + 1); the flower
-    // layer's weighted list draws nextInt(4) with only the last slot blooming.
+    // parity: `BiasedToBottomInt.sample` is min + nextInt(nextInt(max - min + 1) + 1).
     const std::int32_t cactusHeight = 1 + random.nextInt(random.nextInt(3) + 1);
     const std::int32_t flowerHeight = random.nextInt(4) == 3 ? 1 : 0;
     const std::int32_t totalHeight = cactusHeight + flowerHeight;
 
-    // parity: the allowed-placement walk checks air above the origin and truncates the flower layer
-    // first, then the cactus body.
+    // parity: the placement walk checks air above the origin and truncates the flower layer first.
     std::int32_t newHeight = totalHeight;
     for (std::int32_t dy = 1; dy <= totalHeight; ++dy) {
         const DecorationPos position{origin.x, origin.y + dy, origin.z};

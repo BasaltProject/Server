@@ -36,7 +36,6 @@ enum class CloneMode : std::uint8_t { Normal, Force, Move };
     return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
 }
 
-/// The world an argument named, or the one the command acts on when it named none.
 [[nodiscard]] world::LoadedWorld* worldNamed(const CommandContext& context, std::string_view name,
                                              world::LoadedWorld* fallback) {
     auto* const* found = context.get<world::LoadedWorld*>(name);
@@ -92,8 +91,7 @@ enum class CloneMode : std::uint8_t { Normal, Force, Move };
         }
     }
 
-    // Read first, write after: a `force` clone onto itself would otherwise copy blocks it has
-    // already overwritten.
+    // Read first, write after: a `force` clone onto itself would otherwise copy blocks it has already overwritten.
     struct Copied {
         std::int32_t x = 0;
         std::int32_t y = 0;
@@ -146,7 +144,6 @@ CloneCommand::CloneCommand() : Command("clone", permissionLevel::kGamemasters) {
 
 namespace {
 
-/// The three movements every clone form ends in, plus the bare one Basalt accepts loose.
 void cloneMovements(const CommandNodeBuilder& node, bool skipAir, bool filtered) {
     node.executes([skipAir, filtered](const CommandContext& context) {
         return clone(context, CloneMode::Normal, skipAir, filtered);
@@ -170,13 +167,7 @@ void cloneFilters(const CommandNodeBuilder& node) {
     });
 }
 
-/// The tail every form shares: what to copy, and what to do with the source afterwards.
-///
-/// `strict` is declared and accepted: vanilla uses it to copy states nothing would normally place,
-/// and this build's clone already writes them exactly, so it changes nothing here.
 void cloneModes(const CommandNodeBuilder& node) {
-    // The bare movement is Basalt's own: vanilla asks for `replace`/`masked`/`filtered` first, and
-    // accepting it loose is syntax on top rather than syntax that differs.
     cloneMovements(node, false, false);
     cloneFilters(node);
     node.literal("strict", [](const CommandNodeBuilder& strict) {
@@ -386,10 +377,7 @@ chunkRange(const CommandContext& context, bool single) {
             CommandSyntaxError{.component = Component::translatable("commands.forceload." + verb + ".failure")}};
     }
     if (adding) {
-        // parity: a forced region is materialised in the order the command enumerates it, measured on
-        // the jar in the nether: from the corner, x outermost. The spawn warm-up is the one that goes
-        // in rings, and it is another code path.
-        // Generated now, not on next visit: the point of forcing a chunk is that it is there.
+        // parity: a forced region is materialised in the order the command enumerates it.
         for (const auto& [x, z] : moved) {
             (*world)->generationQueue().request(x, z, 0);
         }

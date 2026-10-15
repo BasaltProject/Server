@@ -8,9 +8,7 @@
 
 namespace basalt::server::world::structure {
 
-/// parity: `WoodlandMansionPieces.FloorRoomCollection`. Which template goes in a room of each shape.
-/// The third floor is the second floor's catalogue unchanged, exactly as `ThirdFloorRoomCollection`
-/// inherits it without overriding anything.
+/// parity: `WoodlandMansionPieces.FloorRoomCollection`.
 class MansionRoomCollection {
 public:
     explicit MansionRoomCollection(bool groundFloor) : groundFloor_(groundFloor) {}
@@ -19,7 +17,7 @@ public:
     [[nodiscard]] std::string room1x1Secret(random::RandomSource& random) const;
     [[nodiscard]] std::string room1x2SideEntrance(random::RandomSource& random, bool isStairs) const;
     [[nodiscard]] std::string room1x2FrontEntrance(random::RandomSource& random, bool isStairs) const;
-    /// parity: the upper floors draw `nextInt(1)`, which always gives `1x2_se1` and still costs a roll.
+    /// parity: the upper floors draw `nextInt(1)`.
     [[nodiscard]] std::string room1x2Secret(random::RandomSource& random) const;
     [[nodiscard]] std::string room2x2(random::RandomSource& random) const;
     [[nodiscard]] static std::string room2x2Secret();
@@ -31,9 +29,7 @@ private:
     bool groundFloor_;
 };
 
-/// parity: the four `addRoom*` methods of `MansionPiecePlacer`. Every combination of where the door
-/// is and which way the room runs has its own offset, turn and mirror, and they are not derivable
-/// from one another: the jar spells all sixteen out and so does this.
+/// parity: the four `addRoom*` methods of `MansionPiecePlacer`.
 namespace mansionRoomFiller {
 
 void addRoom1x1(std::vector<MansionPiece>& pieces, random::RandomSource& random, StructurePos position,

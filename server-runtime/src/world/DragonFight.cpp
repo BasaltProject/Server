@@ -105,7 +105,7 @@ void DragonFight::shuffleGateways(std::int64_t seed) {
     for (std::int32_t index = 0; index < kGatewayCount; ++index) {
         gateways.push_back(index);
     }
-    // parity: `Util.shuffle` over `RandomSource.createThreadLocalInstance(seed)`, a plain LCG.
+    // parity: `Util.shuffle` over `RandomSource.createThreadLocalInstance(seed)`.
     random::RandomSource random = random::RandomSource::legacy(seed);
     for (auto index = static_cast<std::int32_t>(gateways.size()); index > 1; --index) {
         const std::int32_t swapTo = random.nextInt(index);

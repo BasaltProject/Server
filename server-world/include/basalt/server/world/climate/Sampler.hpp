@@ -12,8 +12,7 @@ class SamplerContext;
 
 namespace basalt::server::world::climate {
 
-/// parity: `Climate.Sampler`. Samples the six axes at a position given in quart coordinates,
-/// vanilla's four-block biome grid, and quantises the result.
+/// parity: `Climate.Sampler`.
 class Sampler {
 public:
     Sampler(densityfunction::RandomState& state, const densityfunction::Function& temperature,
@@ -21,7 +20,6 @@ public:
             const densityfunction::Function& erosion, const densityfunction::Function& depth,
             const densityfunction::Function& weirdness);
 
-    /// Through `context` when given, otherwise uncached, the way `createUncachedResolver` samples.
     [[nodiscard]] TargetPoint sample(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ,
                                      densityfunction::SamplerContext* context = nullptr) const;
 

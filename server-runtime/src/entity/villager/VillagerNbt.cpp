@@ -15,7 +15,6 @@ using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
 using wire::nbt::NbtType;
 
-/// The dimension a `GlobalPos` names when the villager has not ticked in any world yet.
 constexpr std::string_view kDefaultDimension = "minecraft:overworld";
 
 [[nodiscard]] const NbtCompound* compoundAt(const NbtCompound& tag, std::string_view key) {

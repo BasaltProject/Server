@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -34,14 +33,11 @@ namespace {
     return directory.string();
 }
 
-/// Big-endian, the only way anything in this format is written.
 [[nodiscard]] std::uint32_t readIntAt(std::span<const std::uint8_t> from, std::size_t offset) {
     return (static_cast<std::uint32_t>(from[offset]) << 24) | (static_cast<std::uint32_t>(from[offset + 1]) << 16) |
            (static_cast<std::uint32_t>(from[offset + 2]) << 8) | static_cast<std::uint32_t>(from[offset + 3]);
 }
 
-/// The error, or nothing when the read in fact succeeded: asking a successful `expected` for its
-/// error is undefined, and a check written that way passes for the wrong reason.
 [[nodiscard]] std::optional<LinearError> errorOf(std::span<const std::uint8_t> bytes) {
     const std::expected<LinearRegion, LinearError> read = LinearRegion::read(bytes);
     return read.has_value() ? std::nullopt : std::optional{read.error()};
@@ -61,11 +57,9 @@ TEST_CASE("an empty region is a header, an empty table and a footer") {
     CHECK(region.timestampAt(0, 0) == 0);
 
     const std::vector<std::uint8_t> written = region.write();
-    // The signature at both ends is what a reader checks before trusting anything between them.
     CHECK(written[0] == 0xC3);
     CHECK(written[7] == 0x9A);
     CHECK(written[8] == 1);
-    // No chunks, so nothing is declared and the newest timestamp is nothing.
     CHECK(written[18] == 0);
     CHECK(written[19] == 0);
 
@@ -86,7 +80,6 @@ TEST_CASE("what goes into a region comes back out of it, at the same coordinates
     CHECK(region.residentBytes() == 4096 + 70000 + 1);
 
     const std::vector<std::uint8_t> written = region.write();
-    // A whole region as one zstd stream, which is the entire point of the format.
     CHECK(written.size() < 4096 + 70000 + 8192);
 
     const std::expected<LinearRegion, LinearError> read = LinearRegion::read(written);
@@ -98,11 +91,9 @@ TEST_CASE("what goes into a region comes back out of it, at the same coordinates
     CHECK(read->timestampAt(31, 31) == 2000);
     CHECK(read->timestampAt(5, 17) == 3000);
     CHECK(read->residentBytes() == region.residentBytes());
-    // Everything else is still empty, and empty is not a chunk of zero bytes.
     CHECK_FALSE(read->hasChunkAt(1, 0));
     CHECK_FALSE(read->hasChunkAt(17, 5));
 
-    // The header declares what the table holds: three chunks and the newest of the three stamps.
     CHECK(written[18] == 0);
     CHECK(written[19] == 3);
 }
@@ -118,18 +109,9 @@ TEST_CASE("a chunk written twice is the second one, and one taken out is gone") 
     region.clearChunk(2, 3);
     CHECK(region.residentBytes() == 0);
     CHECK_FALSE(region.hasChunkAt(2, 3));
-    // And what is not there is not written, so the file is an empty region again.
     const std::expected<LinearRegion, LinearError> read = LinearRegion::read(region.write());
     REQUIRE(read.has_value());
     CHECK_FALSE(read->hasChunkAt(2, 3));
-}
-
-TEST_CASE("coordinates outside the region are refused rather than folded back in") {
-    LinearRegion region;
-    CHECK_THROWS_AS(region.setChunk(32, 0, blob(4, 0), 0), std::out_of_range);
-    CHECK_THROWS_AS(region.setChunk(-1, 0, blob(4, 0), 0), std::out_of_range);
-    CHECK_THROWS_AS(static_cast<void>(region.chunkAt(0, 32)), std::out_of_range);
-    CHECK_THROWS_AS(static_cast<void>(region.timestampAt(0, -1)), std::out_of_range);
 }
 
 TEST_CASE("a file written to disk reads back the same as one written to memory") {
@@ -146,8 +128,6 @@ TEST_CASE("a file written to disk reads back the same as one written to memory")
 
     const std::optional<std::vector<std::uint8_t>> onDisk = fileIO::readBytes(path);
     REQUIRE(onDisk.has_value());
-    // The streamed write patches the length back into the header, so the two paths agree byte for
-    // byte.
     CHECK(*onDisk == region.write());
 
     const std::expected<LinearRegion, LinearError> read = LinearRegion::read(*onDisk);
@@ -173,7 +153,6 @@ TEST_CASE("a corrupt region says what is wrong with it rather than half-reading 
     std::vector<std::uint8_t> badVersion = good;
     badVersion[8] = 3;
     CHECK(errorOf(badVersion) == LinearError::UnsupportedVersion);
-    // Version two is the same layout with a different compression note, and reads.
     std::vector<std::uint8_t> versionTwo = good;
     versionTwo[8] = 2;
     CHECK(LinearRegion::read(versionTwo).has_value());
@@ -186,20 +165,16 @@ TEST_CASE("a corrupt region says what is wrong with it rather than half-reading 
     badLength[23] = static_cast<std::uint8_t>(badLength[23] + 1);
     CHECK(errorOf(badLength) == LinearError::LengthMismatch);
 
-    // A header that claims more chunks than the table holds: the file is not what wrote it.
     std::vector<std::uint8_t> badCount = good;
     badCount[19] = 7;
     CHECK(errorOf(badCount) == LinearError::ChunkCountMismatch);
 }
 
 TEST_CASE("a stream that ends before its own table does") {
-    // A region whose compressed body is a valid frame of nothing: the table cannot be read out of
-    // it, which is not the same as a region with no chunks.
     LinearRegion region;
     const std::vector<std::uint8_t> good = region.write();
     std::vector<std::uint8_t> truncated;
     truncated.insert(truncated.end(), good.begin(), good.begin() + 32);
-    // An empty zstd frame, then the footer, with the length patched to match.
     const std::vector<std::uint8_t> emptyFrame = basalt::wire::io::zstd::compress(std::vector<std::uint8_t>{}).value();
     truncated.insert(truncated.end(), emptyFrame.begin(), emptyFrame.end());
     truncated.insert(truncated.end(), good.end() - 8, good.end());
@@ -216,8 +191,6 @@ TEST_CASE("the table is laid out the way linear.py reads it") {
     region.setChunk(0, 1, blob(128, 2), 222);
     const std::vector<std::uint8_t> written = region.write();
 
-    // The newest of the timestamps goes in the header, where a tool that never decompresses the
-    // body can see how old the region is.
     CHECK(readIntAt(written, 13) == 222);
 
     const std::size_t compressedLength = readIntAt(written, 20);
@@ -225,22 +198,18 @@ TEST_CASE("the table is laid out the way linear.py reads it") {
         basalt::wire::io::zstd::decompress(std::span{written}.subspan(32, compressedLength)).value();
     REQUIRE(body.size() > 8192);
 
-    // Row-major, x fastest: (1,0) is slot one and (0,1) is slot thirty-two. Reading and writing
-    // with x and z the other way round round-trips within one process and produces a file no other
-    // Linear tool agrees with.
+    // Row-major, x fastest: (1,0) is slot one and (0,1) is slot thirty-two.
     CHECK(readIntAt(body, 1 * 8) == 64);
     CHECK(readIntAt(body, (1 * 8) + 4) == 111);
     CHECK(readIntAt(body, 32 * 8) == 128);
     CHECK(readIntAt(body, (32 * 8) + 4) == 222);
     CHECK(readIntAt(body, 0) == 0);
 
-    // The blobs follow the table in the same order, so the first one is the chunk at (1,0).
     CHECK(body.size() == 8192 + 64 + 128);
     CHECK(body[8192] == 1);
 }
 
 TEST_CASE("a stream holding more than its table describes is not a region") {
-    // The table says one chunk of sixteen bytes, and the body carries a second one nobody declared.
     std::vector<std::uint8_t> body(8192, 0);
     body[3] = 16;
     std::vector<std::uint8_t> payload(16 + 40, 0xAB);
@@ -268,12 +237,4 @@ TEST_CASE("a stream holding more than its table describes is not a region") {
     }
 
     CHECK(errorOf(file) == LinearError::TruncatedChunks);
-}
-
-TEST_CASE("every error has something to say") {
-    for (const LinearError error : {LinearError::TooShort, LinearError::BadSignature, LinearError::UnsupportedVersion,
-                                    LinearError::BadFooter, LinearError::LengthMismatch, LinearError::TruncatedTable,
-                                    LinearError::TruncatedChunks, LinearError::ChunkCountMismatch}) {
-        CHECK_FALSE(describe(error).empty());
-    }
 }

@@ -8,8 +8,7 @@
 namespace basalt::server::runtime::world::fallLanding {
 namespace {
 
-/// parity: `BlockBehaviour.Properties.fallDistanceReduction`, half for the sixteen dyed beds and the
-/// shelf mushroom. The straw bed has none.
+/// parity: `BlockBehaviour.Properties.fallDistanceReduction`.
 constexpr double kHalfReduction = 0.5;
 
 /// parity: `HayBlock.fallOn` and `HoneyBlock.fallOn`, a fifth of the damage.
@@ -19,7 +18,7 @@ constexpr float kSoftLanding = 0.2F;
 constexpr double kSpikeExtra = 2.5;
 constexpr float kSpikeMultiplier = 2.0F;
 
-/// parity: `calculateFallPower`'s epsilon, so a fall of exactly the safe distance plus one hurts.
+/// parity: `calculateFallPower`'s epsilon.
 constexpr double kEpsilon = 1.0E-6;
 
 } // namespace
@@ -40,7 +39,7 @@ Landing of(std::int32_t stateId, bool suppressingBounce) {
     if (path == "hay_block" || path == "honey_block") {
         return Landing{.damageMultiplier = kSoftLanding};
     }
-    // parity: `SlimeBlock.fallOn`: no damage unless the entity keeps its feet, which is sneaking.
+    // parity: `SlimeBlock.fallOn`.
     if (path == "slime_block") {
         return suppressingBounce ? Landing{} : Landing{.damageMultiplier = 0.0F};
     }

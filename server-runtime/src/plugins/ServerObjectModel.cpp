@@ -36,7 +36,6 @@ using wire::common::Identifier;
 constexpr std::int32_t kMaxFood = 20;
 constexpr std::string_view kMaxHealthId = "minecraft:max_health";
 
-/// The name a plugin writes, as the enum. Not the API's to expose.
 [[nodiscard]] std::optional<play::Gamemode> gamemodeOf(std::string_view name) {
     if (name == "survival") {
         return play::Gamemode::Survival;
@@ -67,7 +66,7 @@ constexpr std::string_view kMaxHealthId = "minecraft:max_health";
     return "survival";
 }
 
-/// `max_health` and `minecraft:max_health` are both written by plugins.
+// Plugins write both `max_health` and `minecraft:max_health`.
 [[nodiscard]] std::string qualified(std::string_view name) {
     return name.find(':') != std::string_view::npos ? std::string{name} : "minecraft:" + std::string{name};
 }
@@ -103,11 +102,7 @@ constexpr std::string_view kMaxHealthId = "minecraft:max_health";
         .id = item.id, .count = std::max(item.count, 1), .components = std::move(components)};
 }
 
-/// A player's slots, through the same inventory the client is looking at.
-///
-/// Every write re-sends the window, because the client keeps its own copy and a slot changed behind
-/// its back is a ghost item until the next click. Offline is not an error here: the handle answers
-/// an empty inventory and drops the writes, the same way `health` reads 0 rather than throwing.
+// Every write re-sends the window, or a slot changed behind the client's back is a ghost item until the next click.
 class SessionInventoryRef final : public PluginInventory {
 public:
     explicit SessionInventoryRef(std::function<player::PlayerSession*()> session) : session_(std::move(session)) {}
@@ -280,7 +275,7 @@ public:
         return player == nullptr ? 0.0 : player->z;
     }
 
-    /// No latency is measured yet, so this answers zero rather than a number that means nothing.
+    // No latency is measured yet, so this answers zero rather than a meaningless number.
     [[nodiscard]] std::int32_t ping() const override { return 0; }
 
     [[nodiscard]] bool sneaking() const override {
@@ -307,8 +302,6 @@ public:
         if (player == nullptr) {
             return false;
         }
-        // Through the same two paths a command uses, so a world change is a world change and a move
-        // within one is a move.
         if (world != player->worldName) {
             world::LoadedWorld* target = hooks_.worldFor ? hooks_.worldFor(std::string{world}) : nullptr;
             if (target == nullptr || !player->connection().switchWorld) {
@@ -330,7 +323,6 @@ public:
         }
     }
 
-    /// The server's own groups, so a plugin does not carry a second permission system.
     [[nodiscard]] bool may(std::string_view permission) const override {
         const player::PlayerSession* player = session();
         if (player == nullptr || !hooks_.groups) {
@@ -435,8 +427,7 @@ public:
         if (found != player->attributeBases.end()) {
             return found->second;
         }
-        // Not set by anybody, so the vanilla default for a player: the only one this build keeps its
-        // own number for is health, and saying 0 for the rest would be a lie.
+        // Not set by anybody: only health has a number of its own here; zero for the rest would be a lie.
         return full == kMaxHealthId ? std::optional{static_cast<double>(player->maxHealth())} : std::nullopt;
     }
 
@@ -447,7 +438,6 @@ public:
         }
         const std::string full = qualified(name);
         player->attributeBases.insert_or_assign(full, value);
-        // The one this server acts on itself. The rest are sent and the client honours what it can.
         if (full == kMaxHealthId) {
             player->setMaxHealth(static_cast<float>(value));
             if (player->connection().syncHealth) {

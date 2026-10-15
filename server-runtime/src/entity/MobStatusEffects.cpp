@@ -59,7 +59,7 @@ constexpr std::array kTemplates{
     Template{"luck", "minecraft:luck", "minecraft:effect.luck", 1.0, AttributeOperation::AddValue},
     Template{"unluck", "minecraft:luck", "minecraft:effect.unluck", -1.0, AttributeOperation::AddValue}};
 
-/// parity: `MobEffect.addAttributeModifiers`, replacing whatever the effect had set before.
+/// parity: `MobEffect.addAttributeModifiers`.
 void applyModifiers(ServerEntity& mob, const Identifier& effect, std::int32_t amplifier) {
     for (const Template& modifier : kTemplates) {
         if (effect.path() != modifier.effect) {
@@ -174,7 +174,7 @@ Instant instantOf(const ServerEntity& mob, const Identifier& effect, std::int32_
     if (!healing && effect != effects::instantDamage()) {
         return {};
     }
-    // parity: `HealOrHarmMobEffect`: four hearts' worth doubling per level to heal, six to harm.
+    // parity: `HealOrHarmMobEffect`.
     const auto heal = static_cast<float>(std::max(4 << amplifier, 0));
     const auto harm = static_cast<float>(6 << amplifier);
     return healing != invertsHealAndHarm(mob) ? Instant{.heal = heal} : Instant{.damage = harm};
@@ -265,8 +265,7 @@ std::vector<TickEffect> tick(ServerEntity& mob, std::vector<Identifier>& expired
         if (!active.infinite()) {
             active.remainingTicks--;
         }
-        // parity: `tickDownDuration` counts the hidden doses down with it, and one takes over when
-        // the stronger runs out.
+        // parity: `tickDownDuration` counts hidden doses down too.
         if (const auto chain = mob.hiddenEffects.find(active.effect); chain != mob.hiddenEffects.end()) {
             for (world::ActiveEffect& hidden : chain->second) {
                 if (!hidden.infinite() && hidden.remainingTicks > 0) {

@@ -21,7 +21,6 @@ using registry::BlockFace;
 /// parity: `SpeleothemBlock`'s two blocks in 26.2.
 constexpr std::array<std::string_view, 2> kSpeleothems{"pointed_dripstone", "sulfur_spike"};
 
-/// The crops whose `canSurvive` is `CropBlock`'s: soil underneath *and* light on top.
 constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrots",          "potatoes",
                                                             "beetroots", "torchflower_crop", "pitcher_crop"};
 
@@ -34,8 +33,7 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
     return block == nullptr ? std::string{} : block->path();
 }
 
-/// parity: `ChorusFlowerBlock.canSurvive` word for word: over air it asks for **exactly one** chorus
-/// plant beside it and nothing but air on the other three sides.
+/// parity: `ChorusFlowerBlock.canSurvive` word for word.
 [[nodiscard]] bool chorusFlowerSurvives(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::int32_t below = stateAt(world, x, y - 1, z);
     const std::string belowPath = pathOf(below);
@@ -78,10 +76,7 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
     return half.empty() || half == "lower";
 }
 
-/// parity: `SpeleothemBlock.isValidSpeleothemPlacement`, which hangs a spike off a sturdy face *or*
-/// off another spike pointing the same way. The probe that built the support table tries each block
-/// in its default state, and the default spike points up, so a hanging column looked to it like a
-/// spike held up by nothing.
+/// parity: `SpeleothemBlock.isValidSpeleothemPlacement`.
 [[nodiscard]] bool speleothemSurvives(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                       std::int32_t stateId, const std::string& path) {
     const bool down = valueOf(stateId, "vertical_direction") != "up";
@@ -95,8 +90,7 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
     return (valueOf(behind, "vertical_direction") != "up") == down;
 }
 
-/// parity: `CactusBlock.canSurvive`, written out here because it is one of the rules a probe of one
-/// neighbour at a time cannot express: it asks what must *not* be beside it.
+/// parity: `CactusBlock.canSurvive`.
 [[nodiscard]] bool cactusSurvives(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     for (const std::int32_t beside : {stateAt(world, x, y, z - 1), stateAt(world, x, y, z + 1),
                                       stateAt(world, x - 1, y, z), stateAt(world, x + 1, y, z)}) {
@@ -109,16 +103,8 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
     return supported && !registry::blockSupport::holdsWater(stateAt(world, x, y + 1, z));
 }
 
-/// Whether there is water at this position, beside it, or beside the block under it.
-///
-/// Sugar cane asks about the last of those and kelp about the first, and neither can be answered
-/// from the block alone. Asking generously is deliberate: it can only keep a block standing.
 [[nodiscard]] bool waterAbout(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    // parity: the jar asks `getFluidState(...).is(FluidTags.WATER)`, the **fluid**, so seagrass, kelp
-    // and a bubble column count. `holdsWater` only knows water and the waterlogged, and the block's own
-    // square is exactly where that failed: `TallSeagrassBlock.canSurvive` wants full water where it
-    // stands, and once it stands there the square is tall seagrass. Measured in `plantasagua`, whose
-    // control column was never placed.
+    // parity: the jar asks `getFluidState(...).is(FluidTags.WATER)`.
     if (registry::blockFluids::hasWaterFluid(stateAt(world, x, y, z))) {
         return true;
     }
@@ -144,16 +130,11 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
     return found == kNames.end() ? std::nullopt : std::optional{found->second};
 }
 
-/// The sides a state hangs on: news from any other cannot take it down. Nothing means any side can,
 /// an empty set means none can, which is the bell hung between two walls. parity: only the blocks
-/// whose survival check lives in `updateShape`; a repeater, a comparator, a rail and the dust check
-/// theirs in `neighborChanged`, which arrives from every side, so they are not named here.
 [[nodiscard]] std::optional<std::uint8_t> hangsOn(std::int32_t stateId) {
     const auto only = [](BlockFace face) { return static_cast<std::uint8_t>(1U << static_cast<std::uint8_t>(face)); };
     const std::string path = pathOf(stateId);
-    // parity: `TripWireHookBlock`, `WallTorchBlock`, `LadderBlock`, `WallSignBlock`, `WallBannerBlock`,
-    // `CoralWallFanBlock` and `AmethystClusterBlock`, one line apiece and all the same:
-    // `directionToNeighbour.getOpposite() == state.getValue(FACING)`.
+    // parity: `TripWireHookBlock`.
     static constexpr std::array<std::string_view, 8> kBehindTheFace{"tripwire_hook",     "wall_torch",  "wall_sign",
                                                                     "wall_hanging_sign", "wall_banner", "wall_fan",
                                                                     "amethyst_cluster",  "amethyst_bud"};
@@ -162,8 +143,7 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
         return facing.has_value() ? std::optional{only(registry::opposite(*facing))} : std::nullopt;
     }
-    // parity: `FaceAttachedHorizontalDirectionalBlock.getConnectedDirection`, which is `DOWN` for a
-    // ceiling, `UP` for a floor and the facing for a wall; what holds the block up is the opposite.
+    // parity: `FaceAttachedHorizontalDirectionalBlock.getConnectedDirection`.
     if (path == "lever" || path == "grindstone" || path.ends_with("_button")) {
         const std::string face = valueOf(stateId, "face");
         if (face == "floor") {
@@ -175,8 +155,7 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
         return facing.has_value() ? std::optional{only(registry::opposite(*facing))} : std::nullopt;
     }
-    // parity: `LanternBlock.getConnectedDirection`, `DOWN` when it hangs and `UP` when it stands. The
-    // property is what tells a lantern from a sea lantern, which is a full block and hangs on nothing.
+    // parity: `LanternBlock.getConnectedDirection`.
     if (path.ends_with("lantern")) {
         const std::string hanging = valueOf(stateId, "hanging");
         if (!hanging.empty()) {
@@ -184,21 +163,15 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         }
         return std::nullopt;
     }
-    // parity: `SpeleothemBlock.updateShape` leaves early for anything that is not up or down, and
-    // only the side its tip points **away** from can take it down; the other end just redraws the
-    // thickness.
+    // parity: `SpeleothemBlock.updateShape` leaves early for anything that is not up or down.
     if (std::ranges::find(kSpeleothems, path) != kSpeleothems.end()) {
         return only(valueOf(stateId, "vertical_direction") != "up" ? BlockFace::Up : BlockFace::Down);
     }
-    // parity: `CoralPlantBlock`, `CoralFanBlock` and their dead pair in `BaseCoralPlantTypeBlock`,
-    // all four gated on `directionToNeighbour == Direction.DOWN`. None of them has a
-    // `neighborChanged`, so that shape update is their **only** way of going, and a coral fan hears
-    // nothing from the sides. The wall fan is a different question and lives in `kBehindTheFace`.
+    // parity: `CoralPlantBlock`.
     if (path.ends_with("_coral") || path.ends_with("_coral_fan")) {
         return only(BlockFace::Down);
     }
-    // parity: `ChorusFlowerBlock.updateShape` is `directionToNeighbour != Direction.UP`, the only one
-    // of the fifty-seven written as an exclusion: a flower answers every side but the one over it.
+    // parity: `ChorusFlowerBlock.updateShape` is `directionToNeighbour != Direction.UP`.
     if (path == "chorus_flower") {
         return static_cast<std::uint8_t>(only(BlockFace::Down) | only(BlockFace::North) | only(BlockFace::South) |
                                          only(BlockFace::West) | only(BlockFace::East));
@@ -212,15 +185,11 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
         return facing.has_value() ? std::optional{only(*facing)} : std::nullopt;
     }
-    // parity: `CandleBlock` has a `canSurvive` and no `updateShape` that answers air, and nothing
-    // else takes it down either: its support is asked when one is placed and never again, so a candle
-    // whose block is taken from under it stays hanging. Measured in `caidos`, where the jar left it.
+    // parity: `CandleBlock` has a `canSurvive` and no `updateShape` that answers air.
     if (path.ends_with("candle") && !path.ends_with("candle_cake")) {
         return std::uint8_t{0};
     }
-    // parity: `BellBlock`. Its support is a floor below, a ceiling above or, on a wall, the square its
-    // own face points at, and a bell hung between two walls comes down from nothing at all: the test
-    // reads `attachment != DOUBLE_WALL` before it asks whether the bell can stay.
+    // parity: `BellBlock`.
     if (path == "bell") {
         const std::string attachment = valueOf(stateId, "attachment");
         if (attachment == "double_wall") {
@@ -235,34 +204,27 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
         return facing.has_value() ? std::optional{only(*facing)} : std::nullopt;
     }
-    // parity: `DoorBlock.updateShape`, which asks `canSurvive` only for the lower half and only when
-    // the news comes from **below**. The upper half never falls for lack of support: what takes it is
-    // its own half coming apart, which the reshape does.
+    // parity: `DoorBlock.updateShape`.
     if (path.ends_with("_door") && !path.ends_with("_trapdoor")) {
         return valueOf(stateId, "half") == "lower" ? std::optional{only(BlockFace::Down)}
                                                    : std::optional{std::uint8_t{0}};
     }
-    // parity: `CeilingHangingSignBlock`, `SporeBlossomBlock`, `HangingRootsBlock`,
-    // `MangrovePropaguleBlock`, `DirtPathBlock` and `FarmlandBlock`, all gated on `UP`.
+    // parity: `CeilingHangingSignBlock`, `SporeBlossomBlock`, `HangingRootsBlock`.
     const bool ceilingSign = path.ends_with("_hanging_sign") && !path.ends_with("_wall_hanging_sign");
     if (ceilingSign || path == "spore_blossom" || path == "hanging_roots" || path == "mangrove_propagule" ||
         path == "dirt_path" || path == "farmland") {
         return only(BlockFace::Up);
     }
-    // parity: `RepeaterBlock`, `ComparatorBlock` and `RedStoneWireBlock` only fall when the square
-    // below changes (`directionToNeighbour == Direction.DOWN`).
+    // parity: `RepeaterBlock`.
     if (path == "repeater" || path == "comparator" || path == "redstone_wire") {
         return only(BlockFace::Down);
     }
-    // parity: `VineBlock.updateShape` is the one written inside out: news from `DOWN` goes straight to
-    // super, and every **other** side recomputes the faces and returns air when none is left. So a vine
-    // answers all five sides but the one under it, which is the opposite of the usual gate.
+    // parity: `VineBlock.updateShape` is the one written inside out.
     if (path == "vine") {
         return static_cast<std::uint8_t>(only(BlockFace::Up) | only(BlockFace::North) | only(BlockFace::South) |
                                          only(BlockFace::West) | only(BlockFace::East));
     }
-    // parity: `BaseTorchBlock`, `CakeBlock`, `CandleCakeBlock`, `BasePressurePlateBlock`,
-    // `FlowerPotBlock`, `StandingSignBlock`, `BannerBlock` and `BigDripleafBlock`, all gated on `DOWN`.
+    // parity: `BaseTorchBlock`, `CakeBlock`, `CandleCakeBlock`, `BasePressurePlateBlock`.
     const bool standingSign =
         path.ends_with("_sign") && !path.ends_with("_wall_sign") && !path.ends_with("_hanging_sign");
     const bool standingBanner = path.ends_with("_banner") && !path.ends_with("_wall_banner");
@@ -271,8 +233,6 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         path.starts_with("potted_") || path == "big_dripleaf") {
         return only(BlockFace::Down);
     }
-    // Everything else falls from any side, which is what the eleven ungated families do and what a
-    // block whose survival is checked in `neighborChanged` does.
     return std::nullopt;
 }
 
@@ -300,31 +260,21 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
     if (std::ranges::find(kSpeleothems, path) != kSpeleothems.end()) {
         return speleothemSurvives(world, x, y, z, state, path);
     }
-    // parity: `ChorusFlowerBlock.canSurvive`, which the probe's table cannot express: over air it
-    // asks for **exactly one** chorus plant around it and nothing else but air on the other three
-    // sides. Without it the flower on top of a tower stayed in the air when the tower came down.
-    // Measured in `tallostorre`.
+    // parity: `ChorusFlowerBlock.canSurvive`.
     if (path == "chorus_flower") {
         return chorusFlowerSurvives(world, x, y, z);
     }
-    // parity: `SnowLayerBlock.canSurvive`'s last clause, snow standing on a full stack of snow. The
-    // probe tries each block in its default state, and a default snow layer is one deep.
+    // parity: `SnowLayerBlock.canSurvive`'s last clause.
     if (path == "snow" && isFullSnow(stateAt(world, x, y - 1, z))) {
         return true;
     }
-    // parity: `CropBlock.canSurvive`, which asks for light eight on top of its soil. The probe
-    // answers one neighbour at a time and cannot see the sky, so it was told the light is fifteen
-    // and the light half is checked here instead.
+    // parity: `CropBlock.canSurvive`.
     if (std::ranges::find(kLightHungryCrops, path) != kLightHungryCrops.end() && isLowerHalf(state)) {
         if (worldLight::rawBrightness(world, x, y, z, hasSkylight) < kCropSurvivalLight) {
             return false;
         }
     }
-    // parity: `BaseRailBlock.shouldBeRemoved`, which asks two things and not one: something rigid
-    // under it, and, for a slope, something rigid in the square it climbs **towards** as well. The
-    // table of block ids only has the first: the probe measures every block in its default shape and
-    // a rail's is flat, so the slope's other support never reached it. Measured in `railrampa`,
-    // where the jar drops the slope as its footing goes and this build left it hanging.
+    // parity: `BaseRailBlock.shouldBeRemoved`.
     if (path == "rail" || path == "powered_rail" || path == "detector_rail" || path == "activator_rail") {
         if (!registry::blockShapes::supportsRigid(stateAt(world, x, y - 1, z), registry::BlockFace::Up)) {
             return false;
@@ -346,22 +296,14 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
         return registry::blockShapes::supportsRigid(
             stateAt(world, x + registry::stepX(*climbing), y, z + registry::stepZ(*climbing)), registry::BlockFace::Up);
     }
-    // parity: `RedStoneWireBlock.canSurviveOn` is `isFaceSturdy(UP) || is(HOPPER)`, and that is a
-    // question about the **state** below, not about which block it is. The table cannot answer it:
-    // its rule for dust is a set of block ids taken from the probe, so a trapdoor that supports only
-    // when it is closed at the top of its block never made the list. Measured in `polvotrampilla`,
-    // where the jar leaves a dust standing on one and this build swept it away as it landed.
+    // parity: `RedStoneWireBlock.canSurviveOn` is `isFaceSturdy(UP) || is(HOPPER)`.
     if (path == "redstone_wire") {
         const std::int32_t below = stateAt(world, x, y - 1, z);
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(below);
         return registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up) ||
                (block != nullptr && block->path() == "hopper");
     }
-    // parity: `BaseTorchBlock.canSurvive` is `canSupportCenter(below, UP)` and
-    // `WallTorchBlock.canSurvive` is `isFaceSturdy` on the wall it hangs from: both are questions
-    // about the **state** next door, and the table of block ids answers them wrong for a block whose
-    // collision box is full but whose support shape is empty. Leaves are the one that shows it: the
-    // jar drops a torch put on them and this build left it standing.
+    // parity: `BaseTorchBlock.canSurvive` is `canSupportCenter(below, UP)` and.
     if (path == "torch" || path == "soul_torch" || path == "redstone_torch") {
         return registry::blockShapes::supportsCentre(stateAt(world, x, y - 1, z), registry::BlockFace::Up);
     }
@@ -378,9 +320,7 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
             stateAt(world, x + registry::stepX(behind), y + registry::stepY(behind), z + registry::stepZ(behind)),
             *facing);
     }
-    // parity: `DoorBlock.canSurvive`: the lower half wants a sturdy face under it and the upper half
-    // wants the lower half to be the same door, and nothing else. Half a door put down by command
-    // stands in the jar; the table's rule for it asked for both halves and swept it away.
+    // parity: `DoorBlock.canSurvive`.
     if (path.ends_with("_door") && !path.ends_with("_trapdoor")) {
         const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(state);
         const auto half = properties.find("half");
@@ -394,11 +334,7 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
             return under != nullptr && mine != nullptr && *under == *mine;
         }
     }
-    // parity: `DoublePlantBlock.canSurvive`, which is the door's bug one block over: the lower half
-    // asks only about the square under it, and the upper half asks that the lower one be there. The
-    // probe learnt "the partner must be above" from `updateShape`, which answers a different
-    // question, so a lower half written on its own was swept away. `tall_seagrass` put over water by
-    // command is: the jar keeps it and both halves vanished here.
+    // parity: `DoublePlantBlock.canSurvive`.
     if (const std::string half = valueOf(state, "half"); half == "upper" || half == "lower") {
         const std::int32_t below = stateAt(world, x, y - 1, z);
         const wire::common::Identifier* mine = registry::blockStateDefinitions::blockOf(state);
@@ -406,8 +342,6 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
             const wire::common::Identifier* under = registry::blockStateDefinitions::blockOf(below);
             return under != nullptr && mine != nullptr && *under == *mine && valueOf(below, "half") == "lower";
         }
-        // The lower half is asked with its partner in place, so every other side keeps the probe's
-        // answer: `TallSeagrassBlock` wants full water at the square and that rides on `waterAbout`.
         if (mine != nullptr) {
             if (const std::optional<std::int32_t> partner =
                     registry::blockStateDefinitions::stateIdOf(*mine, {{"half", "upper"}}, state);
@@ -418,27 +352,18 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
             }
         }
     }
-    // parity: `BasePressurePlateBlock.canSurvive` is `canSupportRigidBlock(below) ||
-    // canSupportCenter(below, UP)`, another question about the **state** below that the table's set
-    // of block ids cannot ask. Same cause as the dust above: a trapdoor closed at the top of its
-    // block holds a plate up in the jar and swept it away here.
+    // parity: `BasePressurePlateBlock.canSurvive` is `canSupportRigidBlock(below) ||.
     if (path.ends_with("_pressure_plate")) {
         const std::int32_t below = stateAt(world, x, y - 1, z);
         return registry::blockShapes::supportsRigid(below, registry::BlockFace::Up) ||
                registry::blockShapes::supportsCentre(below, registry::BlockFace::Up);
     }
-    // parity: `HangingMossBlock.canStayAtPosition` is `MultifaceBlock.canAttachTo(UP)` or more moss,
-    // and `canAttachTo` takes the collision box as well as the support shape. The table answers this
-    // one with a set of **block** ids, so a top slab held it up here the way a bottom one does: the
-    // set was built from each block's default state and `stone_slab`'s default is the bottom half.
+    // parity: `HangingMossBlock.canStayAtPosition` is `MultifaceBlock.canAttachTo(UP)` or more moss.
     if (path == "pale_hanging_moss") {
         const std::int32_t above = stateAt(world, x, y + 1, z);
         return registry::blockShapes::canAttachTo(above, registry::BlockFace::Down) ||
                pathOf(above) == "pale_hanging_moss";
     }
-    // Nothing the table skips is refused by it either, so this is a shortcut rather than a rule of
-    // its own: it is here because "the table does not model this" and "this stands anywhere" are
-    // different reasons to say yes.
     if (!registry::blockSupport::needsSupport(state) || !registry::blockSupport::isModelled(state)) {
         return true;
     }

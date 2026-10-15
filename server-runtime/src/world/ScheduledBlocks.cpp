@@ -34,18 +34,16 @@ constexpr std::int32_t kStalagmiteDelay = 1;
 constexpr std::int32_t kFrostedMaxAge = 3;
 constexpr std::int32_t kFrostedNeighbours = 4;
 
-/// parity: `FrostedIceBlock.neighborChanged` asks for `fewerNeigboursThan(level, pos, 2)`.
+/// parity: `FrostedIceBlock.neighborChanged` asks for `fewerNeigboursThan(level.
 constexpr std::int32_t kFrostedMeltNeighbours = 2;
 
 /// A trail of frost walker ice is at most a few hundred squares; this only stops a runaway.
 constexpr std::int32_t kFrostedChainLimit = 512;
-/// parity: `Mth.nextInt(random, 20, 40)`, inclusivo por los dos lados, que es el que el hielo
-/// fragil se reserva a si mismo y a cada vecino que sobrevive.
+/// parity: `Mth.nextInt(random, 20, 40)`.
 constexpr std::int32_t kFrostedRetryLow = 20;
 constexpr std::int32_t kFrostedRetryHigh = 40;
 
-/// parity: `FrostedIceBlock.onPlace`'s own `Mth.nextInt(random, 60, 120)`, the wait before a fresh
-/// piece of frosted ice first looks at whether it should melt.
+/// parity: `FrostedIceBlock.onPlace`'s own `Mth.nextInt(random.
 constexpr std::int32_t kFrostedFirstLow = 60;
 constexpr std::int32_t kFrostedFirstHigh = 120;
 constexpr std::int32_t kMeltLight = 11;
@@ -57,7 +55,7 @@ constexpr std::int32_t kRegularHatchTicks = 24000;
 constexpr std::int32_t kBoostedHatchTicks = 12000;
 constexpr std::int32_t kHatchSpreadTicks = 300;
 
-/// parity: `spawnTadpoles`: `nextInt(2, 6)` of them, each one clamped inside its own square.
+/// parity: `spawnTadpoles`.
 constexpr std::int32_t kTadpolesLow = 2;
 constexpr std::int32_t kTadpolesHigh = 5;
 constexpr double kTadpoleInset = 0.2;
@@ -196,8 +194,6 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 }
 
 /// One step thinner, or gone. parity: `FrostedIceBlock.slightlyMelt`, which answers **true only when
-/// the ice went**: thinning it by one is a `false`, and that answer is what decides whether the caller
-/// goes on to the neighbours or just books itself another turn. It books nothing of its own.
 bool thin(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t age,
           std::vector<BlockChange>& changes) {
     if (age < kFrostedMaxAge) {
@@ -233,8 +229,7 @@ void scheduleFrostedIce(WorldState& world, const std::int32_t x, const std::int3
     if (!stateId.has_value() || pathOf(*stateId) != "frosted_ice") {
         return;
     }
-    // parity: `onPlace` books without asking whether one is already pending, and `LevelChunkTicks`
-    // keeps only one turn per square and type, so the second call changes nothing either way.
+    // parity: `onPlace` books without asking whether one is already pending.
     world.scheduleBlockTick(x, y, z, frostedIceTickType(),
                             random.nextIntBetweenInclusive(kFrostedFirstLow, kFrostedFirstHigh));
 }
@@ -269,8 +264,7 @@ const wire::common::Identifier& sugarCaneTickType() {
     return instance;
 }
 
-/// parity: `FarmlandBlock.canSurvive` over `shouldMaintainFarmland`, and `DirtPathBlock`'s, which is
-/// the same question without the crop.
+/// parity: `FarmlandBlock.canSurvive` over `shouldMaintainFarmland`.
 [[nodiscard]] bool soilIsCovered(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                  std::string_view path) {
     const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);
@@ -305,8 +299,7 @@ std::optional<std::int32_t> coveredSoil(WorldState& world, std::int32_t x, std::
     if (path != "farmland" && path != "dirt_path") {
         return std::nullopt;
     }
-    // parity: `FarmlandBlock.tick` asks again before it gives way; `DirtPathBlock.tick` does not,
-    // because nothing else books its turn.
+    // parity: `FarmlandBlock.tick` asks again before it gives way.
     if (path == "farmland" && !soilIsCovered(world, x, y, z, path)) {
         return std::nullopt;
     }
@@ -317,7 +310,6 @@ std::optional<std::int32_t> coveredSoil(WorldState& world, std::int32_t x, std::
     return dirt;
 }
 
-/// Whether this is live coral that is currently out of water.
 [[nodiscard]] bool coralIsDrying(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                  std::int32_t stateId, std::string_view path) {
     if (!path.ends_with("coral") && !path.ends_with("coral_block") && !path.ends_with("coral_fan") &&
@@ -336,8 +328,7 @@ void scheduleCoralDeath(WorldState& world, std::int32_t x, std::int32_t y, std::
     if (!coralIsDrying(world, x, y, z, *stateId, path)) {
         return;
     }
-    // parity: `BaseCoralPlantTypeBlock.tryScheduleDieTick`, three seconds and a bit, never the same
-    // twice: coral out of water keeps its colour for a while before it goes white.
+    // parity: `BaseCoralPlantTypeBlock.tryScheduleDieTick`.
     random::RandomSource random = random::RandomSource::legacy(seed);
     world.scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla(path),
                             kCoralGraceTicks + random.nextInt(kCoralGraceSpread));
@@ -404,8 +395,7 @@ ScaffoldingTurn scaffoldingTick(WorldState& world, std::int32_t x, std::int32_t 
         return ScaffoldingTurn{};
     }
     const std::int32_t distance = scaffoldDistance(world, x, y, z);
-    // parity: `ScaffoldingBlock.tick` decides by the **new** distance, and tells apart a piece that
-    // was already at seven (it falls) from one that has just got there (it breaks).
+    // parity: `ScaffoldingBlock.tick` decides by the **new** distance.
     if (distance >= kScaffoldReach) {
         const bool wasOutOfReach = numberProperty(*stateId, "distance").value_or(0) >= kScaffoldReach;
         return ScaffoldingTurn{.falls = wasOutOfReach, .breaks = !wasOutOfReach};
@@ -425,9 +415,7 @@ std::optional<BlockChange> frostedIceHeard(WorldState& world, std::int32_t x, st
 
 void frostedIceChain(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                      std::vector<BlockChange>& changes) {
-    // parity: melting is a `setBlockAndUpdate`, so each piece that goes tells its own six squares
-    // with the block that **was** there, which is more frosted ice: that is how a whole trail goes at
-    // once.
+    // parity: melting is a `setBlockAndUpdate`.
     std::deque<std::array<std::int32_t, 3>> pending{{std::array<std::int32_t, 3>{x, y, z}}};
     std::int32_t melted = 0;
     while (!pending.empty() && melted < kFrostedChainLimit) {
@@ -451,8 +439,7 @@ std::optional<BlockChange> frostedIceHeard(WorldState& world, std::int32_t x, st
     if (!stateId.has_value() || pathOf(*stateId) != "frosted_ice") {
         return std::nullopt;
     }
-    // parity: `FrostedIceBlock.neighborChanged` melts it whole when fewer than two of its six squares
-    // are frosted ice too, and only when what changed is another piece of frosted ice.
+    // parity: `FrostedIceBlock.neighborChanged` melts it whole when fewer than two of its six squares.
     if (neighbouringIce(world, x, y, z) >= kFrostedMeltNeighbours) {
         return std::nullopt;
     }
@@ -472,16 +459,13 @@ void frostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     if (!age.has_value()) {
         return;
     }
-    // parity: `FrostedIceBlock.tick`. One roll in three, **or** fewer than four frosted neighbours,
-    // is what lets it look at the light at all; the roll is spent either way because it comes first.
+    // parity: `FrostedIceBlock.tick`.
     const bool looks = random.nextInt(3) == 0 || neighbouringIce(world, x, y, z) < kFrostedNeighbours;
     if (looks &&
         worldLight::rawBrightness(world, x, y, z, hasSkylight) >
             kMeltLight - *age - registry::blockShapes::dampening(*stateId) &&
         thin(world, x, y, z, *age, changes)) {
-        // parity: only a piece that went **whole** reaches its neighbours, and it thins each of them
-        // on the spot. The one that survives that thinning is the one that books a turn; the one that
-        // went with it books nothing, because it is water now.
+        // parity: only a piece that went **whole** reaches its neighbours, and it thins each of them.
         for (const registry::BlockFace face : kAllFaces) {
             const std::int32_t nx = x + offsetX(face);
             const std::int32_t ny = y + offsetY(face);
@@ -519,8 +503,7 @@ void frostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     return 270.0F;
 }
 
-/// parity: `DriedGhastBlock.spawnGhastling`: `removeBlock` with no drop, then a baby happy ghast at
-/// the bottom centre of the square facing the way the block did.
+/// parity: `DriedGhastBlock.spawnGhastling`.
 void spawnGhastling(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                     const std::int32_t stateId, std::vector<BlockChange>& changes, std::vector<Hatchling>& hatched) {
     const std::int32_t empty = registry::blocks::air().stateId;
@@ -569,14 +552,12 @@ void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
         return;
     }
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *changed});
-    // parity: `DriedGhastBlock.tick` raises `BLOCK_CHANGE` on both sides of the clock, hydrating and
-    // drying, so a sculk sensor beside one hears it change.
+    // parity: `DriedGhastBlock.tick` raises `BLOCK_CHANGE` on both sides of the clock.
     if (world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
         vibrations::emit(world, "block_change", static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
                          static_cast<double>(z) + 0.5, gameTime);
     }
-    // parity: `DriedGhastBlock.tick` books nothing. The next step of the clock is armed by
-    // `randomTick`, so the block waits for a random tick again instead of running free.
+    // parity: `DriedGhastBlock.tick` books nothing. The next step of the clock is armed by.
 }
 
 void scheduleHatch(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed) {
@@ -603,9 +584,7 @@ void scheduleFrogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::i
 }
 
 bool booksItsOwnBreak(const std::string_view path) {
-    // parity: every class whose `updateShape` answers a neighbour with `scheduleTick(pos, this, 1)`
-    // and whose `tick` is `if (!canSurvive) destroyBlock(pos, true)`. Which sides wake them up is
-    // still `blockSurvival::loosenedBy`'s question; this is only about **when** they go.
+    // parity: every class whose `updateShape` answers a neighbour with `scheduleTick(pos.
     static constexpr std::array<std::string_view, 15> kBooks{
         "sugar_cane",          "cactus",         "big_dripleaf_stem",    "bamboo",
         "chorus_plant",        "chorus_flower",  "pale_hanging_moss",    "kelp",
@@ -621,8 +600,7 @@ void scheduleCreakingHeart(WorldState& world, std::int32_t x, std::int32_t y, st
     if (!stateId.has_value() || pathOf(*stateId) != "creaking_heart") {
         return;
     }
-    // parity: `CreakingHeartBlock.updateShape` books a turn for **any** neighbour that moved, and
-    // answers the state it was given.
+    // parity: `CreakingHeartBlock.updateShape` books a turn for **any** neighbour that moved.
     world.scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("creaking_heart"), 1);
 }
 
@@ -630,14 +608,12 @@ bool creakingIsActive(const std::int64_t timeOfDay, const bool hasDayTimeline) {
     constexpr std::int64_t kNightStart = 12600;
     constexpr std::int64_t kNightEnd = 23401;
     constexpr std::int64_t kDay = 24000;
-    // parity: `creaking_active` is a track of the `minecraft:day` timeline, and only
-    // `#minecraft:in_overworld` carries it. Everywhere else the attribute keeps its own `false`, so a
-    // heart in the Nether or the End never wakes whatever the clock says.
+    // parity: `creaking_active` is a track of the `minecraft:day` timeline, and only.
     if (!hasDayTimeline) {
         return false;
     }
     const std::int64_t inDay = ((timeOfDay % kDay) + kDay) % kDay;
-    // parity: the keyframe at 23401 carries `false`, so the last active tick is the one before it.
+    // parity: the keyframe at 23401 carries `false`.
     return inDay >= kNightStart && inDay < kNightEnd;
 }
 
@@ -647,8 +623,7 @@ std::optional<std::int32_t> creakingHeartTick(WorldState& world, std::int32_t x,
     if (!stateId.has_value() || pathOf(*stateId) != "creaking_heart" || !isPaleOakLog) {
         return std::nullopt;
     }
-    // parity: `CreakingHeartBlock.updateState` only ever wakes an uprooted heart; nothing puts one
-    // back to sleep from here.
+    // parity: `CreakingHeartBlock.updateState` only ever wakes an uprooted heart.
     if (textProperty(*stateId, "creaking_heart_state") != "uprooted") {
         return std::nullopt;
     }
@@ -684,8 +659,7 @@ void scheduleSpeleothem(WorldState& world, std::int32_t x, std::int32_t y, std::
     }
     const wire::common::Identifier type = wire::common::Identifier::vanilla(path);
     const bool pointsDown = textProperty(*stateId, "vertical_direction") != "up";
-    // parity: `SpeleothemBlock.updateShape` leaves a stalactite alone once its turn is booked, so a
-    // second neighbour moving does not push the fall two ticks further out.
+    // parity: `SpeleothemBlock.updateShape` leaves a stalactite alone once its turn is booked.
     if (pointsDown && world.hasScheduledBlockTick(x, y, z, type)) {
         return;
     }
@@ -714,8 +688,7 @@ SpeleothemTurn speleothemTick(WorldState& world, std::int32_t x, std::int32_t y,
     if (!stateId.has_value() || !isSpeleothem(pathOf(*stateId))) {
         return SpeleothemTurn{};
     }
-    // parity: `SpeleothemBlock.tick`: only a stalagmite is broken where it stands. Everything else
-    // that got this far is a stalactite, and a stalactite comes down as entities.
+    // parity: `SpeleothemBlock.tick`.
     if (textProperty(*stateId, "vertical_direction") == "up") {
         return supported ? SpeleothemTurn{} : SpeleothemTurn{.destroys = true};
     }
@@ -758,7 +731,7 @@ void frogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
         return;
     }
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = empty});
-    // parity: `spawnTadpoles`, two to five of them, each one inside the square and half a block down.
+    // parity: `spawnTadpoles`.
     const std::int32_t count = random.nextIntBetweenInclusive(kTadpolesLow, kTadpolesHigh);
     for (std::int32_t index = 0; index < count; ++index) {
         const double offsetX = std::clamp(random.nextDouble(), kTadpoleInset, kTadpoleReach);
@@ -793,7 +766,7 @@ void snifferEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
             return;
         }
         changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = empty});
-        // parity: `SnifferEggBlock.tick` hatches a calf at the centre of the square, facing anywhere.
+        // parity: `SnifferEggBlock.tick` hatches a calf at the centre of the square.
         hatched.push_back(Hatchling{.type = wire::common::Identifier::vanilla("sniffer"),
                                     .x = static_cast<double>(x) + 0.5,
                                     .y = static_cast<double>(y) + 0.5,
@@ -811,17 +784,13 @@ void snifferEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     scheduleHatch(world, x, y, z, random.nextLong());
 }
 
-/// parity: `BubbleColumnBlock.updateShape` books the **water** on every shape update but its own turn
-/// only in the three cases below. Booking it always left turns the jar never has: fifteen of them in
-/// `columnalado`, three squares across five ticks while the column was still forming.
+/// parity: `BubbleColumnBlock.updateShape` books the **water** on every shape update but its own turn.
 [[nodiscard]] bool columnBooksItsTurn(WorldState& world, const std::int32_t x, const std::int32_t y,
                                       const std::int32_t z, const std::optional<registry::BlockFace> towards) {
-    // No direction is the arriving block reshaping itself, and in the jar that is the pre-shape
-    // walking all six sides: `DOWN` is one of them, so the booking happens either way.
     if (!towards.has_value() || *towards == registry::BlockFace::Down) {
         return true;
     }
-    // parity: `canSurvive` is `below.is(this)` or one of the two tags, which are soul sand and magma.
+    // parity: `canSurvive` is `below.is(this)` or one of the two tags.
     const std::string below = pathOf(world.blockState(x, y - 1, z).value_or(0));
     if (below != "bubble_column" && below != "soul_sand" && below != "magma_block") {
         return true;
@@ -839,17 +808,14 @@ void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std
     if (!here.has_value()) {
         return;
     }
-    // parity: `BubbleColumnBlock.updateShape` books its own turn five ticks out, which is what
-    // carries a column up and what takes it apart when its source goes.
+    // parity: `BubbleColumnBlock.updateShape` books its own turn five ticks out.
     if (pathOf(*here) == "bubble_column") {
         if (columnBooksItsTurn(world, x, y, z, towards)) {
             world.scheduleBlockTick(x, y, z, bubbleColumnTickType(), kColumnStepDelay);
         }
         return;
     }
-    // parity: `LiquidBlock.tryScheduleBubbleBlockColumn`, twenty ticks (`BUBBLE_COLUMN_CHECK_DELAY`)
-    // booked on the **water**, not on the column: a source over soul sand or magma waits a whole
-    // second before the column appears. Doing it at once built the column on the spot.
+    // parity: `LiquidBlock.tryScheduleBubbleBlockColumn`.
     if (*here != waterState()) {
         return;
     }
@@ -876,22 +842,15 @@ void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
     } else if (below == "magma_block") {
         column = columnState(true);
     } else if (pathOf(*here) == "bubble_column") {
-        // Nothing feeding it any more: what was a column goes back to being water.
         column = waterState();
     } else {
-        // parity: the last branch is `occupyState`, the square's own state, and it is not a no-op:
-        // when the turn belongs to the **water** (`LiquidBlock.tick`) and nothing feeds it, the water
-        // carries itself upwards and turns whatever column is over it back into water.
+        // parity: the last branch is `occupyState`.
         column = *here;
     }
     if (!column.has_value()) {
         return;
     }
-    // parity: the jar writes the starting square and **throws the answer away**, and only from the
-    // square above does a write that changes nothing end the walk: `Level.setBlock` answers false
-    // when the state does not move, because `LevelChunk.setBlockState` opens with
-    // `if (oldState == state) return null`. Skipping those and carrying on, which is what this did,
-    // grew a column a tick early every time one was lengthened.
+    // parity: the jar writes the starting square and **throws the answer away**, and only from the.
     if (*here != *column && world.setBlockState(x, y, z, *column)) {
         changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *column});
         if (written) {
@@ -906,10 +865,6 @@ void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
         }
         changes.push_back(BlockChange{.x = x, .y = level, .z = z, .stateId = *column});
         // parity: the shape walk of this square's own write, run **here** and not after the loop.
-        // The jar writes one square at a time and each `setBlock(..., 2)` shapes its neighbours
-        // before the next one lands, so the square above is still water and hears nothing. Reshaping
-        // the whole column afterwards told every square that a bubble column had arrived below it,
-        // and each booked a turn the jar never books: forty of them in `columnaburbujas`.
         if (written) {
             written(x, level, z);
         }

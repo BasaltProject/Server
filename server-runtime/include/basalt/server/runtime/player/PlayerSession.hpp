@@ -31,13 +31,10 @@
 
 namespace basalt::server::runtime::player {
 
-/// Server-side state for one logged-in player: identity, live position, and the survival state the
-/// client draws in its HUD (what a respawn resets and `players.db` keeps across a rejoin).
 class PlayerSession {
 public:
     static constexpr float kMaxHealth = 20.0F;
 
-    /// Every layer on, which is what a client that has not told us otherwise almost certainly has.
     static constexpr std::int8_t kAllSkinParts = 0x7F;
 
     PlayerSession(wire::common::Uuid uuid, std::string name, std::int32_t entityId, PlayerConnection connection,
@@ -63,107 +60,67 @@ public:
     float yaw = 0.0F;
     float pitch = 0.0F;
     bool onGround = false;
-    /// parity: `Entity.FLAG_FALL_FLYING` and `LivingEntity.fallFlyTicks`, gliding on an elytra.
     bool fallFlying = false;
     std::int32_t fallFlyTicks = 0;
 
-    /// Which permission group they belong to, loaded from `players.db` at join. Unset means the
-    /// group currently marked as the default, which is resolved when a permission is checked rather
-    /// than written into the row.
     std::optional<std::string> group;
 
-    /// Which world this player is in. Sweeps use it so one world's chunks are not held by another's
-    /// players.
     std::string worldName;
 
     wire::protocol::play::Gamemode gamemode = wire::protocol::play::Gamemode::Survival;
     bool sprinting = false;
 
-    /// Whether they are crouching, from `player_input`'s own bitmask. Read because sneaking is what
-    /// tells "place a block against this one" apart from "open this one's screen".
     bool sneaking = false;
 
-    /// Whether they are in the middle of using something: eating, drinking, drawing a bow, holding
-    /// a shield up. parity: `LivingEntity.isUsingItem`, which is what draws the animation on
-    /// everybody else's screen.
     bool usingItem = false;
-    /// The slot of the shield held up, and for how many ticks. parity: `useItem` with
-    /// `blocks_attacks`, which only blocks once its delay has passed.
     std::optional<std::int32_t> blockingSlot;
     std::int32_t blockingTicks = 0;
-    /// parity: `LivingEntity.getUsedItemHand`, whether what is in use is in the off hand.
     bool usingOffhand = false;
-    /// parity: `LivingEntity.autoSpinAttackTicks`, `autoSpinAttackDmg` and the trident that started
-    /// it, a riptide's spin.
     std::int32_t autoSpinTicks = 0;
     float autoSpinDamage = 0.0F;
     std::optional<storage::StoredItemStack> autoSpinItem;
 
-    /// parity: `Entity.FLAG_SWIMMING` as `updateSwimming` sets it, and `Player.updatePlayerPose`.
     bool swimming = false;
     wire::protocol::play::Pose pose = wire::protocol::play::Pose::Standing;
-    /// parity: `Avatar.DATA_PLAYER_MAIN_HAND` from the client's settings: 0 left, 1 right.
     std::int32_t mainArm = 1;
-    /// parity: `LivingEntity`'s stuck arrows and stingers and the timers that shed them.
     std::int32_t arrowCount = 0;
     std::int32_t removeArrowTime = 0;
     std::int32_t stingerCount = 0;
     std::int32_t removeStingerTime = 0;
-    /// parity: `ServerPlayer.shoulderEntityLeft`/`Right`, a parrot sitting there as its saved tag.
     std::optional<wire::nbt::NbtCompound> shoulderLeft;
     std::optional<wire::nbt::NbtCompound> shoulderRight;
     std::int64_t timeEntitySatOnShoulder = 0;
-    /// parity: `removeEntitiesOnShoulder` asked for by a hit, a death or spectating, done on the tick.
     bool shoulderDropPending = false;
-    /// parity: `Entity.fallDistance`, as the movement the client reports counts it.
     double fallDistance = 0.0;
-    /// parity: `Entity.moveDist` and `nextStep` for the footsteps everyone else hears, where they
-    /// were last heard from, and `walkingStepSound`'s amethyst chime clock.
+    /// parity: `Entity.moveDist` and `nextStep` for the footsteps everyone else hears.
     std::optional<std::array<double, 3>> emittedFrom;
-    /// parity: `ServerPlayer.getKnownMovement`, what the client moved it by last tick.
     std::array<double, 3> knownMovement{};
-    /// parity: `Entity.deltaMovement` as the server keeps it for a player. See `PlayerVelocity`.
     std::array<double, 3> deltaMovement{};
     float moveDist = 0.0F;
     float nextStep = 1.0F;
     std::int64_t lastCrystalSoundTime = 0;
     float crystalSoundIntensity = 0.0F;
-    /// parity: `LivingEntity.currentImpulseImpactPos` and its grace, see `impulse`.
     std::optional<std::array<double, 3>> impulseImpact;
     std::int32_t impulseGraceTicks = 0;
 
-    /// What they are riding, by entity id. parity: `Entity.vehicle`.
     std::optional<std::int32_t> vehicleId;
-    /// Where the mobs last saw them, and whether they had moved sideways since.
-    /// parity: `Entity.lastKnownSpeed` as `hasMovedHorizontallyRecently` reads it.
     std::array<double, 2> seenAt{};
     bool movedHorizontally = false;
-    /// The bobber this player has out, by entity id. parity: `Player.fishing`.
     std::optional<std::int32_t> fishingHook;
 
-    /// The movement keys held, as `player_input` sends them.
-    ///
-    /// parity: `ServerPlayer.getLastClientMoveIntent`, which is what nudges a minecart along when
-    /// its rider leans on a key.
     bool inputForward = false;
     bool inputBack = false;
     bool inputLeft = false;
     bool inputRight = false;
 
-    /// The signed profile properties from the session server, carrying this player's skin and cape.
-    /// Empty in offline mode, where nothing signs them and every client draws the default skin.
     std::vector<wire::protocol::login::GameProfileProperty> profileProperties;
 
-    /// Which skin layers this player has switched on in their own video settings (hat, jacket,
-    /// sleeves, trouser legs). The client owns this and reports it; the server only relays it to
-    /// everyone else, or nobody would see the outer layer of anyone's skin.
     std::int8_t skinParts = kAllSkinParts;
 
-    /// parity: `ChatVisiblity`, from the client's settings: full, system messages only, or hidden.
+    /// parity: `ChatVisiblity`.
     enum class ChatVisibility : std::uint8_t { Full, System, Hidden };
     std::atomic<ChatVisibility> chatVisibility{ChatVisibility::Full};
 
-    /// The chat session other clients check this player's messages with, once it is verified.
     [[nodiscard]] std::optional<wire::protocol::play::RemoteChatSessionData> chatSession() const;
     void setChatSession(std::optional<wire::protocol::play::RemoteChatSessionData> session);
 
@@ -171,86 +128,51 @@ public:
 
     void setHealth(float value) noexcept { health_ = value; }
 
-    /// What this player's health tops out at, which vanilla keeps as the `max_health` attribute.
-    ///
-    /// Settable because a plugin can move it, and moving it has to mean something: every heal and
-    /// every clamp reads this, so twenty hearts on the screen and twenty hearts in the damage
-    /// arithmetic stay the same number.
     [[nodiscard]] float maxHealth() const noexcept { return maxHealth_; }
 
     void setMaxHealth(float value);
 
-    /// parity: `Player.getLuck`, the `luck` attribute: its base, plus one a level of Luck and less
-    /// one a level of Bad Luck.
     [[nodiscard]] float luck() const;
 
-    /// Attribute bases a plugin set, by their registry name. Empty for almost every player.
     std::map<std::string, double, std::less<>> attributeBases;
 
     /// parity: `LivingEntity.getAbsorptionAmount`, the pool damage eats before health does.
     float absorption = 0.0F;
 
-    /// Where this player is asleep. parity: `LivingEntity.sleepingPos`.
     std::optional<std::array<std::int32_t, 3>> sleepingBed;
 
-    /// parity: `ServerPlayer.raidOmenPosition`, where the raid starts when the omen runs out.
     std::optional<std::array<std::int32_t, 3>> raidOmenPosition;
     std::int32_t sleepTicks = 0;
 
-    /// parity: `LivingEntity.invulnerableTime`, the half second after a hit when most others miss.
+    /// parity: `LivingEntity.invulnerableTime`.
     std::int32_t invulnerableTicks = 0;
 
-    /// What the last `hurtServer` answered: whether that hit counted, shield and cooldown included.
     bool lastHurtLanded = false;
 
-    /// parity: `LivingEntity.lastHurt`: inside that window only a bigger hit lands, and only the
-    /// rest of it.
+    /// parity: `LivingEntity.lastHurt`.
     float lastHurt = 0.0F;
 
-    /// Ticks since the last swing, which is what a hit is charged from.
-    ///
-    /// parity: `Player.attackStrengthTicker`. A swing before the bar refills lands a fifth of the
-    /// damage, which is the whole reason a player waits between hits.
+    /// parity: `Player.attackStrengthTicker`.
     std::int32_t ticksSinceSwing = 0;
 
     FoodData food;
     ExperienceData experience;
 
-    /// parity: `Player.enchantmentSeed`, which is what fixes an enchanting table's three offers
-    /// until one of them is taken. On the live session only: vanilla writes it as `XpSeed`, which
-    /// here needs a column in `players.db`, so the offers re-roll on a rejoin.
     std::int32_t enchantmentSeed = 0;
 
-    /// Scoreboard tags, as `/tag` sets them. On the live session only: vanilla keeps them with the
-    /// saved entity, which here needs a column in `players.db`.
     std::set<std::string, std::less<>> tags;
-    /// parity: 26.3 `ServerPlayer.postEffects`, the shaders `/posteffect` puts on this player's
-    /// screen. Kept for the session only: `players.db` has no column for them yet.
     std::vector<std::string> postEffects;
 
-    /// Counters, incremented as this server notices things happening.
     PlayerStats stats;
 
-    /// The 41 slots this player carries.
     PlayerInventory inventory;
 
-    /// The twenty-seven slots that follow this player rather than the block.
-    ///
-    /// parity: `PlayerEnderChestContainer`, which is why every ender chest in the world shows the
-    /// same things to one player and different things to the next. Persisted in `players.db`, not
-    /// in any world.
     std::array<std::optional<storage::StoredItemStack>, storage::StoredPlayer::kEnderChestSlots> enderChest;
 
-    /// Air left and how long this player keeps burning.
-    ///
-    /// parity: `Entity`'s own two synced values. The client draws the bubbles and the flames from
-    /// what the server sends, and moves neither on its own.
     std::int32_t airSupply = world::fluids::kMaxAir;
 
     std::int32_t fireTicks = 0;
 
-    /// What the criteria objectives were last told. parity: `ServerPlayer.lastRecorded*`, which start
-    /// where no real value is so the first tick reports every one.
     struct RecordedScores {
         float health = std::numeric_limits<float>::denorm_min();
         std::int32_t food = std::numeric_limits<std::int32_t>::min();
@@ -262,54 +184,32 @@ public:
 
     RecordedScores recordedScores;
 
-    /// Deaths the scoreboard has not counted yet, and whose hit caused the last, by entity id. A
-    /// counter rather than the dead flag: a player can respawn before the scoring pass runs.
     std::atomic<std::int32_t> deathsToScore{0};
     std::optional<std::int32_t> killerEntityId;
-    /// parity: `LivingEntity.lastHurtByPlayer` and its hundred-tick memory, by entity id, which is
-    /// who gets the kill credit.
     std::optional<std::int32_t> lastHurtByPlayerId;
     std::atomic<std::int32_t> lastHurtByPlayerTime{0};
-    /// parity: `LivingEntity.lastHurtByMob`, the kind of mob that hurt them last, kept for as long.
     std::optional<wire::common::Identifier> lastHurtByMobType;
     std::atomic<std::int32_t> lastHurtByMobTime{0};
-    /// parity: `ServerPlayer.currentExplosionImpactPos` and `currentExplosionCause`, where the last
-    /// blast caught them and what set it off, until their next fall starts.
     std::optional<std::array<double, 3>> explosionImpact;
     std::optional<std::int32_t> explosionCause;
 
-    /// What this player may not use yet, and the turn of the world each one frees up on.
-    ///
-    /// parity: `ItemCooldowns`, which belongs to the player and not to the connection: both doors
-    /// throw the same pearl, so both wait the same.
+    /// parity: `ItemCooldowns`.
     std::map<std::string, std::int64_t, std::less<>> itemCooldowns;
 
-    /// Status effects this player carries, by effect id. parity: `LivingEntity.activeEffects`.
     std::map<wire::common::Identifier, world::ActiveEffect> effects;
 
-    /// Who put an effect on this player since the last tick, one entry per `addEffect`: the source
-    /// `EffectsChangedTrigger` is told about.
     std::vector<std::optional<std::int32_t>> effectSources;
 
-    /// Records the entity behind an effect about to be added, or none.
     void noteEffectSource(std::optional<std::int32_t> sourceId) { effectSources.push_back(sourceId); }
 
-    /// How close this player is to summoning a warden. parity: `ServerPlayer.wardenSpawnTracker`,
-    /// kept for the session only.
     world::wardenSpawnTracker::Tracker wardenTracker;
 
-    /// How long this player has been standing in a portal, and how long until one works again.
-    ///
-    /// parity: `Entity.portalProcess`/`portalCooldown`, counted on the player rather than on the
-    /// connection: a portal half entered survives a chunk reload the way vanilla's does.
     std::int32_t portalTicks = 0;
 
     std::int32_t portalCooldown = 0;
 
-    /// Set the moment health hits zero, cleared on respawn. A dead player stops being ticked.
     bool dead = false;
 
-    /// Client-driven, and only meaningful when the game mode allows it.
     bool flying = false;
 
     [[nodiscard]] bool mayFly() const noexcept;
@@ -318,13 +218,11 @@ public:
 
     [[nodiscard]] bool instabuild() const noexcept;
 
-    /// parity: `ServerPlayer.sendSystemMessage`, which a hidden chat drops.
     void sendSystemMessage(const wire::text::Component& message) const;
 
     /// parity: `ServerPlayer.sendChatMessage`, which only a full chat shows.
     void sendChatMessage(const chat::PlayerChatMessage& message, const chat::BoundChatType& chatType) const;
 
-    /// Back to a freshly spawned player: full health, full food, no experience kept.
     void resetForRespawn();
 
 private:

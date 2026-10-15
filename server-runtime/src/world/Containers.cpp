@@ -37,7 +37,7 @@ constexpr std::int32_t kFullCake = 7;
 constexpr std::int32_t kLavaCauldronSignal = 3;
 constexpr std::int32_t kMaxCharges = 4;
 
-/// parity: `CopperGolemStatueBlock.Pose`, in its declared order, which is what the signal counts.
+/// parity: `CopperGolemStatueBlock.Pose`.
 constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "running", "star"};
 
 [[nodiscard]] const std::unordered_map<std::string_view, std::int32_t>& sizes() {
@@ -51,7 +51,7 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
             {"dispenser", 9},
             {"dropper", 9},
             {"crafter", 9},
-            // parity: `BrewingStandBlock.getAnalogOutputSignal`, its five slots read like any container.
+            // parity: `BrewingStandBlock.getAnalogOutputSignal`.
             {"brewing_stand", brewingStands::kSize},
             // A jukebox holds one disc, and what a comparator reads off it is the song, not the slot.
             {"jukebox", 1},
@@ -61,8 +61,6 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
             {"decorated_pot", decoratedPots::kSize},
             // parity: `ChiseledBookShelfBlockEntity`, six slots read by which was touched last.
             {"chiseled_bookshelf", chiseledBookshelves::kSize},
-            // The two container minecarts. They are not blocks, but a comparator beside a detector
-            // rail reads one the same way it reads a chest, so the size lives in the same table.
             {"chest_minecart", kChestSize},
             {"hopper_minecart", 5},
         };
@@ -97,13 +95,10 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
     return found == properties.end() ? std::string{} : found->second;
 }
 
-/// The blocks a comparator reads straight off their own state, with no contents involved.
-///
-/// parity: each block's `getAnalogOutputSignal`. They are one line each in the jar and they are one
-/// line each here; what they have in common is that the number is already in the state.
+/// parity: each block's `getAnalogOutputSignal`.
 [[nodiscard]] std::optional<std::int32_t> stateSignal(std::string_view path,
                                                       const std::map<std::string, std::string>& properties) {
-    // parity: `CakeBlock.getOutputSignal`, two per slice left, so a whole cake reads fourteen.
+    // parity: `CakeBlock.getOutputSignal`.
     if (path == "cake") {
         return (kFullCake - numberOf(properties, "bites").value_or(0)) * 2;
     }
@@ -144,9 +139,7 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
 } // namespace
 
 std::optional<std::int32_t> sizeOf(std::string_view path) {
-    // parity: `ShelfBlockEntity implements ListBackedContainer`, three slots and no door of its own,
-    // so a hopper fills a shelf and another one empties it. It is by suffix rather than by name
-    // because there is one shelf per wood.
+    // parity: `ShelfBlockEntity implements ListBackedContainer`.
     if (shelves::isShelf(path)) {
         return shelves::kSize;
     }
@@ -164,8 +157,7 @@ bool isPlain(std::string_view path) {
 
 std::int32_t maxStackFor(const std::string_view path, const server::world::loot::ItemStack& stack) {
     const std::int32_t inHand = registry::itemStacking::maxStackSize(stack.item, stack.components);
-    // parity: `ChiseledBookShelfBlockEntity.getMaxStackSize` and `JukeboxBlockEntity`'s, both one.
-    // The lectern's is one too and is not here: a lectern is no container to a hopper.
+    // parity: `ChiseledBookShelfBlockEntity.getMaxStackSize` and `JukeboxBlockEntity`'s.
     if (path == "chiseled_bookshelf" || path == "jukebox") {
         return 1;
     }
@@ -195,10 +187,7 @@ std::vector<std::int32_t> slotsForFace(const std::string_view path, const std::i
     return every;
 }
 
-/// parity: `ChiseledBookShelfBlockEntity` takes and gives through `setItem`/`removeItem`, both of
-/// which run `updateState` and light the slot on the block. A hopper reaches it through its own door
-/// for that reason, the way it reaches a jukebox and a composter, so the plain container path has to
-/// keep its hands off.
+/// parity: `ChiseledBookShelfBlockEntity` takes and gives through `setItem`/`removeItem`.
 [[nodiscard]] bool hasItsOwnDoor(const std::string_view path) { return path == "chiseled_bookshelf"; }
 
 bool acceptsThroughFace(const std::string_view path, const std::int32_t slot, const wire::common::Identifier& item,
@@ -206,8 +195,7 @@ bool acceptsThroughFace(const std::string_view path, const std::int32_t slot, co
     if (hasItsOwnDoor(path)) {
         return false;
     }
-    // parity: `AbstractFurnaceBlockEntity.canPlaceItem`: nothing goes into the result slot, and the
-    // fuel slot takes fuel or **one** empty bucket, which is what a lava bucket leaves behind.
+    // parity: `AbstractFurnaceBlockEntity.canPlaceItem`.
     if (furnaces::cookerFor(path).has_value()) {
         if (slot == furnaces::kResultSlot) {
             return false;
@@ -227,7 +215,7 @@ bool acceptsThroughFace(const std::string_view path, const std::int32_t slot, co
         }
         return slotIsEmpty && brewingStands::isPotionInput(item);
     }
-    // parity: `ShulkerBoxBlockEntity.canPlaceItemThroughFace`, the one thing a box will not hold.
+    // parity: `ShulkerBoxBlockEntity.canPlaceItemThroughFace`.
     if (shulkers::isShulkerBox(path)) {
         return !shulkers::isShulkerBox(item.path());
     }
@@ -239,13 +227,11 @@ bool givesThroughFace(const std::string_view path, const std::int32_t slot, cons
     if (hasItsOwnDoor(path)) {
         return false;
     }
-    // parity: `AbstractFurnaceBlockEntity.canTakeItemThroughFace`: what comes out of the fuel slot
-    // downwards is `#furnace_fuel_bottom_takeable`, the two buckets, and never the fuel itself.
+    // parity: `AbstractFurnaceBlockEntity.canTakeItemThroughFace`.
     if (furnaces::cookerFor(path).has_value() && from == registry::BlockFace::Down && slot == furnaces::kFuelSlot) {
         return item.path() == "bucket" || item.path() == "water_bucket";
     }
-    // parity: `BrewingStandBlockEntity.canTakeItemThroughFace`: the ingredient slot only gives back
-    // the glass bottle a brew leaves in it.
+    // parity: `BrewingStandBlockEntity.canTakeItemThroughFace`.
     if (path == "brewing_stand" && slot == brewingStands::kIngredientSlot) {
         return item.path() == "glass_bottle";
     }
@@ -253,18 +239,15 @@ bool givesThroughFace(const std::string_view path, const std::int32_t slot, cons
 }
 
 bool setItemTellsComparators(const std::string_view path, const std::int32_t slot, const bool sameItem) {
-    // parity: `HopperBlockEntity.setItem` and `LecternBlockEntity`'s, neither of which calls
-    // `setChanged`: a hopper filled by command leaves the comparator beside it reading nothing.
+    // parity: `HopperBlockEntity.setItem` and `LecternBlockEntity`'s, neither of which calls.
     if (path == "hopper" || path == "lectern") {
         return false;
     }
-    // parity: `ChiseledBookShelfBlockEntity.setItem` goes through `updateState`, so what the
-    // comparators hear is the block changing state, not this.
+    // parity: `ChiseledBookShelfBlockEntity.setItem` goes through `updateState`, so what the.
     if (path == "chiseled_bookshelf") {
         return false;
     }
-    // parity: `AbstractFurnaceBlockEntity.setItem`, which only speaks for the slot whose contents
-    // decide the cook time.
+    // parity: `AbstractFurnaceBlockEntity.setItem`.
     if (furnaces::cookerFor(path).has_value()) {
         return slot == furnaces::kInputSlot && !sameItem;
     }
@@ -286,9 +269,7 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     if (const std::optional<std::int32_t> plain = stateSignal(path, properties); plain.has_value()) {
         return plain;
     }
-    // parity: `CreakingHeartBlock.getAnalogOutputSignal`: the bound creaking's distance, fifteen next
-    // to it and nothing at thirty-two, and zero uprooted or alone. It always answers, which is what
-    // stops a comparator looking past it for a container.
+    // parity: `CreakingHeartBlock.getAnalogOutputSignal`.
     if (path == "creaking_heart") {
         if (textOf(properties, "creaking_heart_state") == "uprooted") {
             return 0;
@@ -317,9 +298,7 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
             return shelf;
         }
     }
-    // parity: `SculkSensorBlock.getAnalogOutputSignal`, the **frequency** of the last thing it heard
-    // and only while it is awake. Not the state's `power`, which says how close the noise was:
-    // measured in `sensormuerte`, a pig dying leaves the state at ten and the comparator at fifteen.
+    // parity: `SculkSensorBlock.getAnalogOutputSignal`.
     if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
         if (textOf(properties, "sculk_sensor_phase") != "active") {
             return 0;
@@ -329,16 +308,14 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
             awake == nullptr ? nullptr : awake->blockEntityAt(x & 15, y, z & 15);
         return heard == nullptr ? 0 : heard->data().getInt(std::string{vibrations::kFrequencyKey}, 0);
     }
-    // parity: `CommandBlock.getAnalogOutputSignal`, which is the `SuccessCount` of the last command it
-    // ran and nothing else. Like the rail it answers zero rather than nothing.
+    // parity: `CommandBlock.getAnalogOutputSignal`.
     if (commandBlocks::modeOf(path).has_value()) {
         const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
         const server::world::ChunkBlockEntity* entity =
             chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
         return entity == nullptr ? 0 : commandBlocks::comparatorSignal(entity->data()).value_or(0);
     }
-    // parity: `DetectorRailBlock.getAnalogOutputSignal`, which is a reading like any other even
-    // though what it reads is not in the block: it answers zero, never nothing.
+    // parity: `DetectorRailBlock.getAnalogOutputSignal`.
     if (path == "detector_rail") {
         return readers.cart ? readers.cart(x, y, z) : 0;
     }
@@ -346,7 +323,7 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     if (!size.has_value()) {
         return std::nullopt;
     }
-    // parity: `getRedstoneSignalFromContainer` reads every slot, which unpacks a pending table.
+    // parity: `getRedstoneSignalFromContainer` reads every slot.
     world.unpackLoot(x, y, z);
     const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
     if (chunk == nullptr) {
@@ -368,13 +345,11 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     if (path == "jukebox") {
         return jukeboxes::comparatorOutputAt(world, entity->data());
     }
-    // parity: `LecternBlock.getAnalogOutputSignal`, which is nothing at all without a book, and
-    // otherwise how far through it the reader is.
+    // parity: `LecternBlock.getAnalogOutputSignal`.
     if (path == "lectern") {
         return textOf(properties, "has_book") == "true" ? lecterns::comparatorSignal(entity->data()) : 0;
     }
-    // parity: `ChestBlock.getAnalogOutputSignal` reads the **pair**, so the same four stacks give
-    // three in a single chest and two in a double one.
+    // parity: `ChestBlock.getAnalogOutputSignal` reads the **pair**.
     std::int32_t seen = *size;
     blockInventory::Slots slots = blockInventory::readFor(path, entity->data(), *size);
     if (const std::optional<std::pair<doubleChests::Half, doubleChests::Half>> pair =
@@ -393,9 +368,7 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     std::vector<std::pair<std::int32_t, std::int32_t>> counts;
     counts.reserve(slots.size());
     for (const std::optional<server::world::loot::ItemStack>& slot : slots) {
-        // parity: `getRedstoneSignalFromContainer` divides each stack by
-        // `container.getMaxStackSize(stack)`, so a chest with one bucket in it reads far higher than
-        // a chest with one stone. Reading 64 for everything was a full fifteen out on a shulker box.
+        // parity: `getRedstoneSignalFromContainer` divides each stack by.
         const std::int32_t cap =
             slot.has_value() ? std::min(kSlotLimit, registry::itemStacking::maxStackSize(slot->item, slot->components))
                              : 1;

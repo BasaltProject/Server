@@ -7,10 +7,8 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using lua::LuaArgs;
 
-/// The bytes a listener wrote back, as a list of numbers from 0 to 255.
 [[nodiscard]] std::vector<std::uint8_t> bytesFrom(LuaArgs& lua, std::int32_t index) {
     if (!lua.isTable(index)) {
         lua.raise("packet bytes are a list of numbers from 0 to 255");
@@ -25,7 +23,6 @@ using lua::LuaArgs;
     }
     return out;
 }
-
 } // namespace
 
 void pushPacket(LuaArgs& lua, PluginPacket& packet, PluginHost& host, LoadedPlugin& plugin) {
@@ -51,8 +48,6 @@ void pushPacket(LuaArgs& lua, PluginPacket& packet, PluginHost& host, LoadedPlug
                 })
         .pushes("bytes",
                 [target](LuaArgs& args) {
-                    // One-based, like every other list in Lua, and a copy: the packet's own array is
-                    // reused.
                     args.pushTable();
                     std::int64_t position = 1;
                     for (const std::uint8_t byte : target->bytes) {
@@ -70,5 +65,4 @@ void pushPacket(LuaArgs& lua, PluginPacket& packet, PluginHost& host, LoadedPlug
         });
     std::move(object).push(lua);
 }
-
 } // namespace basalt::server::plugins

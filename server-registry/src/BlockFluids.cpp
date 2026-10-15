@@ -10,16 +10,11 @@
 
 namespace basalt::server::registry::blockFluids {
 namespace {
-
-/// parity: blocks whose `getFluidState` is water without a `waterlogged` property: the four plants
-/// and `BubbleColumnBlock`.
+// parity: blocks whose `getFluidState` is water without a `waterlogged` property.
 constexpr std::array<std::string_view, 5> kAlwaysInWater = {"seagrass", "tall_seagrass", "kelp", "kelp_plant",
                                                             "bubble_column"};
 
-/// Every level of the block, not just the source: flowing water is water, and reading it as anything
-/// else leaves it out of the section's fluid count and out of the flow engine.
 constexpr std::int32_t kLevels = 16;
-
 } // namespace
 
 bool hasWaterFluid(std::int32_t stateId) {
@@ -38,5 +33,4 @@ bool hasFluid(std::int32_t stateId) {
     const std::int32_t lava = blocks::lava().stateId;
     return (stateId >= lava && stateId < lava + kLevels) || hasWaterFluid(stateId);
 }
-
 } // namespace basalt::server::registry::blockFluids

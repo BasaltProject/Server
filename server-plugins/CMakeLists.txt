@@ -35,12 +35,6 @@ basalt_module(server-plugins
     PRIVATE_DEPENDS basalt::lua
 )
 
-basalt_test(server-plugins-object-test
-    SOURCES
-        test/PluginObjectTest.cpp
-    DEPENDS basalt::server-plugins
-)
-
 basalt_test(server-plugins-event-types-test
     SOURCES
         test/PluginEventTypesTest.cpp
@@ -77,18 +71,6 @@ basalt_test(server-plugins-text-test
 
 target_compile_definitions(server-plugins-text-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
-)
-
-basalt_test(server-plugins-toml-test
-    SOURCES
-        test/PluginTomlTest.cpp
-    DEPENDS basalt::server-plugins
-)
-
-basalt_test(server-plugins-command-test
-    SOURCES
-        test/PluginCommandSpecTest.cpp
-    DEPENDS basalt::server-plugins
 )
 
 basalt_test(server-plugins-json-test

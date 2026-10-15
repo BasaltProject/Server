@@ -44,7 +44,7 @@ constexpr std::int32_t kMiddleRing = 20;
     return a.hash == b.hash && a.x == b.x && a.y == b.y && a.z == b.z;
 }
 
-/// parity: `BinaryHeap`, whose tie-breaking decides which of two equal routes the dragon takes.
+/// parity: `BinaryHeap`.
 class NodeHeap {
 public:
     explicit NodeHeap(std::vector<Node>& pool) : pool_(&pool) {}
@@ -220,8 +220,7 @@ double vanillaAtan2(double y, double x) {
     const double inverse = wire::common::mth::fastInvSqrt(squared);
     x *= inverse;
     y *= inverse;
-    // 2^44 has a unit in the last place of 1/256, so adding it rounds y to the table's step, and the
-    // low bits of the sum are the index.
+    // 2^44 has a ulp of 1/256, so adding it rounds y to the table's step and the low bits are the index.
     constexpr double kFracBias = 17592186044416.0;
     const double biased = kFracBias + y;
     const auto index = static_cast<std::size_t>(static_cast<std::uint32_t>(std::bit_cast<std::uint64_t>(biased)));
@@ -247,8 +246,7 @@ void buildNodes(DragonState& state, const std::function<std::int32_t(std::int32_
     if (state.nodesReady) {
         return;
     }
-    // parity: `EnderDragon.findClosestNode`, three rings of 12, 8 and 4 around the fight origin's
-    // column, each lifted over whatever stands under it.
+    // parity: `EnderDragon.findClosestNode`.
     for (std::int32_t i = 0; i < static_cast<std::int32_t>(kNodeCount); ++i) {
         std::int32_t yAdjustment = 5;
         std::int32_t nodeX = 0;
@@ -295,7 +293,6 @@ std::int32_t closestNode(const DragonState& state, double x, double y, double z,
 
 std::optional<Path> findPath(DragonState& state, std::int32_t startIndex, std::int32_t endIndex,
                              std::optional<std::array<std::int32_t, 3>> finalNode, bool crystalsLeft) {
-    // The 24 nodes, then the final one if there is one, as a pool the heap indexes into.
     std::vector<Node> pool{state.nodes.begin(), state.nodes.end()};
     for (Node& node : pool) {
         node.closed = false;

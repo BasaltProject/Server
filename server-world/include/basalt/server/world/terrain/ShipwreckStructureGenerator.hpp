@@ -13,9 +13,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// The two shipwrecks, sunk and beached: the same structure with different template lists and
 /// heightmaps. parity: `ShipwreckStructure`. The height is the mean of the heightmap over the whole
-/// footprint, not the column it started from, so a wreck across a slope half buries itself.
 class ShipwreckStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;
@@ -23,7 +21,6 @@ public:
     using HeightAt = std::function<std::int32_t(std::int32_t, std::int32_t)>;
 
     static constexpr std::string_view kName = "shipwreck";
-    /// Position among the 44 structures of `surface_structures`, in registry order.
     static constexpr std::int32_t kSunkStructureIndex = 35;
     static constexpr std::int32_t kBeachedStructureIndex = 36;
     static constexpr std::int32_t kSurfaceStructuresStep = 4;
@@ -32,29 +29,19 @@ public:
                                 std::set<std::string, std::less<>> beachBiomes, TemplateOf templateOf,
                                 HeightAt surfaceHeightAt, HeightAt oceanFloorAt, WorldHeightAt worldHeightAt);
 
-    /// A hull is up to 32 blocks long, so it spills into its neighbours. Every chunk it touches
-    /// places its own part, which is what vanilla does by giving each chunk the same start and
-    /// clipping the write; here that means walking the nearby cells rather than only this chunk's.
     void generateInto(Chunk& chunk, std::int64_t seed);
 
-    /// parity: `PlaceCommand.placeStructure`: the bounds of the wreck of this kind (`beached` picks
-    /// the template list) started at this chunk with the grid and biome checks skipped, or nothing
-    /// when its template or its settle is missing.
+    /// parity: `PlaceCommand.placeStructure`.
     [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
                                                                                std::int32_t chunkZ, bool beached) const;
 
-    /// Writes the part of the wreck of this kind started at (chunkX, chunkZ) that lands in `chunk`,
-    /// like the worldgen pass does, but without the grid and biome checks and without recording a start.
     void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, bool beached) const;
 
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
-    /// Whether a wreck of that kind starts in the chunk, which is what `/locate` and a dolphin ask.
     [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, bool beached) const;
 
 private:
-    /// A drawn and settled hull of the given kind, which both the bounds query and the writer derive
-    /// the same way so they agree on what a start at this chunk is.
     struct HullStart {
         const structure::StructureTemplate* piece = nullptr;
         structure::StructureRotation rotation = structure::StructureRotation::None;
@@ -66,19 +53,15 @@ private:
 
     void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
-    /// Which of the two the chunk gets, or nothing when neither fits its biome.
     /// parity: the weighted draw in `ChunkGenerator`, both weights one, `shipwreck` first.
     [[nodiscard]] std::optional<bool> chooseVariant(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
-    /// parity: `ShipwreckPiece.postProcess`. The sunk hull takes the mean ocean floor of its
-    /// footprint; the beached one takes the lowest surface, then sinks half its own height and one
-    /// to three blocks more.
+    /// parity: `ShipwreckPiece.postProcess`. The sunk hull takes the mean ocean floor of its.
     [[nodiscard]] std::optional<structure::StructurePos> settle(const structure::StructureTemplate& piece,
                                                                 structure::StructurePos origin, bool beached,
                                                                 random::RandomSource& random) const;
 
-    /// parity: `ShipwreckPiece.handleDataMarker`, which turns the three chest markers into a loot
-    /// table on the container below the marker.
+    /// parity: `ShipwreckPiece.handleDataMarker`.
     static void placeMarkerChests(Chunk& chunk, const structure::StructureTemplate& piece,
                                   structure::StructurePos position, structure::StructureRotation rotation,
                                   const structure::StructureBoundingBox& clip, random::RandomSource& random);

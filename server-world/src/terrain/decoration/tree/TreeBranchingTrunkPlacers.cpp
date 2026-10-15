@@ -12,8 +12,7 @@
 namespace basalt::server::world::terrain::decoration::tree {
 namespace {
 
-/// parity: `CherryTrunkPlacer`'s sideways log, which is the trunk state turned onto a horizontal
-/// axis rather than a separate block.
+/// parity: `CherryTrunkPlacer` sideways log is the trunk state on a horizontal axis.
 [[nodiscard]] std::int32_t horizontalAxisStateId(const std::int32_t stateId, const HorizontalDirection direction) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {

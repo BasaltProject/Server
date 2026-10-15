@@ -8,7 +8,6 @@
 
 namespace basalt::server::registry::itemFood {
 namespace {
-
 using wire::common::Identifier;
 
 [[nodiscard]] std::vector<std::string_view> split(std::string_view text, char separator) {
@@ -36,8 +35,6 @@ using wire::common::Identifier;
     return value;
 }
 
-/// `apply:effect,ticks,amplifier,probability`, `remove:effect`, `teleport:diameter` or `clear`, joined
-/// with semicolons.
 [[nodiscard]] std::vector<ConsumeEffect> parseEffects(std::string_view encoded) {
     std::vector<ConsumeEffect> effects;
     for (const std::string_view entry : split(encoded, ';')) {
@@ -98,12 +95,10 @@ using wire::common::Identifier;
     }();
     return built;
 }
-
 } // namespace
 
 const FoodValue* of(const Identifier& item) {
     const auto found = table().find(item);
     return found == table().end() ? nullptr : &found->second;
 }
-
 } // namespace basalt::server::registry::itemFood

@@ -23,8 +23,7 @@ void shuffle(std::vector<Value>& values, random::RandomSource& random) {
     return least >= most ? least : random.nextInt(most - least + 1) + least;
 }
 
-/// parity: `LootTable.shuffleAndSplitItems`, which breaks stacks up until the roll covers as many
-/// slots as it can.
+/// parity: `LootTable.shuffleAndSplitItems`.
 void shuffleAndSplit(std::vector<ItemStack>& result, std::size_t availableSlots, random::RandomSource& random) {
     std::vector<ItemStack> splittable;
     std::vector<ItemStack> kept;

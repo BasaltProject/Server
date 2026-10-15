@@ -93,7 +93,6 @@ constexpr std::int32_t kCellarZ = 13;
     return id;
 }
 
-/// The seven rows of the wall band, from y 2 up to y 8, each three blocks wide.
 [[nodiscard]] const std::array<std::array<std::int32_t, 3>, 7>& sideRows() {
     static const std::array<std::array<std::int32_t, 3>, 7> built{{
         {cutSandstone(), orangeTerracotta(), cutSandstone()},
@@ -138,7 +137,7 @@ constexpr std::array<std::string_view, 4> kFacings{"north", "east", "south", "we
     return registry::blocks::isAir(stateId) || replaceable().contains(pathOf(stateId));
 }
 
-/// parity: `StructurePiece.reorient`, the chest turning its back on its one solid neighbour.
+/// parity: `StructurePiece.reorient`.
 [[nodiscard]] std::string reorient(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     std::string solid;
     for (std::size_t index = 0; index < kFacings.size(); ++index) {
@@ -343,7 +342,6 @@ void DesertPyramidPiece::buildTrapChamber() const {
     box(9, -11, 9, 11, -1, 11, air(), air());
     set(stonePressurePlate(), 10, -11, 10);
     box(9, -13, 9, 11, -13, 11, tnt(), air());
-    // The four alcoves, each an opening in the wall with its own two decorated blocks behind.
     for (const auto& [dx, dz] : kHorizontalOffsets) {
         set(air(), 10 + dx * 2, -11, 10 + dz * 2);
         set(air(), 10 + dx * 2, -10, 10 + dz * 2);
@@ -402,7 +400,6 @@ void DesertPyramidPiece::addCellarRoom() {
     set(orangeTerracotta(), x - 2, y, z);
     set(orangeTerracotta(), x, y, z + 2);
     set(orangeTerracotta(), x, y, z - 2);
-    // The two side niches, each an orange arm with a sand plug and a decorated back.
     for (const std::int32_t dx : {1, -1}) {
         set(orangeTerracotta(), x + dx * 3, y, z);
         recordSand(x + dx * 3, y + 1, z);

@@ -5,8 +5,6 @@
 
 // parity: net.minecraft.world.level.levelgen.RandomSupport.
 namespace basalt::server::random {
-
-/// A 128-bit seed as a pair of longs, mirroring `RandomSupport.Seed128bit`.
 struct Seed128bit {
     std::int64_t lo = 0;
     std::int64_t hi = 0;
@@ -45,10 +43,7 @@ constexpr Seed128bit Seed128bit::mixed() const noexcept { return Seed128bit{mixS
     return upgradeSeedTo128bitUnmixed(legacySeed).mixed();
 }
 
-/// Hashes the name through MD5 the way vanilla does, then reads the digest as two big-endian longs.
 [[nodiscard]] Seed128bit seedFromHashOf(std::string_view input);
 
-/// Reproduces `java.lang.String.hashCode()`, used by `LegacyPositionalRandomFactory.fromHashOf`.
 [[nodiscard]] std::int32_t javaStringHashCode(std::string_view value) noexcept;
-
 } // namespace basalt::server::random

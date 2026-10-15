@@ -19,9 +19,6 @@ struct FoliageAttachment {
 };
 
 /// parity: `TwoLayersFeatureSize` and `ThreeLayersFeatureSize`.
-///
-/// A value type with a kind tag rather than a class hierarchy: this build has RTTI off, and the two
-/// shapes together are five ints.
 class FeatureSize {
 public:
     [[nodiscard]] static constexpr FeatureSize twoLayers(std::int32_t limit, std::int32_t lowerSize,
@@ -58,8 +55,7 @@ public:
         if (yo < limit_) {
             return lowerSize_;
         }
-        // parity: the upper band is measured from the top down, so it depends on the tree's own
-        // height rather than on a fixed y.
+        // parity: the upper band is measured from the top down, so it depends on the tree's own.
         if (yo >= treeHeight - upperLimit_) {
             return upperSize_;
         }
@@ -78,7 +74,6 @@ private:
     std::optional<std::int32_t> minClippedHeight_;
 };
 
-/// The tree decorators a configuration may carry, as a closed set.
 namespace decorator {
 
 struct AlterGroundToPodzol {

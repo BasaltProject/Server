@@ -101,7 +101,7 @@ void writeSlots(MobContext& ctx, const std::vector<Position>& halves, const Slot
     }
 }
 
-/// parity: `ChestBlock.isChestBlockedAt`: a block that conducts on top, or a cat sitting there.
+/// parity: `ChestBlock.isChestBlockedAt`.
 [[nodiscard]] bool blocked(world::WorldState& world, const std::vector<ServerEntity*>& entities, const Position& at) {
     const std::optional<std::int32_t> above = world.blockState(at[0], at[1] + 1, at[2]);
     if (above.has_value() && reg::blockSupport::conductsRedstone(*above)) {
@@ -131,8 +131,7 @@ void writeSlots(MobContext& ctx, const std::vector<Position>& halves, const Slot
     return {mob.x, mob.y + (mob.height() / 2.0), mob.z};
 }
 
-/// parity: `isWithinTargetDistance`: the chest's collision bounds grown by `distance` across and half
-/// a block up and down, against the golem's box centred on `from`.
+/// parity: `isWithinTargetDistance`.
 [[nodiscard]] bool within(MobContext& ctx, const Position& at, double distance, const std::array<double, 3>& from) {
     const std::optional<std::int32_t> stateId = ctx.world.blockState(at[0], at[1], at[2]);
     if (!stateId.has_value()) {
@@ -178,7 +177,7 @@ void writeSlots(MobContext& ctx, const std::vector<Position>& halves, const Slot
     return !mob.path.has_value() && state.approachEnd.has_value() ? kReachArrived : kReachWalking;
 }
 
-/// parity: `canSeeAnyTargetSide`, a line to the middle of each face that meets the chest itself.
+/// parity: `canSeeAnyTargetSide`.
 [[nodiscard]] bool seesAnySide(MobContext& ctx, const Position& at, const std::array<double, 3>& eye) {
     for (const reg::BlockFace face : {reg::BlockFace::Down, reg::BlockFace::Up, reg::BlockFace::North,
                                       reg::BlockFace::South, reg::BlockFace::West, reg::BlockFace::East}) {
@@ -193,8 +192,7 @@ void writeSlots(MobContext& ctx, const std::vector<Position>& halves, const Slot
     return false;
 }
 
-/// The squares beside a chest a golem could stand in, the shortest walk first. Our paths only end on
-/// standable squares, where the jar's may end beside the target.
+/// Standable squares beside a chest, shortest walk first; our paths only end on standable squares, the jar's may not.
 [[nodiscard]] std::optional<std::vector<Position>> pathBeside(MobContext& ctx, const Position& at) {
     std::optional<std::vector<Position>> best;
     const auto from =
@@ -351,8 +349,7 @@ private:
                     if (distance >= closest) {
                         continue;
                     }
-                    // parity: `new AABB(blockPosition()).inflate(...)`, which `contains` checks with
-                    // the lower edge closed and the upper one open.
+                    // parity: `new AABB(blockPosition()).inflate(...)`.
                     const bool inside = at[0] >= blockX - across && at[0] < blockX + 1 + across &&
                                         at[1] >= blockY - up && at[1] < blockY + 1 + up && at[2] >= blockZ - across &&
                                         at[2] < blockZ + 1 + across;
@@ -414,7 +411,6 @@ private:
         if (ctx_.mob.path.has_value() || !state_.target.has_value()) {
             return;
         }
-        // A walk that ended short of the chest looks for another way from here.
         state_.approachEnd.reset();
         if (std::optional<std::vector<Position>> path = pathBeside(ctx_, *state_.target); path.has_value()) {
             walk(std::move(*path));
@@ -435,7 +431,7 @@ private:
         }
     }
 
-    /// parity: `doReachedTargetInteraction`'s four outcomes, decided the moment the golem arrives.
+    /// parity: `doReachedTargetInteraction`'s four outcomes.
     [[nodiscard]] Interaction interactionFor(const Position& at) {
         const Slots slots = readSlots(ctx_.world, halvesOf(ctx_.world, at));
         const std::optional<server::world::loot::ItemStack> held = golems::mainHand(ctx_.mob);
@@ -513,8 +509,7 @@ private:
         return golems::Pose::Idle;
     }
 
-    /// parity: the sounds `CopperGolemAi` names, whose registered ids read the other way round for
-    /// the two pickups.
+    /// parity: the sounds `CopperGolemAi` names.
     [[nodiscard]] static std::string_view soundFor(Interaction interaction) {
         switch (interaction) {
         case Interaction::PickupItem:
@@ -619,8 +614,7 @@ bool CopperGolemIdleGoal::canContinueToUse(MobContext& mob) {
 
 void CopperGolemIdleGoal::start(MobContext& mob) {
     GolemState& state = golems::stateOf(mob.mob, mob.random);
-    // parity: `RunOne` shuffles its two choices evenly, and a stroll with nowhere to go gives way
-    // to the wait.
+    // parity: `RunOne` shuffles its two choices evenly.
     if (mob.random.nextBoolean()) {
         const std::optional<std::array<double, 3>> spot =
             mobBrain::strollTarget(mob.world, mob.mob, mob.random, kStrollRange, kStrollRange);
@@ -654,7 +648,7 @@ bool LookAtPlayerSometimesGoal::canUse(MobContext& mob) {
     if (nearest == nullptr) {
         return false;
     }
-    // parity: `SetEntityLookTargetSometimes.Ticker`, a new wait of forty to eighty after each look.
+    // parity: `SetEntityLookTargetSometimes.Ticker`.
     if (ticksUntilNextStart_ == 0) {
         ticksUntilNextStart_ = 40 + mob.random.nextInt(41) - 1;
         return false;

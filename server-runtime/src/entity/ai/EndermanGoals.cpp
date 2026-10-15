@@ -38,8 +38,7 @@ constexpr float kDegreesToRadians = std::numbers::pi_v<float> / 180.0F;
     return (dx * dx) + (dy * dy) + (dz * dz);
 }
 
-/// parity: `TargetingConditions.forCombat` with the follow range, `getVisibilityPercent`'s crouch
-/// and, unless `ignoreSight`, the mob's line of sight.
+/// parity: `TargetingConditions.forCombat`.
 [[nodiscard]] bool combatTarget(MobContext& mob, const PlayerView& player, bool ignoreSight) {
     if (!player.targetable) {
         return false;
@@ -98,7 +97,7 @@ bool staredAtBy(MobContext& mob, const PlayerView& player) {
     if (dot <= 1.0 - (kCone / distance)) {
         return false;
     }
-    // parity: `LivingEntity.hasLineOfSight` from the player's eyes to the enderman's, colliders only.
+    // parity: `LivingEntity.hasLineOfSight` from the player's eyes to the enderman's.
     if (distance > kSightRange) {
         return false;
     }

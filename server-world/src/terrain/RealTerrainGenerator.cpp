@@ -34,18 +34,10 @@
 namespace basalt::server::world::terrain::realTerrainGenerator {
 namespace {
 
-/// Fills every quart cell of the chunk with its real biome network id, so the wire palette carries
-/// the actual biome layout the client needs for grass, water and fog colours.
 void fillBiomes(Chunk& chunk, const surface::SurfaceRuleEnvironment& environment,
                 densityfunction::SamplerContext* context) {
-    // A chunk holds a handful of distinct biomes, so the identifier parse and the registry lookup
-    // are paid once per name instead of once per each of the 1536 quarts.
     std::map<std::string, std::int32_t, std::less<>> idByName;
-    // parity: `ChunkAccess.fillBiomesFromNoise` goes section by section and
-    // `LevelChunkSection.fillBiomesFromNoise` goes x, then y, then z inside each one. The order decides real
-    // biomes: `Climate.RTree` seeds every search with the thread's previous leaf and keeps it when nothing is
-    // strictly closer, so a column whose continentalness quantises onto a band edge takes the biome of the
-    // cell asked for just before it.
+    // parity: `LevelChunkSection.fillBiomesFromNoise` x.
     const std::int32_t sections = chunk.verticalBounds().height() / 16;
     for (std::int32_t section = 0; section < sections; ++section) {
         for (std::int32_t quartX = 0; quartX < 4; ++quartX) {
@@ -139,8 +131,7 @@ GeneratedTerrain generateTerrain(const NoiseRouter& router, const surface::Surfa
     }
     GeneratedTerrain terrain =
         buildTerrain(router, environment, Chunk{chunkX, chunkZ}, structureBeardifier(std::move(beard)));
-    // parity: the `_WG` heightmaps stop being updated here, so everything that follows sees the bare
-    // terrain rather than what the feature before it left standing.
+    // parity: the `_WG` heightmaps stop updating here.
     terrain.chunk().freezeWorldgenHeights();
     return terrain;
 }
@@ -157,12 +148,9 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         return neighbours == nullptr ? std::nullopt : neighbours->oceanFloorHeightAt(x, z);
     };
     generationMetrics::measure(generationMetrics::Phase::Decoration, [&] {
-        // parity: one `WorldgenRandom` decorates the whole chunk in the jar, so the spare its
-        // gaussian cached in one feature is handed to the next.
+        // parity: one `WorldgenRandom` decorates the whole chunk.
         const random::RandomSource::SharedGaussian sharedGaussian;
-        // One reader for the whole phase. A feature body that reaches past the chunk edge asks the
-        // chunk, and the chunk asks this: without it the outside reads as air, which makes a lake
-        // preflight reject itself and a grass patch find no ground to stand on.
+        // One reader for the whole phase, otherwise outside reads as air.
         const Chunk::ExternalStateScope scope{chunk, externalState};
         decoration::overworldLakeDecoration::decorate(chunk, seed, environment);
         decoration::frozenOceanDecoration::decorateLocalModifications(chunk, seed, environment);
@@ -178,9 +166,7 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
                 return parsed.has_value() ? templates(*parsed) : nullptr;
             }}
                       : nullptr;
-        // parity: `underground_structures` is step 3, and vanilla interleaves a step's structures with
-        // that step's features rather than running every structure first. Running them all ahead of the
-        // decoration lets a step 1 or 2 feature bury what a step 3 structure carved.
+        // parity: vanilla interleaves a step's structures with its features.
         if (generators.buriedTreasure != nullptr) {
             generators.buriedTreasure->generateInto(chunk, seed);
         }
@@ -194,8 +180,7 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
             generators.mineshaft->generateInto(chunk, seed);
         }
         decoration::overworldUndergroundStructures::decorate(chunk, seed, environment, byName, externalOceanFloor);
-        // parity: `surface_structures` is step 4, the village included, so it follows step 3 rather
-        // than opening the whole pass. The camps are its first eighteen structures.
+        // parity: `surface_structures` is step 4 and follows step 3.
         if (generators.camp != nullptr) {
             generators.camp->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
         }
@@ -237,11 +222,7 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         }
 
         decoration::frozenOceanDecoration::decorateSurfaceStructures(chunk, seed, environment);
-        // Ore and stone blobs are spheres around their origin, so most cross a chunk edge. The part
-        // outside is deferred, and its guard has to be the block actually out there.
         decoration::overworldOreDecoration::decorate(chunk, seed, environment, externalOceanFloor, externalState);
-        // Step 7 opens with its structures, and the ancient city is the first of the three, so the
-        // sculk features below decorate a chunk that already has the city in it.
         if (generators.ancientCity != nullptr) {
             generators.ancientCity->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
         }
@@ -252,8 +233,6 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         decoration::overworldSpringDecoration::decorate(chunk, seed, environment, externalState);
         decoration::overworldVegetalDecoration::decorate(chunk, seed, environment, externalState);
     });
-    // The water over a magma block or soul sand carries its column in the saved chunk, so this runs
-    // once decoration has put both of them down.
     bubbleColumnFormation::formInto(chunk);
     generationMetrics::measure(generationMetrics::Phase::SurfaceFreeze,
                                [&] { decoration::surfaceFreezingDecoration::decorate(chunk, environment); });

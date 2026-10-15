@@ -12,8 +12,6 @@ namespace forestRockDecoration {
 
 void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment);
 
-/// The feature itself at one position: what the pass calls per origin and what `/place feature`
-/// calls once. Chunk-local x and z, as everything in this package uses.
 void placeAt(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z);
 
 } // namespace forestRockDecoration

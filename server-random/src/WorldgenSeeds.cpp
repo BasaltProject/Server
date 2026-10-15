@@ -4,11 +4,9 @@
 
 namespace basalt::server::random {
 namespace {
-
 constexpr std::int64_t wrap(std::uint64_t value) noexcept { return static_cast<std::int64_t>(value); }
 
 constexpr std::uint64_t bits(std::int64_t value) noexcept { return static_cast<std::uint64_t>(value); }
-
 } // namespace
 
 std::int64_t setDecorationSeed(RandomSource& random, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
@@ -40,5 +38,4 @@ void setLargeFeatureWithSalt(RandomSource& random, std::int64_t seed, std::int32
                         bits(static_cast<std::int64_t>(z)) * 132897987541ULL + bits(seed) +
                         bits(static_cast<std::int64_t>(blend))));
 }
-
 } // namespace basalt::server::random

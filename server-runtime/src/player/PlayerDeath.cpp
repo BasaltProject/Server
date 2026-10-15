@@ -19,10 +19,10 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     session.setHealth(0.0F);
     // parity: `ServerPlayer.die` puts the shoulder parrots back in the world.
     session.shoulderDropPending = true;
-    // parity: `LivingEntity.die` empties the absorption pool, so respawning starts without it.
+    // parity: `LivingEntity.die` empties the absorption pool.
     session.absorption = 0.0F;
     session.stats.increment(storage::stats::deaths());
-    // parity: `getKillCredit`, the player who hit them within the last hundred ticks, else the mob.
+    // parity: `getKillCredit`.
     session.killerEntityId = session.lastHurtByPlayerTime.load() > 0 ? session.lastHurtByPlayerId : std::nullopt;
     if (session.killerEntityId.has_value()) {
         session.stats.increment(storage::stats::killedBy("minecraft:player"));
@@ -36,8 +36,7 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
         session.connection().syncHealth();
     }
 
-    // parity: `DamageSource.getLocalizedDeathMessage`, whose second argument is whoever did it.
-    // Half of vanilla's death messages name them, and one built without it reads as `%2$s`.
+    // parity: `DamageSource.getLocalizedDeathMessage`.
     std::vector<Component> arguments{Component::text(session.name())};
     if (killer.has_value()) {
         arguments.push_back(*killer);
@@ -54,9 +53,6 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     if (context.registry == nullptr) {
         return;
     }
-    // Through the connection's own way of saying something rather than a packet of Java's: for a
-    // player on that edition it is the same call, and for one on Bedrock it is the only one there
-    // is. Without this a death is announced to half the server.
     for (const PlayerSession* player : context.registry->snapshot()) {
         if (player->connection().sendSystemMessage) {
             player->connection().sendSystemMessage(message);

@@ -46,8 +46,6 @@ std::expected<CompatibilityConfig, std::string> CompatibilityConfig::load(const 
     if (!root.has_value()) {
         return std::unexpected(root.error());
     }
-    // How old a client may be is asked once per edition, in the same table as that edition's port:
-    // the two doors are the same kind of thing and read the same way.
     const TomlTable* network = root->table("network");
     const TomlTable* java = network == nullptr ? nullptr : network->table("java");
 
@@ -55,8 +53,7 @@ std::expected<CompatibilityConfig, std::string> CompatibilityConfig::load(const 
     if (java != nullptr) {
         if (const std::optional<std::string_view> written = java->string("backwards"); written.has_value()) {
             if (lowercaseAscii(trim(*written)) != "all") {
-                // Not a guess: "backwards = none" and "backwards = 775" are both someone meaning
-                // something specific, and quietly reading either as "all" is the worst answer.
+                // Not a guess: `backwards = none` and `775` each mean something specific, never all.
                 return std::unexpected(path + ": backwards must be \"all\" or a list of protocol numbers");
             }
         } else if (java->find("backwards") != nullptr) {
@@ -140,8 +137,7 @@ wire::multiversion::ProtocolGate CompatibilityConfig::gate(const std::set<std::i
             chosen.insert(protocol);
         }
     }
-    // The native version is never off: a server that could not be joined by its own clients is a
-    // configuration nobody meant to write.
+    // The native version is never off: a server its own clients cannot join is not what anybody meant.
     chosen.insert(wire::multiversion::protocolVersions::kNative);
     return wire::multiversion::ProtocolGate{std::move(chosen), futureProtocols_, snapshots_};
 }

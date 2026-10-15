@@ -11,7 +11,6 @@
 
 namespace basalt::server::registry::blockConnections {
 namespace {
-
 constexpr std::string_view kBase64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 constexpr int kAxisX = 0;
 constexpr int kAxisZ = 2;
@@ -59,7 +58,6 @@ constexpr int kAxisZ = 2;
     return index < found->second.size() && ((found->second[index] >> (blockId % 8)) & 1) != 0;
 }
 
-/// One property of a state, or empty when it has none of that name.
 [[nodiscard]] std::string propertyOf(std::int32_t stateId, const std::string& name) {
     const std::map<std::string, std::string> properties = blockStateDefinitions::propertiesOf(stateId);
     const auto found = properties.find(name);
@@ -98,7 +96,7 @@ constexpr int kAxisZ = 2;
     return "north";
 }
 
-/// parity: `StairBlock.canTakeShape`: stairs pointing the same way block the corner.
+// parity: `StairBlock.canTakeShape`: stairs pointing the same way block the corner.
 [[nodiscard]] bool canTakeShape(std::string_view facing, const std::string& half, std::int32_t neighbour) {
     if (!isStairs(neighbour)) {
         return true;
@@ -106,14 +104,13 @@ constexpr int kAxisZ = 2;
     return propertyOf(neighbour, "facing") != facing || propertyOf(neighbour, "half") != half;
 }
 
-/// parity: `FenceBlock.isSameFence`, which is not "another fence": a wooden fence joins wooden
-/// fences and a nether brick fence joins nether brick ones, and the two ignore each other.
+// parity: `FenceBlock.isSameFence`.
 [[nodiscard]] bool sameFence(std::int32_t stateId, std::int32_t neighbourStateId) {
     return inFamily("fences_tag", neighbourStateId) &&
            inFamily("wooden_fences_tag", neighbourStateId) == inFamily("wooden_fences_tag", stateId);
 }
 
-/// parity: `FenceGateBlock.connectsToDirection`: a gate joins the fences along its own line.
+// parity: `FenceGateBlock.connectsToDirection`.
 [[nodiscard]] bool gateFaces(std::int32_t stateId, BlockFace face) {
     if (!inFamily("gate", stateId)) {
         return false;
@@ -123,10 +120,8 @@ constexpr int kAxisZ = 2;
         return false;
     }
     const int gateAxis = facing == "north" || facing == "south" ? kAxisZ : kAxisX;
-    // The gate stands across the fence line, so it joins the axis its facing turns into.
     return gateAxis != axisOf(face);
 }
-
 } // namespace
 
 bool isFence(std::int32_t stateId) { return inFamily("fence", stateId); }
@@ -209,5 +204,4 @@ bool connectsTo(std::int32_t stateId, std::int32_t neighbourStateId, BlockFace f
     }
     return false;
 }
-
 } // namespace basalt::server::registry::blockConnections

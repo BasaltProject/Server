@@ -9,14 +9,14 @@
 
 namespace basalt::server::runtime::entity {
 
-/// parity: `AttributeModifier.Operation`, whose serialized names are what `/attribute` takes.
+/// parity: `AttributeModifier.Operation`.
 enum class AttributeOperation : std::uint8_t { AddValue, AddMultipliedBase, AddMultipliedTotal };
 
 [[nodiscard]] std::string_view attributeOperationName(AttributeOperation operation) noexcept;
 
 [[nodiscard]] std::optional<AttributeOperation> attributeOperationByName(std::string_view name);
 
-/// One modifier on one attribute. parity: `AttributeModifier`, keyed by id as 1.21 made it.
+/// parity: `AttributeModifier`, keyed by id as 1.21 made it.
 struct AttributeModifier {
     std::string id;
     double amount = 0.0;
@@ -25,7 +25,7 @@ struct AttributeModifier {
     friend bool operator==(const AttributeModifier&, const AttributeModifier&) = default;
 };
 
-/// The attribute ids commands name, as `minecraft:` ids. parity: `Attributes`.
+/// parity: `Attributes`.
 namespace attribute {
 
 inline constexpr std::string_view kMaxHealth = "minecraft:max_health";

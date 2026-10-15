@@ -50,13 +50,12 @@ constexpr auto kPathfinders =
                                      "magma_cube", "pufferfish", "salmon", "shulker", "slime", "snow_golem", "squid",
                                      "sulfur_cube", "tadpole", "tropical_fish", "villager", "wandering_trader"});
 
-/// parity: the `checkSpawnObstruction` overrides that only ask `isUnobstructed`: `Strider`,
-/// `Guardian`, `Drowned`, `AgeableWaterCreature`, `AbstractNautilus`, `Axolotl` and `WaterAnimal`.
+/// parity: the `checkSpawnObstruction` overrides that only ask `isUnobstructed`.
 constexpr auto kUnobstructedOnly = std::to_array<std::string_view>(
     {"axolotl", "cod", "dolphin", "drowned", "elder_guardian", "glow_squid", "guardian", "nautilus", "pufferfish",
      "salmon", "squid", "strider", "tadpole", "tropical_fish", "zombie_nautilus"});
 
-/// parity: `InfestedBlock.isCompatibleHostBlock`, the blocks an infested block can pass for.
+/// parity: `InfestedBlock.isCompatibleHostBlock`.
 constexpr auto kInfestationHosts =
     std::to_array<std::string_view>({"stone", "cobblestone", "stone_bricks", "mossy_stone_bricks",
                                      "cracked_stone_bricks", "chiseled_stone_bricks", "deepslate"});
@@ -65,7 +64,7 @@ constexpr auto kInfestationHosts =
 constexpr float kPreferred = 10.0F;
 constexpr float kLightMidpoint = 0.5F;
 
-/// parity: `BlockCollisions`, which looks one block past the box for shapes that reach out of theirs.
+/// parity: `BlockCollisions`.
 constexpr double kCollisionEpsilon = 1.0E-7;
 
 template <std::size_t N>
@@ -143,8 +142,7 @@ template <std::size_t N>
     return lightCost(world, x, y, z);
 }
 
-/// parity: `IronGolem.checkSpawnObstruction`: something to stand on, two free blocks over it, and
-/// its own block free whatever fluid is in it.
+/// parity: `IronGolem.checkSpawnObstruction`.
 [[nodiscard]] bool ironGolemFits(LoadedWorld& world, const Identifier& type, const Aabb& box, double x, double y,
                                  double z, std::span<const Aabb> players) {
     const auto blockX = static_cast<std::int32_t>(std::floor(x));

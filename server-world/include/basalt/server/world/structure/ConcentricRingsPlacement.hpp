@@ -10,12 +10,9 @@
 
 namespace basalt::server::world::structure {
 
-/// parity: `ConcentricRingsStructurePlacement` plus `generateRingPositions`. The stronghold is the
-/// only structure not spread over a grid: a fixed list of chunks on rings around the origin. The
-/// whole list is built at once because each position moves the shared random on.
+/// parity: `ConcentricRingsStructurePlacement` plus `generateRingPositions`.
 class ConcentricRingsPlacement {
 public:
-    /// The biome at a quart position, which is what the search samples.
     using NoiseBiomeAt = std::function<std::string_view(std::int32_t, std::int32_t, std::int32_t)>;
 
     ConcentricRingsPlacement(std::int32_t distance, std::int32_t spread, std::int32_t count,
@@ -23,7 +20,6 @@ public:
         : distance_(distance), spread_(spread), count_(count), preferredBiomes_(std::move(preferredBiomes)),
           noiseBiomeAt_(std::move(noiseBiomeAt)) {}
 
-    /// Chunk coordinates, in the order the rings were laid out.
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> ringPositions(std::int64_t seed) const;
 
 private:

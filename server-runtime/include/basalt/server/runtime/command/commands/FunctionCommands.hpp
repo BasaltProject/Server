@@ -14,8 +14,6 @@ namespace basalt::server::runtime::command::commands {
 /// parity: `FunctionCommand`, tags and macro arguments included.
 class FunctionCommand final : public Command {
 public:
-    /// `data` is where `with block|entity|storage` reads its arguments, or null in a fixture
-    /// without any.
     FunctionCommand(FunctionRunner& runner, const DataAccess* data = nullptr);
 
     void build(const CommandNodeBuilder& root) const override;
@@ -25,7 +23,7 @@ private:
     const DataAccess* data_;
 };
 
-/// parity: `ReturnCommand`. Outside a function it only ends the command, as vanilla's top frame does.
+/// parity: `ReturnCommand`.
 class ReturnCommand final : public Command {
 public:
     explicit ReturnCommand(FunctionRunner& runner);
@@ -51,7 +49,6 @@ private:
     GameTime gameTime_;
 };
 
-/// The functions and function tags a `minecraft:function` argument completes with.
 [[nodiscard]] std::vector<std::string> functionSuggestions(const function::FunctionLibrary& library);
 
 } // namespace basalt::server::runtime::command::commands

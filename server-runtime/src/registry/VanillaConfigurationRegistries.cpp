@@ -22,7 +22,6 @@ using wire::protocol::configuration::RegistryEntry;
     return RegistryEntry{.key = "minecraft:" + std::string{path}, .value = NbtTag::ofCompound(std::move(value))};
 }
 
-/// One registry whose entries are built from their own names, which is most of the variant ones.
 [[nodiscard]] RegistryDataPacket variants(std::string registryId, const std::vector<std::string>& paths,
                                           const std::function<NbtCompound(std::string_view)>& value) {
     RegistryDataPacket packet{.registryId = std::move(registryId), .entries = {}};
@@ -32,7 +31,6 @@ using wire::protocol::configuration::RegistryEntry;
     return packet;
 }
 
-/// One registry whose entries are already built, which is the rest.
 [[nodiscard]] RegistryDataPacket built(std::string registryId, const std::vector<vanillaRegistryData::Entry>& entries) {
     RegistryDataPacket packet{.registryId = std::move(registryId), .entries = {}};
     for (const auto& [path, value] : entries) {
@@ -42,9 +40,7 @@ using wire::protocol::configuration::RegistryEntry;
 }
 
 /// A registry whose entries the client reads from its own copy of the vanilla pack.
-///
-/// parity: `RegistrySynchronization.packRegistry` leaves out the data of an entry from a pack both
-/// ends know, and these four are only ever the vanilla ones. Sorted, as data pack loading is.
+/// parity: `RegistrySynchronization.packRegistry`.
 [[nodiscard]] RegistryDataPacket known(std::string registryId, std::initializer_list<std::string_view> paths) {
     RegistryDataPacket packet{.registryId = std::move(registryId), .entries = {}};
     for (const std::string_view path : paths) {
@@ -66,8 +62,7 @@ std::vector<RegistryDataPacket> packets() {
         biomes.entries.push_back(entryOf(entry.path, vanillaBiomes::toNbt(entry)));
     }
     all.push_back(std::move(biomes));
-    // parity: right after the biomes, as `SYNCHRONIZED_REGISTRIES` lists it. Their order is what a
-    // chat packet's chat type number refers to.
+    // parity: `SYNCHRONIZED_REGISTRIES`.
     all.push_back(
         known("minecraft:chat_type", {"chat", "emote_command", "msg_command_incoming", "msg_command_outgoing",
                                       "say_command", "team_msg_command_incoming", "team_msg_command_outgoing"}));

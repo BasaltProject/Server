@@ -6,38 +6,26 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// Closed-eyeblossom placed features used only by the pale garden. Both configured features request
-/// a scheduled tick, so each accepted flower schedules its own one-tick block update.
 namespace paleGardenDecoration {
 
-/// `pale_garden_flowers`: rarity 1/8, then a 96-candidate patch below leaf cover.
 [[nodiscard]] const BiomeVegetalDecoration& flowerPatch();
 
-/// `flower_pale_garden`: a separate rarity-1/32 single placement.
 [[nodiscard]] const BiomeVegetalDecoration& rareFlower();
 
-/// The patch at one origin, which is what `/place feature` runs for `pale_garden_flowers`.
 void placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin);
 
-/// The single flower `flower_pale_garden` places, with no patch around it.
 void placeSingleAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin);
 
 } // namespace paleGardenDecoration
 
-/// The cherry grove's pink petals and its own trees. Vanilla's weighted provider keeps all 16 petal
-/// states: amount 1 to 4 crossed with four horizontal facings.
 namespace cherryGroveDecoration {
 
-/// The petals followed by `trees_cherry`, in `BiomeDefaultFeatures.addCherryGroveVegetation` order.
 void decorate(Chunk& chunk, random::RandomSource& random);
 
-/// The petal-only tail, for when the global tree step already owns `trees_cherry`.
 [[nodiscard]] const BiomeVegetalDecoration& flowersOnly();
 
-/// The petal patch at one origin, which is what `/place feature` runs for `flower_cherry`.
 void placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin);
 
-/// One of the 16 pink petal states, by the weighted provider's choice index.
 [[nodiscard]] std::int32_t pinkPetalsStateId(std::int32_t choice);
 
 } // namespace cherryGroveDecoration

@@ -8,11 +8,9 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// Whoever tamed this mob, if they are here.
 [[nodiscard]] const PlayerView* ownerOf(const MobContext& mob);
 
-/// parity: `SitWhenOrderedToGoal`: a pet told to sit stays sat, and nothing else it wants to do
-/// outranks that.
+/// parity: `SitWhenOrderedToGoal`.
 class SitWhenOrderedToGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Jump, GoalFlag::Move}; }
@@ -26,8 +24,7 @@ public:
     void start(MobContext& mob) override;
 };
 
-/// parity: `FollowOwnerGoal`: a pet that is not sitting keeps within a couple of blocks of whoever
-/// tamed it, and starts following again once they are ten blocks away.
+/// parity: `FollowOwnerGoal`.
 class FollowOwnerGoal final : public Goal {
 public:
     static constexpr double kStartDistance = 10.0;

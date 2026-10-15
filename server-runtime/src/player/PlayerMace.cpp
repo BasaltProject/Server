@@ -51,13 +51,13 @@ constexpr double kHang = static_cast<double>(0.01F);
     return own != nullptr && own == context.teams->teamOf(member);
 }
 
-/// parity: `getKnockbackPower`, the power left at that distance, doubled after a heavy fall.
+/// parity: `getKnockbackPower`.
 [[nodiscard]] double powerAt(const PlayerSession& attacker, double distance, double resistance) {
     return (kKnockbackRadius - distance) * kKnockbackPower * (attacker.fallDistance > kHeavyThreshold ? 2.0 : 1.0) *
            (1.0 - resistance);
 }
 
-/// parity: `MaceItem.knockback`'s predicate and push, over everything alive near the victim.
+/// parity: `MaceItem.knockback`'s predicate and push.
 void shockWave(const pvp::Context& context, world::LoadedWorld& world, PlayerSession& attacker, const Struck& struck) {
     const std::vector<PlayerSession*> players = playersIn(context, attacker.worldName);
     for (PlayerSession* player : players) {
@@ -153,7 +153,7 @@ float damageBonus(const PlayerSession& attacker, const std::optional<storage::St
 
 void hurtEnemy(const pvp::Context& context, world::LoadedWorld& world, PlayerSession& attacker, const Struck& struck) {
     attacker.deltaMovement[1] = kHang;
-    // parity: `calculateImpactPosition`, the impulse's own point while it is still below them.
+    // parity: `calculateImpactPosition`.
     const std::array<double, 3> here{attacker.x, attacker.y, attacker.z};
     const std::array<double, 3> impact =
         attacker.impulseImpact.has_value() && (*attacker.impulseImpact)[1] <= attacker.y ? *attacker.impulseImpact

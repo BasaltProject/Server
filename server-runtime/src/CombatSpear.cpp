@@ -77,7 +77,7 @@ constexpr std::int32_t kLungeGraceTicks = 10;
 
 std::vector<spear::Candidate> CombatHandler::spearTargets(const PlayerSession& session, world::LoadedWorld& world) {
     std::vector<spear::Candidate> candidates;
-    // parity: `PiercingWeapon.canHitEntity`: alive, pickable and not invulnerable, never whoever
+    // parity: `PiercingWeapon.canHitEntity`.
     // rides the same vehicle.
     const auto sameVehicle = [&session](const std::optional<std::int32_t>& vehicle) {
         return session.vehicleId.has_value() && vehicle == session.vehicleId;
@@ -196,7 +196,7 @@ void CombatHandler::tickCharge(PlayerSession& session) {
         stopCharge();
         return;
     }
-    // parity: `KineticWeapon.damageEntities`, nothing before the delay and the clock counted after it.
+    // parity: `KineticWeapon.damageEntities`.
     const std::int32_t used = chargeTicks_++ - weapon->delayTicks;
     if (used < 0) {
         return;
@@ -290,7 +290,7 @@ bool CombatHandler::stab(PlayerSession& session, world::LoadedWorld& world, std:
         .type = victimType, .inTag = [entityTags, &victimType](const Identifier& tag) {
             return entityTags != nullptr && world::realEntityTypeTags::membersOf(*entityTags, tag).contains(victimType);
         }};
-    // parity: `Player.stabAttack`: the weapon's bonus, and a jab scaled by the charge of the swing
+    // parity: `Player.stabAttack`.
     // while a charge in that hand is not.
     float magic = world::weaponDamage::of(weapon, base, definitionOf, &target) - base;
     if (strength.has_value()) {
@@ -372,7 +372,7 @@ bool CombatHandler::stab(PlayerSession& session, world::LoadedWorld& world, std:
         mob->panicTicks = kPanicTicks;
     }
     broadcastMotion(*mob);
-    // parity: `itemAttackInteraction`: a `weapon` counts as used and wears on any living target.
+    // parity: `itemAttackInteraction`.
     if (weapon.has_value() && item::itemWear::costPerAttack(*weapon) > 0) {
         player::statAwards::used(session, weapon->id);
         player::wearItemIn(owner_->blockInteraction().breakContext(), session, slot,
@@ -444,7 +444,7 @@ bool CombatHandler::stabPlayer(PlayerSession& session, PlayerSession& victim, st
     if (blow.magic > 0.0F) {
         broadcastAnimation(victim.entityId(), wire::protocol::play::AnimatePacket::kMagicCriticalHit);
     }
-    // parity: `itemAttackInteraction`: a `weapon` counts as used and wears on any living target.
+    // parity: `itemAttackInteraction`.
     if (weapon.has_value() && item::itemWear::costPerAttack(*weapon) > 0) {
         player::statAwards::used(session, weapon->id);
         player::wearItemIn(owner_->blockInteraction().breakContext(), session, slot,

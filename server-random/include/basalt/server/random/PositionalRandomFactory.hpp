@@ -6,9 +6,7 @@
 #include <string_view>
 
 namespace basalt::server::random {
-
-/// parity: PositionalRandomFactory. Derives deterministic per-position and per-name sources.
-/// Flattened the same way RandomSource is, and for the same reason.
+// parity: PositionalRandomFactory.
 class PositionalRandomFactory {
 public:
     [[nodiscard]] static PositionalRandomFactory legacy(std::int64_t seed) noexcept {
@@ -33,5 +31,4 @@ private:
     std::int64_t seedLo_;
     std::int64_t seedHi_;
 };
-
 } // namespace basalt::server::random

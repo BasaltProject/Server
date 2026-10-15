@@ -48,7 +48,6 @@ constexpr double kDegrees = 180.0 / std::numbers::pi;
 constexpr double kPlayerWidth = 0.6;
 constexpr double kPlayerHeight = 1.8;
 
-/// What a rocket's flight line met first.
 struct Hit {
     ServerEntity* mob = nullptr;
     PlayerSession* player = nullptr;
@@ -62,8 +61,7 @@ struct Hit {
                                         x + half, y + height + kHitMargin, z + half);
 }
 
-/// parity: `ProjectileUtil.getHitResultOnMoveVector` with `Projectile.canHitEntity`: blocks first, then
-/// whoever the shortened line passes through, never its owner before it has left them.
+/// parity: `ProjectileUtil.getHitResultOnMoveVector`.
 [[nodiscard]] Hit hitAlong(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                            const std::vector<ServerEntity*>& living, const ServerEntity& rocket) {
     Hit hit;
@@ -108,7 +106,7 @@ struct Hit {
     return hit;
 }
 
-/// parity: `Projectile.checkLeftOwner`: the swept box grown by a block no longer touches the owner.
+/// parity: `Projectile.checkLeftOwner`.
 [[nodiscard]] bool leftOwner(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                              const ServerEntity& rocket) {
     if (!rocket.ownerId.has_value()) {
@@ -210,8 +208,6 @@ void FireworkSystem::tick(world::LoadedWorld& world, const std::vector<PlayerSes
     }
     Hit hit;
     if (state.attachedTo.has_value()) {
-        // parity: stuck to whoever flies on it: where they are, as fast as they go. A glider's own
-        // client does the pushing, as it does its own flying.
         if (const ServerEntity* mob = world.state().entity(*state.attachedTo); mob != nullptr) {
             rocket.x = mob->x;
             rocket.y = mob->y;

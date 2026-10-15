@@ -24,21 +24,13 @@ namespace basalt::server::runtime::world {
 class LoadedWorld;
 class LootRegistries;
 
-/// Resolves a block's break drops from the real `data/minecraft/loot_table/blocks/<path>.json` the
-/// operator's own downloaded jar carries, never embedded in this repo.
-///
-/// Results are cached, misses included: a table that fails to parse once is not worth re-reading on
-/// every single block broken.
+/// Results are cached, misses included, so a table that fails to parse is not re-read for every block broken.
 class RealLootTables {
 public:
-    /// One jar entry as text, or nothing when the jar has no such entry.
     using ReadText = std::function<std::optional<std::string>(std::string_view name)>;
 
-    /// Every entry name under a prefix, which is how a whole table directory is listed.
     using EntriesUnder = std::function<std::vector<std::string>(std::string_view prefix)>;
 
-    /// The jar arrives as callbacks rather than as `ServerJarAssets`: this needs the operator's own
-    /// copy of the game, and a test has no jar to hand it.
     struct Jar {
         ReadText readText;
         EntriesUnder entriesUnder;
@@ -49,46 +41,38 @@ public:
     RealLootTables(const RealLootTables&) = delete;
     RealLootTables& operator=(const RealLootTables&) = delete;
 
-    /// Reads every table and reference from `jar` from now on. parity: `/reload` replaces the
-    /// loot registries, and a table handed out before stays valid until the reload after.
+    /// parity: `/reload`.
     void reload(Jar jar);
 
-    /// Any table by its own id, which is what `/loot ... loot <table>` rolls.
     [[nodiscard]] const server::world::loot::LootTable* byId(const wire::common::Identifier& id);
 
     /// parity: an entity's death table, `entities/<type>`.
     [[nodiscard]] const server::world::loot::LootTable* forEntity(const wire::common::Identifier& type);
 
-    /// The block's own loot table, or nothing if it breaks empty-handed: no table, or one this build
-    /// cannot parse yet.
     [[nodiscard]] const server::world::loot::LootTable* forBlock(const wire::common::Identifier& block);
 
-    /// Every table the jar ships, for the completions the client asks for.
     [[nodiscard]] std::vector<wire::common::Identifier> ids() const;
 
     void useRegistries(const LootRegistries* registries) { registries_ = registries; }
 
-    /// What the `score` providers and `entity_scores` read. Only rolled on the tick thread.
+    /// Only rolled on the tick thread.
     void useScoreboard(const scoreboard::Scoreboard* scoreboard) { scoreboard_ = scoreboard; }
 
-    /// What an `exploration_map` rolled in a world does to its stack. Unset, the stack is left blank.
+    /// Unset, the stack is left blank.
     using ExplorationMaps = std::function<void(LoadedWorld& world, server::world::loot::ItemStack& stack,
                                                const server::world::loot::ExplorationMapRequest& request,
                                                const std::array<double, 3>& origin)>;
 
     void useExplorationMaps(ExplorationMaps maps) { explorationMaps_ = std::move(maps); }
 
-    /// Fills in what every roll asks outside the table: nested tables, enchantments and ordered tags.
     void prepare(server::world::loot::LootContext& context);
 
-    /// The named predicates, item modifiers and number providers the jar's loot data refers to.
     [[nodiscard]] server::world::loot::LootReferences& references() noexcept { return references_; }
 
-    /// The same, plus where the roll happens. parity: `LootContextParams.ORIGIN`.
+    /// parity: `LootContextParams.ORIGIN`.
     void prepareAt(server::world::loot::LootContext& context, LoadedWorld& world, double x, double y, double z);
 
 private:
-    /// `verb` is how the log names what the caller wanted, since a block drops and a table rolls.
     const server::world::loot::LootTable* read(const wire::common::Identifier& key, const std::string& path,
                                                std::string_view verb);
 
@@ -98,8 +82,6 @@ private:
     const LootRegistries* registries_ = nullptr;
     const scoreboard::Scoreboard* scoreboard_ = nullptr;
     ExplorationMaps explorationMaps_;
-    // Several connection threads can break a block at once, so the cache has one owner and it is
-    // this lock. Map nodes never move, so a table handed out stays valid while another thread reads.
     std::mutex mutex_;
     std::map<wire::common::Identifier, std::optional<server::world::loot::LootTable>> cache_;
     /// The cache before the last reload, kept so a roll already under way finishes on it.

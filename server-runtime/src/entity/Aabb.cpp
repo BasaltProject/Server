@@ -35,8 +35,7 @@ Aabb Aabb::inflate(double amount) const {
 }
 
 bool Aabb::intersects(const Aabb& other) const {
-    // Touching is not intersecting: two boxes that share a face are side by side, which is what
-    // lets an entity stand exactly on a block without being inside it.
+    // Touching is not intersecting, which lets an entity stand on a block without being inside it.
     return minX < other.maxX && maxX > other.minX && minY < other.maxY && maxY > other.minY && minZ < other.maxZ &&
            maxZ > other.minZ;
 }

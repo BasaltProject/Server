@@ -11,10 +11,8 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using lua::LuaArgs;
 
-/// A stored value comes back as what it was written as.
 void pushStored(LuaArgs& lua, const std::string& stored) {
     std::int64_t whole = 0;
     const auto* end = stored.data() + stored.size();
@@ -34,7 +32,6 @@ void pushStored(LuaArgs& lua, const std::string& stored) {
     lua.pushString(stored);
 }
 
-/// `store.top("kills", 10)`: highest first, as `{ { name = ..., value = ... }, ... }`.
 void pushTop(LuaArgs& lua, PluginHost& host, const std::string& pluginId) {
     PluginHost* target = &host;
     lua::pushHostFunction(lua, "store.top", [target, pluginId](LuaArgs& args) {
@@ -57,7 +54,6 @@ void pushTop(LuaArgs& lua, PluginHost& host, const std::string& pluginId) {
         return 1;
     });
 }
-
 } // namespace
 
 void pushStore(LuaArgs& lua, PluginHost& host, const std::string& pluginId) {
@@ -97,7 +93,6 @@ std::string jsonPathOf(const std::string& folder, const std::string& name) {
 }
 
 void pushData(LuaArgs& lua, const std::string& folder) {
-    // One reference per file, so `data.json("arenas")` twice is the same table both times.
     const auto loaded = std::make_shared<std::map<std::string, lua::LuaRef, std::less<>>>();
     lua.pushTable();
     lua::pushHostFunction(lua, "data.json", [folder, loaded](LuaArgs& args) {
@@ -128,8 +123,6 @@ void pushData(LuaArgs& lua, const std::string& folder) {
         if (slash != std::string::npos) {
             wire::io::fileIO::createDirectories(path.substr(0, slash));
         }
-        // Serialised before the file is touched: a plugin whose table cannot be written keeps the
-        // one it had rather than losing both.
         held->second.push(args);
         const std::string text = pluginJson::write(args, args.top());
         args.pop(1);
@@ -138,5 +131,4 @@ void pushData(LuaArgs& lua, const std::string& folder) {
     });
     lua.setField("save");
 }
-
 } // namespace basalt::server::plugins

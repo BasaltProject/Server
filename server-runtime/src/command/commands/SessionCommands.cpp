@@ -45,7 +45,6 @@ void sendTo(const player::PlayerSession& player, std::int32_t packetId,
     return 1;
 }
 
-/// The one player a `single = true` selector matched, or null when it matched nobody.
 [[nodiscard]] player::PlayerSession* only(const CommandContext& context, std::string_view name) {
     const auto* matched = context.get<std::vector<player::PlayerSession*>>(name);
     return matched == nullptr || matched->size() != 1 ? nullptr : matched->front();
@@ -133,8 +132,7 @@ void RestartCommand::build(const CommandNodeBuilder& root) const {
                         true);
         context.environment().broadcast(
             Component::text("The server is restarting. You can reconnect in a moment.", wire::text::kYellow));
-        // After the messages, since the first thing a restart does is close the socket they would
-        // have gone out on.
+        // After the messages, since the first thing a restart does is close the socket they would have gone out on.
         if (requestRestart_) {
             requestRestart_();
         }

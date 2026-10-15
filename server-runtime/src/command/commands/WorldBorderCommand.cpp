@@ -77,7 +77,6 @@ void broadcast(const CommandContext& context, const world::LoadedWorld& world, c
     return static_cast<std::int32_t>(std::abs(newSize - old));
 }
 
-/// The value an argument holds, or the fallback when the branch did not declare it.
 template <typename T>
 [[nodiscard]] T valueOf(const CommandContext& context, std::string_view name, T fallback) {
     const auto* found = context.get<T>(name);
@@ -158,7 +157,6 @@ void WorldBorderCommand::build(const CommandNodeBuilder& root) const {
     });
 
     root.literal("damage", [](const CommandNodeBuilder& damage) {
-        /// The two numbers differ only in which field they land on and what they then say.
         const auto set = [](const CommandContext& context, std::string_view which, std::string_view argument,
                             double WorldBorder::* field) -> Parsed<std::int32_t> {
             const Parsed<world::LoadedWorld*> world = context.world();

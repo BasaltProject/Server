@@ -13,22 +13,14 @@ extern "C" {
 
 namespace basalt::server::lua {
 namespace {
-
-/// How many VM instructions pass between hook calls. Small enough that a runaway loop is stopped
-/// within a fraction of a millisecond, large enough that the hook is not the cost of running.
 constexpr int kHookStep = 1000;
 
-/// Where the sandbox lives in its own state's registry, so a C callback can find it back.
 constexpr const char* kSandboxKey = "basalt.sandbox";
 
-/// `debug` is not loaded to begin with; it is named here so that adding it back is a deliberate act
-/// rather than a side effect of switching to another way of building the globals.
 constexpr std::string_view kRemovedGlobals[] = {"io", "debug", "dofile", "loadfile", "collectgarbage"};
 constexpr std::string_view kRemovedOs[] = {"execute", "exit", "getenv", "remove", "rename", "tmpname", "setlocale"};
-
 } // namespace
 
-/// The one thing allowed to reach a sandbox's privates from a C callback.
 struct SandboxAccess {
     [[nodiscard]] static LuaSandbox* of(lua_State* state) {
         lua_getfield(state, LUA_REGISTRYINDEX, kSandboxKey);
@@ -39,8 +31,6 @@ struct SandboxAccess {
 
     static void* reallocate(void* opaque, void* pointer, std::size_t oldSize, std::size_t newSize) {
         auto* sandbox = static_cast<LuaSandbox*>(opaque);
-        // `oldSize` is the type tag rather than a size when the pointer is null, which is Lua's own
-        // convention for a fresh allocation.
         const std::size_t previous = pointer == nullptr ? 0 : oldSize;
         if (newSize == 0) {
             std::free(pointer);
@@ -49,8 +39,6 @@ struct SandboxAccess {
         }
         const std::size_t used = sandbox->memoryUsed_.load(std::memory_order_relaxed);
         if (newSize > previous && used + (newSize - previous) > sandbox->memoryCeiling_) {
-            // Refusing here is what Lua turns into its own "not enough memory", which is the message
-            // the plugin's author sees and the one the failure looks for.
             return nullptr;
         }
         void* moved = std::realloc(pointer, newSize);
@@ -95,9 +83,6 @@ struct SandboxAccess {
         return 0;
     }
 
-    /// `load`, with the mode forced to text. A binary chunk is unverified bytecode: a malformed one
-    /// is a way to crash the interpreter from inside the sandbox, which is the one thing a sandbox
-    /// cannot allow.
     static int textOnlyLoad(lua_State* state) {
         const int count = lua_gettop(state);
         lua_pushvalue(state, lua_upvalueindex(1));
@@ -117,13 +102,9 @@ struct SandboxAccess {
         return lua_gettop(state) - count;
     }
 
-    /// `require`, looking only through the finder this class installed. The package table is gone,
-    /// so there is no `loaded`, no `preload` and no searcher a plugin could put a door back into.
     static int require(lua_State* state) {
         LuaSandbox* sandbox = of(state);
         const char* name = luaL_checkstring(state, 1);
-        // The modules this state has already loaded, kept in the registry rather than in a table a
-        // plugin can see.
         lua_getfield(state, LUA_REGISTRYINDEX, "basalt.loaded");
         lua_getfield(state, -1, name);
         if (!lua_isnil(state, -1)) {
@@ -180,9 +161,6 @@ std::unique_ptr<LuaSandbox> LuaSandbox::create(std::string name, LuaLimits limit
                                                SourceFinder sources, PrintSink printLine) {
     std::unique_ptr<LuaSandbox> sandbox{
         new LuaSandbox{std::move(name), limits, std::move(sources), std::move(printLine)}};
-    // Lua seeds its own string hashing with 32 bits, and the cast is written out because the whole
-    // seed is not lost: `install` gives all 64 of it to `math.randomseed`, which is the one a
-    // plugin's randomness comes from.
     sandbox->state_ =
         lua_newstate(&SandboxAccess::reallocate, sandbox.get(), static_cast<unsigned int>(seed & 0xFFFFFFFFULL));
     if (sandbox->state_ == nullptr) {
@@ -199,8 +177,6 @@ void LuaSandbox::install(std::uint64_t seed) {
     lua_newtable(state_);
     lua_setfield(state_, LUA_REGISTRYINDEX, "basalt.loaded");
     strip();
-    // The same seed gives the same sequence, which is what makes a plugin's own randomness
-    // reproducible from a saved world rather than from the clock.
     lua_getglobal(state_, "math");
     if (lua_istable(state_, -1)) {
         lua_getfield(state_, -1, "randomseed");
@@ -229,9 +205,6 @@ void LuaSandbox::strip() {
     }
     lua_pop(state_, 1);
 
-    // `package` is the map of every other door: `loaded`, `preload` and the searchers that would put
-    // one back. Taking the global away is not enough on its own, which is why `require` below looks
-    // only through the finder this class installed.
     lua_pushnil(state_);
     lua_setglobal(state_, "package");
 
@@ -266,8 +239,6 @@ std::expected<LuaChunk, LuaFailure> LuaSandbox::compile(std::string_view source,
 
 std::expected<void, LuaFailure> LuaSandbox::bind(const LuaChunk& chunk) {
     const std::string named = "@" + chunk.chunkName;
-    // Binary here, unlike everywhere else: these bytes came out of `compile` above, never out of a
-    // plugin, so there is nothing unverified about them.
     if (luaL_loadbufferx(state_, reinterpret_cast<const char*>(chunk.bytecode.data()), chunk.bytecode.size(),
                          named.c_str(), "b") != LUA_OK) {
         return std::unexpected(failureFromStack());
@@ -294,5 +265,4 @@ void LuaSandbox::refill() {
 void LuaSandbox::interrupt() { interrupted_.store(true, std::memory_order_relaxed); }
 
 void LuaSandbox::resetMemoryCount() { memoryUsed_.store(0, std::memory_order_relaxed); }
-
 } // namespace basalt::server::lua

@@ -44,7 +44,6 @@ constexpr double kSneakingHeight = 1.5;
 constexpr double kStandingEye = 1.62;
 constexpr double kSneakingEye = 1.27;
 
-/// The worn pieces in the inventory's own order, head first.
 constexpr std::array<std::string_view, 4> kArmourSlots{"head", "chest", "legs", "feet"};
 
 constexpr std::array<std::string_view, 7> kEquipmentSlots{"mainhand", "offhand", "head", "chest",
@@ -344,7 +343,7 @@ std::shared_ptr<const loot::EntityFacts> lookingAtOf(LoadedWorld& world, const p
     if (!found.has_value()) {
         return nullptr;
     }
-    // parity: `LivingEntity.hasLineOfSight`, eye to eye through what collides, and never past 128.
+    // parity: `LivingEntity.hasLineOfSight`.
     const double dx = foundEye[0] - from[0];
     const double dy = foundEye[1] - from[1];
     const double dz = foundEye[2] - from[2];

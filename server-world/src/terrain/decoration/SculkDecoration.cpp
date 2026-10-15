@@ -330,7 +330,6 @@ void ChargeCursor::update(SculkRegion& region, const DecorationPos& origin, rand
     updateDelay_ = 1;
 }
 
-/// The sculk body of a patch grown from an origin, without the catalyst.
 bool growSculkPatch(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
     if (!region.canSpreadFrom(origin)) {
         return false;
@@ -348,16 +347,14 @@ bool growSculkPatch(SculkRegion& region, random::RandomSource& random, const Dec
     return region.hasSturdyFace(offsetBy(position, kDirections[0]), kDirections[1]);
 }
 
-/// parity: 26.3's catalyst step: a `random_chance` of one half, strictly below, then a sturdy top
-/// face under the catalyst.
+/// parity: 26.3 catalyst step, `random_chance` 0.5 strictly below.
 void placeCatalyst(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
     if (random.nextFloat() < 0.5F && hasSturdyFloor(region, origin)) {
         region.set(origin, sculk::states().catalyst);
     }
 }
 
-/// parity: the ancient city's shrieker step: one to three tries within two blocks on every axis,
-/// each wanting air on a sturdy floor.
+/// parity: ancient city shrieker step, one to three tries within two blocks, wanting air on a sturdy floor.
 void placeShriekers(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
     const std::int32_t count = random.nextInt(3) + 1;
     for (std::int32_t index = 0; index < count; ++index) {
@@ -388,8 +385,7 @@ bool placeSculkPatchAt(SculkRegion& region, random::RandomSource& random, const 
     return true;
 }
 
-/// parity: `sculk_patch_ancient_city`, the patch and then an `overlay` of the catalyst and the
-/// summoning shriekers.
+/// parity: `sculk_patch_ancient_city`.
 bool placeAncientCitySculkPatchAt(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
     if (!growSculkPatch(region, random, origin)) {
         return false;

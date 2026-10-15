@@ -206,7 +206,7 @@ bool EntityPushSystem::isPushable(world::LoadedWorld& world, const Body& body) c
 }
 
 bool EntityPushSystem::pushableBy(world::LoadedWorld& world, const Body& pusher, const Body& input) const {
-    // parity: `EntitySelector.pushableBy`: no spectator, pushable, and the teams' collision rules.
+    // parity: `EntitySelector.pushableBy`.
     const scoreboard::Team* own = options_.teams == nullptr ? nullptr : options_.teams->teamOf(memberOf(pusher));
     const CollisionRule ownRule = own == nullptr ? CollisionRule::Always : own->collisionRule;
     if (ownRule == CollisionRule::Never || isSpectator(input) || !isPushable(world, input)) {
@@ -227,7 +227,7 @@ bool EntityPushSystem::pushableBy(world::LoadedWorld& world, const Body& pusher,
 std::vector<EntityPushSystem::Body> EntityPushSystem::entitiesIn(world::LoadedWorld& world, const Body& self,
                                                                  const Aabb& box) const {
     std::vector<Body> found;
-    // parity: `EntitySectionStorage`, which looks two blocks past the box for the boxes it may hold.
+    // parity: `EntitySectionStorage`.
     constexpr double kMargin = 2.0;
     for (std::int32_t chunkX = mth::floor(box.minX - kMargin) >> 4; chunkX <= mth::floor(box.maxX + kMargin) >> 4;
          ++chunkX) {
@@ -382,7 +382,7 @@ void EntityPushSystem::push(world::LoadedWorld& world, const Body& target, const
         cartPush(world, *target.mob, pusher);
         return;
     }
-    // parity: `AbstractBoat.push`: a boat bumps another only below its top, anything else only
+    // parity: `AbstractBoat.push`.
     // from level with its bottom or lower.
     if (target.mob != nullptr && entity::boats::isBoat(target.mob->type())) {
         const Aabb mine = boxOf(target);

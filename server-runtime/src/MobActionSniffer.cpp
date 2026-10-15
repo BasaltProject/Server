@@ -35,7 +35,7 @@ constexpr float kDegreesToRadians = static_cast<float>(std::numbers::pi) / 180.0
 /// parity: `storeExploredPosition`: twenty kept, then the new one in front.
 constexpr std::size_t kExploredKept = 20;
 
-/// parity: `Sniffer.getHeadBlock`: two and a quarter blocks forward, a fifth of a block up.
+/// parity: `Sniffer.getHeadBlock`.
 [[nodiscard]] kit::Block headBlock(const ServerEntity& sniffer) {
     const float yCos =
         mth::cos(static_cast<double>((-sniffer.yaw * kDegreesToRadians) - static_cast<float>(std::numbers::pi)));
@@ -322,7 +322,7 @@ void MobActionSystem::tickSniffer(world::LoadedWorld& world, entity::ai::MobCont
         state.happy = false;
         transition(Pose::Idling);
     }
-    // parity: `Sniffer.tick` while digging: a game event at its nose every ten turns, and the seed.
+    // parity: `Sniffer.tick` while digging.
     if (state.pose == Pose::Digging) {
         const kit::Block head = headBlock(sniffer);
         if (sniffer.tickCount % 10 == 0) {
@@ -363,7 +363,7 @@ void MobActionSystem::snifferRunning(world::LoadedWorld& world, entity::ai::MobC
             return;
         }
         idle();
-        // parity: `Sniffing.stop`: only a sniff run to its end finds a spot, a walk of up to five
+        // parity: `Sniffing.stop`: only a sniff run to its end finds a spot, a walk of up to five.
         // tries further out each time.
         if (timedOut) {
             for (std::int32_t index = 0; index < 5; ++index) {
@@ -442,7 +442,7 @@ void MobActionSystem::snifferRunning(world::LoadedWorld& world, entity::ai::MobC
 
 void MobActionSystem::snifferDropsSeed(world::LoadedWorld& world, const ServerEntity& sniffer,
                                        const std::array<std::int32_t, 3>& head) {
-    // parity: `dropSeed` over `dropFromGiftLootTable(SNIFFER_DIGGING)`, dropped on the head square's
+    // parity: `dropSeed` over `dropFromGiftLootTable(SNIFFER_DIGGING)`.
     // corner.
     const server::world::loot::LootTable* table =
         lootTables_->byId(wire::common::Identifier::vanilla("gameplay/sniffer_digging"));

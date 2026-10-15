@@ -47,11 +47,11 @@ constexpr std::string_view kRod = "fishing_rod";
 constexpr double kParticleRange = 32.0;
 constexpr double kHookGravity = 0.03;
 constexpr double kHookInertia = 0.92;
-/// parity: `FishingHook.retrieve`'s wear: an item costs three, anything else five, the ground two.
+/// parity: `FishingHook.retrieve`'s wear.
 constexpr std::int32_t kItemPullWear = 3;
 constexpr std::int32_t kEntityPullWear = 5;
 constexpr std::int32_t kGroundWear = 2;
-/// parity: `EntityEvent.FISHING_ROD_REEL_IN`, which the hooked player's own client pulls itself by.
+/// parity: `EntityEvent.FISHING_ROD_REEL_IN`.
 constexpr std::int8_t kReelInEvent = 31;
 /// parity: the lure and luck enchantments' effect amounts, five seconds and one point a level.
 constexpr std::int32_t kLureTicksPerLevel = 100;
@@ -185,7 +185,7 @@ void FishingSystem::cast(const player::BreakContext& context, PlayerSession& pla
     }
     hooks::cast(*hook, *state, player.x, player.y + world::fluids::eyeHeight(player.sneaking), player.z, player.yaw,
                 player.pitch);
-    // parity: `getAddEntityPacket` carries the owner, which the client needs to draw the line.
+    // parity: `getAddEntityPacket` carries the owner.
     hook->objectData = player.entityId();
     hook->ownerId = player.entityId();
     hook->hook = std::move(state);
@@ -498,7 +498,7 @@ void FishingSystem::bob(world::LoadedWorld& world, const std::vector<PlayerSessi
 void FishingSystem::hookFirstHit(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                  const std::vector<ServerEntity*>& living, ServerEntity& hook,
                                  hooks::HookState& state) {
-    // parity: `ProjectileUtil.getEntityHitResult`, the nearest box along this tick's move, each grown
+    // parity: `ProjectileUtil.getEntityHitResult`.
     // by the default margin.
     const double toX = hook.x + hook.velocityX;
     const double toY = hook.y + hook.velocityY;

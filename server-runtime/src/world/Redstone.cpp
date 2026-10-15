@@ -76,11 +76,8 @@ using Properties = std::map<std::string, std::string>;
     return valueOf(properties, "powered") == "true" ? kMaxSignal : 0;
 }
 
-/// parity: `RedStoneWireBlock.getSignal`, whose three cases are all here: nothing downwards,
-/// everything upwards (the block the dust sits on), and sideways only where it is connected.
+/// parity: `RedStoneWireBlock.getSignal`.
 [[nodiscard]] std::int32_t wireSignal(const Properties& drawn, std::int32_t stateId, BlockFace from) {
-    // Dust has no `up` property, so asking from below would answer nothing anyway; the case is
-    // written out because it is a rule and not an accident of the state names.
     if (from == BlockFace::Down) {
         return 0;
     }
@@ -91,12 +88,11 @@ using Properties = std::map<std::string, std::string>;
     if (from == BlockFace::Up) {
         return power;
     }
-    // The side facing whoever is asking, which is the opposite of the way they asked from.
     const std::string_view side = valueOf(drawn, nameOf(registry::opposite(from)));
     return side.empty() || side == "none" ? 0 : power;
 }
 
-/// parity: `FaceAttachedHorizontalDirectionalBlock.getConnectedDirection`, the side it hangs on.
+/// parity: `FaceAttachedHorizontalDirectionalBlock.getConnectedDirection`.
 [[nodiscard]] std::optional<BlockFace> attachedFace(const Properties& properties) {
     const std::string_view face = valueOf(properties, "face");
     if (face == "ceiling") {
@@ -114,25 +110,17 @@ using Properties = std::map<std::string, std::string>;
     return std::nullopt;
 }
 
-/// parity: the tag `lightning_rods` is eight blocks and not one, because the rod oxidises like any
-/// other copper and every stage is its own block, all of them a `LightningRodBlock`. Matching the
-/// plain name left an exposed rod struck by lightning feeding nothing at all.
+/// parity: the tag `lightning_rods` is eight blocks and not one.
 [[nodiscard]] bool isLightningRod(std::string_view path) { return path.ends_with("lightning_rod"); }
 
-/// parity: the blocks whose `isSignalSource` is true, whatever they are giving off right now. The
-/// rods are not here: they are matched by suffix above.
+/// parity: the blocks whose `isSignalSource` is true.
 constexpr std::array<std::string_view, 19> kSignalSources{
     "redstone_block", "redstone_torch", "redstone_wall_torch", "repeater", "comparator", "observer", "lever",
     "daylight_detector", "detector_rail", "lectern", "tripwire_hook", "sculk_sensor", "calibrated_sculk_sensor",
     "trapped_chest",
-    // parity: `JukeboxBlock.isSignalSource` is
-    // always true, playing or not, and that is
-    // what makes a dust reach out to it.
+    // parity: `JukeboxBlock.isSignalSource` is.
     "jukebox", "light_weighted_pressure_plate", "heavy_weighted_pressure_plate", "target",
-    // parity: `RedStoneWireBlock.isSignalSource` is true too, which is easy to miss because every
-    // redstone path checks for the dust before it asks. The two that do ask are the plain rail
-    // deciding whether to turn a corner and, above all, `NaturalSpawner.isValidEmptySpawnBlock`:
-    // a dust on the floor is what stops mobs spawning on it.
+    // parity: `RedStoneWireBlock.isSignalSource` is true too.
     "redstone_wire"};
 
 [[nodiscard]] bool conducts(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -148,8 +136,7 @@ constexpr std::array<std::string_view, 19> kSignalSources{
     return numberOf(registry::blockStateDefinitions::propertiesOf(*stateId), "power").value_or(0);
 }
 
-/// parity: `RedStoneWireBlock.getBlockSignal`, which asks the neighbours while pretending the dust
-/// itself gives off nothing: without that, two pieces of dust would hold each other up.
+/// parity: `RedStoneWireBlock.getBlockSignal`.
 [[nodiscard]] std::int32_t blockSignalFor(const WorldState& world, std::string_view worldName, std::int32_t x,
                                           std::int32_t y, std::int32_t z) {
     std::int32_t best = 0;
@@ -157,8 +144,6 @@ constexpr std::array<std::string_view, 19> kSignalSources{
         const std::int32_t nx = x + registry::stepX(face);
         const std::int32_t ny = y + registry::stepY(face);
         const std::int32_t nz = z + registry::stepZ(face);
-        // Dust beside dust is skipped outright, and would answer nothing anyway with the wire
-        // muted: what this rules out is two pieces holding each other up.
         const std::optional<std::int32_t> neighbour = world.blockState(nx, ny, nz);
         if (!neighbour.has_value() || isWire(*neighbour)) {
             continue;
@@ -190,7 +175,6 @@ constexpr std::array<std::string_view, 19> kSignalSources{
     return std::max(0, best - 1);
 }
 
-/// Writes the strength a single piece of dust settles on, or nothing when it did not move.
 [[nodiscard]] std::optional<BlockChange> updateWire(WorldState& world, std::string_view worldName, std::int32_t x,
                                                     std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -229,7 +213,7 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     if (path == "redstone_block") {
         return kMaxSignal;
     }
-    // parity: `RedstoneTorchBlock.getSignal`, which feeds every side but the block it stands on.
+    // parity: `RedstoneTorchBlock.getSignal`.
     if (path == "redstone_torch") {
         return valueOf(properties, "lit") == "true" && from != BlockFace::Up ? kMaxSignal : 0;
     }
@@ -237,8 +221,7 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     if (path == "redstone_wall_torch") {
         return valueOf(properties, "lit") == "true" && valueOf(properties, "facing") != nameOf(from) ? kMaxSignal : 0;
     }
-    // parity: `DiodeBlock.getSignal` and `ObserverBlock.getSignal`, both of which feed only the side
-    // `FACING` names.
+    // parity: `DiodeBlock.getSignal` and `ObserverBlock.getSignal`.
     if (path == "repeater" || path == "comparator" || path == "observer") {
         if (!powered || valueOf(properties, "facing") != nameOf(from)) {
             return 0;
@@ -254,9 +237,7 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     if (path.ends_with("_pressure_plate")) {
         return plateSignal(properties);
     }
-    // parity: `RedStoneWireBlock.getSignal`: dust only feeds the sides it is *drawn towards*, plus
-    // the block underneath it. Feeding every side lit whatever happened to be next to a line of dust
-    // running past it.
+    // parity: `RedStoneWireBlock.getSignal`.
     if (path == "redstone_wire") {
         return mutedWire ? 0 : wireSignal(properties, stateId, from);
     }
@@ -264,33 +245,27 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     if (path == "daylight_detector") {
         return numberOf(properties, "power").value_or(0);
     }
-    // parity: `DetectorRailBlock`, `LecternBlock`, `TripWireHookBlock` and `LightningRodBlock`, all
-    // fifteen or nothing.
+    // parity: `DetectorRailBlock`.
     if (path == "detector_rail" || path == "lectern" || path == "tripwire_hook" || isLightningRod(path)) {
         return powered ? kMaxSignal : 0;
     }
-    // parity: `TargetBlock` and `SculkSensorBlock`, both of which carry their strength in `power`
-    // and count it down on their own scheduled tick.
+    // parity: `TargetBlock` and `SculkSensorBlock`.
     if (path == "target" || path == "sculk_sensor") {
         return numberOf(properties, "power").value_or(0);
     }
-    // parity: `CalibratedSculkSensorBlock.getSignal` gives nothing on the face it looks at, which is
-    // the one its frequency filter reads: a sensor that fed its own filter would tune itself.
+    // parity: `CalibratedSculkSensorBlock.getSignal` gives nothing on the face it looks at.
     if (path == "calibrated_sculk_sensor") {
         return valueOf(properties, "facing") == nameOf(from) ? 0 : numberOf(properties, "power").value_or(0);
     }
-    // parity: `TrappedChestBlock.getSignal`, one per person looking inside, capped at fifteen.
+    // parity: `TrappedChestBlock.getSignal`.
     if (path == "trapped_chest") {
         return std::clamp(openers, 0, kMaxSignal);
     }
-    // parity: `JukeboxBlock.ownSignal`, fifteen while a disc is *playing*, not while one is in: a
-    // song that has run out leaves its disc in the block and the signal goes.
+    // parity: `JukeboxBlock.ownSignal`.
     if (path == "jukebox") {
         return valueOf(properties, "has_record") == "true" && playing ? kMaxSignal : 0;
     }
-    // parity: `TestBlock.ownSignal`. Only the `start` mode gives anything off, and only while its
-    // block entity says the test is running: the other modes are what **read** a signal, and the
-    // `powered` they keep is theirs and never reaches a wire.
+    // parity: `TestBlock.ownSignal`.
     if (path == "test_block") {
         return valueOf(properties, "mode") == "start" && testPowered ? kMaxSignal : 0;
     }
@@ -305,7 +280,7 @@ std::int32_t directSignalOf(std::int32_t stateId, BlockFace from, std::int32_t o
     }
     const Properties properties = registry::blockStateDefinitions::propertiesOf(stateId);
 
-    // parity: `RedstoneTorchBlock.getDirectSignal`, only downwards, which is the block above it.
+    // parity: `RedstoneTorchBlock.getDirectSignal`.
     if (path == "redstone_torch" || path == "redstone_wall_torch") {
         return from == BlockFace::Down ? signalOf(stateId, from) : 0;
     }
@@ -319,8 +294,7 @@ std::int32_t directSignalOf(std::int32_t stateId, BlockFace from, std::int32_t o
     if (path.ends_with("_pressure_plate")) {
         return from == BlockFace::Up ? plateSignal(properties) : 0;
     }
-    // parity: `RedStoneWireBlock.getDirectSignal`, which is its `getSignal` again: dust powers what
-    // it points at strongly, and that is what a repeater behind it reads.
+    // parity: `RedStoneWireBlock.getDirectSignal`.
     if (path == "redstone_wire") {
         return mutedWire ? 0 : wireSignal(properties, stateId, from);
     }
@@ -328,8 +302,7 @@ std::int32_t directSignalOf(std::int32_t stateId, BlockFace from, std::int32_t o
     if (path == "repeater" || path == "comparator" || path == "observer") {
         return signalOf(stateId, from, 0, comparatorOutput);
     }
-    // parity: a detector rail, a lectern, a sculk sensor and a trapped chest all feed the block
-    // underneath them and nothing else.
+    // parity: a detector rail, a lectern, a sculk sensor and a trapped chest all feed the block.
     if (path == "detector_rail" || path == "lectern" || path == "sculk_sensor" || path == "calibrated_sculk_sensor" ||
         path == "trapped_chest") {
         return from == BlockFace::Up ? signalOf(stateId, from, openers) : 0;
@@ -360,9 +333,7 @@ std::int32_t comparatorOutputAt(const WorldState& world, std::int32_t x, std::in
 
 namespace {
 
-/// parity: `JukeboxSongPlayer.isPlaying`, which lives in the block entity and not in the state.
-/// parity: `TestBlock.ownSignal` reads `TestBlockEntity.isPowered`, which is not a state property:
-/// the mode is, and whether the test is running is not.
+/// parity: `JukeboxSongPlayer.isPlaying`.
 [[nodiscard]] bool testBlockPoweredAt(const WorldState& world, const std::int32_t x, const std::int32_t y,
                                       const std::int32_t z) {
     const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
@@ -391,8 +362,7 @@ std::int32_t signalFrom(const WorldState& world, std::string_view worldName, std
     if (!stateId.has_value()) {
         return 0;
     }
-    // parity: `RedStoneWireBlock.getSignal` works the connection out from the world with
-    // `getConnectionState`, not off the drawn shape, which can be stale and still carry.
+    // parity: `RedStoneWireBlock.getSignal` works the connection out from the world with.
     const std::int32_t own =
         isWire(*stateId)
             ? (mutedWire ? 0 : wireSignal(redstoneWire::connectionsFor(world, x, y, z, *stateId), *stateId, from))
@@ -436,8 +406,7 @@ std::int32_t containerSignal(std::span<const std::pair<std::int32_t, std::int32_
         total += static_cast<float>(count) / static_cast<float>(std::max(maxStack, 1));
     }
     total /= static_cast<float>(size);
-    // parity: `Mth.lerpDiscrete(fraction, 0, 15)`, which is `floor(fraction * 14)` plus one for
-    // anything at all: a single item already reads one, however big the container is.
+    // parity: `Mth.lerpDiscrete(fraction, 0, 15)`.
     if (total <= 0.0F) {
         return 0;
     }
@@ -459,8 +428,6 @@ std::int32_t bestNeighbourSignal(const WorldState& world, std::string_view world
 
 std::int32_t wireStrength(const WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                           std::int32_t z) {
-    // The fifteen wins outright, which the maximum below would say too: it is here because vanilla
-    // stops looking at the wires the moment a block signal maxes out.
     const std::int32_t blockSignal = blockSignalFor(world, worldName, x, y, z);
     if (blockSignal >= kMaxSignal) {
         return kMaxSignal;
@@ -475,22 +442,17 @@ bool isSignalSource(std::int32_t stateId) {
     if (path.empty()) {
         return false;
     }
-    // The buttons and the plates are one per wood, so they are matched rather than listed.
     return std::ranges::find(kSignalSources, path) != kSignalSources.end() || path.ends_with("_button") ||
            path.ends_with("_pressure_plate") || isLightningRod(path);
 }
 
 std::vector<registry::BlockFace> alsoTells(std::int32_t stateId) {
     const std::string path = pathOf(stateId);
-    // parity: `SculkSensorBlock.updateNeighbours` tells its own square **and the one below**. A
-    // sensor only feeds strongly upwards, so what is under it would never hear it otherwise.
+    // parity: `SculkSensorBlock.updateNeighbours` tells its own square **and the one below**.
     if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
         return {registry::BlockFace::Down};
     }
-    // parity: `PoweredRailBlock.updateState` ends by telling the square **below**, and the one above
-    // as well when the shape is a slope; `DetectorRailBlock.checkPressed` tells the one below too.
-    // The rail feeds nobody, so this changes no signal: what it changes is a neighbour that was left
-    // out of step, which is exactly what a lamp written `lit=false` beside a block of redstone is.
+    // parity: `PoweredRailBlock.updateState` ends by telling the square **below**.
     if (path == "powered_rail" || path == "activator_rail" || path == "detector_rail") {
         std::vector<registry::BlockFace> tells{registry::BlockFace::Down};
         if (valueOf(registry::blockStateDefinitions::propertiesOf(stateId), "shape").starts_with("ascending_")) {
@@ -536,13 +498,9 @@ std::vector<BlockChange> settle(WorldState& world, std::string_view worldName, s
     std::vector<BlockChange> changes;
     std::map<std::int64_t, std::size_t> changedAt;
 
-    // The block that changed is asked first, and so is every piece of dust that can see it: a lever,
-    // a torch or a block of redstone is not dust itself, so starting at it alone left the dust
     // beside a new source dark. parity: `Level.updateNeighborsAt`, which tells the neighbours rather
-    // than the block itself.
     std::vector<std::array<std::int32_t, 3>> queue;
-    // parity: `updateNeighboursOnBlockSet` leaves the square itself alone, so it comes out of the
-    // whole opening queue: the step up and down from a neighbour puts it back otherwise.
+    // parity: `updateNeighboursOnBlockSet` leaves the square itself alone.
     const std::array<std::int32_t, 3> here{x, y, z};
     const auto open = [&queue, asked, &here](const std::array<std::int32_t, 3>& position) {
         if (asked == Asked::NeighboursOnly && position == here) {
@@ -572,8 +530,6 @@ std::vector<BlockChange> settle(WorldState& world, std::string_view worldName, s
                 changedAt.emplace(key, changes.size());
                 changes.push_back(*moved);
             }
-            // The dust that can see this one has to be asked again, which is the same set the signal
-            // itself travels over.
             for (const BlockFace face : kFaces) {
                 const std::int32_t nx = position[0] + registry::stepX(face);
                 const std::int32_t ny = position[1] + registry::stepY(face);
@@ -586,10 +542,7 @@ std::vector<BlockChange> settle(WorldState& world, std::string_view worldName, s
         queue = std::move(next);
     }
 
-    // parity: `RedStoneWireBlock.updatePowerStrength`, which tells the neighbours of every piece of
-    // dust that moved, not only of the block that started it. Without this a repeater more than two
-    // blocks from the lever never heard that the dust in front of it had changed, and sat there
-    // until something broke it.
+    // parity: `RedStoneWireBlock.updatePowerStrength`.
     if (notify) {
         for (const BlockChange& change : changes) {
             notify(change.x, change.y, change.z);

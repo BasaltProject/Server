@@ -27,7 +27,6 @@ using wire::text::Component;
         .component = Component::translatable("arguments.nbtpath.nothing_found", {Component::text(std::string{path})})};
 }
 
-/// The block coordinates an argument named, resolved against whoever is running the command.
 [[nodiscard]] std::array<std::int32_t, 3> blockAt(const CommandContext& context, std::string_view name) {
     const auto* coordinates = context.get<BlockCoordinates>(name);
     return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
@@ -49,8 +48,6 @@ using wire::text::Component;
     return *holder;
 }
 
-/// Which of the three holders an argument set names. Vanilla calls both the storage id and the
-/// entity `target`, so which one it is follows from what parsed there.
 [[nodiscard]] std::expected<DataHolderRef, CommandSyntaxError>
 holderOf(const CommandContext& context, std::string_view posName, std::string_view targetName) {
     if (context.get<BlockCoordinates>(posName) != nullptr) {
@@ -62,8 +59,7 @@ holderOf(const CommandContext& context, std::string_view posName, std::string_vi
     return entityOf(context, targetName);
 }
 
-/// parity: each holder has its own pair of strings, and the block ones take the three coordinates
-/// rather than a description, so there is no generic form to share.
+/// parity: each holder has its own pair of strings, and the block ones take the three coordinates rather than a.
 [[nodiscard]] Component holderMessage(const DataHolderRef& holder, std::string_view verb, std::vector<Component> tail) {
     if (const auto* named = holder.as<DataHolderRef::Storage>(); named != nullptr) {
         std::vector<Component> args{Component::text(named->id.toString())};
@@ -83,7 +79,6 @@ holderOf(const CommandContext& context, std::string_view posName, std::string_vi
     return Component::translatable("commands.data.block." + std::string{verb}, std::move(args));
 }
 
-/// The result `/data get` reports, which for a number is the number itself.
 [[nodiscard]] std::optional<std::int32_t> numeric(const NbtTag& tag) {
     if (const auto* value = tag.get<std::int32_t>(); value != nullptr) {
         return *value;
@@ -105,7 +100,6 @@ DataCommand::DataCommand(CommandStorage& storage)
 void DataCommand::build(const CommandNodeBuilder& root) const {
     const DataAccess access{*storage_};
 
-    /// Reading a holder, refusing an unloaded chunk and a block with nothing in it by name.
     const auto readHolder = [access](const CommandContext& context,
                                      const DataHolderRef& holder) -> std::expected<NbtCompound, CommandSyntaxError> {
         if (const auto* block = holder.as<DataHolderRef::Block>(); block != nullptr) {
@@ -149,9 +143,7 @@ void DataCommand::build(const CommandNodeBuilder& root) const {
         if (existing == nullptr) {
             return CommandSyntaxError{.component = Component::translatable("commands.data.block.invalid")};
         }
-        // parity: `loadAdditional` runs on what a command writes, and two block entities do
-        // something with it: a command block that has just become automatic books a turn, and a
-        // lectern resolves the book it was handed.
+        // parity: `loadAdditional` runs on what a command writes.
         const bool wasAutomatic = existing->data().getBoolean("auto");
         chunk->setBlockEntity(server::world::ChunkBlockEntity{existing->localX(), existing->y(), existing->localZ(),
                                                               existing->type(), value});
@@ -161,7 +153,6 @@ void DataCommand::build(const CommandNodeBuilder& root) const {
         return std::nullopt;
     };
 
-    /// The three `(block|entity|storage)` forms, declared once per verb the way vanilla does.
     const auto holders = [](const CommandNodeBuilder& node, std::string_view posName, std::string_view targetName,
                             const std::function<void(const CommandNodeBuilder&)>& build) {
         node.literal("block", [posName, build](const CommandNodeBuilder& form) {

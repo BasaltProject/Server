@@ -14,12 +14,10 @@
 namespace basalt::server::runtime::world::jukeboxes {
 namespace {
 
-/// parity: `JukeboxBlockEntity.SONG_ITEM_TAG_ID`, an `ItemStack.CODEC` compound: the disc itself,
-/// written under vanilla's own name so a world of ours opens in vanilla still playing.
+/// parity: `JukeboxBlockEntity.SONG_ITEM_TAG_ID`.
 constexpr std::string_view kRecordKey = "RecordItem";
 
-/// parity: `JukeboxBlockEntity.TICKS_SINCE_SONG_STARTED_TAG_ID`, written only while a song plays. A
-/// disc that has finished stays in the block, so this is the only thing that says it is still going.
+/// parity: `JukeboxBlockEntity.TICKS_SINCE_SONG_STARTED_TAG_ID`.
 constexpr std::string_view kTicksKey = "ticks_since_song_started";
 
 /// parity: `JukeboxSong.SONG_END_PADDING_TICKS`, a second of silence after the last note.
@@ -27,7 +25,6 @@ constexpr std::int64_t kEndPadding = 20;
 
 constexpr std::string_view kDiscPrefix = "music_disc_";
 
-/// The block entity of a jukebox, made on the spot if the block has none yet.
 [[nodiscard]] server::world::ChunkBlockEntity* entityAt(WorldState& world, std::int32_t x, std::int32_t y,
                                                         std::int32_t z, bool create) {
     server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
@@ -44,7 +41,6 @@ constexpr std::string_view kDiscPrefix = "music_disc_";
     return chunk->blockEntityAt(x & 15, y, z & 15);
 }
 
-/// The disc a jukebox holds, read the way vanilla writes it.
 [[nodiscard]] std::optional<wire::common::Identifier> discIn(const wire::nbt::NbtCompound& data) {
     const wire::nbt::NbtTag* record = data.find(std::string{kRecordKey});
     const wire::nbt::NbtCompound* held = record == nullptr ? nullptr : record->get<wire::nbt::NbtCompound>();
@@ -187,8 +183,7 @@ bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const s
         return false;
     }
     const std::int64_t elapsed = entity->data().getLong(kTicksKey, 0);
-    // parity: `JukeboxSongPlayer.tick` checks whether the song is over **before** counting, so the
-    // last turn is spent on the check and not on the counter.
+    // parity: `JukeboxSongPlayer.tick` checks whether the song is over **before** counting.
     if (elapsed >= lengthTicks + kEndPadding) {
         entity->data().remove(kTicksKey);
         if (gameTime.has_value()) {
@@ -211,8 +206,6 @@ std::int32_t comparatorOutputAt(const WorldState& world, const wire::nbt::NbtCom
 
 namespace {
 
-/// The number after `"<field>":` in a song's own JSON. Two fields, both numbers, no nesting: a whole
-/// JSON reader here would be more machinery than the file has.
 [[nodiscard]] std::optional<double> numberIn(const std::string& json, const std::string_view field) {
     const std::size_t at = json.find('"' + std::string{field} + '"');
     const std::size_t colon = at == std::string::npos ? std::string::npos : json.find(':', at);

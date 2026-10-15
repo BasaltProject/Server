@@ -30,8 +30,6 @@ bool wearsSnow(std::int32_t stateId) {
 }
 
 std::optional<std::int32_t> updated(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    // The `wearsSnow` half is a fast path: a block without the property answers with itself below
-    // and is dropped by the comparison there. It is here because most blocks are that block.
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || !wearsSnow(*stateId)) {
         return std::nullopt;

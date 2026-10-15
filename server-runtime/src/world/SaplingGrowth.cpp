@@ -19,14 +19,10 @@ namespace {
 
 namespace trees = server::world::terrain::decoration::tree;
 
-/// Where the scratch chunk puts the sapling, far enough from every edge for any canopy.
 constexpr std::int32_t kCentre = 8;
 
-/// How far above the sapling a tree may reach, which bounds what is copied back.
 constexpr std::int32_t kHeight = 32;
 
-/// One weighted entry. A null tree is a feature this build does not have yet: it is drawn like any
-/// other and then grows nothing, which is what vanilla does with a feature it cannot find.
 struct Weighted {
     const trees::TreeConfiguration* tree = nullptr;
     std::int32_t weight = 1;
@@ -34,8 +30,7 @@ struct Weighted {
 
 using WeightedTrees = std::vector<Weighted>;
 
-/// parity: 26.3 `TreeGrower`: weighted lists for the single tree, the 2x2 one and the one grown
-/// beside flowers.
+/// parity: 26.3 `TreeGrower`.
 struct Grower {
     WeightedTrees trees;
     WeightedTrees megaTrees;
@@ -72,8 +67,7 @@ struct Grower {
     return byPath;
 }
 
-/// parity: `WeightedList.getRandom`, one `nextInt` over the total even for a single entry, and no
-/// roll at all for an empty list.
+/// parity: `WeightedList.getRandom`.
 [[nodiscard]] std::optional<const trees::TreeConfiguration*> pick(const WeightedTrees& list,
                                                                   random::RandomSource& random) {
     std::int32_t total = 0;
@@ -114,7 +108,7 @@ struct Grower {
     return false;
 }
 
-/// parity: `TreeGrower.findTwoByTwoSaplingPos`: the corner whose square of four is all this sapling.
+/// parity: `TreeGrower.findTwoByTwoSaplingPos`.
 [[nodiscard]] std::optional<std::array<std::int32_t, 2>> twoByTwo(const WorldState& world, std::int32_t x,
                                                                   std::int32_t y, std::int32_t z,
                                                                   const wire::common::Identifier& block) {
@@ -135,7 +129,6 @@ struct Grower {
     return std::nullopt;
 }
 
-/// Grows `config` on a scratch chunk and copies what it made into the world.
 [[nodiscard]] std::vector<BlockChange> plant(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                              const trees::TreeConfiguration& config, random::RandomSource& random,
                                              bool square) {
@@ -222,7 +215,7 @@ std::vector<BlockChange> advance(WorldState& world, std::int32_t x, std::int32_t
         return changes;
     }
 
-    // parity: `TreeGrower.growTree`: the 2x2 tree is drawn first, and grown only on a full square.
+    // parity: `TreeGrower.growTree`.
     if (const std::optional<const trees::TreeConfiguration*> mega = pick(grower.megaTrees, random);
         mega.has_value() && *mega != nullptr) {
         if (const std::optional<std::array<std::int32_t, 2>> corner = twoByTwo(world, x, y, z, *block);

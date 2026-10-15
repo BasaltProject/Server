@@ -34,7 +34,6 @@ using wire::common::JsonValue;
     return value == nullptr ? nullptr : value->get<std::vector<JsonValue>>();
 }
 
-/// Every id in this schema is a resource location, so a malformed one is a malformed file.
 [[nodiscard]] std::optional<Identifier> asIdentifier(const JsonValue* value) {
     const std::string* text = asString(value);
     if (text == nullptr) {
@@ -87,8 +86,6 @@ using wire::common::JsonValue;
     return ItemMatcher{.items = {*parsed}, .tag = std::nullopt};
 }
 
-/// The one entry a holder set names: an id, or a list of exactly one. parity: 26.3 turned the
-/// recipe, loot table and block of several triggers into holder sets; the model keeps one.
 [[nodiscard]] std::optional<Identifier> singleHolder(const JsonValue* value) {
     if (const std::vector<JsonValue>* list = asArray(value); list != nullptr) {
         return list->size() == 1 ? singleHolder(&list->front()) : std::nullopt;
@@ -99,7 +96,6 @@ using wire::common::JsonValue;
 
 namespace parts = loot::lootTableJson::parts;
 
-/// A context-aware predicate: one loot condition as 26.3 writes it, or the older list of them.
 [[nodiscard]] std::optional<std::vector<loot::LootCondition>> contextPredicate(const JsonValue& value) {
     std::vector<loot::LootCondition> conditions;
     const auto one = [&conditions](const JsonValue& term) {
@@ -182,8 +178,6 @@ namespace parts = loot::lootTableJson::parts;
     return check;
 }
 
-/// The trigger instances read field by field. parity: each trigger's `TriggerInstance` codec; an
-/// unknown field is refused, so a criterion is never granted on less than it asks for.
 [[nodiscard]] std::optional<GenericCondition> parseGeneric(std::string_view trigger, const JsonObject* conditions) {
     static constexpr std::array<std::string_view, 13> kEntityFields{
         "player", "entity", "source",   "projectile", "shooter", "bystander", "lightning",
@@ -283,16 +277,12 @@ namespace parts = loot::lootTableJson::parts;
     return built;
 }
 
-/// The triggers kept on their own shape: indexed by item or recipe, or naming only ids.
 [[nodiscard]] bool isSpecialized(std::string_view name) {
     return name == "minecraft:inventory_changed" || name == "minecraft:recipe_unlocked" ||
            name == "minecraft:recipe_crafted" || name == "minecraft:player_generates_container_loot" ||
            name == "minecraft:changed_dimension";
 }
 
-/// The condition a trigger fires under, for the triggers this server can observe. Anything else is
-/// `Unsupported` and never fires, rather than firing on the bare trigger and handing out an
-/// advancement nobody earned.
 [[nodiscard]] CriterionCondition parseCondition(const Identifier& trigger, const JsonObject* conditions) {
     const std::string name = trigger.toString();
     if (!isSpecialized(name)) {
@@ -340,8 +330,7 @@ namespace parts = loot::lootTableJson::parts;
         }
         return built;
     }
-    // parity: `RecipeCraftedTrigger`. A criterion that also names the ingredients is left
-    // unsupported: what was in the grid is gone by the time the result is taken.
+    // parity: `RecipeCraftedTrigger`.
     if (name == "minecraft:recipe_crafted") {
         const std::optional<Identifier> recipe =
             conditions == nullptr ? std::nullopt : singleHolder(conditions->find("recipes"));
@@ -360,8 +349,7 @@ namespace parts = loot::lootTableJson::parts;
     }
     const JsonValue* description = display.find("description");
     const std::string* frame = asString(display.find("frame"));
-    // parity: the frozen Kotlin reads this off `JsonPrimitive.content`, so the file may spell it as a
-    // JSON boolean or as a quoted one, and `String.toBoolean` accepts any casing of `true`.
+    // parity: the frozen Kotlin reads this off `JsonPrimitive.content`.
     bool announceToChat = true;
     if (const JsonValue* announce = display.find("announce_to_chat"); announce != nullptr) {
         if (const bool* flag = announce->get<bool>(); flag != nullptr) {

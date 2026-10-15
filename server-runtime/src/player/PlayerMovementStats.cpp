@@ -9,8 +9,7 @@
 namespace basalt::server::runtime::player::playerMovement {
 namespace {
 
-/// parity: the jar takes the square root as a float and rounds that, so the counted centimetres come
-/// from float precision rather than double.
+/// parity: the jar rounds a float square root, so the counted centimetres come from float precision.
 [[nodiscard]] std::int32_t centimetresOf(double dx, double dy, double dz) {
     const auto distance = static_cast<float>(std::sqrt((dx * dx) + (dy * dy) + (dz * dz)));
     return static_cast<std::int32_t>(std::lround(distance * 100.0F));
@@ -24,7 +23,7 @@ namespace {
     return centimetres > 0 ? std::optional<Counted>{Counted{.key = key, .centimetres = centimetres}} : std::nullopt;
 }
 
-/// parity: `BlockTags.CLIMBABLE` plus the trapdoor rule, as `Entity.onClimbable` reads it.
+/// parity: `BlockTags.CLIMBABLE` plus the trapdoor rule.
 [[nodiscard]] const std::set<std::string, std::less<>>& climbableBlocks() {
     static const std::set<std::string, std::less<>> kBlocks{"ladder",
                                                             "vine",
@@ -73,8 +72,6 @@ std::optional<Counted> movementStat(double dx, double dy, double dz, const Facts
     if (facts.fallFlying) {
         return counted(storage::stats::custom("aviate_one_cm"), centimetresOf(dx, dy, dz));
     }
-    // parity: the last branch is everything else in the air, and a step under a quarter of a block
-    // counts for nothing: it is what keeps a player standing on a slab from flying on the spot.
     const std::int32_t horizontal = horizontalOf(dx, dz);
     return horizontal > kFlyingThreshold ? counted(storage::stats::flyOneCm(), horizontal) : std::nullopt;
 }

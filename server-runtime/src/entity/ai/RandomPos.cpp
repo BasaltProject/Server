@@ -63,7 +63,7 @@ constexpr double kQuarterTurn = static_cast<double>(static_cast<float>(std::numb
     return below.has_value() && reg::blockShapes::isSolidRender(*below);
 }
 
-/// parity: `GoalUtils.hasMalus`, whatever the walk evaluator would not call open or walkable.
+/// parity: `GoalUtils.hasMalus`.
 [[nodiscard]] bool hasMalus(world::WorldState& world, const Block& pos) {
     const std::optional<std::int32_t> state = world.blockState(pos[0], pos[1], pos[2]);
     if (!state.has_value()) {
@@ -120,8 +120,7 @@ constexpr double kQuarterTurn = static_cast<double>(static_cast<float>(std::numb
     return {floorOf(x + mob.x), floorOf(static_cast<double>(offset[1]) + mob.y), floorOf(z + mob.z)};
 }
 
-/// parity: the `generateRandomPosTowardDirection` of both classes; the default one also refuses a
-/// spot with a malus.
+/// parity: `generateRandomPosTowardDirection` of both classes.
 [[nodiscard]] std::optional<Block> accept(world::WorldState& world, const ServerEntity& mob, double horizontal,
                                           bool restrict, const Block& offset, random::RandomSource& random,
                                           bool checkMalus) {

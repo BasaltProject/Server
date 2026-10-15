@@ -60,8 +60,6 @@ bool MobSpawnForestBuilder::mountExternal(MobSpawnNode& passenger, std::int32_t 
 }
 
 MobSpawnForest MobSpawnForestBuilder::freeze(const MobSpawnNode& main) const {
-    // The descriptor each node became, so the external links and the main entity can be found again
-    // once the tree has been copied into values.
     std::map<const MobSpawnNode*, ChunkGeneratedEntity> descriptors;
     const auto freezeNode = [&descriptors](const MobSpawnNode& node, const auto& self) -> ChunkGeneratedEntity {
         ChunkGeneratedEntity descriptor{.type = node.type(),
@@ -99,8 +97,6 @@ MobSpawnForest MobSpawnForestBuilder::freeze(const MobSpawnNode& main) const {
 }
 
 MobSpawnForest relocateMain(const MobSpawnForest& forest, double x, double y, double z, float yaw) {
-    // The main entity is found by value: it is one of the descriptors in the tree, and moving it
-    // must move the copy that is really in the forest rather than a look-alike.
     const auto moveTree = [&](const ChunkGeneratedEntity& entity, const auto& self) -> ChunkGeneratedEntity {
         ChunkGeneratedEntity copied = entity;
         copied.passengers.clear();

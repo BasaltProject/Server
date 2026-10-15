@@ -6,9 +6,7 @@
 namespace basalt::server::runtime::entity::blockTriggers {
 namespace {
 
-/// parity: the five overrides of `isIgnoringBlockTriggers` that answer true, `Display`'s three
-/// subclasses written out. A bat is one of them, which is the surprise: it is the only mob that
-/// walks over a plate without pressing it.
+/// parity: `isIgnoringBlockTriggers` overrides.
 constexpr std::array<std::string_view, 7> kIgnored{
     "ominous_item_spawner", "interaction", "block_display", "item_display", "text_display", "marker", "bat"};
 

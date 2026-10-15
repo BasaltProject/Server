@@ -36,18 +36,18 @@ constexpr std::string_view kDeathSpit = "mob";
 /// parity: `PanicGoal`, which runs for as long as the last hit is remembered.
 constexpr std::int32_t kPanicTicks = 40;
 
-/// parity: `ProjectileUtil.computeMargin`, which grows to three tenths over the first few ticks.
+/// parity: `ProjectileUtil.computeMargin`.
 constexpr float kMaxMargin = 0.3F;
 constexpr float kMarginGrowth = 20.0F;
 
-/// parity: `Entity.updateFluidHeightAndDoFluidPushing`, which shrinks the box a hair first.
+/// parity: `Entity.updateFluidHeightAndDoFluidPushing`.
 constexpr double kFluidShrink = 0.001;
 
-/// parity: `Projectile.updateRotation`: float degrees widened, and a fifth of the way a tick.
+/// parity: `Projectile.updateRotation`.
 constexpr double kDegrees = static_cast<double>(180.0F / static_cast<float>(std::numbers::pi));
 constexpr float kTurnShare = 0.2F;
 
-/// parity: `BlockStateBase.isAir`, the three airs. A square that is not loaded counts as one.
+/// parity: `BlockStateBase.isAir`.
 [[nodiscard]] bool isAir(const std::optional<std::int32_t>& state) {
     if (!state.has_value()) {
         return true;
@@ -56,7 +56,7 @@ constexpr float kTurnShare = 0.2F;
     return block == nullptr || block->path() == "air" || block->path() == "cave_air" || block->path() == "void_air";
 }
 
-/// parity: `findBlocksIn(getBoundingBox()).filterState(isAir).noneMatched()`: every square the box
+/// parity: `findBlocksIn(getBoundingBox()).filterState(isAir).noneMatched()`.
 /// touches is something other than air.
 [[nodiscard]] bool buried(world::WorldState& world, const ServerEntity& spit) {
     const double half = spit.width() / 2.0;
@@ -117,7 +117,7 @@ constexpr float kTurnShare = 0.2F;
     return party;
 }
 
-/// parity: `Projectile.isOutsideOwnerCollisionRange`: the box swept by this turn's movement and
+/// parity: `Projectile.isOutsideOwnerCollisionRange`.
 /// grown by a block meets nobody of the owner's party.
 [[nodiscard]] bool outsideParty(world::WorldState& world, const std::vector<PlayerSession*>& watchers,
                                 const ServerEntity& spit, const std::vector<std::int32_t>& party) {
@@ -172,7 +172,7 @@ void CombatSystem::tickLlamaSpit(world::LoadedWorld& world, const std::vector<Pl
             }
         }
     }
-    // parity: `Projectile.checkLeftOwner`, before the move; until then the owner's party is spared.
+    // parity: `Projectile.checkLeftOwner`.
     std::vector<std::int32_t> spared;
     if (spit.ownerId.has_value() && !spit.leftOwner) {
         spared = partyOf(world.state(), *spit.ownerId);
@@ -221,13 +221,13 @@ void CombatSystem::tickLlamaSpit(world::LoadedWorld& world, const std::vector<Pl
     const double horizontal = std::sqrt((spit.velocityX * spit.velocityX) + (spit.velocityZ * spit.velocityZ));
     spit.pitch = lerpRotation(pitchBefore, static_cast<float>(std::atan2(spit.velocityY, horizontal) * kDegrees));
     spit.yaw = lerpRotation(yawBefore, static_cast<float>(std::atan2(spit.velocityX, spit.velocityZ) * kDegrees));
-    // parity: gone once every square its box touches is solid, or in water, both judged where it
+    // parity: gone once every square its box touches is solid, or in water, both judged where it.
     // stood when the tick began.
     if (buried(world.state(), spit) || wet) {
         spit.removed = true;
         return;
     }
-    // parity: the drag is taken off the movement it started with, so a deflection's reversal is
+    // parity: the drag is taken off the movement it started with, so a deflection's reversal is.
     // lost again.
     spit.velocityX = moveX * kind.drag;
     spit.velocityY = moveY * kind.drag;

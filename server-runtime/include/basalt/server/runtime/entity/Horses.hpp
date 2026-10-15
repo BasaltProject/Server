@@ -14,8 +14,7 @@ namespace basalt::server::runtime::entity {
 
 class ServerEntity;
 
-/// Horses, donkeys, mules, llamas, the undead horses and camels as mounts: taming, feeding,
-/// saddles, chests and who steers. parity: `AbstractHorse` and `AbstractChestedHorse`.
+/// parity: `AbstractHorse` and `AbstractChestedHorse`.
 namespace horses {
 
 /// parity: `AbstractHorse.DATA_ID_FLAGS` and `AbstractChestedHorse.DATA_ID_CHEST`.
@@ -39,7 +38,7 @@ inline constexpr std::int32_t kEquipmentSlots = 2;
 /// parity: `Camel.DASH_COOLDOWN_TICKS`.
 inline constexpr std::int32_t kDashCooldownTicks = 55;
 
-/// What a mount keeps between turns beyond its saved fields. parity: `AbstractHorse`'s counters.
+/// parity: `AbstractHorse`'s counters.
 struct HorseState {
     std::int32_t eatingCounter = 0;
     std::int32_t mouthCounter = 0;
@@ -50,11 +49,9 @@ struct HorseState {
     /// parity: `Camel.dashCooldown` and `DASH`.
     std::int32_t dashCooldown = 0;
     bool dashing = false;
-    /// A hit that landed since its last turn, whose one-in-three rear is rolled on that turn.
     bool hurt = false;
 };
 
-/// Every `AbstractHorse`, camels included.
 [[nodiscard]] bool isHorse(const wire::common::Identifier& type);
 
 /// parity: `AbstractChestedHorse`: donkeys, mules and llamas.
@@ -87,7 +84,7 @@ std::int32_t modifyTemper(ServerEntity& horse, std::int32_t amount);
 
 void setChest(ServerEntity& horse, bool chest);
 
-/// parity: `getInventoryColumns`: five for a donkey or mule with a chest, a llama's strength.
+/// parity: `getInventoryColumns`.
 [[nodiscard]] std::int32_t inventoryColumns(const ServerEntity& horse);
 
 /// parity: `Llama.getStrength`, one to five whatever was saved.
@@ -101,8 +98,7 @@ void setChest(ServerEntity& horse, bool chest);
 /// parity: `Entity.isSilent`, its saved `Silent`.
 [[nodiscard]] bool silent(const ServerEntity& horse);
 
-/// The slot an item goes into on this mount. parity: `isEquippableInSlot` over the item's own
-/// `equippable`, with `canUseSlot`.
+/// parity: `isEquippableInSlot`.
 enum class Wearable : std::uint8_t { None, Saddle, Body };
 
 [[nodiscard]] Wearable wearableFor(const ServerEntity& horse, const wire::common::Identifier& item);
@@ -114,12 +110,11 @@ enum class Wearable : std::uint8_t { None, Saddle, Body };
 /// parity: `isFood`.
 [[nodiscard]] bool isFood(const wire::common::Identifier& type, const wire::common::Identifier& item);
 
-/// What one bite of an item does. parity: `handleEating`'s table.
+/// parity: `handleEating`'s table.
 struct Feeding {
     float heal = 0.0F;
     std::int32_t ageUp = 0;
     std::int32_t temper = 0;
-    /// Whether it puts a tamed grown one in love.
     bool love = false;
 };
 
@@ -140,7 +135,6 @@ void standIfPossible(ServerEntity& horse);
 /// parity: `openMouth`.
 void openMouth(ServerEntity& horse);
 
-/// The mob's own sounds, by type and age. Empty for one that has none.
 [[nodiscard]] std::string_view angrySound(const ServerEntity& horse);
 [[nodiscard]] std::string_view eatingSound(const ServerEntity& horse);
 [[nodiscard]] std::string_view ambientSound(const ServerEntity& horse);
@@ -154,8 +148,6 @@ void openMouth(ServerEntity& horse);
 /// parity: `AbstractHorse.canParent`: tame, grown, unhurt, in love and nobody aboard.
 [[nodiscard]] bool canParent(const ServerEntity& horse);
 
-/// parity: the kinds' own `canMate`: horses and donkeys with each other, llamas and camels with
-/// their own, and nothing for a mule or the undead horses.
 [[nodiscard]] bool canMate(const ServerEntity& horse, const ServerEntity& partner);
 
 /// parity: `getBreedOffspring`'s kind, a mule from a horse and a donkey.

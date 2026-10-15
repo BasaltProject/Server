@@ -91,14 +91,11 @@ void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
     if (propertyOf(stateId, "vertical_direction") != "down") {
         return;
     }
-    // parity: `isStalactiteStartPos`, the topmost block of the stalactite. The check below refuses
-    // the same blocks, since a spike above is not the block a spike hangs from; this says which of
-    // the two rules is which.
+    // parity: `isStalactiteStartPos`.
     if (pathAt(world, x, y + 1, z) == spike) {
         return;
     }
-    // parity: `canGrow`, which asks for the block it hangs from, and a pointed dripstone for a water
-    // source over that.
+    // parity: `canGrow`.
     if (pathAt(world, x, y + 1, z) != grownOn->second) {
         return;
     }
@@ -154,8 +151,6 @@ void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
     std::int32_t floorY = tipY - 1;
     for (std::int32_t step = 0; step < kDrop; ++step) {
         const std::optional<std::int32_t> here = world.blockState(x, floorY, z);
-        // Water stops the drip. Falling through to the check below would stop it too, since water
-        // is not something a stalagmite stands on, but a flooded cave is a different reason.
         if (!here.has_value() || registry::blockSupport::holdsWater(*here)) {
             return;
         }

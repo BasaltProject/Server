@@ -13,23 +13,18 @@ namespace {
 
 using registry::BlockFace;
 
-/// What one square of a pattern asks of the block on it.
 enum class Wants : std::uint8_t { Pumpkin, SnowBlock, IronBlock, CopperBlock, Air };
 
-/// One of `trySpawnGolem`'s three patterns, all of them one aisle deep.
 struct Shape {
     Golem kind;
     std::int32_t width;
     std::int32_t height;
-    /// Row major, top row first, exactly as the aisle strings read.
     std::array<Wants, 9> cells;
-    /// The square `spawnGolemInWorld` is handed, as right and down into the pattern.
     std::int32_t spawnRight;
     std::int32_t spawnDown;
 };
 
-// parity: `getOrCreateSnowGolemFull`, `getOrCreateIronGolemFull` and `getOrCreateCopperGolemFull`,
-// tried in that order because the first match is the one that gets built.
+// parity: `getOrCreateSnowGolemFull`.
 constexpr std::array<Shape, 3> kShapes{
     Shape{.kind = Golem::Snow,
           .width = 1,
@@ -84,8 +79,7 @@ using blockPatterns::translateAndRotate;
     return false;
 }
 
-/// parity: `BlockPattern.matches`, x outermost so a pattern gives up on the first wrong column.
-/// The state a square is read as when the caller is asking what a pumpkin **would** finish.
+/// parity: `BlockPattern.matches`.
 [[nodiscard]] std::optional<std::int32_t> pumpkinState() {
     const registry::BlockState* block = registry::blocks::named("carved_pumpkin");
     return block == nullptr ? std::nullopt : std::optional<std::int32_t>{block->stateId};
@@ -97,8 +91,6 @@ using blockPatterns::translateAndRotate;
     for (std::int32_t right = 0; right < shape.width; ++right) {
         for (std::int32_t down = 0; down < shape.height; ++down) {
             const std::array<std::int32_t, 3> at = translateAndRotate(origin, forwards, up, right, down, 0);
-            // A square asked about as if it already held a pumpkin picks itself out: no other cell of
-            // any of the three patterns takes one, so a match can only be one with its head here.
             const std::optional<std::int32_t> stateId =
                 asPumpkin.has_value() && at == *asPumpkin ? pumpkinState() : world.blockState(at[0], at[1], at[2]);
             if (!stateId.has_value()) {
@@ -116,17 +108,14 @@ using blockPatterns::translateAndRotate;
 [[nodiscard]] Match matchOf(const WorldState& world, const Shape& shape, const std::array<std::int32_t, 3>& origin,
                             const BlockFace forwards, const BlockFace up) {
     Match match{.kind = shape.kind};
-    // parity: `clearPatternBlocks` walks the whole rectangle, x outermost, and the empty corners of
-    // the iron cross are in it: it writes air over squares that already were air.
+    // parity: `clearPatternBlocks` walks the whole rectangle.
     for (std::int32_t right = 0; right < shape.width; ++right) {
         for (std::int32_t down = 0; down < shape.height; ++down) {
             match.cells.push_back(translateAndRotate(origin, forwards, up, right, down, 0));
         }
     }
     match.spawn = translateAndRotate(origin, forwards, up, shape.spawnRight, shape.spawnDown, 0);
-    // parity: `replaceCopperBlockWithChest` and `getWeatherStateFromPattern` read `getBlock(0, 1, 0)`
-    // and `getBlock(0, 0, 0)` off the pattern's own cache, which was filled before the squares were
-    // cleared, so both keep the states the pattern matched on.
+    // parity: `replaceCopperBlockWithChest` and `getWeatherStateFromPattern` read `getBlock(0.
     if (shape.kind == Golem::Copper) {
         match.body = translateAndRotate(origin, forwards, up, 0, 1, 0);
         match.bodyState = world.blockState(match.body[0], match.body[1], match.body[2]).value_or(0);

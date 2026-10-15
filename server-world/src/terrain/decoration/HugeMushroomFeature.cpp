@@ -138,9 +138,7 @@ void placeMushroomBlock(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32
     if (!canPlaceOnPaths().contains(pathOf(chunk.decorationBlockStateId(originX, originY - 1, originZ)))) {
         return false;
     }
-    // parity: the real isValidPosition passes treeHeight = -1 into getTreeRadiusForHeight, so the red
-    // variant's own radius rule resolves to 0 for every checked layer and brown's to `dy <= 3 ? 0 : 3`.
-    // The cap radius therefore only matters for brown here.
+    // parity: `isValidPosition` passes treeHeight -1.
     for (std::int32_t dy = 0; dy <= treeHeight; ++dy) {
         const std::int32_t radius = kind == hugeMushroomFeature::Kind::Brown ? (dy <= 3 ? 0 : 3) : 0;
         for (std::int32_t dx = -radius; dx <= radius; ++dx) {

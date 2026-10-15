@@ -46,12 +46,12 @@ constexpr double kLookFar = 8.0;
 /// parity: `AbstractFish`, which pushes itself along more gently than a squid.
 constexpr double kFishPush = 0.1;
 
-/// parity: `AbstractSkeleton`'s own bow goal: a shot every twenty ticks inside fifteen blocks.
+/// parity: `AbstractSkeleton`'s own bow goal.
 constexpr std::int32_t kBowIntervalMin = 20;
 constexpr std::int32_t kBowIntervalMax = 20;
 constexpr double kBowRange = 15.0;
 
-/// parity: `Pillager` and `Illusioner`, both of which carry their weapon eight blocks out.
+/// parity: `Pillager` and `Illusioner`.
 constexpr double kCrossbowRange = 8.0;
 
 /// parity: `EvokerSummonSpellGoal` and `EvokerAttackSpellGoal`, wind-up and wait apart.
@@ -62,8 +62,7 @@ constexpr std::int32_t kFangCooldown = 100;
 constexpr std::int32_t kBlindCast = 20;
 constexpr std::int32_t kBlindCooldown = 180;
 
-/// parity: `Llama.registerGoals`: the caravan at a float's 2.1, and a spit every two seconds from
-/// twenty blocks.
+/// parity: `Llama.registerGoals`.
 constexpr double kCaravanSpeed = static_cast<double>(2.1F);
 constexpr double kSpitSpeed = 1.25;
 constexpr std::int32_t kSpitInterval = 40;
@@ -73,7 +72,7 @@ constexpr float kSpitRange = 20.0F;
 constexpr std::int32_t kWitherShotInterval = 40;
 constexpr double kWitherRange = 20.0;
 
-/// parity: `Monster` and the golem's `DefendVillageTargetGoal`: what an iron golem goes after.
+/// parity: `Monster` and the golem's `DefendVillageTargetGoal`.
 const Names& hostile() {
     static const Names kTypes{"zombie",       "husk",       "drowned",         "zombie_villager", "skeleton",
                               "stray",        "bogged",     "wither_skeleton", "creeper",         "spider",
@@ -83,7 +82,6 @@ const Names& hostile() {
     return kTypes;
 }
 
-/// Every Raider inherits `PatrollingMonster`'s priority-four long-distance goal.
 const Names& patrollingTypes() {
     static const Names kTypes{"pillager", "vindicator", "evoker", "illusioner", "witch", "ravager"};
     return kTypes;
@@ -122,7 +120,6 @@ void farmAnimal(GoalSelector& selector, const wire::common::Identifier& type, do
     add<RandomLookAroundGoal>(selector, 7);
 }
 
-/// The tail every walking monster shares: wander, look about, and go for whoever is nearest.
 void monsterTail(GoalSelector& selector, double strollSpeed = 1.0) {
     add<RandomStrollGoal>(selector, 7, strollSpeed);
     add<LookAtPlayerGoal>(selector, 8, kLookFar);
@@ -150,8 +147,7 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path);
 std::unique_ptr<GoalSelector> mobGoals::forType(const wire::common::Identifier& type) {
     auto selector = std::make_unique<GoalSelector>();
     const std::string_view path = type.path();
-    // PatrollingMonster.registerGoals runs through super before each concrete Raider adds its own
-    // priority-four goals, so insertion order at the same priority matters here too.
+    // parity: `PatrollingMonster.registerGoals` runs super first.
     if (patrollingTypes().contains(path)) {
         add<LongDistancePatrolGoal>(*selector, 4);
     }
@@ -166,8 +162,7 @@ std::unique_ptr<GoalSelector> mobGoals::forType(const wire::common::Identifier& 
 
 namespace {
 
-/// parity: `AbstractHorse.registerGoals` and each kind's `addBehaviourGoals`, and `Llama.registerGoals`
-/// with `TraderLlama`'s on top.
+/// parity: `AbstractHorse.registerGoals`.
 bool buildHorse(GoalSelector& selector, std::string_view path) {
     if (path == "llama" || path == "trader_llama") {
         add<FloatGoal>(selector, 0);
@@ -333,7 +328,7 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<ResetUniversalAngerTargetGoal>(selector, 5, false);
         return true;
     }
-    // parity: `CopperGolemAi`: panic, the chest round, and a short stroll or a wait between rounds.
+    // parity: `CopperGolemAi`.
     if (path == "copper_golem") {
         add<PanicGoal>(selector, 0, copperGolems::kPanicSpeed);
         add<CopperGolemTransportGoal>(selector, 1);
@@ -352,8 +347,7 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
             add<AngryAtPlayerGoal>(selector, 3);
             add<ResetUniversalAngerTargetGoal>(selector, 4, false);
         }
-        // parity: `DefendVillageTargetGoal` and the golem's own list of what counts as a monster,
-        // which is everything hostile that walks.
+        // parity: `DefendVillageTargetGoal` and the golem's list of what counts as a monster.
         add<NearestAttackableEntityGoal>(selector, 3, hostile());
         return true;
     }
@@ -373,8 +367,7 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
         return true;
     }
     if (path == "zombified_piglin") {
-        // parity: `ZombifiedPiglin.addBehaviourGoals`: whoever hit it, its neighbours told, and any
-        // player it is still angry at.
+        // parity: `ZombifiedPiglin.addBehaviourGoals`.
         add<MeleeAttackGoal>(selector, 2, 1.0);
         monsterTail(selector);
         add<HurtByTargetGoal>(selector, 1, HurtByTargetGoal::Types{}, true);
@@ -383,8 +376,7 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
         return true;
     }
     if (path == "warden") {
-        // parity: `Warden.registerGoals` has no target goal at all: the anger it has heard is what
-        // decides who it walks to, and there is nobody until it has heard somebody.
+        // parity: `Warden.registerGoals` has no target goal: heard anger decides who it walks to.
         add<FloatGoal>(selector, 0);
         add<WardenBusyGoal>(selector, 0);
         add<MeleeAttackGoal>(selector, 4, 1.0);
@@ -473,8 +465,7 @@ bool buildMonster(GoalSelector& selector, std::string_view path) {
     }
     static const Names kSkeletons{"skeleton", "stray", "bogged", "parched"};
     if (kSkeletons.contains(path)) {
-        // parity: `AbstractSkeleton.reassessWeaponGoal`, which is the bow goal whenever it is
-        // holding one, and every skeleton this build spawns is.
+        // parity: `AbstractSkeleton.reassessWeaponGoal`: the bow goal whenever one is held.
         add<AvoidEntityGoal>(selector, 3, Names{"wolf"}, 6.0, 1.0, 1.2);
         add<RangedAttackGoal>(selector, 4, 1.0, kBowIntervalMin, kBowIntervalMax, kBowRange);
         add<RandomStrollGoal>(selector, 5, 1.0);
@@ -484,8 +475,7 @@ bool buildMonster(GoalSelector& selector, std::string_view path) {
         add<NearestAttackablePlayerGoal>(selector, 2);
         return true;
     }
-    // parity: `AbstractCubeMob`: a cube turns and hops, and hops three times as often at whatever it
-    // is after.
+    // parity: `AbstractCubeMob`: turns and hops, three times as often at its target.
     static const Names kCubes{"slime", "magma_cube", "sulfur_cube"};
     if (kCubes.contains(path)) {
         add<HopAboutGoal>(selector, 2);
@@ -631,8 +621,7 @@ bool buildVillage(GoalSelector& selector, std::string_view path) {
 }
 
 bool buildSwimmer(GoalSelector& selector, std::string_view path) {
-    // parity: `Squid.SquidRandomMovementGoal` and `AbstractFish.FishSwimGoal`, neither of which
-    // walks a path: they push themselves about in the water.
+    // parity: `Squid.SquidRandomMovementGoal` and `AbstractFish.FishSwimGoal` push about in water without a path.
     if (path == "squid" || path == "glow_squid") {
         add<SwimAboutGoal>(selector, 0);
         return true;

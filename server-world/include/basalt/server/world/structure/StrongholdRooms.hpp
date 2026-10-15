@@ -4,8 +4,7 @@
 
 namespace basalt::server::world::structure {
 
-/// The pieces that only carry the maze along. parity: `StrongholdPieces`' Straight,
-/// StraightStairsDown, StairsDown, Turn, ChestCorridor and FillerCorridor.
+/// The pieces that only carry the maze along. parity: `StrongholdPieces`' Straight.
 namespace strongholdCorridors {
 
 /// parity: `StairsDown`, which is also the start piece: a spiral of brick and slab.
@@ -14,13 +13,11 @@ void stairsDown(const StrongholdBrush& brush, const StrongholdPiece& piece);
 void straightStairsDown(const StrongholdBrush& brush, const StrongholdPiece& piece);
 /// parity: `Straight`. The four torch draws happen whether or not a torch lands.
 void straight(const StrongholdBrush& brush, const StrongholdPiece& piece);
-/// parity: `LeftTurn` and `RightTurn`, which are the same room with the opening on the other side.
-/// Which side that is depends on the facing, and the two classes disagree on it, so it is not a
-/// plain mirror.
+/// parity: `LeftTurn` and `RightTurn`.
 void turn(const StrongholdBrush& brush, const StrongholdPiece& piece);
-/// parity: `ChestCorridor`, whose chest is the only thing that makes it not a plain corridor.
+/// parity: `ChestCorridor`.
 void chestCorridor(const StrongholdBrush& brush, const StrongholdPiece& piece);
-/// parity: `FillerCorridor`, a plain brick tube with no shell selector and no draws at all.
+/// parity: `FillerCorridor`.
 void fillerCorridor(const StrongholdBrush& brush, const StrongholdPiece& piece);
 
 } // namespace strongholdCorridors

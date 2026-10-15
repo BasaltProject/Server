@@ -98,7 +98,6 @@ using wire::nbt::NbtTag;
     });
 }
 
-/// The `entity_properties` check on `this` the post-attack entries carry: an entity type or a tag.
 [[nodiscard]] bool victimIs(const NbtCompound& predicate, const weaponDamage::Victim* victim) {
     const std::string* wanted = stringAt(predicate, "minecraft:entity_type");
     if (victim == nullptr || wanted == nullptr || predicate.size() != 1) {
@@ -112,7 +111,6 @@ using wire::nbt::NbtTag;
     return id.has_value() && *id == victim->type;
 }
 
-/// A range as `MinMaxBounds` writes it, a bare number being both ends.
 [[nodiscard]] bool inRange(const NbtTag* bounds, double value) {
     if (const std::optional<double> exact = numberOf(bounds); exact.has_value()) {
         return value == *exact;

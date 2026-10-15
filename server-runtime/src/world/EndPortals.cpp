@@ -17,7 +17,6 @@ using wire::common::Identifier;
     return block;
 }
 
-/// The default state of a block that is only ever placed in it.
 [[nodiscard]] std::int32_t stateOf(std::string_view path) {
     const registry::BlockState* block = registry::blocks::named(path);
     return block == nullptr ? registry::blocks::air().stateId : block->stateId;
@@ -33,15 +32,12 @@ using wire::common::Identifier;
     return stateId;
 }
 
-/// Where a frame sits around a centre, and which way it has to look.
 struct Slot {
     std::int32_t x = 0;
     std::int32_t z = 0;
     std::string_view facing;
 };
 
-/// The twelve of them, in the order the Kotlin built them: `completeRing` tries each as the offset
-/// from the block it was asked about, so the order picks the ring when two of them would fit.
 constexpr std::array<Slot, 12> kRing{{
     {-1, -2, "south"},
     {-1, 2, "north"},

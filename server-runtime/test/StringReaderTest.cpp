@@ -13,7 +13,6 @@ using basalt::server::runtime::command::StringReader;
 
 namespace {
 
-/// The message an error carries, as the client would see it.
 [[nodiscard]] std::string messageOf(const CommandSyntaxError& error) {
     return basalt::wire::text::toPlainText(error.component);
 }
@@ -51,11 +50,9 @@ TEST_CASE("whitespace is skipped, and only whitespace") {
     reader.skipWhitespace();
 
     CHECK(reader.remaining() == "one");
-    // Skipping again where there is none moves nothing.
     reader.skipWhitespace();
     CHECK(reader.cursor() == 6);
 
-    // And nothing else counts, however close to a space it looks.
     for (const char other : {'a', '0', '_', '!', '\0'}) {
         StringReader stopped{std::string{other} + " x"};
         stopped.skipWhitespace();
@@ -72,12 +69,10 @@ TEST_CASE("an expected symbol is consumed, and a missing one is named") {
     const std::expected<void, CommandSyntaxError> wrong = reader.expect(']');
     REQUIRE_FALSE(wrong.has_value());
     CHECK(messageOf(wrong.error()) == "Expected ']'");
-    // A failed expect leaves the cursor where it was.
     CHECK(reader.cursor() == 1);
     CHECK(wrong.error().cursor == 1);
     CHECK(wrong.error().input == "[1]");
 
-    // And so does one at the end of the line.
     StringReader done{""};
     const std::expected<void, CommandSyntaxError> empty = done.expect('[');
     REQUIRE_FALSE(empty.has_value());
@@ -89,11 +84,9 @@ TEST_CASE("an unquoted word stops at the first character that is not one") {
     CHECK(reader.readUnquotedString() == "stone_slab+2.5-x");
     CHECK(reader.remaining() == " other");
 
-    // A colon is not part of an unquoted word, which is what a namespaced id is for.
     StringReader colon{"minecraft:stone"};
     CHECK(colon.readUnquotedString() == "minecraft");
 
-    // Nothing readable is the empty word rather than an error.
     StringReader none{"!!!"};
     CHECK(none.readUnquotedString().empty());
     CHECK(none.cursor() == 0);
@@ -135,11 +128,9 @@ TEST_CASE("a quoted string is read between its quotes, either kind") {
     StringReader singled{"'hi'"};
     CHECK(singled.readString().value() == "hi");
 
-    // An unquoted line is a plain word.
     StringReader plain{"word rest"};
     CHECK(plain.readString().value() == "word");
 
-    // And the end of the line is the empty string, not an error.
     StringReader empty{""};
     CHECK(empty.readString().value().empty());
 }
@@ -152,7 +143,6 @@ TEST_CASE("a quote can be escaped, and only a quote or a backslash can") {
     const std::expected<std::string, CommandSyntaxError> wrong = bad.readString();
     REQUIRE_FALSE(wrong.has_value());
     CHECK(messageOf(wrong.error()) == "Invalid escape sequence 'n' in quoted string");
-    // The cursor is put back on the offending character.
     CHECK(bad.string()[static_cast<std::size_t>(wrong.error().cursor)] == 'n');
 
     StringReader unclosed{R"("never ends)"};
@@ -160,7 +150,6 @@ TEST_CASE("a quote can be escaped, and only a quote or a backslash can") {
     REQUIRE_FALSE(open.has_value());
     CHECK(messageOf(open.error()) == "Unclosed quoted string");
 
-    // A quote inside a single-quoted string needs no escape of its own.
     StringReader mixed{R"('say "hi"')"};
     CHECK(mixed.readString().value() == R"(say "hi")");
 }
@@ -183,7 +172,6 @@ TEST_CASE("an integer is read, and a word that is not one is named") {
     const std::expected<std::int32_t, CommandSyntaxError> bad = broken.readInt();
     REQUIRE_FALSE(bad.has_value());
     CHECK(messageOf(bad.error()) == "Invalid integer '1.5'");
-    // A failed read puts the cursor back where the number started.
     CHECK(broken.cursor() == 0);
 }
 
@@ -220,18 +208,15 @@ TEST_CASE("an error carries the line and where the reader stopped") {
     CHECK(error.input == "give @p stone");
     CHECK(error.cursor == 8);
 
-    // A failure with no position of its own is the default, and gets no context line.
     const CommandSyntaxError plain;
     CHECK(plain.cursor == -1);
     CHECK_FALSE(plain.input.has_value());
 }
 
 TEST_CASE("the characters a word is made of are exactly brigadier's own") {
-    // Every edge of the three ranges, and the four it allows besides them.
     StringReader all{"09AZaz_-.+"};
     CHECK(all.readUnquotedString() == "09AZaz_-.+");
 
-    // The character just outside each range ends the word.
     for (const char outside : {'/', ':', '@', '[', '`', '{', ' ', '!', '"'}) {
         StringReader stopped{std::string{"ab"} + outside + "cd"};
         CHECK(stopped.readUnquotedString() == "ab");
@@ -239,7 +224,6 @@ TEST_CASE("the characters a word is made of are exactly brigadier's own") {
 }
 
 TEST_CASE("the characters a number is made of are exactly brigadier's own") {
-    // Every character the reader takes, in a number that also parses.
     StringReader all{"-90.5e+9"};
     CHECK(all.readDouble().value() == doctest::Approx(-90.5e9));
     CHECK(all.cursor() == 8);

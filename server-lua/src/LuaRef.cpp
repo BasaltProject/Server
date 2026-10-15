@@ -9,7 +9,6 @@ extern "C" {
 }
 
 namespace basalt::server::lua {
-
 LuaRef& LuaRef::operator=(LuaRef&& other) noexcept {
     if (this != &other) {
         release();
@@ -59,5 +58,4 @@ void LuaRef::release() {
     state_ = nullptr;
     ref_ = 0;
 }
-
 } // namespace basalt::server::lua

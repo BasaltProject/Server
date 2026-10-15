@@ -11,7 +11,6 @@ namespace {
 using wire::common::placeholder::lowercaseAscii;
 using wire::common::toml::TomlTable;
 
-/// The lines a custom command answers with: a list as written, or one string cut at its newlines.
 [[nodiscard]] std::vector<std::string> messageLines(const TomlTable& table) {
     std::vector<std::string> lines = table.stringList("message");
     if (!lines.empty()) {
@@ -92,8 +91,7 @@ std::expected<CommandsConfig, std::string> CommandsConfig::load(const ConfigDire
             }
             std::vector<std::string> message = messageLines(*table);
             if (message.empty()) {
-                // Not fatal: a command with nothing to say is a half-written entry, and stopping
-                // the server over it would be worse than skipping it.
+                // Not fatal: a command with nothing to say is a half-written entry, and stopping the server is worse.
                 logger.warn([&name, &path] {
                     return "Custom command '" + name + "' in " + path + " has no message; skipping it.";
                 });

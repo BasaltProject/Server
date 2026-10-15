@@ -87,7 +87,7 @@ void writeTarget(wire::nbt::NbtCompound& data, const std::optional<Uuid>& target
         }
         return nullptr;
     }
-    // parity: `selectNewTarget`, every `Enemy` in water or rain whose box meets the cube eight out.
+    // parity: `selectNewTarget`.
     std::vector<entity::ServerEntity*> candidates;
     const double minX = at[0] - conduits::kKillRange;
     const double minY = at[1] - conduits::kKillRange;
@@ -130,7 +130,7 @@ std::vector<PlayerSession*> ConduitSystem::watchersOf(const world::LoadedWorld& 
 bool ConduitSystem::tick(world::LoadedWorld& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                          wire::nbt::NbtCompound& data) {
     const std::int64_t gameTime = world.gameTime();
-    // parity: a block entity that was not ticked last turn is a new one, loaded or placed, and
+    // parity: a block entity that was not ticked last turn is a new one, loaded or placed, and.
     // starts inactive.
     if (gameTime % conduits::kShapeInterval == 0) {
         std::erase_if(memory_, [gameTime](const auto& entry) { return entry.second.lastTick < gameTime - 1; });

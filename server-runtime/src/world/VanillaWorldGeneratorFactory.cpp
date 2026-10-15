@@ -57,16 +57,12 @@ namespace terrain = server::world::terrain;
 
 using wire::common::Identifier;
 
-/// The settings of the four Overworld jigsaw structures, which are one generator apiece.
-/// The tag loader answers a plain set; every generator takes the transparent-comparator one.
 [[nodiscard]] std::set<std::string, std::less<>> biomesOf(BiomeTagLoader& tags, const std::string& name) {
     const std::set<std::string>& members = tags.biomesIn(name);
     return {members.begin(), members.end()};
 }
 
-/// parity: the 26.3 `abandoned_camp` structure set's eighteen entries in file order, each an
-/// `abandoned_camp_<biome>` jigsaw with its own start pool and `has_structure` tag. Their index in
-/// `surface_structures` is their registry position, alphabetical and ahead of every other structure.
+/// parity: the 26.3 `abandoned_camp` structure set's eighteen entries in file order.
 [[nodiscard]] std::vector<terrain::VillageStructureGenerator::Variant> campVariants(BiomeTagLoader& tags) {
     static constexpr std::array<std::string_view, 18> kFileOrder{"bamboo_jungle",
                                                                  "birch_forest",
@@ -106,9 +102,6 @@ using wire::common::Identifier;
     return variants;
 }
 
-// The settings live in `server-world` beside the generator that reads them, and the tests exercise
-// those same objects. Keeping a second copy here is what let a wrong step and a wrong terrain
-// adaptation ship while the suite stayed green.
 [[nodiscard]] const terrain::JigsawStructureSettings& pillagerOutpostSettings() {
     return terrain::jigsawStructures::pillagerOutpost();
 }
@@ -127,8 +120,6 @@ using wire::common::Identifier;
 
 } // namespace
 
-/// A `/place structure` placer over the generator's own placement methods, with any trailing
-/// variant argument (mineshaft type, ruin temperature, portal variant) bound into both calls.
 template <typename Generator, typename BoundsFn, typename PlaceFn, typename... Bound>
 [[nodiscard]] StructurePlacer makePlacer(Identifier id, Generator* generator, BoundsFn bounds, PlaceFn place,
                                          Bound... bound) {
@@ -144,10 +135,7 @@ template <typename Generator, typename BoundsFn, typename PlaceFn, typename... B
             }};
 }
 
-/// One world's generator and everything it borrows, kept alive together.
 struct VanillaWorldGeneratorFactory::Built {
-    // Declared in construction order: the router is read by the environment, which is read by every
-    // structure generator, and destruction has to run the other way round.
     std::unique_ptr<StructureTemplates> templates;
     std::unique_ptr<VillageDataLoader> loader;
     std::unique_ptr<BiomeTagLoader> tags;
@@ -180,8 +168,6 @@ struct VanillaWorldGeneratorFactory::Built {
     std::unique_ptr<terrain::JigsawStructureGenerator> trialChambers;
     std::unique_ptr<terrain::NetherStructureGenerator> netherStructures;
     std::unique_ptr<terrain::EndCityStructureGenerator> endCities;
-    /// A structure height query reaches chunks no decoration asked for, so it keeps undecorated
-    /// terrain of its own.
     std::unique_ptr<terrain::NeighbourTerrainCache> structureHeights;
     std::unique_ptr<SpawnEquipmentFinalizer> equipment;
     terrain::TerrainStructureGenerators generators;
@@ -256,8 +242,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         SpawnEquipmentJar{.entriesUnder = nullptr, .readText = jar_.readText});
 
     const std::int64_t biomeZoomSeed = obfuscateBiomeSeed(seed);
-    // parity: the overworld's shape is the jar's own `noise_settings`. Without it there is no terrain
-    // to make, so the world says so rather than handing back a generator that dereferences nothing.
+    // parity: the overworld's shape is the jar's own `noise_settings`.
     std::expected<terrain::NoiseRouter, std::string> router =
         terrain::noiseRouterData::load(settings, seed, worldgenReader());
     if (!router.has_value()) {
@@ -268,9 +253,6 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     built->overworldSurface = std::make_unique<RealSurfaceEnvironment>(*built->overworldRouter, biomeZoomSeed);
 
     const RealSurfaceEnvironment& surface = *built->overworldSurface;
-    // The return type is spelled out because `auto` would deduce a copy, and a consumer that takes
-    // a `std::function` returning `string_view` would then be handed a view of a temporary that dies
-    // on the way out. The environment interns these names, so the reference outlives every reader.
     const auto blockBiome = [&surface](std::int32_t x, std::int32_t y, std::int32_t z) -> const std::string& {
         return surface.biomeAt(x, y, z);
     };
@@ -280,8 +262,6 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     const auto quartBiome = [&surface](std::int32_t x, std::int32_t y, std::int32_t z) -> const std::string& {
         return surface.noiseBiomeAt(x >> 2, y >> 2, z >> 2);
     };
-    // Two shapes of the same lookup: the pool assembly names templates by string, and the
-    // dimension generators name them by identifier.
     StructureTemplates& templates = *built->templates;
     const auto templateOf = [&templates](std::string_view name) -> const structure::StructureTemplate* {
         const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(name);
@@ -301,10 +281,6 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     const terrain::NoiseColumnHeights& columns = *built->columns;
     const auto surfaceHeight = [&columns](std::int32_t x, std::int32_t z) { return columns.surfaceHeight(x, z); };
     const auto oceanFloor = [&columns](std::int32_t x, std::int32_t z) { return columns.oceanFloorHeight(x, z); };
-    // A cache and not the bounded view the features read: a piece settling on the mean of its
-    // footprint is placed by every chunk it crosses, and a view that sometimes refuses would tear it
-    // in two. Its own cache, because generating a chunk nobody asked for moves what the features
-    // find in theirs.
     const auto worldHeight = [holder = built.get()](std::int32_t x, std::int32_t z, server::world::HeightmapType type) {
         return holder->structureHeights->worldgenHeightAt(x, z, type);
     };
@@ -327,10 +303,6 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     built->strongholds = std::make_unique<terrain::StrongholdStructureGenerator>(
         structure::ConcentricRingsPlacement{32, 3, 128, biomesOf(tags, "minecraft:stronghold_biased_to"), noiseBiome},
         seed, noiseBiome, biomesOf(tags, "minecraft:has_structure/stronghold"));
-    // An outpost takes a fifth of its candidates and keeps ten chunks clear of any village, which is
-    // why it needs the villages' own grid to answer at all.
-    // The village grid is captured by value and handed back by reference: the exclusion zone reads
-    // it long after this function returns, so it cannot borrow the local one.
     const auto villages = std::make_shared<structure::StructurePlacementGrid>(villageGrid);
     const structure::StructurePlacementGrid outpostGrid{
         32,
@@ -533,8 +505,6 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         if (variant.name == "ruined_portal_nether") {
             continue;
         }
-        // The variant list is a temporary: bind the name by value, or the lambdas would hold a
-        // dangling view of a destroyed string.
         answer.placers.push_back(makePlacer(Identifier::vanilla(variant.name), built->ruinedPortals.get(),
                                             &terrain::RuinedPortalStructureGenerator::placeBoundsAt,
                                             &terrain::RuinedPortalStructureGenerator::placeAt,
@@ -615,8 +585,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
     answer.pipeline.adopt = [](server::world::Chunk chunk) {
         return terrain::realTerrainGenerator::GeneratedTerrain{std::move(chunk), nullptr, nullptr};
     };
-    // parity: `FlatLevelGeneratorSettings.adjustGenerationSettings` with `features` off keeps only the
-    // structure steps, and the only structures it keeps are the villages.
+    // parity: `FlatLevelGeneratorSettings.adjustGenerationSettings` with `features` off keeps only the.
     answer.pipeline.decorate = [&world](terrain::realTerrainGenerator::GeneratedTerrain& generated,
                                         terrain::ProtoRegion& region) {
         server::world::Chunk& chunk = generated.chunk();

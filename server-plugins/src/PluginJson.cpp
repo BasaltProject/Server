@@ -6,7 +6,6 @@
 
 namespace basalt::server::plugins::pluginJson {
 namespace {
-
 void writeValue(lua::LuaArgs& lua, std::int32_t index, std::string& out);
 
 void writeString(std::string_view value, std::string& out) {
@@ -42,8 +41,6 @@ void writeString(std::string_view value, std::string& out) {
 
 void writeTable(lua::LuaArgs& lua, std::int32_t index, std::string& out) {
     const std::int64_t length = lua.length(index);
-    // 1..n and nothing else is an array; anything else is an object, which is the one place a Lua
-    // table and JSON disagree about what they are.
     bool isArray = length > 0;
     if (isArray) {
         lua.pushIndex(index, length + 1);
@@ -67,15 +64,11 @@ void writeTable(lua::LuaArgs& lua, std::int32_t index, std::string& out) {
     out += '{';
     bool first = true;
     lua.pushNil();
-    // `next` leaves the key and the value; the key has to stay for the following call, so only the
-    // value is dropped each time round.
     while (lua.nextEntry(index < 0 ? index - 1 : index)) {
         if (!first) {
             out += ',';
         }
         first = false;
-        // `luaL_tolstring` pushes the text rather than converting the value where it lies, which is
-        // why the key survives to be handed back to `next` on the way round.
         writeString(lua.toText(-2), out);
         out += ':';
         writeValue(lua, -1, out);
@@ -108,7 +101,6 @@ void writeValue(lua::LuaArgs& lua, std::int32_t index, std::string& out) {
     writeString(lua.toText(index), out);
 }
 
-/// A reader over the document, leaving what it makes on the Lua stack.
 class Reader {
 public:
     Reader(lua::LuaArgs& lua, std::string_view text) : lua_(&lua), text_(text) {}
@@ -271,7 +263,6 @@ private:
     std::string_view text_;
     std::size_t index_ = 0;
 };
-
 } // namespace
 
 std::string write(lua::LuaArgs& lua, std::int32_t index) {
@@ -289,5 +280,4 @@ void parse(lua::LuaArgs& lua, std::string_view text) {
         lua.pushTable();
     }
 }
-
 } // namespace basalt::server::plugins::pluginJson

@@ -19,7 +19,6 @@ constexpr std::int64_t kSecondsPerDay = 86400;
     return error == std::errc{} && end == text.data() + text.size() ? std::optional{value} : std::nullopt;
 }
 
-/// Days since 1970-01-01 of a proleptic Gregorian date (Hinnant's algorithm).
 [[nodiscard]] std::int64_t daysFromCivil(std::int64_t year, std::int64_t month, std::int64_t day) {
     year -= month <= 2 ? 1 : 0;
     const std::int64_t era = (year >= 0 ? year : year - 399) / 400;
@@ -32,7 +31,6 @@ constexpr std::int64_t kSecondsPerDay = 86400;
 } // namespace
 
 std::optional<std::int64_t> parseObtainedTime(std::string_view text) {
-    // "2026-09-26 10:15:30 +0200"
     if (text.size() != 25 || text[4] != '-' || text[7] != '-' || text[10] != ' ' || text[13] != ':' ||
         text[16] != ':' || text[19] != ' ' || (text[20] != '+' && text[20] != '-')) {
         return std::nullopt;

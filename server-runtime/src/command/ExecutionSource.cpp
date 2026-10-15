@@ -17,7 +17,7 @@ ExecutionSource::ExecutionSource(const CommandSource& base, Changes changes)
     entity_ = changes.entity.has_value() ? changes.entity : (inner == nullptr ? std::nullopt : inner->entity());
 }
 
-// parity: `CommandSourceStack.withEntity` names the source after the entity, whatever it is.
+// parity: `CommandSourceStack.withEntity` names the source after the entity.
 std::string ExecutionSource::name() const {
     if (player_ != nullptr) {
         return player_->name();

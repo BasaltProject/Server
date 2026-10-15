@@ -62,8 +62,7 @@ std::optional<JungleTemplePiece> JungleTempleStructureGenerator::startPiece(std:
     if (!forPlacement && !templeBiomes_.contains(biomeAt_(centreX, stubY, centreZ))) {
         return std::nullopt;
     }
-    // parity: `SinglePieceStructure.findGenerationPoint` refuses a start whose lowest corner, over
-    // the piece's 12 by 15 footprint measured one past its far edges, is below sea level.
+    // parity: `SinglePieceStructure.findGenerationPoint` rejects a start below sea level at its lowest corner.
     const std::int32_t minX = chunkX * 16;
     const std::int32_t minZ = chunkZ * 16;
     const auto occupied = [this](std::int32_t x, std::int32_t z) { return surfaceHeightAt_(x, z) - 1; };

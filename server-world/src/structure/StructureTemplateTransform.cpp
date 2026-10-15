@@ -20,9 +20,7 @@ constexpr std::array<std::string_view, 4> kHorizontalNames{"north", "east", "sou
 
 [[nodiscard]] std::int32_t signedRotation(std::int32_t rotation) { return rotation > 8 ? rotation - 16 : rotation; }
 
-/// parity: `StairBlock.mirror`. A corner stair's shape halves swap, and only when the mirror crosses
-/// the facing's own axis. The asymmetry is the jar's: LeftRight swaps both pairs, FrontBack only the
-/// outer one.
+/// parity: `StairBlock.mirror`.
 [[nodiscard]] std::optional<std::string> mirrorStairShape(const std::string& shape, StructureMirror mirror,
                                                           const std::string* facing) {
     if (facing == nullptr) {
@@ -90,7 +88,6 @@ constexpr std::array<std::string_view, 4> kHorizontalNames{"north", "east", "sou
     } else if (shape == "north_east") {
         parts = {"north", "east"};
     } else {
-        // Not a rail shape; a stair shape goes to the stair mirror instead.
         return std::nullopt;
     }
     std::set<std::string> directions;
@@ -178,9 +175,7 @@ std::int32_t StructureTemplate::transformedStateId(const std::int32_t stateId,
             transformed["rotation"] = std::to_string(rotatedValue);
         }
     }
-    // parity: `DoorBlock.mirror` cycles the hinge for *any* mirror, whether or not the facing's axis
-    // matches. That is unlike the stair's shape below, which only swaps when the axis does, and the
-    // difference is the jar's.
+    // parity: `DoorBlock.mirror` cycles the hinge for *any* mirror.
     if (mirror != StructureMirror::None) {
         if (const auto hinge = properties.find("hinge"); hinge != properties.end()) {
             if (hinge->second == "left") {

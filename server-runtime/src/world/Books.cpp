@@ -18,8 +18,6 @@ constexpr std::string_view kPages = "pages";
 constexpr std::string_view kWritableBook = "minecraft:writable_book";
 constexpr std::string_view kWrittenBook = "minecraft:written_book";
 
-/// A page is a plain string wherever nothing was filtered out of it, which is every page this
-/// server writes: it filters nothing.
 [[nodiscard]] NbtList pageList(const std::vector<std::string>& pages) {
     NbtList list{NbtType::String};
     for (const std::string& page : pages) {
@@ -31,8 +29,7 @@ constexpr std::string_view kWrittenBook = "minecraft:written_book";
 } // namespace
 
 bool isWritable(const storage::StoredItemStack& book) {
-    // parity: a `writable_book` carries `writable_book_content` whether or not anything was written
-    // into it, so the item's own name answers for an empty one.
+    // parity: a `writable_book` carries `writable_book_content` whether or not anything was written.
     return book.id == kWritableBook || book.components.getCompound(kWritable) != nullptr;
 }
 

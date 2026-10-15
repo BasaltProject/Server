@@ -15,8 +15,7 @@ struct PlayerView;
 
 namespace basalt::server::runtime::entity::villager {
 
-/// Every behaviour a villager's brain is built from. parity: the classes `VillagerGoalPackages`
-/// instantiates, in the order the packages list them.
+/// Every behaviour a villager brain is built from. parity: `VillagerGoalPackages`, in package order.
 enum class Kind : std::uint8_t {
     kSwim,
     kInteractWithDoor,
@@ -77,7 +76,6 @@ enum class Kind : std::uint8_t {
     kCount,
 };
 
-/// Who a look or interaction behaviour picks from the ones it can see.
 enum class Filter : std::uint8_t {
     kAny,
     kVillager,
@@ -91,8 +89,6 @@ enum class Filter : std::uint8_t {
     kMonster,
 };
 
-/// One behaviour in a brain, and how it was configured. Children follow their parent's
-/// `firstChild`; top-level nodes carry the priority and activity they were registered under.
 struct Node {
     Kind kind = Kind::kDoNothing;
     std::uint8_t priority = 0;
@@ -117,7 +113,6 @@ struct Node {
     MemoryId requireAbsent = MemoryId::kNone;
 };
 
-/// A whole brain: its nodes, and the top-level ones in the order the brain walks them.
 struct BrainTable {
     std::vector<Node> nodes;
     std::vector<std::uint8_t> top;
@@ -126,7 +121,6 @@ struct BrainTable {
 /// parity: `Villager.BRAIN_PROVIDER` for a baby, a farmer, or anybody else.
 [[nodiscard]] const BrainTable& tableFor(bool baby, bool farmer);
 
-/// What every behaviour is handed.
 struct Ctx {
     ai::MobContext& mob;
     ServerEntity& self;
@@ -149,7 +143,6 @@ struct Ops {
     bool (*trigger)(Ctx&, const Node&, NodeState&) = nullptr;
 };
 
-/// What the batch caches and lists of the fussier behaviours keep between turns.
 struct NodeExtra {
     struct Retry {
         std::int64_t previous = 0;
@@ -170,7 +163,6 @@ namespace ops {
 
 [[nodiscard]] const Ops& of(Kind kind);
 
-// Registered by the file that implements each group.
 [[nodiscard]] const Ops* core(Kind kind);
 [[nodiscard]] const Ops* poi(Kind kind);
 [[nodiscard]] const Ops* work(Kind kind);
@@ -237,7 +229,6 @@ void restock(Ctx& ctx);
 
 namespace look {
 
-/// Where an entity stands, whether it is a mob or a player.
 [[nodiscard]] std::optional<std::array<double, 3>> feet(Ctx& ctx, std::int32_t entityId);
 
 [[nodiscard]] ServerEntity* mob(Ctx& ctx, std::int32_t entityId);
@@ -257,10 +248,9 @@ namespace look {
 /// parity: `BehaviorUtils.setWalkAndLookTargetMemories`.
 void walkAndLook(Ctx& ctx, const Tracker& target, float speed, std::int32_t closeEnough);
 
-/// parity: `BehaviorUtils.lockGazeAndWalkToEachOther`, whose other half is another villager.
+/// parity: `BehaviorUtils.lockGazeAndWalkToEachOther`.
 void lockGaze(Ctx& ctx, ServerEntity& other, float speed, std::int32_t closeEnough);
 
-/// Whether an entity is a villager with a brain, and that brain.
 [[nodiscard]] VillagerState* villagerState(Ctx& ctx, std::int32_t entityId);
 
 [[nodiscard]] bool matches(Ctx& ctx, std::int32_t entityId, Filter filter);
@@ -299,7 +289,6 @@ void eatAndDigest(VillagerState& state);
 
 [[nodiscard]] std::int32_t countItem(const VillagerState& state, std::string_view item);
 
-/// Takes up to `count` of an item out of the inventory, from the first slot on.
 void removeItem(VillagerState& state, std::string_view item, std::int32_t count);
 
 /// parity: `SimpleContainer.addItem`. Answers what did not fit.

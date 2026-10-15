@@ -33,10 +33,7 @@ constexpr std::array kMinecarts = {std::string_view{"minecart"},
                                    std::string_view{"spawner_minecart"},
                                    std::string_view{"command_block_minecart"}};
 
-/// parity: `DetectorRailBlock.getSearchBB`, the rail's own square shrunk a fifth of a block on each
-/// horizontal side and off the top, against the **cart's own box** and not its middle. A cart is on
-/// the rail a good quarter of a block before its centre crosses the edge: measured, the jar fires at
-/// x 4.84 for a rail at 5 and going by the middle fired at 5.12.
+/// parity: `DetectorRailBlock.getSearchBB`.
 [[nodiscard]] bool touches(const entity::ServerEntity& cart, const std::int32_t x, const std::int32_t y,
                            const std::int32_t z) {
     if (cart.removed) {
@@ -71,9 +68,7 @@ Checked check(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
     const auto poweredAt = properties.find("powered");
     const bool powered = poweredAt != properties.end() && poweredAt->second == "true";
-    // parity: `entityInside` asks only while the rail is not powered and `tick` only while it is, so
-    // a cart sitting on a rail that already went off does not re-ask it every tick: the twenty tick
-    // turn is what keeps looking.
+    // parity: `entityInside` asks only while the rail is not powered and `tick` only while it is.
     if (powered != (caller == Caller::ScheduledTick)) {
         return {};
     }
@@ -107,8 +102,7 @@ std::int32_t comparatorSignal(const WorldState& world, const std::int32_t x, con
     if (poweredAt == properties.end() || poweredAt->second != "true") {
         return 0;
     }
-    // parity: `EntitySelector.CONTAINER_ENTITY_SELECTOR`, so only the carts that hold something, and
-    // the first one found rather than the fullest.
+    // parity: `EntitySelector.CONTAINER_ENTITY_SELECTOR`.
     for (const entity::ServerEntity* cart : entities) {
         if (cart == nullptr || !touches(*cart, x, y, z)) {
             continue;

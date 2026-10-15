@@ -17,8 +17,7 @@ void placeFeature(Chunk& chunk, random::RandomSource& random, const NetherBiomeL
     if (globalIndex < 0 || globalIndex >= static_cast<std::int32_t>(order.size())) {
         return;
     }
-    // Dispatch by name: an index on its own says nothing about which fungus it is, and the crimson
-    // and warped ones were crossed here for exactly that reason.
+    // Dispatch by name: an index alone does not say which fungus it is.
     const std::string& name = order[static_cast<std::size_t>(globalIndex)];
     if (name == "spring_lava") {
         shared::placeLavaSprings(chunk, random, biomeSource);

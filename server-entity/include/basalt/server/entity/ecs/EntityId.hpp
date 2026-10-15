@@ -3,10 +3,6 @@
 #include <cstdint>
 
 namespace basalt::server::entity::ecs {
-
-/// A dense array index (the low 32 bits) packed with a generation counter (the high 32 bits): when
-/// an index is recycled after its entity is destroyed, the generation bumps, so a stale id compares
-/// unequal to the new entity occupying that slot instead of silently aliasing it.
 struct EntityId {
     std::uint64_t raw = 0;
 
@@ -23,5 +19,4 @@ struct EntityId {
 
     friend constexpr bool operator==(EntityId, EntityId) = default;
 };
-
 } // namespace basalt::server::entity::ecs

@@ -31,7 +31,7 @@ constexpr std::string_view kCenter = "center";
     return block == nullptr ? std::string{} : std::string{block->path()};
 }
 
-/// parity: `Direction.getClockWise`/`getCounterClockWise`, which is how a shelf finds its sides.
+/// parity: `Direction.getClockWise`/`getCounterClockWise`.
 [[nodiscard]] std::array<std::int32_t, 2> turn(const std::string& facing, std::int32_t way) {
     static const std::array<std::string_view, 4> order{"north", "east", "south", "west"};
     const auto found = std::ranges::find(order, facing);
@@ -135,7 +135,7 @@ void setPart(WorldState& world, const Position& at, const std::string& part, std
     changes.push_back(BlockChange{.x = at[0], .y = at[1], .z = at[2], .stateId = *turned});
 }
 
-/// parity: `updateSelfAndNeighborsOnPoweringUp`, which only joins chains that still fit in three.
+/// parity: `updateSelfAndNeighborsOnPoweringUp`.
 void connect(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -165,7 +165,7 @@ void connect(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, 
     setPart(world, Position{x, y, z}, part, changes);
 }
 
-/// parity: `updateNeighborsAfterPoweringDown`, which leaves the shelves either side as they were.
+/// parity: `updateNeighborsAfterPoweringDown`.
 void disconnectFacing(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const std::string& facing,
                       std::vector<BlockChange>& changes) {
     if (facing.empty()) {
@@ -220,8 +220,7 @@ void disconnect(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
 
 } // namespace
 
-/// parity: `ShelfBlock`, which is every `<wood>_shelf` and nothing else. The suffix carries the
-/// underscore on purpose: the plain `bookshelf` is not one of these, and neither is the chiseled one.
+/// parity: `ShelfBlock`.
 bool isShelf(std::string_view path) { return path.ends_with("_shelf"); }
 
 std::optional<std::int32_t> slotAt(std::int32_t stateId, std::string_view face, float clickX, float clickY,
@@ -325,8 +324,7 @@ void arrived(WorldState& world, const std::int32_t x, const std::int32_t y, cons
         disconnect(world, x, y, z, changes);
         return;
     }
-    // parity: `isBeingUpdatedByNeighbor`: a shelf that already carries a part, or that carried one
-    // before the write, is being joined by whoever is writing it and does not redo the chain itself.
+    // parity: `isBeingUpdatedByNeighbor`.
     if (propertyOf(*stateId, "side_chain") != kUnconnected || wasConnected) {
         return;
     }
@@ -364,7 +362,7 @@ void reactToSignal(WorldState& world, std::string_view worldName, std::int32_t x
                                                    .source = wire::protocol::play::SoundSource::Blocks,
                                                    .volume = 1.0F,
                                                    .pitch = 1.0F}}});
-    // parity: the `gameEvent` beside the sound, which is what a sculk sensor beside a shelf hears.
+    // parity: the `gameEvent` beside the sound.
     if (world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
         vibrations::emit(world, signal ? "block_activate" : "block_deactivate", static_cast<double>(x) + 0.5,
                          static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, gameTime);

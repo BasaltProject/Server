@@ -46,7 +46,7 @@ constexpr double kLevelEventRange = 64.0;
 /// parity: `Entity.thunderHit`'s five points and eight seconds.
 constexpr float kLightningDamage = 5.0F;
 constexpr std::int32_t kLightningFireTicks = 160;
-/// parity: `MushroomCow.DATA_TYPE` after `AgeableMob`'s two, and `Creeper.DATA_IS_POWERED` after
+/// parity: `MushroomCow.DATA_TYPE` after `AgeableMob`'s two.
 /// its swell direction.
 constexpr std::uint8_t kMooshroomTypeIndex = 18;
 constexpr std::uint8_t kCreeperPoweredIndex = 17;
@@ -125,7 +125,7 @@ bool MobActionSystem::tickConversion(world::LoadedWorld& world, const std::vecto
                 tag.set(key, *value);
             }
         }
-        // parity: `ReputationEventType.ZOMBIE_VILLAGER_CURED`, for the curer if they are still here.
+        // parity: `ReputationEventType.ZOMBIE_VILLAGER_CURED`.
         if (curer.has_value()) {
             entity::villager::Gossips gossips;
             if (const wire::nbt::NbtList* old = tag.getList("Gossips"); old != nullptr) {
@@ -140,7 +140,7 @@ bool MobActionSystem::tickConversion(world::LoadedWorld& world, const std::vecto
 }
 
 std::int32_t MobActionSystem::cureProgress(world::LoadedWorld& world, const ServerEntity& mob) {
-    // parity: `ZombieVillager.getConversionProgress`: one in a hundred ticks it looks for iron bars
+    // parity: `ZombieVillager.getConversionProgress`.
     // and beds around it, and each one found may add a tick.
     random::RandomSource random = freshRandom();
     std::int32_t amount = 1;
@@ -237,7 +237,7 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
     const bool silent = mob.sourceNbt.has_value() && mob.sourceNbt->getBoolean("Silent");
     if (!conversion.sound.empty() && !silent && (!conversion.quietInPeace || world.difficulty() != "peaceful")) {
         random::RandomSource voice = freshRandom();
-        // parity: `Mob.makeSound`, at the mob's own voice pitch; a grown tadpole's is a plain one.
+        // parity: `Mob.makeSound`.
         const float pitch = conversion.soundVolume != 1.0F
                                 ? 1.0F
                                 : ((voice.nextFloat() - voice.nextFloat()) * 0.2F) + (mob.age < 0 ? 1.5F : 1.0F);
@@ -268,7 +268,7 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
 }
 
 bool MobActionSystem::infectVillager(world::LoadedWorld& world, const ServerEntity& zombie, ServerEntity& villager) {
-    // parity: `Zombie.killedEntity`, which every zombie kind inherits: sure on hard, a coin flip on
+    // parity: `Zombie.killedEntity`.
     // normal, never on easy.
     static constexpr std::array kZombies{"zombie", "husk", "drowned", "zombie_villager", "zombified_piglin"};
     const std::string_view difficulty = world.difficulty();
@@ -354,7 +354,7 @@ void MobActionSystem::tickMobEffects(world::LoadedWorld& world, const std::vecto
                 result.died);
         }
     }
-    // parity: `LivingEntity.onAttributeUpdated`, which takes back health a lost boost held up.
+    // parity: `LivingEntity.onAttributeUpdated`.
     if (!expired.empty()) {
         mob.health = std::min(mob.health, mob.attributeWithModifiers("minecraft:max_health"));
     }
@@ -370,7 +370,7 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
         path == "leash_knot") {
         return;
     }
-    // parity: `Pig.thunderHit`, a zombified piglin with a fresh golden weapon and no despawning.
+    // parity: `Pig.thunderHit`.
     if (path == "pig" && !peaceful) {
         random::RandomSource random = freshRandom();
         const conversions::Conversion conversion{.into = wire::common::Identifier::vanilla("zombified_piglin"),
@@ -413,7 +413,7 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
         }
         return;
     }
-    // parity: `Entity.thunderHit`: a tick more of fire, eight seconds of it when it was not burning,
+    // parity: `Entity.thunderHit`.
     // and five points. A turtle takes everything. Not burning is vanilla's minus one, our zero.
     mob.fireTicks = mob.fireTicks <= 0 ? kLightningFireTicks : mob.fireTicks + 1;
     const float damage = path == "turtle" ? std::numeric_limits<float>::max() : kLightningDamage;
@@ -437,7 +437,7 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
 
 void MobActionSystem::carryOver(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                 ServerEntity& from, ServerEntity& to) {
-    // parity: `ConversionType.SINGLE`: the first passenger climbs onto the new mob, the rest get
+    // parity: `ConversionType.SINGLE`.
     // off, and the new one takes the old one's seat.
     for (std::size_t index = 0; index < from.passengerIds.size(); ++index) {
         const std::int32_t passengerId = from.passengerIds[index];
@@ -505,7 +505,7 @@ void MobActionSystem::finalizeConverted(world::LoadedWorld& world, const ServerE
         static_cast<void>(
             world::mobVariantSpawnFinalizer::beforeCommon("frog", context, group, data, bx, by, bz, random));
     }
-    // parity: `ZombieVillager.finalizeSpawn` under `Zombie.finalizeSpawn(CONVERSION)`: never a baby,
+    // parity: `ZombieVillager.finalizeSpawn` under `Zombie.finalizeSpawn(CONVERSION)`.
     // no gear, but the doors, the reinforcements and a leader's bonus all rolled.
     const server::world::Chunk* chunk = world.state().chunkIfLoaded(bx >> 4, bz >> 4);
     const float special = world::mobLocalDifficulty::specialMultiplier(
@@ -526,7 +526,7 @@ void MobActionSystem::finalizeConverted(world::LoadedWorld& world, const ServerE
     }
     static_cast<void>(from);
     data.putBoolean("CanBreakDoors", random.nextFloat() < special * 0.1F);
-    // parity: `Zombie.finalizeSpawn`'s Halloween head, rolled only on the day, and never dropped.
+    // parity: `Zombie.finalizeSpawn`'s Halloween head.
     const wire::nbt::NbtCompound* worn = data.getCompound("equipment");
     const std::chrono::year_month_day today{std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now())};
     if ((worn == nullptr || worn->getCompound("head") == nullptr) && today.month() == std::chrono::October &&
@@ -560,7 +560,7 @@ void MobActionSystem::finalizeConverted(world::LoadedWorld& world, const ServerE
 }
 
 void MobActionSystem::villagerCured(world::LoadedWorld& world, const ServerEntity& zombie, ServerEntity& villager) {
-    // parity: `dropPreservedEquipment` in `EquipmentSlot.VALUES` order: what the zombie picked up
+    // parity: `dropPreservedEquipment` in `EquipmentSlot.VALUES` order.
     // falls out, as the cured villager wears nothing, but what the curse of binding holds goes into
     // the villager's own inventory at the slot's index.
     const wire::nbt::NbtCompound saved = entity::entityNbt::encode(zombie);

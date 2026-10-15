@@ -6,8 +6,6 @@
 #include <string_view>
 
 namespace basalt::server::registry {
-
-/// How a block underfoot changes the way something moves over it.
 struct BlockMovementEntry {
     std::string_view block;
     float friction;
@@ -16,8 +14,6 @@ struct BlockMovementEntry {
     float bounciness;
 };
 
-/// A block's `SoundType`: its volume and pitch and the sound of breaking, stepping on, placing,
-/// hitting and falling onto it.
 struct BlockSoundTypeEntry {
     float volume;
     float pitch;
@@ -28,20 +24,17 @@ struct BlockSoundTypeEntry {
     std::string_view fallSound;
 };
 
-/// Which of those a block has, by its index in `blockSoundTypesTable`.
 struct BlockSoundEntry {
     std::string_view block;
     std::int32_t soundType;
 };
 
-/// What one kind of mob starts with: its health, how fast it walks, how far it notices you.
 struct EntityAttributeEntry {
     std::string_view entity;
     std::string_view attribute;
     double value;
 };
 
-/// How much use an item takes before it breaks.
 struct ItemDurabilityEntry {
     std::string_view item;
     std::int32_t maxDamage;
@@ -49,7 +42,6 @@ struct ItemDurabilityEntry {
     std::int32_t damagePerAttack;
 };
 
-/// How big an entity is and how the server tracks it.
 struct EntityTypeShape {
     std::string_view entity;
     float width;
@@ -61,53 +53,24 @@ struct EntityTypeShape {
     bool farFromPlayer;
 };
 
-/// One rule of one tool: which blocks it applies to, whether they drop, and how fast.
-///
-/// Flattened, with the item repeated on each of its rules: a tool has two or three and the
-/// rows of one tool are contiguous, so the shape a nested list would give buys nothing.
 struct ToolRule {
     std::string_view item;
     std::string_view blockTag;
     bool correctForDrops;
-    /// Absent where the rule only says whether the block drops, which is what the
-    /// `incorrect_for_...` tags do.
     std::optional<float> speed;
 };
 
-/// The blocks that move an entity differently: ice is slippery, soul sand is slow, honey kills a
-/// jump and a bed bounces. Anything absent is the default 0.6 friction with no bounce.
-///
-/// Not in the data generator's reports; dumped by a harness (see `basalt.datagen`).
 [[nodiscard]] std::span<const BlockMovementEntry> blockMovementTable();
 
-/// Every distinct `SoundType`, stone's first, and the blocks that do not sound like stone.
-///
-/// Code and not data in the jar, so it comes from a harness run against the real classes, off each
-/// block's default state: the decorated pot is the one block whose sound changes with its state.
 [[nodiscard]] std::span<const BlockSoundTypeEntry> blockSoundTypesTable();
 
 [[nodiscard]] std::span<const BlockSoundEntry> blockSoundsTable();
 
-/// Every living entity type's attribute base values, before anything modifies them.
-///
-/// Built in code by each class's `createAttributes`, so dumped by a harness (see `basalt.datagen`).
 [[nodiscard]] std::span<const EntityAttributeEntry> entityAttributesTable();
 
-/// Every damageable item: `minecraft:max_damage`, `minecraft:tool`'s `damage_per_block` and
-/// `minecraft:weapon`'s `item_damage_per_attack`, from the jar's item component reports.
-///
-/// An item missing from here has no durability at all: it never wears and never breaks.
 [[nodiscard]] std::span<const ItemDurabilityEntry> itemDurabilityTable();
 
-/// Every entity type's box, spawn category, client tracking range and update interval.
-///
-/// Built in code by `EntityType.Builder`, so dumped by a harness (see `basalt.datagen`).
 [[nodiscard]] std::span<const EntityTypeShape> entityTypeShapesTable();
 
-/// Every tool item's `minecraft:tool` rules, from the jar's item component reports.
-///
-/// Order is preserved: vanilla applies the first rule whose tag contains the block, so each tool's
-/// `incorrect_for_<tier>_tool` exclusion wins over the general `mineable/<kind>` rule after it.
 [[nodiscard]] std::span<const ToolRule> itemToolsTable();
-
 } // namespace basalt::server::registry

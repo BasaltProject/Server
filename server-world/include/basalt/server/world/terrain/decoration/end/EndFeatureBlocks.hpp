@@ -10,8 +10,7 @@ class RandomSource;
 
 namespace basalt::server::world::terrain::decoration::end {
 
-/// parity: `EndGatewayFeature.place`: the portal block, its bedrock caps and the air round it. The
-/// block entity is the caller's, since only it knows the exit.
+/// parity: `EndGatewayFeature.place`.
 namespace endGatewayFeature {
 
 void placeBlocks(std::int32_t x, std::int32_t y, std::int32_t z, const endSpikes::SetBlock& set);

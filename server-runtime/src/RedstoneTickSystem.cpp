@@ -43,11 +43,10 @@
 namespace basalt::server::runtime {
 namespace {
 
-/// parity: `Entity.getOnPosLegacy`, `getOnPos(0.2f)`: the square a fifth of a block under the feet is
-/// the one an entity is standing on.
+/// parity: `Entity.getOnPosLegacy`.
 constexpr double kOnPosDepth = 0.2;
 
-/// parity: `BlockEventDispatcher`'s reach, the sixty-four blocks a block event travels to a player.
+/// parity: `BlockEventDispatcher`'s reach.
 constexpr double kBlockEventRange = 64.0;
 
 using player::PlayerSession;
@@ -68,17 +67,11 @@ std::int32_t unpackZ(std::int64_t packed) { return static_cast<std::int32_t>((pa
 
 void sendBlockUpdate(const std::vector<PlayerSession*>& watchers, const BlockPos& pos, std::int32_t stateId) {
     for (PlayerSession* player : watchers) {
-        // Through the shared one, which says it the way each client reads it: a lever, a lamp or a
-        // piston told only in Java's packet leaves the other edition looking at the old block.
         player::sendBlockChangeTo(*player, pos.x, pos.y, pos.z, stateId);
     }
 }
 
 /// Every tripwire block an entity of this size is crossing.
-///
-/// parity: the wire collects with the bounds of its **own** shape, so the sweep is over the squares
-/// the entity's box reaches and the test is box against box. A string one square over still fires
-/// when a shoulder is in it.
 void crossingsOf(world::LoadedWorld& world, double x, double y, double z, double halfWidth, double height,
                  std::set<std::int64_t>& into) {
     for (std::int32_t blockX = wire::common::mth::floor(x - halfWidth);
@@ -125,16 +118,11 @@ std::vector<PlayerSession*> RedstoneTickSystem::watchersOf(const world::LoadedWo
     return watchers;
 }
 
-/// The chunks whose turns run this tick. parity: `ChunkMap.onFullChunkStatusChange` gives a chunk its
-/// `LevelTicks` container at block ticking and takes it away below that, so a chunk that is loaded
-/// and not ticking is frozen. Ours are the ones around a player plus the forced ones, which is the
-/// same set.
+/// The chunks whose turns run this tick.
 world::WorldState::Ticking RedstoneTickSystem::tickingChunks(const world::LoadedWorld& world,
                                                              const sched::Region& region,
                                                              const std::int32_t extraRadius) const {
-    // Worked out on the first question and not before: `dueTicks` skips a chunk with nothing booked
-    // before it asks, so an idle world never builds the set at all. With a full view distance it is
-    // four hundred and forty one entries, twice a tick, for nothing.
+    // Built on the first question: an idle world never builds the set (441 entries at full view distance).
     auto keys = std::make_shared<std::optional<std::unordered_set<std::int64_t>>>();
     return [this, keys, &world, &region, extraRadius](std::int32_t chunkX, std::int32_t chunkZ) {
         if (!keys->has_value()) {
@@ -171,9 +159,7 @@ void RedstoneTickSystem::tickFluids(world::LoadedWorld& world, const sched::Regi
             const BlockPos pos{change.x, change.y, change.z};
             broadcaster_->dropWashedAwayBlock(world, change.x, change.y, change.z, change.washedAway);
             sendBlockUpdate(watchers, pos, change.stateId);
-            // parity: `Level.setBlock` from the fluid tick updates the neighbours like any other
-            // block change. Without it, water that washed a snow layer away left the grass under it
-            // wearing its white top for ever, since nothing ever asked it to look again.
+            // parity: `Level.setBlock`.
             broadcaster_->notifyAround(world, watchers, pos.x, pos.y, pos.z,
                                        change.washedAway == 0 ? std::nullopt : std::optional{change.washedAway});
         }
@@ -182,16 +168,11 @@ void RedstoneTickSystem::tickFluids(world::LoadedWorld& world, const sched::Regi
 
 void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sched::Region& region) {
     const std::vector<PlayerSession*> watchers = watchersOf(world);
-    // parity: `entityInside` is the entity's doing, not the player's. An item lying on a wooden
-    // plate presses it with nobody around, so this cannot start by asking whether anybody is here.
+    // parity: `entityInside`.
     const std::vector<world::DroppedItem> items = world.state().items();
-    // parity: a plate is pressed by a **box**, so an entity reaches every square its own box crosses
-    // and not only the one its navel is over. Same sweep the arrow buttons already do.
     const auto touch = [this, &world, &region, &watchers, &items](double atX, double atY, double atZ, double halfWidth,
                                                                   double height, std::size_t movedThrough) {
-        // The `y` is a range and not the square under the feet: a body is taller than a block, and
-        // the jar's box test counts a plate it reaches **upwards** too, which is how a plate on top
-        // of a step presses for somebody standing beside it.
+        // `y` is a range: the jar's box test counts a plate the body reaches upwards too.
         for (std::int32_t x = wire::common::mth::floor(atX - halfWidth); x <= wire::common::mth::floor(atX + halfWidth);
              ++x) {
             for (std::int32_t y = wire::common::mth::floor(atY); y <= wire::common::mth::floor(atY + height); ++y) {
@@ -226,22 +207,18 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
             touch(player->x, player->y, player->z, playerHalf, playerHeight, items.size());
         }
     }
-    // parity: `entityInside` runs for whoever is inside the square, and a mob is inside it just the
-    // same. Only players and items ever asked here.
+    // parity: `entityInside`.
     for (const entity::ServerEntity* standing : world.state().entities()) {
         if (!standing->removed && !entity::blockTriggers::ignored(standing->type())) {
             const auto [half, height] = sizeOf(standing->type());
             touch(standing->x, standing->y, standing->z, half, height, items.size());
         }
     }
-    // parity: an item presses the plate on its own turn, so what it counts is itself and whoever
-    // moved before it. The ones still to move are counted where they were when the tick began.
     for (std::size_t index = 0; index < items.size(); ++index) {
         touch(items[index].x, items[index].y, items[index].z, itemHalf, itemHeight, index + 1);
     }
 
-    // parity: `BigDripleafBlock.entityInside`, which is the same question the plate asks and the
-    // same sweep answers it: what is standing on the square, and is anything holding the leaf up.
+    // parity: `BigDripleafBlock.entityInside`.
     const auto stand = [this, &world, &region, &watchers](double atX, double atY, double atZ, bool onGround,
                                                           bool carefully = false) {
         if (!onGround || !region.ownsPosition(atX, atZ)) {
@@ -250,9 +227,7 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
         const auto x = static_cast<std::int32_t>(std::floor(atX));
         const auto y = static_cast<std::int32_t>(std::floor(atY));
         const auto z = static_cast<std::int32_t>(std::floor(atZ));
-        // parity: `RedStoneOreBlock.stepOn` lights the ore under whoever walks on it, unless they are
-        // treading carefully, which is vanilla's word for crouching. The square is `getOnPosLegacy`,
-        // a fifth of a block under their feet. Measured in `pisar`.
+        // parity: `RedStoneOreBlock.stepOn`.
         if (!carefully) {
             if (const std::optional<world::BlockChange> lit = world::miscGrowth::lightRedstoneOre(
                     world.state(), x, static_cast<std::int32_t>(std::floor(atY - kOnPosDepth)), z);
@@ -275,14 +250,10 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
         }
     }
     for (const world::DroppedItem& item : items) {
-        // parity: `canEntityTilt` asks `onGround()`, and an item still sliding along the leaf is on
-        // the ground: waiting for it to settle started the leaf's clock three ticks late.
+        // parity: `canEntityTilt`.
         stand(item.x, item.y, item.z, item.onGround);
     }
-    // parity: `entityInside` runs for **every** entity standing on the leaf, not only for a player
-    // and a dropped item: a block of tnt that lands on one tips it over just the same. Measured in
-    // `hojagrande`. An arrow is left out because the flag this build calls `onGround` means "stuck"
-    // for one, which is not the `onGround()` vanilla asks about.
+    // parity: `entityInside`.
     for (const entity::ServerEntity* one : world.state().entities()) {
         if (one == nullptr || one->removed || entity::projectiles::kindOf(one->type()) != nullptr) {
             continue;
@@ -301,8 +272,7 @@ void RedstoneTickSystem::tickArrowButtons(world::LoadedWorld& world, const sched
             !region.ownsPosition(arrow->x, arrow->z)) {
             continue;
         }
-        // parity: `entityInside` runs for every square the entity's box touches, and an arrow's box
-        // straddles two of them more often than not.
+        // parity: `entityInside`.
         for (std::int32_t x = wire::common::mth::floor(arrow->x - half); x <= wire::common::mth::floor(arrow->x + half);
              ++x) {
             for (std::int32_t y = wire::common::mth::floor(arrow->y); y <= wire::common::mth::floor(arrow->y + height);
@@ -327,8 +297,7 @@ void RedstoneTickSystem::pressArrowButton(world::LoadedWorld& world, const std::
     if (block == nullptr || !world::arrowButtons::acceptsArrows(block->path())) {
         return;
     }
-    // parity: `entityInside` gives up on a button that is already down; its own turn is what looks
-    // again.
+    // parity: `entityInside`.
     if (!world::arrowButtons::reaches(x, y, z, *stateId, arrowX, arrowY, arrowZ, half, height)) {
         return;
     }
@@ -337,14 +306,11 @@ void RedstoneTickSystem::pressArrowButton(world::LoadedWorld& world, const std::
     if (!toggled.has_value()) {
         return;
     }
-    // parity: `checkPressed` raises `BLOCK_ACTIVATE` from the arrow, the same event a player's
-    // click raises.
+    // parity: `checkPressed`.
     if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
         world::vibrations::emit(world.state(), "block_activate", x + 0.5, y + 0.5, z + 0.5, world.gameTime());
     }
-    // parity: `ButtonBlock.checkPressed` books the release, and books it again every turn an arrow
-    // is still there.
-    // The turn goes under the button's own name, which is what the chunk saves.
+    // parity: `ButtonBlock.checkPressed`.
     if (const std::optional<std::int32_t> pressed = world::blockInteractions::pressedTicks(*stateId);
         pressed.has_value()) {
         world.state().scheduleBlockTick(x, y, z, *block, *pressed);
@@ -383,9 +349,7 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
             continue;
         }
         lastFootstep_[player->entityId()] = block;
-        // parity: `RedStoneOreBlock.stepOn`, which lights the ore under whoever walks over it unless
-        // they are sneaking. The random tick that puts it out again was already here; nothing ever
-        // lit it.
+        // parity: `RedStoneOreBlock.stepOn`.
         if (!player->sneaking) {
             const auto oreX = static_cast<std::int32_t>(std::floor(player->x));
             const auto oreZ = static_cast<std::int32_t>(std::floor(player->z));
@@ -398,8 +362,7 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
         }
         // parity: sneaking makes no vibration, so nothing hears the step or feels it.
         if (!player->sneaking) {
-            // parity: `Block.stepOn` for the blocks outside redstone, the sculk shrieker among them,
-            // on `Entity.getOnPos`, a fifth of a block under the feet.
+            // parity: `Block.stepOn`.
             if (options_.steppedOn) {
                 options_.steppedOn(world, *player, static_cast<std::int32_t>(std::floor(player->x)),
                                    static_cast<std::int32_t>(std::floor(player->y - kOnPosDepth)),
@@ -409,9 +372,7 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
         if (!world.state().hasSculkSensorNear(player->x, player->y, player->z, world::vibrations::kCalibratedRange)) {
             continue;
         }
-        // parity: `SculkSensorBlock.stepOn`, which puts the step straight into the sensor under the
-        // feet without asking whether it already has one on the way. Standing on one is not the same
-        // as walking past it, and only the second went through `handleGameEvent`.
+        // parity: `SculkSensorBlock.stepOn`.
         const auto stepX = static_cast<std::int32_t>(std::floor(player->x));
         const auto stepZ = static_cast<std::int32_t>(std::floor(player->z));
         const std::int32_t stepY = world::pressurePlates::blockUnder(player->y);
@@ -449,9 +410,7 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
             crossingsOf(world, item.x, item.y, item.z, itemHalf, itemHeight, crossed);
         }
     }
-    // parity: `TripWireBlock.entityInside` runs for whatever is inside the square, and `checkPressed`
-    // counts anything that is not `isIgnoringBlockTriggers`. A mob walking a string sets it off, and
-    // only players and items ever asked here.
+    // parity: `TripWireBlock.entityInside`.
     for (const entity::ServerEntity* crossing : world.state().entities()) {
         if (crossing->removed || entity::blockTriggers::ignored(crossing->type()) ||
             !region.ownsPosition(crossing->x, crossing->z)) {
@@ -473,9 +432,7 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
                                             const std::vector<PlayerSession*>& watchers,
                                             const std::vector<world::DroppedItem>& items, std::size_t movedThrough) {
     std::int32_t count = 0;
-    // parity: `getEntityCount(level, TOUCH_AABB.move(pos), ...)` counts every entity whose **box**
-    // crosses the plate's, so the same entity can be counted by two plates at once and a weighted
-    // plate reads what is over its edge.
+    // parity: `getEntityCount(level, TOUCH_AABB.move(pos), ...)`.
     const auto sizeOf = [](const wire::common::Identifier& type) {
         return std::pair{server::registry::entityTypeShapes::widthOf(type) / 2.0,
                          server::registry::entityTypeShapes::heightOf(type)};
@@ -488,19 +445,15 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
             count++;
         }
     }
-    // parity: `PressurePlateBlock.getSignalStrength` picks the class it counts from the plate's own
-    // sensitivity: `EVERYTHING` counts any entity and `MOBS` only the living ones. The stone and
-    // blackstone plates are the `MOBS` pair.
+    // parity: `PressurePlateBlock.getSignalStrength`.
     const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
     const wire::common::Identifier* block =
         stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
     const std::string_view path = block == nullptr ? std::string_view{} : block->path();
     const bool livingOnly = path == "stone_pressure_plate" || path == "polished_blackstone_pressure_plate";
-    // A mob, an arrow, a boat or a lit tnt is an entity like any other, and none of them was counted:
-    // this sweep only knew about players and items, so a cow never pressed anything.
+    // Any entity presses a plate, not just players and items: a cow must press one.
     for (const entity::ServerEntity* standing : world.state().entities()) {
-        // parity: `BasePressurePlateBlock.getEntityCount` filters with
-        // `EntitySelector.NO_SPECTATORS.and(e -> !e.isIgnoringBlockTriggers())` before it counts.
+        // parity: `BasePressurePlateBlock.getEntityCount`.
         if (standing->removed || entity::blockTriggers::ignored(standing->type()) ||
             (livingOnly && !server::registry::entityAttributes::isLiving(standing->type()))) {
             continue;
@@ -526,8 +479,7 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
 
 namespace {
 
-/// parity: `Entity.checkInsideBlocks`, which walks the squares the box overlaps after deflating it
-/// by a ten-millionth so a box resting exactly on an edge is not inside the block beyond it.
+/// parity: `Entity.checkInsideBlocks`.
 [[nodiscard]] std::vector<std::array<std::int32_t, 3>> squaresInside(double x, double y, double z, double half,
                                                                      double height) {
     constexpr double kEdgeSlack = 1.0e-7;
@@ -548,9 +500,7 @@ namespace {
 } // namespace
 
 void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sched::Region& region) {
-    // parity: a falling block is a `FallingBlockEntity` and takes its turn off `entityTickList`, so
-    // it stops where it is when its chunk falls out of `ENTITY_TICKING`. This one does not go through
-    // the world's entity loop, so it needs the same gate of its own.
+    // parity: `FallingBlockEntity`.
     const world::WorldState::Ticking ticking = tickingChunks(world, region, 0);
     std::vector<entity::ServerEntity*> falling;
     for (entity::ServerEntity* entity : world.state().entities()) {
@@ -581,9 +531,7 @@ void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sche
                 sendBlockUpdate(watchers, BlockPos{bx, by, bz}, stateId);
                 broadcaster_->notifyAround(world, watchers, bx, by, bz, std::nullopt);
             });
-        // parity: `FrogspawnBlock.entityInside` is `destroyBlock(pos, false)` for a falling block and
-        // nothing else, and `checkInsideBlocks` runs inside the move, over the squares the box ends
-        // up touching: sand dropped through a nest of eggs takes it with it and drops nothing.
+        // parity: `FrogspawnBlock.entityInside`.
         for (const std::array<std::int32_t, 3>& at : squaresInside(entity->x, entity->y, entity->z, half, height)) {
             const std::optional<std::int32_t> here = world.state().blockState(at[0], at[1], at[2]);
             if (!here.has_value() || server::registry::blockStateDefinitions::blockOf(*here) == nullptr ||
@@ -598,10 +546,7 @@ void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sche
         if (landed.placed.has_value()) {
             sendBlockUpdate(watchers, BlockPos{landed.placed->x, landed.placed->y, landed.placed->z},
                             landed.placed->stateId);
-            // parity: `FallingBlockEntity.tick` lands with `setBlock(pos, state, 3)`, so the square
-            // it stops in tells its neighbours and reshapes them. Writing the block and telling only
-            // the client left a fence beside the landing square unjoined and a tilled soil under it
-            // untouched, which is what `arenacae` measured.
+            // parity: `FallingBlockEntity.tick`.
             broadcaster_->notifyAround(world, watchers, landed.placed->x, landed.placed->y, landed.placed->z,
                                        std::nullopt);
         } else if (landed.shattered.has_value()) {
@@ -650,12 +595,8 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
     }
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     for (const world::BlockChange& change : changes) {
-        // parity: a block entity that changed its own state is a block change like any other, so its
-        // neighbours hear about it: a daylight detector that dropped to zero at dusk has to take the
-        // dust beside it down with it.
         broadcaster_->announceRedstone(world, watchers, change);
-        // parity: `setBlock` again: what a random tick changed reshapes what is around it, which is
-        // how the grass under a snow layer that melted stops wearing snow.
+        // parity: `setBlock`.
         broadcaster_->notifyAround(world, watchers, change.x, change.y, change.z, std::nullopt);
     }
 }
@@ -701,8 +642,7 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                 return options_.blockTags != nullptr &&
                        world::realBlockTags::contains(*options_.blockTags, "minecraft:beacon_base_blocks", block);
             },
-        // parity: `BeaconBlockEntity.applyEffects`: everybody inside the square it reaches, at any
-        // height, gets the effect again for as long as the pyramid is worth.
+        // parity: `BeaconBlockEntity.applyEffects`.
         .beaconPulse =
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t levels,
                            const std::string& primary, const std::string& secondary) {
@@ -731,8 +671,7 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                     }
                 }
             },
-        // parity: `BeaconBlockEntity.tick` hands the criterion to every player in a box ten blocks
-        // out and five up from the beacon, four deep under it.
+        // parity: `BeaconBlockEntity.tick`.
         .beaconLit =
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z,
                            const std::int32_t levels) {
@@ -814,9 +753,7 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         world.state(), world.name(), world.clock(), world.skyDarken(), world.gameTime(), chunks, random, hooks,
         config::dimensionFacts(world.declaration().dimension).hasSkylight,
         config::dimensionFacts(world.declaration().dimension).hasDayTimeline, world.metadata().seed);
-    // parity: `PistonMovingBlockEntity` is a block entity like any other and ticks here, which is
-    // why the jar books no turn while a piston slides. Every sliding square moves its own progress
-    // along and lands itself.
+    // parity: `PistonMovingBlockEntity`.
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     for (const std::array<std::int32_t, 2>& position : chunks) {
         const server::world::Chunk* chunk = world.state().chunkIfLoaded(position[0], position[1]);
@@ -838,10 +775,7 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         return;
     }
     for (const world::BlockChange& change : changes) {
-        // parity: a block entity that rewrites its own block does it with `setBlock(..., 3)`, which
-        // is `UPDATE_NEIGHBORS | UPDATE_CLIENTS`. Telling only the clients left the dust beside a
-        // daylight detector reading nothing while the detector itself said eleven, which is what
-        // `detectorluz` measured; the same held for anything else that changes on its own turn.
+        // parity: `setBlock(..., 3)`.
         broadcaster_->announceRedstone(world, watchers, change);
     }
 }

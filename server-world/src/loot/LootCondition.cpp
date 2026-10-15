@@ -305,14 +305,13 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
     }
     case Kind::KilledByPlayer:
         return context.killedByPlayer;
-    // parity: `ExplosionCondition`, a draw against one over the radius, and true without a blast.
+    // parity: `ExplosionCondition`.
     case Kind::SurvivesExplosion:
         if (!context.explosionRadius.has_value()) {
             return true;
         }
         return random.nextFloat() <= 1.0F / *context.explosionRadius;
-    // parity: `LocationCheck`, false without an origin. The bare factory, which carries no predicate,
-    // still passes.
+    // parity: `LocationCheck`, false without an origin.
     case Kind::LocationCheck: {
         if (part.location == nullptr) {
             return true;
@@ -366,13 +365,11 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
         return false;
     case Kind::FishingHookOpenWater:
         return context.inOpenWater.has_value() && *context.inOpenWater == (plainChance_ > 0.0F);
-    // parity: `LootItemEntityPropertyCondition` with an empty predicate, which asks only that the
-    // entity be there: the player mining the block or the arrow that hit it.
+    // parity: `LootItemEntityPropertyCondition` with an empty predicate.
     case Kind::ThisEntityExists:
         return target_ == Target::This ? context.hasEntity || context.thisEntity.has_value()
                                        : factsFor(context, target_).has_value();
-    // parity: `MatchBlock`: a roll with no block behind it matches nothing, and a predicate on the
-    // block entity is a gap that never matches.
+    // parity: `MatchBlock`.
     case Kind::MatchBlock:
         if (part.unsupported || (context.blockState.empty() && !context.block.has_value())) {
             return false;
@@ -400,7 +397,7 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
 bool LootCondition::testNumbers(random::RandomSource& random, const LootContext& context) const {
     const Parts& part = parts();
     switch (kind_) {
-    // parity: `IntValueCheck` and `FloatValueCheck`: the value first, then the range's own bounds.
+    // parity: `IntValueCheck` and `FloatValueCheck`.
     case Kind::IntValueCheck: {
         const std::int32_t value = part.intValue.get(random, context);
         return part.intRange.test(random, context, value);
@@ -436,7 +433,7 @@ bool LootCondition::testWorld(random::RandomSource& random, const LootContext& c
             return false;
         }
         return !part.thundering.has_value() || context.thundering.value_or(false) == *part.thundering;
-    // parity: `EntityHasScoreCondition`: every objective scored and in range, in the file's order.
+    // parity: `EntityHasScoreCondition`.
     case Kind::EntityScores: {
         const std::optional<std::string> holder = scoreHolderOf(context, part.entityTarget);
         if (!holder.has_value()) {

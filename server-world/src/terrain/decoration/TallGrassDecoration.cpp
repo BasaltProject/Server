@@ -73,8 +73,6 @@ void placePatch(PatchRegion& region, random::RandomSource& random, const Decorat
         const DecorationPos target{origin.x + random.nextInt(8) - random.nextInt(8),
                                    origin.y + random.nextInt(4) - random.nextInt(4),
                                    origin.z + random.nextInt(8) - random.nextInt(8)};
-        // The upper half needs its own block, so the top of the world is excluded rather than
-        // clamped.
         if (target.y < bounds.minY() || target.y >= bounds.maxY() || !registry::blocks::isAir(region.get(target))) {
             continue;
         }
@@ -112,8 +110,7 @@ void placeSavanna(const PlacementContext& context, PatchRegion& region, random::
 void placePlain(const PlacementContext& context, PatchRegion& region, random::RandomSource& random,
                 const surface::SurfaceRuleEnvironment& environment, ChunkHeight bounds) {
     const DecorationPos chunkOrigin{context.chunk().chunkX() * 16, 0, context.chunk().chunkZ() * 16};
-    // parity: the noise placement yields either nothing or seven positions, and vanilla only asks
-    // whether it yielded any: the count itself is fixed at seven.
+    // parity: the noise placement yields nothing or seven positions, only whether it yielded any matters.
     const bool anyNoise = !noiseThresholdCountPlacement(-0.8, 0, 7)(context, random, chunkOrigin).empty();
     const std::int32_t outerCount = anyNoise ? 7 : 0;
     for (std::int32_t outer = 0; outer < outerCount; ++outer) {

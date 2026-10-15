@@ -11,7 +11,6 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// Whatever a mob is after, whether that is a player or another mob.
 struct TargetView {
     std::optional<std::int32_t> playerId;
     ServerEntity* entity = nullptr;
@@ -22,7 +21,6 @@ struct TargetView {
     double height = 0.0;
 };
 
-/// The thing this mob is after, resolved against what is in the world this tick.
 [[nodiscard]] std::optional<TargetView> targetOf(const MobContext& mob);
 
 /// parity: `FloatGoal`, which is why a mob in water bobs instead of drowning.
@@ -37,8 +35,7 @@ public:
     void tick(MobContext& mob) override;
 };
 
-/// parity: `RandomStrollGoal` over `DefaultRandomPos.getPos(mob, 10, 7)`: one roll in sixty (the
-/// interval halved, since the goal is not ticked every tick), and the walk it starts is a real path.
+/// parity: `RandomStrollGoal`.
 class RandomStrollGoal : public Goal {
 public:
     static constexpr std::int32_t kDefaultInterval = 120;
@@ -89,7 +86,7 @@ private:
     std::int32_t lookTime_ = 0;
 };
 
-/// parity: `RandomLookAroundGoal`, one roll in fifty a tick and a second of looking that way.
+/// parity: `RandomLookAroundGoal`.
 class RandomLookAroundGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
@@ -110,8 +107,7 @@ private:
     std::int32_t lookTime_ = 0;
 };
 
-/// parity: `PanicGoal`: something hurt it, so it runs to a spot within five blocks and keeps running
-/// until it gets there.
+/// parity: `PanicGoal`.
 class PanicGoal final : public Goal {
 public:
     explicit PanicGoal(double speedModifier);
@@ -131,8 +127,7 @@ private:
     std::optional<std::array<double, 3>> wanted_;
 };
 
-/// parity: `TemptGoal`: a player holding the right food is followed to within two and a half blocks,
-/// and the mob looks at them the whole way.
+/// parity: `TemptGoal`.
 class TemptGoal final : public Goal {
 public:
     static constexpr double kDefaultStopDistance = 2.5;
@@ -159,7 +154,7 @@ private:
     std::optional<std::int32_t> player_;
 };
 
-/// parity: `BreedGoal`: two of the same kind in love walk together for three seconds and breed.
+/// parity: `BreedGoal`.
 class BreedGoal final : public Goal {
 public:
     explicit BreedGoal(double speedModifier);
@@ -207,7 +202,7 @@ private:
     std::int32_t repathCooldown_ = 0;
 };
 
-/// parity: `EatBlockGoal`: a sheep stops, eats the grass under it, and leaves dirt behind.
+/// parity: `EatBlockGoal`.
 class EatBlockGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look, GoalFlag::Jump}; }
@@ -274,8 +269,7 @@ private:
     double height_;
 };
 
-/// parity: `SwellGoal` over `Creeper.tick`: within three blocks of what it is after the fuse counts
-/// up, past seven or out of sight it counts back down, and at thirty it goes off.
+/// parity: `SwellGoal`.
 class SwellGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
@@ -289,8 +283,7 @@ public:
     void tick(MobContext& mob) override;
 };
 
-/// parity: `RangedAttackGoal` over `AbstractSkeleton.performRangedAttack`: it closes to inside its
-/// range, stands still once it can see you, and lets an arrow go on its own clock.
+/// parity: `RangedAttackGoal`.
 class RangedAttackGoal final : public Goal {
 public:
     RangedAttackGoal(double speedModifier, std::int32_t attackIntervalMin, std::int32_t attackIntervalMax,
@@ -317,8 +310,7 @@ private:
     std::int32_t attackTime_ = -1;
 };
 
-/// parity: `Squid.SquidRandomMovementGoal` with `Squid.aiStep`: a squid does not walk a path at all,
-/// it points itself somewhere and pushes, and the water slows it down between pushes.
+/// parity: `Squid.SquidRandomMovementGoal`.
 class SwimAboutGoal final : public Goal {
 public:
     /// parity: the 0.2 a squid pushes with.
@@ -341,8 +333,7 @@ private:
     double vectorZ_ = 0.0;
 };
 
-/// parity: `AbstractCubeMob.CubeMobMoveControl`: a slime does not walk, it turns to a chosen heading
-/// and hops, with ten to thirty ticks between hops and a third of that when it is angry.
+/// parity: `AbstractCubeMob.CubeMobMoveControl`.
 class HopAboutGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Jump, GoalFlag::Look}; }

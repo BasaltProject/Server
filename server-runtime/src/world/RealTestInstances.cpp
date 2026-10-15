@@ -32,7 +32,6 @@ constexpr std::int32_t kDefaultMaxTicks = 100;
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
-/// The tick budget, written either as a number or as the text of one, as the schema allows.
 [[nodiscard]] std::int32_t maxTicksAt(const JsonObject& root) {
     const JsonValue* value = root.find("max_ticks");
     if (value == nullptr) {
@@ -68,7 +67,6 @@ constexpr std::int32_t kDefaultMaxTicks = 100;
     return *text != "false";
 }
 
-/// One declared instance, or why the file could not be read as one.
 [[nodiscard]] std::expected<TestInstance, std::string> declared(const std::string& path,
                                                                 const std::optional<std::string>& text) {
     if (!text.has_value()) {

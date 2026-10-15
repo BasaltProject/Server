@@ -4,7 +4,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `WitherBoss.WitherDoNothingGoal`, which holds every other move while it is being born.
+/// parity: `WitherBoss.WitherDoNothingGoal`.
 class WitherDoNothingGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Jump, GoalFlag::Look}; }
@@ -12,8 +12,6 @@ public:
     [[nodiscard]] bool canUse(MobContext& mob) override;
 };
 
-/// parity: the wither's `NearestAttackableTargetGoal<LivingEntity>`, every tick and anything alive
-/// that is not undead, players and mobs alike.
 class WitherTargetGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }

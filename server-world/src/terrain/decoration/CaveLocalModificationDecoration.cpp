@@ -122,7 +122,7 @@ const PathSet& baseStoneOverworld() { return stoneBlockTags::baseStoneOverworld(
     return *resolved;
 }
 
-/// parity: `LargeDripstoneFeature.getDripstoneHeight`, kept in doubles all the way through.
+/// parity: `LargeDripstoneFeature.getDripstoneHeight`.
 [[nodiscard]] double speleothemHeight(double suppliedDistance, double radius, double scale, double bluntness) {
     const double distance = std::max(suppliedDistance, bluntness);
     const double ratio = distance / radius * 0.384;
@@ -132,7 +132,6 @@ const PathSet& baseStoneOverworld() { return stoneBlockTags::baseStoneOverworld(
     return std::max(scale * (part1 - part2 - part3), 0.0) / 0.384 * radius;
 }
 
-/// The read and write view both features work through.
 class LocalModificationRegion {
 public:
     LocalModificationRegion(Chunk& chunk, ExternalSurfaceHeightReader externalSurfaceHeight,
@@ -181,8 +180,6 @@ public:
         if (!current.has_value() || !oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy::Geode, *current, 0)) {
             return false;
         }
-        // A neighbour that does not exist yet reads as air, so testing here decides nothing for it.
-        // The policy travels with the write and is tested again against whatever really turns up.
         const Chunk::WritePolicyScope scope{*chunk_, GeneratedBlockWritePolicy::Geode};
         set(position, stateId);
         return true;
@@ -234,8 +231,7 @@ public:
 
     [[nodiscard]] std::int32_t worldSurfaceHeight(std::int32_t x, std::int32_t z) const {
         if ((x >> 4) == chunk_->chunkX() && (z >> 4) == chunk_->chunkZ()) {
-            // parity: the large dripstone stops at `WORLD_SURFACE_WG`, the frozen map, so a feature
-            // that ran earlier in the chunk cannot let the spike grow through it.
+            // parity: the large dripstone stops at the frozen `WORLD_SURFACE_WG`.
             return chunk_->worldgenHeightAt(x & 15, z & 15, HeightmapType::WorldSurface);
         }
         if (externalSurfaceHeight_) {

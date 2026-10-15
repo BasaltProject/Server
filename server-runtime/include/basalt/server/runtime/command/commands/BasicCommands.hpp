@@ -8,12 +8,6 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// The commands whose whole body is one message and no state of their own.
-///
-/// Vanilla gives each of these a class under `net.minecraft.server.commands`, and so does this
-/// build; they share a file because a header per two-line command is ceremony without a reader.
-/// Each still says which vanilla command it reimplements and asks for the same permission level.
-
 /// parity: `SeedCommand`, which on a dedicated server needs game-master level.
 class SeedCommand final : public Command {
 public:
@@ -30,8 +24,7 @@ public:
     void build(const CommandNodeBuilder& root) const override;
 };
 
-/// parity: `SayCommand`, whose output is the `say_command` chat type, rendered by
-/// `chat.type.announcement`.
+/// parity: `SayCommand`.
 class SayCommand final : public Command {
 public:
     SayCommand();
@@ -39,8 +32,7 @@ public:
     void build(const CommandNodeBuilder& root) const override;
 };
 
-/// parity: `EmoteCommands`, the `emote_command` chat type (`chat.type.emote`). Available to
-/// everyone.
+/// parity: `EmoteCommands`, the `emote_command` chat type (`chat.type.emote`).
 class EmoteCommand final : public Command {
 public:
     EmoteCommand();
@@ -48,8 +40,7 @@ public:
     void build(const CommandNodeBuilder& root) const override;
 };
 
-/// parity: `TellRawCommand`. The message is a component, so styles and events survive to the
-/// client.
+/// parity: `TellRawCommand`.
 class TellRawCommand final : public Command {
 public:
     TellRawCommand();
@@ -65,7 +56,7 @@ public:
     void build(const CommandNodeBuilder& root) const override;
 };
 
-/// parity: `ListPlayersCommand`. Available to everyone, as it is in vanilla.
+/// parity: `ListPlayersCommand`.
 class ListPlayersCommand final : public Command {
 public:
     ListPlayersCommand();
@@ -73,11 +64,9 @@ public:
     void build(const CommandNodeBuilder& root) const override;
 };
 
-/// parity: `VersionCommand` in shape only. Vanilla prints its data pack version and feature flags,
-/// which do not exist here; this prints what this build actually is, which is the useful answer.
+/// parity: `VersionCommand` in shape only.
 class VersionCommand final : public Command {
 public:
-    /// Every protocol this server lets in right now, the native one included.
     using AcceptedProtocols = std::function<std::set<std::int32_t>()>;
 
     explicit VersionCommand(AcceptedProtocols accepted = {});

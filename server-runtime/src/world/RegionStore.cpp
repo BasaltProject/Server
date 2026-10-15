@@ -75,11 +75,6 @@ LinearRegion& RegionStore::store(std::int64_t regionKey, LinearRegion region) {
     if (cached_.size() <= capacity_ && cachedBytesLocked() <= byteBudget_) {
         return cached_.back().region;
     }
-    // Evicts least recently used *clean* regions. A dirty one stays cached until `flushDirty`
-    // writes it: evicting it here would mean compressing a region file while holding the cache
-    // lock, which is exactly the stall this store exists to avoid, and it is what `flushDirty`'s
-    // snapshot relies on. Between flushes the cache can therefore run past its budget by the dirty
-    // regions; the sweep flushes every interval, so the excursion is bounded.
     for (auto at = cached_.begin();
          at != cached_.end() && (cached_.size() > capacity_ || cachedBytesLocked() > byteBudget_);) {
         if (at->key == regionKey || dirtyRegions_.contains(at->key)) {
@@ -113,10 +108,6 @@ std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t ch
     const std::int32_t regionZ = chunkZ >> 5;
     const std::int64_t regionKey = key(regionX, regionZ);
 
-    // Reading and decompressing a region happens outside the lock, on purpose. It is tens of
-    // megabytes of zstd, and holding the lock across it meant eight generation workers kept this
-    // store permanently busy, so the save/unload sweep could never get in: the server stopped
-    // saving and unloading entirely while exploring, and memory grew because of it.
     bool missing = false;
     {
         const std::lock_guard<std::mutex> lock{mutex_};
@@ -133,8 +124,6 @@ std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t ch
             return std::nullopt;
         }
         const std::lock_guard<std::mutex> lock{mutex_};
-        // Another worker may have loaded the same region meanwhile; theirs wins, since it may
-        // already hold writes this one would not have.
         if (touch(regionKey) == nullptr) {
             store(regionKey, *std::move(read));
         }
@@ -151,8 +140,6 @@ std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t ch
         if (blob.empty()) {
             return std::nullopt;
         }
-        // Copied rather than kept as a view: the region behind it can be evicted the moment the
-        // lock goes, and the decode below is the whole reason the lock goes.
         chunkBytes.assign(blob.begin(), blob.end());
     }
 
@@ -170,8 +157,6 @@ std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t ch
     if (!chunk.has_value()) {
         return std::nullopt;
     }
-    // The decoder hands back a chunk already marked clean, which the frozen Kotlin had to do here
-    // instead: it rebuilt a chunk through the same block setters generation uses, and they dirty it.
     return std::move(*chunk);
 }
 
@@ -181,10 +166,6 @@ std::size_t RegionStore::saveChunks(std::span<Chunk* const> chunks, std::int32_t
     }
     const std::lock_guard<std::mutex> writeLock{writeMutex_};
 
-    // Grouped by region and encoded one region at a time, outside the cache lock. Encoding the
-    // whole sweep up front held every chunk's NBT blob at once, and a thousand-chunk sweep left a
-    // ~50 MB high-water mark in the sweeper thread's allocator pools for good; region by region the
-    // transient peak is one region's worth.
     std::map<std::int64_t, std::vector<Chunk*>> byRegion;
     for (Chunk* chunk : chunks) {
         byRegion[key(chunk->chunkX() >> 5, chunk->chunkZ() >> 5)].push_back(chunk);
@@ -227,9 +208,6 @@ std::size_t RegionStore::flush() {
 }
 
 std::size_t RegionStore::flushDirty() {
-    // The snapshot is what lets the zstd and the file writes run without the cache lock: a dirty
-    // region is never evicted (see `store`), so the pointer stays valid, and `writeMutex_` keeps
-    // `setChunk` out of the file write.
     std::vector<std::pair<std::int64_t, LinearRegion*>> toWrite;
     {
         const std::lock_guard<std::mutex> lock{mutex_};

@@ -6,22 +6,13 @@
 #include <cstdint>
 
 namespace basalt::server::random {
-
 class PositionalRandomFactory;
 
-/// parity: net.minecraft.util.RandomSource, flattened into one value type.
-///
-/// Vanilla has an interface with three implementations that worldgen passes around by reference.
-/// Here the three are a tag plus their state inline, so a source is copied, forked and stored
-/// without ever touching the heap and without a virtual call per `nextInt` in the hottest loop of
-/// the server. Every sequence stays bit-exact: the tag picks the same algorithm the interface
-/// dispatch used to.
+// parity: net.minecraft.util.RandomSource, flattened into one value type.
 class RandomSource {
 public:
     enum class Algorithm : std::uint8_t {
-        /// LegacyRandomSource: the 48-bit LCG of java.util.Random.
         Legacy,
-        /// XoroshiroRandomSource: xoroshiro128++ with its own bounded-int algorithm.
         Xoroshiro,
     };
 
@@ -33,18 +24,14 @@ public:
 
     [[nodiscard]] static RandomSource xoroshiro(Seed128bit seed) noexcept;
 
-    /// parity: WorldgenRandom. Bridges any source to the java.util.Random-style `next(bits)`
-    /// algorithms, so worldgen written against them behaves the same over either generator. Over a
-    /// legacy source that is a passthrough; over xoroshiro the bits are synthesized from
-    /// `nextLong()`, discarding its own bounded-int algorithm.
+    // parity: WorldgenRandom.
     [[nodiscard]] static RandomSource worldgen(RandomSource inner) noexcept;
 
     [[nodiscard]] Algorithm algorithm() const noexcept { return algorithm_; }
 
     [[nodiscard]] bool isWorldgenView() const noexcept { return bitAlgorithms_; }
 
-    /// Where a xoroshiro source stands right now. parity: `Xoroshiro128PlusPlus.CODEC`, two longs
-    /// and nothing else: the half-drawn gaussian is not part of what vanilla writes down either.
+    // parity: `Xoroshiro128PlusPlus.CODEC`, two longs.
     [[nodiscard]] Seed128bit xoroshiroState() const noexcept { return generator_.state(); }
 
     [[nodiscard]] RandomSource fork() noexcept;
@@ -53,8 +40,6 @@ public:
 
     void setSeed(std::int64_t seed) noexcept;
 
-    /// The `next(bits)` primitive. Only meaningful for legacy and worldgen sources; a bare
-    /// xoroshiro source has no such primitive in vanilla, and neither has this one.
     [[nodiscard]] std::int32_t next(int bits) noexcept;
 
     [[nodiscard]] std::int32_t nextInt() noexcept;
@@ -89,10 +74,7 @@ public:
 
     void consumeCount(int rounds) noexcept;
 
-    /// parity: vanilla decorates a chunk with a single `WorldgenRandom`, and its `setSeed` reseeds
-    /// only the source it wraps without calling `super`, so the spare its gaussian cached outlives
-    /// every `setFeatureSeed`. Our sources are one per decoration module, so for the length of one
-    /// chunk's decoration the spare lives here instead.
+    // parity: vanilla decorates a chunk with a single `WorldgenRandom`.
     class SharedGaussian {
     public:
         SharedGaussian() noexcept;
@@ -114,12 +96,10 @@ private:
     }
 
     Algorithm algorithm_ = Algorithm::Legacy;
-    /// True for a worldgen view: every derived value comes from `next(bits)`.
     bool bitAlgorithms_ = false;
     bool haveNextGaussian_ = false;
     std::uint64_t legacySeed_ = 0;
     Xoroshiro128PlusPlus generator_;
     double nextGaussian_ = 0.0;
 };
-
 } // namespace basalt::server::random

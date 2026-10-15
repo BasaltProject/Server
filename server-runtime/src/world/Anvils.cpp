@@ -12,8 +12,7 @@ namespace {
 
 namespace item = runtime::item;
 
-/// parity: the `repair_items` of each tool material in the jar's item data. The vanilla tool and
-/// armour families, by the prefix their items share.
+/// parity: the `repair_items` of each tool material in the jar's item data.
 constexpr auto kRepairMaterials =
     std::to_array<std::pair<std::string_view, std::string_view>>({{"wooden_", "oak_planks"},
                                                                   {"stone_", "cobblestone"},
@@ -94,8 +93,7 @@ Result combine(const storage::StoredItemStack* input, const storage::StoredItemS
 
     if (addition != nullptr) {
         const bool damageable = item::itemWear::isDamageable(*input);
-        // parity: `usingBook`, which is what lets an addition that is not the same item work at all.
-        // An enchanted book carries the component even with nothing written in it.
+        // parity: `usingBook`.
         const bool usingBook = addition->id == "minecraft:enchanted_book" ||
                                addition->components.find(item::itemComponents::kStoredEnchantments) != nullptr;
         if (damageable && isRepairMaterial && isRepairMaterial(*input, *addition)) {
@@ -114,8 +112,7 @@ Result combine(const storage::StoredItemStack* input, const storage::StoredItemS
             materials = used;
             result = withDamage(std::move(result), damage);
         } else {
-            // parity: anything but a book has to be the same damageable item, or the anvil refuses
-            // the pair before it looks at what is written on either of them.
+            // parity: anything but a book has to be the same damageable item, or the anvil refuses.
             if (!usingBook && (input->id != addition->id || !damageable)) {
                 return Result{};
             }
@@ -138,8 +135,7 @@ Result combine(const storage::StoredItemStack* input, const storage::StoredItemS
                 result.components = *merged.components;
             }
             price += merged.cost;
-            // parity: a stack of more than one is priced out of the anvil rather than refused, and
-            // only once something has actually gone onto it.
+            // parity: a stack of more than one is priced out of the anvil rather than refused, and.
             if (input->count > 1 && merged.cost > 0) {
                 price = kTooExpensive;
             }

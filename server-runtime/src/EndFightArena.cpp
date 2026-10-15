@@ -41,7 +41,7 @@ constexpr std::int32_t kDragonSpawnY = 128;
 constexpr double kGatewayDistance = 96.0;
 constexpr std::int32_t kGatewayY = 75;
 constexpr std::int32_t kArenaChunks = 8;
-/// parity: `TicketType.DRAGON`'s radius, `addTicketWithRadius(..., 9)`: the nineteen by
+/// parity: `TicketType.DRAGON`'s radius, `addTicketWithRadius(..., 9)`: the nineteen by.
 /// nineteen chunks around the exit portal stay loaded and ticking while the fight has players.
 constexpr std::int32_t kDragonTicketRadius = 9;
 /// parity: `LevelEvent.ANIMATION_END_GATEWAY_SPAWN`.
@@ -87,7 +87,7 @@ void EndFightSystem::tickFight(world::LoadedWorld& world, const std::vector<Play
         releaseDragonTicket(world, *fight);
         return;
     }
-    // parity: `TicketType.DRAGON`, re-added every tick while somebody fights and taken back
+    // parity: `TicketType.DRAGON`, re-added every tick while somebody fights and taken back.
     // when the arena empties: the chunks the fight looks at stay loaded and ticking.
     if (!fight->dragonTicketHeld) {
         fight->dragonTicketHeld = true;
@@ -390,7 +390,7 @@ void EndFightSystem::spawnNewGateway(world::LoadedWorld& world, DragonFight& fig
             player->connection().sendLevelEvent(kGatewaySpawnEvent, x, kGatewayY, z, 0);
         }
     }
-    // parity: `END_GATEWAY_DELAYED`, a gateway with no exit yet, capped with bedrock above and below.
+    // parity: `END_GATEWAY_DELAYED`.
     world::endGateways::place(world.state(), x, kGatewayY, z, std::nullopt, false);
     syncArea(world, x - 1, z - 1, x + 1, z + 1);
 }

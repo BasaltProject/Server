@@ -21,7 +21,7 @@ using player::PlayerSession;
 using server::world::loot::ItemStack;
 using storage::StoredItemStack;
 
-/// parity: `ItemCost.test`: the item, and every component the cost names with the same value.
+/// parity: `ItemCost.test`.
 [[nodiscard]] bool costMatches(const ItemStack& cost, const std::optional<StoredItemStack>& stack) {
     if (!stack.has_value() || stack->count <= 0 || stack->id != cost.item.toString()) {
         return false;
@@ -36,7 +36,7 @@ using storage::StoredItemStack;
     return true;
 }
 
-/// parity: `MerchantOffer.satisfiedBy`: the first cost at its current price, the second at its base.
+/// parity: `MerchantOffer.satisfiedBy`.
 [[nodiscard]] bool satisfiedBy(const world::trades::Offer& offer, const std::optional<StoredItemStack>& buyA,
                                const std::optional<StoredItemStack>& buyB) {
     if (!costMatches(offer.costA, buyA) || buyA->count < world::trades::currentCost(offer).first.count) {
@@ -48,7 +48,7 @@ using storage::StoredItemStack;
     return costMatches(*offer.costB, buyB) && buyB->count >= offer.costB->count;
 }
 
-/// parity: `MerchantOffers.getRecipeFor`: a hint above zero is the only offer tried; zero tries all.
+/// parity: `MerchantOffers.getRecipeFor`.
 [[nodiscard]] std::optional<std::size_t> recipeFor(const std::vector<world::trades::Offer>& offers,
                                                    const std::optional<StoredItemStack>& buyA,
                                                    const std::optional<StoredItemStack>& buyB, std::int32_t hint) {
@@ -212,7 +212,7 @@ void VillagerTradeController::takeResult() {
 }
 
 void VillagerTradeController::quickMoveResult(PlayerSession& session) {
-    // parity: `AbstractContainerMenu.doClick`'s quick move keeps taking the result while the same
+    // parity: `AbstractContainerMenu.doClick`'s quick move keeps taking the result while the same.
     // item comes back and the whole of it fits.
     while (slots_[kResult].has_value() && mayTakeResult()) {
         const StoredItemStack result = *slots_[kResult];

@@ -16,29 +16,19 @@ using wire::common::JsonObject;
 using wire::common::JsonValue;
 
 enum class Kind : std::uint8_t {
-    /// `Identifier.CODEC`.
     Id,
     String,
     Number,
     Bool,
-    /// A holder set: an id, a `#tag`, or a list of ids.
     HolderSet,
-    /// `IntProviders.CODEC`: a number or a typed provider.
     IntProvider,
-    /// A string or a list of them.
     Strings,
     Object,
-    /// `ComponentSerialization.CODEC`: a string, a list or an object.
     Text,
-    /// `SoundEvent.CODEC`: an id, or an inline event.
     Sound,
-    /// `ChatTypeDecoration.CODEC`.
     Decoration,
-    /// `SpawnPrioritySelectors.CODEC`.
     SpawnConditions,
-    /// `WolfVariant.AssetInfo.CODEC`.
     WolfAssets,
-    /// A nested sound set, one sound per field.
     WolfSounds,
     PigSounds,
     CatSounds,
@@ -135,7 +125,6 @@ std::optional<std::string> sounds(const JsonValue& value, std::initializer_list<
     return std::nullopt;
 }
 
-/// A holder set: an id, a `#tag`, or a list of ids.
 std::optional<std::string> holderSet(const JsonValue& value) {
     if (const auto* text = value.get<std::string>(); text != nullptr) {
         const std::string_view id =
@@ -352,7 +341,6 @@ constexpr std::array<std::string_view, 23> kEffectTypes{"add",
 
 [[nodiscard]] std::string vanillaPath(std::string_view id);
 
-/// Every `effect` object inside the effects map must name a type vanilla registers.
 std::optional<std::string> effectTypes(const JsonValue& value) {
     if (const auto* list = value.get<std::vector<JsonValue>>(); list != nullptr) {
         for (const JsonValue& element : *list) {
@@ -459,7 +447,7 @@ std::optional<std::string> dimensionType(const JsonObject& element) {
                             {"monster_spawn_block_light_limit", Kind::Number}});
 }
 
-/// parity: `Biome.DIRECT_CODEC`: climate, the effects' water colour, carvers and features.
+/// parity: `Biome.DIRECT_CODEC`.
 std::optional<std::string> biome(const JsonObject& element) {
     if (auto error = fields(element, {{"has_precipitation", Kind::Bool},
                                       {"temperature", Kind::Number},

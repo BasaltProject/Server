@@ -12,15 +12,12 @@ using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
 using wire::text::Component;
 
-/// A dialog that leads to a dialog that leads back is a registry an operator can write, so the
-/// walk stops rather than following it.
 constexpr int kMaxDepth = 4;
 
 [[nodiscard]] Component textOf(const NbtTag* tag) {
     return tag == nullptr ? Component::empty() : wire::text::componentNbt::deserialize(*tag);
 }
 
-/// The part of a type name after the namespace, since every one of these is vanilla's.
 [[nodiscard]] std::string_view kindOf(const NbtCompound& nbt) {
     const std::string_view named = nbt.getString("type");
     const std::size_t colon = named.find(':');
@@ -51,9 +48,6 @@ void readBodyInto(const NbtTag& tag, std::vector<Component>& body) {
 
 [[nodiscard]] std::optional<Dialog> readAt(const NbtCompound& nbt, const ByName& byName, int depth);
 
-/// The dialog a `show_dialog` points at, which is either written out where it is used or named.
-/// A name beginning with a hash is a tag, and this server loads no dialog tags: vanilla's own two
-/// lists are tags, and both are empty until a datapack fills them.
 [[nodiscard]] std::shared_ptr<const Dialog> pointedAt(const NbtTag& tag, const ByName& byName, const int depth) {
     const NbtCompound* inline_ = tag.get<NbtCompound>();
     if (inline_ == nullptr) {
@@ -83,7 +77,6 @@ void readAction(const NbtCompound& action, Button& button, const ByName& byName,
         button.press = button.next == nullptr ? Press::None : Press::OpenDialog;
         return;
     }
-    // Everything else is a line the player can read and act on themselves.
     for (const std::string_view field : {"url", "value", "command"}) {
         if (action.contains(field)) {
             button.press = Press::ShowText;
@@ -115,8 +108,6 @@ void readButtonsInto(const NbtCompound& nbt, std::string_view key, std::vector<B
     }
 }
 
-/// One entry of a `dialog_list`, which is a whole dialog rather than a button: the label is its
-/// own title, and pressing it opens it.
 void readListedInto(const NbtCompound& nbt, std::vector<Button>& buttons, const ByName& byName, const int depth) {
     const NbtTag* listed = nbt.find("dialogs");
     if (listed == nullptr || depth >= kMaxDepth) {
@@ -171,7 +162,6 @@ std::optional<Dialog> readAt(const NbtCompound& nbt, const ByName& byName, const
     } else if (kind == "dialog_list") {
         readListedInto(nbt, dialog.buttons, byName, depth);
     } else if (kind != "server_links") {
-        // An unknown kind is still worth drawing: its title and body are where the words are.
         return dialog;
     }
     if (const NbtCompound* exit = nbt.getCompound("exit_action"); exit != nullptr) {

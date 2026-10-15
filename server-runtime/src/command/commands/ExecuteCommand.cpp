@@ -14,7 +14,6 @@ using wire::text::Component;
 /// parity: the six number types vanilla writes with `/execute store`.
 constexpr std::array<std::string_view, 6> kNumberTypes{"byte", "double", "float", "int", "long", "short"};
 
-/// What a condition reports: how many it matched, or zero when it did not hold.
 [[nodiscard]] std::int32_t counted(const Test& test, const CommandContext& context, bool positive) {
     const std::optional<std::int32_t> matched = test(context);
     if (matched.has_value() != positive) {

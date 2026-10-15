@@ -29,7 +29,6 @@ constexpr double kGravity = 0.04;
     return Aabb::of(boat.x, boat.y, boat.z, boat.width(), boat.height());
 }
 
-/// The water a square holds, and how high it stands, or nothing for no water.
 struct Water {
     float height = 0.0F;
     bool source = false;
@@ -64,7 +63,7 @@ struct Water {
     return under ? std::optional{Status::UnderWater} : std::nullopt;
 }
 
-/// parity: `checkInWater`: water around the bottom of the box, and the highest surface of it.
+/// parity: `checkInWater`.
 [[nodiscard]] bool inWater(const world::WorldState& world, const Aabb& box, double& waterLevel) {
     bool wet = false;
     waterLevel = -std::numeric_limits<double>::max();
@@ -84,8 +83,7 @@ struct Water {
     return wet;
 }
 
-/// Whether any collision box of this square overlaps `box` with some volume. parity:
-/// `Shapes.joinIsNotEmpty(..., BooleanOp.AND)`.
+/// Overlap with some volume. parity: `Shapes.joinIsNotEmpty(..., BooleanOp.AND)`.
 [[nodiscard]] bool overlaps(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z, const Aabb& box) {
     const std::span<const std::int32_t> boxes = registry::blockShapes::collisionBoxes(stateId);
     constexpr double kUnit = 1.0 / registry::blockShapes::kUnits;
@@ -105,8 +103,7 @@ struct Water {
     return false;
 }
 
-/// parity: `getGroundFriction`: the mean slipperiness of what the bottom of the boat rests on,
-/// leaving the corner columns and lily pads out.
+/// parity: `getGroundFriction`.
 [[nodiscard]] float groundFriction(const world::WorldState& world, const Aabb& whole) {
     const Aabb box{whole.minX, whole.minY - 0.001, whole.minZ, whole.maxX, whole.minY, whole.maxZ};
     const std::int32_t x0 = floorOf(box.minX) - 1;
@@ -139,7 +136,7 @@ struct Water {
     return friction / static_cast<float>(count);
 }
 
-/// parity: `getWaterLevelAbove`: the first layer above the boat that is not water all the way up.
+/// parity: `getWaterLevelAbove`.
 [[nodiscard]] float waterLevelAbove(const world::WorldState& world, const Aabb& box, double lastYd) {
     const std::int32_t minX = floorOf(box.minX);
     const std::int32_t maxX = ceilOf(box.maxX);
@@ -227,8 +224,7 @@ void floatBoat(world::WorldState& world, ServerEntity& boat, BoatState& state, b
     }
 }
 
-/// parity: `Entity.move(SELF)` for a boat: blocks stop it axis by axis and a stopped axis loses its
-/// speed.
+/// parity: `Entity.move(SELF)` for a boat: a blocked axis loses its speed.
 void move(world::WorldState& world, ServerEntity& boat, BoatState& state) {
     const entityCollision::BlockAt blockAt = [&world](std::int32_t x, std::int32_t y, std::int32_t z) {
         return world.blockState(x, y, z);
@@ -290,8 +286,7 @@ TickResult tick(world::WorldState& world, ServerEntity& boat, bool drivenByPlaye
         floatBoat(world, boat, state, drivenByPlayer);
         move(world, boat, state);
     }
-    // parity: the oars: a stroke splashes as it passes an eighth of a turn, by what the boat is on,
-    // and a boat nobody drives keeps its oars still.
+    // parity: the oars splash an eighth of a turn into each stroke; a boat nobody drives keeps them still.
     const auto yawRadians = boat.yaw * static_cast<float>(std::numbers::pi / 180.0);
     const std::array<bool, 2> paddles{boat.paddleLeft && drivenByPlayer, boat.paddleRight && drivenByPlayer};
     for (std::size_t side = 0; side < 2; ++side) {

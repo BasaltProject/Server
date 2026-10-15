@@ -93,8 +93,7 @@ void FunctionCommand::build(const CommandNodeBuilder& root) const {
                                                                               permissionLevel::kGamemasters),
                                                        .silent = true}};
         if (runner_->insideFunction()) {
-            // parity: `queueFunctions`: behind this command, and whatever waits on the result told
-            // once, with the sum of what returned, after the last of them.
+            // parity: `queueFunctions`.
             const ExecutionSource* execution = context.source().asExecution();
             std::vector<ExecutionSource::OnResult> waiting =
                 execution == nullptr ? std::vector<ExecutionSource::OnResult>{} : execution->resultCallbacks();
@@ -246,7 +245,7 @@ void ReturnCommand::build(const CommandNodeBuilder& root) const {
     root.literal("fail", [returnWith](const CommandNodeBuilder& fail) {
         fail.executes([returnWith](const CommandContext&) { return returnWith(false, 0); });
     });
-    // parity: `run` forwards to the root, and what the command reports becomes the function's.
+    // parity: `run` forwards to the root.
     root.literal("run", [this, &root](const CommandNodeBuilder& run) {
         run.redirectTo(root.root(), false, [runner = runner_](const CommandContext& context) {
             return std::vector<std::shared_ptr<const CommandSource>>{executeCommand::wrapping(

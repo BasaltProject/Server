@@ -63,9 +63,7 @@ constexpr std::string_view kDefaultReason = "Banned by an operator.";
     return reason == nullptr ? std::string{kDefaultReason} : *reason;
 }
 
-/// parity: `BanIpCommands.banIp` asks Guava's `InetAddresses.isInetAddress` whether the argument is
-/// an address or a player's name. This is the four-dotted-numbers half of that answer: an address
-/// written the other way round is read as a name here and as an address there.
+/// parity: `BanIpCommands.banIp` asks Guava's `InetAddresses.isInetAddress` whether the argument is an address or a.
 [[nodiscard]] bool looksLikeAddress(std::string_view text) {
     std::int32_t parts = 0;
     std::size_t at = 0;

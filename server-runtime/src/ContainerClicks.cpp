@@ -99,7 +99,6 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
     const std::int32_t slotIndex = packet.slot;
     const std::int32_t button = packet.button;
     if (hooks_.clickAllowed) {
-        // What is in the slot the click is about, when it is one this build models.
         const std::optional<MenuSlot> clickedSlot = openMenu.slotAt(slotIndex);
         std::optional<std::string> item;
         if (clickedSlot.has_value()) {
@@ -111,14 +110,12 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
             }
         }
         if (!hooks_.clickAllowed(slotIndex, button, nameOf(packet.mode), item)) {
-            // The client moved the item on its own screen the moment it clicked.
             sendInventory();
             return;
         }
     }
 
-    // A plugin's window: the click is a button press, so nothing moves and the plugin is told which
-    // of *its* slots was meant, never the player's own.
+    // A plugin's window: a click is a button press, told as the plugin's slot, never the player's own.
     if (pluginMenu_.has_value()) {
         const std::optional<MenuSlot> clicked = openMenu.slotAt(slotIndex);
         if (clicked.has_value() && pluginMenuClick_) {
@@ -132,7 +129,6 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
 
     switch (packet.mode) {
     case ServerboundContainerClickPacket::Mode::Pickup: {
-        // Slot -999 is the click outside the window: whatever is on the cursor is thrown.
         if (slotIndex == kOutsideWindowSlot) {
             if (!carriedItem_.has_value()) {
                 sendInventory();
@@ -185,7 +181,6 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
             return;
         }
         if (std::holds_alternative<player::menuSlot::Result>(*slot)) {
-            // Throwing the result still has to craft it, ingredients and all.
             const std::optional<storage::StoredItemStack> previouslyCarried = carriedItem_;
             carriedItem_.reset();
             takeCraftingResult(*session);
@@ -201,7 +196,6 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
             sendInventory();
             return;
         }
-        // Button 0 is `Q`, button 1 is ctrl+`Q`: one item or the whole stack.
         const std::int32_t thrown = button == 0 ? 1 : stack->count;
         dropStack(*session, withCount(*stack, thrown));
         player::statAwards::awardThrown(*session, stack->id, thrown);
@@ -219,8 +213,7 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
         break;
     }
     case ServerboundContainerClickPacket::Mode::QuickCraft:
-        // Mid-gesture stages answer with nothing: resending the window while the player is still
-        // dragging is what makes the drag snap back under their cursor.
+        // Mid-gesture stages answer with nothing: resending while the player drags makes the drag snap back.
         if (!handleQuickCraft(*session, packet)) {
             return;
         }
@@ -259,8 +252,7 @@ void ContainerMenuController::collectMatching(PlayerSession& session, bool rever
         return;
     }
 
-    // Every slot of the *open window*, not just the player's own inventory: a crafting table shows
-    // the grid too, and vanilla's own sweep gathers from everything the player can see.
+    // Every slot of the open window, not just the inventory: vanilla's sweep gathers from all that the player sees.
     std::vector<MenuSlot> slots;
     for (std::int32_t index = 0; index < openMenu.slotCount(); index++) {
         const std::optional<MenuSlot> slot = openMenu.slotAt(index);
@@ -272,9 +264,7 @@ void ContainerMenuController::collectMatching(PlayerSession& session, bool rever
         std::ranges::reverse(slots);
     }
 
-    // The first pass deliberately skips already-full stacks so the loose ones are consumed first,
-    // which is what makes double-clicking tidy an inventory up; the second takes what is still
-    // needed.
+    // The first pass skips full stacks so loose ones are consumed first, which makes double-clicking tidy.
     for (std::int32_t pass = 0; pass < 2; pass++) {
         for (const MenuSlot& slot : slots) {
             if (total >= most) {
@@ -297,8 +287,7 @@ void ContainerMenuController::collectMatching(PlayerSession& session, bool rever
 }
 
 bool ContainerMenuController::handleQuickCraft(PlayerSession& session, const ServerboundContainerClickPacket& packet) {
-    // parity: `getQuickcraftHeader` is `mask and 3` and `getQuickcraftType` is `mask shr 2 and 3`,
-    // the opposite way round from how it reads.
+    // parity: `getQuickcraftHeader`.
     const std::int32_t stage = packet.button & 3;
     const std::int32_t type = (packet.button >> 2) & 3;
 
@@ -327,7 +316,6 @@ bool ContainerMenuController::handleQuickCraft(PlayerSession& session, const Ser
         quickCraftSlots_.clear();
         return true;
     }
-    // Any other order is an interrupted gesture: forget it and resync.
     quickCraftActive_ = false;
     quickCraftSlots_.clear();
     return true;
@@ -379,7 +367,6 @@ void ContainerMenuController::distributeQuickCraft(PlayerSession& session) {
         writeSlot(session, slot, withCount(carried, already + give));
         remaining -= give;
     }
-    // A middle-button drag is creative's own "fill them all" and costs the player nothing.
     if (quickCraftType_ == kQuickCraftTypeMiddle && session.gamemode == Gamemode::Creative) {
         carriedItem_ = carried;
     } else if (remaining <= 0) {
@@ -408,7 +395,7 @@ void ContainerMenuController::pickupClick(PlayerSession& session, const MenuSlot
         return;
     }
     const storage::StoredItemStack carried = *carriedItem_;
-    // parity: `Slot.mayPlace` and `getMaxStackSize`, which only the brewing stand's slots narrow here.
+    // parity: `Slot.mayPlace` and `getMaxStackSize`.
     const std::int32_t capacity = slotCapacity(slot, carried);
     if ((brewingStandOpen() || mountOpen()) && !accepts(slot, carried)) {
         return;
@@ -431,7 +418,6 @@ void ContainerMenuController::pickupClick(PlayerSession& session, const MenuSlot
         carriedItem_ = left <= 0 ? std::nullopt : std::optional{withCount(carried, left)};
         return;
     }
-    // Two different items: they trade places, cursor for slot.
     if (carried.count > capacity) {
         return;
     }
@@ -440,8 +426,6 @@ void ContainerMenuController::pickupClick(PlayerSession& session, const MenuSlot
 }
 
 void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& slot) {
-    // Shift-clicking the result crafts as many times as the grid allows, which is what makes it the
-    // fast way to turn a stack of logs into planks.
     if (std::holds_alternative<player::menuSlot::Result>(slot)) {
         const std::optional<storage::StoredItemStack> previouslyCarried = carriedItem_;
         carriedItem_.reset();
@@ -458,8 +442,7 @@ void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& 
         return;
     }
 
-    // parity: `MerchantMenu.quickMoveStack`: the result trades again and again, and the inventory
-    // only ever moves within itself, never into the payment slots.
+    // parity: `MerchantMenu.quickMoveStack`.
     const auto* merchantSlot = std::get_if<player::menuSlot::Block>(&slot);
     if (openMerchant_ && merchantSlot != nullptr && merchantSlot->index == VillagerTradeController::kResult) {
         owner_->trades().quickMoveResult(session);
@@ -469,9 +452,7 @@ void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& 
     if (!stack.has_value()) {
         return;
     }
-    // parity: `AbstractContainerMenu.quickMoveStack`, whose whole job is picking the other side:
-    // with a block open, the inventory sends to the block and the block sends to the inventory.
-    // Without a block open the two halves of the inventory swap, hotbar to storage and back.
+    // parity: `AbstractContainerMenu.quickMoveStack`.
     if (mountOpen()) {
         quickMoveMount(session, slot, *stack);
         return;
@@ -504,7 +485,7 @@ void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& 
     }
 
     std::int32_t remaining = stack->count;
-    // Stacking onto what is already there comes first, exactly as vanilla's `moveItemStackTo`.
+    // parity: `moveItemStackTo` stacks onto what is already there first.
     for (const MenuSlot& target : targets) {
         if (remaining <= 0) {
             break;
@@ -562,9 +543,7 @@ void ContainerMenuController::handleSetCreativeModeSlot(
     if (session == nullptr || session->gamemode != Gamemode::Creative) {
         return;
     }
-    // The client numbers this in container 0's own slots, not this server's storage order, and the
-    // two are neither the same size nor the same layout. Slot -1 (dragged out of the window to
-    // discard) and the crafting slots resolve to nothing.
+    // The client numbers container 0's slots its own way; slot -1 and the crafting slots resolve to nothing.
     const std::optional<std::int32_t> slot = PlayerInventory::storageSlotOf(packet.slot);
     if (!slot.has_value()) {
         return;
@@ -573,8 +552,7 @@ void ContainerMenuController::handleSetCreativeModeSlot(
     if (packet.item.has_value()) {
         const server::registry::Item* item = server::registry::items::registry().byId(packet.item->itemId);
         if (item != nullptr) {
-            // A creative client echoes a slot whenever the inventory screen opens, so anything not
-            // rebuilt here is stripped off an item its owner merely looked at.
+            // A creative client echoes a slot when the inventory opens, so what is not rebuilt here is stripped.
             world::RealEnchantments* enchantments = owner_->options().enchantments;
             stack = storage::StoredItemStack{
                 .id = item->id.toString(),
@@ -589,7 +567,7 @@ void ContainerMenuController::handleSetCreativeModeSlot(
                     })};
         }
     }
-    // parity: `handleSetCreativeModeSlot`'s `validData`: an overfull stack is ignored outright.
+    // parity: `handleSetCreativeModeSlot`'s `validData`.
     if (stack.has_value() &&
         stack->count > server::registry::itemStacking::maxStackSize(stack->id, stack->components)) {
         return;
@@ -621,7 +599,7 @@ void ContainerMenuController::handlePickItemFromBlock(const wire::protocol::play
         !hooks_.pickAllowed(*session, packet.pos.x, packet.pos.y, packet.pos.z, item->id.toString())) {
         return;
     }
-    // parity: `handlePickItemFromBlock`: the block entity's data only for a creative player who asked.
+    // parity: `handlePickItemFromBlock`.
     const bool includeData = session->gamemode == Gamemode::Creative && packet.includeData;
     const server::world::ChunkBlockEntity* entity = nullptr;
     if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
@@ -648,8 +626,7 @@ void ContainerMenuController::handlePickItemFromEntity(const wire::protocol::pla
     if (target == nullptr || target->removed || !owner_->withinAttackReach(*session, *target)) {
         return;
     }
-    // parity: `Entity.getPickResult`: a mob answers with its own spawn egg, a boat or a minecart
-    // with the item it was placed from, and everything else with nothing at all.
+    // parity: `Entity.getPickResult`.
     const std::optional<Identifier> item = entity::entityPickResults::itemFor(target->type());
     if (!item.has_value()) {
         return;

@@ -105,8 +105,7 @@ std::vector<PlacedJigsaw> StructurePoolElement::getShuffledJigsawBlocks(const Po
         return elements_->empty() ? std::vector<PlacedJigsaw>{}
                                   : elements_->front().getShuffledJigsawBlocks(loader, position, rotation, random);
     case Kind::Feature:
-        // parity: `FeaturePoolElement.getShuffledJigsawBlocks`. The synthetic connector is DOWN_SOUTH
-        // at the requested position, ignores rotation and, since 26.3, has no name.
+        // parity: `FeaturePoolElement.getShuffledJigsawBlocks`.
         return {PlacedJigsaw{.pos = position,
                              .front = StructureDirection::Down,
                              .top = StructureDirection::South,

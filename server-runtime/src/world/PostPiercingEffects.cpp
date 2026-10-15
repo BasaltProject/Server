@@ -187,14 +187,14 @@ using wire::nbt::NbtTag;
     return false;
 }
 
-/// parity: `ApplyEntityImpulse`: the direction turned by the look, scaled per axis, then by the level.
+/// parity: `ApplyEntityImpulse`.
 [[nodiscard]] std::array<double, 3> impulseOf(const NbtCompound& effect, std::int32_t level, const User& user) {
     const std::array<double, 3> direction = vectorOf(effect.find("direction"));
     const std::array<double, 3> scale = vectorOf(effect.find("coordinate_scale"));
     const auto magnitude = static_cast<double>(levelBased(effect.find("magnitude"), level));
     const double pitch = static_cast<double>(user.pitch) * std::numbers::pi / 180.0;
     const double yaw = static_cast<double>(user.yaw) * std::numbers::pi / 180.0;
-    // parity: `calculateViewQuaternion`, the pitch about x first and then the negated yaw about y.
+    // parity: `calculateViewQuaternion`.
     const double y = (direction[1] * std::cos(pitch)) - (direction[2] * std::sin(pitch));
     const double z0 = (direction[1] * std::sin(pitch)) + (direction[2] * std::cos(pitch));
     const double x = (direction[0] * std::cos(yaw)) - (z0 * std::sin(yaw));

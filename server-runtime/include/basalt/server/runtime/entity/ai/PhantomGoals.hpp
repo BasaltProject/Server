@@ -6,8 +6,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `Phantom.PhantomAttackStrategyGoal`: circle for a while, then swoop, with the anchor
-/// set twenty to forty blocks over the target and never below the sea.
+/// parity: `Phantom.PhantomAttackStrategyGoal`.
 class PhantomStrategyGoal final : public Goal {
 public:
     [[nodiscard]] bool canUse(MobContext& mob) override;
@@ -22,8 +21,7 @@ private:
     std::int32_t nextSweepTick_ = 0;
 };
 
-/// parity: `Phantom.PhantomSweepAttackGoal`: dive at the target's middle and pull away after the
-/// hit, or when a cat is near, when it bumps into something or when it was just hurt.
+/// parity: `Phantom.PhantomSweepAttackGoal`.
 class PhantomSweepGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
@@ -41,7 +39,7 @@ private:
     std::int32_t catSearchTick_ = 0;
 };
 
-/// parity: `Phantom.PhantomCircleAroundAnchorGoal`: round the anchor fifteen degrees at a time.
+/// parity: `Phantom.PhantomCircleAroundAnchorGoal`.
 class PhantomCircleGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
@@ -61,8 +59,7 @@ private:
     float clockwise_ = 0.0F;
 };
 
-/// parity: `Phantom.PhantomAttackPlayerTargetGoal`: every three seconds, the highest player within
-/// sixteen blocks across and sixty-four up or down.
+/// parity: `Phantom.PhantomAttackPlayerTargetGoal`.
 class PhantomTargetGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }

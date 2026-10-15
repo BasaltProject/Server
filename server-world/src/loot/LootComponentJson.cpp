@@ -42,7 +42,7 @@ constexpr std::int32_t kMaxGeneration = 3;
     return tag.has_value() ? std::optional{std::move(*tag)} : std::nullopt;
 }
 
-/// parity: the `DataComponentType` names in a codec: a namespaced id, the vanilla one by default.
+/// parity: the `DataComponentType` names in a codec.
 [[nodiscard]] std::optional<std::string> componentName(std::string_view name) {
     const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(name);
     return id.has_value() ? std::optional{id->toString()} : std::nullopt;
@@ -76,7 +76,7 @@ constexpr std::int32_t kMaxGeneration = 3;
     return operation;
 }
 
-/// parity: `Filterable.codec`: the value alone, or `{raw, filtered}`; always stored in full.
+/// parity: `Filterable.codec`.
 [[nodiscard]] Parsed<NbtTag> filterable(const JsonValue& value, bool text) {
     const JsonObject* object = value.get<JsonObject>();
     const JsonValue* raw = object != nullptr && object->find("raw") != nullptr ? object->find("raw") : &value;
@@ -154,7 +154,7 @@ standAlone(const JsonObject& object, const std::function<Parsed<Element>(const J
     return built;
 }
 
-/// parity: `ExtraCodecs.RGB_COLOR_CODEC`'s vector form, three channels floored to eight bits.
+/// parity: `ExtraCodecs.RGB_COLOR_CODEC`'s vector form.
 [[nodiscard]] std::optional<std::int32_t> rgbOf(const JsonValue& value) {
     const std::vector<JsonValue>* channels = value.get<std::vector<JsonValue>>();
     if (channels == nullptr || channels->size() != 3) {
@@ -399,7 +399,7 @@ std::optional<Parsed<LootFunction>> Reader::componentFunction(const std::string&
     case Op::SetLootTable: {
         const bool item = edit.op == Op::SetItem;
         const JsonValue* id = object.find(item ? "item" : "loot_table_id");
-        // parity: `SetContainerLootTable.ID_ONLY_CODEC`, a named table and never one written in place.
+        // parity: `SetContainerLootTable.ID_ONLY_CODEC`.
         const std::optional<std::string> name = asString(id);
         const std::expected<Identifier, wire::common::IdentifierError> parsed =
             name.has_value() ? Identifier::parse(*name) : std::unexpected(wire::common::IdentifierError::EmptyPart);

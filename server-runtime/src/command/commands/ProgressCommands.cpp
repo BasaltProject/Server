@@ -182,8 +182,6 @@ void AdvancementCommand::build(const CommandNodeBuilder& root) const {
                                     named.argument(
                                         "criterion", wordArgument(),
                                         [this, granting, mode, selection](const CommandNodeBuilder& one) {
-                                            /// Only the criteria of the advancement already
-                                            /// named, which is what vanilla completes here.
                                             one.suggestsFromServer([this](const SuggestionContext& context) {
                                                 std::vector<std::string> named;
                                                 const auto* id = context.argument<Identifier>("advancement");
@@ -229,8 +227,7 @@ void RecipeCommand::build(const CommandNodeBuilder& root) const {
                 bool applied = false;
                 if (giving) {
                     applied = progress_->learn(target->uuid().toString(), id);
-                    // parity: `ServerPlayer.awardRecipes` fires the unlock trigger itself, rather
-                    // than leaving the advancement to whatever crafting follows.
+                    // parity: `ServerPlayer.awardRecipes` fires the unlock trigger itself.
                     if (applied && context.environment().options().advancementTriggers != nullptr) {
                         context.environment().options().advancementTriggers->onRecipeUnlocked(
                             target->name(), target->uuid().toString(), id);
@@ -246,7 +243,6 @@ void RecipeCommand::build(const CommandNodeBuilder& root) const {
                 }
             }
             if (!moved.empty()) {
-                // Adds or removes the entries in this player's own book.
                 if (giving) {
                     world::recipeBook::add(*target, *recipes_, moved);
                 } else {

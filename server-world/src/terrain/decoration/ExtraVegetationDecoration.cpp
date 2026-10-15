@@ -66,9 +66,7 @@ const StateSet& cactusSupport() {
     return states;
 }
 
-/// parity: these features scatter up to seven blocks from their origin, so they land in a neighbour
-/// often. Masking with `and 15` put those on the opposite edge of the same chunk, which is worse than
-/// dropping them; the deferred writer takes them to the chunk they belong to. Coordinates are world.
+/// parity: these features scatter up to seven blocks, so they land in a neighbour; coordinates are world.
 [[nodiscard]] std::int32_t get(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
     if (y < bounds.minY() || y > bounds.maxY()) {

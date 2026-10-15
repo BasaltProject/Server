@@ -109,7 +109,7 @@ constexpr std::int64_t kSlimeChunkSalt = 987234911;
 
 [[nodiscard]] bool isLavaFluid(std::int32_t stateId) { return blockPathOf(stateId) == "lava"; }
 
-/// parity: `EntityType.isBlockDangerous`, whose burning half a fire-immune mob walks through.
+/// parity: `EntityType.isBlockDangerous`.
 [[nodiscard]] bool isDangerous(std::int32_t stateId, std::string_view path, const Identifier* type) {
     if (type != nullptr && reg::entityTypeShapes::isImmuneTo(*type, path)) {
         return false;
@@ -122,8 +122,7 @@ constexpr std::int64_t kSlimeChunkSalt = 987234911;
     return hurtsOnContact().contains(path);
 }
 
-/// parity: `NaturalSpawner.isValidEmptySpawnBlock`, all four of its answers. `fluidCounts` is off
-/// where the caller hands it `Fluids.EMPTY` instead of the block's own fluid.
+/// parity: `NaturalSpawner.isValidEmptySpawnBlock`.
 [[nodiscard]] bool canStandIn(std::int32_t stateId, const Identifier* type, bool fluidCounts = true) {
     if (reg::blockShapes::isFullCube(stateId) || redstone::isSignalSource(stateId) ||
         (fluidCounts && reg::blockFluids::hasFluid(stateId))) {
@@ -166,7 +165,7 @@ constexpr std::int64_t kSlimeChunkSalt = 987234911;
     return batGround().contains(blockPathOf(ground));
 }
 
-/// parity: 26.2 `Slime.checkSlimeSpawnRules`, including its moon timeline and slime chunks.
+/// parity: 26.2 `Slime.checkSlimeSpawnRules`.
 [[nodiscard]] bool canSpawnSlime(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                  random::RandomSource& random) {
     if (world.difficulty() == "peaceful") {
@@ -270,7 +269,6 @@ constexpr std::int64_t kSlimeChunkSalt = 987234911;
     return !naturalSpawnPredicates::isSurfaceMonster(type) || canSeeSky(world, x, y, z);
 }
 
-/// Whether the position leaves room for this type, blocks and standing entities alike.
 [[nodiscard]] bool obstructionAllows(LoadedWorld& world, const Identifier& type, double x, double y, double z) {
     if (!naturalSpawnObstruction::blocksAllow(type, x, y, z,
                                               [&world](std::int32_t bx, std::int32_t by, std::int32_t bz) {
@@ -310,7 +308,6 @@ std::vector<MobCategory> categoriesFor(std::string_view difficulty, std::int64_t
 
 std::int32_t spawnTopY(const server::world::Chunk& chunk, std::int32_t localX, std::int32_t localZ) {
     // parity: `NaturalSpawner` adds one to a heightmap that answers with the topmost solid block.
-    // Ours answers with the free space over it, so it is already the same number.
     return chunk.heightAt(localX, localZ, server::world::HeightmapType::WorldSurface);
 }
 
@@ -491,8 +488,7 @@ bool canSpawnAt(LoadedWorld& world, const Identifier* type, MobCategory category
     }
 
     if (category == MobCategory::Monster) {
-        // parity: `Monster.isDarkEnoughToSpawn`: the sky has to be dark where it stands, and the
-        // block light under the dimension's own limit, which is zero in the overworld.
+        // parity: `Monster.isDarkEnoughToSpawn`: the sky has to be dark where it stands, and the.
         const bool dark = monstersIgnoringLight().contains(typePath) ||
                           (worldLight::skyLight(world.state(), x, y, z) <= random.nextInt(32) &&
                            worldLight::blockLight(world.state(), x, y, z) <= 0);
@@ -536,9 +532,7 @@ std::vector<SpawnRequest> spawnForChunk(LoadedWorld& world, std::int32_t chunkX,
     if (topEmptyY <= minY) {
         return {};
     }
-    // parity: `getRandomPosWithin` picks between the world's floor and the surface, and the floor is
-    // below zero: taking the height as a bound crashed on every world whose surface is negative,
-    // which is every superflat one.
+    // parity: `getRandomPosWithin` picks between the world's floor and the surface.
     const std::int32_t startY = minY + random.nextInt(topEmptyY - minY + 1);
     const std::int32_t startX = (chunkX << 4) + localX;
     const std::int32_t startZ = (chunkZ << 4) + localZ;
@@ -630,8 +624,7 @@ std::vector<SpawnRequest> spawnForChunk(LoadedWorld& world, std::int32_t chunkX,
             if (clusterSize >= maxClusterSize(chosen->type)) {
                 return requests;
             }
-            // parity: a shoal of tropical fish stops at the first member until its variant is
-            // decided, which is what the caller's group data records.
+            // parity: a shoal of tropical fish stops at the first member until its variant is.
             if (chosen->type.path() == "tropical_fish" && !sharedVariant.has_value()) {
                 break;
             }

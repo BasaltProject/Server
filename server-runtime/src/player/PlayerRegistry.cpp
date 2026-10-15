@@ -60,8 +60,7 @@ void PlayerRegistry::keepAlive(std::shared_ptr<void> owner) {
 
 void PlayerRegistry::collect() {
     const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-    // Moved out and dropped outside the lock: a session's own destructor is nobody's business here
-    // and may take as long as it likes.
+    // Moved out and dropped outside the lock: a session's destructor may take as long as it likes.
     std::vector<std::unique_ptr<PlayerSession>> letGo;
     std::vector<std::shared_ptr<void>> closed;
     {

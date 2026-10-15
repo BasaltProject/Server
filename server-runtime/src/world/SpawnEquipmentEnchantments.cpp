@@ -35,7 +35,6 @@ constexpr std::int32_t kAdditionalEnchantmentBound = 50;
     return tag;
 }
 
-/// A number written either as a number or as the text of one, as the jar's own files do both.
 [[nodiscard]] std::optional<std::int32_t> intAt(const JsonObject& root, std::string_view key) {
     const JsonValue* value = root.find(key);
     if (value == nullptr) {
@@ -60,7 +59,6 @@ constexpr std::int32_t kAdditionalEnchantmentBound = 50;
     return value == nullptr ? nullptr : value->get<std::string>();
 }
 
-/// The `<prefix><path>.json` entries of one directory, as ids, in the order the jar lists them.
 [[nodiscard]] std::vector<std::pair<Identifier, std::string>> entriesOf(const SpawnEquipmentJar& jar,
                                                                         std::string_view prefix) {
     std::vector<std::pair<Identifier, std::string>> found;
@@ -181,8 +179,7 @@ std::vector<SpawnEquipmentEnchantments::Candidate> SpawnEquipmentEnchantments::a
         if (found == definitions_.end() || !found->second.primaryItems.matches(item, itemTags_)) {
             continue;
         }
-        // parity: the highest level whose cost band this draw lands in, which is why a rich draw
-        // gives a high level rather than several low ones.
+        // parity: the highest level whose cost band this draw lands in, which is why a rich draw.
         for (std::int32_t level = found->second.maxLevel; level >= 1; level--) {
             if (cost >= found->second.minCost.at(level) && cost <= found->second.maxCost.at(level)) {
                 candidates.push_back({.definition = &found->second, .level = level});

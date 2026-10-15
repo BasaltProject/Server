@@ -13,8 +13,7 @@ namespace basalt::server::runtime::command {
 namespace {
 
 namespace parserId = wire::protocol::play::argumentType;
-/// `world::` inside this namespace is `runtime::world`, and the two transforms live in the world
-/// module's own.
+/// `world::` inside this namespace is `runtime::world`, and the two transforms live in the world module's own.
 namespace structure = server::world::structure;
 
 using wire::protocol::play::ArgumentParser;
@@ -22,7 +21,6 @@ using wire::protocol::play::DisplaySlot;
 using wire::protocol::play::TeamColor;
 using wire::text::Component;
 
-/// A registry entry read exactly as a resource location, differing only in what the client is told.
 class RegistryArgument final : public ArgumentType {
 public:
     RegistryArgument(std::int32_t parser, std::string registry) : parser_(parser), registry_(std::move(registry)) {}
@@ -61,8 +59,6 @@ public:
     [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kFunction}; }
 };
 
-/// A name the client already keeps a list of: read as a brigadier string, declared as its own
-/// parser so the client completes it without asking.
 class NameArgument final : public ArgumentType {
 public:
     explicit NameArgument(std::int32_t parser) : parser_(parser) {}
@@ -82,7 +78,6 @@ private:
     std::int32_t parser_;
 };
 
-/// Everything up to the next space, which is how the three word-shaped parsers below read.
 [[nodiscard]] std::string readWord(StringReader& reader) {
     const std::int32_t start = reader.cursor();
     while (reader.canRead() && std::isspace(static_cast<unsigned char>(reader.peek())) == 0) {
@@ -91,7 +86,7 @@ private:
     return reader.string().substr(static_cast<std::size_t>(start), static_cast<std::size_t>(reader.cursor() - start));
 }
 
-/// parity: `ObjectiveCriteriaArgument.parse`, everything up to the next space, colons included.
+/// parity: `ObjectiveCriteriaArgument.parse`.
 class CriteriaArgument final : public ArgumentType {
 public:
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
@@ -171,8 +166,7 @@ public:
         const auto found = std::ranges::find_if(kSlots, [&name](const auto& slot) { return slot.first == name; });
         if (found == kSlots.end()) {
             reader.setCursor(start);
-            // parity: vanilla also takes `sidebar.team.<colour>`, which needs per-team display slots
-            // this build has not got. Refused by name rather than drawn in the wrong slot.
+            // parity: vanilla also takes `sidebar.team.<colour>`.
             return std::unexpected{CommandSyntaxError{
                 .component = Component::translatable("argument.scoreboardDisplaySlot.invalid", {Component::text(name)}),
                 .input = reader.string(),
@@ -184,7 +178,6 @@ public:
     [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kScoreboardSlot}; }
 };
 
-/// The two `/place template` modifiers, which read the same way and differ only in their table.
 template <typename T, std::size_t N>
 class TransformArgument final : public ArgumentType {
 public:

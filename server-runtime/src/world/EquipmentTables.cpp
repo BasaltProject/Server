@@ -28,7 +28,6 @@ constexpr float kDefaultDropChance = 0.085F;
     return found == nullptr ? NbtCompound{} : *found;
 }
 
-/// The slot an item's own `equippable` component names, before any stack changes it.
 [[nodiscard]] std::optional<std::string_view> defaultSlot(const wire::common::Identifier& item) {
     if (item.namespaceName() != wire::common::Identifier::kVanillaNamespace) {
         return std::nullopt;
@@ -49,8 +48,7 @@ constexpr float kDefaultDropChance = 0.085F;
     if (path == "saddle") {
         return "saddle";
     }
-    // parity: `Equippable.harness` and `Equippable.llamaSwag`, one per dye colour. The moss carpets
-    // are not dyed and are not worn.
+    // parity: `Equippable.harness` and `Equippable.llamaSwag`.
     if (path.ends_with("_harness") ||
         (path.ends_with("_carpet") && path != "moss_carpet" && path != "pale_moss_carpet")) {
         return "body";
@@ -61,8 +59,7 @@ constexpr float kDefaultDropChance = 0.085F;
 } // namespace
 
 std::optional<std::string_view> equippableSlot(const ItemStack& stack) {
-    // parity: a stack's own components win over the item's: a removed `equippable` takes the slot
-    // away, and a patched one names its own.
+    // parity: a stack's own components win over the item's: a removed `equippable` takes the slot.
     if (stack.components.contains("!minecraft:equippable")) {
         return std::nullopt;
     }

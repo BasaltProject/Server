@@ -35,7 +35,7 @@ constexpr std::int32_t kPillarClearRadius = 10;
 constexpr float kPillarBlastPower = 5.0F;
 constexpr float kCrystalBlastPower = 6.0F;
 constexpr double kLevelEventRange = 64.0;
-/// parity: the crystals `tryRespawn` looks for, three blocks out from the portal's centre.
+/// parity: the crystals `tryRespawn` looks for.
 constexpr std::int32_t kCrystalReach = 3;
 
 /// parity: `Direction.Plane.HORIZONTAL`: north, east, south, west.
@@ -102,7 +102,7 @@ void EndFightSystem::tryRespawn(world::LoadedWorld& world) {
             return;
         }
     }
-    // parity: `respawnDragon` first takes the lit portal apart, turning its bedrock and portal blocks
+    // parity: `respawnDragon` first takes the lit portal apart.
     // to end stone, then builds it again unlit.
     const std::int32_t originY = (*fight->exitPortalLocation)[1];
     const std::int32_t bedrock = registry::blocks::bedrock().stateId;
@@ -164,7 +164,7 @@ void EndFightSystem::resetSpikeCrystals(world::LoadedWorld& world) {
 void EndFightSystem::tickRespawn(world::LoadedWorld& world, DragonFight& fight,
                                  const std::vector<PlayerSession*>& watchers,
                                  const std::vector<ServerEntity*>& crystals) {
-    // parity: `respawnTime++` is taken before the stage runs, so a stage that moves on starts at zero.
+    // parity: `respawnTime++` is taken before the stage runs.
     const std::int32_t time = fight.respawnTime++;
     const auto beamAll = [&crystals](std::optional<std::array<std::int32_t, 3>> target) {
         for (ServerEntity* crystal : crystals) {
@@ -250,7 +250,7 @@ void EndFightSystem::rebuildSpike(world::LoadedWorld& world, const std::vector<P
                         [&world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
                             static_cast<void>(world.state().setBlockState(x, y, z, stateId));
                         });
-    // parity: `EndSpikeConfiguration(true, [spike], summoning point)`: an invulnerable crystal beaming at
+    // parity: `EndSpikeConfiguration(true, [spike], summoning point)`.
     // where the dragon will appear.
     const registry::EntityTypeEntry* entry =
         registry::entityTypes::of(wire::common::Identifier::vanilla("end_crystal"));

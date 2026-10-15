@@ -45,8 +45,6 @@ enum class SpreadType : std::uint8_t { SamePosition, SamePlane, WrapAround };
 
 enum class SculkBehaviour : std::uint8_t { Default, Sculk, Vein };
 
-/// The sculk block ids, resolved once. The waterlogged variants sit at a fixed offset from the
-/// default state, which is how the state table orders the property they differ in.
 struct SculkStates {
     std::int32_t sculk;
     std::int32_t vein;
@@ -89,7 +87,6 @@ void shuffle(std::vector<T>& values, random::RandomSource& random) {
     }
 }
 
-/// The read and write view the sculk features work through.
 class SculkRegion {
 public:
     SculkRegion(Chunk& chunk, ExternalStateReader externalBlockState)

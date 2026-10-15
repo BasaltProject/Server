@@ -23,7 +23,6 @@ using wire::nbt::NbtTag;
 using wire::nbt::NbtType;
 using wire::text::Component;
 
-/// The three holders, named as vanilla names them on the reading side of a `modify`.
 void sourceHolders(const CommandNodeBuilder& node, const std::function<void(const CommandNodeBuilder&)>& build) {
     node.literal("block",
                  [build](const CommandNodeBuilder& form) { form.argument("sourcePos", blockPosArgument(), build); });
@@ -49,7 +48,6 @@ void sourceHolders(const CommandNodeBuilder& node, const std::function<void(cons
 void DataCommand::buildModify(const CommandNodeBuilder& root) const {
     const DataAccess access{*storage_};
 
-    /// The holder an argument set names, shared with the read half but looked up by its own names.
     const auto holderNamed = [](const CommandContext& context, std::string_view posName,
                                 std::string_view targetName) -> std::expected<DataHolderRef, CommandSyntaxError> {
         if (const auto* coordinates = context.get<BlockCoordinates>(posName); coordinates != nullptr) {
@@ -67,7 +65,7 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
         return *holder;
     };
 
-    /// parity: `/data modify ... from`, which copies whatever is at that path, compound or not.
+    /// parity: `/data modify ... from`.
     const auto sourceValue = [access, holderNamed](const CommandContext& context,
                                                    bool pathed) -> std::expected<NbtTag, CommandSyntaxError> {
         const auto holder = holderNamed(context, "sourcePos", "source");
@@ -91,7 +89,7 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
         return *found;
     };
 
-    /// parity: `/data modify ... string`, which is the same value as text, optionally a slice of it.
+    /// parity: `/data modify ... string`.
     const auto sourceText = [sourceValue](const CommandContext& context,
                                           bool pathed) -> std::expected<NbtTag, CommandSyntaxError> {
         const auto value = sourceValue(context, pathed);
@@ -114,7 +112,6 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
         return NbtTag::ofString(text.substr(static_cast<std::size_t>(start), static_cast<std::size_t>(end - start)));
     };
 
-    /// Which of the five `/data modify` operations to run with an already-resolved value.
     const auto apply = [this, access, holderNamed](const CommandContext& context, std::string_view mode,
                                                    const NbtTag& value) -> Parsed<std::int32_t> {
         const auto holder = holderNamed(context, "targetPos", "target");
@@ -138,7 +135,6 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
                 next = NbtTag::ofCompound(dataPaths::merge(*base, *incoming));
             }
         } else if (mode != "set") {
-            // `append`, `prepend` and `insert <index>`, which are the list forms.
             std::vector<NbtTag> elements;
             if (const auto* list = existing.has_value() ? existing->get<NbtList>() : nullptr; list != nullptr) {
                 elements = list->elements();
@@ -196,16 +192,14 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
                 return std::unexpected{
                     CommandSyntaxError{.component = Component::translatable("commands.data.block.invalid")}};
             }
-            // parity: `loadAdditional` ends in `setAutomatic`, which books a turn when `auto` has just
-            // come on. Writing the data is what starts a repeating command block nobody has powered.
+            // parity: `loadAdditional` ends in `setAutomatic`.
             const bool wasAutomatic = existingEntity->data().getBoolean("auto");
             chunk->setBlockEntity(server::world::ChunkBlockEntity{existingEntity->localX(), existingEntity->y(),
                                                                   existingEntity->localZ(), existingEntity->type(),
                                                                   *written});
             world::commandBlocks::onDataLoaded((*world)->state(), block->pos[0], block->pos[1], block->pos[2],
                                                wasAutomatic);
-            // parity: `LecternBlockEntity.loadAdditional` resolves the book it was handed, which is
-            // what marks a written one `resolved` even when it never went through a player's hand.
+            // parity: `LecternBlockEntity.loadAdditional` resolves the book it was handed.
             static_cast<void>(
                 world::lecterns::resolveBook((*world)->state(), block->pos[0], block->pos[1], block->pos[2]));
         }
@@ -228,7 +222,6 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
         return result;
     };
 
-    /// Where a modified value comes from: a literal tag, another holder, or one as text.
     const auto sources = [apply, sourceValue, sourceText](const CommandNodeBuilder& node, std::string_view mode) {
         node.literal("value", [apply, mode](const CommandNodeBuilder& form) {
             form.argument("value", nbtTagArgument(), [apply, mode](const CommandNodeBuilder& value) {

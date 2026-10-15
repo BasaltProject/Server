@@ -8,12 +8,10 @@
 
 namespace basalt::server::assets {
 namespace {
-
 constexpr std::string_view kDataPrefix = "data/";
 constexpr std::string_view kLangPrefix = "assets/minecraft/lang/";
 constexpr std::string_view kVanillaPrefix = "data/minecraft/";
 
-/// Bumped whenever the set of entries unpacked below changes, so existing caches redo it.
 constexpr std::string_view kUnpackFormat = "v2-lang";
 
 [[nodiscard]] std::vector<std::string> splitLines(std::string_view text) {
@@ -46,7 +44,6 @@ constexpr std::string_view kUnpackFormat = "v2-lang";
     }
     return joined;
 }
-
 } // namespace
 
 std::string ServerJarAssets::pathFor(std::string_view name) const {
@@ -59,9 +56,6 @@ std::string ServerJarAssets::pathFor(std::string_view name) const {
 std::expected<ServerJarAssets, AssetError> ServerJarAssets::open(std::string_view versionId, std::string dataRoot,
                                                                  const Source& source, wire::common::Logger logger) {
     const std::string marker = dataRoot + "/.unpacked";
-    // The marker carries what was unpacked, not just which version: widening the set of entries
-    // taken has to invalidate a cache written under the narrower one, or an existing install
-    // silently keeps missing whatever was added.
     const std::string stamp = std::string{versionId} + " " + std::string{kUnpackFormat};
     if (const std::optional<std::string> written = wire::io::fileIO::readText(marker); written.has_value()) {
         std::string_view trimmed{*written};
@@ -84,8 +78,6 @@ std::expected<ServerJarAssets, AssetError> ServerJarAssets::open(std::string_vie
     if (!outerBytes.has_value()) {
         return std::unexpected(AssetError{std::format("{} data not found at {}", versionId, *archivePath)});
     }
-    // Since 1.18 the published download is a bundler wrapping the real server archive one level
-    // down, confirmed against the real 26.2 download.
     const std::string innerEntryName = std::format("META-INF/versions/{0}/server-{0}.jar", versionId);
     const std::expected<wire::io::ZipReader, wire::io::ZipError> outer = wire::io::ZipReader::open(*outerBytes);
     if (!outer.has_value()) {
@@ -121,11 +113,8 @@ std::expected<ServerJarAssets, AssetError> ServerJarAssets::open(std::string_vie
     }
     wire::io::fileIO::createDirectories(built.dataRoot_);
     wire::io::fileIO::writeText(built.dataRoot_ + "/.index", join(built.entryNames_));
-    // Written last, so an interrupted unpack is redone rather than trusted.
     wire::io::fileIO::writeText(built.dataRoot_ + "/.unpacked", stamp);
 
-    // The archive has served its only purpose. Keeping it would leave several times the size of what
-    // was extracted sitting on disk forever, for data already on disk in a usable form.
     wire::io::fileIO::remove(*archivePath);
     wire::io::fileIO::remove(*archivePath + ".verified");
     built.logger_.info(
@@ -174,5 +163,4 @@ std::vector<wire::common::Identifier> ServerJarAssets::dataIds(std::string_view 
     }
     return ids;
 }
-
 } // namespace basalt::server::assets

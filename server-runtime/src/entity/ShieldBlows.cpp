@@ -20,8 +20,7 @@ constexpr double kBaseSpeed = 0.3;
 constexpr double kAttackSpeed = 0.35;
 constexpr double kSpeedLerp = 0.1;
 
-/// parity: `Entity.push(Entity)` from the defender's side: each gets a nudge apart, the defender's
-/// answered, the ravager's applied.
+/// parity: `Entity.push(Entity)` from the defender's side.
 [[nodiscard]] Push pushApart(ServerEntity& ravager, double defenderX, double defenderZ) {
     double xa = ravager.x - defenderX;
     double za = ravager.z - defenderZ;

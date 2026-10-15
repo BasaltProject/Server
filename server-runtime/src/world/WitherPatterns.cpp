@@ -15,7 +15,6 @@ enum class Wants : std::uint8_t { Skull, Base, Air, Any };
 
 constexpr std::int32_t kSize = 3;
 
-/// Row major, top row first, as the aisle strings read.
 constexpr std::array<Wants, 9> kCells{Wants::Skull, Wants::Skull, Wants::Skull, Wants::Base, Wants::Base,
                                       Wants::Base,  Wants::Air,   Wants::Base,  Wants::Air};
 
@@ -30,7 +29,6 @@ bool isWitherSkull(std::int32_t stateId) {
     return path == "wither_skeleton_skull" || path == "wither_skeleton_wall_skull";
 }
 
-/// One aisle of three by three against the world, `cells` saying what each square has to be.
 [[nodiscard]] bool matchesCells(const WorldState& world, const IsBase& isBase, const blockPatterns::Cell& origin,
                                 BlockFace forwards, BlockFace up, const std::array<Wants, 9>& cells) {
     // parity: `BlockPattern.matches`, the columns outermost.

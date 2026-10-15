@@ -34,8 +34,6 @@ struct Direction {
     std::int32_t dy;
     std::int32_t dz;
     Axis axis;
-    /// The bit cleared from the default state to turn that face on: vanilla's lichen states count
-    /// down from all-faces-set, exactly as vines do.
     std::int32_t falseBit;
     registry::BlockFace blockFace;
 
@@ -103,9 +101,7 @@ const std::set<std::int32_t>& canBePlacedOnStateIds() {
            registry::blockStateFamilies::isGlowLichenState(stateId);
 }
 
-/// parity: `MultifaceSpreader.DefaultSpreaderConfig.stateCanBeReplaced`. The spread step is stricter
-/// than the first placement: it takes water only where it is a source, while an origin or a search
-/// target takes any water level.
+/// parity: `MultifaceSpreader.DefaultSpreaderConfig.stateCanBeReplaced`.
 [[nodiscard]] bool spreadCanReplace(std::int32_t stateId) {
     if (registry::blocks::isAir(stateId) || registry::blockStateFamilies::isGlowLichenState(stateId)) {
         return true;
@@ -142,7 +138,7 @@ const std::set<std::int32_t>& canBePlacedOnStateIds() {
            ((stateId - firstGlowLichenStateId()) & direction.falseBit) == 0;
 }
 
-/// parity: `Util.shuffle`, a Fisher-Yates walking downward. The draw count and order are observable.
+/// parity: `Util.shuffle`.
 template <typename T>
 [[nodiscard]] std::vector<T> shuffled(const std::vector<T>& source, random::RandomSource& random) {
     std::vector<T> copy = source;
@@ -157,14 +153,11 @@ template <typename T>
     return DecorationPos{position.x + direction.dx, position.y + direction.dy, position.z + direction.dz};
 }
 
-/// The patch region plus the sturdy-face question the spread step asks.
 class LichenRegion {
 public:
     LichenRegion(Chunk& chunk, ExternalStateReader externalBlockState)
         : chunk_(&chunk), external_(externalBlockState), inner_(chunk, std::move(externalBlockState), nullptr) {}
 
-    /// Nothing rather than air outside the chunk with no reader: a growth cannot judge a face it
-    /// cannot see, and answering air would attach lichen to phantom walls at every border.
     [[nodiscard]] std::optional<std::int32_t> get(const DecorationPos& position) const {
         const ChunkHeight bounds = chunk_->verticalBounds();
         if (position.y < bounds.minY() || position.y > bounds.maxY()) {
@@ -224,8 +217,7 @@ void spread(LichenRegion& region, random::RandomSource& random, const Decoration
             if (!oldState.has_value() || !spreadCanReplace(*oldState)) {
                 continue;
             }
-            // After the first placement vanilla attaches by the generic sturdy-face test, not by the
-            // narrower can-be-placed-on list the configuration carries.
+            // After the first placement vanilla attaches by the generic sturdy-face test.
             if (!region.hasSturdyFace(relative(position, face), opposite(face))) {
                 continue;
             }
@@ -265,8 +257,6 @@ bool placeGrowth(LichenRegion& region, random::RandomSource& random, const Decor
     if (!oldState.has_value()) {
         return false;
     }
-    // The origin gate is narrower than the search-target gate: an existing lichen may be traversed
-    // during the directional search, but cannot itself be the origin.
     if (!registry::blocks::isAir(*oldState) && !isWaterBlock(*oldState)) {
         return false;
     }
@@ -290,8 +280,7 @@ bool placeGrowth(LichenRegion& region, random::RandomSource& random, const Decor
         if (!targetState.has_value() || !isAirWaterOrLichen(*targetState)) {
             continue;
         }
-        // parity: 26.2 repeats this same one-block target `searchRange` times. A failed attempt
-        // consumes no random, so one evaluation is equivalent and preserves the vanilla bug.
+        // parity: 26.2 repeats the same one-block target `searchRange` times.
         if (placeOnFirstSupport(region, random, target, *targetState, placementDirections)) {
             return true;
         }

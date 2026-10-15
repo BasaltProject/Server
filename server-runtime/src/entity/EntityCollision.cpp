@@ -10,7 +10,6 @@ namespace {
 
 enum class Axis : std::uint8_t { X, Y, Z };
 
-/// The shape table rasterises a block into so many units a side, which is what the boxes count in.
 const double kUnits = static_cast<double>(registry::blockShapes::kUnits);
 
 template <typename Action>
@@ -21,8 +20,7 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
     const std::int32_t maxY = static_cast<std::int32_t>(std::ceil(box.maxY));
     const std::int32_t minZ = static_cast<std::int32_t>(std::floor(box.minZ));
     const std::int32_t maxZ = static_cast<std::int32_t>(std::ceil(box.maxZ));
-    // A box this big is not a move, it is a bug upstream: gathering the blocks would cost more than
-    // whatever asked for it can be worth.
+    // A box this big is a bug upstream: gathering its blocks would cost more than it could be worth.
     if (maxX - minX > kMaxSpan || maxY - minY > kMaxSpan || maxZ - minZ > kMaxSpan) {
         return;
     }
@@ -33,16 +31,12 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
                 if (!stateId.has_value()) {
                     continue;
                 }
-                // parity: an override answers **instead of** the block's own shape, so it is asked
-                // before the empty check: powder snow's table shape is empty and its answer is not.
                 if (shapeFor) {
                     if (const std::optional<Aabb> instead = shapeFor(*stateId, x, y, z); instead.has_value()) {
                         action(*instead);
                         continue;
                     }
                 }
-                // A shape with no boxes has none to add, which is the loop below arriving at the
-                // same answer more slowly.
                 if (registry::blockShapes::isEmptyShape(*stateId)) {
                     continue;
                 }
@@ -72,8 +66,7 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
     }
 }
 
-/// A box only counts when it overlaps on the other two axes by more than the epsilon, so sliding
-/// along a flush wall is not a collision.
+/// Counts only when overlapping the other two axes by more than epsilon, so sliding along a wall is no hit.
 [[nodiscard]] bool overlapsOtherAxes(Axis axis, const Aabb& box, const Aabb& collider) {
     if (axis != Axis::X && !(box.minX < collider.maxX - kEpsilon && box.maxX > collider.minX + kEpsilon)) {
         return false;
@@ -94,8 +87,7 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
         return distance;
     }
     if (distance > 0.0 && colliderMin >= movingMax - kEpsilon) {
-        // The blocks are gathered a whole block at a time, so a collider can sit further away
-        // than the movement asked for: the answer is the move, not the gap to what was found.
+        // Blocks are gathered whole, so a collider can lie beyond the movement: the answer is the move, not the gap.
         return std::min(distance, colliderMin - movingMax);
     }
     if (distance < 0.0 && colliderMax <= movingMin + kEpsilon) {
@@ -104,7 +96,7 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
     return distance;
 }
 
-/// parity: `AABB.collide`: how far the box can go along the axis before the colliders stop it.
+/// parity: `AABB.collide`.
 [[nodiscard]] double clip(Axis axis, const Aabb& box, const std::vector<Aabb>& boxes, double distance) {
     double left = distance;
     for (const Aabb& collider : boxes) {
@@ -116,8 +108,7 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
     return left;
 }
 
-/// parity: `collectCandidateStepUpHeights`: every Y a collider in the way offers, measured from the
-/// feet, up to the step height and in order.
+/// parity: `collectCandidateStepUpHeights`.
 [[nodiscard]] std::vector<double> candidateHeights(const BlockAt& blockAt, const Aabb& grounded, double dx, double dz,
                                                    double stepHeight, double skip) {
     const Aabb reach = grounded.expandTowards(dx, stepHeight, dz);
@@ -125,8 +116,7 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
     for (const Aabb& collider : collidingBoxes(blockAt, reach)) {
         for (const double edge : {collider.minY, collider.maxY}) {
             const double height = edge - grounded.minY;
-            // A step is a step up: the floor's own edges measure zero or less from the feet, and
-            // the height the flat move already took is not a second thing to try.
+            // A step is a step up: the floor's own edges measure zero or less from the feet.
             if (height <= 0.0 || height > stepHeight || height == skip) {
                 continue;
             }
@@ -144,8 +134,6 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
 std::array<double, 3> collide(const BlockAt& blockAt, const Aabb& box, double dx, double dy, double dz,
                               const ShapeFor& shapeFor) {
     std::array<double, 3> out{dx, dy, dz};
-    // Standing still is the common call from the item and mob loops, and it asks the world
-    // nothing at all.
     if (dx == 0.0 && dy == 0.0 && dz == 0.0) {
         return out;
     }
@@ -182,22 +170,16 @@ std::array<double, 3> collide(const BlockAt& blockAt, const Aabb& box, double dx
 std::array<double, 3> collideWithStep(const BlockAt& blockAt, const Aabb& box, double dx, double dy, double dz,
                                       double stepHeight, bool onGround) {
     std::array<double, 3> out = collide(blockAt, box, dx, dy, dz);
-    // Nothing that cannot step: no candidate height is both above zero and within a step of
-    // nothing, so the walk below would answer the same.
     if (stepHeight <= 0.0) {
         return out;
     }
     const double flatX = out[0];
     const double flatY = out[1];
     const double flatZ = out[2];
-    // Nothing was in the way sideways, so there is nothing to step onto: no lift can get further
-    // than a move that already went the whole way.
     if (flatX == dx && flatZ == dz) {
         return out;
     }
-    // parity: `movement.y != adjusted.y && movement.y < 0.0`. A landing is a fall that was
-    // stopped, not any vertical move that was: a jump cut short by a ceiling is not something to
-    // step from, and could not be anyway, since the same ceiling bounds every lift a step tries.
+    // parity: `movement.y != adjusted.y && movement.y < 0.0`.
     const bool landed = flatY != dy && dy < 0.0;
     if (!onGround && !landed) {
         return out;
@@ -211,8 +193,7 @@ std::array<double, 3> collideWithStep(const BlockAt& blockAt, const Aabb& box, d
             continue;
         }
         out[0] = stepped[0];
-        // parity: `subtract(0, aabb.minY - groundedAABB.minY, 0)`, which is the drop it already
-        // took.
+        // parity: `subtract(0, aabb.minY - groundedAABB.minY, 0)`, the drop already taken.
         out[1] = stepped[1] + (landed ? flatY : 0.0);
         out[2] = stepped[2];
         return out;

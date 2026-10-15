@@ -5,7 +5,6 @@
 #include <utility>
 
 namespace basalt::server::plugins {
-
 std::vector<std::string> PluginRegistrations::summary() const {
     std::vector<std::string> names;
     names.reserve(entries_->size());
@@ -50,5 +49,4 @@ void PluginRegistrations::retireAll(const OnFailure& onFailure) {
     entries_->clear();
     ids_->clear();
 }
-
 } // namespace basalt::server::plugins

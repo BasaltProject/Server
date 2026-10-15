@@ -443,7 +443,6 @@ bool PoiManager::release(const BlockPos& pos) {
 
 std::int32_t PoiManager::sectionsToVillage(std::int32_t sectionX, std::int32_t sectionY, std::int32_t sectionZ) {
     const std::lock_guard lock{mutex_};
-    // The sections around the question have to be known before the answer is.
     for (std::int32_t regionZ = (sectionZ - kMaxVillageDistance) >> 5; regionZ <= (sectionZ + kMaxVillageDistance) >> 5;
          ++regionZ) {
         for (std::int32_t regionX = (sectionX - kMaxVillageDistance) >> 5;

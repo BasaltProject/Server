@@ -275,8 +275,7 @@ void JungleTemplePiece::buildRoof() const {
         mossBox(x, 6, 5, x, 6, 5);
         mossBox(x, 6, 9, x, 6, 9);
     }
-    // Z outer, X inner: the jar writes (2,2), (9,2), (2,12), (9,12), and the selector draws in that
-    // order, so swapping the loops would hand the next box a different stream position.
+    // Z outer, X inner: the jar draws in this order.
     for (const std::int32_t z : {2, 12}) {
         for (const std::int32_t x : {2, 9}) {
             mossBox(x, 7, z, x, 9, z);
@@ -308,7 +307,6 @@ void JungleTemplePiece::buildStairs() const {
     mossBox(5, 4, 5, 6, 4, 5);
     set(stairs("east"), 4, 4, 5);
     set(stairs("west"), 7, 4, 5);
-    // The staircase down into the cellar, cut a step at a time.
     for (std::int32_t step = 0; step < 4; ++step) {
         set(stairs("south"), 5, -step, 6 + step);
         set(stairs("south"), 6, -step, 6 + step);

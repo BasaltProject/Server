@@ -124,7 +124,6 @@ bool isChatMessageIllegal(std::string_view message) {
         if (byte < 0x20 || byte == 0x7F) {
             return true;
         }
-        // The section sign, U+00A7.
         if (byte == 0xC2 && i + 1 < message.size() && static_cast<unsigned char>(message[i + 1]) == 0xA7) {
             return true;
         }

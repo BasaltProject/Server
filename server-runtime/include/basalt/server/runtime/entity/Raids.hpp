@@ -23,17 +23,12 @@ class NbtCompound;
 
 namespace basalt::server::runtime::entity {
 
-/// parity: `Raid.RaidStatus`.
 enum class RaidStatus : std::uint8_t { Ongoing, Victory, Loss, Stopped };
 
-/// parity: `Raid.RaiderType`, in its declaration order, which is the order a wave is spawned in.
 enum class RaiderType : std::uint8_t { Vindicator, Evoker, Pillager, Witch, Ravager };
 
 using RaidPos = std::array<std::int32_t, 3>;
 
-/// One raid on one village.
-///
-/// parity: `Raid`. The raiders are held by entity id, grouped by the wave they joined.
 class Raid {
 public:
     static constexpr std::int32_t kPreRaidTicks = 300;
@@ -79,29 +74,22 @@ public:
         return cooldownTicks == 0 && (groupsSpawned < numGroups || shouldSpawnBonusGroup()) && totalRaidersAlive() == 0;
     }
 
-    /// parity: `absorbRaidOmen`: the omen's level plus one, capped at five.
     void absorbOmen(std::int32_t amplifier);
 
     /// parity: `stop`. The bar's players are dropped by whoever owns the bar.
     void stop();
 
-    /// parity: `getEnchantOdds`.
     [[nodiscard]] float enchantOdds() const noexcept;
 
-    /// parity: `getDefaultNumSpawns` plus `getPotentialBonusSpawns`, drawn off the raid's random.
     [[nodiscard]] std::int32_t spawnsFor(RaiderType type, std::int32_t wave, std::string_view difficulty,
                                          bool bonusWave);
 
-    /// Whether `entityId` is one of this raid's raiders.
     [[nodiscard]] bool has(std::int32_t entityId) const;
 
-    /// parity: `addWaveMob`. Answers whether it was new.
     bool addWaveMob(std::int32_t wave, std::int32_t entityId);
 
-    /// parity: `removeFromRaid`'s set removal. Answers whether it was there.
     bool removeRaider(std::int32_t wave, std::int32_t entityId);
 
-    /// parity: the `MAP_CODEC` fields.
     void encode(wire::nbt::NbtCompound& tag) const;
     [[nodiscard]] static std::unique_ptr<Raid> decode(const wire::nbt::NbtCompound& tag, std::int64_t seed);
 
@@ -118,27 +106,22 @@ public:
     /// How it ended before `stop` wrote over it. Not saved.
     RaidStatus endedAs = RaidStatus::Ongoing;
     RaidPos center{};
-    /// Insertion order stands in for the `HashSet`'s.
     std::vector<wire::common::Uuid> heroes;
     std::int32_t celebrationTicks = 0;
     std::optional<RaidPos> waveSpawnPos;
     std::map<std::int32_t, std::vector<std::int32_t>> groups;
     std::map<std::int32_t, std::int32_t> leaders;
 
-    /// parity: `RandomSource.create()`, a raid's own unseeded stream.
     random::RandomSource random;
 
-    /// parity: the `ServerBossEvent`: its players by entity id, and what they were last sent.
     wire::common::Uuid barId;
     std::set<std::int32_t> barPlayers;
     wire::text::Component barName;
     float barProgress = 0.0F;
-    /// When the bar was last worked out, against `entityCombat::nextRaidBarStamp`.
     std::int64_t barStamp = 0;
     bool barVisible = true;
 };
 
-/// parity: `Raid.RaiderType`'s per-wave arrays and `getNumGroups`.
 namespace raidWaves {
 
 [[nodiscard]] std::string_view typeName(RaiderType type);
@@ -149,17 +132,12 @@ namespace raidWaves {
 
 } // namespace raidWaves
 
-/// Every raid in one world.
-///
-/// parity: `Raids`, the saved data behind `ServerLevel.getRaids`, kept in `raids.nbt` next to the
-/// world's regions.
 class RaidManager {
 public:
     [[nodiscard]] Raid* get(std::int32_t id);
 
     [[nodiscard]] std::optional<std::int32_t> idOf(const Raid* raid) const;
 
-    /// parity: `getNearbyRaid`, the closest active one strictly inside the radius.
     [[nodiscard]] Raid* nearby(const RaidPos& pos, std::int32_t maxDistanceSquared = Raid::kValidRadiusSquared);
 
     /// parity: `getUniqueId`, which bumps before it answers: the first raid is number two.
@@ -169,15 +147,12 @@ public:
 
     void remove(std::int32_t id);
 
-    /// The ids in the order `Int2ObjectOpenHashMap` walks them.
     [[nodiscard]] std::vector<std::int32_t> tickOrder() const { return order_.order(); }
 
-    /// parity: `Raids.tick`'s iterator: `visit` answers true to remove that raid on the spot.
     void forEachInTickOrder(const std::function<bool(std::int32_t id, Raid& raid)>& visit);
 
     [[nodiscard]] std::size_t size() const noexcept { return raids_.size(); }
 
-    /// parity: `Raids.tick`'s own counter.
     std::int32_t tick = 0;
     bool dirty = false;
 

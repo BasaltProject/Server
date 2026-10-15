@@ -45,7 +45,6 @@ constexpr float kEyeHeight = 2.3F;
 /// parity: `LivingEntity.hasLineOfSight`, which gives up past this.
 constexpr double kSightRange = 128.0;
 
-/// One player the creaking's sensor sees.
 struct Nearby {
     PlayerSession* player = nullptr;
     double distanceSquared = 0.0;
@@ -65,7 +64,7 @@ struct Nearby {
     return creaking.y + static_cast<double>(kEyeHeight * scaleOf(creaking));
 }
 
-/// parity: `LivingEntity.hasLineOfSight(target, block, NONE, eyeY)`: nothing past 128 blocks, else a clip.
+/// parity: `LivingEntity.hasLineOfSight(target, block, NONE, eyeY)`.
 [[nodiscard]] bool hasLineOfSight(world::WorldState& world, double fromX, double fromY, double fromZ, double toX,
                                   double toY, double toZ, entity::blockRay::ClipShape shape,
                                   const entity::blockRay::ClipViewer& viewer) {
@@ -87,8 +86,7 @@ struct Nearby {
     return {x / length, y / length, z / length};
 }
 
-/// parity: `LivingEntity.isLookingAtMe(player, 0.5, false, true, heights)`: the player's view within the
-/// cone of one of the three heights, and nothing but see-through blocks in between.
+/// parity: `LivingEntity.isLookingAtMe(player, 0.5, false, true, heights)`.
 [[nodiscard]] bool isLookingAt(world::WorldState& world, const PlayerSession& player, const ServerEntity& creaking) {
     // parity: `Entity.calculateViewVector`, normalised.
     constexpr float kRadians = std::numbers::pi_v<float> / 180.0F;
@@ -120,7 +118,7 @@ struct Nearby {
 } // namespace
 
 void MobActionSystem::tearDownCreaking(world::LoadedWorld& world, ServerEntity& creaking) {
-    // parity: `Creaking.tearDown`: splinters of pale oak and of the heart, its death sound, and gone.
+    // parity: `Creaking.tearDown`.
     const double halfWidth = creaking.width() / 2.0;
     const double centerY = creaking.y + (creaking.height() / 2.0);
     const auto spread = [&](std::int32_t stateId, std::int32_t count) {
@@ -166,8 +164,7 @@ void MobActionSystem::tickCreaking(world::LoadedWorld& world, entity::ai::MobCon
     const double half = border.size() / 2.0;
     state.border = std::array<double, 4>{border.centerX() - half, border.centerZ() - half, border.centerX() + half,
                                          border.centerZ() + half};
-    // parity: `Creaking.tick`: one bound to a heart that no longer claims it goes; a heart broken
-    // out from under it tore it down.
+    // parity: `Creaking.tick`.
     if (state.home.has_value()) {
         const std::optional<bool> claimed = heartClaims(world, *state.home, creaking);
         if (!claimed.has_value()) {
@@ -285,7 +282,7 @@ void MobActionSystem::tickCreaking(world::LoadedWorld& world, entity::ai::MobCon
         }
         return 0;
     }();
-    // parity: `NEAREST_VISIBLE_ATTACKABLE_PLAYER(S)`, in sight of its eyes through what it collides with.
+    // parity: `NEAREST_VISIBLE_ATTACKABLE_PLAYER(S)`.
     std::vector<std::int32_t> visible;
     const entity::blockRay::ClipViewer ownView{.feetY = creaking.y, .fallDistance = creaking.fallDistance};
     for (const Nearby& seen : players) {
@@ -321,8 +318,7 @@ void MobActionSystem::tickCreaking(world::LoadedWorld& world, entity::ai::MobCon
             }
         }
     }
-    // parity: the core's `MoveToTargetSink` and `LookAtTargetSink` run frozen or not; it is the
-    // creaking's own navigation, move and look controls that hold still.
+    // parity: `MoveToTargetSink`.
     kit::moveToTarget(context, state.motion);
     kit::lookAtTarget(context, state.look);
 }

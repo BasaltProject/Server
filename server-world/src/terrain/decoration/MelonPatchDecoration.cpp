@@ -35,8 +35,7 @@ constexpr std::int32_t kVegetalDecorationStep = 9;
     return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
-/// parity: the feature's own replaceable list, which is wider than "is air": a melon takes over
-/// grass, vines and the other soft blocks a jungle floor is covered in.
+/// parity: the feature's own replaceable list is wider than air.
 const std::set<std::string, std::less<>>& replaceableBlocks() {
     static const std::set<std::string, std::less<>> paths = {"air",
                                                              "water",

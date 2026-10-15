@@ -48,8 +48,7 @@ constexpr std::array<StructureRotation, 4> kRotations{StructureRotation::None, S
     }
 }
 
-/// parity: `countEmptyCorners` over the eight corners of the box and nothing between them. Air, lava
-/// and water each count as empty.
+/// parity: `countEmptyCorners` over the eight corners.
 [[nodiscard]] std::int32_t emptyCorners(const Chunk& chunk, const StructureBoundingBox& box) {
     const ChunkHeight bounds = chunk.verticalBounds();
     std::int32_t count = 0;
@@ -107,8 +106,7 @@ bool fossilFeature::place(Chunk& chunk, random::RandomSource& random, const Stru
         return false;
     }
 
-    // parity: the level bounding box is the chunk grown by 16 on each side, so a fossil that starts
-    // here may reach a neighbour; what lands there is deferred like any other write.
+    // parity: the level bounding box is the chunk grown by 16, so a fossil may reach a neighbour.
     const ChunkHeight bounds = chunk.verticalBounds();
     structure::TemplatePlacement placement;
     placement.position = targetPos;
@@ -118,8 +116,7 @@ bool fossilFeature::place(Chunk& chunk, random::RandomSource& random, const Stru
     placement.clipTo = StructureBoundingBox{chunk.chunkX() * 16 - 16, bounds.minY(), chunk.chunkZ() * 16 - 16,
                                             chunk.chunkX() * 16 + 31, bounds.maxY(), chunk.chunkZ() * 16 + 31};
     placement.processors = &spec.fossilProcessors;
-    // parity: the feature calls `setRandom`, so the palette pick and the rot draw from this stream
-    // in template order rather than from a fresh source per position.
+    // parity: the feature calls `setRandom`, so palette pick and rot draw from this stream.
     placement.settingsRandom = &random;
     base->placeInto(chunk, placement);
     placement.processors = &spec.overlayProcessors;

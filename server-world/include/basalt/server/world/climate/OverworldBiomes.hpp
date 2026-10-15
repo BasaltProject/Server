@@ -12,25 +12,15 @@
 
 namespace basalt::server::world::climate {
 
-/// Where a biome sits, as its own name. The registry ids are dynamic and synced per world, so the
-/// list is built in names and resolved by whoever needs numbers.
 using BiomeName = std::string_view;
 
-/// parity: `OverworldBiomeBuilder`, ported mechanically: every threshold, table and branch is
-/// vanilla's, not an approximation.
-///
-/// Biomes are regions in the six-axis climate space and the closest one wins, ties broken by
-/// first-registered. The call order is therefore semantically significant and must never be
-/// reordered; the test that guards this asserts the whole emitted list, in order, against the
-/// frozen Kotlin's.
+/// parity: `OverworldBiomeBuilder`.
 namespace overworldBiomes {
 
 using Emit = std::function<void(const ParameterPoint&, BiomeName)>;
 
-/// Every parameter point of the overworld, in the order vanilla registers them.
 [[nodiscard]] std::vector<std::pair<ParameterPoint, BiomeName>> build();
 
-/// The static spans and lookup tables `build` walks, plus the pickers that only read them.
 class Tables {
 public:
     Tables();
@@ -72,8 +62,6 @@ public:
     std::array<std::array<std::optional<BiomeName>, 5>, 5> plateauBiomesVariant;
     std::array<std::array<std::optional<BiomeName>, 5>, 5> shatteredBiomes;
 
-    /// The three shapes vanilla emits a pair in: a surface pair spanning depth zero and one, an
-    /// underground span, and a single bottom point.
     static void addSurfaceBiome(const Emit& emit, const Parameter& temperature, const Parameter& humidity,
                                 const Parameter& continentalness, const Parameter& erosion, const Parameter& weirdness,
                                 float offset, BiomeName biome);

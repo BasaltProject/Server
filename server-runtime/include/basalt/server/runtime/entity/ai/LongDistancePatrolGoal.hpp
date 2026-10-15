@@ -14,8 +14,7 @@ class ServerEntity;
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `PatrollingMonster.LongDistancePatrolGoal`: the leader picks a point five hundred blocks
-/// off and the rest of the patrol is handed the same one every time it repaths.
+/// parity: `PatrollingMonster.LongDistancePatrolGoal`.
 class LongDistancePatrolGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }

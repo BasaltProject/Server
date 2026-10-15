@@ -25,8 +25,7 @@ constexpr std::string_view kLastExecutionKey = "LastExecution";
 constexpr std::string_view kTrackOutputKey = "TrackOutput";
 constexpr std::string_view kLastOutputKey = "LastOutput";
 
-/// parity: `CommandBlock.tick` books its turn one tick out, both for the first one and for the
-/// repeating block's own next.
+/// parity: `CommandBlock.tick` books its turn one tick out.
 constexpr std::int32_t kDelay = 1;
 
 [[nodiscard]] const wire::common::Identifier& impulseBlock() {
@@ -72,9 +71,7 @@ constexpr std::int32_t kDelay = 1;
     return found == kNames.end() ? std::nullopt : std::optional{found->second};
 }
 
-/// parity: `CommandBlockEntity.markConditionMet`. It is always true unless the block is conditional,
-/// and then it is "the square **behind** me holds a command block whose `SuccessCount` is not zero".
-/// Behind is the opposite of the block's own facing.
+/// parity: `CommandBlockEntity.markConditionMet`.
 [[nodiscard]] bool markConditionMet(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                     std::int32_t stateId) {
     bool met = true;
@@ -94,9 +91,7 @@ constexpr std::int32_t kDelay = 1;
         }
     }
     if (server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z); entity != nullptr) {
-        // parity: `markConditionMet` writes the field and calls nothing else. A repeating block marks
-        // it on **every** turn, so dirtying the chunk here rewrote it once a tick for ever, where the
-        // jar leaves the chunk alone as soon as nothing is really moving.
+        // parity: `markConditionMet` writes the field and calls nothing else.
         if (entity->data().getBoolean(std::string{kConditionKey}) != met) {
             entity->data().putBoolean(std::string{kConditionKey}, met);
             world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
@@ -120,8 +115,7 @@ constexpr std::int32_t kDelay = 1;
     return true;
 }
 
-/// parity: the tail of `performCommand`: the turn is marked unless the block was told not to, and a
-/// -1 is written as nothing at all.
+/// parity: the tail of `performCommand`.
 void markExecuted(server::world::ChunkBlockEntity& entity, WorldState& world, std::int32_t x, std::int32_t z,
                   std::int64_t gameTime) {
     if (entity.data().getBoolean(std::string{kUpdateLastKey}, true)) {
@@ -132,8 +126,7 @@ void markExecuted(server::world::ChunkBlockEntity& entity, WorldState& world, st
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
 }
 
-/// parity: `BaseCommandBlock.performCommand`. The guard at the top is what stops a chain running
-/// twice on one tick, and it is the only thing that does.
+/// parity: `BaseCommandBlock.performCommand`.
 [[nodiscard]] bool performCommand(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                   std::int64_t gameTime, bool commandBlocksWork, const RunCommand& run) {
     server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z);
@@ -144,9 +137,7 @@ void markExecuted(server::world::ChunkBlockEntity& entity, WorldState& world, st
         return false;
     }
     const std::string command{entity->data().getString(std::string{kCommandKey})};
-    // parity: `performCommand` answers a command block whose command is the word `Searge` before it
-    // looks at anything else: it counts one, writes `#itzlipofutzli` as its output and runs nothing,
-    // whatever the `command_blocks_work` rule says. Left in since 1.9 and readable from a comparator.
+    // parity: `performCommand` answers a command block whose command is the word `Searge` before it.
     if (isSearge(command)) {
         entity->data().putInt(std::string{kSuccessKey}, 1);
         markExecuted(*entity, world, x, z, gameTime);
@@ -156,18 +147,12 @@ void markExecuted(server::world::ChunkBlockEntity& entity, WorldState& world, st
     if (commandBlocksWork && !command.empty() && run) {
         entity->data().putInt(std::string{kSuccessKey}, std::max(0, run(x, y, z, command)));
     }
-    // parity: `updateLastExecution` off leaves the mark at -1, which is what lets the same block run
-    // again inside one tick. It reads **true** when absent: `BaseCommandBlock.load` is
-    // `getBooleanOr("UpdateLastExecution", true)` and the field starts true, so a block placed by
-    // command and never told otherwise marks its turn. A -1 is not written at all, which is what
-    // `saveAdditional` does with it.
+    // parity: `updateLastExecution` off leaves the mark at -1.
     markExecuted(*entity, world, x, z, gameTime);
     return true;
 }
 
-/// parity: `CommandBlock.executeChain`, which walks on from the block that just ran. The direction of
-/// each step is the **facing of the block it is standing on**, not the one it started with, so a chain
-/// turns corners.
+/// parity: `CommandBlock.executeChain`.
 void executeChain(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, BlockFace direction,
                   std::int64_t gameTime, bool commandBlocksWork, std::int32_t maxChainLength, const RunCommand& run) {
     std::int32_t left = maxChainLength;
@@ -208,8 +193,7 @@ void executeChain(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
     }
 }
 
-/// parity: `CommandBlock.execute`, which runs the command when there is one, zeroes the count when
-/// there is not, and carries on down the chain either way.
+/// parity: `CommandBlock.execute`.
 void execute(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
              std::int64_t gameTime, bool commandBlocksWork, std::int32_t maxChainLength, const RunCommand& run) {
     server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z);
@@ -260,15 +244,12 @@ void onSignal(WorldState& world, const std::int32_t x, const std::int32_t y, con
     if (!powered) {
         return;
     }
-    // parity: a repeating block runs off its own booked turn and a chain block off whoever points at
-    // it, so neither starts from the signal itself.
+    // parity: a repeating block runs off its own booked turn and a chain block off whoever points at.
     if (entity->data().getBoolean(std::string{kAutoKey}) || *mode == Mode::Chain) {
         return;
     }
     static_cast<void>(markConditionMet(world, x, y, z, *stateId));
-    // parity: a turn is stored under the block that booked it, and vanilla drops one whose name does
-    // not match what is standing there. Booking every command block's turn as the impulse block left
-    // a repeating block's turn named wrong in the saved world.
+    // parity: a turn is stored under the block that booked it, and vanilla drops one whose name does.
     world.scheduleBlockTick(x, y, z, blockOfMode(*mode), kDelay);
 }
 
@@ -285,8 +266,7 @@ bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const s
         return false;
     }
     const bool conditional = valueOf(*stateId, "conditional") == "true";
-    // parity: the turn acts on the condition the **last** pass left behind, and a repeating block
-    // marks the new one before it looks.
+    // parity: the turn acts on the condition the **last** pass left behind, and a repeating block.
     const bool wasMet = entity->data().getBoolean(std::string{kConditionKey});
     if (*mode == Mode::Repeating) {
         static_cast<void>(markConditionMet(world, x, y, z, *stateId));
@@ -309,9 +289,7 @@ bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const s
             world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
         }
     }
-    // parity: `CommandBlock.tick` ends in `updateNeighbourForOutputSignal` **whatever** it did, so a
-    // turn that ran nothing still tells the comparators. That is what carries a conditional block's
-    // `SuccessCount` back down to zero when its condition fails.
+    // parity: `CommandBlock.tick` ends in `updateNeighbourForOutputSignal` **whatever** it did.
     return true;
 }
 
@@ -330,9 +308,7 @@ void onDataLoaded(WorldState& world, const std::int32_t x, const std::int32_t y,
         entity->data().getBoolean(std::string{kPoweredKey})) {
         return;
     }
-    // parity: `CommandBlockEntity.scheduleTick` marks the condition **before** booking the turn, so
-    // the very first turn already finds `wasConditionMet` true and runs the command. Booking without
-    // marking made a block switched to automatic by command start a whole tick late.
+    // parity: `CommandBlockEntity.scheduleTick` marks the condition **before** booking the turn.
     static_cast<void>(markConditionMet(world, x, y, z, *stateId));
     world.scheduleBlockTick(x, y, z, blockOfMode(*mode), kDelay);
 }
@@ -351,10 +327,7 @@ std::optional<BlockChange> program(WorldState& world, const std::int32_t x, cons
     }
     const bool wasAutomatic = entity->data().getBoolean(std::string{kAutoKey});
     const bool powered = entity->data().getBoolean(std::string{kPoweredKey});
-    // parity: the mode **is** the block, so a screen that changed it puts a different one down with
-    // the facing it had and the conditional flag the packet carried. Vanilla writes it with flag 2,
-    // which tells the clients and not the neighbours, and then hands the block entity back: our
-    // write drops it, so it is put back by hand with everything it held.
+    // parity: the mode **is** the block, so a screen that changed it puts a different one down with.
     std::optional<BlockChange> moved;
     const std::optional<std::int32_t> wanted = registry::blockStateDefinitions::stateIdOf(
         blockOfMode(mode), {{"facing", valueOf(*stateId, "facing")}, {"conditional", conditional ? "true" : "false"}},
@@ -388,9 +361,7 @@ std::optional<BlockChange> program(WorldState& world, const std::int32_t x, cons
     if (!now.has_value()) {
         return moved;
     }
-    // parity: `CommandBlockEntity.setAutomatic` books a turn the moment a block is switched to
-    // `auto` while nothing is powering it, and `onModeSwitch` books one for a repeating block that
-    // was already awake. A chain block books nothing either way: something else has to point at it.
+    // parity: `CommandBlockEntity.setAutomatic` books a turn the moment a block is switched to.
     const bool switchedOn = !wasAutomatic && automatic && !powered && mode != Mode::Chain;
     const bool becameRepeating = *was != mode && mode == Mode::Repeating && (powered || automatic);
     if (switchedOn || becameRepeating) {

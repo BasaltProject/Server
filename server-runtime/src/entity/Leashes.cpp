@@ -45,8 +45,7 @@ bool canBeLeashed(const ServerEntity& entity, bool monster) {
         return true;
     }
     const std::string_view path = entity.type().path();
-    // parity: the overrides that say no whatever the rest says: villagers and traders, pandas and
-    // turtles, and whatever lives in water.
+    // parity: the overrides that refuse a leash: villagers, traders, pandas, turtles and water mobs.
     if (path == "villager" || path == "wandering_trader" || path == "panda" || path == "turtle" || path == "dolphin" ||
         path == "squid" || path == "glow_squid" || path == "cod" || path == "salmon" || path == "pufferfish" ||
         path == "tropical_fish" || path == "tadpole" || path == "axolotl") {
@@ -73,8 +72,7 @@ double distance(const Body& entity, const Body& holder) {
 
 std::optional<Pull> elastic(const Body& entity, const Body& holder, double slack) {
     constexpr float kRadians = std::numbers::pi_v<float> / 180.0F;
-    // parity: `ENTITY_ATTACHMENT_POINT` at the front of the entity and `LEASHER_ATTACHMENT_POINT` in
-    // the holder's middle, both half way up and turned with the body.
+    // parity: `ENTITY_ATTACHMENT_POINT` and `LEASHER_ATTACHMENT_POINT`.
     const Vec lever = yRot({0.0, 0.5 * entity.height, 0.5 * entity.width}, -(entity.yaw * kRadians));
     const Vec objectAt{entity.x + lever[0], entity.y + lever[1], entity.z + lever[2]};
     const Vec holderArm = yRot({0.0, 0.5 * holder.height, 0.0}, -(holder.yaw * kRadians));

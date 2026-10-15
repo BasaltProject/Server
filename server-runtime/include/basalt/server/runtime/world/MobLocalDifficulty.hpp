@@ -5,12 +5,9 @@
 
 namespace basalt::server::runtime::world {
 
-/// Minecraft's local difficulty multiplier, which is what mob finalizers ask before deciding how
-/// nasty a spawn is.
 namespace mobLocalDifficulty {
 
-/// parity: `DifficultyInstance.getSpecialMultiplier`: nothing below two, everything above four, and
-/// a straight line between them.
+/// parity: `DifficultyInstance.getSpecialMultiplier`.
 [[nodiscard]] float specialMultiplier(std::string_view difficulty, std::int64_t gameTime, std::int64_t inhabitedTime,
                                       float moonBrightness);
 

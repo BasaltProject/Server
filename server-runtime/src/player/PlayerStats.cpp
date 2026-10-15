@@ -7,7 +7,7 @@
 namespace basalt::server::runtime::player {
 namespace {
 
-/// parity: `Float.roundToLong`, a floor of the value plus a half rather than a round to even.
+/// parity: `Float.roundToLong`.
 [[nodiscard]] std::int64_t rounded(float value) {
     return static_cast<std::int64_t>(std::floor(static_cast<double>(value) + 0.5));
 }
@@ -88,8 +88,7 @@ storage::StoredStats PlayerStats::snapshot(std::int64_t playTimeTicks) const {
 void PlayerStats::restore(const storage::StoredStats& stored) {
     const std::lock_guard<std::mutex> guard{lock_};
     counters_ = stored.counters;
-    // Play time has a column of its own and is authoritative there; keeping a second copy here
-    // would let the two disagree.
+    // Play time has its own authoritative column; a second copy here could disagree.
     const auto found = counters_.find(storage::stats::playTime());
     if (found != counters_.end()) {
         counters_.erase(found);

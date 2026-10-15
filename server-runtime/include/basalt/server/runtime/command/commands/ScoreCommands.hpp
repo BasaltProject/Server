@@ -4,11 +4,7 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// parity: `GameRuleCommand`. One literal per rule, each optionally taking a value, exactly as
-/// vanilla builds the tree, so the client autocompletes rule names.
-///
-/// Every rule is declared twice, bare and under its `minecraft:` id, which is what vanilla does and
-/// what makes `/gamerule minecraft:keep_inventory` work.
+/// parity: `GameRuleCommand`.
 class GameRuleCommand final : public Command {
 public:
     GameRuleCommand();
@@ -16,11 +12,7 @@ public:
     void build(const CommandNodeBuilder& root) const override;
 };
 
-/// parity: `TriggerCommand`, the one command an ordinary player may run against the scoreboard.
-///
-/// It only works on an objective of criterion `trigger` that `/scoreboard players enable` has armed
-/// for that player, and running it disarms it again: that is the whole mechanism datapacks use to
-/// offer a menu to players who have no permissions at all.
+/// parity: `TriggerCommand`.
 class TriggerCommand final : public Command {
 public:
     explicit TriggerCommand(scoreboard::Scoreboard& scoreboard);

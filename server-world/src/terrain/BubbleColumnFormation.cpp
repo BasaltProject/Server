@@ -15,7 +15,7 @@ namespace {
         .value_or(registry::blocks::air().stateId);
 }
 
-/// parity: `getColumnState`. Soul sand pushes up, magma drags down, anything else grows nothing.
+/// parity: `getColumnState`.
 [[nodiscard]] std::optional<std::int32_t> columnStateFor(std::int32_t belowStateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(belowStateId);
     if (block == nullptr) {

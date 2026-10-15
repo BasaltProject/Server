@@ -24,11 +24,9 @@ constexpr double kDegrees = 180.0 / std::numbers::pi;
 
 [[nodiscard]] std::int32_t blockOf(double coordinate) { return static_cast<std::int32_t>(std::floor(coordinate)); }
 
-/// The way there: through the water for a swimmer, over the ground for everything else.
 [[nodiscard]] std::optional<std::vector<std::array<std::int32_t, 3>>>
 pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, double z) {
-    // parity: `AmphibiousPathNavigation` for the frog and the axolotl: one search over water and land,
-    // to the target's square half a block up and within a block of it.
+    // parity: `AmphibiousPathNavigation`.
     if (const std::string_view path = mob.type().path(); path == "frog" || path == "axolotl") {
         const double range = mob.attributeWithModifiers("minecraft:follow_range");
         const std::array<std::int32_t, 3> start =
@@ -102,7 +100,7 @@ void resetStuckTimeout(ServerEntity& mob) {
     mob.navigationWatch.stuck = false;
 }
 
-/// parity: `moveTo(Path, speed)`: a new path starts the hundred-tick stuck clock where the mob is.
+/// parity: `moveTo(Path, speed)`.
 bool start(ServerEntity& mob, std::vector<std::array<std::int32_t, 3>> nodes, const std::array<double, 3>& target,
            double speedModifier) {
     if (nodes.empty()) {
@@ -155,8 +153,7 @@ void stop(ServerEntity& mob) {
 
 namespace {
 
-/// parity: `PathNavigation.shouldTargetNextNodeInDirection` without a direct line, which the
-/// ground navigation never has.
+/// parity: `PathNavigation.shouldTargetNextNodeInDirection` without a direct line.
 [[nodiscard]] bool shouldTargetNextNode(const ServerEntity& mob) {
     const auto next = static_cast<std::size_t>(mob.pathIndex) + 1;
     if (next >= mob.path->size()) {
@@ -312,8 +309,7 @@ void tick(world::WorldState& world, ServerEntity& mob, double speed) {
         tickSwimming(world, mob, speed);
         return;
     }
-    // parity: `LivingEntity.travel` picks the fluid path first: a squid pushes itself along in water
-    // rather than walking, and nothing in water falls like a stone.
+    // parity: `LivingEntity.travel` picks the fluid path first.
     if (inWater(world, mob)) {
         livingMovement::travelInWater(world, mob, 0.0, 0.0);
         mob.moving = false;
@@ -339,12 +335,10 @@ void tick(world::WorldState& world, ServerEntity& mob, double speed) {
     }
     const auto wanted = static_cast<float>(std::atan2(dz, dx) * kDegrees) - 90.0F;
     mob.yaw = rotlerp(mob.yaw, wanted, kTurnRate);
-    // parity: `Mob.setSpeed`, which also sets the forward input to the same number, so what a mob
-    // accelerates by is the speed times itself. Passing one here made every mob run.
+    // parity: `Mob.setSpeed` also sets the forward input to the same number.
     const double walk = speed * mob.moveSpeed;
     mob.aiSpeed = static_cast<float>(walk);
-    // parity: the jump when the next step is above what the mob can climb, or when it is stood
-    // inside something with a collision box.
+    // parity: the jump when the next step is above what the mob can climb or it stands inside a collision box.
     if (dy > livingMovement::kStepHeight && dx * dx + dz * dz < std::max(1.0, mob.width())) {
         livingMovement::jump(world, mob);
     } else if (mob.horizontallyBlocked && mob.onGround) {
@@ -385,8 +379,7 @@ void tickSwimming(world::WorldState& world, ServerEntity& mob, double speed) {
                     // parity: `MoveControl.rotateTowards`, five degrees a tick.
                     mob.pitch = mob.pitch + std::clamp(wrapDegrees(pitch - mob.pitch), -5.0F, 5.0F);
                 }
-                // parity: `zza` and `yya` take the full speed, not the water's share of it: the input
-                // is then longer than one and `moveRelative` scales it back to the share.
+                // parity: `zza`.
                 const float radians = mob.pitch * std::numbers::pi_v<float> / 180.0F;
                 forward = static_cast<double>(std::cos(radians) * full);
                 up = -static_cast<double>(std::sin(radians) * full);
@@ -416,7 +409,7 @@ void tickSwimming(world::WorldState& world, ServerEntity& mob, double speed) {
 namespace lookControl {
 namespace {
 
-/// parity: `LookControl.tick`, which brings the head back to the body ten degrees at a time.
+/// parity: `LookControl.tick`.
 constexpr float kDriftRate = 10.0F;
 constexpr double kEyeShare = 0.85;
 constexpr float kMaxHeadTurn = 75.0F;
@@ -457,8 +450,7 @@ void tick(ServerEntity& mob) {
 }
 
 void tickSwimming(ServerEntity& mob) {
-    // parity: `SmoothSwimmingLookControl`: the head twenty degrees past what it looks at, the nose
-    // ten, and a level nose again once it has nowhere to go.
+    // parity: `SmoothSwimmingLookControl`.
     constexpr float kHeadTiltY = 20.0F;
     constexpr float kHeadTiltX = 10.0F;
     constexpr float kLevelRate = 5.0F;

@@ -56,9 +56,7 @@ void sendTo(const std::vector<PlayerSession*>& players, std::int32_t packetId,
     }
 }
 
-/// parity: `ServerPlayer.checkMovementStatistics` and `checkRidingStatistics`. The facts come off the
-/// session because this build has no poses: sneaking stands in for crouching and sprinting in water
-/// for swimming, which is what `updateSwimming` asks anyway.
+/// parity: `ServerPlayer.checkMovementStatistics`.
 void countMovement(player::PlayerSession& session, double dx, double dy, double dz, bool onGround,
                    const std::optional<std::int32_t>& feet, const std::optional<std::int32_t>& atEye) {
     const bool riding = session.vehicleId.has_value();
@@ -93,13 +91,12 @@ std::optional<std::string> ClientSession::rememberAddress() const {
 }
 
 const wire::text::LangTable& ClientSession::consoleLang() const {
-    // Empty (so keys print as keys) when no language is loaded.
     static const wire::text::LangTable kEmpty;
     return options_.commands == nullptr ? kEmpty : options_.commands->environment().lang();
 }
 
 std::vector<PlayerSession*> ClientSession::playersInSameWorld() const {
-    // Everyone who can actually see this player: the tab list is server-wide, entities are not.
+    // Only who can see this player: the tab list is server-wide, entities are not.
     if (playerSession_ == nullptr || options_.playerRegistry == nullptr) {
         return {};
     }
@@ -236,23 +233,17 @@ void ClientSession::broadcastToEveryone(const wire::text::Component& message) {
         if (!options_.plugins.broadcastAllowed(plain)) {
             return;
         }
-        // Only what a plugin actually rewrote is read back as MiniMessage. Flattening every
-        // broadcast through plain text costs the original its colour and its translation, so an
-        // untouched join announcement arrived white and already translated, in the console's
-        // language rather than each client's.
+        // Only what a plugin rewrote is read back as MiniMessage; flattening everything lost colour and translation.
         if (plain != said) {
             text = wire::text::miniMessage::parse(plain);
         }
     }
-    // parity: vanilla ends `PlayerList.broadcastSystemMessage` at `MinecraftServer.sendSystemMessage`,
-    // which writes the same line to the console. Joining and leaving are the only two that come
-    // through here, and they are the two an operator watches the console for.
+    // parity: `PlayerList.broadcastSystemMessage`.
     wire::common::Logger{"Server"}.info([&text, this] { return wire::text::resolvePlainText(text, consoleLang()); });
     if (options_.playerRegistry == nullptr) {
         return;
     }
-    // Same reason as in broadcastChat: what reaches everyone has to reach both editions, and each
-    // connection knows how its own client is told something.
+    // What reaches everyone has to reach both editions, each connection knowing how its client is told.
     for (const PlayerSession* player : options_.playerRegistry->snapshot()) {
         if (player->connection().sendSystemMessage) {
             player->connection().sendSystemMessage(text);
@@ -291,8 +282,6 @@ void ClientSession::tryPickupNearbyItems() {
     if (session == nullptr) {
         return;
     }
-    // parity: an arrow stuck in the ground is taken the same way an item is, and the same animation
-    // says so; what comes back is one arrow rather than a stack.
     for (const player::PickedArrow& arrow : player::pickupNearbyArrows(*session, world())) {
         sendInventoryAll();
         const play::TakeItemEntityPacket collected{
@@ -309,7 +298,6 @@ void ClientSession::tryPickupNearbyItems() {
     const std::vector<PlayerSession*> watchers = playersInSameWorld();
     for (const player::PickedItem& row : taken) {
         if (row.leftover > 0) {
-            // Only some of it fit, and what is left is the same entity with fewer items in it.
             const reg::Item* item = reg::items::registry().byName(row.item.item);
             if (item != nullptr) {
                 const play::SetEntityDataPacket packet = play::SetEntityDataPacket::item(
@@ -318,14 +306,13 @@ void ClientSession::tryPickupNearbyItems() {
                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
             }
         }
-        // The pickup animation only: the entity itself leaves every watcher's view through their own
-        // item sync, since it is no longer in the world.
+        // The pickup animation only: the entity leaves every watcher's view through their own item sync.
         const play::TakeItemEntityPacket collected{.collectedEntityId = row.item.entityId,
                                                    .collectorEntityId = session->entityId(),
                                                    .pickupItemCount = row.picked};
         sendTo(watchers, play::TakeItemEntityPacket::kId,
                [&collected](wire::io::ByteBuffer& buffer) { collected.write(buffer); });
-        // parity: `ServerPlayer.onItemPickup`, with what is left of the stack, or all of it once gone.
+        // parity: `ServerPlayer.onItemPickup`.
         if (world::LoadedWorld* loaded = currentWorld(); loaded != nullptr) {
             world::thrownItems::pickedUpByPlayer(options_.advancementTriggers, *loaded, watchers, row.item,
                                                  row.leftover > 0 ? row.leftover : row.picked, *session);
@@ -395,7 +382,7 @@ void ClientSession::acceptTeleport(const play::AcceptTeleportationPacket& accept
         !std::isfinite(accept.yaw) || !std::isfinite(accept.pitch)) {
         return;
     }
-    // parity: `absSnapTo` the awaited position first, then `handlePlayerPositionChange` off the ground.
+    // parity: `absSnapTo` the awaited position first.
     session->x = (*awaited)[0];
     session->y = (*awaited)[1];
     session->z = (*awaited)[2];
@@ -407,19 +394,16 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
     if (session == nullptr) {
         return;
     }
-    // parity: `handleMovePlayer` takes only the rotation from somebody who is riding: where they are
-    // is the vehicle's business.
+    // parity: `handleMovePlayer`.
     if (session->vehicleId.has_value()) {
         session->yaw = yaw;
         session->pitch = pitch;
         return;
     }
-    // Only on a real move: a client sends its position every tick whether it moved or not, and
-    // waking a handler for standing still is what makes this event expensive elsewhere.
+    // Only on a real move: waking a handler for standing still makes this event expensive elsewhere.
     if ((x != session->x || y != session->y || z != session->z) && options_.plugins.moveAllowed &&
         !options_.plugins.moveAllowed(*session, session->x, session->y, session->z, x, y, z)) {
-        // Put them back where they were, which is what the client is told rather than asked: it has
-        // already drawn the step it took.
+        // Put back where they were: the client is told, not asked, since it already drew the step.
         sendPlayerPosition(session->x, session->y, session->z, yaw, pitch);
         return;
     }
@@ -456,8 +440,7 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
     chunkStreamer_->streamChunksAround(x, z);
     const play::EntityTeleportPacket moved{
         .entityId = session->entityId(), .x = x, .y = y, .z = z, .yaw = yaw, .pitch = pitch, .onGround = onGround};
-    // The rotation above is the body. A head turns on its own, and without this one it only ever
-    // tips up and down while the face stays pointing the same way.
+    // The rotation above is the body; without this a head only tips up and down while the face stays put.
     const play::RotateHeadPacket head{.entityId = session->entityId(), .headYaw = yaw};
     for (const PlayerSession* other : playersInSameWorld()) {
         if (other->uuid() == session->uuid() || !other->connection().sendPlayPacket) {

@@ -32,15 +32,12 @@ constexpr double kItemViewRadiusSquared = 4096.0;
 constexpr std::int32_t kGeneratedEntityViewRadiusChunks = 4;
 constexpr double kGeneratedEntityViewRadiusSquared = 4096.0;
 
-/// How far an NPC turns its head to look at somebody.
 constexpr double kNpcLookRange = 16.0;
 constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
 
-/// A profile name is capped by the protocol, and an NPC's is made from its id.
 constexpr std::size_t kProfileNameLimit = 16;
 constexpr std::string_view kNamelessTeam = "basalt_nameless";
 
-/// The entity types world generation emits, by their own protocol id.
 const std::map<std::string, std::int32_t, std::less<>>& generatedEntityTypeIds() {
     static const std::map<std::string, std::int32_t, std::less<>> kIds = [] {
         std::map<std::string, std::int32_t, std::less<>> ids;
@@ -125,15 +122,13 @@ void EntityVisibilityTracker::syncNpcs() {
             continue;
         }
         if (known != trackedNpcs_.end()) {
-            // Something a client was already told changed: taken away and drawn again, which is
-            // what the profile requires anyway since a skin cannot be changed in place.
+            // A skin cannot be changed in place, so a changed profile is removed and drawn again.
             owner_->sendPlayPacket(RemoveEntitiesPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                 RemoveEntitiesPacket{.entityIds = {npc.entityId}}.write(buffer);
             });
         }
         trackedNpcs_.insert_or_assign(npc.entityId, npc.version);
-        // Before the entity: the tag is hidden by the team this name belongs to, and a tag drawn
-        // before the team arrives flashes on screen.
+        // Before the entity: a name tag drawn before its hiding team arrives flashes on screen.
         hideNameTagOf(npcProfileName(npc.entityId));
         std::vector<wire::protocol::login::GameProfileProperty> properties;
         if (npc.skinTexture.has_value()) {
@@ -164,19 +159,17 @@ void EntityVisibilityTracker::syncNpcs() {
         owner_->sendPlayPacket(RotateHeadPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             RotateHeadPacket{.entityId = npc.entityId, .headYaw = npc.yaw}.write(buffer);
         });
-        // Every layer of the skin on, or an NPC is drawn without its jacket and hat.
+        // Every skin layer on, or an NPC is drawn without its jacket and hat.
         owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             SetEntityDataPacket::skinParts(npc.entityId, player::PlayerSession::kAllSkinParts).write(buffer);
         });
     }
-    // Heads turn toward whoever is looking, which is per connection: each player sees the NPC
-    // looking at them, and none of it is state the server has to keep.
+    // Head turns are per connection: each player sees the NPC looking at them, with no server state.
     for (const NpcView& npc : here) {
         if (!npc.looksAtPlayers) {
             continue;
         }
         const double dx = session->x - npc.x;
-        // Eyes to eyes, so a tall NPC does not stare at your feet.
         const double dy = session->y - npc.y;
         const double dz = session->z - npc.z;
         const double flat = (dx * dx) + (dz * dz);
@@ -265,8 +258,7 @@ void EntityVisibilityTracker::syncItemEntities() {
         }
         const auto counted = trackedItemCounts_.find(item.entityId);
         if (item.countChanged && (counted == trackedItemCounts_.end() || counted->second != item.count)) {
-            // A merge changed the stack: the client draws the number it was told, so it has to hear
-            // the new one or two logs on the floor keep looking like one.
+            // A merge changed the stack: the client draws the count it was told, so two logs would look like one.
             trackedItemCounts_.insert_or_assign(item.entityId, item.count);
             owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                 SetEntityDataPacket::item(
@@ -277,9 +269,7 @@ void EntityVisibilityTracker::syncItemEntities() {
             continue;
         }
         if (item.resting && settledItems_.insert(item.entityId).second) {
-            // One correction when it stops, and nothing while it falls: the client simulates the
-            // item from the velocity it was spawned with, and a teleport every tick fights that
-            // simulation on a different clock, which shows up as a stutter.
+            // One correction when it stops, none while it falls: per-tick teleports fight the client's simulation.
             owner_->sendPlayPacket(wire::protocol::play::EntityTeleportPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                 wire::protocol::play::EntityTeleportPacket{.entityId = item.entityId,
                                                            .x = item.x,
@@ -338,8 +328,7 @@ void EntityVisibilityTracker::syncGeneratedEntities() {
             continue;
         }
         const bool isFrame = descriptor.type.path() == "item_frame";
-        // parity: `Painting.recreateFromPacket` reads its direction off the spawn packet's data, the
-        // same place a frame does; only the rounding of the position differs between the two.
+        // parity: `Painting.recreateFromPacket`.
         const bool hangs = isFrame || descriptor.type.path() == "painting";
         owner_->sendPlayPacket(SpawnEntityPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             SpawnEntityPacket{.entityId = entity.entityId,

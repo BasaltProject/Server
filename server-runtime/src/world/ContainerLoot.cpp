@@ -29,8 +29,7 @@ void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, st
     }
     // parity: `Vec3.atCenterOf(worldPosition)`.
     tables.prepareAt(context, world, at[0] + 0.5, at[1] + 0.5, at[2] + 0.5);
-    // parity: `withOptionalRandomSeed`, a fresh `LegacyRandomSource` unless the seed is zero, and
-    // then the table's own sequence, or the level's random when it names none.
+    // parity: `withOptionalRandomSeed`.
     if (seed != 0) {
         random::RandomSource random = random::RandomSource::legacy(seed);
         rolled->fill(slots, random, context);
@@ -60,7 +59,7 @@ std::optional<wire::common::Identifier> unpack(LoadedWorld& world, RealLootTable
     const std::string path{entity->type().path()};
     const std::optional<std::int32_t> size = containers::sizeOf(path);
     const std::int64_t seed = entity->data().getLong(kSeedKey);
-    // parity: `setLootTable(null)` goes first, so a roll that reads the container finds no table.
+    // parity: `setLootTable(null)` goes first.
     static_cast<void>(entity->data().remove(kTableKey));
     static_cast<void>(entity->data().remove(kSeedKey));
     chunk->markDirty();

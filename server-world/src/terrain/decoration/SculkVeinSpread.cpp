@@ -223,8 +223,7 @@ std::optional<std::int32_t> SculkRegion::get(const DecorationPos& position) cons
             return stateId;
         }
     }
-    // parity: what this chunk already queued for the neighbour is in the neighbour's proto chunk as
-    // far as vanilla is concerned, so it beats whatever the neighbour view still reports.
+    // parity: writes already queued for the neighbour count as its proto chunk, beating the neighbour view.
     if (const std::optional<std::int32_t> queued = chunk_->queuedDecorationStateId(position.x, position.y, position.z);
         queued.has_value()) {
         return queued;
@@ -471,8 +470,7 @@ bool placeMultifaceGrowth(SculkRegion& region, random::RandomSource& random, con
             }
         }
         shuffle(placementDirections, random);
-        // parity: 26.2's MultifaceGrowthFeature resets to origin + direction on every one of its 20
-        // iterations, so a failed immutable attempt has the same result twenty times.
+        // parity: 26.2 `MultifaceGrowthFeature` resets to origin + direction on each of its 20 iterations.
         const DecorationPos position = offsetBy(origin, *searchDirection);
         const std::optional<std::int32_t> stateId = region.get(position);
         if (!stateId.has_value()) {

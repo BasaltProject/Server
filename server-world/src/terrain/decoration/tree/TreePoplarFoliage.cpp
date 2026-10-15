@@ -13,8 +13,7 @@ namespace {
     return foliageHeight - 1 == y || foliageHeight - 2 == y;
 }
 
-/// parity: `PoplarFoliagePlacer.getCornerBlocksToCutForRhombusShape`. Two opposite quadrants keep a
-/// wider corner, and `flip` decides which pair.
+/// parity: `PoplarFoliagePlacer.getCornerBlocksToCutForRhombusShape`.
 [[nodiscard]] std::int32_t cornerCut(std::int32_t dx, std::int32_t dz, std::int32_t radius, bool partial, bool flip) {
     const bool smallCorner = flip ? (dx > 0 && dz > 0) || (dz < 0 && dx < 0) : (dx > 0 && dz < 0) || (dz > 0 && dx < 0);
     if (smallCorner) {
@@ -47,8 +46,7 @@ void FoliagePlacer::createPoplarFoliage(Chunk& chunk, random::RandomSource& rand
             for (std::int32_t dz = -currentRadius; dz <= currentRadius + extra; ++dz) {
                 const std::int32_t absDx = std::abs(dx);
                 const std::int32_t absDz = std::abs(dz);
-                // parity: the edge of a partial row is cut before the side hole is rolled, so it
-                // draws nothing.
+                // parity: the edge of a partial row is cut before the side hole is rolled.
                 if (partial && (absDx == currentRadius || absDz == currentRadius)) {
                     continue;
                 }
@@ -74,8 +72,7 @@ void FoliagePlacer::createPoplarFoliage(Chunk& chunk, random::RandomSource& rand
         row(radius, y);
     }
 
-    // parity: `replaceLeavesWithLog`, the four straight arms of the widest row turned into sideways
-    // logs where a plain leaf of this tree still stands. They go through the foliage setter.
+    // parity: `replaceLeavesWithLog`.
     const std::int32_t coreY = foliageHeight - 4;
     const bool corePartial = isPartialRow(foliageHeight, coreY);
     for (std::int32_t dx = -radius; dx <= radius + extra; ++dx) {

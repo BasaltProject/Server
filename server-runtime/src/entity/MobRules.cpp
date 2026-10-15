@@ -20,8 +20,7 @@ using wire::common::Identifier;
 } // namespace
 
 bool mobs::isMob(const Identifier& type) {
-    // parity: `MobCategory.MISC` also holds villagers and iron golems, so `follow_range` (which only a
-    // `Mob` has) settles it. The category check is the cheap half and says what the rule means.
+    // parity: `MobCategory.MISC`.
     return registry::entityTypeShapes::categoryOf(type) != "misc" ||
            registry::entityAttributes::baseValue(type, "follow_range").has_value();
 }
@@ -57,15 +56,12 @@ std::vector<cubeMobs::Split> cubeMobs::splitsOf(const ServerEntity& cube, random
     if (!isCube(cube.type()) || cube.cubeSize <= kMinSize) {
         return splits;
     }
-    // parity: `AbstractCubeMob.remove`: two to four halves, each one offset by a quarter of the
-    // width the cube had, which is its type's width times its size.
+    // parity: `AbstractCubeMob.remove`.
     const auto offset = static_cast<float>(cube.width() * cube.cubeSize) / 2.0F;
     const std::int32_t half = cube.cubeSize / 2;
     const std::int32_t count = 2 + random.nextInt(3);
     splits.reserve(static_cast<std::size_t>(count));
     for (std::int32_t index = 0; index < count; ++index) {
-        // parity: the jar does this in float and only the finished position is a double, so the
-        // widening happens once, at the add, rather than inside the offsets.
         const float dx = (static_cast<float>(index % 2) - 0.5F) * offset;
         const float dz = (static_cast<float>(index / 2) - 0.5F) * offset;
         splits.push_back(Split{.x = cube.x + static_cast<double>(dx),
@@ -228,8 +224,7 @@ bool sunBurn::shouldBurn(const Identifier& type, bool day, std::int32_t light, b
     if (!day || !openSky || inWater || !burns(type)) {
         return false;
     }
-    // parity: `getLightLevelDependentMagicValue`, which is the light over fifteen, and the roll
-    // against thirty that keeps a mob in dim light alive a while longer.
+    // parity: `getLightLevelDependentMagicValue` (light over fifteen) and the roll against thirty for dim light.
     static constexpr float kMaxLight = 15.0F;
     static constexpr float kHalf = 0.5F;
     static constexpr float kMargin = 0.4F;
@@ -260,13 +255,11 @@ bool mobDespawn::shouldDespawn(ServerEntity& mob, MobCategory category, std::opt
     if (path == "wandering_trader") {
         return false;
     }
-    // Animal.removeWhenFarAway(false). The exceptional natural water animals, zombie horse, camel
-    // husk, chicken, cat and ocelot are deliberately absent or handled immediately below.
+    // parity: `Animal.removeWhenFarAway(false)`.
     if (holds(kNeverDespawnAnimals, path)) {
         return false;
     }
-    // parity: `removeWhenFarAway` answers false for the mobs that live in the misc category, a
-    // villager and an iron golem among them, so a village does not empty when you walk away.
+    // parity: `removeWhenFarAway` is false for misc-category mobs.
     if (category == MobCategory::Misc) {
         return false;
     }
@@ -299,8 +292,7 @@ bool mobDespawn::shouldDespawn(ServerEntity& mob, MobCategory category, std::opt
         mob.idleTicks = 0;
         return false;
     }
-    // parity: PatrollingMonster.removeWhenFarAway. A patrol may leave the player but does not take
-    // the ordinary random-despawn roll until it crosses the hard 128-block boundary.
+    // parity: `PatrollingMonster.removeWhenFarAway`.
     if (mob.patrolling && distanceSquared <= kPatrolHardDespawnSquared) {
         return false;
     }
@@ -381,7 +373,7 @@ std::optional<Identifier> entityPickResults::itemFor(const Identifier& type) {
         return std::nullopt;
     }
     const std::string path{type.path()};
-    // parity: `LeashFenceKnotEntity.getPickResult`, the one whose item is not called after it.
+    // parity: `LeashFenceKnotEntity.getPickResult`.
     if (path == "leash_knot") {
         return itemOrNothing("lead");
     }

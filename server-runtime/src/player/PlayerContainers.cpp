@@ -49,8 +49,7 @@ void announceOpeners(const OpenersContext& context, world::LoadedWorld& world, c
     } else {
         return;
     }
-    // parity: the counter raises `CONTAINER_OPEN` on the first one in and `CONTAINER_CLOSE` on the
-    // last one out, on the same edges as the sound, so a sculk sensor beside a chest hears it.
+    // parity: `CONTAINER_OPEN` on the first in and `CONTAINER_CLOSE` on the last out.
     if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
         world::vibrations::emit(world.state(), openers == 1 ? "container_open" : "container_close", x + 0.5, y + 0.5,
                                 z + 0.5, world.gameTime());

@@ -8,17 +8,9 @@
 #include <vector>
 
 namespace basalt::server::registry {
-
-/// Two-way mapping between an identifier, a numeric protocol id, and a value, matching vanilla's own
-/// registry model (`net.minecraft.core.Registry`).
-///
-/// Ids are supplied at registration rather than auto-incremented: vanilla's own numbering (block
-/// states most of all) is not insertion order, so the caller has to know the real id.
 template <typename T>
 class Registry {
 public:
-    /// Refuses a duplicate id or name rather than overwriting: two blocks answering to one number is
-    /// a table bug, and the wrong block is worse than a missing one.
     const T* registerEntry(std::int32_t id, wire::common::Identifier identifier, T value) {
         if (valueById_.contains(id) || idByName_.contains(identifier)) {
             return nullptr;
@@ -52,7 +44,6 @@ public:
 
     [[nodiscard]] std::size_t size() const noexcept { return valueById_.size(); }
 
-    /// Every id registered, in registration order. What command completions are drawn from.
     [[nodiscard]] const std::vector<std::int32_t>& ids() const noexcept { return order_; }
 
 private:
@@ -61,5 +52,4 @@ private:
     std::unordered_map<std::int32_t, wire::common::Identifier> nameById_;
     std::vector<std::int32_t> order_;
 };
-
 } // namespace basalt::server::registry

@@ -56,7 +56,7 @@ void setAnchor(ServerEntity& mob, const Block& at) {
     return block != nullptr && (block->path() == "air" || block->path() == "cave_air" || block->path() == "void_air");
 }
 
-/// parity: `canAttack(target, TargetingConditions.DEFAULT)`, which is a live, targetable target.
+/// parity: `canAttack(target, TargetingConditions.DEFAULT)`.
 [[nodiscard]] bool canAttack(const MobContext& mob) { return targetOf(mob).has_value(); }
 
 [[nodiscard]] bool touchingTarget(const ServerEntity& mob) {

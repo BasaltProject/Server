@@ -25,10 +25,9 @@ void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32
     vibrations::emit(world, event, x + 0.5, y + 0.5, z + 0.5, gameTime);
 }
 
-/// parity: `AbstractCandleBlock.extinguish`, the one thing the gust puts out rather than opens.
+/// parity: `AbstractCandleBlock.extinguish`.
 [[nodiscard]] bool isCandle(std::string_view path) { return path.ends_with("candle") || path.ends_with("candle_cake"); }
 
-/// What the gust does to one square, or nothing when the block is not one it moves.
 void knock(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
            std::vector<BlockChange>& changes) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -53,8 +52,7 @@ void knock(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
         heard(world, "block_change", x, y, z, gameTime);
         return;
     }
-    // parity: `BellBlock.onExplosionHit` rings it through `attemptToRing` with no direction of its
-    // own and no "was it a proper hit" test. No state moves; what comes out is the ring.
+    // parity: `BellBlock.onExplosionHit` rings it through `attemptToRing` with no direction of its.
     if (path == "bell") {
         heard(world, "block_change", x, y, z, gameTime);
         return;
@@ -66,8 +64,7 @@ void knock(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
     if (!button && !lever && !opens) {
         return;
     }
-    // parity: every `onExplosionHit` but the lever's refuses while the block is held by a signal,
-    // and a door only listens on its lower half.
+    // parity: every `onExplosionHit` but the lever's refuses while the block is held by a signal.
     if (!lever && propertyOf(*stateId, "powered") == "true") {
         return;
     }

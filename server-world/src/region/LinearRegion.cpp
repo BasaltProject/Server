@@ -9,16 +9,12 @@
 namespace basalt::server::world::region {
 namespace {
 
-// From linear.py: LINEAR_SIGNATURE, the versions its own reader accepts (write_region_linear itself
-// only ever emits version 1), and the fixed 32-byte superblock and 8-byte footer.
 constexpr std::uint64_t kSignature = 0xC3FF13183CCA9D9AULL;
 constexpr std::uint8_t kVersion = 1;
 constexpr std::size_t kHeaderSize = 32;
 constexpr std::size_t kFooterSize = 8;
 constexpr std::size_t kInnerHeaderSize = LinearRegion::kSlotCount * 8;
 
-/// Big-endian scalar writes straight into a pre-sized buffer, so building a region file never needs
-/// an intermediate growing one.
 void writeIntAt(std::span<std::uint8_t> into, std::size_t offset, std::uint32_t value) {
     into[offset] = static_cast<std::uint8_t>(value >> 24);
     into[offset + 1] = static_cast<std::uint8_t>(value >> 16);
@@ -143,7 +139,6 @@ bool LinearRegion::writeTo(const std::string& path, int compressionLevel) const 
     writeLongAt(header, 9, static_cast<std::uint64_t>(built.newestTimestamp));
     header[17] = static_cast<std::uint8_t>(compressionLevel);
     writeShortAt(header, 18, static_cast<std::uint16_t>(built.chunkCount));
-    // Patched below, once the compressed length is known.
     writeIntAt(header, 20, 0);
     writeLongAt(header, 24, 0);
 
@@ -226,8 +221,6 @@ std::expected<LinearRegion, LinearError> LinearRegion::read(std::span<const std:
         return std::unexpected{LinearError::BadSignature};
     }
     const std::uint8_t version = bytes[8];
-    // Version 2 differs only in what the header says about compression, which the zstd frame
-    // describes itself, so both read the same way.
     if (version != 1 && version != 2) {
         return std::unexpected{LinearError::UnsupportedVersion};
     }
@@ -242,9 +235,6 @@ std::expected<LinearRegion, LinearError> LinearRegion::read(std::span<const std:
         return std::unexpected{LinearError::LengthMismatch};
     }
 
-    // Streamed straight into the table and then each chunk's own blob: the whole region
-    // decompressed at once was megabytes of transient per read, and every worker thread's allocator
-    // kept its high-water mark. Mirrors writeTo, which streams the other way.
     wire::io::zstd::StreamDecompressor reader{bytes.subspan(kHeaderSize, compressedLength)};
     std::vector<std::uint8_t> table(kInnerHeaderSize);
     if (!reader.readFully(table)) {

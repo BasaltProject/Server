@@ -32,7 +32,6 @@ using wire::protocol::play::Gamemode;
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
-/// One off the stack in hand, and the whole screen redrawn where a slot is not enough.
 void spendOne(const BreakContext& context, PlayerSession& player, const std::int32_t heldSlot,
               const storage::StoredItemStack& held) {
     if (player.gamemode == Gamemode::Creative) {
@@ -46,7 +45,6 @@ void spendOne(const BreakContext& context, PlayerSession& player, const std::int
     }
 }
 
-/// Into the bag if it fits, on the ground if it does not.
 void giveOrDrop(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                 const storage::StoredItemStack& stack, const std::int32_t x, const std::int32_t y,
                 const std::int32_t z) {
@@ -117,8 +115,6 @@ void usePotFor(const BreakContext& context, PlayerSession& player, world::Loaded
     if (entity != nullptr && item.has_value()) {
         inserted = world::decoratedPots::insert(entity->data(), *item, held->components);
     }
-    // An empty hand, a full pot or the wrong item all end the same way: the pot rocks and takes
-    // nothing.
     if (!inserted.has_value()) {
         context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, *stateId,
                                     world::decoratedPots::rebuff());
@@ -160,8 +156,7 @@ void swapHotbarWithShelf(const BreakContext& context, PlayerSession& player, wor
     if (player.connection().sendInventoryAll) {
         player.connection().sendInventoryAll();
     }
-    // parity: `swapHotbar` calls `setChanged(ENTITY_INTERACT)` on every shelf of the chain, and each
-    // one is a noise of its own.
+    // parity: `swapHotbar` calls `setChanged(ENTITY_INTERACT)` on every shelf of the chain.
     for (const world::shelves::Position& part : world::shelves::chainAt(world.state(), x, y, z)) {
         if (world.state().hasSculkSensorNear(part[0], part[1], part[2], world::vibrations::kCalibratedRange)) {
             world::vibrations::emit(world.state(), "entity_interact", part[0] + 0.5, part[1] + 0.5, part[2] + 0.5,
@@ -213,8 +208,7 @@ void useShelfFor(const BreakContext& context, PlayerSession& player, world::Load
     if (context.slotChanged) {
         context.slotChanged(player, heldSlot);
     }
-    // parity: `swapSingleItem` ends in `setChanged(ITEM_INTERACT_FINISH)`. Its one exception, an item
-    // whose `use_effects` asks for silence, is a component this server does not carry yet.
+    // parity: `swapSingleItem`.
     if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
         world::vibrations::emit(world.state(), "item_interact_finish", x + 0.5, y + 0.5, z + 0.5, world.gameTime(),
                                 world::triggerFacts::vibrationSourceOf(player, context.triggers));
@@ -273,8 +267,7 @@ bool placeBookOnLecternFor(const BreakContext& context, PlayerSession& player, w
     if (server::registry::blockStateDefinitions::propertiesOf(*stateId)["has_book"] == "true") {
         return false;
     }
-    // parity: `tryPlaceBook` takes one off the stack, and the pages a comparator counts are one of
-    // its components.
+    // parity: `tryPlaceBook` takes one off the stack.
     const std::optional<world::BlockChange> change = world::lecterns::placeBook(
         world.state(), x, y, z,
         server::world::loot::ItemStack{.item = *item, .count = 1, .components = held->components});

@@ -22,7 +22,6 @@ using server::plugins::PluginCommandCall;
 using server::plugins::PluginCommandSpec;
 using server::plugins::PluginHandle;
 
-/// Before the object model is given to a test server: nobody is online and there are no worlds.
 class NoPlayers final : public server::plugins::PluginPlayers {
 public:
     [[nodiscard]] std::vector<std::shared_ptr<server::plugins::PluginPlayerRef>> online() const override { return {}; }
@@ -81,7 +80,6 @@ public:
     }
 };
 
-/// Before there is a world to open a window in.
 class NoMenus final : public server::plugins::PluginMenus {
 public:
     PluginHandle open(server::plugins::PluginPlayerRef&, std::string_view, std::int32_t,
@@ -107,7 +105,6 @@ public:
     [[nodiscard]] std::vector<std::string> names() const override { return packetNames::all(); }
 };
 
-/// Before there is a connection to talk over.
 class NoChannels final : public server::plugins::PluginChannelSender {
 public:
     bool send(server::plugins::PluginPlayerRef&, std::string_view, std::span<const std::uint8_t>) override {
@@ -150,7 +147,6 @@ NoChannels& noChannels() {
     return kNone;
 }
 
-/// One run of a plugin command, over the values the tree already parsed.
 class DispatchedCall final : public PluginCommandCall {
 public:
     DispatchedCall(std::string source, bool console, std::map<std::string, Argument, std::less<>> values,
@@ -213,8 +209,7 @@ PluginHandle OwnerTasks::every(std::int32_t delayTicks, std::int32_t periodTicks
     const auto handle = std::make_shared<sched::TaskHandle>();
     const auto held = std::make_shared<std::function<void()>>(std::move(task));
     sched::Owner* owner = owner_;
-    // The re-arm asks for one turn less than the period: a task scheduled while a turn is running is
-    // due that many turns *after* this one, so `every(1)` armed with 1 would run every other tick.
+    // The re-arm asks one turn less than the period: a task scheduled mid-turn is due that many turns later.
     const auto arm = std::make_shared<std::function<void(std::int32_t)>>();
     *arm = [owner, cancelled, handle, held, arm, period](std::int32_t delay) {
         *handle = owner->schedule(delay, [cancelled, held, arm, period] {
@@ -240,11 +235,9 @@ command::CommandNode* DispatcherCommands::add(Entry& entry) {
     return &dispatcher_->registerNode(entry.spec.name(), [target, owner](const command::CommandNodeBuilder& root) {
         root.permission(
             target->spec.permission.value_or("basalt.plugin." + target->pluginId + "." + target->spec.name()));
-        // Literals first, then one argument node per argument, the executor hanging off the last.
         const auto arguments = std::make_shared<std::function<void(const command::CommandNodeBuilder&, std::size_t)>>();
         *arguments = [target, owner, arguments](const command::CommandNodeBuilder& builder, std::size_t index) {
-            // An optional argument means the command is runnable without it, so every node from the
-            // first optional one onwards executes.
+            // An optional argument makes the command runnable without it, so every node from it onwards executes.
             const bool runnable = index >= target->spec.arguments.size() || target->spec.arguments[index].optional;
             if (runnable) {
                 builder.executes([target, owner, index](const command::CommandContext& context) {
@@ -264,8 +257,7 @@ command::CommandNode* DispatcherCommands::add(Entry& entry) {
                             values.emplace(argument.name, *flag);
                         }
                     }
-                    // Hands the call to the owner rather than running it here: a command arrives on
-                    // whichever owner the source belongs to, and plugin code only ever runs on one.
+                    // Handed to the owner: plugin code only ever runs on one, and the command arrives on the source's.
                     const command::CommandSource& source = context.source();
                     auto call = std::make_shared<DispatchedCall>(
                         source.name(), source.player() == nullptr, std::move(values),
@@ -322,7 +314,6 @@ bool DispatcherCommands::runAsConsole(std::string_view command) {
     if (source == nullptr) {
         return false;
     }
-    // Trimmed of its slash, since a plugin writes the command the way an operator types it.
     std::string line{command};
     if (line.starts_with('/')) {
         line.erase(0, 1);

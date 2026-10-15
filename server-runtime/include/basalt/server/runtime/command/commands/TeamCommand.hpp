@@ -4,8 +4,7 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// parity: `TeamCommand`. `deathMessageVisibility` is stored and travels with the team; who is
-/// actually shown a death message belongs with the death message work, not here.
+/// parity: `TeamCommand`.
 class TeamCommand final : public Command {
 public:
     explicit TeamCommand(scoreboard::Teams& teams);

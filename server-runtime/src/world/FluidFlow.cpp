@@ -40,7 +40,6 @@ constexpr std::size_t kUp = 1;
 constexpr std::size_t kFirstHorizontal = 2;
 constexpr std::size_t kLastHorizontal = 5;
 
-/// The face of `kOffsets`, in the same order, for asking a block shape about a wall.
 constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  registry::BlockFace::Up,
                                                     registry::BlockFace::West,  registry::BlockFace::East,
                                                     registry::BlockFace::North, registry::BlockFace::South};
@@ -50,8 +49,6 @@ constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  
     return block == nullptr ? registry::blocks::air().stateId : block->stateId;
 }
 
-/// The handful of blocks a flow can turn into, looked up once: `solidify` asks for them on every
-/// neighbour of every lava block, and a registry lookup by name there is a string per call.
 struct SolidStates {
     std::int32_t obsidian = namedState("obsidian");
     std::int32_t cobblestone = namedState("cobblestone");
@@ -67,7 +64,7 @@ struct SolidStates {
     return instance;
 }
 
-/// parity: `FlowingFluid.canHoldAnyFluid`'s own exclusion list, the blocks a flow refuses to enter.
+/// parity: `FlowingFluid.canHoldAnyFluid`'s own exclusion list.
 [[nodiscard]] const std::unordered_set<std::int32_t>& neverFlooded() {
     static const std::unordered_set<std::int32_t> table = [] {
         std::unordered_set<std::int32_t> built;
@@ -87,8 +84,6 @@ struct SolidStates {
     return stateId >= base && stateId <= base + 15 ? stateId - base : 0;
 }
 
-/// One range of states per fluid, written once: `liquidBlockKindOf` is the same walk and answering
-/// **which** fluid is strictly more than answering whether there is one.
 [[nodiscard]] bool isLiquidBlock(std::int32_t stateId) { return fluidFlow::liquidBlockKindOf(stateId).has_value(); }
 
 /// parity: `FlowingFluid.getLegacyLevel` read backwards: block level to fluid amount.
@@ -114,7 +109,7 @@ struct SolidStates {
     return kind.has_value() && levelOf(stateId, *kind) == 0;
 }
 
-/// parity: `FlowingFluid.getLegacyLevel`: the block state an amount plus falling flag maps to.
+/// parity: `FlowingFluid.getLegacyLevel`.
 [[nodiscard]] std::int32_t stateFor(FluidKind kind, std::int32_t amount, bool falling) {
     if (amount >= kMaxAmount && !falling) {
         return baseStateId(kind);
@@ -123,21 +118,19 @@ struct SolidStates {
     return baseStateId(kind) + level;
 }
 
-/// parity: `BlockState.blocksMotion`, read from the block's own shape rather than guessed.
+/// parity: `BlockState.blocksMotion`.
 [[nodiscard]] bool blocksMotion(std::int32_t stateId) {
     return !registry::blocks::isAir(stateId) && !isLiquidBlock(stateId) && registry::blockShapes::blocksMotion(stateId);
 }
 
-/// parity: `LiquidBlockContainer`, which no flowing liquid ever enters: every waterloggable block and
-/// the four underwater plants.
+/// parity: `LiquidBlockContainer`.
 [[nodiscard]] bool isLiquidContainer(std::int32_t stateId, const wire::common::Identifier& block) {
     const std::string_view path = block.path();
     return path == "kelp" || path == "kelp_plant" || path == "seagrass" || path == "tall_seagrass" ||
            registry::blockStateDefinitions::propertiesOf(stateId).contains("waterlogged");
 }
 
-/// parity: 26.3 `FlowingFluid.canHoldFluid` for a flowing liquid: a liquid container takes none, and
-/// anything else only what `washed_away_by_fluids` lists.
+/// parity: 26.3 `FlowingFluid.canHoldFluid` for a flowing liquid.
 [[nodiscard]] bool canHoldAnyFluid(std::int32_t stateId, const realBlockTags::TagMembers* tags) {
     if (tags == nullptr) {
         return !blocksMotion(stateId) && !neverFlooded().contains(stateId);
@@ -152,10 +145,6 @@ struct SolidStates {
            (static_cast<std::int64_t>(z) & 0x3FFFFFF);
 }
 
-/// One run of the engine, so the world and the change list are not passed through twenty calls.
-///
-/// An unloaded neighbour reads as bedrock rather than being generated: vanilla would load it, and
-/// generating a chunk from the tick thread is the one thing this loop cannot afford.
 class Flow {
 public:
     Flow(const fluidFlow::Context& context, std::vector<FluidChange>& changes) : context_(context), changes_(changes) {}
@@ -204,26 +193,18 @@ private:
         return state;
     }
 
-    /// Writing the same state again is not a change, and treating it as one is what turns a settled
     /// ocean into a tick that reschedules itself for ever. parity: `LevelChunk` returns early on an
-    /// identical state, so vanilla never fires the updates either.
     void set(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
         const std::int32_t previous = at(x, y, z);
         if (previous == stateId || !context_.world.setBlockState(x, y, z, stateId)) {
             return;
         }
         states_[packed(x, y, z)] = stateId;
-        // parity: `FlowingFluid.spreadTo` calls `beforeDestroyingBlock` before the block goes, which
-        // is what the washed-away state is for.
+        // parity: `FlowingFluid.spreadTo` calls `beforeDestroyingBlock` before the block goes.
         changes_.push_back(FluidChange{.x = x, .y = y, .z = z, .stateId = stateId, .washedAway = previous});
         blockChanged(x, y, z);
     }
 
-    /// The jar hooks this stands for, `LiquidBlock.onPlace` and `LiquidBlock.neighborChanged`, live
-    /// on **`LiquidBlock`**, so asking the narrow `liquidBlockKindOf` here looks right and is not:
-    /// this one call also carries the flow of every waterlogged square, which the jar moves through
-    /// `updateShape` on paths `bookLiquidTurn` does not reach yet. Narrowed it once and `anegadoforma`
-    /// went from 0 cells and 5 turns to 152 and 215. Narrow it again only with those paths covered.
     void wake(std::int32_t x, std::int32_t y, std::int32_t z) {
         const std::int32_t state = at(x, y, z);
         const std::optional<FluidKind> kind = fluidFlow::kindOf(state);
@@ -233,7 +214,7 @@ private:
         context_.world.scheduleFluidTick(x, y, z, fluidId(*kind, isSource(state)), tickDelay(*kind));
     }
 
-    /// parity: `WaterFluid.getTickDelay`, and `LavaFluid`'s override for an ultrawarm dimension.
+    /// parity: `WaterFluid.getTickDelay`.
     [[nodiscard]] std::int32_t tickDelay(FluidKind kind) const {
         if (kind == FluidKind::Water) {
             return fluidFlow::kWaterTickDelay;
@@ -253,10 +234,7 @@ private:
         return kind == FluidKind::Water || context_.ultrawarm ? 1 : 2;
     }
 
-    /// parity: `LavaFluid.getSpreadDelay`: lava whose square **rises** usually takes four times as
-    /// long. Three conditions come first and the roll last: both states have to hold liquid, neither
-    /// can be falling, and the new height has to beat the old one. Applying it to every change made a
-    /// lava that drains take four times too long in three of every four squares.
+    /// parity: `LavaFluid.getSpreadDelay`.
     [[nodiscard]] std::int32_t spreadDelay(FluidKind kind, std::int32_t was, std::int32_t now, std::int32_t x,
                                            std::int32_t y, std::int32_t z) {
         const std::int32_t base = tickDelay(kind);
@@ -264,26 +242,19 @@ private:
             isFalling(was) || isFalling(now)) {
             return base;
         }
-        // parity: `FluidState.getHeight` answers a full block whenever the square above holds the
-        // same fluid, and it is the same square for both states, so there is nothing to beat.
+        // parity: `FluidState.getHeight` answers a full block whenever the square above holds the.
         if (fluidFlow::kindOf(at(x, y + 1, z)) == kind || amountOf(now) <= amountOf(was)) {
             return base;
         }
-        // Not a parity gap despite the look of it: vanilla rolls this on `Level.random`, which is a
-        // `RandomSource.create()` with no seed of its own, so the same lava does not reproduce its
-        // own timing there either.
         return context_.random.nextInt(4) != 0 ? base * 4 : base;
     }
 
-    /// parity: `LiquidBlock.shouldSpreadLiquid`: lava that touches water turns to rock instead of
-    /// flowing.
+    /// parity: `LiquidBlock.shouldSpreadLiquid`.
     bool solidify(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t state, FluidKind kind) {
         if (kind != FluidKind::Lava) {
             return false;
         }
         const bool overSoulSoil = at(x, y - 1, z) == solidStates().soulSoil;
-        // The five directions lava can flow, looked at from the other side: water above or beside it
-        // stops it, water below does not.
         for (const std::size_t index : {kUp, std::size_t{2}, std::size_t{3}, std::size_t{4}, std::size_t{5}}) {
             const std::array<std::int32_t, 3>& offset = kOffsets[index];
             const std::int32_t neighbour = at(x + offset[0], y + offset[1], z + offset[2]);
@@ -299,7 +270,7 @@ private:
         return false;
     }
 
-    /// parity: `FlowingFluid.getNewLiquid`, the amount a position is entitled to from its neighbours.
+    /// parity: `FlowingFluid.getNewLiquid`.
     [[nodiscard]] std::int32_t newLiquid(std::int32_t x, std::int32_t y, std::int32_t z, FluidKind kind) {
         std::int32_t highest = 0;
         std::int32_t sources = 0;
@@ -318,7 +289,7 @@ private:
 
         if (sources >= 2 && canConvertToSource(kind)) {
             const std::int32_t below = at(x, y - 1, z);
-            // parity: `getNewLiquid` asks `isSolid`, which 26.3's `blocks_motion` tag no longer matches.
+            // parity: `getNewLiquid` asks `isSolid`.
             if (registry::blockShapes::isSolidState(below) || (fluidFlow::kindOf(below) == kind && isSource(below))) {
                 return stateFor(kind, kMaxAmount, false);
             }
@@ -339,7 +310,7 @@ private:
                                                                : gameRules::kLavaSourceConversion);
     }
 
-    /// parity: `FlowingFluid.spread`: down first, and sideways only when down is not an option.
+    /// parity: `FlowingFluid.spread`.
     void spread(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t state, FluidKind kind) {
         const std::int32_t below = at(x, y - 1, z);
         if (canMaybePassThrough(kind, state, below, registry::BlockFace::Down)) {
@@ -382,9 +353,7 @@ private:
             const std::int32_t distance =
                 isHole(nextX, y, nextZ, kind) ? 0 : slopeDistance(nextX, y, nextZ, 1, opposite(index), kind);
             distances[index] = distance;
-            // parity: `getSpread` only records a direction the fluid can really be put in, but it
-            // lowers `lowest` either way. A nearer drop behind a block that refuses the water still
-            // rules out the farther directions, and skipping it is what floods a cave.
+            // parity: `getSpread` only records a direction the fluid can really be put in, but it.
             if (canBeReplacedWith(neighbour, kind, false)) {
                 targets[index] = target;
             }
@@ -400,8 +369,7 @@ private:
         }
     }
 
-    /// parity: `FlowingFluid.getSlopeDistance`: how far away the nearest drop is, up to the fluid's
-    /// limit.
+    /// parity: `FlowingFluid.getSlopeDistance`.
     [[nodiscard]] std::int32_t slopeDistance(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t pass,
                                              std::size_t from, FluidKind kind) {
         std::int32_t lowest = kSlopeMiss;
@@ -428,7 +396,7 @@ private:
 
     [[nodiscard]] static std::size_t opposite(std::size_t index) { return index % 2 == 0 ? index + 1 : index - 1; }
 
-    /// parity: `FlowingFluid.isWaterHole`: whether the fluid at this position would fall out of it.
+    /// parity: `FlowingFluid.isWaterHole`.
     [[nodiscard]] bool isHole(std::int32_t x, std::int32_t y, std::int32_t z, FluidKind kind) {
         const std::int32_t below = at(x, y - 1, z);
         if (!canPassThroughWall(at(x, y, z), below, registry::BlockFace::Down)) {
@@ -458,14 +426,12 @@ private:
         return canHoldAnyFluid(target, context_.blockTags) && canPassThroughWall(source, target, face);
     }
 
-    /// parity: `FlowingFluid.canPassThroughWall`: the two shapes are merged before asking, so a slab
-    /// under an upside-down slab walls the flow off even though neither fills its cube.
+    /// parity: `FlowingFluid.canPassThroughWall`.
     [[nodiscard]] static bool canPassThroughWall(std::int32_t source, std::int32_t target, registry::BlockFace face) {
         return !registry::blockShapes::mergedFaceOccludes(source, target, face);
     }
 
-    /// parity: `WaterFluid`/`LavaFluid.canBeReplacedWith`: only lava falling into water, and water
-    /// into deep lava.
+    /// parity: `WaterFluid`/`LavaFluid.canBeReplacedWith`.
     [[nodiscard]] static bool canBeReplacedWith(std::int32_t target, FluidKind incoming, bool downward) {
         const std::optional<FluidKind> kind = fluidFlow::kindOf(target);
         if (!kind.has_value()) {
@@ -477,8 +443,7 @@ private:
         return static_cast<float>(amountOf(target)) / 9.0F >= kLavaReplaceHeight && incoming == FluidKind::Water;
     }
 
-    /// parity: `FlowingFluid.spreadTo`, and `LavaFluid`'s override that makes falling lava fizz into
-    /// stone.
+    /// parity: `FlowingFluid.spreadTo`.
     void spreadTo(std::int32_t x, std::int32_t y, std::int32_t z, FluidKind kind, bool downward, std::int32_t target) {
         const std::int32_t existing = at(x, y, z);
         if (downward && kind == FluidKind::Lava && fluidFlow::kindOf(existing) == FluidKind::Water) {
@@ -491,9 +456,7 @@ private:
     const fluidFlow::Context& context_;
     std::vector<FluidChange>& changes_;
 
-    /// Blocks read during this run, kept so the slope search does not ask the world for the same
     /// position twenty times. parity: `FlowingFluid.SpreadContext` caches for the same reason; here
-    /// every miss is also a lock on the world.
     std::unordered_map<std::int64_t, std::int32_t> states_;
 };
 
@@ -506,9 +469,7 @@ const wire::common::Identifier& fluidId(const FluidKind kind, const bool source)
     static const wire::common::Identifier lava = wire::common::Identifier::vanilla("lava");
     static const wire::common::Identifier flowingWater = wire::common::Identifier::vanilla("flowing_water");
     static const wire::common::Identifier flowingLava = wire::common::Identifier::vanilla("flowing_lava");
-    // parity: `LiquidBlock` books with `state.getFluidState().getType()`, and a square that is not a
-    // source answers `FLOWING_WATER` or `FLOWING_LAVA`. The turn runs the same either way; the name
-    // is what reaches the disk, so a world of ours opened in vanilla carried the wrong one.
+    // parity: `LiquidBlock` books with `state.getFluidState().getType()`.
     if (kind == FluidKind::Water) {
         return source ? water : flowingWater;
     }

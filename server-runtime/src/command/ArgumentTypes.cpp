@@ -38,7 +38,6 @@ public:
     }
 };
 
-/// `brigadier:string` in its `QUOTABLE_PHRASE` form: a word, or anything in quotes.
 class QuotableStringArgument final : public ArgumentType {
 public:
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
@@ -77,7 +76,6 @@ public:
     [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kBrigadierBool}; }
 };
 
-/// The shared shape of the three bounded number types: read, then refuse what is out of range.
 template <typename T, std::int32_t kParserId>
 class BoundedArgument final : public ArgumentType {
 public:
@@ -123,8 +121,6 @@ private:
             return std::to_string(value);
         } else {
             std::string text = std::to_string(value);
-            // Trailing zeroes are noise in a message the player reads; brigadier prints the shortest
-            // form of the same number.
             while (text.size() > 1 && text.back() == '0') {
                 text.pop_back();
             }
@@ -204,8 +200,7 @@ public:
     [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kRotation}; }
 };
 
-/// parity: `TimeArgument`, whose units are ticks, seconds (20) and days (24000), and which rounds
-/// the product down rather than to nearest.
+/// parity: `TimeArgument`, whose units are ticks, seconds (20) and days (24000).
 class TimeArgument final : public ArgumentType {
 public:
     explicit TimeArgument(std::int32_t min) : min_(min) {}
@@ -243,8 +238,6 @@ private:
     std::int32_t min_;
 };
 
-/// Everything left on the line. `minecraft:message` reads the same text, but checks its length and
-/// selectors and is signed by the client.
 class RestOfLineArgument final : public ArgumentType {
 public:
     explicit RestOfLineArgument(bool asMessage) : asMessage_(asMessage) {}
@@ -277,8 +270,6 @@ private:
     bool asMessage_;
 };
 
-/// Basalt has no profile cache yet, so this only carries the name through; `/op` on a name nobody
-/// has ever used is accepted, exactly as vanilla accepts it.
 class GameProfileArgument final : public ArgumentType {
 public:
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
@@ -324,17 +315,11 @@ public:
     [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kGamemode}; }
 };
 
-/// `minecraft:dimension` on the wire rather than `brigadier:string`: that is what `/execute in` and
-/// `if dimension` declare. A Basalt world is not always a dimension id, so the completions are this
-/// server's own world names and the client is told to ask for them rather than offer its three.
 class WorldArgument final : public ArgumentType {
 public:
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
                                               const CommandEnvironment& environment) const override {
         const std::int32_t start = reader.cursor();
-        // Read a namespaced id, not a bare word: a level key carries a colon, and brigadier's
-        // unquoted reader stops at it, so `basalt:nether` used to be refused as "unknown world
-        // 'basalt'" with the rest of the argument left unread.
         const std::string name = reader.readIdentifier();
         const std::map<std::string, world::LoadedWorld*, std::less<>>& worlds = environment.options().worlds;
         if (const auto found = worlds.find(name); found != worlds.end()) {
@@ -379,8 +364,6 @@ public:
     }
 };
 
-/// The two selector-backed types. Both parse the same grammar and differ in what they hand back
-/// and in the message they refuse with.
 class SelectorArgument final : public ArgumentType {
 public:
     SelectorArgument(bool single, bool playersOnly, bool optional = false)
@@ -432,7 +415,7 @@ public:
 private:
     bool single_;
     bool playersOnly_;
-    /// parity: `EntityArgument.getOptionalEntities`, which answers an empty list rather than failing.
+    /// parity: `EntityArgument.getOptionalEntities`.
     bool optional_;
 };
 

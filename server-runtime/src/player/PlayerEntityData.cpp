@@ -112,7 +112,7 @@ PlayerEntityData PlayerEntityData::of(const PlayerSession& session) {
     if (session.swimming) {
         data.sharedFlags |= SetEntityDataPacket::kFlagSwimming;
     }
-    // parity: `ServerPlayer.updateInvisibilityStatus`: a spectator is invisible and swirls nothing.
+    // parity: `ServerPlayer.updateInvisibilityStatus`.
     if (spectator || session.effects.contains(wire::common::Identifier::vanilla("invisibility"))) {
         data.sharedFlags |= SetEntityDataPacket::kFlagInvisible;
     }
@@ -235,8 +235,7 @@ void tickBody(PlayerSession& session, const entity::entityCollision::BlockAt& bl
             --session.stingerCount;
         }
     }
-    // parity: `Player.updateSwimming`: a flier never swims; otherwise it takes the eyes under water
-    // and water at the feet to start, and only being in water to go on.
+    // parity: `Player.updateSwimming`.
     const bool riding = session.vehicleId.has_value();
     if (session.flying) {
         session.swimming = false;

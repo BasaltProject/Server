@@ -17,7 +17,6 @@ namespace basalt::server::runtime::player {
 
 namespace {
 
-/// Whether the plugin gate refuses this one, with the screen put back when it does.
 [[nodiscard]] bool refused(PlayerSession& player, const wire::common::Identifier& item, const BucketGate& allowed) {
     if (!allowed || allowed(player, static_cast<std::int32_t>(player.x), static_cast<std::int32_t>(player.y),
                             static_cast<std::int32_t>(player.z), item.toString(), item.path() == "bucket")) {
@@ -29,7 +28,6 @@ namespace {
     return true;
 }
 
-/// What the fluid rules read while a bucket pours: the world, its gamerules and where it is.
 [[nodiscard]] world::fluidFlow::Context flowingIn(const BreakContext& context, world::LoadedWorld& world,
                                                   random::RandomSource& random) {
     return world::fluidFlow::Context{.world = world.state(),
@@ -39,14 +37,10 @@ namespace {
                                      .blockTags = context.blockTags};
 }
 
-/// What the world owes a bucket that did something: the blocks, their neighbours, the sensor that
-/// hears it and the bucket the hand is left holding.
 void settle(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
             const wire::common::Identifier& item, const std::int32_t heldSlot, const storage::StoredItemStack& held,
             const world::buckets::Result& result) {
-    // parity: `BucketItem` raises `FLUID_PICKUP` where it took the fluid from and `FLUID_PLACE`
-    // where it put it, and a sculk sensor hears both. Which of the two it is comes from the item:
-    // an empty bucket is the one that picks up.
+    // parity: `BucketItem`.
     if (!result.changes.empty()) {
         const world::FluidChange& at = result.changes.front();
         if (world.state().hasSculkSensorNear(at.x, at.y, at.z, world::vibrations::kCalibratedRange)) {
@@ -59,8 +53,7 @@ void settle(const BreakContext& context, PlayerSession& player, world::LoadedWor
     for (const world::FluidChange& change : result.changes) {
         announceBlock(context, world.name(), change.x, change.y, change.z, change.stateId);
     }
-    // parity: `BucketItem.emptyContents` calls `setBlock`, so what was around it hears about it:
-    // grass that had a snow layer over it until the water took its place stops wearing snow.
+    // parity: `BucketItem.emptyContents` calls `setBlock`.
     for (const world::FluidChange& change : result.changes) {
         notifyAround(context, world, change.x, change.y, change.z, std::nullopt);
     }
@@ -70,8 +63,7 @@ void settle(const BreakContext& context, PlayerSession& player, world::LoadedWor
     player.inventory.set(
         heldSlot,
         storage::StoredItemStack{.id = result.replacement->toString(), .count = 1, .components = held.components});
-    // parity: `BucketItem.use` and `Bucketable.bucketMobPickup` both end in `FILLED_BUCKET.trigger`,
-    // which is the bucket that came back full and never the empty one.
+    // parity: `BucketItem.use` and `Bucketable.bucketMobPickup` trigger `FILLED_BUCKET` with the full bucket.
     if (context.triggers != nullptr && result.replacement->path() != "bucket") {
         context.triggers->fire(
             "filled_bucket", player.name(), player.uuid().toString(),

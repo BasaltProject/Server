@@ -27,7 +27,6 @@ namespace {
     return stateId;
 }
 
-/// Interior 0: a lit pillar ringed with slabs.
 void pillarRoom(const StrongholdBrush& brush) {
     const std::int32_t bricks = strongholdPalette::stoneBricks();
     const std::int32_t slab = strongholdPalette::smoothStoneSlab();
@@ -48,7 +47,6 @@ void pillarRoom(const StrongholdBrush& brush) {
     brush.place(slab, 5, 1, 6);
 }
 
-/// Interior 1: a brick ring around a pillar with water on top.
 void fountainRoom(const StrongholdBrush& brush) {
     const std::int32_t bricks = strongholdPalette::stoneBricks();
     for (std::int32_t offset = 0; offset < 5; ++offset) {
@@ -63,7 +61,6 @@ void fountainRoom(const StrongholdBrush& brush) {
     brush.place(water(), 5, 4, 5);
 }
 
-/// Interior 2: a cobblestone frame under a plank loft, with a ladder and a chest above it.
 void loftRoom(const StrongholdBrush& brush) {
     const std::int32_t cobble = strongholdPalette::cobblestone();
     for (std::int32_t z = 1; z <= 9; ++z) {

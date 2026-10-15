@@ -16,16 +16,12 @@ class LootCondition;
 class FloatProvider;
 
 /// Where a `score` provider reads its holder from. parity: `ScoreboardNameProvider`: one of the
-/// roll's entities, or a fixed name.
 struct ScoreTarget {
     std::optional<EntityTarget> entity;
     std::string name;
 };
 
 /// A whole number worked out from the roll. parity: `ContextIntProvider` and its 23 types.
-///
-/// A value copies cheaply: what it is built from is shared, and a named registry entry is resolved
-/// into its value once, when the data is read.
 class IntProvider {
 public:
     enum class Kind : std::uint8_t {
@@ -59,11 +55,8 @@ public:
     [[nodiscard]] static IntProvider constant(std::int32_t value);
     [[nodiscard]] static IntProvider uniform(IntProvider min, IntProvider max);
     [[nodiscard]] static IntProvider binomial(IntProvider n, FloatProvider p);
-    /// `Sum`, `Product`, `Minimum`, `Maximum` and `Average`, over one or more inputs.
     [[nodiscard]] static IntProvider aggregate(Kind kind, std::vector<IntProvider> inputs);
-    /// `Difference`, `Quotient`, `FloorQuotient`, `Modulus`, `FloorModulus` and `Power`.
     [[nodiscard]] static IntProvider binary(Kind kind, IntProvider left, IntProvider right);
-    /// `Negate` and `Absolute`.
     [[nodiscard]] static IntProvider unary(Kind kind, IntProvider input);
     [[nodiscard]] static IntProvider fromFloat(FloatProvider input);
     [[nodiscard]] static IntProvider conditional(LootCondition condition, IntProvider onTrue, IntProvider onFalse);
@@ -76,11 +69,10 @@ public:
 
     [[nodiscard]] Kind kind() const noexcept { return kind_; }
 
-    /// parity: `getInt`, which answers 0 for anything that would have thrown `ArithmeticException`.
+    /// parity: `getInt`.
     [[nodiscard]] std::int32_t get(random::RandomSource& random, const LootContext& context) const;
 
-    /// parity: `getIntUnsafe`: nothing where vanilla throws, having used exactly the random vanilla
-    /// used up to the throw.
+    /// parity: `getIntUnsafe`.
     [[nodiscard]] std::optional<std::int32_t> tryGet(random::RandomSource& random, const LootContext& context) const;
 
 private:
@@ -129,11 +121,8 @@ public:
 
     [[nodiscard]] static FloatProvider constant(float value);
     [[nodiscard]] static FloatProvider uniform(FloatProvider min, FloatProvider max);
-    /// `Sum`, `Product`, `Minimum`, `Maximum`, `Average` and `Length`.
     [[nodiscard]] static FloatProvider aggregate(Kind kind, std::vector<FloatProvider> inputs);
-    /// `Difference`, `Quotient`, `Modulus` and `Power`.
     [[nodiscard]] static FloatProvider binary(Kind kind, FloatProvider left, FloatProvider right);
-    /// The one-input operations, `Negate` through `Cosine`.
     [[nodiscard]] static FloatProvider unary(Kind kind, FloatProvider input);
     [[nodiscard]] static FloatProvider fromInt(IntProvider input);
     [[nodiscard]] static FloatProvider conditional(LootCondition condition, FloatProvider onTrue,
@@ -150,7 +139,7 @@ public:
     /// parity: `getFloat`: 0 for anything not finite or that would have thrown.
     [[nodiscard]] float get(random::RandomSource& random, const LootContext& context) const;
 
-    /// parity: `getFloatUnsafe`, NaN and infinities included; nothing only where vanilla throws.
+    /// parity: `getFloatUnsafe`.
     [[nodiscard]] std::optional<float> tryGet(random::RandomSource& random, const LootContext& context) const;
 
     /// parity: `getFloatOrThrow`, which also throws for a value that is not finite.

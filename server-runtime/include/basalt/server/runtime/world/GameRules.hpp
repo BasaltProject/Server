@@ -11,10 +11,6 @@
 
 namespace basalt::server::runtime::world {
 
-/// One game rule: its id, its default, and the bounds an integer rule accepts.
-///
-/// 26.2 renamed most of them (`doDaylightCycle` is `advance_time`, `doMobSpawning` is `spawn_mobs`)
-/// and the client resolves each id's label itself, so these are the new names verbatim.
 struct GameRule {
     enum class Kind : std::uint8_t { Boolean, Integer };
 
@@ -36,8 +32,6 @@ struct GameRule {
     }
 };
 
-/// parity: `GameRules`, with the rules something already reads named so a caller asks for one by
-/// name instead of by string.
 namespace gameRules {
 
 inline constexpr GameRule kAdvanceTime = GameRule::boolean("advance_time", true);
@@ -47,10 +41,8 @@ inline constexpr GameRule kNaturalHealthRegeneration = GameRule::boolean("natura
 inline constexpr GameRule kMaxBlockModifications = GameRule::integer("max_block_modifications", 32768, 1);
 inline constexpr GameRule kMaxCommandSequenceLength = GameRule::integer("max_command_sequence_length", 65536, 0);
 
-/// parity: `isCommandBlockEnabled`, which is what stops a command block running its command. The
-/// cycle around it carries on either way: only the command is skipped.
+/// parity: `isCommandBlockEnabled` only skips the command.
 inline constexpr GameRule kCommandBlocksWork = GameRule::boolean("command_blocks_work", true);
-/// parity: `GameRules.RAIDS`, which stops every raid the moment it is off.
 inline constexpr GameRule kRaids = GameRule::boolean("raids", true);
 inline constexpr GameRule kMaxCommandForks = GameRule::integer("max_command_forks", 65536, 0);
 inline constexpr GameRule kSendCommandFeedback = GameRule::boolean("send_command_feedback", true);
@@ -58,17 +50,13 @@ inline constexpr GameRule kLogAdminCommands = GameRule::boolean("log_admin_comma
 inline constexpr GameRule kShowDeathMessages = GameRule::boolean("show_death_messages", true);
 inline constexpr GameRule kRandomTickSpeed = GameRule::integer("random_tick_speed", 3, 0);
 
-/// Named because the vine spread asks for it by name. parity: `GameRules.SPREAD_VINES`.
 inline constexpr GameRule kSpreadVines = GameRule::boolean("spread_vines", true);
 inline constexpr GameRule kMobGriefing = GameRule::boolean("mob_griefing", true);
 
-/// parity: `GameRules.UNIVERSAL_ANGER`: a neutral mob hurt by a player turns on every player.
 inline constexpr GameRule kUniversalAnger = GameRule::boolean("universal_anger", false);
 
-/// parity: `GameRules.FORGIVE_DEAD_PLAYERS`: a neutral mob lets go of a player who died.
 inline constexpr GameRule kForgiveDeadPlayers = GameRule::boolean("forgive_dead_players", true);
 
-/// Named because a nether portal asks it before spawning anything.
 inline constexpr GameRule kSpawnMonsters = GameRule::boolean("spawn_monsters", true);
 inline constexpr GameRule kImmediateRespawn = GameRule::boolean("immediate_respawn", false);
 
@@ -80,88 +68,68 @@ inline constexpr GameRule kPlayersNetherPortalCreativeDelay =
 inline constexpr GameRule kPlayersNetherPortalDefaultDelay =
     GameRule::integer("players_nether_portal_default_delay", 80, 0);
 
-/// parity: with this on, a player crafts only the recipes they have been taught.
 inline constexpr GameRule kLimitedCrafting = GameRule::boolean("limited_crafting", false);
 
-/// parity: `show_advancement_messages`, the rule vanilla renamed from `announceAdvancements`.
+/// parity: `show_advancement_messages`.
 inline constexpr GameRule kShowAdvancementMessages = GameRule::boolean("show_advancement_messages", true);
 
 /// parity: `spawn_mobs`, which vanilla renamed from `doMobSpawning`.
 inline constexpr GameRule kSpawnMobs = GameRule::boolean("spawn_mobs", true);
 
-/// parity: the custom phantom spawner's independent switch.
 inline constexpr GameRule kSpawnPhantoms = GameRule::boolean("spawn_phantoms", true);
 
-/// parity: the custom pillager patrol spawner's independent switch.
 inline constexpr GameRule kSpawnPatrols = GameRule::boolean("spawn_patrols", true);
 
-/// parity: `GameRules.SPAWN_WARDENS`, which a shrieker asks before it answers.
 inline constexpr GameRule kSpawnWardens = GameRule::boolean("spawn_wardens", true);
 
-/// parity: `ServerLevel.isSpawnerBlockEnabled`, which a monster spawner asks before it counts down.
 inline constexpr GameRule kSpawnerBlocksWork = GameRule::boolean("spawner_blocks_work", true);
 
-/// parity: the periodic trader spawner's independent switch.
 inline constexpr GameRule kSpawnWanderingTraders = GameRule::boolean("spawn_wandering_traders", true);
 
-/// parity: what makes two water sources next to each other fill the block between them.
 inline constexpr GameRule kWaterSourceConversion = GameRule::boolean("water_source_conversion", true);
 
-/// parity: the share of the players who have to be in bed for the night to end.
 inline constexpr GameRule kPlayersSleepingPercentage = GameRule::integer("players_sleeping_percentage", 100, 0);
 
-/// parity: what a fall costs, and what turning it off costs nothing.
 inline constexpr GameRule kFallDamage = GameRule::boolean("fall_damage", true);
 
-/// parity: `TntBlock.prime` answers false with this off, and the caller then leaves the block where it
-/// is: nothing lights and nothing is removed.
+/// parity: `TntBlock.prime` answers false with this off, leaving the block where it is.
 inline constexpr GameRule kTntExplodes = GameRule::boolean("tnt_explodes", true);
 
-/// parity: `ServerLevel.canSpreadFireAround`: fire and lightning act only this near a player, and
-/// everywhere at -1.
+/// parity: `ServerLevel.canSpreadFireAround`.
 inline constexpr GameRule kFireSpreadRadiusAroundPlayer =
     GameRule::integer("fire_spread_radius_around_player", 128, -1);
 
-/// parity: `Block.popResource` and `Block.popExperience`, which are what every block break ends in.
-/// With this off a block still breaks and still goes: what it drops is what stops.
+/// parity: `Block.popResource`/`popExperience`.
 inline constexpr GameRule kBlockDrops = GameRule::boolean("block_drops", true);
 
-/// parity: `Entity.spawnAtLocation` answers nothing with this off, so a mob still dies and an item
-/// frame still comes off the wall: what they leave behind is what stops.
+/// parity: `Entity.spawnAtLocation` answers nothing with this off.
 inline constexpr GameRule kEntityDrops = GameRule::boolean("entity_drops", true);
 
-/// parity: what a mob leaves when it dies, the dragon's experience included.
 inline constexpr GameRule kMobDrops = GameRule::boolean("mob_drops", true);
 
-/// parity: `LivingEntity.pushEntities`, how many a body may be squeezed against before it hurts.
 inline constexpr GameRule kMaxEntityCramming = GameRule::integer("max_entity_cramming", 24, 0);
 
-/// parity: `NewMinecartBehavior.getMaxSpeed`, blocks a second under `minecart_improvements`.
 inline constexpr GameRule kMaxMinecartSpeed = GameRule::integer("max_minecart_speed", 8, 1, 1000);
 
-/// parity: `ServerPlayer.isPvpAllowed`, whether players may hurt each other at all.
 inline constexpr GameRule kPvp = GameRule::boolean("pvp", true);
 
 /// parity: off in vanilla, which is why lava has no infinite pools.
 inline constexpr GameRule kLavaSourceConversion = GameRule::boolean("lava_source_conversion", false);
 
-/// Every rule, by id, which is the order `/gamerule` lists them in.
+/// Every rule by id, in the order `/gamerule` lists them.
 [[nodiscard]] std::span<const GameRule> all();
 
-/// The rule with that id, with or without the `minecraft:` a command may carry.
 [[nodiscard]] const GameRule* byId(std::string_view id);
 
 } // namespace gameRules
 
-/// The values one world runs with; anything unset answers the vanilla default, so an older `level.nbt`
-/// keeps working. Rules nothing reads yet are still stored, so an operator can set them ahead.
+/// Unset rules answer the vanilla default so an older `level.nbt` keeps working; unread rules are still stored.
 class GameRuleValues {
 public:
     [[nodiscard]] bool get(const GameRule& rule) const;
 
     [[nodiscard]] std::int32_t number(const GameRule& rule) const;
 
-    /// The value as `/gamerule` prints it: `true`/`false` for a boolean, digits for an integer.
     [[nodiscard]] std::string serialized(const GameRule& rule) const;
 
     void set(const GameRule& rule, std::string value);
@@ -170,7 +138,6 @@ public:
 
     [[nodiscard]] static GameRuleValues readFrom(const wire::nbt::NbtCompound& root);
 
-    /// By the values set, so world metadata read back from disk equals what wrote it.
     friend bool operator==(const GameRuleValues&, const GameRuleValues&) = default;
 
 private:

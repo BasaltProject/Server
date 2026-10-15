@@ -9,8 +9,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `LlamaFollowCaravanGoal`: a free llama falls in behind the nearest caravan's tail, or
-/// behind a llama on a lead, and keeps two blocks back for as long as the head of the line is led.
+/// parity: `LlamaFollowCaravanGoal`.
 class LlamaFollowCaravanGoal final : public Goal {
 public:
     explicit LlamaFollowCaravanGoal(double speedModifier);
@@ -30,7 +29,7 @@ private:
     std::int32_t distCheckCounter_ = 0;
 };
 
-/// parity: `RangedAttackGoal` as `Llama.registerGoals` builds it, whose attack is `Llama.spit`.
+/// parity: `RangedAttackGoal` as `Llama.registerGoals` builds it.
 class LlamaSpitGoal final : public Goal {
 public:
     LlamaSpitGoal(double speedModifier, std::int32_t attackIntervalMin, std::int32_t attackIntervalMax,
@@ -75,7 +74,7 @@ private:
     HurtByTargetGoal revenge_;
 };
 
-/// parity: `Llama.LlamaAttackWolfGoal`: any wolf nobody tamed, within a quarter of the follow range.
+/// parity: `Llama.LlamaAttackWolfGoal`.
 class LlamaAttackWolfGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
@@ -92,8 +91,7 @@ private:
     std::optional<std::int32_t> target_;
 };
 
-/// parity: `TraderLlama.TraderLlamaDefendWanderingTraderGoal`: whoever last hurt the trader holding
-/// its lead.
+/// parity: `TraderLlama.TraderLlamaDefendWanderingTraderGoal`.
 class TraderLlamaDefendTraderGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
@@ -111,7 +109,7 @@ private:
     std::int32_t timestamp_ = 0;
 };
 
-/// parity: `Wolf.WolfAvoidEntityGoal`: a wild wolf backs off from a llama, the stronger the likelier.
+/// parity: `Wolf.WolfAvoidEntityGoal`.
 class WolfAvoidLlamaGoal final : public Goal {
 public:
     WolfAvoidLlamaGoal();

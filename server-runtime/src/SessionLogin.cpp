@@ -36,7 +36,6 @@ namespace reg = server::registry;
 using wire::common::Identifier;
 using wire::common::Uuid;
 
-/// The line a refused client reads, whichever way its version is wrong.
 std::string versionRefusalOf(mv::ProtocolVerdict::Refused::Reason reason) {
     const std::string version{buildInfo::kMinecraftVersion};
     if (reason == mv::ProtocolVerdict::Refused::Reason::TooOld) {
@@ -62,9 +61,7 @@ std::string_view reasonName(mv::ProtocolVerdict::Refused::Reason reason) {
     return "too_old";
 }
 
-/// The seven registries in `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` that nothing else here
-/// populates yet. Sent with zero entries so the client's registry access has an entry for each,
-/// which the tags scoped to them need to resolve at all.
+// Sent empty so the client's registry access has an entry, which tags scoped to them need to resolve.
 constexpr std::array<std::string_view, 7> kEmptySynchronizedRegistries{
     "minecraft:trim_pattern",     "minecraft:sulfur_cube_archetype", "minecraft:enchantment",
     "minecraft:test_environment", "minecraft:test_instance",         "minecraft:dialog",
@@ -95,17 +92,14 @@ void ClientSession::handleHandshake(std::int32_t packetId, wire::io::ByteBuffer&
         state_ = wire::protocol::ProtocolState::Login;
         break;
     case wire::protocol::handshake::ClientIntent::Transfer:
-        // Not supported yet: the connection is dropped rather than half-answered.
         connection_.close();
         return;
     }
-    // Read now, acted on at login: a refusal there is still a disconnect screen rather than a socket
-    // that closes for no stated reason. A ping never carries forwarded data.
+    // Read now, acted on at login: a refusal there is a disconnect screen, not a silent close.
     if (proxy_.readsHandshake() && packet->intent == wire::protocol::handshake::ClientIntent::Login) {
         forwardedHandshake_ = proxy_.readHandshake(packet->hostName);
         if (const auto* accepted = std::get_if<wire::auth::forwarding::ForwardedLogin>(&*forwardedHandshake_);
             accepted != nullptr) {
-            // The host with the forwarded data stripped back off it, which is what the player typed.
             handshake_->hostName = accepted->host;
         }
     }
@@ -119,9 +113,7 @@ void ClientSession::handleStatus(std::int32_t packetId, wire::io::ByteBuffer& bo
         }
         wire::protocol::status::ServerStatusPayload status = options_.statusProvider(
             protocol, handshake_.has_value() ? handshake_->hostName : "", connection_.remoteAddress());
-        // A client compares this number with its own and paints the entry red when they differ, so
-        // echoing an accepted client's own number is what stops a server that would let them play
-        // from looking broken in their list. Refusing one keeps our number, which is the honest hint.
+        // A client paints the entry red when its number differs, so echoing an accepted client's own avoids that.
         const bool refused = std::holds_alternative<mv::ProtocolVerdict::Refused>(verdict_.value);
         if (status.version.has_value() && status.version->protocol != protocol && !refused) {
             status.version->protocol = protocol;
@@ -184,8 +176,7 @@ void ClientSession::handleLoginStart(wire::io::ByteBuffer& body) {
         });
     }
     pendingUsername_ = loginStart->name;
-    // A proxy has already authenticated this player, so the session exchange never happens: what it
-    // says about them is the whole of their identity here.
+    // A proxy already authenticated this player, so what it says is their whole identity.
     if (proxy_.enabled()) {
         startForwardedLogin(*loginStart);
         return;
@@ -213,8 +204,7 @@ void ClientSession::handleLoginStart(wire::io::ByteBuffer& body) {
 }
 
 bool ClientSession::pluginRefusesLogin(const std::string& name, const std::string& profileId) {
-    // The one gate before a player exists at all: a plugin that says no here means they never join,
-    // and what it says is what they read on the disconnect screen.
+    // The one gate before a player exists: a plugin saying no means they never join.
     if (!options_.plugins.loginRefused) {
         return false;
     }
@@ -273,7 +263,6 @@ void ClientSession::handleForwardingAnswer(wire::io::ByteBuffer& body) {
         return;
     }
     const wire::auth::forwarding::ForwardedLogin& forwarded = *proxy_.login();
-    // The proxy's name for them, not the one they claimed in the login packet.
     const std::string name = forwarded.name.value_or(*pendingUsername_);
     if (pluginRefusesLogin(name, forwarded.profileId.toString())) {
         return;
@@ -328,8 +317,7 @@ void ClientSession::handleKey(wire::io::ByteBuffer& body) {
 }
 
 std::optional<wire::text::Component> ClientSession::loginRefusal(Uuid id, const std::string& name) {
-    // parity: `PlayerList.canPlayerLogin`, which checks the bans and the whitelist before the
-    // connection is allowed to go any further.
+    // parity: `PlayerList.canPlayerLogin`.
     storage::PlayerStore* store = options_.playerStore;
     if (store == nullptr || !store->isOpen()) {
         return std::nullopt;
@@ -383,9 +371,7 @@ void ClientSession::finishLogin(Uuid id, const std::string& name,
     sendCompressed(login::LoginFinishedPacket::kId, [&profile, sessionId](wire::io::ByteBuffer& buffer) {
         login::LoginFinishedPacket{.gameProfile = profile, .sessionId = sessionId}.write(buffer);
     });
-    // Before 1.20.2 there is no configuration phase and nothing to acknowledge: the client is
-    // already in play. The server still walks its own configuration, whose packets the translation
-    // turns into the one thing that client does read, but it walks it by itself.
+    // Before 1.20.2 there is no configuration phase to acknowledge: the server walks its own by itself.
     if (handshake_.has_value() && handshake_->protocolVersion < mv::protocolVersions::kV1_20_2) {
         enterConfiguration();
     }
@@ -393,14 +379,12 @@ void ClientSession::finishLogin(Uuid id, const std::string& name,
 
 void ClientSession::enterConfiguration() {
     state_ = wire::protocol::ProtocolState::Configuration;
-    // parity: `ServerConfigurationPacketListenerImpl` opens with the brand, which is what F3 prints
-    // as `"<brand>" server`. Without it the client has nothing to name us with.
+    // parity: `ServerConfigurationPacketListenerImpl`.
     sendCompressed(wire::protocol::configuration::BrandPacket::kId, [](wire::io::ByteBuffer& buffer) {
         wire::protocol::configuration::BrandPacket{.brand = "Basalt " + std::string{buildInfo::kMinecraftVersion}}
             .write(buffer);
     });
-    // parity: `ClientboundUpdateEnabledFeaturesPacket` comes before the known packs. Only a client
-    // on this server's own protocol is told: the older ones take the vanilla flags either way.
+    // parity: `ClientboundUpdateEnabledFeaturesPacket`.
     if (handshake_.has_value() && handshake_->protocolVersion == buildInfo::kProtocolVersion) {
         std::vector<std::string> features{"minecraft:vanilla"};
         if (options_.enabledFeatures) {
@@ -411,8 +395,7 @@ void ClientSession::enterConfiguration() {
                 wire::protocol::configuration::UpdateEnabledFeaturesPacket{.features = features}.write(buffer);
             });
     }
-    // Claims the client's own vanilla data pack rather than an empty list. A client older than
-    // 1.20.5 has no such packet and would never answer, so it is not asked.
+    // A client older than 1.20.5 has no such packet and would never answer, so it is not asked.
     if (handshake_.has_value() && handshake_->protocolVersion < mv::protocolVersions::kV1_20_5) {
         sendRegistriesThenFinish();
         return;
@@ -436,8 +419,7 @@ void ClientSession::handleConfiguration(std::int32_t packetId, wire::io::ByteBuf
         return;
     }
     if (packetId == wire::protocol::configuration::ClientInformationPacket::kId) {
-        // Read even here, before the player exists: it is where the skin layer mask, the chat
-        // setting and the view distance first arrive.
+        // Read even before the player exists: skin layer mask, chat setting and view distance first arrive here.
         const std::optional<wire::protocol::configuration::ClientInformationPacket> information =
             wire::protocol::configuration::ClientInformationPacket::read(body);
         if (information.has_value()) {
@@ -456,9 +438,7 @@ void ClientSession::sendRegistriesThenFinish() {
     for (const RegistryDataPacket& packet : registry::installedRegistries()) {
         sendCompressed(RegistryDataPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     }
-    // The rest of `RegistryDataLoader.SYNCHRONIZED_REGISTRIES`, sent empty: a registry that was
-    // never sent does not exist client-side, and tags scoped to it stop resolving. Enchantments are
-    // all or nothing, because a partial registry disconnects at login.
+    // A registry never sent does not exist client-side and its tags stop resolving; enchantments are all or nothing.
     const auto sendLoaded = [this](std::string_view id, const auto& entries) {
         if (entries.empty()) {
             return false;
@@ -476,8 +456,7 @@ void ClientSession::sendRegistriesThenFinish() {
     const bool sentEnchantments =
         options_.enchantments != nullptr && sendLoaded("minecraft:enchantment", options_.enchantments->entries());
     const bool sentDialogs = options_.dialogs != nullptr && sendLoaded("minecraft:dialog", options_.dialogs->entries());
-    // Without these the client has a clock that ticks and nothing that reads it: the sky never moves
-    // however much `/time` reports success.
+    // Without these the client has a clock that ticks and nothing that reads it: the sky never moves.
     const bool sentTimelines =
         options_.timelines != nullptr && sendLoaded("minecraft:timeline", options_.timelines->entries());
     for (const std::string_view emptyRegistryId : kEmptySynchronizedRegistries) {
@@ -490,9 +469,7 @@ void ClientSession::sendRegistriesThenFinish() {
             RegistryDataPacket{.registryId = std::string{emptyRegistryId}, .entries = {}}.write(buffer);
         });
     }
-    // Every tag name goes out: the client looks tags up by key whether or not their registry is
-    // loaded. Members matter separately, because it runs its own tool rules against them and an
-    // empty `mineable/pickaxe` means bare-hand speed.
+    // Every tag name goes out; members matter too, since an empty `mineable/pickaxe` means bare-hand speed.
     const std::vector<wire::protocol::configuration::TagGroup> groups =
         registry::syncedTags(registry::TagSources{.blocks = options_.blockTags,
                                                   .items = options_.itemTags,
@@ -504,8 +481,7 @@ void ClientSession::sendRegistriesThenFinish() {
         wire::protocol::configuration::TagsPacket{.groups = groups}.write(buffer);
     });
     sendCompressed(wire::protocol::configuration::kFinishConfigurationId, [](wire::io::ByteBuffer&) {});
-    // Same again at the other end of it: a client with no configuration phase will not answer that
-    // this one is over.
+    // Same at the other end: a client with no configuration phase will not answer that this one is over.
     if (handshake_.has_value() && handshake_->protocolVersion < mv::protocolVersions::kV1_20_2) {
         enterPlay();
     }

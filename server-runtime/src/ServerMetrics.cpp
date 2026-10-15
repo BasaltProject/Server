@@ -9,12 +9,9 @@ namespace {
 
 constexpr std::uint64_t kBytesPerMegabyte = 1'048'576;
 
-/// Normally one reading a second is plenty.
 constexpr std::int64_t kMinimumWindowMillis = 1000;
 
-/// The exception is the very first answer after priming: holding out for a full second there would
-/// report nothing at all for that second, which is exactly when somebody is looking at a freshly
-/// started server.
+/// The first answer after priming uses a short window: waiting a full second reports nothing on a fresh server.
 constexpr std::int64_t kFirstWindowMillis = 50;
 
 } // namespace

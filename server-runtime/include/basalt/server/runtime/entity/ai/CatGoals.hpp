@@ -8,8 +8,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `MoveToBlockGoal`: every so often looks outwards from its feet for a block it wants, walks
-/// on top of it, and stays a random while before giving up on it.
+/// parity: `MoveToBlockGoal`.
 class MoveToBlockGoal : public Goal {
 public:
     MoveToBlockGoal(double speedModifier, std::int32_t searchRange, std::int32_t verticalSearchRange = 1);
@@ -67,8 +66,7 @@ protected:
     [[nodiscard]] bool isValidTarget(MobContext& mob, std::int32_t x, std::int32_t y, std::int32_t z) override;
 };
 
-/// parity: `CatSitOnBlockGoal`: a closed chest, a lit furnace or the foot of a bed, from the
-/// `cats_can_sit_on` tag.
+/// parity: `CatSitOnBlockGoal`.
 class CatSitOnBlockGoal final : public MoveToBlockGoal {
 public:
     explicit CatSitOnBlockGoal(double speedModifier);
@@ -85,8 +83,7 @@ protected:
     [[nodiscard]] bool isValidTarget(MobContext& mob, std::int32_t x, std::int32_t y, std::int32_t z) override;
 };
 
-/// parity: `Cat.CatRelaxOnOwnerGoal`: to the bed its owner sleeps in, curled up there, and on
-/// waking perhaps a gift from `gameplay/cat_morning_gift`.
+/// parity: `Cat.CatRelaxOnOwnerGoal`.
 class CatRelaxOnOwnerGoal final : public Goal {
 public:
     [[nodiscard]] bool canUse(MobContext& mob) override;

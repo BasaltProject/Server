@@ -11,7 +11,6 @@ using basalt::server::runtime::world::BiomeTagLoader;
 
 namespace {
 
-/// A jar that holds exactly the entries it was handed, and counts what was asked of it.
 struct Jar {
     std::map<std::string, std::string> entries;
     mutable std::int32_t reads = 0;
@@ -35,7 +34,6 @@ TEST_CASE("a tag answers with the biomes it names") {
     BiomeTagLoader loader{jar.reader()};
 
     CHECK(loader.biomesIn("minecraft:is_overworld") == std::set<std::string>{"minecraft:plains", "minecraft:swamp"});
-    // The name is read after its namespace, so the bare form finds the same file.
     CHECK(loader.biomesIn("is_overworld") == std::set<std::string>{"minecraft:plains", "minecraft:swamp"});
 }
 
@@ -77,7 +75,6 @@ TEST_CASE("a tag is read from the jar once and then remembered") {
     CHECK(jar.reads == 1);
     CHECK(loader.biomesIn("minecraft:is_overworld") == std::set<std::string>{"minecraft:plains"});
     CHECK(jar.reads == 1);
-    // An empty answer is remembered too, so a missing tag is not looked for twice.
     CHECK(loader.biomesIn("minecraft:missing").empty());
     CHECK(jar.reads == 2);
     CHECK(loader.biomesIn("minecraft:missing").empty());

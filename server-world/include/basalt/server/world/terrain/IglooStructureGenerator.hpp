@@ -14,8 +14,6 @@
 namespace basalt::server::world::terrain {
 
 /// The igloo, and half the time the ladder shaft and laboratory under it. parity: `IglooStructure`
-/// plus `IglooPieces`. The shaft is the middle template repeated per level, so the whole thing is
-/// one position shifted three blocks at a time rather than three separate structures.
 class IglooStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;
@@ -23,7 +21,6 @@ public:
     using SurfaceHeightAt = std::function<std::int32_t(std::int32_t, std::int32_t)>;
 
     static constexpr std::string_view kName = "igloo";
-    /// Position among the 44 structures of `surface_structures`, in registry order.
     static constexpr std::int32_t kStructureIndex = 21;
     static constexpr std::int32_t kSurfaceStructuresStep = 4;
 
@@ -32,20 +29,16 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
-    /// parity: `PlaceCommand.placeStructure`: every piece is clipped to its start chunk here, so the
-    /// bounds are that whole chunk. The grid and biome checks are skipped, as the command skips them.
+    /// parity: `PlaceCommand.placeStructure`.
     [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
                                                                                std::int32_t chunkZ) const;
 
-    /// Writes the igloo started at (chunkX, chunkZ) into `chunk`, like the worldgen pass does, but
-    /// without the grid and biome checks and without recording a start.
     void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
 
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
 private:
-    /// parity: `IglooStructure.findGenerationPoint`'s draw order: the rotation, then the basement
-    /// decision, then the pieces. `forPlacement` skips the start record.
+    /// parity: `IglooStructure.findGenerationPoint`'s draw order.
     void placeIgloo(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
                     bool forPlacement = false);
 
@@ -54,14 +47,13 @@ private:
           std::string_view name, structure::StructurePos start, structure::StructureRotation rotation,
           std::int32_t depth) const;
 
-    /// parity: `handleDataMarker`, which clears the marker and puts the loot in the chest below.
+    /// parity: `handleDataMarker`.
     static void placeChestMarker(Chunk& chunk, const structure::StructureTemplate& piece,
                                  structure::StructurePos position, structure::StructureRotation rotation,
                                  structure::StructurePos pivot, const structure::StructureBoundingBox& clip,
                                  random::RandomSource& random);
 
-    /// parity: the trapdoor square is filled with snow when there is no ladder under it, which is
-    /// what closes the floor of an igloo that drew no basement.
+    /// parity: the trapdoor square is filled with snow when there is no ladder under it, which is.
     static void closeTrapDoorWithoutShaft(Chunk& chunk, structure::StructurePos position,
                                           structure::StructureRotation rotation, structure::StructurePos pivot,
                                           const structure::StructureBoundingBox& clip);

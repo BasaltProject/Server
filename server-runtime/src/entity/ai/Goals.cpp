@@ -260,8 +260,6 @@ void BreedGoal::tick(MobContext& mob) {
     }
     lookControl::lookAt(mob.mob, partner_->x, partner_->y + partner_->height() * kEyeShare, partner_->z, 10.0F);
     static_cast<void>(navigation::moveTo(mob.world, mob.mob, partner_->x, partner_->y, partner_->z, speedModifier_));
-    // The three seconds of standing together, and the calf itself, are counted by the world's own
-    // breeding tick: this goal is the walking half of `BreedGoal`.
     loveTime_++;
 }
 
@@ -563,8 +561,7 @@ void HopAboutGoal::tick(MobContext& mob) {
     }
     mob.mob.yaw = moveControl::rotlerp(mob.mob.yaw, heading_, kTurnRate);
     mob.mob.headYaw = mob.mob.yaw;
-    // parity: `CubeMobMoveControl.tick`: in the air it keeps its speed, on the ground it only has
-    // one on the tick it jumps, and none at all while it waits for the next hop.
+    // parity: `CubeMobMoveControl.tick`.
     if (!mob.mob.onGround) {
         moveControl::setForward(mob.mob, kForwardShare);
         return;

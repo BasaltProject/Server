@@ -13,10 +13,7 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// Runs functions, and holds what `/return` did while they run. parity: `ServerFunctionManager`
-/// with the execution context `Commands.executeCommandInContext` opens. A nested call is queued as in
-/// vanilla, so only `max_command_sequence_length` bounds recursion; whatever waits on its result
-/// (`execute store`, `return run`, `execute if function`) is told when it returns.
+/// parity: `ServerFunctionManager`.
 class FunctionRunner {
 public:
     struct Settings {
@@ -26,8 +23,6 @@ public:
         std::function<std::int32_t(const CommandSource& source)> commandLimit;
     };
 
-    /// A function's answer: what `/return` gave, and whether it succeeded, or nothing when it ran
-    /// to the end without returning.
     struct Returned {
         bool success = true;
         std::int32_t value = 0;
@@ -40,49 +35,40 @@ public:
 
     [[nodiscard]] std::int32_t permissionLevel() const noexcept { return settings_.permissionLevel; }
 
-    /// Set by `/return` while a function is running, and cleared by the runner that reads it.
     void requestReturn(Returned value) { pendingReturn_ = value; }
 
     [[nodiscard]] bool insideFunction() const noexcept { return !frames_.empty(); }
 
-    /// Runs one function as `source`, macro arguments filled in first. An error is an instantiation
-    /// failure, already worded as vanilla words it; nothing has run then.
     [[nodiscard]] Parsed<std::optional<Returned>> call(const CommandDispatcher& dispatcher, const CommandSource& source,
                                                        const function::ServerFunction& function,
                                                        const wire::nbt::NbtCompound* arguments = nullptr);
 
-    /// Told when a queued function is done: its return, or nothing when it ran to the end.
     using Done = std::function<void(const std::optional<Returned>& returned)>;
 
-    /// Queues a function behind the command running now. Only inside a function; the error is an
-    /// instantiation failure, and nothing is queued then.
     Parsed<void> defer(const CommandDispatcher& dispatcher, const CommandSource& source,
                        const function::ServerFunction& function, const wire::nbt::NbtCompound* arguments,
                        Done onDone = {});
 
-    /// parity: `IsolatedCall`: the functions one after another until one returns, then `onDone`.
+    /// parity: `IsolatedCall`.
     void deferUntilReturn(const CommandDispatcher& dispatcher, std::shared_ptr<const CommandSource> source,
                           std::vector<const function::ServerFunction*> functions, Done onDone);
 
-    /// A copy of a source that outlives the command it came from, for work queued behind it.
     [[nodiscard]] std::shared_ptr<const CommandSource> keep(const CommandSource& source) const;
 
-    /// A function by id, answering its return value or 0. What `/test` and `/debug function` use.
     [[nodiscard]] Parsed<std::int32_t> run(const CommandDispatcher& dispatcher, const CommandSource& source,
                                            const wire::common::Identifier& id,
                                            const wire::nbt::NbtCompound* arguments = nullptr);
 
-    /// parity: `ServerFunctionManager.execute` of every function in a tag, each as its own call.
+    /// parity: `ServerFunctionManager.execute` of every function in a tag.
     void runTag(const CommandDispatcher& dispatcher, const CommandSource& source, const wire::common::Identifier& tag);
 
-    /// parity: `ServerFunctionManager.tick`: `#minecraft:load` once after a load, then `#minecraft:tick`.
+    /// parity: `ServerFunctionManager.tick`.
     void tick(const CommandDispatcher& dispatcher, const CommandSource& gameLoop);
 
-    /// Whether the next tick runs `#minecraft:load` first. parity: `postReload`.
+    /// parity: `postReload`.
     void loaded() { runLoad_ = true; }
 
 private:
-    /// The lines to run, macros filled in and checked, or why the function cannot run.
     [[nodiscard]] Parsed<std::vector<std::string>> instantiate(const CommandDispatcher& dispatcher,
                                                                const CommandSource& source,
                                                                const function::ServerFunction& function,
@@ -101,7 +87,6 @@ private:
 
     void settle(const CommandDispatcher& dispatcher, Frame& finished);
 
-    /// What the command that just ran queued goes on top, first queued first run.
     void afterCommand();
 
     const function::FunctionLibrary* library_;
@@ -115,8 +100,7 @@ private:
     bool runLoad_ = true;
 };
 
-/// Functions waiting for a game time to come round. parity: `TimerQueue`, keyed by the name
-/// `/schedule` gives: a function's id, or `#` and a tag's.
+/// parity: `TimerQueue`.
 class FunctionSchedule {
 public:
     struct Event {
@@ -132,16 +116,13 @@ public:
     /// parity: `TimerQueue.remove`, answering how many went.
     std::int32_t remove(std::string_view name);
 
-    /// What is waiting right now, which is what `/schedule clear` completes with.
     [[nodiscard]] std::vector<std::string> names() const;
 
-    /// Everything due by `gameTime`, in trigger order and then the order it was scheduled.
     [[nodiscard]] std::vector<Event> due(std::int64_t gameTime);
 
     /// parity: the `scheduled_events` saved data, `{events: [{trigger_time, id, callback}]}`.
     [[nodiscard]] wire::nbt::NbtCompound toNbt() const;
 
-    /// Replaces what is waiting with what was saved, skipping any event it cannot read.
     void readNbt(const wire::nbt::NbtCompound& saved);
 
 private:

@@ -213,8 +213,7 @@ namespace {
 /// parity: `Sensor.DEFAULT_SCAN_RATE`.
 constexpr std::int64_t kScanRate = 20;
 
-/// parity: the scan itself: the living things in the follow range's box and the players within the
-/// follow range, nearest first.
+/// parity: the scan: living things in the follow range's box and players within it, nearest first.
 void scan(const MobContext& mob, SensorScan& sensed) {
     const double range = mob.mob.attributeWithModifiers("minecraft:follow_range");
     std::vector<std::pair<double, std::pair<std::int32_t, bool>>> found;
@@ -244,8 +243,7 @@ void scan(const MobContext& mob, SensorScan& sensed) {
     }
 }
 
-/// parity: `Sensor.isEntityTargetable`: within the follow range, less a fifth for a crouching player,
-/// and in the mob's line of sight, eye to eye.
+/// parity: `Sensor.isEntityTargetable`.
 [[nodiscard]] bool targetable(const MobContext& mob, double x, double y, double z, double eyeY, bool sneaking) {
     const double range = mob.mob.attributeWithModifiers("minecraft:follow_range");
     const double reach = std::max(range * (sneaking ? 0.8 : 1.0), 2.0);
@@ -477,7 +475,7 @@ void lookAround(MobContext& mob, Look& look, std::int32_t& gazeCooldown, std::in
     if (yaw < -180.0F) {
         yaw += 360.0F;
     }
-    // parity: `Vec3.directionFromRotation` off the eyes, and a `BlockPosTracker` of that square.
+    // parity: `Vec3.directionFromRotation` off the eyes.
     const float yCos = mth::cos(static_cast<double>((-yaw * kRadians) - kPi));
     const float ySin = mth::sin(static_cast<double>((-yaw * kRadians) - kPi));
     const float xCos = -mth::cos(static_cast<double>(-pitch * kRadians));

@@ -53,16 +53,11 @@ PlaceholderValue needsPlayer(const PingRequest* ping) {
                         : std::string{"there is no player yet: this is a server list ping, before login"});
 }
 
-/// A name a ping *could* have answered and did not, which is not the same as having no subject.
-///
-/// `%basalt_player_name%` in the server list is a fair question: it is asking who is looking. It
-/// simply has no answer for somebody this server has never seen, and saying "this text is not about
-/// any player" there was plainly wrong, since it is about the person pinging.
+// A ping could have answered and did not, which is not the same as having no subject.
 PlaceholderValue unanswered(const PingRequest* ping) {
     return PlaceholderValue::unavailable(ping == nullptr ? std::string{kNoSubject} : std::string{kNotRecognised});
 }
 
-/// Answerable from a pending connection as well as from a player: what a handshake already carries.
 std::optional<PlaceholderValue> eitherWay(std::string_view params, const PlayerSession* session,
                                           const PingRequest* ping) {
     const auto text = [](std::string value) { return std::optional{PlaceholderValue::of(std::move(value))}; };
@@ -200,7 +195,6 @@ std::optional<PlaceholderValue> ofPlayer(std::string_view params, const PlayerSe
     return std::nullopt;
 }
 
-/// The names only a logged-in player can answer.
 const std::vector<std::string>& playerNames() {
     static const std::vector<std::string> kNames{"uuid",
                                                  "online",
@@ -236,7 +230,6 @@ const std::vector<std::string>& playerNames() {
 
 bool isPlayerName(std::string_view params) { return std::ranges::find(playerNames(), params) != playerNames().end(); }
 
-/// The names a handshake already carries, which a server list ping can answer too.
 const std::vector<std::string>& sharedNames() {
     static const std::vector<std::string> kNames{"protocol", "host", "ip", "name", "displayname", "list_name", "known"};
     return kNames;
@@ -244,8 +237,7 @@ const std::vector<std::string>& sharedNames() {
 
 bool isSharedName(std::string_view params) { return std::ranges::find(sharedNames(), params) != sharedNames().end(); }
 
-/// Placeholders whose meaning is settled but whose answer needs a system this build has not written
-/// yet. Registered so that using one is reported as "not yet" and not as a typo.
+// Meaning settled but the answer needs a system not written yet: reported as not yet, not as a typo.
 const std::map<std::string, std::string, std::less<>>& notImplementedReasons() {
     static const std::map<std::string, std::string, std::less<>> kReasons = [] {
         std::map<std::string, std::string, std::less<>> reasons;
@@ -337,8 +329,7 @@ wire::common::placeholder::PlaceholderProvider playerPlaceholders(PlayerPlacehol
                 return notImplemented(reason->second);
             }
             if (params.starts_with(kStatPrefix) && params.size() > kStatPrefix.size()) {
-                // Written without the namespaces for readability: `stat_mined_stone` rather than the
-                // full `minecraft:mined/minecraft:stone` a file would otherwise have to spell out.
+                // Written without namespaces: `stat_mined_stone` rather than `minecraft:mined/minecraft:stone`.
                 if (session == nullptr) {
                     return needsPlayer(ping);
                 }
@@ -357,8 +348,7 @@ wire::common::placeholder::PlaceholderProvider playerPlaceholders(PlayerPlacehol
                 }
                 return ofPlayer(params, *session, sources).value_or(PlaceholderValue::unknown());
             }
-            // `x_1` and friends: the same placeholder, rounded. Tried last, so a real name that happens
-            // to end in a digit is never mistaken for a precision.
+            // `x_1` and friends: the same placeholder, rounded; tried last so a real name ending in a digit wins.
             const std::optional<std::pair<std::string, std::int32_t>> rounded = decimals::split(params);
             if (!rounded.has_value() || !isPlayerName(rounded->first)) {
                 return PlaceholderValue::unknown();

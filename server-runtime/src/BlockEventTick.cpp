@@ -16,7 +16,7 @@ void RedstoneTickSystem::tickBlockEvents(world::LoadedWorld& world, const sched:
         return;
     }
     const std::vector<player::PlayerSession*> watchers = watchersOf(world);
-    // parity: `runBlockEvents` takes the oldest one and drains until nothing is left, so an event
+    // parity: `runBlockEvents` takes the oldest one and drains until nothing is left.
     // booked by another event runs in this same tick, and one booked while the queue still holds an
     // identical one collapses against it. What falls outside what this turn ticks goes back in the
     // queue, which is what `blockEventsToReschedule` is for.

@@ -31,8 +31,7 @@ inline constexpr std::int32_t kBottomY = -64;
 
 } // namespace monumentPalette
 
-/// parity: the drawing half of `OceanMonumentPiece`. Every monument piece writes through these, so
-/// the flooding rule and the "only where the water already is" rule are stated once.
+/// parity: the drawing half of `OceanMonumentPiece`.
 class MonumentBrush {
 public:
     MonumentBrush(const StructurePieceFill& fill, std::int32_t seaLevel, StructureBoundingBox clip)
@@ -47,27 +46,24 @@ public:
     void box(std::int32_t x0, std::int32_t y0, std::int32_t z0, std::int32_t x1, std::int32_t y1, std::int32_t z1,
              std::int32_t stateId) const;
 
-    /// parity: `generateWaterBox`. Ice of any kind and water already there are left alone; above sea
-    /// level the box is air instead, which is what opens the monument's roof to the sky.
+    /// parity: `generateWaterBox`.
     void waterBox(std::int32_t x0, std::int32_t y0, std::int32_t z0, std::int32_t x1, std::int32_t y1,
                   std::int32_t z1) const;
 
-    /// parity: `generateBoxOnFillOnly`, which seals a ceiling only where the room is still flooded.
+    /// parity: `generateBoxOnFillOnly`.
     void boxOnFillOnly(std::int32_t x0, std::int32_t y0, std::int32_t z0, std::int32_t x1, std::int32_t y1,
                        std::int32_t z1, std::int32_t stateId) const;
 
-    /// parity: `generateDefaultFloor`. A room above the ground floor lays its own, holed if it opens
-    /// downward.
+    /// parity: `generateDefaultFloor`.
     void defaultFloor(std::int32_t xOff, std::int32_t zOff, bool downOpening) const;
 
-    /// parity: `StructurePiece.fillColumnDown`, which stops at the first block it may not replace.
+    /// parity: `StructurePiece.fillColumnDown`.
     void fillColumnDown(std::int32_t stateId, std::int32_t x, std::int32_t startY, std::int32_t z) const;
 
-    /// parity: `spawnElder`, which stands a healed elder guardian on the block rather than inside it.
+    /// parity: `spawnElder`.
     void spawnElder(std::int32_t x, std::int32_t y, std::int32_t z) const;
 
-    /// parity: `chunkIntersects`, the per-slice guard that keeps a piece from drawing 58 blocks wide
-    /// every chunk.
+    /// parity: `chunkIntersects`.
     [[nodiscard]] bool chunkIntersects(std::int32_t x0, std::int32_t z0, std::int32_t x1, std::int32_t z1) const;
 
 private:

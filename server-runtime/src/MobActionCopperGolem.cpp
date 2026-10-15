@@ -112,7 +112,7 @@ void MobActionSystem::containerChanged(ServerEntity& mob, std::int32_t x, std::i
 
 void MobActionSystem::tickCopperGolem(world::LoadedWorld& world, ServerEntity& golem, random::RandomSource& random) {
     golems::GolemState& state = golems::stateOf(golem, random);
-    // parity: `CarvedPumpkinBlock.trySpawnGolem` ends in `spawn(weatherState)`: the copper the pattern
+    // parity: `CarvedPumpkinBlock.trySpawnGolem` ends in `spawn(weatherState)`.
     // was built on, now the chest under the golem, and the spawn sound.
     if (state.fromPattern) {
         state.fromPattern = false;

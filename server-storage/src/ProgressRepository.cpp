@@ -1,7 +1,6 @@
 #include <basalt/server/storage/ProgressRepository.hpp>
 
 namespace basalt::server::storage {
-
 StoredProgress ProgressRepository::load(std::string_view uuid) {
     StoredProgress progress;
     sql::Statement criteria =
@@ -61,5 +60,4 @@ void ProgressRepository::forgetRecipe(std::string_view uuid, std::string_view re
     statement.bind(2, recipe);
     statement.execute();
 }
-
 } // namespace basalt::server::storage

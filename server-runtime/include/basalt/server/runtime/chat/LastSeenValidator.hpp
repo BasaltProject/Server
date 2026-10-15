@@ -12,9 +12,7 @@
 
 namespace basalt::server::runtime::chat {
 
-/// parity: `LastSeenMessagesValidator`: the signed messages a client was sent and has not yet
-/// said it saw, and the window its acknowledgements move over. An error is the reason the client
-/// is disconnected for desyncing.
+/// parity: `LastSeenMessagesValidator`.
 class LastSeenValidator {
 public:
     /// parity: `ServerGamePacketListenerImpl.lastSeenMessages`, twenty wide.
@@ -29,7 +27,6 @@ public:
 
     [[nodiscard]] std::expected<void, std::string> applyOffset(std::int32_t offset);
 
-    /// The signatures the client says it has seen, which is what its signed body carries.
     [[nodiscard]] std::expected<std::vector<MessageSignature>, std::string>
     applyUpdate(const wire::protocol::play::LastSeenUpdate& update);
 
@@ -46,16 +43,14 @@ private:
     std::optional<MessageSignature> lastPending_;
 };
 
-/// parity: `MessageSignatureCache`, what a client is assumed to remember so a signature it already
-/// has goes out as an index.
+/// parity: `MessageSignatureCache`.
 class MessageSignatureCache {
 public:
     static constexpr std::size_t kCapacity = 128;
 
-    /// The slot holding this signature, or -1.
     [[nodiscard]] std::int32_t pack(const MessageSignature& signature) const;
 
-    /// parity: `push(body, signature)`: what the body saw, then the message itself, newest first.
+    /// parity: `push(body, signature)`.
     void push(const std::vector<MessageSignature>& lastSeen, const std::optional<MessageSignature>& signature);
 
 private:

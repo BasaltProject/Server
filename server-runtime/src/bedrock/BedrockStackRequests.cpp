@@ -27,14 +27,12 @@ using wire::bedrock::BedrockStackAction;
 using wire::bedrock::BedrockStackActionType;
 using wire::bedrock::BedrockStackSlot;
 
-/// Where that edition starts numbering a grid. A table's nine cells run from 32 and the player's
-/// own four from 28: the same window number with two runs of slots inside it.
+// A table's nine cells run from 32 and the player's own four from 28 under one window number.
 constexpr std::int32_t kFirstTableSlot = 32;
 constexpr std::int32_t kFirstCarriedSlot = 28;
 constexpr std::int32_t kCarriedCells = 4;
 
-/// Where one end of a move really is. Bedrock names a window and a slot of it; this server has one
-/// list of slots per player, one stack being dragged, a table's grid and whatever block is open.
+// This server has one slot list per player, one dragged stack, a table's grid and the open block.
 struct Place {
     enum class Kind : std::uint8_t { None, Storage, Cursor, Block, Grid, Created };
 
@@ -42,15 +40,12 @@ struct Place {
     std::int32_t slot = 0;
 };
 
-/// Bedrock's own slot numbering for the 36 a player carries puts the hotbar first; this server's
-/// puts it last.
+// Bedrock numbers the 36 carried slots hotbar first; this server puts it last.
 [[nodiscard]] std::int32_t carriedSlotOf(const std::int32_t slot) {
     return slot < PlayerInventory::kHotbarSize ? PlayerInventory::kHotbarStart + slot
                                                : slot - PlayerInventory::kHotbarSize;
 }
 
-/// Where one end of a move is, given what this player has open: which of the block's own slots a
-/// container names is the window's business, not this table's.
 [[nodiscard]] Place placeOf(const BedrockStackSlot& named, const BedrockWindows& windows) {
     if (named.container < 0 || named.container > 0xFF) {
         return {};
@@ -63,8 +58,7 @@ struct Place {
     }
     const auto container = static_cast<BedrockContainerSlot>(named.container);
     if (container == BedrockContainerSlot::CraftingInput) {
-        // Both grids are counted left to right and then down, which is this server's own order.
-        // The four a player carries land on the first four cells: only one grid is ever open.
+        // Both grids count left to right then down; the player's four land on the first four cells.
         if (named.slot >= kFirstCarriedSlot && named.slot < kFirstCarriedSlot + kCarriedCells) {
             return {.kind = Place::Kind::Grid, .slot = named.slot - kFirstCarriedSlot};
         }
@@ -102,51 +96,40 @@ struct Place {
         }
         return {.kind = Place::Kind::Storage, .slot = PlayerInventory::kOffhandSlot};
     case BedrockContainerSlot::EnchantingInput:
-        // An enchanting table's two slots are the screen's, so they live where a grid's first cells
-        // do: only one screen is ever open.
+        // Screen slots of these tables live where a grid's first cells do: only one screen is ever open.
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::EnchantingMaterial:
         return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::SmithingTemplate:
-        // A smithing table's four slots are the screen's, so its three inputs live where a grid's
-        // first cells do and what it makes is nowhere until it is taken.
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::SmithingInput:
         return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::SmithingMaterial:
         return {.kind = Place::Kind::Grid, .slot = 2};
     case BedrockContainerSlot::GrindstoneInput:
-        // A grindstone's two slots are the screen's, so they live where a grid's first cells do.
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::GrindstoneAdditional:
         return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::AnvilInput:
-        // An anvil's two slots belong to the screen, so they live where a grid's first cells do:
-        // only one screen is ever open.
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::AnvilMaterial:
         return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::LoomInput:
-        // A loom's three inputs are the screen's, so they live where a grid's first cells do.
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::LoomDye:
         return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::LoomMaterial:
         return {.kind = Place::Kind::Grid, .slot = 2};
     case BedrockContainerSlot::CartographyInput:
-        // A cartography table's two inputs are the screen's, so they live where a grid's first cells do.
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::CartographyAdditional:
         return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::BeaconPayment:
-        // A beacon's one slot is the screen's, so it lives where a grid's first cell does.
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::StonecutterInput:
-        // One slot, which lives where the grid's first cell does: only one screen is ever open.
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::TradeIngredientA:
-        // What a trade is being paid with. It is laid in the first two cells for the same reason:
-        // nothing else is open behind a merchant's book.
+        // A trade's payment is laid in the first two cells: nothing else is open behind a merchant's book.
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::TradeIngredientB:
         return {.kind = Place::Kind::Grid, .slot = 1};
@@ -161,18 +144,13 @@ struct Place {
     case BedrockContainerSlot::SmithingResult:
     case BedrockContainerSlot::LoomResult:
     case BedrockContainerSlot::CartographyResult:
-        // What a craft just made, which is nowhere until the line that takes it says where.
         return {.kind = Place::Kind::Created};
     default:
         return {};
     }
 }
 
-/// Everything one request reaches, and everything it has changed so far.
-///
-/// Nothing is written where it belongs until every line of the request has worked: a request is all
-/// or nothing on the client too, so a half-applied one leaves the two sides disagreeing about a
-/// chest. The staged writes here are what makes "refused" mean the world did not move.
+// Writes are staged until every line works: requests are all or nothing, or the two sides disagree about a chest.
 struct Reach {
     player::PlayerSession& session;
     BedrockWindows& windows;
@@ -182,23 +160,16 @@ struct Reach {
     std::map<std::int32_t, std::optional<storage::StoredItemStack>> grid;
     std::optional<std::optional<storage::StoredItemStack>> cursor;
     std::vector<storage::StoredItemStack> dropped;
-    /// What the recipe named by the last craft line makes. It exists only between that line and the
-    /// one that takes it, which is how this edition hands a result over.
+    // Exists only between the craft line and the one that takes it, which is how this edition hands a result over.
     std::optional<storage::StoredItemStack> created;
-    /// Which of the open merchant's offers this request is buying, and how many times over. The
-    /// offer is not counted as used until every line of the request has worked.
+    // The offer is not counted as used until every line of the request has worked.
     std::optional<std::int32_t> trade;
     std::int32_t trades = 0;
-    /// What the open anvil charged, once the request has taken what it made.
     std::optional<std::int32_t> anvilCost;
-    /// What the open beacon was set to, once the request has paid for it.
     std::optional<BeaconChoice> beacon;
-    /// What the open grindstone took off, once the request has taken what it left.
     std::optional<std::int32_t> grindstoneWorth;
-    /// What the open enchanting table charged, once the request has taken one of its rows.
     std::optional<std::int32_t> enchantCost;
-    /// How many of each were in the open cartography table when it made something: its own
-    /// consume lines have to take exactly one of each.
+    // Its consume lines have to take exactly one of each.
     std::optional<std::array<std::int32_t, 2>> cartographyBefore;
 };
 
@@ -232,7 +203,6 @@ struct Reach {
     return std::nullopt;
 }
 
-/// False when the write has nowhere to land, which ends the request.
 [[nodiscard]] bool writeStack(Reach& reach, const Place& place, std::optional<storage::StoredItemStack> stack) {
     switch (place.kind) {
     case Place::Kind::Storage:
@@ -260,7 +230,7 @@ struct Reach {
     return false;
 }
 
-/// Puts everything the request worked out where it belongs. Runs only once the whole request has.
+// Runs only once the whole request has worked.
 void commit(Reach& reach, const std::function<void(const storage::StoredItemStack&)>& drop) {
     for (const auto& [slot, stack] : reach.inventory) {
         reach.session.inventory.set(slot, stack);
@@ -287,12 +257,10 @@ void commit(Reach& reach, const std::function<void(const storage::StoredItemStac
     return stack;
 }
 
-/// Whether two stacks are the same thing, so one can be poured into the other.
 [[nodiscard]] bool sameKind(const storage::StoredItemStack& a, const storage::StoredItemStack& b) {
     return a.id == b.id && a.components == b.components;
 }
 
-/// Which windows a request touched, so the answer names them and nothing else.
 class Touched {
 public:
     void add(const BedrockStackSlot& named) { slots_[named.container].insert(named.slot); }
@@ -317,7 +285,6 @@ private:
     std::map<std::int32_t, std::set<std::int32_t>> slots_;
 };
 
-/// Pours `count` from one place into another, or says it cannot.
 [[nodiscard]] bool moveStack(Reach& reach, const Place& from, const Place& to, const std::int32_t count) {
     if (from.kind == Place::Kind::None || to.kind == Place::Kind::None || count <= 0) {
         return false;
@@ -341,7 +308,6 @@ private:
     return writeStack(reach, from, left <= 0 ? std::nullopt : std::optional{withCount(*source, left)});
 }
 
-/// Takes `count` out of a place and hands it over, or says it cannot.
 [[nodiscard]] std::optional<storage::StoredItemStack> takeStack(Reach& reach, const Place& from,
                                                                 const std::int32_t count) {
     if (from.kind == Place::Kind::None || count <= 0) {
@@ -359,9 +325,7 @@ private:
     return taken;
 }
 
-/// Takes what an offer asks for out of whatever slots hold it and lays it in the cell that edition
-/// draws it in. False when it is not all there, which leaves the staged writes to be thrown away
-/// with the rest of the request.
+// False leaves the staged writes to be thrown away with the rest of the request.
 [[nodiscard]] bool payInto(Reach& reach, const std::int32_t cell, const server::world::loot::ItemStack& cost,
                            const std::int32_t times) {
     const std::string id = cost.item.toString();
@@ -391,17 +355,14 @@ private:
 }
 
 /// Buys one of the open merchant's offers and stages what it hands over.
-///
-/// parity: `MerchantMenu.clickMenuButton` over `MerchantResultSlot.onTake`: the cost comes out of
-/// the inventory when the offer is picked, and what it buys is what the next line takes.
+/// parity: `MerchantMenu.clickMenuButton`.
 [[nodiscard]] bool takeTrade(Reach& reach, const std::int32_t index, const std::int32_t times) {
     if (!reach.windows.trades.has_value() || index < 0 || times <= 0 ||
         static_cast<std::size_t>(index) >= reach.windows.trades->offers.size()) {
         return false;
     }
     const world::trades::Offer& offer = reach.windows.trades->offers[static_cast<std::size_t>(index)];
-    // parity: `MerchantOffer.isOutOfStock`: an offer that has run out is not sold again until the
-    // merchant restocks, and asking for more than is left buys none of them.
+    // parity: `MerchantOffer.isOutOfStock`.
     if (offer.uses + times > offer.maxUses) {
         return false;
     }
@@ -418,8 +379,6 @@ private:
     return true;
 }
 
-/// Stages what a smithing table makes and eats one of each of its three, which is what taking the
-/// result does. parity: `SmithingMenu.onTake`.
 [[nodiscard]] bool forge(Reach& reach, const StackRequestContext& context) {
     if (!context.smithingResult) {
         return false;
@@ -447,11 +406,7 @@ private:
     return true;
 }
 
-/// Puts one of the open table's rows onto what is in it: the lapis goes, the item is written on,
-/// and what it costs in levels is answered rather than taken, because the levels live elsewhere.
-///
-/// parity: `EnchantmentMenu.clickMenuButton`, which charges the row's own number plus one in both
-/// levels and lapis, and only asks that the cost shown is affordable.
+/// parity: `EnchantmentMenu.clickMenuButton`.
 [[nodiscard]] bool takeEnchantment(Reach& reach, const std::int32_t netId, const StackRequestContext& context) {
     if (!reach.windows.enchanting.has_value()) {
         return false;
@@ -469,7 +424,6 @@ private:
     if (!held.has_value()) {
         return false;
     }
-    // Creative answers yes to any price at all, which is how "nothing is charged" is asked here.
     const bool free = !context.canPay || context.canPay(std::numeric_limits<std::int32_t>::max());
     if (!free) {
         if (!context.canPay(std::max(found->cost, price))) {
@@ -494,8 +448,6 @@ private:
     return windows.open.has_value() && windows.open->type == wire::bedrock::BedrockContainerType::Cartography;
 }
 
-/// A cartography table names one of its four fixed recipes, but what it makes is worked out from what
-/// is in it. Its consume lines take the inputs, as a table's do.
 [[nodiscard]] bool craftCartography(Reach& reach, const StackRequestContext& context) {
     if (!context.cartographyResult) {
         return false;
@@ -514,8 +466,7 @@ private:
     return true;
 }
 
-/// parity: `CartographyTableMenu`'s result slot `onTake`: one of each input, however the client
-/// counted them.
+/// parity: `CartographyTableMenu`.
 [[nodiscard]] bool cartographyPaid(const Reach& reach) {
     if (!reach.cartographyBefore.has_value()) {
         return true;
@@ -543,8 +494,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
         case BedrockStackActionType::Take:
         case BedrockStackActionType::Place: {
             const Place from = placeOf(action.source, windows);
-            // A smithing table is the one screen whose result the client takes without asking for
-            // it first, so what it makes is worked out the moment somebody reaches for it.
+            // Smithing is the one screen whose result is taken without asking first, so it is worked out on reach.
             if (from.kind == Place::Kind::Created && !reach.created.has_value() && windows.open.has_value() &&
                 windows.open->type == wire::bedrock::BedrockContainerType::SmithingTable && !forge(reach, context)) {
                 return {};
@@ -597,8 +547,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
                 }
                 break;
             }
-            // An enchanting table names one of its three rows by the number it was given, which is
-            // the only thing that number means: what the row puts on was decided when it was rolled.
+            // The row number means only the row: what it puts on was decided when it was rolled.
             if (windows.enchanting.has_value() && windows.open.has_value() &&
                 windows.open->type == wire::bedrock::BedrockContainerType::Enchantment) {
                 if (!takeEnchantment(reach, action.recipeNetId, context)) {
@@ -608,16 +557,14 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
                 touched.add({.container = static_cast<std::int32_t>(BedrockContainerSlot::EnchantingMaterial)});
                 break;
             }
-            // A merchant's book names a trade where a table names a recipe, and the number is the
-            // offer's place in the list that was sent, counted from one.
+            // The number is the offer's place in the list that was sent, counted from one.
             if (windows.trades.has_value()) {
                 if (!takeTrade(reach, action.recipeNetId - 1, std::max(1, action.crafts))) {
                     return {};
                 }
                 break;
             }
-            // What the recipe makes is this server's answer, not the client's claim: the number is
-            // the only thing taken from the line.
+            // The result is this server's answer, not the client's claim: only the number is taken from the line.
             if (!context.resultOf) {
                 return {};
             }
@@ -625,20 +572,17 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             if (!made.has_value() || action.crafts <= 0) {
                 return {};
             }
-            // Asking for it a stack at a time is the same line with a number on it: what it makes
-            // is that many times over, and the lines that follow take it in whatever helpings fit.
+            // Asking a stack at a time is the same line with a number on it; the result is that many times over.
             reach.created = withCount(*made, made->count * action.crafts);
             break;
         }
         case BedrockStackActionType::Consume: {
-            // A trade was paid for when it was picked, so these lines are the client saying again
-            // what it thinks that cost. Acting on them would charge for the same trade twice.
+            // A trade was paid when picked; acting on these lines would charge for it twice.
             if (reach.trade.has_value()) {
                 touched.add(action.source);
                 break;
             }
-            // The ingredients, one line each. What they come out of is the client's own accounting,
-            // and it only stands if the slot really holds what it says.
+            // What the ingredients come out of is the client's accounting, and stands only if the slot really holds it.
             if (!takeStack(reach, placeOf(action.source, windows), action.count).has_value()) {
                 return {};
             }
@@ -646,16 +590,13 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             break;
         }
         case BedrockStackActionType::CraftOptional: {
-            // The same line a cartography table sends, whose name box this edition has and Java
-            // does not: the name goes unused.
+            // Same line a cartography table sends, whose name box Java does not have: the name goes unused.
             if (cartographyOpen(windows)) {
                 if (!craftCartography(reach, context)) {
                     return {};
                 }
                 break;
             }
-            // An anvil, which names no recipe: what it makes is worked out from what is in it, and
-            // the name is whatever was typed into the box.
             if (!windows.open.has_value() || windows.open->type != wire::bedrock::BedrockContainerType::Anvil ||
                 !context.anvilResult) {
                 return {};
@@ -674,8 +615,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             if (!made.output.has_value() || made.cost <= 0 || (context.canPay && !context.canPay(made.cost))) {
                 return {};
             }
-            // parity: `AnvilMenu.onTake`: the first slot goes whatever happens, the second only as
-            // far as the repair ate into it.
+            // parity: `AnvilMenu.onTake`.
             if (!writeStack(reach, input, std::nullopt)) {
                 return {};
             }
@@ -693,8 +633,6 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             break;
         }
         case BedrockStackActionType::CraftGrindstone: {
-            // A grindstone, which names no recipe either: what it makes is what is in it, and what
-            // it hands back is what it took off.
             if (!windows.open.has_value() || windows.open->type != wire::bedrock::BedrockContainerType::Grindstone ||
                 !context.grindstoneResult) {
                 return {};
@@ -716,8 +654,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             break;
         }
         case BedrockStackActionType::BeaconPayment: {
-            // parity: `BeaconMenu.updateEffects`, which does nothing at all without a payment and
-            // eats one of it when it works.
+            // parity: `BeaconMenu.updateEffects`.
             if (!windows.open.has_value() || windows.open->type != wire::bedrock::BedrockContainerType::Beacon) {
                 return {};
             }
@@ -731,8 +668,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
                                               : std::optional<storage::StoredItemStack>{})) {
                 return {};
             }
-            // That edition numbers the effects one higher than this one does, and calls nothing
-            // zero.
+            // That edition numbers the effects one higher and calls nothing zero.
             const auto ours = [](const std::int32_t theirs) {
                 return theirs == 0 ? std::optional<std::int32_t>{} : std::optional{theirs - 1};
             };
@@ -741,8 +677,6 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             break;
         }
         case BedrockStackActionType::CraftLoom: {
-            // A loom, which names a pattern rather than a recipe: what it makes is the banner in it
-            // with one more layer.
             if (!windows.open.has_value() || windows.open->type != wire::bedrock::BedrockContainerType::Loom ||
                 !context.loomResult) {
                 return {};
@@ -774,15 +708,12 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             break;
         }
         case BedrockStackActionType::CraftResults:
-            // The client repeating what it thinks it made, which this server already knows.
             break;
         default:
-            // Everything a block's own machinery does: not moved by this build yet.
             return {};
         }
     }
-    // Work nobody took the result of is work nobody paid for: the client asks for both in one
-    // request, so a half of it left over means the whole of it is refused.
+    // The client asks for both in one request, so a half left over means the whole is refused.
     if ((reach.trade.has_value() || reach.anvilCost.has_value() || reach.grindstoneWorth.has_value()) &&
         reach.created.has_value()) {
         return {};
@@ -794,8 +725,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
     commit(reach, drop);
     StackRequestAnswer answer{.accepted = true, .containers = containers};
     if (reach.trade.has_value() && windows.trades.has_value()) {
-        // The two cells hold the villager's payment, not the player's: whatever the client left in
-        // them goes with the trade rather than back into the bag when the book closes.
+        // The cells hold the villager's payment, not the player's: it goes with the trade, not back into the bag.
         windows.grid[0].reset();
         windows.grid[1].reset();
         world::trades::Offer& offer = windows.trades->offers[static_cast<std::size_t>(*reach.trade)];

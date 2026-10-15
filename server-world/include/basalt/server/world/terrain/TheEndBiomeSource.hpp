@@ -12,16 +12,13 @@
 
 namespace basalt::server::world::terrain {
 
-/// parity: `TheEndBiomeSource`. The central island is always `the_end`; outside its 64-chunk radius
-/// the End router's erosion value at the containing chunk's centre selects highlands, midlands,
-/// barrens or small islands with vanilla's own thresholds.
+/// parity: `TheEndBiomeSource`.
 class TheEndBiomeSource {
 public:
     explicit TheEndBiomeSource(const NoiseRouter& router, std::optional<std::int64_t> biomeZoomSeed = std::nullopt)
         : erosion_(router.state->sampler(router.erosion)),
           zoomer_(biomeZoomSeed.has_value() ? std::optional<BiomeZoomer>{BiomeZoomer{*biomeZoomSeed}} : std::nullopt) {}
 
-    /// Input coordinates are quart positions, matching `BiomeSource.getNoiseBiome`.
     [[nodiscard]] std::string_view biomeAtQuart(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) const;
 
     /// parity: `BiomeManager.getBiome`, which the placed-feature biome filters go through.

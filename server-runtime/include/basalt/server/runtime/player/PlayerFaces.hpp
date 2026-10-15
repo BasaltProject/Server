@@ -6,7 +6,6 @@
 
 namespace basalt::server::runtime::player {
 
-/// The name a block state gives that face, which is what every property table is keyed by.
 [[nodiscard]] constexpr std::string_view faceName(const wire::protocol::play::Direction face) {
     switch (face) {
     case wire::protocol::play::Direction::Down:

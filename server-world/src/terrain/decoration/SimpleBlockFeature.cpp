@@ -272,8 +272,7 @@ void placePaleMossCarpet(Chunk& chunk, random::RandomSource& random, const Decor
 
 bool SimpleBlockFeature::place(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin,
                                random::RandomSource& mossyCarpetRandom) const {
-    // parity: vanilla asks the state provider before evaluating canSurvive, so weighted and noise
-    // providers consume random even when the candidate ultimately cannot be placed.
+    // parity: the state provider is asked before `canSurvive`.
     const std::int32_t stateId = toPlace_(random, origin);
     const ChunkHeight bounds = chunk.verticalBounds();
     if (origin.y < bounds.minY() || origin.y > bounds.maxY()) {

@@ -16,8 +16,7 @@ namespace reg = ::basalt::server::registry;
 
 using wire::common::Identifier;
 
-/// A tag's members as the client numbers them. Members are ids of the tagged thing: a block tag
-/// carries `minecraft:block` ids, not block state ids.
+/// A block tag carries `minecraft:block` ids, not block state ids.
 [[nodiscard]] std::vector<std::int32_t> membersOf(const TagSources& sources, std::string_view registryId,
                                                   const Identifier& tag) {
     std::vector<std::int32_t> ids;
@@ -57,7 +56,6 @@ using wire::common::Identifier;
     return ids;
 }
 
-/// Every tag name a loaded table holds for a registry, so a pack's own tags reach the client too.
 template <typename Members>
 void namesOf(const Members* tags, std::set<Identifier>& names) {
     if (tags == nullptr) {

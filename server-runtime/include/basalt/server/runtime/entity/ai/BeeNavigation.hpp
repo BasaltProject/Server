@@ -9,15 +9,12 @@ namespace basalt::server::runtime::entity::ai {
 
 class MobContext;
 
-/// How a bee finds its way: a flying path forty-eight blocks long, and the random spots it wanders
-/// and hops towards. The allay flies the same forty-eight blocks and shares the path.
-///
-/// parity: `Bee.createNavigation`, `Bee.pathfindRandomlyTowards` and `BeeWanderGoal.findPos`.
+/// parity: `Bee.createNavigation`.
 namespace beeNavigation {
 
 using Block = std::array<std::int32_t, 3>;
 
-/// A path worked out but not yet walked. parity: `Path` and its `canReach`.
+/// parity: `Path` and its `canReach`.
 struct Route {
     std::vector<Block> nodes;
     Block target{};
@@ -27,23 +24,21 @@ struct Route {
 /// parity: `createPath(pos, accuracy)` with the navigation's `maxVisitedNodesMultiplier`.
 [[nodiscard]] Route plan(MobContext& mob, const Block& target, std::int32_t accuracy, float visitedMultiplier = 1.0F);
 
-/// parity: `navigation.moveTo(path, speed)`. Answers false for a path with nothing to walk.
+/// parity: `navigation.moveTo(path, speed)`.
 bool follow(MobContext& mob, const Route& route, double speed);
 
 /// parity: `Bee.pathfindRandomlyTowards`, a hop of up to six blocks the way of `target`.
 void hopTowards(MobContext& mob, const Block& target);
 
-/// parity: `BeeWanderGoal.findPos`: a hover spot ahead, or towards the hive once it is far, else one
-/// in the air. The bottom centre of the chosen block.
+/// parity: `BeeWanderGoal.findPos`.
 [[nodiscard]] std::optional<std::array<double, 3>> wanderSpot(MobContext& mob, const std::optional<Block>& hive,
                                                               std::int32_t threshold);
 
-/// parity: `AirAndWaterRandomPos.getPos` along the way the mob faces, which the allay's
-/// `RandomStroll.fly` flies to as well.
+/// parity: `AirAndWaterRandomPos.getPos`.
 [[nodiscard]] std::optional<std::array<double, 3>> airAndWaterSpot(MobContext& mob, std::int32_t horizontal,
                                                                    std::int32_t vertical, std::int32_t lift);
 
-/// parity: `Level.findBlocksInBoxByManhattanDistance(origin, reach)`, nearest shells first.
+/// parity: `Level.findBlocksInBoxByManhattanDistance(origin, reach)`.
 template <typename Visit>
 std::optional<Block> firstByManhattan(const Block& origin, std::int32_t reach, Visit visit) {
     const std::int32_t maxDepth = reach * 3;

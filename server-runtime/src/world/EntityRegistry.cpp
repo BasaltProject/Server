@@ -94,11 +94,8 @@ entity::ServerEntity* EntityRegistry::entity(std::int32_t entityId) const {
 
 entity::ServerEntity& EntityRegistry::spawnEntity(std::unique_ptr<entity::ServerEntity> entity) {
     const WorldWriteLock lock{*mutex_};
-    // A cube's speed, health and damage all derive from the size chosen when it was finalized.
     entity::cubeMobs::applySize(*entity);
     const std::int32_t id = entity->entityId();
-    // Spawning the same id twice replaces, as putting into a map by id did. The index says whether
-    // there is anything to replace, so the usual case never walks the list.
     if (byId_.erase(id) != 0) {
         std::erase_if(entities_, [id](const std::unique_ptr<entity::ServerEntity>& existing) {
             return existing->entityId() == id;

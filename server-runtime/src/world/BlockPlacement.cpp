@@ -43,17 +43,12 @@ constexpr std::int32_t kScaffoldReach = 7;
 constexpr auto kHorizontal =
     std::to_array<Direction>({Direction::South, Direction::West, Direction::North, Direction::East});
 
-/// The blocks that pile another of themselves into the same space.
 constexpr auto kStacking =
     std::to_array<std::string_view>({"candles", "pickles", "eggs", "layers", "flower_amount", "segment_amount"});
 
-/// Six-way blocks that point at the face that was clicked rather than away from the player.
 constexpr auto kClickedFaceBlocks =
     std::to_array<std::string_view>({"lightning_rod", "end_rod", "shulker_box", "amethyst_cluster", "amethyst_bud"});
 
-/// The blocks whose `getStateForPlacement` uses `getHorizontalDirection()` as it comes, taken from
-/// the jar rather than guessed: everything else takes its opposite, because a furnace or a chest
-/// faces whoever put it down while a bed or a stair runs away from them.
 constexpr auto kPlayerFacingBlocks =
     std::to_array<std::string_view>({"campfire", "bell", "decorated_pot", "calibrated_sculk_sensor"});
 
@@ -179,7 +174,7 @@ constexpr std::int64_t kQuarterTable = 16384;
     return path == "snow" || path == "snow_block";
 }
 
-/// parity: `Level.getFluidState`, which answers water for water and for anything logged with it.
+/// parity: `Level.getFluidState`.
 [[nodiscard]] bool isWater(std::int32_t stateId) {
     return pathOf(stateId) == "water" || propertyOf(stateId, "waterlogged") == "true";
 }
@@ -188,14 +183,13 @@ constexpr std::int64_t kQuarterTable = 16384;
     return std::ranges::any_of(suffixes, [path](std::string_view suffix) { return path.ends_with(suffix); });
 }
 
-/// The block itself, or any of its wood and colour variants: `end_rod` and `oak_shulker_box` alike.
 [[nodiscard]] bool named(std::string_view path, std::span<const std::string_view> names) {
     return std::ranges::any_of(names, [path](std::string_view name) {
         return path == name || path.ends_with(std::string{"_"} + std::string{name});
     });
 }
 
-/// parity: `SegmentedAnglePrecision`'s sixteen, which is what a sign, a banner and a skull use.
+/// parity: `SegmentedAnglePrecision`'s sixteen.
 [[nodiscard]] std::int32_t segmentOf(float degrees) {
     const auto turned = static_cast<std::int32_t>(std::lround(degrees * kSegments / kFullTurn));
     return turned & (kSegments - 1);
@@ -206,8 +200,7 @@ constexpr std::int64_t kQuarterTable = 16384;
     return path.ends_with("_door") && propertyOf(stateId, "half") == "lower";
 }
 
-/// parity: `DoorBlock.getHinge`: a door beside another door, or with solid blocks on one side, hangs
-/// away from them; with nothing to go by it hangs on the side that was clicked.
+/// parity: `DoorBlock.getHinge`.
 [[nodiscard]] std::string hingeOf(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                   Direction towards, float clickX, float clickZ) {
     const Direction left = counterClockwise(towards);
@@ -235,7 +228,7 @@ constexpr std::int64_t kQuarterTable = 16384;
     return clicked ? "left" : "right";
 }
 
-/// parity: `BellBlock`'s own test: a sturdy face on both sides bolts the bell to the pair.
+/// parity: `BellBlock`'s own test.
 [[nodiscard]] bool bothWalls(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Direction face) {
     const bool alongX = face == Direction::West || face == Direction::East;
     const std::array<std::pair<Direction, registry::BlockFace>, 2> sides =
@@ -256,7 +249,6 @@ constexpr std::int64_t kQuarterTable = 16384;
     const std::int32_t below = stateAt(world, x, y - 1, z);
     std::int32_t nearest = kScaffoldReach;
     // parity: scaffolding is asked about first, and the sturdy face only when it is not scaffolding.
-    // The top of a scaffold is sturdy, so the other order answers zero for a whole tower.
     if (pathOf(below) == "scaffolding") {
         nearest = numberOf(propertyOf(below, "distance")).value_or(kScaffoldReach);
     } else if (registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up)) {
@@ -272,7 +264,7 @@ constexpr std::int64_t kQuarterTable = 16384;
     return std::min(nearest, kScaffoldReach);
 }
 
-/// parity: `candidatePartnerFacing`: only a *single* chest of the same kind is a candidate.
+/// parity: `candidatePartnerFacing`.
 [[nodiscard]] std::optional<Direction> partnerFacing(const WorldState& world, std::int32_t x, std::int32_t y,
                                                      std::int32_t z, const wire::common::Identifier& block,
                                                      Direction towards) {
@@ -296,9 +288,6 @@ constexpr std::int64_t kQuarterTable = 16384;
     return "single";
 }
 
-/// The per-block half of placement: what each `getStateForPlacement` sets that no general rule
-/// covers. Answers a state id only when the block turns into a different one (bamboo), and otherwise
-/// writes into `properties`.
 [[nodiscard]] std::optional<std::int32_t> special(const wire::common::Identifier& block,
                                                   const registry::blockStateDefinitions::Definition& definition,
                                                   std::map<std::string, std::string>& properties,
@@ -309,25 +298,18 @@ constexpr std::int64_t kQuarterTable = 16384;
     const std::int32_t y = placement.y;
     const std::int32_t z = placement.z;
     // parity: the blocks whose `getStateForPlacement` reads the power that is already in the square.
-    // A trapdoor or a fence gate put down where a lever is on arrives **open**, and a shelf, a skull
-    // and a crafter arrive switched on. Nothing reaches them afterwards to correct it: a block that
-    // has just landed only hears its own `onPlace`, and none of these has one.
     const auto poweredHere = [&]() {
         return world != nullptr && redstone::bestNeighbourSignal(*world, placement.worldName, x, y, z) > 0;
     };
     if (path.ends_with("_trapdoor")) {
-        // parity: the trapdoor only ever **sets** these two, so an unpowered square leaves the
-        // default alone rather than writing false over it.
+        // parity: the trapdoor only ever **sets** these two, so an unpowered square leaves the.
         if (poweredHere()) {
             properties["open"] = "true";
             properties["powered"] = "true";
         }
     } else if (path.ends_with("_fence_gate")) {
         properties["open"] = properties["powered"] = poweredHere() ? "true" : "false";
-        // parity: `FenceGateBlock.getStateForPlacement`'s `IN_WALL`, which looks along the axis the
-        // gate opens **across**, not the one it faces. A gate is in neither the fence nor the pane
-        // family, so nothing joined it as it landed and one dropped between two walls sat a block
-        // too high until something else touched it.
+        // parity: `FenceGateBlock.getStateForPlacement`'s `IN_WALL`.
         if (world != nullptr) {
             const bool acrossZ = properties["facing"] == "north" || properties["facing"] == "south";
             const std::int32_t first = acrossZ ? stateAt(*world, x - 1, y, z) : stateAt(*world, x, y, z - 1);
@@ -341,9 +323,7 @@ constexpr std::int64_t kQuarterTable = 16384;
     } else if (path == "crafter") {
         properties["triggered"] = poweredHere() ? "true" : "false";
     } else if (path == "tripwire" && world != nullptr) {
-        // parity: `TripWireBlock.getStateForPlacement` sets all four sides from `shouldConnectTo`,
-        // the same question `updateShape` asks one side at a time. Only fences and panes were joined
-        // as they landed, so a line of string laid by hand stayed a row of stubs.
+        // parity: `TripWireBlock.getStateForPlacement` sets all four sides from `shouldConnectTo`.
         for (const auto& [face, name] :
              std::array<std::pair<registry::BlockFace, std::string_view>, 4>{{{registry::BlockFace::North, "north"},
                                                                               {registry::BlockFace::South, "south"},
@@ -352,31 +332,24 @@ constexpr std::int64_t kQuarterTable = 16384;
             properties[std::string{name}] = tripwires::connectsTo(*world, x, y, z, face) ? "true" : "false";
         }
     } else if (path == "hopper") {
-        // parity: `HopperBlock.getStateForPlacement`, which points the spout **into** the square that
-        // was clicked, and straight down whenever that would be up or down. A hopper has five
-        // facings, so neither the four-way nor the six-way rule above reaches it and every one used
-        // to land pointing down.
+        // parity: `HopperBlock.getStateForPlacement`.
         const Direction back = opposite(placement.face);
         properties["facing"] =
             back == Direction::Up || back == Direction::Down ? std::string{"down"} : std::string{nameOf(back)};
     } else if (path == "repeater" && world != nullptr) {
-        // parity: `RepeaterBlock.getStateForPlacement` asks `isLocked` before the block is written,
-        // so one dropped between two powered repeaters is held from its very first tick.
+        // parity: `RepeaterBlock.getStateForPlacement` asks `isLocked` before the block is written.
         properties["locked"] = redstoneComponents::wouldBeLocked(*world, x, y, z, properties) ? "true" : "false";
     }
     // parity: `SnowyBlock.getStateForPlacement`, grass and mycelium put down under snow.
     if (!definition.valuesOf("snowy").empty() && world != nullptr) {
         properties["snowy"] = isSnow(stateAt(*world, x, y + 1, z)) ? "true" : "false";
     }
-    // parity: `CampfireBlock.getStateForPlacement`: hay under it makes the tall smoke, and a campfire
-    // placed in water goes down unlit.
+    // parity: `CampfireBlock.getStateForPlacement`.
     if (path.ends_with("campfire") && world != nullptr) {
         properties["signal_fire"] = pathOf(stateAt(*world, x, y - 1, z)) == "hay_block" ? "true" : "false";
         properties["lit"] = properties["waterlogged"] != "true" ? "true" : "false";
     }
-    // parity: `ChestBlock.getStateForPlacement` into `getChestType`: a chest put down beside a single
-    // chest facing the same way becomes half of a double one there and then. Nothing else pairs them:
-    // `updateShape` only ever *completes* a pair somebody already started.
+    // parity: `ChestBlock.getStateForPlacement` into `getChestType`.
     if (std::ranges::find(reshapes::chestBlocks(), path) != reshapes::chestBlocks().end() && world != nullptr) {
         const auto facing = properties.find("facing");
         const std::string chosen =
@@ -384,7 +357,7 @@ constexpr std::int64_t kQuarterTable = 16384;
         properties["facing"] = chosen;
         properties["type"] = chestType(*world, x, y, z, block, fromName(chosen).value_or(Direction::North));
     }
-    // parity: `NoteBlock.getStateForPlacement`, which takes its instrument from what it lands on.
+    // parity: `NoteBlock.getStateForPlacement`.
     if (path == "note_block" && world != nullptr) {
         properties["instrument"] = std::string{noteBlocks::instrumentAt(*world, x, y, z).serializedName()};
     }
@@ -410,8 +383,7 @@ constexpr std::int64_t kQuarterTable = 16384;
             properties["facing"] = nameOf(opposite(placement.face));
         }
     }
-    // parity: `ShelfMushroomBlock.getStateForPlacement`: the first horizontal looking direction with a
-    // sturdy face to hang from, the mushroom facing back out of it.
+    // parity: `ShelfMushroomBlock.getStateForPlacement`.
     if (path == "shelf_mushroom" && world != nullptr) {
         for (const Direction looking : nearestLookingDirections(placement.yaw, placement.pitch, placement.face)) {
             if (looking == Direction::Up || looking == Direction::Down) {
@@ -433,8 +405,7 @@ constexpr std::int64_t kQuarterTable = 16384;
     if (std::ranges::find(kGrowingHeads, path) != kGrowingHeads.end()) {
         properties["age"] = std::to_string(random.nextInt(kGrowingAges));
     }
-    // parity: `SpeleothemBlock.getStateForPlacement`: it points away from the face it was hung on,
-    // and the reshape that follows works out how thick it is.
+    // parity: `SpeleothemBlock.getStateForPlacement`.
     if (!definition.valuesOf("vertical_direction").empty()) {
         properties["vertical_direction"] = placement.face == Direction::Down ? "down" : "up";
         properties["thickness"] = "tip";
@@ -450,8 +421,7 @@ constexpr std::int64_t kQuarterTable = 16384;
         }
         properties["orientation"] = std::string{nameOf(front)} + "_" + std::string{nameOf(top)};
     }
-    // parity: `BambooStalkBlock.getStateForPlacement`, the one that answers a different block: bamboo
-    // planted on the ground is a sapling, and on bamboo it copies how grown that is.
+    // parity: `BambooStalkBlock.getStateForPlacement`.
     if (path == "bamboo" && world != nullptr) {
         const std::int32_t below = stateAt(*world, x, y - 1, z);
         const std::string belowPath = pathOf(below);
@@ -530,8 +500,7 @@ std::array<Direction, 6> nearestLookingDirections(float yaw, float pitch, Direct
     } else {
         directions = xMagnitude > yMagnitude ? ordered(axisZ, axisX, axisY) : ordered(axisZ, axisY, axisX);
     }
-    // parity: `BlockPlaceContext.getNearestLookingDirections` moves the clicked block's direction to
-    // the front, which is the placement case every item use here is.
+    // parity: `BlockPlaceContext.getNearestLookingDirections` moves the clicked block's direction to.
     const auto into = std::ranges::find(directions, opposite(clickedFace));
     std::rotate(directions.begin(), into, std::next(into));
     return directions;
@@ -539,19 +508,11 @@ std::array<Direction, 6> nearestLookingDirections(float yaw, float pitch, Direct
 
 std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenDefault, const Placement& placement,
                       random::RandomSource& random) {
-    // A block has two numbers that look alike: its registry id and its default state id. Handed the
-    // wrong one this used to answer a state belonging to some other block entirely, and the caller
-    // had no way to tell. The block itself is the authority here, so the number is checked against
-    // it and replaced when it does not fit.
     const wire::common::Identifier* owner = registry::blockStateDefinitions::blockOf(givenDefault);
     const std::int32_t defaultStateId = owner != nullptr && *owner == block
                                             ? givenDefault
                                             : registry::blocks::defaultStateIdOf(block).value_or(givenDefault);
-    // parity: `ConcretePowderBlock.getStateForPlacement`, the third site that asks the same question
-    // as the shape update and the landing: the square still holds the water being replaced when it
-    // is asked, which is how anybody actually makes concrete. This goes before everything else
-    // because concrete powder has no properties at all, so the state table has no entry to orient
-    // and the whole rest of this function is skipped for it.
+    // parity: `ConcretePowderBlock.getStateForPlacement`.
     if (block.path().ends_with("_concrete_powder") && placement.world != nullptr &&
         (registry::blockFluids::hasWaterFluid(placement.replacing) ||
          reshapes::touchesWater(*placement.world, placement.x, placement.y, placement.z))) {
@@ -571,8 +532,7 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
         properties["axis"] = axisOf(face);
     }
 
-    // parity: `FaceAttachedHorizontalDirectionalBlock`, the buttons, levers and grindstones: what
-    // they hang on comes from the face that was clicked, and only then which way they look.
+    // parity: `FaceAttachedHorizontalDirectionalBlock`.
     const bool attached = !definition->valuesOf("face").empty();
     if (attached) {
         if (face == Direction::Up) {
@@ -586,11 +546,7 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
 
     const std::size_t facings = definition->valuesOf("facing").size();
     if (facings == 6) {
-        // parity: `ObserverBlock.getStateForPlacement` is
-        // `getNearestLookingDirection().getOpposite().getOpposite()`, two opposites that cancel, so
-        // alone among the six-way blocks an observer faces **away** from whoever put it down and
-        // watches the square beyond. A piston, a dispenser, a barrel and a command block all take the
-        // single opposite and face back. Every observer placed by hand used to look the wrong way.
+        // parity: `ObserverBlock.getStateForPlacement` is.
         const Direction looking = nearestLooking(placement.yaw, placement.pitch);
         properties["facing"] = named(path, kClickedFaceBlocks) ? nameOf(face)
                                : path == "observer"            ? nameOf(looking)
@@ -608,8 +564,7 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
             towardsPlayer ? nameOf(playerDirection(placement.yaw)) : nameOf(opposite(playerDirection(placement.yaw)));
     }
 
-    // parity: the same test in `StairBlock`, `SlabBlock` and `TrapDoorBlock`: the top half only when
-    // the click was on a ceiling, or above the middle of a side.
+    // parity: the same test in `StairBlock`.
     const bool upsideDown = face == Direction::Down || (face != Direction::Up && placement.clickY > kHalf);
     const std::vector<std::string>& halves = definition->valuesOf("half");
     if (std::ranges::find(halves, "top") != halves.end()) {
@@ -625,29 +580,24 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
         }
     }
 
-    // parity: every `SimpleWaterloggedBlock`'s `getStateForPlacement`, which is the same line in all
-    // twenty-odd of them: the block keeps the water it was put into instead of eating it.
+    // parity: every `SimpleWaterloggedBlock`'s `getStateForPlacement`.
     if (!definition->valuesOf("waterlogged").empty()) {
         properties["waterlogged"] = isWater(placement.replacing) ? "true" : "false";
     }
 
-    // parity: `BaseRailBlock.getStateForPlacement`: a rail lies along the axis the player is looking
-    // down, and the connection pass afterwards is what bends it towards its neighbours.
+    // parity: `BaseRailBlock.getStateForPlacement`.
     const std::vector<std::string>& shapes = definition->valuesOf("shape");
     if (std::ranges::find(shapes, "north_south") != shapes.end()) {
         const Direction looking = playerDirection(placement.yaw);
         properties["shape"] = looking == Direction::East || looking == Direction::West ? "east_west" : "north_south";
     }
 
-    // parity: `LeavesBlock.getStateForPlacement`. Leaves a player puts down never decay, which is the
-    // whole reason the property exists.
+    // parity: `LeavesBlock.getStateForPlacement`.
     if (!definition->valuesOf("persistent").empty()) {
         properties["persistent"] = "true";
     }
 
-    // parity: sixteen segments of the yaw. `StandingSignBlock` and `BannerBlock` turn it around so the
-    // face looks back at whoever placed it; `SkullBlock` does not, because a head looks the same way
-    // the player does.
+    // parity: sixteen segments of the yaw. `StandingSignBlock` and `BannerBlock` turn it around.
     if (definition->valuesOf("rotation").size() == kSegments) {
         const bool head = path.ends_with("_head") || path.ends_with("_skull");
         properties["rotation"] =
@@ -659,8 +609,7 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
         properties["hanging"] = face == Direction::Down ? "true" : "false";
     }
 
-    // parity: `CandleBlock`, `SeaPickleBlock` and `TurtleEggBlock`, which stack another one into the
-    // block that is already there rather than refusing the placement.
+    // parity: `CandleBlock`.
     const wire::common::Identifier* replacingBlock = registry::blockStateDefinitions::blockOf(placement.replacing);
     if (replacingBlock != nullptr && *replacingBlock == block) {
         for (const std::string_view name : kStacking) {
@@ -677,8 +626,7 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
         }
     }
 
-    // parity: `DoorBlock.getHinge`, which counts the solid blocks either side and falls back to which
-    // half of the block was clicked.
+    // parity: `DoorBlock.getHinge`.
     if (placement.world != nullptr && !definition->valuesOf("hinge").empty()) {
         const auto facing = properties.find("facing");
         const Direction towards = facing == properties.end()
@@ -688,7 +636,6 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
                                       placement.clickX, placement.clickZ);
     }
 
-    // The blocks whose own `getStateForPlacement` does something the rules above cannot say.
     if (const std::optional<std::int32_t> answered = special(block, *definition, properties, placement, random);
         answered.has_value()) {
         return *answered;

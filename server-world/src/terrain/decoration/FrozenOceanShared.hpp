@@ -40,10 +40,6 @@ inline constexpr std::int32_t kSeaLevel = 63;
 
 [[nodiscard]] bool isFrozenWater(std::int32_t stateId);
 
-/// Small feature-region overlay. An iceberg can extend outside its origin chunk, and retaining those
-/// writes in memory is what preserves its shape and smoothing at the chunk edge. At the flush they
-/// all go to the chunk, the ones past its edge as deferred writes: the part of an iceberg that falls
-/// in the next chunk is still part of the iceberg.
 class ChunkFeatureRegion {
 public:
     explicit ChunkFeatureRegion(Chunk& chunk) : chunk_(&chunk) {}
@@ -57,8 +53,7 @@ public:
     void flush();
 
 private:
-    /// One key per block position, so a lookup does not walk the whole overlay. A big iceberg writes
-    /// more than fifteen thousand cells and reads each of them several times over.
+    /// One key per block position, a big iceberg writes over fifteen thousand cells.
     [[nodiscard]] static std::int64_t keyOf(const DecorationPos& position) noexcept;
 
     Chunk* chunk_;

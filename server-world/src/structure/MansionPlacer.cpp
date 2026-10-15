@@ -9,7 +9,6 @@ namespace {
     return StructurePos{pos.x, pos.y + distance, pos.z};
 }
 
-/// The corridor tiles, each with a carpet on any side that carries on being corridor.
 void corridorFloor(std::vector<MansionPiece>& pieces, StructurePos floorOrigin, StructureRotation rotation,
                    const SimpleGrid& grid, const SimpleGrid& roomGrid, std::size_t floor, std::int32_t startX,
                    std::int32_t startY) {
@@ -73,8 +72,6 @@ void fillRoom(std::vector<MansionPiece>& pieces, random::RandomSource& random, S
         return;
     }
     if (roomType == MansionGrid::kRoom2x2 && doorDirection.has_value() && *doorDirection != StructureDirection::Up) {
-        // The 2x2 is entered from one of its two halves, so which way it opens is the door's
-        // clockwise neighbour, or the other side when that one is not part of the same room.
         StructureDirection roomDirection = MansionGrid::clockWise(*doorDirection);
         if (!mansion.isRoomId(x + dx(roomDirection), y + dz(roomDirection), floor, roomId)) {
             roomDirection = opposite(roomDirection);
@@ -87,7 +84,6 @@ void fillRoom(std::vector<MansionPiece>& pieces, random::RandomSource& random, S
     }
 }
 
-/// The four walls of every room, one of which becomes its door, and then whatever fills it.
 void roomWalls(std::vector<MansionPiece>& pieces, random::RandomSource& random, StructurePos floorOrigin,
                StructureRotation rotation, const MansionGrid& mansion, const SimpleGrid& grid,
                const SimpleGrid& roomGrid, std::size_t floor, std::int32_t startX, std::int32_t startY) {
@@ -176,8 +172,6 @@ void mansionPlacer::createMansion(std::vector<MansionPiece>& pieces, random::Ran
     exterior.traverseOuterWalls(pieces, data, baseGrid, StructureDirection::South, startX, startY, endX, endY);
     exterior.traverseOuterWalls(pieces, secondData, baseGrid, StructureDirection::South, startX, startY, endX, endY);
 
-    // The tower: its wall starts at the first house cell found scanning rows from the north and
-    // columns from the east, which is not the reading order and decides where its wall begins.
     MansionPlacement thirdData{
         .position = above(data.position, 19), .rotation = data.rotation, .wallType = "wall_window"};
     bool done = false;

@@ -23,7 +23,7 @@ namespace {
     return static_cast<std::int64_t>(random());
 }
 
-/// parity: brigadier's `CommandSyntaxException.getMessage`, the message and where it stopped.
+/// parity: brigadier's `CommandSyntaxException.getMessage`.
 [[nodiscard]] std::string messageOf(const command::CommandSyntaxError& error, const wire::text::LangTable& lang) {
     std::string message = wire::text::resolvePlainText(error.component, lang);
     if (error.cursor < 0 || !error.input.has_value()) {
@@ -153,7 +153,7 @@ void BasaltServer::tickFunctions() {
 }
 
 void BasaltServer::resyncAfterReload() {
-    // parity: `PlayerList.reloadResources`: the tags to everyone, then each player's recipe book.
+    // parity: `PlayerList.reloadResources`.
     const wire::protocol::configuration::TagsPacket tags{
         .groups = registry::syncedTags(registry::TagSources{.blocks = &vanillaData_.blockTags,
                                                             .items = &vanillaData_.itemTags,
@@ -267,7 +267,6 @@ void BasaltServer::awardAdvancementLoot(std::string_view uuid, const std::vector
 
 void BasaltServer::sendAdvancementPacket(const player::PlayerSession& player, std::int32_t id,
                                          const std::function<void(wire::io::ByteBuffer&)>& write) const {
-    // Older clients get it through their chain, which lays it out their way or drops it before 1.12.
     if (player.connection().sendPlayPacket) {
         player.connection().sendPlayPacket(id, write);
     }

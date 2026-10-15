@@ -30,8 +30,6 @@ using server::world::light::SectionLight;
     if (chunk == nullptr) {
         return 0;
     }
-    // The section check below would refuse the same positions on its own; this says why, and says
-    // it before a light pass is run for a question that has no answer.
     if (y < chunk->verticalBounds().minY() || y > chunk->verticalBounds().maxY()) {
         return 0;
     }
@@ -39,12 +37,7 @@ using server::world::light::SectionLight;
         return 0;
     }
 
-    // The already-computed pass first, and only build the nine-chunk window when there is none.
-    // Rebuilding it per query cost eleven microseconds a time, and the grass alone asks for it
-    // thousands of times a tick: it was most of a tick on its own.
     const Chunk::PackedLight* cached = sky ? chunk->cachedSkyLight() : chunk->cachedBlockLight();
-    // Held only when it had to be worked out here: what the chunk already had is read where it
-    // lies, which is what keeps this cheap enough to ask thousands of times a tick.
     Chunk::PackedLight computedHere;
     if (cached == nullptr) {
         const LightWindow::Neighbours neighbours = [&world](std::int32_t chunkX, std::int32_t chunkZ) {

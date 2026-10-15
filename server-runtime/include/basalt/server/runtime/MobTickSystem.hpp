@@ -20,19 +20,16 @@ namespace basalt::server::runtime {
 class EntityPushSystem;
 class MobActionSystem;
 
-/// Attachment points used by the rider combinations Basalt currently creates.
 namespace entityRiding {
 
 void position(const entity::ServerEntity& vehicle, entity::ServerEntity& passenger);
 
 } // namespace entityRiding
 
-/// Ticks one mob vehicle and its passenger tree in vanilla's root-first order.
 class MobTickSystem {
 public:
     MobTickSystem(MobActionSystem& actions, EntityPushSystem& pushes) : actions_(&actions), pushes_(&pushes) {}
 
-    /// Whether the outer entity loop must leave this entity to its vehicle's recursive turn.
     [[nodiscard]] static bool hasActiveVehicle(world::LoadedWorld& world, entity::ServerEntity& entity);
 
     void tickTree(world::LoadedWorld& world, entity::ServerEntity& root,

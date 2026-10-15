@@ -25,7 +25,6 @@ constexpr std::string_view kPotionContents = "minecraft:potion_contents";
 using ItemStack = server::world::loot::ItemStack;
 
 /// One fewer, and the remainder in its place or dropped. parity: 26.3 reads the remainder before
-/// the shrink, so the last dragon's breath leaves its bottle, where 26.2 read it off the empty stack.
 [[nodiscard]] std::optional<ItemStack> spend(const ItemStack& stack, const DropRemainder& drop) {
     const wire::common::Identifier* remainder = registry::craftingRemainders::of(stack.item);
     std::optional<ItemStack> left =
@@ -41,7 +40,6 @@ using ItemStack = server::world::loot::ItemStack;
     return left;
 }
 
-/// Reads an int that older saves of this build or of 26.2 wrote narrower.
 [[nodiscard]] std::int32_t wideOf(const wire::nbt::NbtCompound& data, std::string_view key, std::int32_t fallback) {
     const wire::nbt::NbtTag* tag = data.find(key);
     if (tag == nullptr) {
@@ -69,7 +67,6 @@ Installed& installed() {
     return instance;
 }
 
-/// The potion a result carries, without its namespace, the way `State::potions` keeps it.
 [[nodiscard]] std::optional<std::string> potionOf(const ItemStack& stack) {
     const wire::nbt::NbtCompound* contents = stack.components.getCompound(kPotionContents);
     std::string_view potion = contents == nullptr ? std::string_view{} : contents->getString("potion");
@@ -79,8 +76,7 @@ Installed& installed() {
     return potion.empty() ? std::nullopt : std::optional{std::string{potion}};
 }
 
-/// parity: `PotionsPredicate.matches`: the bottle's potion must sit in the holder set, where a
-/// `#tag` entry binds to the potion tags a datapack loaded.
+/// parity: `PotionsPredicate.matches`.
 [[nodiscard]] bool holdsOneOf(const std::vector<std::string>& potions, const std::optional<std::string>& potion) {
     if (potions.empty()) {
         return true;
@@ -196,8 +192,7 @@ const wire::common::Identifier& block() {
 bool tick(State& state, const DropRemainder& drop) {
     bool moved = false;
     const std::optional<ItemStack>& fuelStack = state.items[static_cast<std::size_t>(kFuelSlot)];
-    // parity: the `minecraft:brewing_fuel` component, whose `brewing/uses_default` is twenty and
-    // `brewing/speed_default` is one.
+    // parity: the `minecraft:brewing_fuel` component.
     if (state.fuel <= 0 && fuelStack.has_value() && fuelStack->item == registry::brewing::fuel()) {
         state.fuel = registry::brewing::kFuelUses;
         state.totalFuel = state.fuel;

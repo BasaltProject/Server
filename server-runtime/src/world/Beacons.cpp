@@ -20,8 +20,7 @@ constexpr std::string_view kPrimaryKey = "primary_effect";
 constexpr std::string_view kSecondaryKey = "secondary_effect";
 constexpr std::string_view kLevelsKey = "Levels";
 
-/// parity: `getRequiredLevelsFor`: nothing needs none, and something nobody offers needs more than
-/// any pyramid can be.
+/// parity: `getRequiredLevelsFor`.
 [[nodiscard]] std::int32_t levelsFor(const std::string_view effect) {
     if (effect.empty()) {
         return 0;

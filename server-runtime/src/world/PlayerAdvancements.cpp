@@ -18,7 +18,7 @@ using wire::common::Identifier;
 /// parity: `AdvancementVisibilityEvaluator.VisibilityRule`.
 enum class Rule : std::uint8_t { Show, Hide, NoChange };
 
-/// parity: `VISIBILITY_DEPTH`, how far up an unfinished advancement looks for a reason to show.
+/// parity: `VISIBILITY_DEPTH`.
 constexpr std::size_t kVisibilityDepth = 2;
 
 [[nodiscard]] std::int32_t frameOf(std::string_view type) {
@@ -79,8 +79,6 @@ void PlayerAdvancements::changed(std::string_view uuid, const Identifier& advanc
         return;
     }
     found->second.progressChanged.insert(advancement);
-    // Re-evaluating a tree whose done states did not move answers what it answered before, so this
-    // is vanilla's "only when it finished or unfinished" without having to know which.
     found->second.rootsToUpdate.insert(tree_.rootOf(advancement));
 }
 
@@ -91,7 +89,7 @@ bool PlayerAdvancements::isDone(std::string_view uuid, const Identifier& advance
 
 void PlayerAdvancements::updateVisibility(std::string_view uuid, State& state, const Identifier& root,
                                           std::set<Identifier>& added, std::set<Identifier>& removed) {
-    // parity: `AdvancementVisibilityEvaluator.evaluateVisibility`, three `NO_CHANGE` below the root.
+    // parity: `AdvancementVisibilityEvaluator.evaluateVisibility`.
     std::vector<Rule> stack(kVisibilityDepth + 1, Rule::NoChange);
     const auto visit = [&](const auto& self, const Identifier& id) -> bool {
         const adv::Advancement* definition = advancements_->find(id);
@@ -180,7 +178,7 @@ play::AdvancementEntry PlayerAdvancements::entryOf(const Identifier& id) const {
 }
 
 play::AdvancementProgressData PlayerAdvancements::progressOf(std::string_view uuid, const Identifier& id) const {
-    // parity: `AdvancementProgress.update`: every criterion the requirements name, done or not.
+    // parity: `AdvancementProgress.update`.
     play::AdvancementProgressData data{.id = id.toString()};
     const adv::Advancement* definition = advancements_->find(id);
     if (definition == nullptr) {

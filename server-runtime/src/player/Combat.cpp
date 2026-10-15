@@ -13,8 +13,7 @@ constexpr float kMinArmourRatio = 0.2F;
 constexpr float kToughnessDivider = 4.0F;
 constexpr std::int32_t kResistancePerLevel = 5;
 
-/// parity: the epsilon `calculateFallPower` adds, without which a fall of exactly four blocks would
-/// not hurt.
+/// parity: the epsilon `calculateFallPower` adds.
 constexpr double kFallEpsilon = 1.0E-6;
 
 /// parity: `getAttackStrengthScale(0.5)`'s own half tick, and the tick rate it divides.
@@ -31,7 +30,7 @@ float afterArmour(float damage, float armour, float toughness, float fractionAdd
     const float scale = kBaseToughness + (toughness / kToughnessDivider);
     const float effective = std::clamp(armour - (damage / scale), armour * kMinArmourRatio, kMaxArmour);
     const float fraction = effective / kProtectionDivider;
-    // parity: `modifyArmorEffectiveness` only runs for a hit with a weapon, and is clamped to [0, 1].
+    // parity: `modifyArmorEffectiveness` only runs for a hit with a weapon.
     return damage * (1.0F - (fractionAdd == 0.0F ? fraction : std::clamp(fraction + fractionAdd, 0.0F, 1.0F)));
 }
 
@@ -89,7 +88,6 @@ bool withinAttackReach(const double playerX, const double playerY, const double 
                        const double targetHeight) {
     /// parity: `Attributes.ENTITY_INTERACTION_RANGE` plus the slack the server allows.
     constexpr double kAttackReach = 6.0;
-    /// Where a standing player's eyes are, which is what the reach is measured from.
     constexpr double kEyeHeight = 1.5;
 
     const double half = targetWidth / 2.0;
@@ -113,8 +111,6 @@ Swing swingOf(const float strength, const float base, const float enchanted, con
     if (swing.critical) {
         swing.damage *= kCriticalMultiplier;
     }
-    // What the enchantments add comes back on top, after the charge and the critical have had the
-    // base to themselves.
     swing.damage += strength * (enchanted - base);
     return swing;
 }

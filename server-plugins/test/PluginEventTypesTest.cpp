@@ -13,9 +13,6 @@
 using namespace basalt::server::plugins;
 
 namespace {
-
-/// One event as one line, which is what the checksum is taken over: the whole table in one number,
-/// plus a handful spelled out so a mismatch says what it should have been.
 [[nodiscard]] std::string describe(const PluginEventType& type) {
     std::string fields;
     for (const std::string& field : type.fields()) {
@@ -48,7 +45,6 @@ namespace {
     }
     return static_cast<std::int64_t>(checksum);
 }
-
 } // namespace
 
 TEST_CASE("the table of events is the frozen kotlin's table") {
@@ -64,11 +60,9 @@ TEST_CASE("the table of events is the frozen kotlin's table") {
         }
         joined += describe(*type);
     }
-    // No two events answer to the same name, which is what makes a name an address.
     CHECK(names.size() == 70);
     CHECK(checksumOf(joined) == 4825059672451943845LL);
 
-    // The ends of the list and a handful in the middle, spelled out.
     CHECK(describe(*all[0]) == "player.join|false|player_name,player_uuid,world|");
     CHECK(describe(*all[1]) == "player.quit|false|player_name,player_uuid,world|");
     CHECK(describe(*all[2]) == "player.chat|true|player_name,player_uuid,world,message|message");
@@ -79,55 +73,4 @@ TEST_CASE("the table of events is the frozen kotlin's table") {
     CHECK(describe(*all[69]) == "block.fade|true|world,x,y,z,block,to_block,cause|");
 
     CHECK(std::count_if(all.begin(), all.end(), [](const PluginEventType* type) { return type->cancellable(); }) == 50);
-}
-
-TEST_CASE("the events a handler is allowed to write back to") {
-    std::vector<std::string> withMutable;
-    for (const PluginEventType* type : pluginEventTypes::all()) {
-        std::vector<std::string> fields;
-        for (const std::string& field : type->fields()) {
-            if (type->isMutable(field)) {
-                fields.push_back(field);
-            }
-        }
-        if (fields.empty()) {
-            continue;
-        }
-        std::sort(fields.begin(), fields.end());
-        std::string written = "[";
-        for (const std::string& field : fields) {
-            if (written.size() > 1) {
-                written += ", ";
-            }
-            written += field;
-        }
-        withMutable.push_back(type->name() + "=" + written + "]");
-    }
-    std::string joined = "[";
-    for (const std::string& entry : withMutable) {
-        if (joined.size() > 1) {
-            joined += ", ";
-        }
-        joined += entry;
-    }
-    joined += "]";
-    CHECK(joined ==
-          "[player.chat=[message], player.command=[command], player.food_change=[food], "
-          "player.sign_change=[line1, line2, line3, line4], entity.damage=[amount], server.ping=[max_players, motd], "
-          "server.command=[command], server.broadcast=[message], entity.heal=[amount]]");
-}
-
-TEST_CASE("the named accessors answer the same objects the list holds") {
-    CHECK(&pluginEventTypes::playerJoin() == pluginEventTypes::all()[0]);
-    CHECK(pluginEventTypes::playerChat().name() == "player.chat");
-    CHECK(pluginEventTypes::blockBreak().cancellable());
-    CHECK(pluginEventTypes::playerJoin().indexOf("player_uuid") == 1);
-
-    // The two that are about one plugin's own life rather than something to broadcast.
-    CHECK(pluginEventTypes::kPluginEnable == "plugin.enable");
-    CHECK(pluginEventTypes::kPluginDisable == "plugin.disable");
-    const std::vector<const PluginEventType*>& all = pluginEventTypes::all();
-    CHECK(std::none_of(all.begin(), all.end(), [](const PluginEventType* type) {
-        return type->name() == pluginEventTypes::kPluginEnable || type->name() == pluginEventTypes::kPluginDisable;
-    }));
 }

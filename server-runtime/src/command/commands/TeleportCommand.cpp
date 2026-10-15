@@ -40,7 +40,7 @@ constexpr double kAudibleBlocksPerVolume = 16.0;
     return found == nullptr ? none : *found;
 }
 
-/// parity: `TeleportCommand.formatDouble`, which is `String.format("%f")`: always six decimals.
+/// parity: `TeleportCommand.formatDouble`.
 [[nodiscard]] std::string formatCoordinate(double value) {
     const auto scaled = static_cast<std::int64_t>(std::llround(std::abs(value) * 1'000'000.0));
     const std::string fraction = std::to_string(scaled % 1'000'000);
@@ -65,15 +65,13 @@ constexpr double kAudibleBlocksPerVolume = 16.0;
     if (coordinates == nullptr) {
         return 0;
     }
-    // parity: `TeleportCommand.performTeleport` moves every target into the source's own level, so a
-    // console or an `execute in` takes a player across dimensions with plain coordinates.
+    // parity: `TeleportCommand.performTeleport` moves every target into the source's own level.
     world::LoadedWorld* destination = world;
     if (destination == nullptr) {
         const Parsed<world::LoadedWorld*> sourceWorld = context.world();
         destination = sourceWorld.has_value() ? *sourceWorld : nullptr;
     }
-    // parity: `TeleportCommand.teleportToPos` resolves once against the source; the relative flags
-    // it then sends land every target on that same point.
+    // parity: `TeleportCommand.teleportToPos` resolves once against the source.
     const std::array<double, 3> at = coordinates->resolve(context.source());
     for (const CommandTarget& target : targets) {
         const std::pair<float, float> angles = facing.has_value()   ? *facing
@@ -121,7 +119,6 @@ constexpr double kAudibleBlocksPerVolume = 16.0;
     return static_cast<std::int32_t>(targets.size());
 }
 
-/// The one entity a `single = true` selector matched, or null when it matched nobody.
 [[nodiscard]] const CommandTarget* only(const CommandContext& context, std::string_view name) {
     const std::vector<CommandTarget>& matched = targetsOf(context, name);
     return matched.size() == 1 ? &matched.front() : nullptr;
@@ -132,7 +129,6 @@ constexpr double kAudibleBlocksPerVolume = 16.0;
 TeleportCommand::TeleportCommand() : Command("teleport", permissionLevel::kGamemasters, {"tp"}) {}
 
 void TeleportCommand::build(const CommandNodeBuilder& root) const {
-    /// The tail `<targets> <location>` shares with the bare `<location>` form.
     const auto destinations = [](const CommandNodeBuilder& node, bool named) {
         node.executes([named](const CommandContext& context) -> Parsed<std::int32_t> {
             if (named) {
@@ -194,8 +190,7 @@ void TeleportCommand::build(const CommandNodeBuilder& root) const {
                                           target->resolve(context.source()));
                     });
                 });
-                /// parity: `teleport ... facing entity <entity> [<anchor>]`, aiming at its feet or
-                /// its eyes.
+                /// parity: `teleport ...
                 facing.literal("entity", [](const CommandNodeBuilder& entity) {
                     const auto aim = [](const CommandContext& context, bool eyes) -> Parsed<std::int32_t> {
                         const auto* matched = context.get<std::vector<CommandTarget>>("facingEntity");
@@ -247,8 +242,7 @@ void PlaySoundCommand::build(const CommandNodeBuilder& root) const {
         const auto* coordinates = positioned ? context.get<Coordinates>("pos") : nullptr;
         const std::array<double, 3> origin =
             coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source());
-        // parity: the sound carries 16 blocks per unit of volume, and beyond that vanilla moves it
-        // to just within earshot rather than dropping it, but only if a minimum volume was given.
+        // parity: the sound carries 16 blocks per unit of volume.
         const double range = static_cast<double>(volume) * kAudibleBlocksPerVolume;
         std::int32_t played = 0;
         for (const player::PlayerSession* target : targets) {

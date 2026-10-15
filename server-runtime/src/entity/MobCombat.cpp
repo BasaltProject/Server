@@ -17,15 +17,10 @@ namespace reg = server::registry;
 constexpr std::int32_t kRepathMin = 4;
 constexpr std::int32_t kRepathSpread = 7;
 
-/// parity: `Spider.SpiderTargetGoal`, which needs the light below a half to notice anybody.
+/// parity: `Spider.SpiderTargetGoal`.
 constexpr std::int32_t kSpiderLight = 8;
 
-/// The mobs this build sends after a player.
-///
-/// parity: the classes whose target selector holds a `NearestAttackableTargetGoal` on the player and
-/// whose goal selector holds a melee attack. The ranged ones (skeletons, blazes, ghasts), the ones
-/// that only fight back when hit (piglins, wolves, endermen) and the creeper, which does not swing at
-/// all, are deliberately not here.
+/// parity: `NearestAttackableTargetGoal`.
 [[nodiscard]] const std::set<std::string, std::less<>>& melee() {
     static const std::set<std::string, std::less<>> all{
         "zombie",          "husk",         "drowned",   "zombie_villager", "giant",   "spider",

@@ -52,7 +52,6 @@ void applyPackRegistries(std::vector<wire::protocol::configuration::RegistryData
 
 namespace {
 
-/// The registries whose entries come from data files and are numbered in load order.
 constexpr std::array<std::string_view, 19> kSorted{"minecraft:banner_pattern",
                                                    "minecraft:wolf_variant",
                                                    "minecraft:wolf_sound_variant",

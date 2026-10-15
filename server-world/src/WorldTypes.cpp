@@ -27,7 +27,6 @@ Chunk voidWorld::generate(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t
     if (platformRadius <= 0) {
         return chunk;
     }
-    // Only the chunks the platform actually reaches do any work; everything else stays air.
     for (std::int32_t x = 0; x < 16; ++x) {
         for (std::int32_t z = 0; z < 16; ++z) {
             const std::int32_t worldX = chunkX * 16 + x;

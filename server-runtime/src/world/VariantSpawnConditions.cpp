@@ -27,7 +27,6 @@ struct Condition {
     enum class Kind : std::uint8_t { Always, Biome, MoonBrightness, Structure };
 
     Kind kind = Kind::Always;
-    /// Biome ids or `#tags`, resolved against `biomeTags` when tested.
     std::vector<std::string> holders;
     std::optional<double> min;
     std::optional<double> max;
@@ -222,7 +221,6 @@ void install(const datapack::EntriesUnder& entriesUnder, const datapack::ReadTex
             }
         }
     }
-    // Without a jar or a pack there is nothing to read, and the built-in tables answer instead.
     const bool any = std::ranges::any_of(built.entries, [](const auto& entry) { return !entry.second.empty(); });
     state() = std::move(built);
     isInstalled() = any;

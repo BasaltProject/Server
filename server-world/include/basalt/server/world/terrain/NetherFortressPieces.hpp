@@ -28,14 +28,11 @@ enum class PieceType : std::uint8_t {
     CastleStalkRoom,
 };
 
-/// One placed fortress piece. Everything about how it is drawn follows from its type, its box and
-/// the direction it faces.
 struct Piece {
     PieceType type = PieceType::Start;
     std::int32_t generationDepth = 0;
     structure::StructureBoundingBox boundingBox;
     structure::StructureDirection orientation = structure::StructureDirection::North;
-    /// The bridge end filler draws its own ragged shape from a seed taken at assembly time.
     std::optional<std::int32_t> selfSeed;
     bool needsChest = false;
 };
@@ -43,7 +40,7 @@ struct Piece {
 /// parity: `NetherFortressStructure.generatePieces` and `NetherFortressPieces` layout assembly.
 [[nodiscard]] std::vector<Piece> assemble(random::RandomSource& random, std::int32_t chunkX, std::int32_t chunkZ);
 
-/// parity: `StructurePiece.isReplaceableByStructures`, plus the fluids a fortress leg pours through.
+/// parity: `StructurePiece.isReplaceableByStructures`.
 [[nodiscard]] bool replaceableByStructures(std::int32_t stateId);
 
 [[nodiscard]] std::int32_t air();

@@ -19,8 +19,6 @@ constexpr double kRoundOff = 33554432.0;
 /// parity: `Math.nextDown((double) 1.6777216E7F)`.
 const double kHalfRoundOff = std::nextafter(16777216.0, 0.0);
 
-/// The eight corner dot products split into their xz part and their y gradient, which the volume
-/// path computes once per y cell and reuses while y stays inside it.
 struct CornerCache {
     std::array<float, 8> xz{};
     std::array<float, 8> gy{};

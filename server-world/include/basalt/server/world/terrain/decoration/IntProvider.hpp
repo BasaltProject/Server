@@ -11,22 +11,17 @@
 namespace basalt::server::world::terrain::decoration {
 
 /// parity: the `net.minecraft.util.valueproviders.IntProvider` variants the ported worldgen uses.
-///
-/// A value type rather than a class hierarchy: these are copied into feature configs by the
-/// hundred, and every variant is two ints plus, at most, a shared child.
 class IntProvider {
 public:
     [[nodiscard]] static IntProvider of(std::int32_t value);
 
-    /// parity: `UniformInt`, inclusive on both ends. Always draws, even when min equals max, which
-    /// is what `Mth.randomBetweenInclusive` does.
+    /// parity: `UniformInt`.
     [[nodiscard]] static IntProvider uniform(std::int32_t min, std::int32_t max);
 
     /// parity: `ClampedInt`, which clamps the sampled source to an inclusive range.
     [[nodiscard]] static IntProvider clamped(IntProvider source, std::int32_t min, std::int32_t max);
 
-    /// parity: `WeightedListInt` over constant entries, the only shape the real configs use. The
-    /// pairs stay in insertion order, so a cumulative walk matches vanilla's repeat-by-weight layout.
+    /// parity: `WeightedListInt` over constant entries.
     [[nodiscard]] static IntProvider weighted(std::initializer_list<std::pair<std::int32_t, std::int32_t>> entries);
 
     [[nodiscard]] std::int32_t sample(random::RandomSource& random) const;

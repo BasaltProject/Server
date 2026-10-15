@@ -37,13 +37,11 @@ void PersistenceCoordinator::persistPlayers() const {
 
 void PersistenceCoordinator::persistEverything() const {
     const std::map<std::string, world::LoadedWorld*> worlds = hooks_.worlds ? hooks_.worlds() : decltype(worlds){};
-    // Logged before the work, not after: if this ever stops completing, the last thing in the log is
-    // where it got to, instead of nothing at all.
+    // Logged before the work: if saving ever stops completing, the log says where it got to.
     logger_.debug([&] { return "Save starting across " + std::to_string(worlds.size()) + " world(s)."; });
     for (const auto& [name, world] : worlds) {
         world->saveDirty();
-        // Clock, weather and game rules, which no chunk carries: cheap enough to write on every save,
-        // and losing an hour of world time to a crash is worse than one small file write.
+        // Clock, weather and game rules no chunk carries: cheap per save, and losing world time to a crash is worse.
         commandStorage_->save();
         world->saveMetadata();
     }
@@ -59,7 +57,6 @@ void PersistenceCoordinator::unloadUnreachableChunks() const {
     std::size_t loaded = 0;
     std::size_t unloaded = 0;
     for (const auto& [name, world] : worlds) {
-        // Only the players actually in this world keep its chunks resident.
         std::vector<std::pair<std::int32_t, std::int32_t>> positions;
         for (const player::PlayerSession* player : players_->snapshot()) {
             if (player->worldName == world->name()) {
@@ -85,9 +82,7 @@ void PersistenceCoordinator::unloadUnreachableChunks() const {
         loaded += world->state().loadedChunkCount();
     }
 
-    // Reported every sweep, not only when something happens: when this server misbehaves it is
-    // because one of these numbers climbs without settling, and knowing which one is the whole
-    // diagnosis. At debug level because it is a diagnostic, not operator news.
+    // Reported every sweep: a misbehaving server shows one number climbing without settling. Debug, as a diagnostic.
     logger_.debug([&] {
         return "Chunks: " + std::to_string(loaded) + " loaded across " + std::to_string(worlds.size()) + " world(s), " +
                std::to_string(unloaded) + " unloaded. " + metrics_->memoryReport();

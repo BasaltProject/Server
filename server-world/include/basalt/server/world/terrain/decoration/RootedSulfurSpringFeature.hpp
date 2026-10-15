@@ -10,11 +10,9 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// parity: the 26.2 `rooted_sulfur_spring` root-system feature and its nested sulfur-spring
-/// selector.
+/// parity: the 26.2 `rooted_sulfur_spring` root-system feature and its nested sulfur-spring.
 namespace rootedSulfurSpringFeature {
 
-/// Reads a world block, so the root column can look past the chunk it starts in.
 using BlockStateAt = std::function<std::int32_t(const DecorationPos&)>;
 
 bool place(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin,

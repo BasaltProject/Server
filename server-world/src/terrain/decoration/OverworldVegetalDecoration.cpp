@@ -39,9 +39,7 @@ const std::vector<Feature>& features() {
         {0, "glow_lichen",
          [](Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
             const ExternalStateReader& externalBlockState) {
-             // parity: a growth reaches the face of a block in the next chunk, so it needs the
-             // same neighbour view every other step gets. Without it every border face reads as
-             // nothing and the lichen goes somewhere else.
+             // parity: a growth reaches a block face in the next chunk, so it needs the neighbour view.
              glowLichenDecoration::decorate(chunk, seed, environment, externalBlockState);
          }},
         {1, "trees_windswept_savanna",

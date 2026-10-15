@@ -15,17 +15,16 @@ using wire::nbt::NbtCompound;
 using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
 
-/// parity: the `BaseContainerBlockEntity` kinds, which carry a name, a lock and their items.
+/// parity: the `BaseContainerBlockEntity` kinds.
 constexpr std::array<std::string_view, 12> kBaseContainers{
     "chest",  "trapped_chest", "barrel",  "furnace",     "blast_furnace", "smoker",
     "hopper", "dispenser",     "dropper", "shulker_box", "brewing_stand", "crafter"};
 
-/// parity: the `RandomizableContainerBlockEntity` kinds, whose unrolled table travels as well.
+/// parity: the `RandomizableContainerBlockEntity` kinds.
 constexpr std::array<std::string_view, 8> kRandomizable{"chest",     "trapped_chest", "barrel",      "hopper",
                                                         "dispenser", "dropper",       "shulker_box", "crafter"};
 
-/// The containers that keep only their items. parity: `CampfireBlockEntity`,
-/// `ChiseledBookShelfBlockEntity` and `ShelfBlockEntity`.
+/// The containers that keep only their items. parity: `CampfireBlockEntity`.
 constexpr std::array<std::string_view, 3> kItemsOnly{"campfire", "chiseled_bookshelf", "shelf"};
 
 template <std::size_t N>
@@ -33,7 +32,6 @@ template <std::size_t N>
     return std::ranges::find(kinds, kind) != kinds.end();
 }
 
-/// Moves `key` to the component `component` when it is there.
 void carry(NbtCompound& rest, std::string_view key, std::string_view component, NbtCompound& components) {
     if (const NbtTag* value = rest.find(key); value != nullptr) {
         components.set(component, *value);
@@ -65,7 +63,7 @@ void carry(NbtCompound& rest, std::string_view key, std::string_view component, 
 
 void addBlockData(const server::world::ChunkBlockEntity& entity, NbtCompound& components) {
     const std::string_view kind = entity.type().path();
-    // parity: `saveCustomOnly` leaves out the id, the position and the entity's own components.
+    // parity: `saveCustomOnly` leaves out the id.
     NbtCompound rest = entity.data();
     for (const std::string_view key : {"id", "x", "y", "z", "keepPacked", "components"}) {
         static_cast<void>(rest.remove(key));

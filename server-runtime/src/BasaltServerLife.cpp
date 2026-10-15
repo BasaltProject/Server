@@ -90,27 +90,21 @@
 namespace basalt::server::runtime {
 namespace {
 
-/// One source for the numbers nobody checks bit for bit: a drop's scatter, a seed.
 [[nodiscard]] std::mt19937_64& scratchRandom() {
     static thread_local std::mt19937_64 random{std::random_device{}()};
     return random;
 }
 
-/// How often the watchdog looks, and how long a plugin may be inside the server. Five ticks: long
-/// enough that no honest handler reaches it, short enough to be felt once.
+// Five ticks: long enough that no honest handler reaches it, short enough to be felt once.
 constexpr std::int64_t kPluginWatchdogIntervalMillis = 250;
 constexpr std::int64_t kPluginStuckMillis = 250;
 
-/// Long enough for an in-flight chunk to land, short enough that a wedged worker cannot hold the
-/// shutdown open indefinitely.
 constexpr std::int64_t kShutdownDrainTimeoutMillis = 5000;
 
-/// Generous on purpose: saving a large world legitimately takes a while, and cutting a save short is
-/// far worse than waiting for one.
+// Generous on purpose: cutting a large world's save short is far worse than waiting for it.
 constexpr std::int64_t kShutdownWaitTimeoutMillis = 120000;
 
-/// parity: `Player.drop`, which lifts a thrown stack a tenth of a block and lets it fall in front
-/// of the eyes rather than at the feet.
+/// parity: `Player.drop`.
 constexpr double kThrowEyeHeight = 1.5;
 constexpr double kThrowLift = 0.1;
 
@@ -120,14 +114,10 @@ constexpr std::int32_t kPickupDelay = 40;
 } // namespace
 
 void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) {
-    // The driver opens lazily, so without a query here a bad path or an unreadable database would
-    // not be discovered until the first player joined, which is the worst possible moment to find
-    // out. It also creates the file, so the layout is complete before anyone connects.
+    // The driver opens lazily; querying here surfaces a bad path before the first player joins and creates the file.
     logger_.info([this] {
         return "Player database ready: " + std::to_string(playerStore_->players().count()) + " player(s) known.";
     });
-    // A server for one edition only is a real thing to want, so the door that is shut is simply not
-    // opened: nothing else in here knows which of the two a player came through.
     if (config_->javaEnabled) {
         const auto address =
             wire::io::TcpAddress::literal(config_->javaBind, static_cast<std::uint16_t>(config_->port));
@@ -136,8 +126,6 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         std::expected<wire::io::TcpListener, wire::io::SocketError> bound =
             wire::io::TcpListener::bind(*address, 128, config_->javaDualStack);
         if (!bound.has_value()) {
-            // Almost always another server already on that port, which is worth saying rather than
-            // leaving the operator with an error number.
             throw std::runtime_error("Could not bind " + config_->javaBind + " port " + std::to_string(config_->port) +
                                      ". Another server is probably already running on it; stop it or change `port` in "
                                      "[network.java] of config/server.toml.");
@@ -146,8 +134,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
     }
     startBedrockListener();
 
-    // Said once at startup, because it changes the order of tick and an operator reading a bug
-    // report has to know which mode produced it.
+    // Logged at startup because regional mode changes the observable tick order.
     if (worldRegistry_->scheduler().regional()) {
         logger_.warn([] {
             return std::string{"Regions are on, which is NOT VANILLA: two of them have no fixed order of tick "} +
@@ -155,8 +142,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         });
     }
 
-    // Before the loop, while nothing else is running: a plugin's own code is the last thing to come
-    // up and the first to go down, so it never races the tick thread over its own state.
+    // Loaded before the loop so plugin code never races the tick thread over its own state.
     if (config_->pluginsEnabled) {
         static_cast<void>(plugins_->loadAll());
         reportOrphanedPluginData();
@@ -165,11 +151,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         logger_.info([] { return "Plugins are off in server.toml."; });
     }
 
-    // The worlds came up before the plugins did, so this says "these are the worlds" rather than
-    // announcing something they could have watched happen.
-    //
-    // On the owner, not on the thread that is still starting the server up: a decider only runs
-    // where the plugins do. Queued rather than run, so it lands as the first thing the loop does.
+    // Queued on the owner, since a decider only runs where the plugins do.
     worldRegistry_->scheduler().global().submit([this] {
         server::plugins::PluginEventBus& bus = plugins_->events();
         for (const auto& [name, world] : worldRegistry_->worlds()) {
@@ -190,8 +172,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                                                     }));
         });
     }
-    // After the plugins are up, so the first thing a plugin can be told is that everything is there.
-    // Nothing before this point is worth telling anyone about: half a server is not one.
+    // Emitted after the plugins are up, so the first thing a plugin is told is that everything is there.
     static_cast<void>(server::plugins::emit(&plugins_->events(), &server::plugins::pluginEventTypes::serverLoad(),
                                             [this](server::plugins::PluginEvent& event) {
                                                 event.set(0,
@@ -206,9 +187,6 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                                   1000.0;
     std::set<std::int32_t> translated = config_->javaEnabled ? protocolGate_.supported() : std::set<std::int32_t>{};
     translated.erase(wire::multiversion::protocolVersions::kNative);
-    // One line, and it starts with the part everybody waits for: whether it is up and how long it
-    // took. Where it listens and what it speaks follow in the same breath, because three lines for
-    // one fact is three lines to read.
     logger_.info([this, elapsedSeconds, &translated] {
         std::string line = "Done (" + std::to_string(elapsedSeconds) + "s)! ";
         const bool java = config_->javaEnabled && listener_.has_value();
@@ -216,15 +194,10 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
             line += "Java on TCP port " + std::to_string(config_->port) + " (" +
                     (options_.sessionService != nullptr ? "online" : "offline") + "-mode)";
             if (!translated.empty()) {
-                // The range and the count, not the list: forty eight of them is a wall of text
-                // nobody reads, and `/version` prints the whole thing for whoever wants it.
                 line += " with " + std::to_string(translated.size()) + " older versions down to " +
                         wire::multiversion::protocolVersions::describe(*translated.begin());
             }
         }
-        // What is open, and nothing about what is not: the two editions are two doors and neither
-        // is the default the other is measured against. Both shut is refused when the config is
-        // read, so there is always one to name.
         if (bedrockListener_ != nullptr) {
             line += java ? ", and " : "";
             line += bedrockListener_->welcome();
@@ -240,7 +213,6 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         }
         connections_.emplace_back(
             [this, connection = std::move(*accepted)]() mutable { serveConnection(std::move(connection)); });
-        // A connection that has finished is joined by its own destructor when the vector is trimmed.
         std::erase_if(connections_, [](const std::jthread& thread) { return !thread.joinable(); });
     }
 
@@ -248,33 +220,26 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
 }
 
 void BasaltServer::shutdown() {
-    // Runs on whichever thread asked, nearly always the tick thread: saving drains a world's owner,
-    // which only that owner's thread may do. Once only, since `/stop` and a signal can arrive together.
+    // Runs on whichever thread asked, nearly always the tick thread; once only, since `/stop` and a signal can race.
     bool expected = false;
     if (!shuttingDown_.compare_exchange_strong(expected, true)) {
         return;
     }
 
-    // First of all, so nothing new can arrive while the rest is winding down. Without this a client
-    // with auto-reconnect walks straight back in mid-save and starts requesting chunks again, which
-    // is exactly the work shutting down is trying to finish.
+    // First, so an auto-reconnecting client cannot walk back in mid-save.
     accepting_.store(false);
-    // Closed, not destroyed: the thread that started the server is inside `accept` on it right now,
-    // and taking the object away under it is worse than the error it gets from a closed socket.
+    // Closed, not destroyed: the thread that started the server is inside `accept` on it.
     if (listener_.has_value()) {
         listener_->close();
     }
-    // Only the door: the thread stays up until the players below have been told why they are
-    // leaving, because it is that thread that carries the goodbye to a Bedrock client.
+    // Only the door: the thread stays up to carry the goodbye to Bedrock clients.
     if (bedrockListener_) {
         bedrockListener_->closeDoor();
     }
 
     const std::vector<player::PlayerSession*> players = playerRegistry_.snapshot();
     if (!players.empty()) {
-        // Saved here, synchronously, *before* disconnecting them. Disconnecting only closes the
-        // socket; each session then saves itself on its own thread, which raced the database being
-        // closed a few lines below. Whoever lost that race was not saved at all.
+        // Saved synchronously before disconnecting: sessions saving on their own threads raced the database close.
         logger_.info([&players] { return "Saving " + std::to_string(players.size()) + " player(s)."; });
         persistence_->persistPlayers();
 
@@ -294,7 +259,6 @@ void BasaltServer::shutdown() {
     static_cast<void>(server::plugins::emit(
         &plugins_->events(), &server::plugins::pluginEventTypes::serverStop(),
         [&players](server::plugins::PluginEvent& event) { event.set(0, static_cast<std::int32_t>(players.size())); }));
-    // After the loop has stopped, for the same reason it loaded before it started.
     plugins_->unloadAll();
     for (const auto& [name, world] : worldRegistry_->worlds()) {
         world->stopGenerating(kShutdownDrainTimeoutMillis);
@@ -309,11 +273,8 @@ void BasaltServer::shutdown() {
     }
     maps_->save();
     saveSchedule();
-    // Nothing else runs anywhere: what was queued is cancelled rather than run against a world that
-    // is already written out.
+    // Queued work is cancelled rather than run against worlds that are already written.
     worldRegistry_->scheduler().close();
-    // The players were saved before being disconnected, above. This is the checkpoint that leaves
-    // players.db as one self-contained file.
     playerStore_.reset();
     logger_.info([this] { return shouldRestart() ? "Restarting the server." : "Stopping the server."; });
     shutdownComplete_.store(true);
@@ -351,9 +312,7 @@ void BasaltServer::awaitShutdown() {
 }
 
 void BasaltServer::startPluginWatchdog() {
-    // Its own thread, because a watchdog that runs on the thread it is watching is not a watchdog.
-    // The instruction ceiling stops a plugin spinning in Lua on its own; this is for the other half,
-    // a plugin stuck inside something the host is doing for it, which no counter sees.
+    // Own thread, since a watchdog on the thread it watches is not one; it covers a plugin stuck inside the host.
     watchdog_ = std::jthread{[this](const std::stop_token& stop) {
         while (!stop.stop_requested() && accepting_.load()) {
             std::this_thread::sleep_for(std::chrono::milliseconds{kPluginWatchdogIntervalMillis});
@@ -363,8 +322,7 @@ void BasaltServer::startPluginWatchdog() {
 }
 
 void BasaltServer::reportOrphanedPluginData() {
-    // Nothing is deleted: a plugin taken out for an afternoon has to find its data when it comes
-    // back. The operator is told it is there and how to get rid of it.
+    // Nothing is deleted: a plugin taken out for an afternoon must find its data again.
     if (config_->orphanData != "warn") {
         return;
     }
@@ -420,7 +378,6 @@ player::BreakContext BasaltServer::breakContext() {
             orbs_->award(world, x, y, z, amount);
         }
     };
-    // However that edition draws one slot of a bag, which for Bedrock is the whole window.
     context.slotChanged = [](const player::PlayerSession& player, std::int32_t) {
         if (player.connection().sendInventoryAll) {
             player.connection().sendInventoryAll();
@@ -456,9 +413,7 @@ player::DamageContext BasaltServer::damageContext() {
     return context;
 }
 
-/// Tells the world that one more, or one fewer, is looking into that block: the lid of a chest,
-/// the state of a barrel, the sound and what a sculk sensor hears. A double chest counts as two,
-/// because a lid is per block entity.
+// A double chest counts as two, because a lid is per block entity.
 void BasaltServer::openersChanged(world::LoadedWorld& world, const bedrock::OpenWindow& window, const bool opened) {
     player::OpenersContext context;
     context.blocks = breakContext();
@@ -528,8 +483,7 @@ void BasaltServer::startBedrockListener() {
     options.port = static_cast<std::uint16_t>(config_->bedrockPort);
     options.prefix = config_->bedrockPrefix;
 
-    // What this build speaks, narrowed to what the operator asked for. A list that names a protocol
-    // this build has no codec for is said out loud rather than accepted and then failed at.
+    // A list naming a protocol this build has no codec for is reported rather than accepted.
     std::set<std::int32_t> speakable = wire::bedrock::BedrockGate::buildSupport();
     if (settings.protocols.has_value()) {
         std::set<std::int32_t> chosen;
@@ -558,8 +512,6 @@ void BasaltServer::startBedrockListener() {
     options.gate = wire::bedrock::BedrockGate{std::move(speakable), settings.futureProtocols};
 
     bedrock::BedrockListener::Hooks hooks;
-    // The same answer a Java client gets to its ping, rendered flat: a Bedrock server list has one
-    // line and no colours of its own to give it.
     hooks.status = [this] {
         bedrock::BedrockListener::Status status;
         const wire::protocol::status::ServerStatusPayload payload =
@@ -572,13 +524,9 @@ void BasaltServer::startBedrockListener() {
         return status;
     };
 
-    // The recipe book, built once and handed to every client that joins: on that door the list the
-    // server sends is the only crafting a client knows.
     hooks.recipes = [this] { return bedrockRecipeBook().recipes; };
 
-    // Where this player left off, asked before the world is described to them: `start_game` names a
-    // position and the client puts its player there for good. A saved position that arrives after
-    // it, as a teleport, is one the client has already decided against.
+    // Asked before the world is described: `start_game` names a position and a later teleport would be refused.
     hooks.spawn = [this](const wire::common::Uuid& uuid) {
         bedrock::BedrockListener::Spawn spawn;
         if (worldRegistry_ != nullptr) {
@@ -596,7 +544,6 @@ void BasaltServer::startBedrockListener() {
             return spawn;
         }
         spawn.gamemode = static_cast<std::int32_t>(stored->gamemode);
-        // Only the position is meaningless when the world they were in is gone.
         if (worldRegistry_ != nullptr && stored->world != worldRegistry_->defaultWorld().name()) {
             return spawn;
         }
@@ -608,16 +555,11 @@ void BasaltServer::startBedrockListener() {
         return spawn;
     };
 
-    // What a client that finished the login becomes: the same kind of player a Java login makes,
-    // in the same registry, so everything that asks who is online finds them.
     hooks.join =
         [this](const bedrock::BedrockListener::Joining& joining) -> std::unique_ptr<bedrock::BedrockListener::Player> {
         bedrock::BedrockPlayer::Context context;
         context.registry = &playerRegistry_;
-        // The same two events the Java door raises, with the same fields: a plugin has no way of
-        // telling which door somebody came in by, and that is the point. Queued onto the owner
-        // because a decider only runs where the plugins do, carrying copies since the player may be
-        // gone by the time the owner gets to it.
+        // Queued onto the owner because a decider only runs where plugins do, with copies since the player may be gone.
         const auto emitOnOwner = [this](const server::plugins::PluginEventType& type,
                                         const player::PlayerSession& player) {
             std::string name = player.name();
@@ -639,9 +581,7 @@ void BasaltServer::startBedrockListener() {
         context.quit = [emitOnOwner](const player::PlayerSession& player) {
             emitOnOwner(server::plugins::pluginEventTypes::playerQuit(), player);
         };
-        // The world, built where the world lives. A chunk belongs to its region's owner, so the
-        // columns are read and written there and only the finished bytes cross to the Bedrock
-        // thread. Queued rather than answered on the spot for the same reason.
+        // Chunks are read and written on the region's owner; only finished bytes cross to the Bedrock thread.
         context.sendChunks = [this](std::vector<std::pair<std::int32_t, std::int32_t>> columns, const int protocol,
                                     std::function<void(std::vector<std::uint8_t>)> send, std::function<void()> done) {
             if (worldRegistry_ == nullptr) {
@@ -659,8 +599,6 @@ void BasaltServer::startBedrockListener() {
                 });
         };
 
-        // What players.db remembers, and where what they become goes back. The same store the Java
-        // door reads: a player who came in one door and out the other is one row, not two.
         context.stored = [this](const wire::common::Uuid& uuid) -> std::optional<storage::StoredPlayer> {
             if (playerStore_ == nullptr || !playerStore_->isOpen()) {
                 return std::nullopt;
@@ -668,15 +606,12 @@ void BasaltServer::startBedrockListener() {
             return playerStore_->players().load(uuid.toString());
         };
         context.save = [this](const storage::StoredPlayer& row) {
-            // The database is closed when the server is shutting down, and by then everyone has
-            // already been written: this is only the door catching up.
+            // The database closes at shutdown after everyone was saved, so this is only the door catching up.
             if (playerStore_ != nullptr && playerStore_->isOpen()) {
                 playerStore_->players().save(row);
             }
         };
 
-        // Moving between worlds: the same refusal the Java path makes (staying put is not a move),
-        // and the world's own dimension turned into the one Bedrock draws.
         context.changeWorld = [](player::PlayerSession& player, const world::LoadedWorld& target, const double x,
                                  const double y,
                                  const double z) -> std::optional<bedrock::BedrockPlayer::Context::Arrival> {
@@ -702,8 +637,7 @@ void BasaltServer::startBedrockListener() {
             return arrival;
         };
 
-        // Dying goes through the same code a Java player's death does, queued where the rest of
-        // the server runs: it touches the registry and every other player's connection.
+        // Queued to the owner: dying touches the registry and every other player's connection.
         context.killed = [this](player::PlayerSession& player, const std::string_view deathMessageId) {
             const wire::common::Uuid uuid = player.uuid();
             const std::string reason{deathMessageId};
@@ -720,8 +654,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // Breaking a block is the same everywhere, so both doors call the same thing; what this
-        // adds is only getting onto the thread that owns the world.
         context.breakBlock = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
                                     const std::int32_t z) {
             const wire::common::Uuid uuid = player.uuid();
@@ -745,8 +677,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // What is alive and what is lying around, near enough to be worth drawing. Taken where the
-        // world is and left for the door's thread to turn into packets.
         context.lookAround = [this](const player::PlayerSession& player,
                                     std::function<void(std::vector<bedrock::Seen>)> answer) {
             const wire::common::Uuid uuid = player.uuid();
@@ -760,8 +690,6 @@ void BasaltServer::startBedrockListener() {
                 if (found == worlds.end() || found->second == nullptr) {
                     return;
                 }
-                // Near enough to be worth drawing, which is the draw distance a Bedrock join asks
-                // for rather than the whole world.
                 constexpr double kRange = 64.0;
                 const auto near = [session](const double x, const double y, const double z) {
                     const double dx = x - session->x;
@@ -792,9 +720,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // A swing at something alive, settled where the world is. Every number here comes from the
-        // same place the other door's swing does: the charge, the reach and what a hit is worth are
-        // all in `player::combat`, so the two editions cannot drift apart.
         context.attackEntity = [this](player::PlayerSession& player, const std::int32_t entityId, const bool falling) {
             const wire::common::Uuid uuid = player.uuid();
             worldRegistry_->scheduler().global().submit([this, uuid, entityId, falling] {
@@ -851,8 +776,6 @@ void BasaltServer::startBedrockListener() {
                 session->ticksSinceSwing = 0;
                 const auto base = static_cast<float>(
                     player::playerAttributes::valueOf(*session, "minecraft:attack_damage", definitionOf));
-                // parity: what the enchantments add rides on the swing but never on the critical, so
-                // it is worked out here and handed to the same arithmetic the other door uses.
                 const world::realEntityTypeTags::TagMembers* entityTags = &vanillaData_.entityTags;
                 const world::weaponDamage::Victim victim{
                     .type = target->type(), .inTag = [entityTags, target](const wire::common::Identifier& tag) {
@@ -888,13 +811,11 @@ void BasaltServer::startBedrockListener() {
                 player::pvp::knockMob(*session, *target,
                                       player::pvp::knockbackOf(melee, *session, held) +
                                           (swing.knockbackAttack ? 0.5F : 0.0F));
-                // parity: `isSweepAttack`: a sword, on the ground, a swing that is neither critical
-                // nor a sprinting one. The sweep itself is the same code the other door runs.
+                // parity: `isSweepAttack`.
                 if (swing.fullStrength && !swing.critical && !swing.knockbackAttack && session->onGround &&
                     weapon.has_value() && weapon->path().ends_with("_sword")) {
                     player::pvp::Context sweeping = melee;
                     const std::string worldName = session->worldName;
-                    // Everything the sweep caught sounds for itself: a silent sweep looks like a miss.
                     sweeping.sweptMob = [this, worldName](entity::ServerEntity& struck, bool died) {
                         for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
                             if (watcher->worldName == worldName && watcher->connection().playSound) {
@@ -912,7 +833,7 @@ void BasaltServer::startBedrockListener() {
                 // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
                 target->hurtBy = session->entityId();
                 entity::entityCombat::rememberPlayer(*target, session->uuid());
-                // parity: `itemAttackInteraction`: the mace's smash, the post-attack enchantments, the wear.
+                // parity: `itemAttackInteraction`.
                 player::pvp::itemAttackInteraction(melee, world, *session, nullptr, target, held,
                                                    player::PlayerInventory::kHotbarStart +
                                                        session->inventory.heldSlot());
@@ -927,8 +848,7 @@ void BasaltServer::startBedrockListener() {
                                                      : entity::entityCombat::hurtSound(*target),
                                          wire::protocol::play::SoundSource::Hostile, target->x, target->y, target->z,
                                          1.0F, 1.0F, 0);
-                    // parity: `ServerPlayer.crit` and the knockback sound, which is what tells the
-                    // difference between a good hit and an ordinary one from across the field.
+                    // parity: `ServerPlayer.crit`.
                     if (swing.critical) {
                         player::playSoundFor(*watcher, "entity.player.attack.crit",
                                              wire::protocol::play::SoundSource::Players, session->x, session->y,
@@ -945,8 +865,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // What a villager offers, read where the world is. A mob that is no merchant offers nothing
-        // and the click goes on to whatever else it was.
         context.trades = [this](player::PlayerSession& player,
                                 const std::int32_t entityId) -> std::optional<bedrock::OpenTrades> {
             const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
@@ -1005,7 +923,7 @@ void BasaltServer::startBedrockListener() {
                 const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
                     wire::common::Identifier::parse(held->id);
                 const std::int32_t heldSlot = player::PlayerInventory::kHotbarStart + session->inventory.heldSlot();
-                // parity: `ZombieVillager.mobInteract`, where the apple is taken only when the cure starts.
+                // parity: `ZombieVillager.mobInteract`.
                 if (item.has_value() && item->path() == "golden_apple" && target->type().path() == "zombie_villager") {
                     if (mobActions_->startCure(*found->second, *target, session->uuid()) &&
                         session->gamemode != wire::protocol::play::Gamemode::Creative) {
@@ -1051,9 +969,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // What they are standing on, gathered where the world is and told to them where they are.
-        // A block a command changed, heard by everyone in that world. The broadcaster owns both the
-        // list and the sending, so this only has to find the world.
         context.blockEffects = [this](const std::string& worldName, const std::int32_t x, const std::int32_t y,
                                       const std::int32_t z, const std::int32_t stateId,
                                       const std::vector<world::BlockEffect>& effects) {
@@ -1066,7 +981,6 @@ void BasaltServer::startBedrockListener() {
             broadcaster_->sendEffects(watchers, x, y, z, stateId, effects);
         };
 
-        // An arm swung at nothing: everybody else has to be told, and the swinger draws its own.
         context.swing = [this](player::PlayerSession& player) {
             const std::int32_t who = player.entityId();
             const std::string worldName = player.worldName;
@@ -1087,8 +1001,7 @@ void BasaltServer::startBedrockListener() {
             }
         };
 
-        // The middle click, answered where the world is: what block is there decides what is handed
-        // over, and only creative may be handed one it is not already carrying.
+        // Only creative may be handed a block it is not already carrying.
         context.pickBlock = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
                                    const std::int32_t z, const std::int32_t hotbarSlot) {
             static_cast<void>(hotbarSlot);
@@ -1124,8 +1037,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // The same click on something alive: a mob answers with its own spawn egg and most other
-        // things answer with nothing at all.
         context.pickEntity = [this](player::PlayerSession& player, const std::int32_t entityId) {
             const wire::common::Uuid uuid = player.uuid();
             worldRegistry_->scheduler().global().submit([this, uuid, entityId] {
@@ -1142,8 +1053,7 @@ void BasaltServer::startBedrockListener() {
                 if (target == nullptr || target->removed) {
                     return;
                 }
-                // parity: `Entity.getPickResult`: a mob answers with its own spawn egg, a boat or a
-                // minecart with what it was placed from, and everything else with nothing.
+                // parity: `Entity.getPickResult`.
                 const std::optional<wire::common::Identifier> item = entity::entityPickResults::itemFor(target->type());
                 if (!item.has_value() || !player::pickItemFor(*session, item->toString())) {
                     return;
@@ -1157,8 +1067,7 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // One of a crafter's nine switched off, where the world is. The block keeps it, and a
-        // comparator counts a slot that is off as a full one.
+        // A comparator counts a switched-off crafter slot as full.
         context.toggleCrafterSlot = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
                                            const std::int32_t z, const std::int32_t slot, const bool disabled) {
             const wire::common::Uuid uuid = player.uuid();
@@ -1188,14 +1097,11 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // An emote. The other edition has none, so it goes to the clients that can draw one and
-        // nowhere else.
         context.emote = [this](player::PlayerSession& player, const std::string& emoteId, const std::int32_t duration,
                                const std::uint8_t flags) {
             const std::int32_t who = player.entityId();
             const std::string worldName = player.worldName;
             for (player::PlayerSession* other : playerRegistry_.snapshot()) {
-                // The one who made it is already drawing it; this is for everybody else.
                 if (other->entityId() == who || other->worldName != worldName || !other->connection().showEmote) {
                     continue;
                 }
@@ -1203,8 +1109,7 @@ void BasaltServer::startBedrockListener() {
             }
         };
 
-        // A command block being programmed. The permission check is the other door's own, because it
-        // is the same question: creative, and operator through their own command source.
+        // The permission check is the Java door's own: creative, and operator through their own command source.
         context.programCommandBlock = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
                                              const std::int32_t z, const std::int32_t mode, const std::string& command,
                                              const bool trackOutput, const bool conditional, const bool needsRedstone) {
@@ -1228,8 +1133,6 @@ void BasaltServer::startBedrockListener() {
                 if (found == worlds.end() || found->second == nullptr) {
                     return;
                 }
-                // That edition numbers the three the same way this server does: impulse, then
-                // repeating, then chain.
                 const world::commandBlocks::Mode kind = mode == 1   ? world::commandBlocks::Mode::Repeating
                                                         : mode == 2 ? world::commandBlocks::Mode::Chain
                                                                     : world::commandBlocks::Mode::Impulse;
@@ -1249,8 +1152,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // A page turned on a lectern. That edition sends the page it wants rather than a direction,
-        // which is the only difference: the block keeps the page either way.
         context.turnLecternPage = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
                                          const std::int32_t z, const std::int32_t page) {
             const wire::common::Uuid uuid = player.uuid();
@@ -1275,8 +1176,7 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // What a client typed into a sign's editor, written where the world is.
-        // The book is the player's own, so both of these only need the thread that owns them.
+        // The book is the player's own, so only the thread that owns the player is needed.
         context.writeBookPage = [this](player::PlayerSession& player, const std::int32_t slot,
                                        const world::books::PageEdit what, const std::int32_t page,
                                        const std::int32_t other, const std::string& text) {
@@ -1333,15 +1233,12 @@ void BasaltServer::startBedrockListener() {
                 if (found == worlds.end() || found->second == nullptr) {
                     return;
                 }
-                // parity: that edition only ever edits the front here, which is the side this
-                // server's own editor is opened on.
                 static_cast<void>(player::writeSignFor(breakContext(), *found->second, *session, x, y, z, true,
                                                        player::signLinesOf(text)));
             });
         };
 
-        // A bed whose sleeper left: this arrives from the door's own thread, so the world is
-        // reached the way everything else from there is.
+        // Arrives from the door's own thread, so the world is reached through the scheduler.
         context.freeBed = [this](const std::string& worldName, const std::int32_t x, const std::int32_t y,
                                  const std::int32_t z) {
             worldRegistry_->scheduler().global().submit([this, worldName, x, y, z] {
@@ -1354,15 +1251,13 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // Morning reaches every connection on the world's own thread, so this runs where it is
-        // called rather than going round the scheduler.
+        // Morning reaches every connection on the world's own thread, so this runs inline.
         context.wakeUp = [this](player::PlayerSession& player) {
             const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
             const auto found = worlds.find(player.worldName);
             player::wakeUpFor(breakContext(), player, found == worlds.end() ? nullptr : found->second);
         };
 
-        // A click on nothing: what leaves the hand does so here, and a bow only starts bending.
         context.useInAir = [this](player::PlayerSession& player, const std::int32_t slot) {
             const wire::common::Uuid uuid = player.uuid();
             worldRegistry_->scheduler().global().submit([this, uuid, slot] {
@@ -1377,8 +1272,7 @@ void BasaltServer::startBedrockListener() {
                     return;
                 }
                 const auto item = wire::common::Identifier::parse(held->id);
-                // parity: `ItemCooldowns` gates the throw itself, not only the icon: a pearl that is
-                // still cooling down goes nowhere on either door.
+                // parity: `ItemCooldowns`.
                 if (!item.has_value() || player::onCooldownFor(*session, *item, found->second->gameTime())) {
                     return;
                 }
@@ -1397,7 +1291,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // Letting go of it, which for a bow is the shot and its arrow.
         context.releaseItem = [this](player::PlayerSession& player, const std::int32_t slot,
                                      const std::int32_t drawnTicks) {
             const wire::common::Uuid uuid = player.uuid();
@@ -1461,7 +1354,6 @@ void BasaltServer::startBedrockListener() {
                     }
                     return;
                 }
-                // The little arc the stack makes on its way in, to everybody who can see it.
                 for (const player::PickedItem& row : taken) {
                     for (const player::PlayerSession* watcher : playerRegistry_.snapshot()) {
                         if (watcher->worldName == session->worldName && watcher->connection().sendPickupAnimation) {
@@ -1475,8 +1367,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // How fast this player digs, answered where the world is: the block, its hardness and
-        // whether the eyes are under water all live over there.
         context.digSpeed = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
                                   const std::int32_t z, const std::int32_t ticks, std::function<void(float)> answer) {
             const wire::common::Uuid uuid = player.uuid();
@@ -1507,8 +1397,7 @@ void BasaltServer::startBedrockListener() {
                 const float perTick = player::destroyProgressPerTickFor(
                     *session, *block, registry::blocks::hardnessOf(*block), breakContext().blockTags, underwater);
                 answer(perTick);
-                // parity: `ServerPlayerGameMode.destroyProgress` tells everybody else how far along
-                // it is. The step is worked out from the turns because this edition never says.
+                // parity: `ServerPlayerGameMode.destroyProgress`.
                 constexpr std::int32_t kStages = 10;
                 const auto stage = std::min(kStages - 1, static_cast<std::int32_t>(static_cast<float>(ticks) * perTick *
                                                                                    static_cast<float>(kStages)));
@@ -1539,8 +1428,7 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // Putting a block down, where the world is. What the client says it holds is not asked:
-        // the slot is, and what is in it here is what goes down.
+        // The client's claimed held item is ignored: the slot is asked and what is in it goes down.
         context.useOn =
             [this](player::PlayerSession& player, const player::BlockHit& hit, const std::int32_t hotbarSlot,
                    std::shared_ptr<bedrock::BedrockWindows> windows,
@@ -1558,8 +1446,7 @@ void BasaltServer::startBedrockListener() {
                     if (found == worlds.end() || found->second == nullptr) {
                         return;
                     }
-                    // parity: `ServerPlayerGameMode.useItemOn` runs the block's own use before it
-                    // considers what is held as something to place, and sneaking overrides that.
+                    // parity: `ServerPlayerGameMode.useItemOn`.
                     if (!session->sneaking && windows != nullptr && opened) {
                         if (std::optional<bedrock::OpenWindow> window =
                                 bedrock::windowFor(*found->second, hit.x, hit.y, hit.z);
@@ -1578,8 +1465,7 @@ void BasaltServer::startBedrockListener() {
                                                      session->uuid());
                                 }
                             }
-                            // The next window is a different window: what was said about the last
-                            // one says nothing about this one.
+                            // The next window is a different window: earlier slot echoes say nothing about it.
                             windows->saidSlots = bedrock::readWindow(*found->second, *window, session);
                             windows->saidNumbers.reset();
                             windows->sinceRead = 0;
@@ -1589,13 +1475,10 @@ void BasaltServer::startBedrockListener() {
                             return;
                         }
                     }
-                    // parity: `ServerPlayerGameMode.useItemOn` runs the block's own use first. A
-                    // door, a gate, a lever, a button, a repeater or a comparator answers the hand
-                    // rather than letting whatever is held be placed against it.
+                    // parity: `ServerPlayerGameMode.useItemOn`.
                     if (!session->sneaking) {
                         const player::BreakContext blocks = breakContext();
-                        // parity: `BedBlock.useWithoutItem`. The spawn point and the plugin's say
-                        // come from this side, the same as they do for the other door.
+                        // parity: `BedBlock.useWithoutItem`.
                         if (const std::optional<std::int32_t> clickedState =
                                 found->second->state().blockState(hit.x, hit.y, hit.z);
                             clickedState.has_value() && world::beds::isBed(*clickedState)) {
@@ -1664,33 +1547,27 @@ void BasaltServer::startBedrockListener() {
                     if (!item.has_value()) {
                         return;
                     }
-                    // parity: `ServerPlayerGameMode.useItemOn` with something in hand: these are
-                    // the item's own use, which happens sneaking or not, unlike the block's.
+                    // parity: `ServerPlayerGameMode.useItemOn`.
                     const player::BreakContext blocks = breakContext();
-                    // parity: `MapItem.useOn` marks a banner, and `EmptyMapItem.use` answers a click
-                    // on anything.
+                    // parity: `MapItem.useOn`.
                     if (maps_->useOnBanner(*session, *found->second, slot, hit.x, hit.y, hit.z).has_value() ||
                         maps_->useEmptyMap(blocks, *session, *found->second, slot)) {
                         return;
                     }
-                    // parity: `BucketItem.use` looks where the player is looking rather than at the
-                    // block that was clicked, so this hands it the eye and not the hit.
-                    // parity: `ThrowableProjectileItem.use`, which leaves the hand whatever is in
-                    // front of it. This door hears it as a click on whatever the arc started at.
+                    // parity: `BucketItem.use`.
+                    // parity: `ThrowableProjectileItem.use`.
                     if (world::enderEyes::throwFor(blocks, *session, *found->second, slot) ||
                         player::throwItemFor(blocks, *session, *found->second, *item, slot)) {
                         return;
                     }
 
-                    // parity: `BucketItem.use` traces where the player is looking; this door is told
-                    // the block and the face outright, so it goes straight to the same fill or pour.
+                    // parity: `BucketItem.use`.
                     if (player::useBucketOnFor(blocks, *session, *found->second, *item, slot, *held, hit.x, hit.y,
                                                hit.z, hit.direction, {})) {
                         return;
                     }
 
-                    // parity: `TntBlock.useItemOn` runs before anything a flint and steel would do
-                    // to the square beside it, and a fire charge is spent where the lighter is worn.
+                    // parity: `TntBlock.useItemOn`.
                     const bool lighter = *item == wire::common::Identifier::vanilla("flint_and_steel");
                     const bool charge = *item == wire::common::Identifier::vanilla("fire_charge");
                     const wire::common::Identifier* clicked = registry::blockStateDefinitions::blockOf(
@@ -1702,15 +1579,13 @@ void BasaltServer::startBedrockListener() {
                     }
 
                     if (lighter) {
-                        // parity: `FlintAndSteelItem.useOn` lights the square beside the face that
-                        // was clicked, not the block itself.
+                        // parity: `FlintAndSteelItem.useOn`.
                         const wire::protocol::play::BlockPos beside =
                             wire::protocol::play::BlockPos{hit.x, hit.y, hit.z}.offset(hit.direction);
                         player::igniteFor(blocks, *session, *found->second, beside.x, beside.y, beside.z, slot, *held);
                         return;
                     }
-                    // parity: `ChiseledBookShelfBlock.useItemOn` and `DecoratedPotBlock.useItemOn`,
-                    // both of which move one item by hand and neither of which opens a screen.
+                    // parity: `ChiseledBookShelfBlock.useItemOn`.
                     if (!session->sneaking && clicked != nullptr) {
                         const player::FaceHit face{
                             .face = hit.direction, .x = hit.clickX, .y = hit.clickY, .z = hit.clickZ};
@@ -1723,9 +1598,7 @@ void BasaltServer::startBedrockListener() {
                             player::usePotFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held);
                             return;
                         }
-                        // parity: `JukeboxBlock` and `LecternBlock` both answer the hand without a
-                        // screen. A lectern that already holds a book opens one, which this door
-                        // does not draw yet, so it falls through to placing instead.
+                        // parity: `JukeboxBlock`.
                         if (clicked->path() == "jukebox" &&
                             player::useJukeboxFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held)) {
                             return;
@@ -1742,8 +1615,6 @@ void BasaltServer::startBedrockListener() {
                         }
                     }
 
-                    // parity: a composter and a lit campfire take what is offered without a screen,
-                    // and answer the click whether or not it changed anything.
                     if (!session->sneaking &&
                         (player::useComposterFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held) ||
                          player::placeOnCampfireFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held,
@@ -1761,12 +1632,10 @@ void BasaltServer::startBedrockListener() {
                         return;
                     }
 
-                    // parity: `MinecartItem.useOn`, `BoatItem.use` and `SpawnEggItem.useOn`, the
-                    // three items that put something alive down rather than a block.
+                    // parity: `MinecartItem.useOn`.
                     const std::string path{item->path()};
                     const bool boat = path.ends_with("_boat") || path == "bamboo_raft" || path == "bamboo_chest_raft";
-                    // parity: `HangingEntityItem.useOn`, which hangs it on the face that was clicked
-                    // and answers nothing at all where it will not hold.
+                    // parity: `HangingEntityItem.useOn`.
                     if ((path == "item_frame" || path == "glow_item_frame" || path == "painting") &&
                         player::hangFrameFor(blocks, *session, *found->second, *item, slot, *held, hit)) {
                         return;
@@ -1781,8 +1650,7 @@ void BasaltServer::startBedrockListener() {
 
                     player::PlaceContext placing;
                     placing.blocks = breakContext();
-                    // A sign that has just gone down opens its own editor, the same as on the other
-                    // door: without it a Bedrock player places a sign and is never asked for text.
+                    // Without this a Bedrock player places a sign and is never asked for text.
                     placing.openSign = [](const player::PlayerSession& who, const std::int32_t signX,
                                           const std::int32_t signY, const std::int32_t signZ, std::int32_t) {
                         if (who.connection().openSignEditor) {
@@ -1808,8 +1676,7 @@ void BasaltServer::startBedrockListener() {
                 });
             };
 
-        // A window closing, which is the client's decision: whatever was being dragged goes back
-        // in the bag rather than staying in a window nobody is looking at.
+        // Whatever was being dragged goes back in the bag rather than staying in a closed window.
         context.closeWindow = [this](player::PlayerSession& player, std::shared_ptr<bedrock::BedrockWindows> windows) {
             const wire::common::Uuid uuid = player.uuid();
             worldRegistry_->scheduler().global().submit([this, uuid, windows = std::move(windows)] {
@@ -1826,8 +1693,7 @@ void BasaltServer::startBedrockListener() {
                 windows->trades.reset();
                 windows->saidSlots.clear();
                 windows->saidNumbers.reset();
-                // parity: `AbstractContainerMenu.removed`, which empties the grid into the player
-                // rather than leaving it in a table the next person opens.
+                // parity: `AbstractContainerMenu.removed`.
                 bool returned = false;
                 for (std::optional<storage::StoredItemStack>& cell : windows->grid) {
                     if (cell.has_value()) {
@@ -1849,8 +1715,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // Tidying a bag, where the world is: a refused request is answered with the whole
-        // inventory, which is the same thing a Java click gets.
         context.moveStacks = [this](player::PlayerSession& player, wire::bedrock::BedrockStackRequest request,
                                     std::shared_ptr<bedrock::BedrockWindows> windows,
                                     std::function<void(bool, std::vector<wire::bedrock::BedrockResponseContainer>)>
@@ -1940,8 +1804,7 @@ void BasaltServer::startBedrockListener() {
                             return storage::StoredItemStack{
                                 .id = made->item.toString(), .count = made->count, .components = made->components};
                         },
-                        // parity: `LoomMenu.slotsChanged`, which only weaves a pattern the item in
-                        // the third slot offers, or one of the free ones when it is empty.
+                        // parity: `LoomMenu.slotsChanged`.
                         .loomResult = [this](const storage::StoredItemStack& banner,
                                              const storage::StoredItemStack& dye,
                                              const storage::StoredItemStack* patternItem,
@@ -1974,15 +1837,14 @@ void BasaltServer::startBedrockListener() {
                 if (!applied.accepted && session->connection().sendInventoryAll) {
                     session->connection().sendInventoryAll();
                 }
-                // parity: `MapItem.onCraftedPostProcess`, once the copy a cartography table made is taken.
+                // parity: `MapItem.onCraftedPostProcess`.
                 if (applied.accepted && maps_ != nullptr && where != nullptr &&
                     world::maps::settleCraftedMaps(*session, &windows->cursor, *maps_, *where) &&
                     session->connection().sendInventoryAll) {
                     session->connection().sendInventoryAll();
                 }
                 if (applied.tradedWith.has_value()) {
-                    // parity: `MerchantMenu` hands the experience to the merchant, not to the
-                    // buyer, and the book is drawn again so the used offer stops being offered.
+                    // parity: `MerchantMenu`.
                     if (where != nullptr) {
                         entity::ServerEntity* merchant = where->state().entity(*applied.tradedWith);
                         if (merchant != nullptr && mobActions_ != nullptr) {
@@ -2002,8 +1864,7 @@ void BasaltServer::startBedrockListener() {
                     }
                 }
                 if (applied.enchantCost.has_value()) {
-                    // parity: `clickMenuButton` charges the row's own number plus one in levels and
-                    // moves the seed on, which is what gives the next item new rows.
+                    // parity: `clickMenuButton`.
                     if (!free) {
                         session->experience.giveLevels(-*applied.enchantCost);
                         if (session->connection().syncExperience) {
@@ -2015,13 +1876,10 @@ void BasaltServer::startBedrockListener() {
                 }
                 if (applied.accepted && where != nullptr && windows->open.has_value() &&
                     windows->open->type == wire::bedrock::BedrockContainerType::Enchantment) {
-                    // What is in it decides what it offers, so every move over that screen rolls
-                    // the three rows again.
                     rollBedrockEnchantment(*session, *where, *windows);
                 }
                 if (applied.grindstoneWorth.has_value() && windows->open.has_value()) {
-                    // parity: `GrindstoneMenu.ResultSlot.onTake` drops the experience as orbs at
-                    // the middle of the block.
+                    // parity: `GrindstoneMenu.ResultSlot.onTake`.
                     const std::int32_t half = (*applied.grindstoneWorth + 1) / 2;
                     const auto roll = static_cast<std::int32_t>(
                         std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()) * static_cast<double>(half));
@@ -2046,8 +1904,7 @@ void BasaltServer::startBedrockListener() {
                     }
                 }
                 if (applied.beacon.has_value() && where != nullptr && windows->open.has_value()) {
-                    // parity: `BeaconMenu.updateEffects` refuses a pair the pyramid is not tall
-                    // enough for, and the payment has already gone either way.
+                    // parity: `BeaconMenu.updateEffects`.
                     server::world::Chunk* chunk =
                         where->state().chunkIfLoaded(windows->open->x >> 4, windows->open->z >> 4);
                     server::world::ChunkBlockEntity* entity =
@@ -2078,8 +1935,7 @@ void BasaltServer::startBedrockListener() {
                             session->connection().syncExperience();
                         }
                     }
-                    // parity: `AnvilMenu.onTake`: creative wears nothing out, and a block that
-                    // goes takes the screen standing over it with it.
+                    // parity: `AnvilMenu.onTake`.
                     const bool gone = !free && where != nullptr &&
                                       player::wearAnvilAt(
                                           breakContext(), *where, windows->open->x, windows->open->y, windows->open->z,
@@ -2095,8 +1951,6 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // Hurting and healing are the same arithmetic on both editions, so both doors call the same
-        // thing; what this adds is only getting onto the thread that owns the world and the player.
         context.hurt = [this](player::PlayerSession& player, const float amount, const std::string_view deathMessageId,
                               const wire::common::Identifier& damageType,
                               const std::optional<entity::DamageSource>& source) {
@@ -2121,14 +1975,11 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // Which commands to offer, filtered by permission exactly as the Java tree is: a player who
-        // cannot run one is never told it exists. Read straight off the dispatcher rather than
-        // queued, because the answer goes back to the caller and the tree only changes when a
-        // plugin loads or a group does.
+        // Read off the dispatcher rather than queued: the tree only changes when a plugin or group does.
         context.commandList =
             [this](const player::PlayerSession& player) -> std::vector<std::pair<std::string, std::string>> {
             command::CommandDispatcher* dispatcher = wired_.dispatcher.get();
-            // The source wants the session the registry owns, not the const view this was handed.
+            // The source wants the registry-owned session, not the const view.
             player::PlayerSession* session = playerRegistry_.get(player.uuid());
             if (dispatcher == nullptr || session == nullptr) {
                 return {};
@@ -2141,8 +1992,6 @@ void BasaltServer::startBedrockListener() {
             return named;
         };
 
-        // A command a Bedrock player typed, run where commands are allowed to run and through the
-        // same dispatcher and the same plugin event as one typed on Java.
         context.runCommand = [this](const player::PlayerSession& player, std::string line) {
             const wire::common::Uuid uuid = player.uuid();
             const std::string name = player.name();
@@ -2202,7 +2051,6 @@ void BasaltServer::startBedrockListener() {
         };
         context.lang = options_.lang;
         context.logger = logger_;
-        // The same files and the same placeholders the other door draws from.
         context.uiConfigs = [this] { return live_->current()->ui; };
         context.placeholders = &placeholders_;
         if (worldRegistry_ != nullptr) {
@@ -2212,8 +2060,6 @@ void BasaltServer::startBedrockListener() {
             context.spawnX = spawn[0];
             context.spawnY = spawn[1];
             context.spawnZ = spawn[2];
-            // What time it is right now, for a client that has just arrived and would otherwise
-            // run its own clock from whatever it last saw.
             context.worldTime = static_cast<std::int32_t>(world.clock().totalTicks());
             context.weather = world.weather();
         }
@@ -2223,8 +2069,7 @@ void BasaltServer::startBedrockListener() {
     bedrockListener_ = std::make_unique<bedrock::BedrockListener>(std::move(options), std::move(hooks),
                                                                   std::string{bedrock::kBedrockGameVersion});
     if (!bedrockListener_->start()) {
-        // It said why in the log already. Dropping it here is what keeps the startup line honest:
-        // a port that never opened is not one to announce.
+        // It already logged why; dropping it keeps the startup line honest.
         bedrockListener_.reset();
     }
 }

@@ -13,7 +13,6 @@ using wire::common::Identifier;
 using wire::common::JsonObject;
 using wire::common::JsonValue;
 
-/// A range of plain majors, as `supported_formats` and `formats` write it.
 struct IntRange {
     std::int32_t min = 0;
     std::int32_t max = 0;
@@ -69,7 +68,7 @@ using Result = std::expected<FormatRange, MetadataError>;
     return PackFormat{.major = parts[0], .minor = parts.size() > 1 ? parts[1] : defaultMinor};
 }
 
-/// parity: `InclusiveRange.codec(Codec.INT)`: a number, `[min, max]` or `{min_inclusive, max_inclusive}`.
+/// parity: `InclusiveRange.codec(Codec.INT)`.
 [[nodiscard]] std::expected<IntRange, MetadataError> intRangeOf(const JsonValue& value) {
     std::optional<std::int32_t> low;
     std::optional<std::int32_t> high;
@@ -214,7 +213,6 @@ using Result = std::expected<FormatRange, MetadataError>;
     return fail(context + " could not be parsed, missing format version information");
 }
 
-/// Reads the optional format fields shared by a pack and an overlay; `supportedKey` is the old one.
 [[nodiscard]] std::expected<Intermediary, MetadataError> intermediaryOf(const JsonObject& object,
                                                                         std::string_view supportedKey) {
     Intermediary in;

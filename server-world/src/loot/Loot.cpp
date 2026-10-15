@@ -13,8 +13,6 @@ namespace {
 
 using wire::common::Identifier;
 
-/// One weighed choice a pool can pick: a leaf entry, or one item or table of an expanded one, with
-/// every entry whose modifier wraps it, outermost first.
 struct Choice {
     const LootEntry* leaf = nullptr;
     std::optional<Identifier> item;
@@ -22,8 +20,6 @@ struct Choice {
     std::vector<const LootEntry*> chain;
 };
 
-/// Everything a roll carries down into nested tables. parity: `LootContext`, whose visited set is
-/// what stops a table that names itself.
 struct Roll {
     random::RandomSource& random;
     const LootContext& context;
@@ -64,9 +60,7 @@ void rollRaw(const LootTable& table, Roll& roll, const LootPool::Output& output)
     return context.tagMembers ? context.tagMembers("item", *entry.tag) : std::vector<Identifier>{};
 }
 
-/// parity: `LootPoolEntryContainer.expand`: the entry's own condition first, then the leaf's one
-/// choice (or one per item or table when it expands) or the composite's children, `alternatives`
-/// stopping at the first that expands, `sequence` at the first that does not, `group` never.
+/// parity: `LootPoolEntryContainer.expand`.
 template <typename Found>
 bool expand(const LootEntry& entry, Roll& roll, std::vector<const LootEntry*>& chain, const Found& found) {
     if (!entry.canRun(roll.random, roll.context)) {
@@ -111,7 +105,7 @@ bool expand(const LootEntry& entry, Roll& roll, std::vector<const LootEntry*>& c
     return expanded;
 }
 
-/// parity: `LootPoolEntry.createItemStack` through every modifier that wraps it, innermost first.
+/// parity: `LootPoolEntry.createItemStack` through every modifier that wraps it.
 void createStacks(const Choice& choice, Roll& roll, const LootPool::Output& output) {
     const auto emit = [&](ItemStack stack) {
         for (auto wrapper = choice.chain.rbegin(); wrapper != choice.chain.rend(); ++wrapper) {
@@ -237,7 +231,6 @@ void rollRaw(const LootTable& table, Roll& roll, const LootPool::Output& output)
     roll.visited.pop_back();
 }
 
-/// The context with the blast in it, copied only when the caller named a radius the context lacks.
 template <typename Body>
 void withRadius(const LootContext& context, std::optional<float> explosionRadius, const Body& body) {
     if (!explosionRadius.has_value() || context.explosionRadius == explosionRadius) {
@@ -255,7 +248,7 @@ void rollContainerEntries(const std::vector<LootEntry>& entries, random::RandomS
                           const LootContext& context, const LootPool::Output& output) {
     std::vector<const LootTable*> visited;
     Roll roll{.random = random, .context = context, .luck = context.luck, .visited = visited};
-    // parity: `LootTable.createStackSplitter`, a stack past its size handed on in full stacks.
+    // parity: `LootTable.createStackSplitter`.
     const LootPool::Output split = [&output](ItemStack stack) {
         const std::int32_t most = std::max(server::registry::itemStacking::maxStackSize(stack.item), 1);
         if (stack.count < most) {
@@ -313,7 +306,6 @@ std::vector<ItemStack> LootTable::generate(random::RandomSource& random, float l
     generateRaw(
         random, luck, explosionRadius,
         [&output](ItemStack stack) {
-            // An empty stack is no drop at all, and `createStackSplitter` cuts what outgrows the item.
             if (stack.count <= 0) {
                 return;
             }

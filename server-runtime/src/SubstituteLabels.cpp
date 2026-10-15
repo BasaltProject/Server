@@ -10,7 +10,6 @@ namespace {
 
 namespace reg = server::registry;
 
-/// `chiseled_cinnabar` reads as `Chiseled Cinnabar`: the client has no translation for it.
 [[nodiscard]] std::string titleCase(std::string_view path) {
     std::string title;
     bool starting = true;

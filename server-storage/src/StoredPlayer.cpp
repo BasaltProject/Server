@@ -6,7 +6,6 @@
 #include <mutex>
 
 namespace basalt::server::storage {
-
 StoredInventory StoredInventory::empty(std::int32_t size) {
     return StoredInventory{.slots = std::vector<std::optional<StoredItemStack>>(static_cast<std::size_t>(size))};
 }
@@ -55,10 +54,7 @@ std::string stats::killedBy(std::string_view entityType) {
 }
 
 namespace {
-
 const std::string& named(std::string_view name) {
-    // One string per counter, built once: these are compared and looked up, never rebuilt per tick.
-    // Asked from every connection's thread; a node's string never moves once it is in.
     static std::mutex guard;
     static std::map<std::string, std::string, std::less<>> built;
     const std::scoped_lock lock{guard};
@@ -68,7 +64,6 @@ const std::string& named(std::string_view name) {
     }
     return built.emplace(std::string{name}, stats::custom(name)).first->second;
 }
-
 } // namespace
 
 const std::string& stats::deaths() { return named("deaths"); }
@@ -108,5 +103,4 @@ const std::string& stats::walkUnderWaterOneCm() { return named("walk_under_water
 const std::string& stats::climbOneCm() { return named("climb_one_cm"); }
 
 const std::string& stats::flyOneCm() { return named("fly_one_cm"); }
-
 } // namespace basalt::server::storage

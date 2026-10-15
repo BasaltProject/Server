@@ -22,16 +22,13 @@ using wire::protocol::play::SetScorePacket;
 using wire::protocol::play::TabListPacket;
 using wire::text::Component;
 
-/// One objective per player connection; the name only has to be unique within that client.
 constexpr std::string_view kObjective = "basalt";
 
-/// How often a plugin's sidebar is redrawn where the operator's own file is switched off.
 constexpr std::int32_t kPluginSidebarInterval = 20;
 
 std::string owner(std::size_t index) { return "basalt.line." + std::to_string(index); }
 
-/// An interval of 0 means "once, on the first tick": some panels are static, and re-sending a fixed
-/// header twenty times a second is pure waste.
+// Interval 0 means once, on the first tick: re-sending a static header twenty times a second is waste.
 bool due(std::int64_t tick, bool enabled, std::int32_t interval) {
     if (!enabled) {
         return false;
@@ -59,14 +56,12 @@ PlayerUi::PlayerUi(std::function<config::UiConfigs()> configs,
 
 void PlayerUi::tick(std::int64_t tick, const PlaceholderContext& context) {
     const config::UiConfigs configs = configs_();
-    // A world change redraws even the panels drawn only once.
     const bool redraw = std::exchange(redrawPending_, false);
     if (due(tick, configs.tabList.enabled, configs.tabList.updateIntervalTicks) ||
         (redraw && configs.tabList.enabled)) {
         updateTabList(context);
     }
-    // A plugin holding the sidebar turns it on even where the operator's file left it off:
-    // installing a plugin that draws one should not also mean editing scoreboard.toml.
+    // A plugin holding the sidebar turns it on even where the operator's file left it off.
     const bool boardOn = configs.scoreboard.enabled || (plugin_.holdsSidebar && plugin_.holdsSidebar());
     const std::int32_t boardEvery =
         configs.scoreboard.enabled ? configs.scoreboard.updateIntervalTicks : kPluginSidebarInterval;
@@ -148,7 +143,6 @@ void PlayerUi::updateScoreboard(const PlaceholderContext& context) {
         }
     }
     if (!configs.scoreboard.enabled) {
-        // The plugin that was drawing it let go and the operator never wanted one.
         clearScoreboard();
         return;
     }
@@ -167,8 +161,7 @@ void PlayerUi::updateScoreboard(const PlaceholderContext& context) {
 }
 
 void PlayerUi::drawScoreboard(const std::string& title, const std::vector<std::string>& lines) {
-    // A client that draws its own gets the whole board every time: what changed is its business,
-    // and the two editions do not agree on how a line is named.
+    // A client with its own scoreboard gets the whole board every time: the editions disagree on line naming.
     if (surfaces_.scoreboard) {
         if (scoreboardShown_ && lastScoreboardTitle_.has_value() && *lastScoreboardTitle_ == title &&
             lastScoreboardLines_ == lines) {
@@ -210,7 +203,6 @@ void PlayerUi::drawScoreboard(const std::string& title, const std::vector<std::s
         if (index < lastScoreboardLines_.size() && lastScoreboardLines_[index] == lines[index]) {
             continue;
         }
-        // The score orders the rows, highest at the top, so it counts down from the line count.
         const auto score = static_cast<std::int32_t>(lines.size() - index);
         send_(SetScorePacket::kId, [&](wire::io::ByteBuffer& buffer) {
             SetScorePacket{.owner = owner(index),
@@ -221,7 +213,6 @@ void PlayerUi::drawScoreboard(const std::string& title, const std::vector<std::s
                 .write(buffer);
         });
     }
-    // A board that got shorter has to have its leftovers taken away, or they stay on screen.
     for (std::size_t index = lines.size(); index < lastScoreboardLines_.size(); index++) {
         send_(ResetScorePacket::kId, [&](wire::io::ByteBuffer& buffer) {
             ResetScorePacket{.owner = owner(index), .objectiveName = std::string{kObjective}}.write(buffer);
@@ -235,8 +226,6 @@ void PlayerUi::updateBossBar(const PlaceholderContext& context) {
     if (plugin_.bossBar) {
         const std::optional<SurfaceContent> fromPlugin = plugin_.bossBar();
         if (fromPlugin.has_value()) {
-            // A bar has a title and one number, so the plugin's first line is its progress: the
-            // surfaces all carry the same shape and each one reads what it needs from it.
             float progress = 1.0F;
             if (!fromPlugin->lines.empty()) {
                 progress = std::clamp(parseFloat(fromPlugin->lines.front()).value_or(1.0F), 0.0F, 1.0F);
@@ -282,8 +271,7 @@ void PlayerUi::clearBossBar() {
 
 void PlayerUi::drawBossBar(const std::string& text, float progress, BossBarColor color, BossBarOverlay overlay) {
     if (surfaces_.bossBar) {
-        // One bar, kept by whether it has an id at all: over there the bar belongs to an entity and
-        // adding it twice is what makes it flicker, so this only says what changed.
+        // A bar belongs to an entity there and adding it twice makes it flicker, so only changes are sent.
         const bool fresh = !bossBarId_.has_value();
         if (fresh) {
             bossBarId_ = wire::common::Uuid::random();
@@ -309,8 +297,7 @@ void PlayerUi::drawBossBar(const std::string& text, float progress, BossBarColor
                 .write(buffer);
         });
     } else {
-        // Nudged rather than re-added: re-adding restarts the client's own fade, which reads as a
-        // flicker every time anything on the bar changes.
+        // Nudged, not re-added: re-adding restarts the client's fade, which flickers on every change.
         const wire::common::Uuid id = *bossBarId_;
         if (!lastBossText_.has_value() || *lastBossText_ != text) {
             send_(BossEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
@@ -383,8 +370,7 @@ std::string PlayerUi::substitute(std::string_view text, const PlaceholderContext
                                               "%, which is not a placeholder this server knows.");
                 return std::nullopt;
             }
-            // Ordinary: a panel that shows something only some players have should go blank for the
-            // rest, not show them the name of the placeholder.
+            // A panel showing something only some players have goes blank for the rest, not the placeholder's name.
             return std::string{};
         });
 }

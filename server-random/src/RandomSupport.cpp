@@ -5,8 +5,6 @@
 
 namespace basalt::server::random {
 namespace {
-
-/// Reproduces Guava's `Longs.fromBytes`: big-endian packing of 8 bytes into a long.
 std::int64_t bytesToLongBigEndian(const std::array<std::uint8_t, 16>& bytes, std::size_t offset) noexcept {
     std::uint64_t result = 0;
     for (std::size_t i = 0; i < 8; ++i) {
@@ -14,7 +12,6 @@ std::int64_t bytesToLongBigEndian(const std::array<std::uint8_t, 16>& bytes, std
     }
     return static_cast<std::int64_t>(result);
 }
-
 } // namespace
 
 Seed128bit seedFromHashOf(std::string_view input) {
@@ -23,8 +20,6 @@ Seed128bit seedFromHashOf(std::string_view input) {
 }
 
 std::int32_t javaStringHashCode(std::string_view value) noexcept {
-    // Java hashes UTF-16 code units, so the UTF-8 input is decoded rather than read byte by byte.
-    // Resource names are ASCII in practice, but a plugin can name a feature anything.
     std::uint32_t hash = 0;
     const auto unit = [&hash](std::uint32_t code) { hash = 31U * hash + code; };
 
@@ -61,5 +56,4 @@ std::int32_t javaStringHashCode(std::string_view value) noexcept {
     }
     return static_cast<std::int32_t>(hash);
 }
-
 } // namespace basalt::server::random

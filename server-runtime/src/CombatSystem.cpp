@@ -39,8 +39,7 @@
 namespace basalt::server::runtime {
 namespace {
 
-/// parity: `LevelEvent.PARTICLES_SPELL_POTION_SPLASH`, heard within sixty-four blocks, with the
-/// colour an experience bottle's splash is drawn in.
+/// parity: `LevelEvent.PARTICLES_SPELL_POTION_SPLASH`.
 constexpr std::int32_t kSplashPotionEvent = 2002;
 constexpr std::int32_t kWaterBottleColour = -13083194;
 constexpr double kLevelEventRange = 64.0;
@@ -56,8 +55,7 @@ constexpr float kSmallFireballDamage = 5.0F;
 constexpr std::int32_t kSmallFireballFireTicks = 100;
 constexpr std::string_view kDeathOnFire = "onFire";
 
-/// parity: `AbstractWindCharge.onHitEntity`'s single point, and the death message key of
-/// `DamageTypes.WIND_CHARGE`.
+/// parity: `AbstractWindCharge.onHitEntity`.
 constexpr float kWindChargeDamage = 1.0F;
 constexpr std::string_view kDeathWindCharge = "mob";
 
@@ -72,13 +70,12 @@ constexpr std::string_view kDeathFall = "fall";
 /// parity: `ThrownEnderpearl.onHit`, five points of fall damage on arrival.
 constexpr float kEnderPearlDamage = 5.0F;
 
-/// parity: `EntityType.PLAYER`, whose box is what a projectile's reach is measured against.
+/// parity: `EntityType.PLAYER`.
 const Identifier& playerType() {
     static const Identifier kType = Identifier::vanilla("player");
     return kType;
 }
 
-/// Where along its flight the projectile met this box, or nothing when it did not.
 std::optional<double> clip(const ServerEntity& arrow, double fromX, double fromY, double fromZ, double x, double y,
                            double z, double width, double height, double margin) {
     const double half = (width / 2.0) + margin;
@@ -92,8 +89,7 @@ CombatSystem::CombatSystem(BlockChangeBroadcaster& broadcaster, ExplosionSystem&
                            Options options)
     : broadcaster_(broadcaster), explosions_(explosions), hooks_(std::move(hooks)), options_(std::move(options)) {}
 
-/// parity: `Level.gameEvent`, which is what a sculk sensor is listening to. Nobody to tell here: the
-/// noise still has to travel, and the sensor lights up on its own turn.
+/// parity: `Level.gameEvent`.
 void CombatSystem::emitVibration(world::LoadedWorld& world, std::string_view event, double x, double y, double z,
                                  const wire::common::Uuid& source) {
     world::vibrations::emit(world.state(), event, x, y, z, world.gameTime(), {.entity = source});
@@ -114,9 +110,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     const double fromY = entity.y;
     const double fromZ = entity.z;
     const std::optional<entity::BlockHit> hit = entity::projectiles::tick(world.state(), entity, kind);
-    // parity: `Projectile.tick` announces the shot on the first turn, and a sculk sensor hears it at
-    // frequency three whether anybody fired it or not. It goes after the move: every projectile tick
-    // moves first and calls `super.tick()` last, so the shot is announced from where it got to.
+    // parity: `Projectile.tick`.
     if (!entity.announced) {
         entity.announced = true;
         emitVibration(world, "projectile_shoot", entity.x, entity.y, entity.z, entity.uuid());
@@ -126,16 +120,14 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         return;
     }
 
-    // parity: `AbstractWindCharge.onHitBlock`, whose gust goes off a quarter of a block back along
-    // the face it came in through, and `onHitEntity`, which lets it off where it stands.
+    // parity: `AbstractWindCharge.onHitBlock`.
     if (path == "wind_charge" || path == "breeze_wind_charge") {
         const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
         if (!hit.has_value() && !target.has_value()) {
             return;
         }
         entity.removed = true;
-        // parity: `AbstractWindCharge.onHitEntity` takes one point off whoever it passed through,
-        // and lets the gust off there rather than against a face.
+        // parity: `AbstractWindCharge.onHitEntity`.
         if (target.has_value()) {
             if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
                 hitCrystal(world, watchers, *target->mob, false);
@@ -177,8 +169,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         return;
     }
 
-    // parity: `AbstractHurtingProjectile.onHit`: a fireball goes off where it lands, whether that is
-    // a block or somebody's face.
+    // parity: `AbstractHurtingProjectile.onHit`.
     if (path == "fireball" || path == "small_fireball") {
         const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
         if (!hit.has_value() && !target.has_value()) {
@@ -212,8 +203,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                 entity::entityCombat::hurt(*target->mob, kSmallFireballDamage, fromX, fromZ, hooks_, "fireball");
             if (result.landed) {
                 announceEntityHit(watchers, *target->mob, world::damageTypes::kOnFire, entity.entityId(), result.died);
-                // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit,
-                // and only when the damage really came off the health.
+                // parity: `LivingEntity.hurtServer`.
                 emitVibration(world, "entity_damage", target->mob->x, target->mob->y, target->mob->z,
                               target->mob->uuid());
             }
@@ -228,8 +218,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         }
         return;
     }
-    // parity: `DragonFireball.onHit`, which bursts on anything but its own dragon, and whose tick
-    // throws it away once the dragon is gone.
+    // parity: `DragonFireball.onHit`.
     if (path == "dragon_fireball") {
         const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
         if (!hit.has_value() && !target.has_value()) {
@@ -319,8 +308,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     if (!hit.has_value()) {
         return;
     }
-    // parity: `AbstractArrow.onHitBlock` sounds, forgets its piercing once it sticks, and keeps the
-    // plain arrow's sound after.
+    // parity: `AbstractArrow.onHitBlock`.
     if (trident) {
         channelOnBlock(world, watchers, entity, *hit);
     }
@@ -367,8 +355,7 @@ void CombatSystem::hitBlock(world::LoadedWorld& world, const std::vector<PlayerS
 
 void CombatSystem::lightWhereItLanded(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                       const entity::BlockHit& hit) {
-    // parity: `SmallFireball.onHitBlock` lights the square on the face it came in through, and with
-    // no owner there is no `mobGriefing` to ask.
+    // parity: `SmallFireball.onHitBlock`.
     const std::int32_t x = hit.blockX + server::registry::stepX(hit.face);
     const std::int32_t y = hit.blockY + server::registry::stepY(hit.face);
     const std::int32_t z = hit.blockZ + server::registry::stepZ(hit.face);
@@ -421,8 +408,7 @@ void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<Pla
         if (distanceSquared > kSplashRange * kSplashRange) {
             continue;
         }
-        // parity: `ThrownSplashPotion.applySplash`, where the further away you are the less of the
-        // effect you get, down to nothing at the edge.
+        // parity: `ThrownSplashPotion.applySplash`.
         const double share = 1.0 - (std::sqrt(distanceSquared) / kSplashRange);
         const auto ticks = static_cast<std::int32_t>(kSplashDuration * share);
         if (ticks <= 0 || !player->connection().addEffect) {
@@ -459,8 +445,7 @@ bool CombatSystem::deflected(const std::vector<PlayerSession*>& watchers, const 
     if (!target.has_value() || target->mob == nullptr || !deflectors.contains(target->mob->type())) {
         return false;
     }
-    // parity: `hitTargetOrDeflectSelf`: the deflector keeps it from landing, and turns it back only
-    // the first time in a row.
+    // parity: `hitTargetOrDeflectSelf`.
     const ServerEntity& breeze = *target->mob;
     if (projectile.lastDeflectedBy == breeze.entityId()) {
         return true;
@@ -471,8 +456,7 @@ bool CombatSystem::deflected(const std::vector<PlayerSession*>& watchers, const 
         player::playSoundFor(*watcher, "minecraft:entity.breeze.deflect", wire::protocol::play::SoundSource::Hostile,
                              breeze.x, breeze.y, breeze.z, 1.0F, 1.0F, seed);
     }
-    // parity: `ProjectileDeflection.REVERSE` at full power: back at half the speed, turned a little
-    // over half a turn either way.
+    // parity: `ProjectileDeflection.REVERSE`.
     constexpr double kReverse = -0.5;
     projectile.velocityX *= kReverse;
     projectile.velocityY *= kReverse;
@@ -545,8 +529,7 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
             std::ranges::contains(projectile.piercedIds, candidate->entityId())) {
             continue;
         }
-        // parity: `Projectile.canHitEntity` asks `isPickable`, which a crystal, a minecart and a boat
-        // are too.
+        // parity: `Projectile.canHitEntity`.
         if (!server::registry::entityAttributes::isLiving(candidate->type()) &&
             !world::endCrystals::isCrystal(candidate->type()) && !world::detectorRails::isMinecart(candidate->type()) &&
             !entity::boats::isBoat(candidate->type())) {
@@ -669,8 +652,7 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
             continue;
         }
         markWitherFriend(world, *entity, sourceEntityId);
-        // parity: `Explosion.getIndirectSourceEntity`: a projectile's or a primed block's owner, or a
-        // living source itself.
+        // parity: `Explosion.getIndirectSourceEntity`.
         if (const ServerEntity* source = world.state().entity(sourceEntityId); source != nullptr) {
             const std::optional<std::int32_t> causing = source->ownerId.has_value() ? source->ownerId
                                                         : server::registry::entityAttributes::isLiving(source->type())
@@ -714,7 +696,7 @@ void CombatSystem::markWitherFriend(world::LoadedWorld& world, ServerEntity& tar
     if (target.wither == nullptr || !sourceId.has_value()) {
         return;
     }
-    // parity: `WitherBoss.hurtServer` asks `source.getEntity()`, the owner behind a skull or arrow.
+    // parity: `WitherBoss.hurtServer` asks `source.getEntity()`.
     const ServerEntity* source = world.state().entity(*sourceId);
     if (source != nullptr && source->ownerId.has_value()) {
         source = world.state().entity(*source->ownerId);
@@ -753,8 +735,7 @@ void CombatSystem::announceEntityHit(const std::vector<PlayerSession*>& watchers
         }
     }
     const std::string sound = died ? entity::entityCombat::deathSound(entity) : entity::entityCombat::hurtSound(entity);
-    // parity: `LivingEntity.makeSound` at the mob's own volume, voice and category, and
-    // `Mob.playHurtSound`, which puts its next ambient sound off.
+    // parity: `LivingEntity.makeSound`.
     random::RandomSource voice = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     const float volume = entity::mobSounds::volume(entity);
     const float pitch = entity::mobSounds::voicePitch(entity, voice);
@@ -762,8 +743,7 @@ void CombatSystem::announceEntityHit(const std::vector<PlayerSession*>& watchers
         entity.ambientSoundTime = -entity::mobSounds::ambientInterval(entity);
     }
     for (PlayerSession* watcher : watchers) {
-        // A client on the other edition hears the hit and nothing else of this: the flinch and the
-        // knock back are drawn from its own metadata, which the entity sync already carries.
+        // A client on the other edition hears only the hit: flinch and knockback come from entity sync metadata.
         if (watcher->connection().playSound) {
             watcher->connection().playSound(sound, entity.x, entity.y, entity.z, volume, pitch);
             continue;

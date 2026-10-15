@@ -17,8 +17,7 @@ using wire::common::LogLevel;
 using wire::common::placeholder::lowercaseAscii;
 using wire::common::toml::TomlTable;
 
-/// A whole number as written, or nothing when it is anything else. `from_chars` stops at the first
-/// character it cannot use and calls that a success, so the end has to be the end.
+// `from_chars` calls a stop at the first unusable character a success, so the end has to be the end.
 [[nodiscard]] std::optional<std::int64_t> asInteger(std::string_view value) {
     std::int64_t parsed = 0;
     const std::from_chars_result read = std::from_chars(value.data(), value.data() + value.size(), parsed);
@@ -28,9 +27,7 @@ using wire::common::toml::TomlTable;
     return parsed;
 }
 
-/// parity of shape with Folia's own `threads = -1`: a number is taken as it is, and anything else
-/// ("auto", missing) means "work it out", which is zero here and is resolved by the scheduler
-/// rather than by the file.
+// parity of shape with Folia's `threads = -1`: anything but a number means auto, resolved by the scheduler.
 [[nodiscard]] std::int32_t regionThreadsOf(std::optional<std::string_view> value) {
     if (!value.has_value()) {
         return 0;
@@ -57,12 +54,9 @@ using wire::common::toml::TomlTable;
     return fallback;
 }
 
-/// What to write into a freshly created `server.toml`: an imported `server.properties`, or the
-/// default.
 [[nodiscard]] std::string initialContents(const std::string& legacyPropertiesPath, const wire::common::Logger& logger) {
     const std::optional<std::string> legacy = wire::io::fileIO::readText(legacyPropertiesPath);
-    // A server with nothing beside it is the common case, and reading the absent file below would
-    // be undefined behaviour rather than a wrong answer.
+    // Reading the absent file below would be undefined behaviour rather than a wrong answer.
     if (!legacy.has_value()) {
         return std::string{kServerDefaultToml};
     }
@@ -144,7 +138,6 @@ std::string mergeLegacyProperties(std::string_view templateText,
         }
     }
     if (const auto online = imported("online-mode"); online.has_value()) {
-        // Strictly true or false, as Java reads it: anything else is not a decision to import.
         if (*online == "true" || *online == "false") {
             replaceOnce("online-mode = true", "online-mode = " + std::string{*online});
         }
@@ -185,9 +178,7 @@ std::string mergeLegacyProperties(std::string_view templateText,
             replaceOnce("function-permission-level = 2", "function-permission-level = " + std::to_string(*number));
         }
     }
-    // The view distance is not imported here because it no longer lives in this file: it is a
-    // per-world setting and belongs to `worlds.toml`, which is where importing it goes when it
-    // does.
+    // The view distance is a per-world setting that belongs to `worlds.toml`, so it is not imported here.
     return result;
 }
 
@@ -217,7 +208,6 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
         config.whitelist = server->boolean("whitelist").value_or(defaults.whitelist);
     }
 
-    // The two doors, side by side: neither edition is a layer on top of the other.
     if (const TomlTable* network = root.table("network"); network != nullptr) {
         if (const TomlTable* java = network->table("java"); java != nullptr) {
             config.javaEnabled = java->boolean("enabled").value_or(defaults.javaEnabled);
@@ -287,9 +277,7 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
 
     if (plugins != nullptr) {
         config.pluginsEnabled = plugins->boolean("enabled").value_or(defaults.pluginsEnabled);
-        // Floored rather than taken as written: a budget of five instructions or a megabyte of
-        // nothing stops every plugin on the server, and reads as "plugins are broken" rather than
-        // as the typo it is.
+        // Floored: a budget of five instructions stops every plugin and reads as plugins broken, not as a typo.
         config.pluginInstructionsPerTurn = std::max<std::int64_t>(
             plugins->integer("instructions-per-turn").value_or(defaults.pluginInstructionsPerTurn), 1000);
         config.pluginMemoryBytes =

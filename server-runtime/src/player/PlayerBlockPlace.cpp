@@ -45,14 +45,12 @@ using wire::common::Identifier;
 
 [[nodiscard]] std::int64_t seedOf(const BreakContext& context) { return context.nextSeed ? context.nextSeed() : 0; }
 
-/// The same stack with one fewer in it.
 [[nodiscard]] storage::StoredItemStack withCount(const storage::StoredItemStack& stack, const std::int32_t count) {
     storage::StoredItemStack copy = stack;
     copy.count = count;
     return copy;
 }
 
-/// What the world tells its neighbours with, built from where the block went down.
 [[nodiscard]] world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::RandomSource& random) {
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
     return world::neighbourUpdates::Context{
@@ -61,13 +59,11 @@ using wire::common::Identifier;
         .minY = facts.chunkHeight.minY(),
         .maxY = facts.chunkHeight.maxY(),
         .random = random,
-        // parity: the `water_evaporates` attribute, which `WetSpongeBlock.onPlace` reads. Only the
-        // Nether carries it: water stays put in the End, so `!hasSkylight` is the wrong test.
+        // parity: `water_evaporates`.
         .evaporates = world.declaration().dimension == config::WorldDimension::Nether,
         .hasSkylight = facts.hasSkylight,
         .ultrawarm = world.declaration().dimension == config::WorldDimension::Nether,
-        // parity: `PotentSulfurBlock.updateShape` is `validBlockState`, which reads the water above
-        // and the block below to say what the geyser is doing now.
+        // parity: `PotentSulfurBlock.updateShape` is `validBlockState`.
         .geyser =
             [&world](const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t stateId) {
                 return world::geysers::validState(world.state(), world.gameTime(), x, y, z, stateId);
@@ -76,8 +72,7 @@ using wire::common::Identifier;
         .tntExplodes = world.gameRules().get(world::gameRules::kTntExplodes)};
 }
 
-/// parity: `BlockItem.canPlace`: a block never goes down inside somebody. Spectators are built
-/// straight through, and the one placing counts even where the world has not listed them yet.
+/// parity: `BlockItem.canPlace`.
 [[nodiscard]] std::vector<std::array<double, 6>>
 buildersInTheWay(const BreakContext& context, const PlayerSession& placer, world::LoadedWorld& world) {
     std::vector<std::array<double, 6>> boxes;
@@ -107,11 +102,9 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
                                          .inside = hit.inside};
     PlayerSession* session = &player;
     const std::optional<std::int32_t> clickedState = world.state().blockState(hit.x, hit.y, hit.z);
-    // parity: `BlockItem` on a wall: a torch, a sign, a banner or a head clicked against a side goes
-    // down as its wall form, not as the standing one refusing to stand.
+    // parity: `BlockItem` on a wall.
     const bool againstAWall = hit.direction != play::Direction::Up && hit.direction != play::Direction::Down;
-    // parity: `BlockItem.getBlock`, which is not the item's own name for redstone dust, string or
-    // any seed.
+    // parity: `BlockItem.getBlock`.
     Identifier placedBlock = reg::itemBlocks::of(heldBlock);
     if (againstAWall) {
         placedBlock = world::wallVariants::of(placedBlock).value_or(placedBlock);
@@ -121,8 +114,7 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
         return false;
     }
 
-    // parity: `BlockPlaceContext`: the clicked block is replaced when it is one of the things that
-    // give way (grass, a fern, a snow layer, fire, a fluid), and the block goes next to it otherwise.
+    // parity: `BlockPlaceContext`.
     const bool replaceClicked = clickedState.has_value() && reg::blockShapes::isReplaceable(*clickedState) &&
                                 reg::blockStateDefinitions::blockOf(*clickedState) != nullptr &&
                                 *reg::blockStateDefinitions::blockOf(*clickedState) != heldBlock;
@@ -159,20 +151,17 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
                                                                          .y = placeAt.y,
                                                                          .z = placeAt.z},
                                         random);
-    // The half a two-block one starts as, whatever the state table's first entry happens to be.
     const std::int32_t blockStateId = world::doubleBlocks::firstHalf(placedStateId);
     // parity: `BlockItem.canPlace`: a block never goes down inside somebody.
     if (world::blockPlacement::isObstructed(blockStateId, placeAt.x, placeAt.y, placeAt.z,
                                             buildersInTheWay(context.blocks, *session, world))) {
         return false;
     }
-    // parity: `canSurvive`, which refuses a torch hung on nothing rather than letting it be placed
-    // and drop on the next update.
+    // parity: `canSurvive` refuses a torch hung on nothing instead of placing it and dropping it later.
     if (!world::blockSurvival::isSupported(world.state(), placeAt.x, placeAt.y, placeAt.z, blockStateId)) {
         return false;
     }
-    // parity: `setPlacedBy` on a door, a bed or a tall flower: the client asks for one block and the
-    // game puts down two.
+    // parity: `setPlacedBy` on a door, bed or tall flower: one block asked for, two put down.
     const std::optional<world::SecondHalf> second =
         world::doubleBlocks::secondHalf(blockStateId, placeAt.x, placeAt.y, placeAt.z);
     if (second.has_value()) {
@@ -181,8 +170,7 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
             return false;
         }
     }
-    // Asked once the server has decided the block would go down, and the client is told to put its
-    // own prediction back when a plugin says no.
+    // Asked once the block is decided to go down; a plugin veto makes the client put its prediction back.
     const Identifier* placedName = reg::blockStateDefinitions::blockOf(blockStateId);
     if (context.placeAllowed && !context.placeAllowed(*session, placeAt.x, placeAt.y, placeAt.z,
                                                       placedName == nullptr ? "" : placedName->toString())) {
@@ -199,16 +187,14 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     if (!world.state().setBlockState(placeAt.x, placeAt.y, placeAt.z, blockStateId)) {
         return false;
     }
-    // parity: `getStateForPlacement` joins a fence, a wall or a staircase to what is already there,
-    // and the announcement below has to carry the state it settled on.
+    // parity: `getStateForPlacement`.
     std::int32_t settledStateId = blockStateId;
     {
         random::RandomSource joining = random::RandomSource::legacy(seedOf(context.blocks));
         const world::neighbourUpdates::Context shapes = contextOf(world, joining);
         settledStateId = world::neighbourUpdates::connect(shapes, placeAt.x, placeAt.y, placeAt.z, blockStateId)
                              .value_or(settledStateId);
-        // parity: `BaseRailBlock.onPlace` into `RailState.place`, which bends the new rail and every
-        // rail it decided to meet.
+        // parity: `BaseRailBlock.onPlace` into `RailState.place` bends the new rail and every rail it meets.
         const std::optional<std::int32_t> rail = world::rails::place(
             world.state(), world.name(), placeAt.x, placeAt.y, placeAt.z,
             [&context, &world, &placeAt, &settledStateId](const std::int32_t x, const std::int32_t y,
@@ -228,16 +214,13 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     if (second.has_value()) {
         world.state().setBlockState(second->x, second->y, second->z, second->stateId);
     }
-    // parity: `Level.setBlock` gives a block its block entity as it lands. Every block that owns one
-    // needs it: a bell without one is a bell whose body the client never draws.
+    // parity: `Level.setBlock` gives the block entity as the block lands.
     if (reg::blockEntityTypes::ofBlock(placedBlock) != nullptr) {
         server::world::Chunk* chunk = world.state().chunkIfLoaded(placeAt.x >> 4, placeAt.z >> 4);
         if (chunk != nullptr) {
             const std::optional<world::commandBlocks::Mode> mode = world::commandBlocks::modeOf(placedBlock.path());
             wire::nbt::NbtCompound data = world::blockEntityDefaults::of(placedBlock);
-            // parity: `CommandBlock.setPlacedBy`, which is the placing half and not the command one:
-            // a repeating block put down **by hand** comes out already automatic, and `TrackOutput`
-            // starts as whatever `sendCommandFeedback` says. A `/setblock` runs none of this.
+            // parity: `CommandBlock.setPlacedBy`.
             if (mode.has_value()) {
                 data.putBoolean("auto", *mode == world::commandBlocks::Mode::Repeating);
                 data.putBoolean("TrackOutput", world.gameRules().get(world::gameRules::kSendCommandFeedback));
@@ -257,8 +240,7 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
         }
     }
     const Identifier* placedPath = reg::blockStateDefinitions::blockOf(blockStateId);
-    // parity: `BlockItem.updateCustomBlockEntityTag`: a shulker box placed from an item that carries
-    // contents gets them back, which is the other half of breaking one.
+    // parity: `BlockItem.updateCustomBlockEntityTag`.
     if (placedPath != nullptr && world::shulkers::isShulkerBox(placedPath->path())) {
         const wire::nbt::NbtCompound* carried = held.components.getCompound(world::shulkers::kContainer);
         server::world::Chunk* chunk = world.state().chunkIfLoaded(placeAt.x >> 4, placeAt.z >> 4);
@@ -272,12 +254,10 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
                                                                  world::comparatorReading::of(world.state()));
         }
     }
-    // parity: `DiodeBlock.setPlacedBy`: a repeater or comparator that lands on a live signal books
-    // its turn here and nowhere else.
+    // parity: `DiodeBlock.setPlacedBy`.
     world::redstoneComponents::bookOnPlacement(world.state(), world.name(), placeAt.x, placeAt.y, placeAt.z,
                                                world::comparatorReading::of(world.state()));
-    // parity: `TripWireHookBlock.setPlacedBy` calls `calculateState`, which is what attaches a hook
-    // to a line of string that was already there.
+    // parity: `TripWireHookBlock.setPlacedBy` calls `calculateState`.
     if (placedPath != nullptr && placedPath->path() == "tripwire_hook") {
         std::vector<world::BlockChange> hookChanges;
         world::tripwires::calculateHook(world.state(), placeAt.x, placeAt.y, placeAt.z, world.gameTime(), hookChanges);
@@ -285,7 +265,7 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
             announceBlock(context.blocks, world.name(), change.x, change.y, change.z, change.stateId);
         }
     }
-    // parity: `MossyCarpetBlock.setPlacedBy`, which grows a second carpet over the one placed.
+    // parity: `MossyCarpetBlock.setPlacedBy`.
     if (placedPath != nullptr && placedPath->path() == "pale_moss_carpet") {
         const std::optional<std::int32_t> topper =
             world::mossCarpetTopper::above(world.state(), placeAt.x, placeAt.y, placeAt.z,
@@ -307,16 +287,13 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     if (second.has_value()) {
         announceBlock(context.blocks, world.name(), second->x, second->y, second->z, second->stateId);
     }
-    // Both the block under it (a snow layer put on grass) and the block itself (grass put under
-    // snow) can change how they look.
     refreshSnowAt(context.blocks, world, placeAt.x, placeAt.y - 1, placeAt.z);
     refreshSnowAt(context.blocks, world, placeAt.x, placeAt.y, placeAt.z);
     notifyAround(context.blocks, world, placeAt.x, placeAt.y, placeAt.z, std::nullopt);
     if (context.placed) {
         context.placed(world, placeAt.x, placeAt.y, placeAt.z);
     }
-    // parity: `BlockItem.place` grants off the state that ended up in the world, not off the one the
-    // item asked for: a dried ghast put in water is waterlogged by the time this is read.
+    // parity: `BlockItem.place` grants off the final state.
     if (context.blocks.triggers != nullptr && context.blocks.lootTables != nullptr &&
         context.blocks.triggers->listensTo("placed_block")) {
         context.blocks.triggers->fire(
@@ -326,10 +303,9 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     }
     // parity: `ItemStack.useOn`, a block item that went down counts as used.
     statAwards::used(player, held.id);
-    // parity: `GameEvent.BLOCK_PLACE`, thirteen: a block going down is louder than one coming up.
+    // parity: `GameEvent.BLOCK_PLACE`.
     heardBySculk(context.blocks, world, "block_place", placeAt.x, placeAt.y, placeAt.z, {.entity = player.uuid()});
-    // parity: `SignBlockEntity.applyImplicitComponents`, then `SignBlock.setPlacedBy`, which only
-    // opens the editor on a sign that is not waxed and whose front a player could have typed.
+    // parity: `SignBlock.setPlacedBy` opens the editor only on an unwaxed sign whose front a player could have typed.
     if (const std::optional<Identifier> signType = world::signs::typeOf(blockStateId); signType.has_value()) {
         const wire::nbt::NbtCompound data = world::signs::withComponents(world::signs::emptyData(), held.components);
         if (server::world::Chunk* chunk = world.state().chunkIfLoaded(placeAt.x >> 4, placeAt.z >> 4);

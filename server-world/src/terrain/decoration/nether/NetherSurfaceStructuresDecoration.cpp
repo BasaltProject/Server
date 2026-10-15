@@ -71,7 +71,6 @@ const PathSet& columnCannotPlaceOn() {
     return (x >> 4) == chunk.chunkX() && (z >> 4) == chunk.chunkZ();
 }
 
-/// This step reads and writes the chunk directly: everything it builds is inside its own column.
 [[nodiscard]] std::optional<std::int32_t> stateAt(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
     if (!isInChunk(chunk, x, z) || y < bounds.minY() || y > bounds.maxY()) {

@@ -49,7 +49,6 @@ constexpr std::int32_t kDecayDistance = 7;
 constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
                                           BlockFace::South, BlockFace::West, BlockFace::East};
 
-/// The axis a facing property names, in the same numbering `registry::axisOf` uses.
 [[nodiscard]] std::int32_t axisOfName(std::string_view name) {
     if (name == "up" || name == "down") {
         return 1;
@@ -57,8 +56,7 @@ constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   Blo
     return name == "north" || name == "south" ? 2 : 0;
 }
 
-/// parity: `NeighborUpdater.UPDATE_ORDER`, the order in which the six squares around a change are
-/// told. It is not `Direction.values()`, and it decides who books first when two of them answer.
+/// parity: `NeighborUpdater.UPDATE_ORDER`.
 constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
                                                 BlockFace::Up,   BlockFace::North, BlockFace::South};
 
@@ -66,11 +64,10 @@ constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East
 constexpr std::array<BlockFace, 6> kUpdateShapeOrder{BlockFace::West,  BlockFace::East, BlockFace::North,
                                                      BlockFace::South, BlockFace::Down, BlockFace::Up};
 
-/// The four a connecting block keeps a property for, named as those properties are.
 constexpr std::array<std::pair<BlockFace, std::string_view>, 4> kHorizontal{
     {{BlockFace::North, "north"}, {BlockFace::South, "south"}, {BlockFace::West, "west"}, {BlockFace::East, "east"}}};
 
-/// parity: `Direction.Plane.HORIZONTAL`, which is not the order the four sides are listed in above.
+/// parity: `Direction.Plane.HORIZONTAL`.
 constexpr std::array<BlockFace, 4> kFlat{BlockFace::North, BlockFace::East, BlockFace::South, BlockFace::West};
 
 using Position = std::array<std::int32_t, 3>;
@@ -83,11 +80,7 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return first != nullptr && second != nullptr && *first == *second;
 }
 
-/// parity: `ObserverBlock.onPlace` only reaches out for one that arrives **powered**, and one that
-/// arrives powered clears itself first, so an observer that has just landed tells nobody from here.
-/// Measured in `observadorllegapuesto`: one written `powered=true` ends up `powered=false`, and one
-/// written `powered=false` still pulses, because the command's own shape pass hands it a change on
-/// the side it is watching.
+/// parity: `ObserverBlock.onPlace` only reaches out for one that arrives **powered**.
 [[nodiscard]] bool isObserverState(const std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     return block != nullptr && block->path() == "observer";
@@ -97,7 +90,7 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return world.blockState(x, y, z).value_or(registry::blocks::air().stateId);
 }
 
-/// parity: `LeavesBlock.getOptionalDistanceAt`, where a trunk is zero and anything unknown is seven.
+/// parity: `LeavesBlock.getOptionalDistanceAt`.
 [[nodiscard]] std::int32_t distanceOf(std::int32_t stateId) {
     if (registry::blockConnections::preventsLeafDecay(stateId)) {
         return 0;
@@ -116,7 +109,6 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return distance;
 }
 
-/// Writes `wanted` over the block there, answering the new state only when it really moved.
 [[nodiscard]] std::optional<std::int32_t> rewrite(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId,
                                                   const std::map<std::string, std::string>& wanted) {
@@ -131,23 +123,16 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return reshaped;
 }
 
-/// How far these leaves are from a trunk, recounted from their neighbours.
-///
-/// parity: `LeavesBlock.updateDistance`: a log counts as zero, any other leaves as their own
-/// distance, and anything else as seven. At seven the leaves are decaying, and a random tick is what
-/// actually drops them.
+/// parity: `LeavesBlock.updateDistance`.
 [[nodiscard]] std::optional<std::int32_t> retreeLeaves(WorldState& world, std::int32_t x, std::int32_t y,
                                                        std::int32_t z, std::int32_t stateId,
                                                        std::optional<BlockFace> towards) {
-    // parity: `LeavesBlock.updateShape` does **not** rewrite the leaves: it books a turn and answers
-    // the state it was given. The distance moves one tick later, in `LeavesBlock.tick`.
+    // parity: `LeavesBlock.updateShape` does **not** rewrite the leaves.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
         return std::nullopt;
     }
-    // parity: the jar reads the **one** neighbour that moved, not the six, and books unless that
-    // neighbour is a trunk these leaves already sit against. So a plank laid beside a leaf already
-    // one block from its log still books a turn that changes nothing, and that turn is measurable.
+    // parity: the jar reads the **one** neighbour that moved, not the six, and books unless that.
     if (towards.has_value()) {
         const std::int32_t fromNeighbour =
             distanceOf(stateAt(world, x + registry::stepX(*towards), y + registry::stepY(*towards),
@@ -158,10 +143,7 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
         }
         return std::nullopt;
     }
-    // parity: no direction is the `updateFromNeighbourShapes` case, which applies `updateShape` once
-    // per side, and each application may book on its own. Recounting the distance once is not the
-    // same: a leaf placed at distance 1 from its trunk booked nothing, and the jar books anyway for
-    // the other five sides, which are air. Measured in `hojaturno`.
+    // parity: no direction is the `updateFromNeighbourShapes` case.
     for (const BlockFace face : kUpdateShapeOrder) {
         const std::int32_t fromNeighbour = distanceOf(stateAt(world, x + registry::stepX(face),
                                                               y + registry::stepY(face), z + registry::stepZ(face))) +
@@ -204,7 +186,6 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return rewrite(world, x, y, z, stateId, {{"shape", std::string{*shape}}});
 }
 
-/// Breaks the block there when nothing holds it up any more.
 [[nodiscard]] bool breakIfUnsupported(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                                       const blockSurvival::ScaffoldingHasFallen& scaffolding, const OnBroken& onBroken,
                                       std::optional<BlockFace> towards = std::nullopt) {
@@ -216,31 +197,26 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     if (!stateId.has_value() || *stateId == registry::blocks::air().stateId) {
         return false;
     }
-    // parity: `updateShape` asks which side the news came from before it asks whether the block can
-    // stay, so a hook or a wall torch only falls when its own wall is what moved.
+    // parity: `updateShape` asks.
     if (!blockSurvival::loosenedBy(*stateId, towards)) {
         return false;
     }
     if (blockSurvival::isSupported(world, x, y, z, *stateId, scaffolding, context.hasSkylight)) {
         return false;
     }
-    // parity: `SugarCaneBlock.updateShape` and `CactusBlock.updateShape` book a turn instead of
-    // breaking, so a stalk left without its footing stands for one more tick and the tower over it
-    // comes apart a square at a time.
+    // parity: `SugarCaneBlock.updateShape` and `CactusBlock.updateShape` book a turn instead of.
     const wire::common::Identifier* breaking = registry::blockStateDefinitions::blockOf(*stateId);
     const std::string_view breakingPath = breaking == nullptr ? std::string_view{} : breaking->path();
     if (scheduledBlocks::booksItsOwnBreak(breakingPath)) {
         scheduledBlocks::scheduleBreakIfLoose(world, x, y, z, false);
         return false;
     }
-    // parity: `SpeleothemBlock.updateShape` books a turn too, and its own delay: a stalactite waits
-    // two ticks and then falls as an entity rather than breaking where it hangs.
+    // parity: `SpeleothemBlock.updateShape` books a turn too.
     if (breakingPath == "pointed_dripstone" || breakingPath == "sulfur_spike") {
         scheduledBlocks::scheduleSpeleothem(world, x, y, z, false);
         return false;
     }
-    // parity: `ScaffoldingBlock.updateShape` never breaks anything either: the turn it booked is
-    // what decides, and that turn has already been booked by the shape walk.
+    // parity: `ScaffoldingBlock.updateShape` never breaks anything either.
     if (breakingPath == "scaffolding") {
         return false;
     }
@@ -249,10 +225,7 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return true;
 }
 
-/// parity: `DiodeBlock.neighborChanged` and `RedStoneWireBlock.neighborChanged` open with `canSurvive`
-/// and, when it fails, drop the block and remove it instead of reacting. Their `updateShape` only
-/// looks down, so this is the one road that takes them away when the news comes from a side.
-/// Answers whether a diode went, which tells more squares than the dust does; nothing if none did.
+/// parity: `DiodeBlock.neighborChanged` and `RedStoneWireBlock.neighborChanged` open with `canSurvive`.
 [[nodiscard]] std::optional<bool> dropUnsupportedComponent(const Context& context, const std::int32_t x,
                                                            const std::int32_t y, const std::int32_t z,
                                                            const OnBroken& onBroken) {
@@ -277,8 +250,7 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return diode;
 }
 
-/// parity: `SideChainPartBlock.isBeingUpdatedByNeighbor`'s second half, the part the shelf carried
-/// before the write.
+/// parity: `SideChainPartBlock.isBeingUpdatedByNeighbor`'s second half.
 [[nodiscard]] bool wasConnectedShelf(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr || !shelves::isShelf(block->path())) {
@@ -289,8 +261,7 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return part != properties.end() && part->second != "unconnected";
 }
 
-/// parity: `BlockBehaviour.BlockStateBase.updateNeighbourShapes`, the six squares a write redraws, each told
-/// the side the news arrives from and walked in vanilla's own order.
+/// parity: `BlockBehaviour.BlockStateBase.updateNeighbourShapes`.
 void shapeAround(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, const OnReshaped& reshaped) {
     for (const BlockFace face : kUpdateShapeOrder) {
         const std::int32_t nx = x + registry::stepX(face);
@@ -303,7 +274,6 @@ void shapeAround(const Context& context, std::int32_t x, std::int32_t y, std::in
     }
 }
 
-/// What one step of the cascade carries with it, so `visit` keeps a signature worth reading.
 struct Walk {
     const Context& context;
     const blockSurvival::ScaffoldingHasFallen& scaffolding;
@@ -311,15 +281,10 @@ struct Walk {
     const OnBroken& onBroken;
 };
 
-/// Whether one of the three plant families that book water on a shape update does so this time.
-///
-/// parity: `SeagrassBlock`, `GrowingPlantHeadBlock` and `GrowingPlantBodyBlock`. Only `kelp` and
-/// `kelp_plant` pass `scheduleFluidTicks`, both growing upwards: the twisting, weeping and cave vines
-/// pass false and never book, and `tall_seagrass` is a `DoublePlantBlock` with no such `updateShape`.
+/// parity: `SeagrassBlock`.
 [[nodiscard]] bool plantBooksWater(const Context& context, const std::int32_t x, const std::int32_t y,
                                    const std::int32_t z, const std::string_view path, const BlockFace towards) {
-    // parity: `SeagrassBlock.updateShape` books unless the shape update left it air, and its super
-    // `VegetationBlock.updateShape` returns air exactly when the block cannot survive.
+    // parity: `SeagrassBlock.updateShape` books unless the shape update left it air.
     if (path == "seagrass") {
         return blockSurvival::isSupported(context.world, x, y, z, std::nullopt, {}, context.hasSkylight);
     }
@@ -332,8 +297,7 @@ struct Walk {
         above.has_value() ? registry::blockStateDefinitions::blockOf(*above) : nullptr;
     const bool kelpAbove = grown != nullptr && (grown->path() == "kelp" || grown->path() == "kelp_plant");
     if (head) {
-        // parity: news from below turns a head into a body when the column carries on above, and that
-        // branch returns before the booking.
+        // parity: news from below turns a head into a body when the column carries on above, and that.
         if (towards == BlockFace::Down && kelpAbove &&
             blockSurvival::isSupported(context.world, x, y, z, std::nullopt, {}, context.hasSkylight)) {
             return false;
@@ -341,13 +305,11 @@ struct Walk {
         // The head converts when the square above **is** kelp, so it books when it is not.
         return towards != BlockFace::Up || !kelpAbove;
     }
-    // parity: and the body converts back into a head when the square above stops being kelp, which is
-    // the opposite test. The two look alike and are not.
+    // parity: and the body converts back into a head when the square above stops being kelp, which is.
     return towards != BlockFace::Up || kelpAbove;
 }
 
-/// parity: `LiquidBlock.updateShape` books the fluid's turn when either square is a source, even on
-/// a write without `UPDATE_NEIGHBORS`; it is what keeps a still column booked.
+/// parity: `LiquidBlock.updateShape` books the fluid's turn when either square is a source.
 void bookLiquidTurn(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                     const BlockFace towards) {
     const std::optional<std::int32_t> here = context.world.blockState(x, y, z);
@@ -357,9 +319,6 @@ void bookLiquidTurn(const Context& context, const std::int32_t x, const std::int
     const std::optional<FluidKind> kind = fluidFlow::liquidBlockKindOf(*here);
     if (!kind.has_value()) {
         // parity: two families book water on a shape update with no condition at all.
-        // `BubbleColumnBlock.updateShape` opens with the booking, before it asks anything; and the
-        // forty-eight `SimpleWaterloggedBlock` classes open with `if (WATERLOGGED)`, which is the
-        // same thing for a block that is holding water. What they book is the still `water`.
         const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*here);
         const auto logged = properties.find("waterlogged");
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*here);
@@ -382,7 +341,6 @@ void bookLiquidTurn(const Context& context, const std::int32_t x, const std::int
     context.world.scheduleFluidTick(x, y, z, fluidId(*kind, sourceHere), delay);
 }
 
-/// Reshapes the block there, breaks it if nothing holds it, and follows on from what it held.
 void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std::int32_t y, std::int32_t z,
            BlockFace towards) {
     fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z, fallingBlocks::Asked::updateShape);
@@ -390,9 +348,7 @@ void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std:
     bool changed = false;
     const std::optional<std::int32_t> before = walk.context.world.blockState(x, y, z);
     if (const std::optional<std::int32_t> reshaped = reshape(walk.context, x, y, z, towards); reshaped.has_value()) {
-        // parity: `Block.updateOrDestroy`, which is what runs a shape update's answer: a state is
-        // written, but **air** is a `destroyBlock` and that one drops what was standing there. Half a
-        // door left alone comes apart and leaves its door on the floor.
+        // parity: `Block.updateOrDestroy`, which is what runs a shape update's answer: a state is.
         if (*reshaped == registry::blocks::air().stateId && before.has_value() &&
             *before != registry::blocks::air().stateId) {
             walk.onBroken(*before, x, y, z);
@@ -451,8 +407,7 @@ std::optional<std::int32_t> connect(const Context& context, std::int32_t x, std:
     }
     std::map<std::string, std::string> wanted;
     for (const auto& [face, name] : kHorizontal) {
-        // parity: `FenceBlock` and `IronBarsBlock` redraw only the side the news came from; no
-        // direction means the block's own pre-shape, which asks every side.
+        // parity: `FenceBlock` and `IronBarsBlock` redraw only the side the news came from; no.
         if (towards.has_value() && *towards != face) {
             continue;
         }
@@ -473,24 +428,17 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
     if (!stateId.has_value()) {
         return std::nullopt;
     }
-    // parity: the blocks whose `updateShape` books a turn and changes nothing now. Doing it here
-    // instead made tilled soil give way a tick early and coral go white on the spot, where the jar
-    // leaves it its three seconds of colour.
+    // parity: the blocks whose `updateShape` books a turn and changes nothing now.
     if (towards == BlockFace::Up) {
         scheduledBlocks::scheduleCoveredSoil(world, x, y, z);
     }
     scheduledBlocks::scheduleCoralDeath(world, x, y, z, context.random.nextLong());
     scheduledBlocks::scheduleCreakingHeart(world, x, y, z);
-    // parity: `ScaffoldingBlock.updateShape` answers the state it was given and books a turn for the
-    // next tick. Counting the distance here made a whole run collapse in one tick instead of walking
-    // out from the footing a square at a time. Measured in `andamio`.
+    // parity: `ScaffoldingBlock.updateShape` answers the state it was given and books a turn for the.
     scheduledBlocks::scheduleScaffolding(world, x, y, z);
     // A column is more than one block, so it reports through the caller rather than as one state.
     scheduledBlocks::scheduleBubbleColumn(world, x, y, z, towards);
-    // parity: `NoteBlock.updateShape` rewrites the instrument **only** when the news comes from above
-    // or below (`directionToNeighbour.getAxis() == Y`); from a side it keeps whatever it has. So a
-    // note block written with an instrument that does not match what it stands on keeps it until
-    // something over or under it moves. Measured in `ejedelaviso`.
+    // parity: `NoteBlock.updateShape` rewrites the instrument **only** when the news comes from above.
     if (!towards.has_value() || registry::axisOf(*towards) == 1) {
         if (const std::optional<std::int32_t> tuned = noteBlocks::retune(world, x, y, z, *stateId); tuned.has_value()) {
             return tuned;
@@ -502,10 +450,7 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
             return snowy;
         }
     }
-    // parity: `RepeaterBlock.updateShape`, which rewrites `locked` from what the sides say, and only
-    // when the news comes from a **side**: `directionToNeighbour.getAxis() != FACING.getAxis()`. One
-    // written `locked` with nothing locking it keeps the lie until a side moves. Measured in
-    // `ejedelaviso`.
+    // parity: `RepeaterBlock.updateShape`.
     const std::map<std::string, std::string> diodeProperties = registry::blockStateDefinitions::propertiesOf(*stateId);
     const auto diodeFacing = diodeProperties.find("facing");
     if (!towards.has_value() || diodeFacing == diodeProperties.end() ||
@@ -514,22 +459,18 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
             return held;
         }
     }
-    // parity: `TripWireHookBlock.updateShape`, which drops the hook **only** when the news comes from
-    // the side it hangs on. From anywhere else it stays, which is why one put down in mid air by
-    // command lives until something touches its wall.
+    // parity: `TripWireHookBlock.updateShape`.
     if (towards.has_value() && tripwires::hookFalls(world, x, y, z, *stateId, *towards)) {
         return registry::blocks::air().stateId;
     }
-    // parity: `BellBlock.updateShape`, the one that rewrites the state instead of only deciding
-    // whether the block stays: a bell between two walls that loses one hangs on the other.
+    // parity: `BellBlock.updateShape`.
     if (towards.has_value()) {
         if (const std::optional<std::int32_t> rung = blockInteractions::bellShape(world, x, y, z, *stateId, *towards);
             rung.has_value()) {
             return rung;
         }
     }
-    // parity: `TripWireBlock.updateShape`, which draws a line of string as a line the same way the
-    // dust does: every horizontal side follows `shouldConnectTo`.
+    // parity: `TripWireBlock.updateShape`.
     if (const std::optional<std::int32_t> strung = tripwires::reshape(world, x, y, z, *stateId, towards);
         strung.has_value()) {
         return strung;
@@ -550,7 +491,7 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
 
 namespace {
 
-/// parity: `ObserverBlock.updateNeighborsInFront`, the notice an observer owes the square it feeds.
+/// parity: `ObserverBlock.updateNeighborsInFront`.
 void tellInFront(const Context& context, const std::int32_t stateId, const std::int32_t x, const std::int32_t y,
                  const std::int32_t z, const OnReshaped& onReshaped) {
     WorldState& world = context.world;
@@ -576,10 +517,7 @@ void tellInFront(const Context& context, const std::int32_t stateId, const std::
 void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                          const std::optional<std::int32_t> removed, const OnReshaped& onReshaped) {
     WorldState& world = context.world;
-    // parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`, which are the same four lines:
-    // a block that arrives already carrying a signal and with no turn booked to spend it puts that
-    // signal back to zero. A `/setblock` of a target with `power=15` reads fifteen here and nothing
-    // in the jar, because a signal with no clock behind it is a signal that would never go out.
+    // parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`.
     const std::optional<std::int32_t> arrived = world.blockState(x, y, z);
     if (!arrived.has_value()) {
         return;
@@ -589,14 +527,9 @@ void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y,
         return;
     }
     const std::string_view path = block->path();
-    // parity: four of the five below open with `!state.is(oldState.getBlock())`, so a write that only
-    // moves the state of a block that was already here runs none of them: a `/setblock` of
-    // `target[power=15]` over a `target[power=0]` keeps the fifteen in the jar. The composter is the
-    // one without a guard, so it is asked before this and not after.
+    // parity: four of the five below open with `!state.is(oldState.getBlock())`.
     const bool blockStayed = removed.has_value() && sameBlock(*removed, *arrived);
-    // parity: `ComposterBlock.onPlace`, which books the twenty turns that finish a composter that
-    // arrives one layer short of ready. This one books without asking whether a turn is already
-    // there, and without asking whether the block changed: it has no guard in the jar either.
+    // parity: `ComposterBlock.onPlace`.
     if (path == "composter") {
         const std::map<std::string, std::string> heap = registry::blockStateDefinitions::propertiesOf(*arrived);
         const auto level = heap.find("level");
@@ -608,8 +541,7 @@ void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y,
     if (blockStayed) {
         return;
     }
-    // parity: `LightningRodBlock.onPlace`, the same idea with the other answer: a rod that arrives
-    // powered keeps its signal and books the eight turns that spend it, instead of dropping it.
+    // parity: `LightningRodBlock.onPlace`.
     if (path.ends_with("lightning_rod")) {
         const std::map<std::string, std::string> rod = registry::blockStateDefinitions::propertiesOf(*arrived);
         const auto powered = rod.find("powered");
@@ -618,8 +550,7 @@ void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y,
         }
         return;
     }
-    // parity: `ObserverBlock.onPlace`, which drops the signal like the sensor does and then tells
-    // what it was feeding, because an observer's pulse does reach two squares.
+    // parity: `ObserverBlock.onPlace`.
     if (path == "observer") {
         const std::map<std::string, std::string> watcher = registry::blockStateDefinitions::propertiesOf(*arrived);
         const auto powered = watcher.find("powered");
@@ -630,9 +561,7 @@ void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y,
                 registry::blockStateDefinitions::stateIdOf(*block, {{"powered", "false"}}, *arrived);
             quiet.has_value() && world.setBlockState(x, y, z, *quiet)) {
             (onReshaped ? onReshaped : OnReshaped{noop})(*quiet, x, y, z);
-            // parity: that `onPlace` ends in `updateNeighborsInFront`, and the write it makes first
-            // carries no `UPDATE_NEIGHBORS`, so this notice is the only one the square it feeds ever
-            // gets. Without it a lamp an observer was lighting never books the turn that puts it out.
+            // parity: that `onPlace` ends in `updateNeighborsInFront`, and the write it makes first.
             tellInFront(context, *quiet, x, y, z, onReshaped);
         }
         return;
@@ -678,16 +607,12 @@ void reshapeOnly(const Context& context, const std::int32_t x, const std::int32_
 
 namespace {
 
-/// parity: `LevelEvent.PARTICLES_DESTROY_BLOCK`, the puff `clearPatternBlocks` leaves behind.
+/// parity: `LevelEvent.PARTICLES_DESTROY_BLOCK`.
 constexpr std::int32_t kBlockDestroyedEffect = 2001;
 
-/// parity: `spawnGolemInWorld`'s `snapTo`, which stands the golem a twentieth of a block up.
+/// parity: `spawnGolemInWorld`'s `snapTo`.
 constexpr double kGolemFootroom = 0.05;
 
-/// Whether the block that just arrived finished a golem, in which case it is already gone. parity:
-/// `CarvedPumpkinBlock.onPlace` runs inside `setBlockState`, so everything `Level.setBlock` does
-/// afterwards is behind `newState == blockState` and never happens. What tells the neighbours is
-/// `updatePatternBlocks`, one `updateNeighborsAt` per square, once the golem is standing.
 [[nodiscard]] bool buildGolem(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                               std::vector<BlockChange>& effects, const OnBroken& broken, const OnReshaped& reshaped) {
     WorldState& world = context.world;
@@ -706,8 +631,7 @@ constexpr double kGolemFootroom = 0.05;
     if (!match.has_value()) {
         return false;
     }
-    // parity: `clearPatternBlocks` writes air with flag 2, which reaches the clients and tells
-    // nothing around it, and raises the break particles of whatever it took away.
+    // parity: `clearPatternBlocks` writes air with flag 2.
     std::vector<std::int32_t> cleared;
     cleared.reserve(match->cells.size());
     for (const std::array<std::int32_t, 3>& cell : match->cells) {
@@ -731,10 +655,7 @@ constexpr double kGolemFootroom = 0.05;
         const std::array<std::int32_t, 3>& cell = match->cells[index];
         afterChange(context, cell[0], cell[1], cell[2], cleared[index], effects, broken, reshaped);
     }
-    // parity: `replaceCopperBlockWithChest` is the last thing `trySpawnGolem` does, after the squares
-    // have already told their neighbours, and it writes with flag 2: the clients hear about it and
-    // nobody is asked again. Flag 2 still redraws the squares **around** it, which is what turns the
-    // chest beside it into the other half of a double one.
+    // parity: `replaceCopperBlockWithChest` is the last thing `trySpawnGolem` does.
     if (match->kind == golemPatterns::Golem::Copper) {
         const wire::common::Identifier* body = registry::blockStateDefinitions::blockOf(match->bodyState);
         const std::map<std::string, std::string> pumpkin =
@@ -773,26 +694,18 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (buildGolem(context, x, y, z, effects, broken, reshaped)) {
         return;
     }
-    // Scaffolding counts out from its footing, which is a walk over the whole row rather than
-    // anything one neighbour can answer, so the survival check is handed the walk.
     const blockSurvival::ScaffoldingHasFallen scaffolding = [&world](const WorldState&, std::int32_t sx,
                                                                      std::int32_t sy, std::int32_t sz) {
         return scheduledBlocks::scaffoldingHasFallen(world, sx, sy, sz);
     };
 
-    // parity: `RedStoneWireBlock.onPlace` tells the blocks over and under it, so a dust with nothing
-    // to sit on goes at once, before anything around it is reshaped: that is what leaves the dust
-    // beside it a dot. It only runs when the block changed, so a dust written over a dust settles
-    // nothing, and a dust handed a strength it could not have keeps it.
+    // parity: `RedStoneWireBlock.onPlace` tells the blocks over and under it.
     bool wireArrived = false;
     if (const std::optional<std::int32_t> arrived = world.blockState(x, y, z);
         arrived.has_value() && redstoneWire::isWire(*arrived) &&
         !(removed.has_value() && redstoneWire::isWire(*removed))) {
         wireArrived = true;
-        // parity: `onPlace` settles this dust's own strength before it tells anybody, and that write
-        // redraws the squares around it while this dust is still there. It is the whole difference
-        // between leaving the dust beside it a dot and leaving it a cross: with no signal the
-        // strength does not move, nothing is written, and the neighbour never sees this dust arrive.
+        // parity: `onPlace` settles this dust's own strength before it tells anybody.
         for (const BlockChange& change : redstone::settle(world, context.worldName, x, y, z)) {
             reshaped(change.stateId, change.x, change.y, change.z);
             shapeAround(context, change.x, change.y, change.z, reshaped);
@@ -802,8 +715,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (const std::optional<std::int32_t> arrived = world.blockState(x, y, z); arrived.has_value()) {
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*arrived);
         const std::string_view path = block == nullptr ? std::string_view{} : block->path();
-        // parity: `PotentSulfurBlock.onPlace` raises `BLOCK_ACTIVATE` for a geyser that arrives
-        // already going, which is the noise of it starting.
+        // parity: `PotentSulfurBlock.onPlace` raises `BLOCK_ACTIVATE` for a geyser that arrives.
         if (path == "potent_sulfur") {
             const std::map<std::string, std::string> properties =
                 registry::blockStateDefinitions::propertiesOf(*arrived);
@@ -813,18 +725,14 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 vibrations::emit(world, "block_activate", x + 0.5, y + 0.5, z + 0.5, context.gameTime);
             }
         }
-        // parity: `ShelfBlock.affectNeighborsAfterRemoval`: the square that held a shelf and holds
-        // one no longer lets its neighbours go. Measured in `estantequita`.
+        // parity: `ShelfBlock.affectNeighborsAfterRemoval`.
         if (removed.has_value()) {
             std::vector<BlockChange> parted;
             shelves::leftBehind(world, x, y, z, *removed, parted);
             for (const BlockChange& change : parted) {
                 reshaped(change.stateId, change.x, change.y, change.z);
             }
-            // parity: `PistonHeadBlock.affectNeighborsAfterRemoval`, which is `destroyBlock` on the
-            // body behind it, drops and all: taking the head off takes the piston with it. It never
-            // fires when the piston pulls its own head back, because that write carries neither
-            // `UPDATE_NEIGHBORS` nor the piston flag. Measured in `pistoncabezarota`.
+            // parity: `PistonHeadBlock.affectNeighborsAfterRemoval`, which is `destroyBlock` on the.
             if (const std::optional<std::array<std::int32_t, 3>> body = pistons::fittingBase(world, x, y, z, *removed);
                 body.has_value()) {
                 const std::optional<std::int32_t> was = world.blockState((*body)[0], (*body)[1], (*body)[2]);
@@ -834,9 +742,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 }
             }
         }
-        // parity: `ShelfBlock.onPlace`, which joins the chain for a shelf that arrives already
-        // powered. Measured in `colocadoonplace`, where three of them link up in the jar as the
-        // third one lands and stayed apart here.
+        // parity: `ShelfBlock.onPlace`, which joins the chain for a shelf that arrives already.
         if (shelves::isShelf(path)) {
             std::vector<BlockChange> joined;
             shelves::arrived(world, x, y, z, removed.has_value() && wasConnectedShelf(*removed), joined);
@@ -845,23 +751,15 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             }
         }
     }
-    // parity: `LiquidBlock.onPlace` books inside the write, before the neighbours hear anything, so a
-    // sponge that drinks the water away in its own `neighborChanged` still leaves the turn booked.
-    // Ours used to book at the end of the cascade, by which time the square was already air: four
-    // turns of `esponja` were exactly that.
+    // parity: `LiquidBlock.onPlace` books inside the write.
     if (context.arrivedFluid) {
         context.arrivedFluid(x, y, z);
     }
     settleArrivedSignal(context, x, y, z, removed, reshaped);
-    // parity: `ScaffoldingBlock.onPlace` really is an `onPlace`, `level.scheduleTick(pos, this, 1)`,
-    // so it runs on **every** write of the piece and not only on a placement. That is why it stays
-    // out here while the cane and the coral below went in with the shape walk.
+    // parity: `ScaffoldingBlock.onPlace` really is an `onPlace`.
     scheduledBlocks::scheduleScaffolding(world, x, y, z);
 
-    // parity: `Level.setBlock` runs `updateIndirectNeighbourShapes` on the state that **left** as
-    // well, and before the arriving one's, so a line of dust broken on a staircase still tells the
-    // dust it used to reach across the step. Nothing else reaches it: the step itself does not
-    // change shape, so the walk over the six sides stops there.
+    // parity: `Level.setBlock` runs `updateIndirectNeighbourShapes` on the state that **left** as.
     if (removed.has_value()) {
         for (const redstoneWire::Step& at : redstoneWire::acrossSteps(world, x, y, z, *removed)) {
             if (const std::optional<std::int32_t> drawn = redstoneWire::reshape(
@@ -871,35 +769,21 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             }
         }
     }
-    // The block that just arrived reaches out to what was already there, the other half of
     // `updateShape`. parity: `CreakingHeartBlock` has no `onPlace`, only `updateShape`, so its turn
-    // belongs here: booked outside, a heart re-booked itself every time its own turn changed its
-    // state and the chain took three ticks to die down.
     if (arrivedShape != ArrivedShape::NotPlaced) {
-        // parity: `BlockInput.place` settles the pre-shape **before** the write, so a caller that has
-        // already done it says so and this one is skipped. Redoing it here overwrote what the command
-        // had named, and the undo that put it back was a one-shot the wire settle could spend.
+        // parity: `BlockInput.place` settles the pre-shape **before** the write.
         if (arrivedShape == ArrivedShape::Reshape) {
             if (const std::optional<std::int32_t> moved = reshape(context, x, y, z); moved.has_value()) {
                 reshaped(*moved, x, y, z);
             }
         }
-        // parity: the fifteen blocks of `booksItsOwnBreak` and `CoralBlock` have no `onPlace`: their
-        // turn comes out of `updateShape`, so a placement books it and a plain write does not. Only
-        // the solid `CoralBlock` is like that; the plant, fan and wall fan do have an `onPlace` with
-        // the same `tryScheduleDieTick`, so the self-reshape above gets them by another road.
+        // parity: the fifteen blocks of `booksItsOwnBreak` and `CoralBlock` have no `onPlace`.
         scheduledBlocks::scheduleBreakIfLoose(
             world, x, y, z, blockSurvival::isSupported(world, x, y, z, std::nullopt, scaffolding, context.hasSkylight));
-        // parity: `ObserverBlock.updateShape` on the observer itself, which books its first turn. It
-        // belongs **inside** the self-reshape: the only thing that runs a block's own `updateShape`
-        // is `BlockInput.place`'s pre-shape, and a component writing its own state with flag two does
-        // not. Outside, an observer's own pulse re-booked it and `relojobservadores` ran away.
+        // parity: `ObserverBlock.updateShape` on the observer itself.
         redstoneComponents::watchOnPlace(world, x, y, z);
     }
-    // parity: `RedStoneWireBlock.updateIndirectNeighbourShapes`, the one place a dust reaches past
-    // its own six sides: the dust one below and one above the square it connects to are told to look
-    // again. It runs on the state the block ends up with, not the one it arrived as, so it goes
-    // after the reshape above; without it a line up a staircase is drawn as if the steps were flat.
+    // parity: `RedStoneWireBlock.updateIndirectNeighbourShapes`.
     for (const redstoneWire::Step& at : redstoneWire::acrossSteps(world, x, y, z)) {
         if (const std::optional<std::int32_t> drawn = redstoneWire::reshape(
                 world, at.x, at.y, at.z, world.blockState(at.x, at.y, at.z).value_or(0), at.towards);
@@ -907,29 +791,18 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             reshaped(drawn.value(), at.x, at.y, at.z);
         }
     }
-    // parity: `FallingBlock.onPlace` and its `updateShape`, which both do nothing but ask to be
-    // looked at again in two ticks. The block that just arrived counts: sand put down in mid air
-    // used to sit there for good, because only its neighbours were ever asked.
+    // parity: `FallingBlock.onPlace` and its `updateShape`.
     fallingBlocks::scheduleIfFalling(world, x, y, z, fallingBlocks::Asked::onPlace);
     fallingBlocks::scheduleIfFalling(world, x, y + 1, z, fallingBlocks::Asked::updateShape);
-    // parity: `SnifferEggBlock.onPlace`, which asks for the first of its three turns as soon as the
-    // egg is down. Re-scheduling keeps a delay already counting, so a neighbour moving nearby does
-    // not put the egg back to the start.
+    // parity: `SnifferEggBlock.onPlace`.
     scheduledBlocks::scheduleHatch(world, x, y, z, context.random.nextLong());
-    // parity: `FrostedIceBlock.onPlace`, which books the melt clock of every piece that lands.
+    // parity: `FrostedIceBlock.onPlace`.
     scheduledBlocks::scheduleFrostedIce(world, x, y, z, context.random);
-    // parity: `FireBlock.onPlace`, which books a turn for every fire that lands and does it without
-    // asking whether the block changed. Soul fire is a `BaseFireBlock` and books none, which is why
-    // it never burns out. Without this a fire put down by command sat there for ever.
+    // parity: `FireBlock.onPlace`.
     if (const std::optional<std::int32_t> lit = world.blockState(x, y, z); lit.has_value() && fires::isFire(*lit)) {
         fires::schedule(world, x, y, z, context.random);
     }
-    // parity: the neighbour update every redstone component listens to: the dust settles at once and
-    // the components book their own turn, which is what their delay is.
-    // parity: `Level.setBlock` updates the shapes around what changed before anything reads the
-    // power off them, and a dust with its connection still unset points nowhere: a lamp at the end
-    // of a line asked the dust next to it, saw `east=none` with power already at fifteen, and stayed
-    // dark. The shapes go first, then the signal.
+    // parity: the neighbour update every redstone component listens to: the dust settles at once and.
     const Walk walk{.context = context, .scaffolding = scaffolding, .onReshaped = reshaped, .onBroken = broken};
     std::deque<Position> pending;
     pending.push_back({x, y, z});
@@ -938,17 +811,13 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         const Position at = pending.front();
         pending.pop_front();
         ++examined;
-        // parity: `BlockBehaviour.updateNeighbourShapes` walks `UPDATE_SHAPE_ORDER`, which is
-        // neither `Direction.values()` nor `NeighborUpdater.UPDATE_ORDER`, and hands each neighbour
-        // the side the news arrives from. A dust redraws differently depending on both.
+        // parity: `BlockBehaviour.updateNeighbourShapes` walks `UPDATE_SHAPE_ORDER`, which is.
         for (const BlockFace face : kUpdateShapeOrder) {
             visit(walk, pending, at[0] + registry::stepX(face), at[1] + registry::stepY(face),
                   at[2] + registry::stepZ(face), registry::opposite(face));
         }
     }
-    // parity: this is the tail of an ordinary write, `updateNeighboursOnBlockSet`, which tells the six
-    // squares around the one that changed and never the square itself. The dust that the write put
-    // there keeps whatever strength it was given until something tells it.
+    // parity: this is the tail of an ordinary write, `updateNeighboursOnBlockSet`.
     const std::vector<BlockChange> settled =
         redstone::settle(world, context.worldName, x, y, z, {}, redstone::Asked::NeighboursOnly);
     for (const BlockChange& change : settled) {
@@ -956,52 +825,32 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     }
     const redstoneComponents::ContainerSignalAt reading = comparatorReading::of(world);
     redstoneComponents::scheduleAround(world, context.worldName, x, y, z, true, reading);
-    // parity: `Level.setBlock` follows the neighbour updates with `updateNeighbourForOutputSignal`
-    // whenever the state that **arrived** is one a comparator reads. That is the only thing that
-    // reaches a comparator sitting one square past a block that conducts, which is how a chest
-    // behind a wall is read. It is gated on the new state, so taking the chest away tells nobody:
-    // air has no analog output, and the jar leaves that comparator where it is.
+    // parity: `Level.setBlock` follows the neighbour updates with `updateNeighbourForOutputSignal`.
     if (comparatorReading::exists(world, x, y, z)) {
         redstoneComponents::scheduleComparatorsAround(world, context.worldName, x, y, z, reading);
     }
-    // parity: `Containers.updateNeighboursAfterDestroy`, which thirteen containers answer their
-    // removal with. It makes the very same call with the block that **left**, so the comparator
-    // reading a chest through a wall does hear the chest go. Same two gates as every removal hook:
-    // the block changed, and the write carried `UPDATE_NEIGHBORS`. Measured in `cofreavisapared`.
+    // parity: `Containers.updateNeighboursAfterDestroy`.
     if (removed.has_value() && redstoneComponents::tellsComparatorsOnRemoval(*removed)) {
         const std::optional<std::int32_t> nowHere = world.blockState(x, y, z);
         if (!nowHere.has_value() || !sameBlock(*removed, *nowHere)) {
             redstoneComponents::scheduleComparatorsAround(world, context.worldName, x, y, z, reading);
         }
     }
-    // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` ends with `updateNeighborsAt` on
-    // **every** piece of dust whose strength moved and on each of that dust's six squares. Without
-    // the first half a lamp at the end of a line never heard that the dust had lit up; without the
-    // second, a repeater one square past the dust never heard either, and a chain of them stopped
-    // at the first.
+    // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` ends with `updateNeighborsAt` on.
     for (const BlockChange& change : settled) {
         redstoneComponents::scheduleAroundWire(world, context.worldName, change.x, change.y, change.z, reading);
     }
-    // parity: `ObserverBlock.updateShape`, which fires for the block it is watching. Every write
-    // updates the shapes around it, so a piece of dust that lit up wakes an observer looking at it
-    // just as much as a block somebody placed.
+    // parity: `ObserverBlock.updateShape`.
     redstoneComponents::watchFor(world, x, y, z);
     for (const BlockChange& change : settled) {
         redstoneComponents::watchFor(world, change.x, change.y, change.z);
     }
     // parity: every `neighborChanged` that reads the power: doors, lamps, bulbs and the rest.
-    //
-    // parity: a reactor writes with `UPDATE_ALL`, so whatever it changed goes on to tell its own
-    // neighbours. That is what carries a signal down a line of powered rails past the first one:
-    // `PoweredRailBlock.updateState` only ever looks at the rail it is asked about.
     if (afterShapes) {
         afterShapes();
     }
 
-    // Each square waiting to react remembers **who told it**, which one block reads: a door does not
-    // answer another door of its own kind.
-    // parity: `CollectingNeighborUpdater` answers from a stack, not a queue: a notice issued inside a
-    // `neighborChanged` runs before the faces still waiting. A frame keeps its next face (`MultiNeighborUpdate.idx`).
+    // parity: `CollectingNeighborUpdater` answers from a stack.
     struct Reacting {
         Position at;
         std::optional<std::int32_t> told;
@@ -1010,10 +859,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     };
 
     std::vector<Reacting> reacting;
-    // parity: a block that changed is asked again, and so are the squares its own update reaches past
-    // its six sides: a rail the one below, a sensor the one below, a rod or a hook the wall behind.
-    // None feeds a signal that way; what it reaches is a neighbour left out of step. Every place
-    // that collects what a reactor changed goes through here.
+    // parity: a block that changed is asked again, and so are the squares its own update reaches past.
     const auto reactsAt = [&reacting](const BlockChange& change) {
         reacting.push_back({{change.x, change.y, change.z}, change.stateId, 0, false});
         for (const registry::BlockFace also : redstone::alsoTells(change.stateId)) {
@@ -1024,51 +870,32 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                  false});
         }
     };
-    // parity: the square that changed tells with the block that **left** on the world's road and with
-    // the one that arrived on a command's, the same as every other notice.
+    // parity: the square that changed tells with the block that **left** on the world's road and with.
     reacting.push_back({{x, y, z}, context.railArrivalTells ? removed : world.blockState(x, y, z), 0, false});
-    // parity: `DiodeBlock.updateNeighborsInFront` from `onPlace` and from
-    // `affectNeighborsAfterRemoval`, plus `RedstoneTorchBlock.notifyNeighbors`, which tell the square
-    // they feed **and its own neighbours**. The state that has just gone is what says where a
-    // component that somebody took out was feeding, so both states are asked.
+    // parity: `DiodeBlock.updateNeighborsInFront` from `onPlace` and from.
     const std::optional<std::int32_t> standing = world.blockState(x, y, z);
-    // Each reach remembers the state that made it: the jar hands that block along to every square it
-    // tells, and a rail reads it to decide whether to re-bend.
     std::vector<std::pair<redstoneComponents::Reach, std::int32_t>> reach;
     if (standing.has_value() && !isObserverState(*standing)) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*standing, x, y, z)) {
             reach.emplace_back(at, *standing);
         }
     }
-    // parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` on the state that left
-    // when the block changed **or when the one that arrived is a rail**, which is the one exception
-    // in the whole method. A rail that only redraws its shape, or a powered rail whose `powered`
-    // moves, still tells its own square and the one below, and a slope still tells the one above.
+    // parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` on the state that left.
     const bool changedBlock = !standing.has_value() || !removed.has_value() || !sameBlock(*removed, *standing);
     const bool railArrived = standing.has_value() && rails::isRail(*standing);
-    // parity: `affectNeighborsAfterRemoval` for a dust, under the same two gates as every other one:
-    // the block has to have changed. That gate is the same on both roads.
+    // parity: `affectNeighborsAfterRemoval` for a dust.
     const bool wireLeft = changedBlock && removed.has_value() && redstoneWire::isWire(*removed);
-    // parity: and this is the one line the two roads do not share: `LevelChunk.setBlockState` lets a
-    // rail that **arrives** run them anyway, and `updateNeighboursOnBlockSet`, the tail a command
-    // uses, does not.
+    // parity: and this is the one line the two roads do not share: `LevelChunk.setBlockState` lets a.
     if (removed.has_value() && (changedBlock || (railArrived && context.railArrivalTells))) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*removed, x, y, z)) {
             reach.emplace_back(at, *removed);
         }
-        // parity: the two `affectNeighborsAfterRemoval` that reach past their own square, a rail's
-        // and a lectern's.
+        // parity: the two `affectNeighborsAfterRemoval` that reach past their own square.
         for (const redstoneComponents::Reach& at : redstoneComponents::removalReach(*removed, x, y, z)) {
             reach.emplace_back(at, *removed);
         }
     }
-    // parity: the rest of `RedStoneWireBlock.onPlace`, which is not only its own strength. It runs
-    // `updateNeighborsAt` on the square over it and the one under it, and that reaches the six
-    // around **those**, then `updateNeighborsOfNeighboringWires` does the same for every dust in the
-    // four horizontals. Measured in `polvollegaabajo`: a lamp beside the block a fresh dust feeds
-    // from above never heard about it.
-    // parity: `checkCornerChangeAt`, which does nothing unless that square really holds a dust, and
-    // then tells it and its own six.
+    // parity: the rest of `RedStoneWireBlock.onPlace`.
     const auto corner = [&reach, &world](const std::int32_t cx, const std::int32_t cy, const std::int32_t cz,
                                          const std::int32_t wireState) {
         const std::optional<std::int32_t> here = world.blockState(cx, cy, cz);
@@ -1091,25 +918,21 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                                                          .z = z + registry::stepZ(face)},
                                wireState);
         }
-        // parity: `updateNeighborsOfNeighboringWires` walks the four horizontals **twice**, in
-        // `Direction.Plane.HORIZONTAL` order, and the two passes do not interleave: first the dust
-        // beside it, then the dust the signal climbs to or drops to on that side.
+        // parity: `updateNeighborsOfNeighboringWires` walks the four horizontals **twice**, in.
         for (const BlockFace side : kFlat) {
             corner(x + registry::stepX(side), y, z + registry::stepZ(side), wireState);
         }
         for (const BlockFace side : kFlat) {
             const std::int32_t sx = x + registry::stepX(side);
             const std::int32_t sz = z + registry::stepZ(side);
-            // parity: a side that conducts sends the news **up**, one that does not sends it down,
-            // which is the dust that runs over the block or down the step beside it.
+            // parity: a side that conducts sends the news **up**, one that does not sends it down.
             const std::optional<std::int32_t> beside = world.blockState(sx, y, sz);
             const bool conducts = beside.has_value() && registry::blockSupport::conductsRedstone(*beside);
             corner(sx, conducts ? y + 1 : y - 1, sz, wireState);
         }
     };
     if (wireArrived) {
-        // parity: `Direction.Plane.VERTICAL` is up and then down, which is the order `onPlace` tells
-        // the two squares in.
+        // parity: `Direction.Plane.VERTICAL` is up and then down.
         static constexpr std::array<BlockFace, 2> kVertical{BlockFace::Up, BlockFace::Down};
         wireSpread(kVertical, standing.value_or(0));
     }
@@ -1124,18 +947,14 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             ahead = redstoneReactors::updateInFront(world, context.worldName, at.x, at.y, at.z, *at.skip,
                                                     context.gameTime, context.random, context.tntExplodes);
         } else {
-            // parity: `RedstoneTorchBlock.notifyNeighbors` is a plain `updateNeighborsAt` on each of
-            // the six, so nothing is left out and the square itself is not asked.
+            // parity: `RedstoneTorchBlock.notifyNeighbors` is a plain `updateNeighborsAt` on each of.
             redstoneComponents::scheduleAround(world, context.worldName, at.x, at.y, at.z, false, reading);
             ahead = redstoneReactors::update(world, context.worldName, at.x, at.y, at.z, context.gameTime,
                                              context.random, context.tntExplodes, false);
         }
         for (const BlockChange& change : ahead) {
             reshaped(change.stateId, change.x, change.y, change.z);
-            // parity: a reactor answers a neighbour with `level.setBlock(pos, state, 2)`, and flag two
-            // still runs the shape walk over the six squares around it: bit one is the neighbour
-            // notice and nothing else. Without it a bubble column under a trapdoor never heard the
-            // trapdoor open, so it never booked its water. Measured in `columnalado`.
+            // parity: a reactor answers a neighbour with `level.setBlock(pos, state, 2)`.
             reshapeOnly(context, change.x, change.y, change.z, broken, reshaped);
             if (!change.effects.empty()) {
                 effects.push_back(change);
@@ -1144,9 +963,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             reactsAt(change);
         }
     }
-    // parity: `onPlace`, the only half of a write the square that changed can answer for itself.
-    // Everything else reacts from `neighborChanged`, and `Level.updateNeighborsAt` never tells the
-    // square it is called for: a lamp put down beside a lit torch stays dark until something pokes it.
+    // parity: `onPlace`.
     for (const BlockChange& change : redstoneReactors::placed(world, context.worldName, x, y, z, context.gameTime,
                                                               context.random, context.tntExplodes, removed)) {
         reshaped(change.stateId, change.x, change.y, change.z);
@@ -1156,25 +973,19 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         redstoneComponents::watchFor(world, change.x, change.y, change.z);
         reactsAt(change);
     }
-    // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` runs `updateNeighborsAt` on the dust
-    // that moved **and on each of its six squares**, so a lamp stuck to a block the dust powers from
-    // above is reached even though nothing touches it. The seven go into a `HashSet` first, so the
-    // order is the map's and `wireReach` is what works it out.
+    // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` runs `updateNeighborsAt` on the dust.
     for (const BlockChange& change : settled) {
         for (const std::array<std::int32_t, 3>& at : redstoneComponents::wireReach(change.x, change.y, change.z)) {
             reacting.push_back({{at[0], at[1], at[2]}, std::nullopt, 0, false});
         }
     }
-    // The initial notices above were collected in issue order, which is the order the jar's stack
-    // answers them in; it answers from the top, so they go on reversed.
     std::ranges::reverse(reacting);
     std::int32_t reacted = 0;
     while (!reacting.empty()) {
         Reacting& current = reacting.back();
         if (!current.started) {
             if (reacted >= context.maxChainedUpdates) {
-                // parity: `CollectingNeighborUpdater.addAndRun` stops answering past
-                // `max-chained-neighbor-updates` and the rest of the queue is left unheard.
+                // parity: `CollectingNeighborUpdater.addAndRun` stops answering past.
                 break;
             }
             current.started = true;
@@ -1183,9 +994,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         if (current.face < 6) {
             const BlockFace face = kUpdateOrder[current.face];
             ++current.face;
-            // parity: the six squares this notice reaches each run their `neighborChanged`, and a
-            // diode or a dust left without footing comes down there, from whichever side the news
-            // arrived.
+            // parity: the six squares this notice reaches each run their `neighborChanged`, and a.
             const std::int32_t nx = current.at[0] + registry::stepX(face);
             const std::int32_t ny = current.at[1] + registry::stepY(face);
             const std::int32_t nz = current.at[2] + registry::stepZ(face);
@@ -1193,9 +1002,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             if (!diode.has_value()) {
                 continue;
             }
-            // parity: `Level.removeBlock` writes with flag three, the shape walk and the notice around
-            // the square both; `DiodeBlock` then tells the neighbours of each of its six squares too.
-            // Both tells come from inside this face's `neighborChanged`: top of the stack, square first.
+            // parity: `Level.removeBlock` writes with flag three.
             reshapeOnly(context, nx, ny, nz, broken, reshaped);
             if (*diode) {
                 for (std::int32_t index = 5; index >= 0; --index) {
@@ -1217,17 +1024,13 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
              redstoneReactors::update(world, context.worldName, at[0], at[1], at[2], context.gameTime, context.random,
                                       context.tntExplodes, false, told)) {
             reshaped(change.stateId, change.x, change.y, change.z);
-            // parity: the same flag-two shape walk as in the reach loop above. This is the loop an
-            // ordinary neighbour notice runs, so it is the one a trapdoor opening beside a new block of
-            // redstone goes through; with the walk only in the other loop, the bubble column under that
-            // trapdoor still never booked its water. Measured in `columnalado`.
+            // parity: the same flag-two shape walk as in the reach loop above. This is the loop an.
             reshapeOnly(context, change.x, change.y, change.z, broken, reshaped);
             if (!change.effects.empty()) {
                 effects.push_back(change);
             }
             redstoneComponents::watchFor(world, change.x, change.y, change.z);
-            // parity: what the answer reaches past its own square is told inside this `neighborChanged`,
-            // so it goes on top of the stack.
+            // parity: what the answer reaches past its own square is told inside this `neighborChanged`.
             std::vector<Reacting> reached;
             for (const registry::BlockFace also : redstone::alsoTells(change.stateId)) {
                 reached.push_back({{change.x + registry::stepX(also), change.y + registry::stepY(also),
@@ -1242,7 +1045,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             reacting.push_back({{change.x, change.y, change.z}, change.stateId, 0, false});
         }
     }
-    // parity: `DispenserBlock.neighborChanged`, which remembers it was triggered and books a turn.
+    // parity: `DispenserBlock.neighborChanged`.
     const auto arm = [&context, &world](std::int32_t atX, std::int32_t atY, std::int32_t atZ) {
         return context.dispenser ? context.dispenser(world, atX, atY, atZ)
                                  : dispensers::onNeighbourChange(world, context.worldName, atX, atY, atZ);
@@ -1252,26 +1055,16 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                                   .minY = context.minY,
                                   .maxY = context.maxY,
                                   .random = context.random};
-    // parity: `Level.updateNeighborsAt`, the six squares around one that changed, each hearing the
-    // whole of its own `neighborChanged`: the rail re-bends (`RailBlock.updateState`), the dispenser
-    // remembers it was triggered, the crafter does the same with its own four ticks, and the piston
-    // books its move (`PistonBaseBlock.checkIfExtend`).
+    // parity: `Level.updateNeighborsAt`.
     const bool wasIce = removed.has_value() && registry::blockStateDefinitions::blockOf(*removed) != nullptr &&
                         registry::blockStateDefinitions::blockOf(*removed)->path() == "frosted_ice";
-    // `skip` is the one side a diode's reach leaves out (`updateNeighborsAtExceptFromFacing`), which
-    // is the square the diode itself sits on. Everything else tells all six.
     const auto tellAround =
         [&](std::int32_t cx, std::int32_t cy, std::int32_t cz, std::optional<BlockFace> skip = std::nullopt,
             std::optional<std::int32_t> from = std::nullopt, std::optional<std::int32_t> told = std::nullopt) {
-            // parity: `updateNeighborsAt(pos, block)` carries the block that **told**, not the one that
-            // is there. A rail only re-bends when that block is a signal source, so a diode's reach has
-            // to hand the diode along and not the square it is pointing at, and the square that changed
-            // has to hand along whichever of the two blocks its road carries.
+            // parity: `updateNeighborsAt(pos, block)` carries the block that **told**.
             const std::optional<std::int32_t> source =
                 from.has_value() ? from : (told.has_value() ? told : world.blockState(cx, cy, cz));
-            // parity: `updateNeighborsInFront` is two calls, and the first one is
-            // `neighborChanged(front)`: the square at the end of the reach hears it too, not only its
-            // neighbours. Measured in `railpordiodo`, where the junction is that square.
+            // parity: `updateNeighborsInFront` is two calls, and the first one is.
             if (from.has_value()) {
                 pistons::trigger(piston, cx, cy, cz);
                 if (const std::optional<BlockChange> armed = arm(cx, cy, cz); armed.has_value()) {
@@ -1311,14 +1104,9 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                     reshaped(armed->stateId, armed->x, armed->y, armed->z);
                 }
                 pistons::trigger(piston, nx, ny, nz);
-                // parity: `SpongeBlock.neighborChanged` drinks when the **neighbour** changes too, not
-                // only when the sponge itself arrives. A sponge put down before the water stayed dry.
+                // parity: `SpongeBlock.neighborChanged` drinks when the **neighbour** changes too, not.
                 sponges::absorb(world, nx, ny, nz, reshaped);
                 // parity: `FrostedIceBlock.neighborChanged`, which only listens to other frosted ice.
-                // Which block the news carries is not the same on both roads: `Level.setBlock` hands the
-                // **old** one (`updateNeighborsAt(pos, oldState.getBlock())`) and a command hands the new
-                // one (`ServerLevel.updateNeighboursOnBlockSet`). Frosted ice is the only block that asks,
-                // and it melts either way, so both are enough here.
                 const bool icy =
                     wasIce || (source.has_value() && registry::blockStateDefinitions::blockOf(*source) != nullptr &&
                                registry::blockStateDefinitions::blockOf(*source)->path() == "frosted_ice");
@@ -1335,16 +1123,9 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 }
             }
         };
-    // parity: the two roads hand along different blocks. `Level.setBlock` tells with
-    // `updateNeighborsAt(pos, oldState.getBlock())`, the state that **left**; the tail a command uses
-    // tells with the one that arrived. Only two blocks ask who told them, and they disagree about
-    // this: frosted ice melts either way, and a rail junction re-bends only for a signal source.
-    // Measured in `railfuentequitada`.
+    // parity: the two roads hand along different blocks. `Level.setBlock` tells with.
     tellAround(x, y, z, std::nullopt, std::nullopt, context.railArrivalTells ? removed : std::nullopt);
-    // parity: the reach above is an `updateNeighborsAt` like any other, so the two nobody else asks
-    // hear it too. A diode's is `updateNeighborsAtExceptFromFacing`, which is why its own square is
-    // skipped. Measured in `pistondiodoroto`: taking away a repeater left the piston under the block
-    // it fed extended for ever, while the lamp beside that block did go out.
+    // parity: the reach above is an `updateNeighborsAt` like any other.
     for (const auto& [at, from] : reach) {
         tellAround(at.x, at.y, at.z, at.skip, from);
     }
@@ -1356,34 +1137,20 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         reshaped(armed->stateId, armed->x, armed->y, armed->z);
     }
     pistons::trigger(piston, x, y, z);
-    // parity: and the same for every square a dust that moved reaches, which is the dust and its six
-    // squares (`DefaultRedstoneWireEvaluator.updatePowerStrength`). Without this a piston stuck to a
-    // line of dust never heard it light up: only the components did.
+    // parity: and the same for every square a dust that moved reaches, which is the dust and its six.
     for (const BlockChange& change : settled) {
         for (const std::array<std::int32_t, 3>& at : redstoneComponents::wireReach(change.x, change.y, change.z)) {
             tellAround(at[0], at[1], at[2]);
         }
     }
     const std::optional<std::int32_t> laid = world.blockState(x, y, z);
-    // parity: `LevelChunk.setBlockState` only runs `affectNeighborsAfterRemoval` when the block
-    // changes, not when its state does. Without this gate, rewriting a string with another state was
-    // taken for a string torn out and lit both hooks of the line: measured in `cuerdadesigual`.
+    // parity: `LevelChunk.setBlockState` only runs `affectNeighborsAfterRemoval` when the block.
     const bool tripwireBlockChanged = !laid.has_value() || !removed.has_value() || !sameBlock(*removed, *laid);
-    // parity: `TripWireBlock.onPlace`, which tells the hooks at the ends of its line. Without it a
-    // tripwire built by hand or by command hung there unattached until something stepped on it. It
-    // opens with `!oldState.is(state.getBlock())` like eleven other `onPlace` do, so a string
-    // rewritten with another state tells the hooks nothing.
+    // parity: `TripWireBlock.onPlace`.
     if (tripwireBlockChanged && laid.has_value() && tripwires::isWire(*laid)) {
         tripwires::updateSource(world, x, y, z, *laid, context.gameTime, effects);
     }
-    // parity: `TripWireBlock.affectNeighborsAfterRemoval`, which hands the line the string that has
-    // just gone **as if it were still there and powered**, so the hooks fire and each books itself a
-    // look ten ticks later to find the gap. Every other block's version of this hook is a plain "tell
-    // the neighbours", which the cascade above already does; this is the only one that substitutes a
-    // state, and without it a cut wire left both hooks hanging loose at once.
-    // parity: `TripWireHookBlock.onRemoved` only does anything if the hook left attached or powered:
-    // it walks the line with `isBeingDestroyed` and leaves the hook at the other end loose. Without
-    // this the other one stayed stuck for good, because removing a hook is not removing a string.
+    // parity: `TripWireBlock.affectNeighborsAfterRemoval`.
     if (tripwireBlockChanged && removed.has_value() && tripwires::isHook(*removed)) {
         const std::map<std::string, std::string> gone = registry::blockStateDefinitions::propertiesOf(*removed);
         const auto attachedAt = gone.find("attached");
@@ -1401,9 +1168,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             tripwires::updateSource(world, x, y, z, *live, context.gameTime, effects);
         }
     }
-    // parity: `LiquidBlock`'s three hooks, which all end in the same `scheduleTick`: water only
-    // notices there is somewhere to go when something around it changes. Measured in `aguapolvo`,
-    // where a `/setblock` of water simply stood there for ever because nobody woke it.
+    // parity: `LiquidBlock`'s three hooks.
     if (context.wakeFluids) {
         context.wakeFluids(x, y, z);
     }

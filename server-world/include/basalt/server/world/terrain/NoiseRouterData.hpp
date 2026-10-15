@@ -41,9 +41,7 @@ struct SpawnTarget {
     std::vector<std::pair<Function, climate::Parameter>> parameters;
 };
 
-/// parity: `NoiseGeneratorSettings` with its `NoiseRouter`, one dimension's whole terrain recipe,
-/// together with the `RandomState` that seeds it. Read from the jar's `noise_settings` file, so the
-/// shape of the terrain is the data's, not code's.
+/// parity: `NoiseGeneratorSettings` with its `NoiseRouter`.
 struct NoiseRouter {
     std::shared_ptr<densityfunction::RandomState> state;
     Function temperature;
@@ -70,8 +68,6 @@ struct NoiseRouter {
 
 namespace noiseRouterData {
 
-/// Loads `worldgen/noise_settings/<id>` and everything it references. Fails naming what is
-/// missing or malformed rather than handing back a partial router.
 [[nodiscard]] std::expected<NoiseRouter, std::string> load(std::string_view settingsId, std::int64_t seed,
                                                            const densityfunction::WorldgenReader& reader);
 

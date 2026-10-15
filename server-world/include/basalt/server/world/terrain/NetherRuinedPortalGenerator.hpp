@@ -15,7 +15,6 @@
 
 namespace basalt::server::world::terrain {
 
-/// What a placed Nether ruined portal is, without the blocks it wrote.
 struct NetherRuinedPortalStartSnapshot {
     std::string templateName;
     structure::StructurePos position;
@@ -25,10 +24,7 @@ struct NetherRuinedPortalStartSnapshot {
     bool airPocket = false;
 };
 
-/// parity: `RuinedPortalStructure` and `RuinedPortalPiece` for the 26.2 `ruined_portal_nether`
-/// setup. The official piece runs once in its template-centre chunk and writes through a
-/// `WorldGenRegion` into neighbouring chunks. Basalt owns one chunk at a time, so this replays that
-/// one global operation from the centre chunk's random and clips only the final writes to the target.
+/// parity: `RuinedPortalStructure` and `RuinedPortalPiece` for the 26.2 `ruined_portal_nether`.
 class NetherRuinedPortalGenerator {
 public:
     using BaseStateAt = std::function<std::int32_t(std::int32_t, std::int32_t, std::int32_t)>;
@@ -41,17 +37,13 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
-    /// What the candidate chunk would start, without replaying the writes.
     [[nodiscard]] std::optional<NetherRuinedPortalStartSnapshot>
     startSnapshot(std::int64_t seed, std::int32_t candidateChunkX, std::int32_t candidateChunkZ);
 
-    /// parity: `PlaceCommand.placeStructure`: the bounds of the portal started at this chunk with
-    /// the biome check skipped, or nothing when its draw found nothing.
+    /// parity: `PlaceCommand.placeStructure`.
     [[nodiscard]] std::optional<NetherRuinedPortalStartSnapshot>
     placementSnapshot(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
 
-    /// Writes the part of the portal started at (chunkX, chunkZ) that lands in `chunk`, replaying
-    /// the same writes worldgen would make.
     void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
 
 private:

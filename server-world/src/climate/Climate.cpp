@@ -13,8 +13,6 @@ namespace basalt::server::world::climate {
 namespace detail {
 namespace {
 
-/// One entry per tree, per thread. A vector rather than a map: slots are dense and handed out in
-/// order, and this is read on every climate lookup.
 thread_local std::vector<const void*> leaves;
 std::atomic<std::size_t> slots{0};
 

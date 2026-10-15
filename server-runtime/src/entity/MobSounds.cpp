@@ -14,8 +14,7 @@ using namespace std::string_view_literals;
 constexpr std::array kHorses{"horse"sv, "donkey"sv,     "mule"sv,           "llama"sv,       "trader_llama"sv,
                              "camel"sv, "camel_husk"sv, "skeleton_horse"sv, "zombie_horse"sv};
 
-/// parity: the `Animal`, `WaterAnimal`, `AgeableWaterCreature` and `AbstractGolem` subclasses, all
-/// at a hundred and twenty.
+/// parity: the `Animal`.
 constexpr std::array kSlowTalkers{
     "armadillo"sv, "axolotl"sv,       "bee"sv,         "cat"sv,          "chicken"sv,         "cow"sv,
     "fox"sv,       "frog"sv,          "goat"sv,        "hoglin"sv,       "mooshroom"sv,       "panda"sv,

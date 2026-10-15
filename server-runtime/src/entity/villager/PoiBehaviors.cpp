@@ -28,7 +28,6 @@ constexpr std::int32_t kPathNodes = 768;
 constexpr std::int32_t kScanRange = 48;
 constexpr double kHalfPi = static_cast<double>(static_cast<float>(std::numbers::pi) / 2.0F);
 
-/// Which predicate a node reads, as the table's `a` names it.
 [[nodiscard]] PoiMask maskFor(const Ctx& ctx, const Node& node) {
     constexpr std::int32_t kHeld = 1;
     constexpr std::int32_t kAcquirable = 2;
@@ -103,8 +102,6 @@ routeTo(Ctx& ctx, ServerEntity& mob, const std::vector<std::array<std::int32_t, 
     return (dx * dx) + (dy * dy) + (dz * dz);
 }
 
-// --- ValidateNearbyPoi --------------------------------------------------------------------------
-
 bool validateNearbyPoi(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     Memory<BlockPos>* memory = ctx.mem.position(node.memory);
     if (memory == nullptr || !memory->present()) {
@@ -135,8 +132,6 @@ bool validateNearbyPoi(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     return true;
 }
 
-// --- PoiCompetitorScan ----------------------------------------------------------------------------
-
 bool poiCompetitorScan(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     if (!ctx.mem.jobSite.present() || !ctx.mem.nearestLivingEntities.present()) {
         return false;
@@ -162,8 +157,6 @@ bool poiCompetitorScan(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     }
     return true;
 }
-
-// --- AcquirePoi -----------------------------------------------------------------------------------
 
 void markAttempt(Ctx& ctx, NodeExtra::Retry& retry) {
     retry.previous = ctx.now;
@@ -248,8 +241,6 @@ bool acquirePoi(Ctx& ctx, const Node& node, NodeState& state) {
     return true;
 }
 
-// --- GoToPotentialJobSite -----------------------------------------------------------------------
-
 bool potentialCheck(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     if (!ctx.mem.potentialJobSite.present()) {
         return false;
@@ -274,8 +265,6 @@ void potentialStop(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     }
     ctx.mem.potentialJobSite.erase();
 }
-
-// --- YieldJobSite ---------------------------------------------------------------------------------
 
 bool yieldJobSite(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     if (!ctx.mem.potentialJobSite.present() || ctx.mem.jobSite.present() || !ctx.mem.nearestLivingEntities.present()) {
@@ -321,8 +310,6 @@ bool yieldJobSite(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     return true;
 }
 
-// --- AssignProfessionFromJobSite and ResetProfession -------------------------------------------
-
 bool assignProfession(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     if (!ctx.mem.potentialJobSite.present()) {
         return false;
@@ -357,8 +344,6 @@ bool resetProfession(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     }
     return false;
 }
-
-// --- SetWalkTargetFromBlockMemory ---------------------------------------------------------------
 
 bool walkToBlockMemory(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     Memory<BlockPos>* memory = ctx.mem.position(node.memory);
@@ -400,8 +385,6 @@ bool walkToBlockMemory(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     }
     return true;
 }
-
-// --- StrollAroundPoi, StrollToPoi, StrollToPoiList ---------------------------------------------
 
 bool strollAroundPoi(Ctx& ctx, const Node& node, NodeState& state) {
     Memory<BlockPos>* memory = ctx.mem.position(node.memory);
@@ -457,8 +440,6 @@ bool strollToPoiList(Ctx& ctx, const Node& node, NodeState& state) {
     return true;
 }
 
-// --- SetClosestHomeAsWalkTarget -----------------------------------------------------------------
-
 bool closestHome(Ctx& ctx, const Node& node, NodeState& state) {
     if (ctx.mem.walkTarget.present() || ctx.mem.home.present()) {
         return false;
@@ -502,8 +483,6 @@ bool closestHome(Ctx& ctx, const Node& node, NodeState& state) {
     return true;
 }
 
-// --- LocateHidingPlace ----------------------------------------------------------------------------
-
 bool locateHidingPlace(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     if (ctx.mem.walkTarget.present()) {
         return false;
@@ -544,8 +523,6 @@ bool locateHidingPlace(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     return true;
 }
 
-// --- VillageBoundRandomStroll and GoToClosestVillage --------------------------------------------
-
 [[nodiscard]] std::int32_t sectionsToVillage(Ctx& ctx, const BlockPos& pos) {
     return ctx.poi.sectionsToVillage(pos.x >> 4, pos.y >> 4, pos.z >> 4);
 }
@@ -559,8 +536,7 @@ bool villageBoundStroll(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     if (ctx.poi.isVillage(here)) {
         spot = ai::randomPos::landPos(ctx.mob.world, ctx.self, ctx.random, node.a, node.b);
     } else {
-        // parity: `BehaviorUtils.findSectionClosestToVillage`, the nearest better section in a
-        // five-section cube.
+        // parity: `BehaviorUtils.findSectionClosestToVillage`, within a five-section cube.
         const std::int32_t sectionX = here.x >> 4;
         const std::int32_t sectionY = here.y >> 4;
         const std::int32_t sectionZ = here.z >> 4;

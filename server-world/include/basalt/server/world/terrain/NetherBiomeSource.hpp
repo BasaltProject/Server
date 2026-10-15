@@ -15,18 +15,14 @@
 
 namespace basalt::server::world::terrain {
 
-/// The block-position biome lookup the Nether placed-feature filters read.
 using NetherBiomeLookup =
     std::function<std::string_view(std::int32_t, std::int32_t, std::int32_t, densityfunction::SamplerContext*)>;
 
-/// parity: `MultiNoiseBiomeSourceParameterList.Preset.NETHER`. Resolves the five Nether biomes from
-/// the router's temperature and vegetation noises using vanilla's own five parameter points,
-/// including the non-zero offsets that bias warped forest and basalt deltas.
+/// parity: `MultiNoiseBiomeSourceParameterList.Preset.NETHER`.
 class NetherBiomeSource {
 public:
     explicit NetherBiomeSource(const NoiseRouter& router, std::optional<std::int64_t> biomeZoomSeed = std::nullopt);
 
-    /// The direct noise-biome lookup from block coordinates, without the biome manager's zoom.
     [[nodiscard]] std::string_view biomeAt(std::int32_t x, std::int32_t y, std::int32_t z,
                                            densityfunction::SamplerContext* cache = nullptr) const;
 
@@ -37,11 +33,8 @@ public:
     [[nodiscard]] std::string_view blockBiomeAt(std::int32_t x, std::int32_t y, std::int32_t z,
                                                 densityfunction::SamplerContext* cache = nullptr) const;
 
-    /// A lookup that carries one generation worker's raw-quart cache, shared by every Nether
-    /// decoration in its chunk.
     [[nodiscard]] NetherBiomeLookup cached(densityfunction::SamplerContext& context) const;
 
-    /// The plain lookup, for callers with no cache of their own.
     [[nodiscard]] NetherBiomeLookup lookup() const;
 
 private:

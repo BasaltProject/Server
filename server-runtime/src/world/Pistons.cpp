@@ -26,10 +26,7 @@ public:
     Resolver(const Context& context, Position piston, BlockFace pushing)
         : context_(context), piston_(piston), pushing_(pushing) {}
 
-    /// parity: `addBlockLine`: what a sticky block drags behind it, then the line ahead of it.
-    ///
-    /// `connection` is the direction this line was reached from, which only a `PUSH_ONLY` block reads:
-    /// glazed terracotta moves when the push comes at it head on and refuses every other approach.
+    /// parity: `addBlockLine`.
     bool addLine(const Position& start, BlockFace connection) {
         std::optional<std::int32_t> nextState = stateAt(start);
         if (!nextState.has_value() || *nextState == air()) {
@@ -96,10 +93,7 @@ public:
                 return false;
             }
             toPush.push_back(position);
-            // parity: `addBlockLine` counts the blocks it adds **ahead** in `blocksAdded` too, not
-            // only the ones a sticky block dragged behind it. `reorderListAtCollision` and the loop
-            // that looks for branches after a collision both measure with that number, so leaving it
-            // short reorders the wrong slice.
+            // parity: `addBlockLine` counts the blocks it adds **ahead** in `blocksAdded` too, not.
             ++blocksAdded;
             ++ahead;
         }
@@ -142,7 +136,7 @@ private:
 
     [[nodiscard]] bool isPistonItself(const Position& position) const { return position == piston_; }
 
-    /// parity: `reorderListAtCollision`, which puts the line that just arrived ahead of the rest.
+    /// parity: `reorderListAtCollision`.
     void reorderAtCollision(std::int32_t blocksAdded, std::int32_t collision) {
         const auto head = static_cast<std::size_t>(collision);
         const std::size_t added = static_cast<std::size_t>(blocksAdded);
@@ -164,8 +158,7 @@ private:
     return (random.nextFloat() * spread) + kBasePitch;
 }
 
-/// parity: `PistonBaseBlock.getNeighborSignal`, which ignores its own face: a piston cannot be
-/// powered by what it is about to push.
+/// parity: `PistonBaseBlock.getNeighborSignal`.
 [[nodiscard]] bool signalToPiston(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                                   BlockFace facing) {
     for (const BlockFace face : kAllFaces) {
@@ -177,15 +170,11 @@ private:
             return true;
         }
     }
-    // parity: `hasSignal(pos, Direction.DOWN)`, the question about the piston's own square. It
-    // never answers in 26.3 (`Blocks.pistonProperties()` marks the piston `isRedstoneConductor`
-    // false, so the strong signal a diode pumps into its face goes nowhere), but the jar asks it,
-    // between the two loops and ahead of the `else` that skips the squares above. Kept as asked.
+    // parity: `hasSignal(pos, Direction.DOWN)`.
     if (redstone::signalFrom(context.world, context.worldName, x, y, z, BlockFace::Down) > 0) {
         return true;
     }
-    // parity: the block above is asked twice, once for itself and once for what is over it, which is
-    // the quirk that makes a piston fire from a signal two blocks up.
+    // parity: the block above is asked twice, once for itself and once for what is over it, which is.
     if (redstone::signalFrom(context.world, context.worldName, x, y + 1, z, BlockFace::Up) > 0) {
         return true;
     }
@@ -209,8 +198,7 @@ const wire::common::Identifier& block() {
 
 bool isPushable(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace pushing,
                 bool allowDestroyable, registry::BlockFace connection) {
-    // parity: `isPushable` starts with the world and not with the block: out of height or out of the
-    // border and nothing moves.
+    // parity: `isPushable` starts with the world and not with the block.
     if (y < context.minY || y > context.maxY || (context.withinBorder && !context.withinBorder(x, z))) {
         return false;
     }
@@ -247,11 +235,9 @@ bool isPushable(const Context& context, std::int32_t x, std::int32_t y, std::int
             break;
         }
     } else if (propertyOf(*stateId, "extended") == "true") {
-        // An extended piston is holding its own head: it is not going anywhere.
         return false;
     }
-    // parity: the last line of `isPushable`. A chest is `NORMAL` and still will not move, because
-    // what it holds lives in a block entity and a piston does not carry those.
+    // parity: the last line of `isPushable`.
     return !registry::blockConnections::hasBlockEntity(*stateId);
 }
 
@@ -303,8 +289,7 @@ std::optional<std::array<std::int32_t, 3>> fittingBase(const WorldState& world, 
     if (!body.has_value()) {
         return std::nullopt;
     }
-    // parity: `isFittingBase`, which picks the block by the head's own `type`: a sticky head only
-    // fits a sticky piston.
+    // parity: `isFittingBase`.
     const std::string_view wanted = propertyOf(headState, "type") == "sticky" ? "sticky_piston" : "piston";
     if (pathOf(*body) != wanted || propertyOf(*body, "extended") != "true" || propertyOf(*body, "facing") != facing) {
         return std::nullopt;
@@ -318,10 +303,7 @@ void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_
         return;
     }
     const std::string path = pathOf(*stateId);
-    // parity: `PistonHeadBlock.neighborChanged` hands the news straight to the body behind it, and
-    // that is the whole of it. It matters because a piston looking up reads the squares around
-    // `pos.above()`, which is where its own head stands: without this the body never hears that the
-    // block beside its head has gone and stays out for ever. Measured in `pistoncabeza`.
+    // parity: `PistonHeadBlock.neighborChanged` hands the news straight to the body behind it.
     if (path == "piston_head") {
         const std::optional<BlockFace> facing = faceNamed(propertyOf(*stateId, "facing"));
         if (!facing.has_value()) {
@@ -331,8 +313,7 @@ void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_
         const std::int32_t bodyX = x + registry::stepX(back);
         const std::int32_t bodyY = y + registry::stepY(back);
         const std::int32_t bodyZ = z + registry::stepZ(back);
-        // parity: `if (state.canSurvive(level, pos))`, which for a head is the body being really
-        // there and looking the same way.
+        // parity: `if (state.canSurvive(level, pos))`, which for a head is the body being really.
         const std::optional<std::int32_t> body = context.world.blockState(bodyX, bodyY, bodyZ);
         if (!body.has_value() || !isPiston(pathOf(*body)) ||
             propertyOf(*body, "facing") != propertyOf(*stateId, "facing")) {
@@ -353,8 +334,7 @@ void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_
     if (powered == extended) {
         return;
     }
-    // parity: `PistonBaseBlock.checkIfExtend`: 0 to push out, 1 to pull back, and the face it moves
-    // along as the second byte. Nothing moves here; the event is what moves it.
+    // parity: `PistonBaseBlock.checkIfExtend`.
     std::int32_t event = kContract;
     if (powered) {
         if (!resolve(context, x, y, z, *direction, true).has_value()) {
@@ -362,8 +342,7 @@ void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_
         }
         event = kExtend;
     } else if (isRetractingOntoSlide(context, x, y, z, *direction)) {
-        // parity: a head that is still sliding out is taken back whole, without asking what is in
-        // front of it.
+        // parity: a head that is still sliding out is taken back whole, without asking what is in.
         event = kContractSliding;
     }
     context.world.queueBlockEvent(BlockEvent{
@@ -381,8 +360,7 @@ void runEvent(const Context& context, const BlockEvent& event, std::vector<Block
         return;
     }
     const std::string path = pathOf(*stateId);
-    // parity: `doBlockEvent` drops an event whose square no longer holds the block that booked it,
-    // so a sticky piston's move does not run on the plain piston that took its place.
+    // parity: `doBlockEvent` drops an event whose square no longer holds the block that booked it.
     if (!isPiston(path) || path != event.block) {
         return;
     }
@@ -390,8 +368,7 @@ void runEvent(const Context& context, const BlockEvent& event, std::vector<Block
     if (!direction.has_value()) {
         return;
     }
-    // parity: `triggerEvent` asks the signal again, because a pulse can be over by the time the
-    // event runs. A piston told to pull back that is powered again only takes `extended` and stays.
+    // parity: `triggerEvent` asks the signal again.
     const bool powered = signalToPiston(context, x, y, z, *direction);
     if (powered && b0 != kExtend) {
         if (const std::optional<std::int32_t> body = registry::blockStateDefinitions::stateIdOf(
@@ -413,20 +390,17 @@ void runEvent(const Context& context, const BlockEvent& event, std::vector<Block
     } else {
         beginRetract(context, x, y, z, *stateId, *direction, path == "sticky_piston", path, b0 == kContractSliding);
     }
-    // parity: `PistonBaseBlock.triggerEvent`, whose sound goes with the event, at half volume and a
-    // pitch rolled between 0.6 and 0.85 going out, 0.6 and 0.75 coming back.
+    // parity: `PistonBaseBlock.triggerEvent`.
     const bool extending = b0 == kExtend;
     const blockEffect::Sound sound{.name = std::string{extending ? kExtendSound : kContractSound},
                                    .source = wire::protocol::play::SoundSource::Blocks,
                                    .volume = kSoundVolume,
                                    .pitch =
                                        pitch(context.random, extending ? kExtendPitchSpread : kContractPitchSpread)};
-    // parity: `triggerEvent` raises `BLOCK_ACTIVATE` going out and `BLOCK_DEACTIVATE` coming back,
-    // both from the piston's own square and both after whatever it broke on the way.
+    // parity: `triggerEvent` raises `BLOCK_ACTIVATE` going out and `BLOCK_DEACTIVATE` coming back.
     vibrations::emit(context.world, extending ? "block_activate" : "block_deactivate", static_cast<double>(x) + 0.5,
                      static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, context.gameTime);
-    // parity: every square that has just started sliding sits out this turn's ticker, which is the
-    // one that only moves `progress` and leaves `progressO` where it was.
+    // parity: every square that has just started sliding sits out this turn's ticker, which is the.
     for (const Carried& sliding : carriedBlocks(context, x, y, z, *direction)) {
         context.world.noteSlideStarted(sliding.at[0], sliding.at[1], sliding.at[2]);
     }

@@ -45,8 +45,7 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kAllNeighbours{
     return !isAir(chunk, x, y, z) || !twistingSupport().contains(blockPathAt(chunk, x, y - 1, z));
 }
 
-/// parity: the two vines' `weighted_list` plant height: 10 for the short range, 2 for the long one
-/// and 3 for the fixed height, which draws nothing.
+/// parity: the vines' `weighted_list` plant height: 10 short, 2 long, 3 fixed (no draw).
 [[nodiscard]] std::int32_t vinePlantHeight(random::RandomSource& random, std::int32_t shortMin, std::int32_t shortMax,
                                            std::int32_t longMin, std::int32_t longMax, std::int32_t fixed) {
     const std::int32_t pick = random.nextInt(15);
@@ -59,8 +58,7 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kAllNeighbours{
     return fixed;
 }
 
-/// parity: `BlockColumnFeature` with a plant layer and a one-block tip, `prioritize_tip` on: the room
-/// is checked from the block after the origin, and a short column loses plant blocks first.
+/// parity: `BlockColumnFeature` with `prioritize_tip`.
 void placeVineColumn(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z,
                      std::int32_t step, std::int32_t plantHeight, std::string_view plant, std::string_view tip) {
     std::int32_t plants = plantHeight;
@@ -88,8 +86,7 @@ void placeVineColumn(Chunk& chunk, random::RandomSource& random, std::int32_t x,
 
 } // namespace
 
-/// parity: the 26.3 `twisting_vines` placement after its first filter: `count` 64, a uniform offset,
-/// a scan down to the ground and the same filter again, then the column.
+/// parity: 26.3 `twisting_vines`.
 void placeTwistingVinesFeature(Chunk& chunk, random::RandomSource& random, const Pos& origin) {
     if (isInvalidTwistingPosition(chunk, origin.x, origin.y, origin.z)) {
         return;
@@ -158,8 +155,7 @@ void placeWeepingColumn(Chunk& chunk, random::RandomSource& random, const std::i
     }
 }
 
-/// parity: the 26.3 `weeping_vines` `overlay`: a `random_neighbor_spread` of nether wart around the
-/// origin, then a hundred columns hung from the roof.
+/// parity: 26.3 `weeping_vines` `overlay`.
 void placeWeepingVinesFeature(Chunk& chunk, random::RandomSource& random, const Pos& origin) {
     if (!isAir(chunk, origin.x, origin.y, origin.z)) {
         return;

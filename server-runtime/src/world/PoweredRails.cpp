@@ -29,8 +29,7 @@ constexpr std::array<std::string_view, 3> kEastWestShapes{"east_west", "ascendin
                                    std::int32_t z, const wire::common::Identifier& block, bool forward,
                                    std::int32_t depth, std::string_view axis);
 
-/// parity: `findPoweredRailSignal`, which walks one rail along the line it is pointing and looks one
-/// below as well, because a slope leaves the next rail a block down.
+/// parity: `findPoweredRailSignal`.
 [[nodiscard]] bool findSignal(const WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                               std::int32_t z, const wire::common::Identifier& block, bool forward, std::int32_t depth) {
     if (depth >= kSearchLimit) {
@@ -95,8 +94,7 @@ constexpr std::array<std::string_view, 3> kEastWestShapes{"east_west", "ascendin
     return checkBelow && samePoweredRail(world, worldName, nextX, nextY - 1, nextZ, block, forward, depth, axis);
 }
 
-/// parity: `isSameRailWithPower`. A rail that crosses the line rather than continuing it stops the
-/// search, and one that is on but powered by nothing of its own keeps it going.
+/// parity: `isSameRailWithPower`.
 bool samePoweredRail(const WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                      std::int32_t z, const wire::common::Identifier& block, bool forward, std::int32_t depth,
                      std::string_view axis) {

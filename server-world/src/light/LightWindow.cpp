@@ -10,7 +10,6 @@ namespace basalt::server::world::light {
 namespace {
 
 constexpr std::size_t kBlocksPerSection = 16 * 16 * 16;
-/// What a block that fills its cube takes out of the light.
 constexpr std::int32_t kSolid = 15;
 
 } // namespace
@@ -18,8 +17,6 @@ constexpr std::int32_t kSolid = 15;
 LightWindow::LightWindow(const Chunk& centre, const Neighbours& neighbours)
     : minY_(centre.verticalBounds().minY()), maxY_(centre.verticalBounds().maxY()),
       originX_((centre.chunkX() - 1) * 16), originZ_((centre.chunkZ() - 1) * 16), complete_(true) {
-    // The nine chunks, looked up once. Per block it was a lookup a few hundred thousand times over,
-    // which is the sort of thing that turns a light pass into a stall.
     for (std::size_t index = 0; index < chunks_.size(); ++index) {
         const auto offsetX = static_cast<std::int32_t>(index % 3) - 1;
         const auto offsetZ = static_cast<std::int32_t>(index / 3) - 1;
@@ -52,12 +49,9 @@ void LightWindow::fillOpacity(std::span<std::uint8_t> into, std::int32_t bottomY
                     continue;
                 }
                 const ChunkSection& section = chunk->section(index);
-                // Air takes nothing out of the light, and the array starts at zero.
                 if (section.nonAirBlockCount() == 0) {
                     continue;
                 }
-                // Solid rock is most of a column and every block of it answers the same, so it is
-                // written straight in rather than unpacked block by block.
                 const bool solid = !section.mayContain([&opacityOf](std::int32_t stateId) {
                     return stateId >= 0 && static_cast<std::size_t>(stateId) < opacityOf.size() &&
                            opacityOf[static_cast<std::size_t>(stateId)] < kSolid;

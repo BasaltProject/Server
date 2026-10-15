@@ -193,8 +193,7 @@ void beforeCommon(std::string_view type, std::string_view biome, MobSpawnReason 
     if (type != "villager" && type != "zombie_villager") {
         return;
     }
-    // parity: `ZombieVillager` initializes its profession from its own entity RNG in the
-    // constructor, before `finalizeSpawn` selects the biome-derived villager type.
+    // parity: `ZombieVillager` initializes its profession from its own entity RNG in the.
     const std::string profession = type == "zombie_villager"
                                        ? professions()[static_cast<std::size_t>(
                                              entityRandom.nextInt(static_cast<std::int32_t>(professions().size())))]
@@ -275,8 +274,7 @@ void beforeCommon(MobSpawnGroupData& group, const MobSpawnContext& context, rand
         leader = random.nextFloat() < kRandomLeaderChance;
     }
     if (group.patrolLeader) {
-        // parity: `PatrolSpawner.findPatrolTarget` runs before `setPos`, while the fresh entity is
-        // still at the origin, and consumes the entity's own RNG rather than the level RNG.
+        // parity: `PatrolSpawner.findPatrolTarget` runs before `setPos`.
         data.putIntArray("patrol_target", {-kPatrolTargetRadius + entityRandom.nextInt(kPatrolTargetDiameter), 0,
                                            -kPatrolTargetRadius + entityRandom.nextInt(kPatrolTargetDiameter)});
     }
@@ -299,8 +297,7 @@ void beforeCommon(MobSpawnForestBuilder& builder, MobSpawnNode& horse, const Mob
     if (horse.type().path() != "zombie_horse" || context.reason != MobSpawnReason::Natural) {
         return;
     }
-    // parity: `ZombieHorse.finalizeSpawn` creates and fully finalizes the zombie before
-    // `AbstractHorse` randomizes the horse, then replaces the rider's main-hand item.
+    // parity: `ZombieHorse.finalizeSpawn` creates and fully finalizes the zombie before.
     MobSpawnNode& rider = builder.create(Identifier::vanilla("zombie"), horse.x(), horse.y(), horse.z(), horse.yaw());
     MobSpawnGroupData group;
     random::RandomSource entityRandom = context.entityRandom();

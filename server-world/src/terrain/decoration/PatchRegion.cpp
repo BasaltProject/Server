@@ -18,8 +18,7 @@ std::int32_t PatchRegion::get(const DecorationPos& position) const {
             return stateId;
         }
     }
-    // parity: what this chunk already queued for the neighbour is in the neighbour's proto chunk as
-    // far as vanilla is concerned, so it beats whatever the neighbour view still reports.
+    // parity: writes already queued for the neighbour count as its proto chunk, beating the neighbour view.
     if (const std::optional<std::int32_t> queued = chunk_->queuedDecorationStateId(position.x, position.y, position.z);
         queued.has_value()) {
         return *queued;

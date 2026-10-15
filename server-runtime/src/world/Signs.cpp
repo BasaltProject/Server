@@ -24,7 +24,7 @@ constexpr std::string_view kBack = "back_text";
     return id == nullptr ? std::string{} : id->path();
 }
 
-/// parity: `SignText`'s codec: the four messages, a colour and the glow flag, always present.
+/// parity: `SignText`'s codec.
 [[nodiscard]] wire::nbt::NbtCompound side(const std::vector<std::string>& lines) {
     wire::nbt::NbtList messages{wire::nbt::NbtType::String};
     for (std::int32_t line = 0; line < kLines; ++line) {
@@ -148,7 +148,7 @@ bool facesFront(const std::int32_t stateId, const std::int32_t x, const std::int
         static constexpr std::array<std::string_view, 4> kQuarters{"south", "west", "north", "east"};
         const auto quarter = std::ranges::find(kQuarters, facing->second);
         signYaw = static_cast<float>(quarter - kQuarters.begin()) * 90.0F;
-        // parity: `WallSignBlock.getSignHitboxCenterPosition`, the middle of the board against its wall.
+        // parity: `WallSignBlock.getSignHitboxCenterPosition`.
         if (!path.ends_with("_hanging_sign")) {
             constexpr double kNear = 0.0625;
             constexpr double kFar = 0.9375;

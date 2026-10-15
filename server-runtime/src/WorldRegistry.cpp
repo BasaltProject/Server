@@ -15,7 +15,6 @@
 namespace basalt::server::runtime {
 namespace {
 
-/// What a world may be called: it becomes a folder name and a row in every player's file.
 [[nodiscard]] bool isUsableName(const std::string& name) {
     static const std::regex shape{"[a-zA-Z0-9_-]{1,64}"};
     return std::regex_match(name, shape);
@@ -34,9 +33,6 @@ WorldRegistry::WorldRegistry(const config::BasaltConfig& config, const config::W
     : worldsConfig_(&worlds), generators_(generators), players_(&players), hooks_(std::move(hooks)),
       options_(std::move(options)), logger_(std::move(logger)), defaultName_(worlds.defaultWorld().name),
       scheduler_(config.regional, config.regionThreads) {
-    // Overworlds first, and that order is the point: a Nether or an End that declares no seed of its
-    // own takes the seed of the overworld it belongs to, which is what makes one set of dimensions
-    // one world. parity: a vanilla save has a single seed for its three dimensions.
     std::vector<const config::WorldDeclaration*> ordered;
     ordered.reserve(worlds.worlds().size());
     for (const config::WorldDeclaration& declaration : worlds.worlds()) {
@@ -70,15 +66,13 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
     world::LoadedWorldOptions options;
     options.timings = options_.timings;
     options.scheduler = &scheduler_;
-    // The default world's own Nether and End: the one its portals lead to.
     const config::WorldDeclaration* linked = worldsConfig_->portalTarget(declaration, declaration.dimension);
     options.vanillaKey =
         worldsConfig_->overworldOf(declaration).isDefault && linked != nullptr && linked->name == declaration.name;
     options.generationWorkers = options_.generationMetrics ? 1 : world::ChunkGenerationQueue::defaultWorkers();
     if (generators_ != nullptr && isNormal(declaration.type)) {
         world::VanillaWorldGeneratorFactory::Generators built = generators_->create(declaration, metadata);
-        // The one generation itself uses, so `/place structure` and `/locate structure` act on the
-        // same villages the world already has.
+        // The same generator, so `/place structure` and `/locate structure` act on the villages the world has.
         options.villageGenerator = built.villages;
         options.campGenerator = built.camps;
         options.structureLocators = built.locators;
@@ -168,9 +162,7 @@ world::LoadedWorld* WorldRegistry::createWorld(const std::string& name, config::
                std::string{config::worldTypeName(type)} + ", seed " + std::to_string(madeWith) + ").";
     });
     made->saveDirty();
-    // Next turn, not now: this is usually called from inside a plugin's own handler, and firing an
-    // event there would re-enter the Lua state that is already running. One turn later it is an
-    // ordinary event like any other.
+    // Next turn, not now: called from inside a plugin handler, firing here would re-enter the running Lua state.
     if (hooks_.worldLoaded) {
         scheduler_.global().schedule(0, [this, name] { hooks_.worldLoaded(name); });
     }

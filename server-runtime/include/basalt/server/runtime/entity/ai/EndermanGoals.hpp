@@ -10,22 +10,17 @@ namespace basalt::server::runtime::entity::ai {
 
 struct PlayerView;
 
-/// The enderman's gaze: who is staring at it, and what it does about them.
 namespace endermanGaze {
 
-/// parity: `Enderman.isBeingStaredBy`: no disguise on the head, and `isLookingAtMe` at its eyes
-/// through a cone of 0.025 over the distance, with nothing solid in between.
+/// parity: `Enderman.isBeingStaredBy`.
 [[nodiscard]] bool staredAtBy(MobContext& mob, const PlayerView& player);
 
-/// parity: `Enderman.teleportTowards`, sixteen blocks back along the line to it and up to four
-/// aside. Answers whether it moved.
+/// parity: `Enderman.teleportTowards`.
 bool teleportTowards(MobContext& mob, double x, double eyeY, double z);
 
 } // namespace endermanGaze
 
-/// parity: `Enderman.EndermanLookForPlayerGoal`: somebody staring at it, or somebody it is angry at,
-/// becomes its target five ticks on; after that it teleports away from a stare up close and towards
-/// a target far off.
+/// parity: `Enderman.EndermanLookForPlayerGoal`.
 class EndermanLookForPlayerGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
@@ -49,7 +44,7 @@ private:
     std::int32_t teleportTime_ = 0;
 };
 
-/// parity: `Enderman.EndermanFreezeWhenLookedAt`: stands still, watching the target staring at it.
+/// parity: `Enderman.EndermanFreezeWhenLookedAt`.
 class EndermanFreezeWhenLookedAtGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Jump, GoalFlag::Move}; }

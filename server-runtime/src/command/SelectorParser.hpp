@@ -20,8 +20,6 @@ using wire::nbt::NbtTag;
 using wire::protocol::play::Gamemode;
 using wire::text::Component;
 
-/// The bracket syntax of a selector, split across two files: the walk and its helpers here, the
-/// option table beside them. One class rather than two because the options fill in the same parts.
 constexpr std::size_t kUuidLength = 36;
 constexpr std::size_t kUuidDashes = 4;
 constexpr std::size_t kMaxPlayerName = 16;
@@ -29,8 +27,6 @@ constexpr double kFullTurn = 360.0;
 constexpr double kHalfTurn = 180.0;
 constexpr double kDefaultRotationMax = 359.0;
 
-/// Whether the actual tag carries everything the expected one asks for.
-/// parity: `NbtUtils.compareNbt` with lists ordered.
 [[nodiscard]] inline bool containsNbt(const NbtCompound& actual, const NbtCompound& expected) {
     for (std::size_t index = 0; index < expected.names().size(); index++) {
         const NbtTag* present = actual.find(expected.names()[index]);
@@ -51,10 +47,6 @@ constexpr double kDefaultRotationMax = 359.0;
     return true;
 }
 
-/// How often an option may appear, and with which sign. parity: `InvertableSetOptionState`.
-///
-/// One positive value settles the question, so nothing else may follow it; negated values only
-/// remove candidates, so any number of them is fine.
 class InvertableOption {
 public:
     [[nodiscard]] bool canParse(bool inverted) const { return inverted ? !single_ : !single_ && !multiple_; }
@@ -80,16 +72,8 @@ private:
     std::set<Identifier> tags_;
 };
 
-/// The bracket syntax, one option at a time. parity: `EntitySelectorParser.parseOptions` and
-/// `EntitySelectorOptions`, error keys included: the client shows them, so they are specification.
-///
-/// The "can this option appear again" rules are vanilla's own and are not cosmetic:
-/// `type=zombie,type=creeper` can never match, so it is refused, while `type=!zombie,type=!creeper`
-/// is fine. Same for `name`, `gamemode` and `team`.
 class SelectorParser {
 public:
-    /// The source is not read here: every option that depends on who is asking is answered when
-    /// the selector runs, not when it is parsed.
     SelectorParser(StringReader& reader, const CommandEnvironment& environment)
         : reader_(&reader), environment_(&environment) {}
 
@@ -173,8 +157,7 @@ private:
         return std::nullopt;
     }
 
-    /// parity: a bare word is a player name, unless it parses as a UUID, and never an entity's
-    /// custom name.
+    /// parity: a bare word is a player name, unless it parses as a UUID, and never an entity's custom name.
     [[nodiscard]] std::optional<CommandSyntaxError> parseNameOrUuid() {
         const std::int32_t start = reader_->cursor();
         const Parsed<std::string> read = reader_->readString();
@@ -282,9 +265,7 @@ private:
                                         static_cast<std::size_t>(reader_->cursor() - start));
     }
 
-    /// parity: `MinMaxBounds.Bounds.fromReader`, including `..` as the only separator and both ends
-    /// optional. The degrees form is the one that does **not** reject a swapped range:
-    /// `y_rotation=160..-160` is the arc through south, not a mistake.
+    /// parity: `MinMaxBounds.Bounds.fromReader`.
     template <typename T>
     [[nodiscard]] Parsed<SelectorRange<T>> readRange(bool rejectSwapped) {
         if (!reader_->canRead()) {

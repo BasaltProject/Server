@@ -31,7 +31,7 @@ constexpr std::int32_t kOuterRing = 12;
     return ((a.x - x) * (a.x - x)) + ((a.y - y) * (a.y - y)) + ((a.z - z) * (a.z - z));
 }
 
-/// parity: `EndPodiumFeature.getLocation`, the fight origin itself, lifted onto that heightmap.
+/// parity: `EndPodiumFeature.getLocation`.
 [[nodiscard]] std::array<std::int32_t, 3> egg(const DragonState& state, const DragonWorld& world, bool noLeaves) {
     const std::int32_t x = state.fightOrigin[0];
     const std::int32_t z = state.fightOrigin[2];
@@ -50,7 +50,6 @@ constexpr std::int32_t kOuterRing = 12;
     return {block[0] + 0.5, static_cast<double>(block[1]), block[2] + 0.5};
 }
 
-/// Whether the closest-node search and the A* may use the outer ring.
 [[nodiscard]] bool crystalsLeft(const DragonWorld& world) {
     return world.aliveCrystals.has_value() && *world.aliveCrystals != 0;
 }
@@ -81,7 +80,6 @@ void navigate(std::optional<Path>& path, std::optional<Vec3>& target, random::Ra
     target = Vec3{static_cast<double>(current[0]), static_cast<double>(lifted), static_cast<double>(current[2])};
 }
 
-/// The next leg of a circling route: one node round, or six across one time in eight.
 [[nodiscard]] std::optional<Path> circle(const ServerEntity& dragon, DragonState& state, DragonWorld& world,
                                          bool& clockwise, bool outer) {
     const bool left = crystalsLeft(world);

@@ -32,7 +32,6 @@ void MobActionSystem::tickVillager(world::LoadedWorld& world, entity::ServerEnti
 
 namespace {
 
-/// A turn with nobody else in it, for what a villager does on its way out.
 [[nodiscard]] entity::ai::MobContext quietTurn(world::LoadedWorld& world, entity::ServerEntity& villager,
                                                entity::ai::MobActions& actions, random::RandomSource& random) {
     static const std::vector<entity::ServerEntity*> kNobody;

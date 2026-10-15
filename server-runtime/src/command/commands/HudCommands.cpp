@@ -24,7 +24,7 @@ using wire::text::Component;
     return found == nullptr ? none : *found;
 }
 
-/// parity: every `/title` form reports with the same pair of keys, one for a single target.
+/// parity: every `/title` form reports with the same pair of keys.
 void reportTitle(const CommandContext& context, const std::vector<player::PlayerSession*>& targets,
                  const std::string& key) {
     context.success(targets.size() == 1 ? Component::translatable("commands.title." + key + ".single",
@@ -34,7 +34,7 @@ void reportTitle(const CommandContext& context, const std::vector<player::Player
                     true);
 }
 
-/// parity: `ExperienceCommand`'s own message, which names the amount and then who it applied to.
+/// parity: `ExperienceCommand`'s own message.
 [[nodiscard]] Component experienceMessage(const std::string& action, bool points, std::int32_t amount,
                                           const std::vector<player::PlayerSession*>& targets) {
     const std::string key = "commands.experience." + action + (points ? ".points" : ".levels") + ".success.";
@@ -44,7 +44,6 @@ void reportTitle(const CommandContext& context, const std::vector<player::Player
                : Component::translatable(key + "multiple", {count, Component::text(std::to_string(targets.size()))});
 }
 
-/// Where a block coordinate lands, or the floor of where the asker stands when none was given.
 [[nodiscard]] std::array<std::int32_t, 3> blockAt(const BlockCoordinates* coordinates, const CommandSource& source) {
     const std::array<double, 3> from = source.position();
     return coordinates != nullptr ? coordinates->resolve(source)
@@ -154,8 +153,7 @@ void ExperienceCommand::build(const CommandNodeBuilder& root) const {
         std::int32_t applied = 0;
         for (player::PlayerSession* target : matched) {
             if (points) {
-                // parity: setting more points than the current level is worth is refused outright
-                // rather than silently rolling over into the next level.
+                // parity: setting more points than the current level is worth is refused outright rather than.
                 if (*amount >= target->experience.xpNeededForNextLevel()) {
                     continue;
                 }
@@ -238,7 +236,7 @@ namespace {
     if (!world.has_value()) {
         return std::unexpected{world.error()};
     }
-    // parity: `BlockPosArgument.getSpawnablePos` reads the source, so every target gets one point.
+    // parity: `BlockPosArgument.getSpawnablePos` reads the source.
     const std::array<std::int32_t, 3> at = blockAt(coordinates, context.source());
     for (const player::PlayerSession* target : targets) {
         access->setSpawnPoint(

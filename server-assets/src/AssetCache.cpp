@@ -8,7 +8,6 @@
 #include <utility>
 
 namespace basalt::server::assets {
-
 AssetCache::AssetCache(ByteFetcher fetch, std::string cacheRoot, wire::common::Logger logger)
     : fetch_(std::move(fetch)), cacheRoot_(std::move(cacheRoot)), logger_(std::move(logger)) {}
 
@@ -48,18 +47,12 @@ std::expected<std::string, AssetError> AssetCache::ensure(const VersionMetadata&
         }
     }
 
-    // One line that redraws itself rather than one per step: the console keeps the download on the
-    // line it announced it on, and a log file gets the announcement once and none of the redraws.
     const std::string announcement =
         std::format("Downloading {} assets ({} MB)...", metadata.id, download.size / 1000000);
-    // The first draw carries no percentage, so a log file and a console with no escape codes are
-    // left with exactly the line they had before anything could be drawn over it.
     logger_.progress([&announcement] { return announcement; });
     std::int32_t drawn = -1;
     const std::optional<std::vector<std::uint8_t>> bytes =
         fetch_(download.url, [this, &announcement, &drawn, total = download.size](std::size_t soFar) {
-            // Headers count towards `soFar` and the manifest's size does not, so the last stretch
-            // would read past a hundred without the clamp.
             const std::int32_t percent =
                 total <= 0 ? 0
                            : static_cast<std::int32_t>(std::min<std::uint64_t>(
@@ -86,5 +79,4 @@ std::expected<std::string, AssetError> AssetCache::ensure(const VersionMetadata&
     logger_.info([&] { return std::format("{} assets downloaded and verified.", metadata.id); });
     return path;
 }
-
 } // namespace basalt::server::assets

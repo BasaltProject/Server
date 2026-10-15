@@ -55,8 +55,7 @@ void strongholdPortalRoom::place(const StrongholdBrush& brush) {
         brush.place(stairs, x, 2, 5);
         brush.place(stairs, x, 3, 6);
     }
-    // parity: the twelve eyes are drawn before any frame is placed, and all twelve are drawn even
-    // when the first already fails, which is what makes a filled portal so rare.
+    // parity: the twelve eyes are drawn before any frame is placed, and all twelve are drawn even when the first.
     std::array<bool, 12> eyes{};
     bool allEyes = true;
     for (bool& eye : eyes) {

@@ -33,7 +33,6 @@ std::optional<std::string> asString(const JsonValue* value) {
     return std::nullopt;
 }
 
-/// A JSON number as read by a schema that also accepts it written as a string.
 std::optional<double> asNumber(const JsonValue* value) {
     if (value == nullptr) {
         return std::nullopt;
@@ -95,7 +94,6 @@ StateMatcher parseStateMatcher(const JsonObject* object) {
     return matcher;
 }
 
-/// An id list, a single id, or a `#tag`, as a registry holder set is written.
 std::vector<std::string> idsOrTag(const JsonValue* value) {
     std::vector<std::string> ids;
     if (const std::optional<std::string> single = asString(value); single.has_value()) {
@@ -144,7 +142,7 @@ DoubleBounds doubleBounds(const JsonValue* value) {
                              : DoubleBounds{.min = asNumber(object->find("min")), .max = asNumber(object->find("max"))};
 }
 
-/// parity: `LocationPredicate`, every field; a block predicate on the block entity is a gap.
+/// parity: `LocationPredicate`.
 LocationPredicate parseLocation(const JsonObject* predicate) {
     LocationPredicate location;
     if (predicate == nullptr) {
@@ -198,7 +196,7 @@ LocationPredicate parseLocation(const JsonObject* predicate) {
     return location;
 }
 
-/// parity: `ItemPredicate`, reading `items`, the two enchantment sub-predicates and presence.
+/// parity: `ItemPredicate`.
 ItemPredicate parseItemPredicate(const JsonObject& object) {
     ItemPredicate predicate;
     for (std::size_t index = 0; index < object.names().size(); ++index) {
@@ -236,8 +234,7 @@ ItemPredicate parseItemPredicate(const JsonObject& object) {
             const std::vector<JsonValue>* list = key == "minecraft:enchantments" || stored
                                                      ? predicates->values()[at].get<std::vector<JsonValue>>()
                                                      : nullptr;
-            // parity: `DataComponentPredicate`'s `AnyValue`, what a type with no predicate of its own
-            // reads as: `"minecraft:map_id": {}` only asks for the component.
+            // parity: `DataComponentPredicate`'s `AnyValue`.
             if (const JsonObject* empty = predicates->values()[at].get<JsonObject>();
                 list == nullptr && empty != nullptr && empty->size() == 0 && !isPredicateType(key)) {
                 predicate.present.push_back(key);
@@ -271,7 +268,7 @@ ItemPredicate parseItemPredicate(const JsonObject& object) {
     return predicate;
 }
 
-/// parity: `EntityPredicate`, the sub-predicates the loot tables use; anything else never matches.
+/// parity: `EntityPredicate`.
 EntityPredicate parseEntityPredicate(const JsonObject& object) {
     EntityPredicate predicate;
     for (std::size_t index = 0; index < object.names().size(); ++index) {
@@ -393,8 +390,6 @@ LevelBasedValue parseLevelBased(const JsonValue* value) {
     return LevelBasedValue{.base = static_cast<float>(asNumber(object->find("value")).value_or(0.0))};
 }
 
-/// The functions that only write components: `set_components` as given, `set_name` into the name
-/// it targets, and `set_potion` into its own.
 Parsed<LootFunction> parseComponentSetter(std::string_view type, const JsonObject& function) {
     wire::nbt::NbtCompound components;
     std::vector<std::string> removed;

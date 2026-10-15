@@ -12,7 +12,6 @@ namespace {
 /// parity: the wither's `FOLLOW_RANGE`.
 constexpr double kFollowRange = 40.0;
 
-/// The nearest living thing the wither would go after, by entity id.
 [[nodiscard]] std::optional<std::int32_t> nearest(MobContext& mob) {
     std::optional<std::int32_t> best;
     double bestDistance = kFollowRange * kFollowRange;

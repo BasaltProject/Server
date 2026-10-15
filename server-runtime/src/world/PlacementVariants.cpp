@@ -58,7 +58,6 @@ bool isScaffolding(std::int32_t stateId) {
     return block != nullptr && block->path() == "scaffolding";
 }
 
-/// The one name a wall pair can have, since every pair in 26.2 follows the same shape.
 std::string wallCandidate(const std::string& path) {
     // A hanging sign puts the wall in front of the pair of words, not before the last one.
     static constexpr std::string_view kHangingSign = "_hanging_sign";
@@ -89,7 +88,6 @@ std::optional<std::array<std::int32_t, 3>> target(const WorldState& world, std::
                                                   std::int32_t clickedX, std::int32_t clickedY, std::int32_t clickedZ,
                                                   Direction face, float yaw, bool sneaking, bool inside) {
     const std::optional<std::int32_t> clicked = world.blockState(clickedX, clickedY, clickedZ);
-    // Clicking anything but a scaffolding places the block the ordinary way, so nothing is walked.
     if (!clicked.has_value() || !isScaffolding(*clicked)) {
         return std::nullopt;
     }
@@ -118,7 +116,6 @@ std::optional<std::array<std::int32_t, 3>> target(const WorldState& world, std::
         x += stepX(direction);
         y += stepY(direction);
         z += stepZ(direction);
-        // Only a sideways walk runs out: a tower is climbed as far as it goes.
         if (direction != Direction::Up && direction != Direction::Down) {
             walked++;
         }

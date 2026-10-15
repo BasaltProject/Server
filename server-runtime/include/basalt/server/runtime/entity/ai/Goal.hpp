@@ -7,18 +7,10 @@ namespace basalt::server::runtime::entity::ai {
 
 class MobContext;
 
-/// What a goal takes hold of while it runs.
-///
-/// parity: `Goal.Flag`. Two goals that want the same flag cannot run together, and the one with the
-/// lower priority number wins: that is the whole of how vanilla decides what a mob is doing.
+/// parity: `Goal.Flag`.
 enum class GoalFlag : std::uint8_t { Move, Look, Jump, Target };
 
-/// One thing a mob might be doing. parity: `Goal`, asked whether it can start, kept while it says it
-/// can continue, and ticked in between; the instance belongs to one mob, so it remembers its own
-/// counters.
-///
-/// Virtual, unlike the block and packet dispatch elsewhere: a mob runs a handful per tick, and a
-/// table here would be the same function pointers with none of the readability.
+/// parity: `Goal`.
 class Goal {
 public:
     Goal() = default;
@@ -34,7 +26,7 @@ public:
 
     [[nodiscard]] virtual bool canContinueToUse(MobContext& mob) { return canUse(mob); }
 
-    /// parity: `Goal.isInterruptable`, which is what stops a panicking mob being talked out of it.
+    /// parity: `Goal.isInterruptable`.
     [[nodiscard]] virtual bool isInterruptable() const { return true; }
 
     [[nodiscard]] virtual bool requiresUpdateEveryTick() const { return false; }

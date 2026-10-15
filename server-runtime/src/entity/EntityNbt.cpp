@@ -105,15 +105,13 @@ namespace {
     return NbtTag::ofList(std::move(list));
 }
 
-/// A reference rather than a copy: a `string_view` read off a returned temporary would dangle the
-/// moment the statement ended, which is a bug that only shows up as an empty field.
+/// A reference, not a copy: a `string_view` off a returned temporary would dangle.
 [[nodiscard]] const NbtCompound& compoundOf(const NbtCompound& tag, std::string_view key) {
     static const NbtCompound empty;
     const NbtCompound* found = tag.getCompound(key);
     return found == nullptr ? empty : *found;
 }
 
-/// Reads Minecraft 26.2's `AttributeInstance.Packed.LIST_CODEC` representation.
 void readAttributes(const NbtCompound& tag, ServerEntity& entity) {
     const NbtList* attributes = tag.getList("attributes");
     if (attributes == nullptr) {
@@ -233,9 +231,7 @@ ServerEntity* decodeGeneratedTreeNode(const server::world::ChunkGeneratedEntity&
 
 } // namespace
 
-/// parity: `UUIDUtil.CODEC`, which is four ints and not a string: the two halves of the number, each
-/// split high word first. Vanilla reads nothing else for an entity, so a world written with a string
-/// there loses every uuid it had.
+/// parity: `UUIDUtil.CODEC`: four ints, high word first; a string there loses every uuid.
 [[nodiscard]] NbtTag uuidTag(const wire::common::Uuid& uuid) {
     return NbtTag::ofIntArray({static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.high() >> 32)),
                                static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.high())),
@@ -243,8 +239,7 @@ ServerEntity* decodeGeneratedTreeNode(const server::world::ChunkGeneratedEntity&
                                static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.low()))});
 }
 
-/// parity: `uuidFromIntArray`. The string form is still read because this build wrote it until now,
-/// and a world of ours should not lose its entities to the change.
+/// parity: `uuidFromIntArray`.
 [[nodiscard]] std::optional<wire::common::Uuid> uuidIn(const NbtCompound& tag, std::string_view key) {
     if (const std::span<const std::int32_t> parts = tag.getIntArray(key); parts.size() == 4) {
         const auto word = [parts](std::size_t at) {
@@ -260,13 +255,11 @@ NbtCompound encode(const ServerEntity& entity) {
     tag.remove("Passengers");
     tag.putString("id", entity.type().toString());
     tag.set("UUID", uuidTag(entity.uuid()));
-    // parity: `LivingEntity.addAdditionalSaveData` writes `DeathTime` as a short, and only a body
-    // still counting has one worth keeping.
+    // parity: `LivingEntity.addAdditionalSaveData` writes `DeathTime` as a short.
     if (entity.deathTime > 0) {
         tag.putShort("DeathTime", static_cast<std::int16_t>(entity.deathTime));
     }
-    // parity: `Entity.addAdditionalSaveData` writes `Fire` as a short. It decides more than the
-    // flame the client draws: a burning arrow is what lights the tnt it lands in.
+    // parity: `Entity.addAdditionalSaveData` writes `Fire` as a short.
     if (entity.fireTicks > 0) {
         tag.putShort("Fire", static_cast<std::int16_t>(entity.fireTicks));
     }
@@ -274,8 +267,7 @@ NbtCompound encode(const ServerEntity& entity) {
     if (entity.noGravity) {
         tag.putBoolean("NoGravity", true);
     }
-    // parity: `Fireball.addAdditionalSaveData` stores the stack it was made from under `Item`, and
-    // stores nothing when there is none: a ghast's own fireball comes from no item.
+    // parity: `Fireball.addAdditionalSaveData` stores the source stack under `Item`.
     const bool arrow = isArrow(entity.type());
     if (entity.heldItem.has_value()) {
         wire::nbt::NbtCompound stack;
@@ -306,9 +298,7 @@ NbtCompound encode(const ServerEntity& entity) {
     tag.set("Pos", doubles(entity.x, entity.y, entity.z));
     tag.set("Motion", doubles(entity.velocityX, entity.velocityY, entity.velocityZ));
     tag.set("Rotation", floats(entity.yaw, entity.pitch));
-    // parity: Air is `Entity.saveWithoutId`, so everything has one. Each field below belongs to a
-    // class further down, and writing one on an entity that has no such field leaves a tag vanilla
-    // never writes: a boat with a Health, an arrow with an Age.
+    // parity: Air is `Entity.saveWithoutId`.
     tag.putShort("Air", static_cast<std::int16_t>(entity.airSupply));
     const std::string_view path = entity.type().path();
     if (server::registry::entityAttributes::isLiving(entity.type())) {
@@ -337,16 +327,14 @@ NbtCompound encode(const ServerEntity& entity) {
         // parity: `PrimedTnt.TAG_FUSE` is lowercase; `Fuse` is a creeper's own swell time.
         tag.putShort("fuse", static_cast<std::int16_t>(entity.fuse));
     }
-    // parity: `MinecartTNT.addAdditionalSaveData` writes the same name as an **int**, and writes it
-    // whether the fuse is lit or not: an untouched cart saves a minus one.
+    // parity: `MinecartTNT.addAdditionalSaveData`.
     if (path == "tnt_minecart") {
         tag.putInt("fuse", entity.fuse);
     }
     if (minecarts::isMinecart(entity.type())) {
         minecarts::save(entity, tag);
     }
-    // parity: `MinecartHopper.addAdditionalSaveData` writes `Enabled` whether anything has touched
-    // it or not, so a cart that has never crossed an activator rail still saves a true.
+    // parity: `MinecartHopper.addAdditionalSaveData` always writes `Enabled`.
     if (path == "hopper_minecart" && !tag.contains("Enabled")) {
         tag.putBoolean("Enabled", true);
     }
@@ -368,8 +356,7 @@ NbtCompound encode(const ServerEntity& entity) {
         tag.putBoolean("IsImmuneToZombification", entity.immuneToZombification);
         tag.putInt("TimeInOverworld", entity.conversionClock);
     }
-    // parity: `Tadpole.addAdditionalSaveData` writes its own `Age`, which is the clock to being a
-    // frog rather than the childhood an animal counts down.
+    // parity: `Tadpole.addAdditionalSaveData` writes its own `Age`.
     if (path == "tadpole") {
         tag.putInt("Age", entity.conversionClock);
     }
@@ -434,7 +421,7 @@ NbtCompound encode(const ServerEntity& entity) {
         }
         tag.putBoolean("PatrolLeader", entity.patrolLeader);
         tag.putBoolean("Patrolling", entity.patrolling);
-        // parity: `Raider.addAdditionalSaveData`; the raid id only while that raid is still saved.
+        // parity: `Raider.addAdditionalSaveData`.
         tag.putInt("Wave", entity.raidWave);
         tag.putBoolean("CanJoinRaid", entity.canJoinRaid);
         if (entity.raidId.has_value() && !entity.raidStale) {
@@ -460,7 +447,7 @@ NbtCompound encode(const ServerEntity& entity) {
     if (horses::isHorse(entity.type())) {
         tag.putBoolean("Tame", entity.tamedHorse);
     }
-    // parity: `LeashData.CODEC`: a knot is its fence's position, anything else its holder's uuid.
+    // parity: `LeashData.CODEC`.
     tag.remove("leash");
     if (entity.leashKnotAt.has_value()) {
         tag.putIntArray("leash", {(*entity.leashKnotAt)[0], (*entity.leashKnotAt)[1], (*entity.leashKnotAt)[2]});
@@ -556,8 +543,7 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     if (const double health = numericDouble(tag, "Health"); health > 0.0) {
         entity->health = health;
     }
-    // parity: a body saved mid-count comes back mid-count, and `isDeadOrDying` is what puts it back
-    // on the clock rather than a flag of its own.
+    // parity: a body saved mid-count resumes mid-count; `isDeadOrDying` puts it back on the clock.
     entity->deathTime = numericInt(tag, "DeathTime");
     entity->dying = entity->deathTime > 0;
     entity->fireTicks = numericInt(tag, "Fire");

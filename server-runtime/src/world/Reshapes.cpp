@@ -137,10 +137,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return reshaped;
 }
 
-/// The same, when the block itself changes: `stateIdOf` only reads its template when the block is
-/// the same one, so a state asked for a different block comes back with that block's first state
-/// under whatever was not named, and a chest turns up waterlogged. parity: `Block.withPropertiesOf`,
-/// only for a pair that shares its whole property set, which is what the copper chests are.
+/// under whatever was not named, and a chest turns up waterlogged. parity: `Block.withPropertiesOf`.
 [[nodiscard]] std::optional<std::int32_t> becomes(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId, const wire::common::Identifier& block,
                                                   const std::string& property, const std::string& value) {
@@ -165,8 +162,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return apply(world, x, y, z, stateId, *reshaped);
 }
 
-/// parity: `AttachedStemBlock.updateShape`: pick the melon and the stem it fed goes back to being a
-/// grown stem, pointing nowhere.
+/// parity: `AttachedStemBlock.updateShape`.
 [[nodiscard]] std::optional<std::int32_t> detachedStem(WorldState& world, std::int32_t x, std::int32_t y,
                                                        std::int32_t z, std::int32_t stateId) {
     const std::string facing = propertyOf(stateId, "facing");
@@ -203,7 +199,6 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     if (facing.empty()) {
         return std::nullopt;
     }
-    // The gate stands across its facing, so the wall it sinks into is on the other axis.
     const bool acrossX = facing == "north" || facing == "south";
     const std::array<registry::BlockFace, 2> sides =
         acrossX ? std::array{registry::BlockFace::West, registry::BlockFace::East}
@@ -215,8 +210,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return changed(world, x, y, z, stateId, block, "in_wall", inWall ? "true" : "false");
 }
 
-/// parity: `BedBlock.updateShape`: a half whose other half is gone goes with it, and one that still
-/// has it copies whether it is occupied.
+/// parity: `BedBlock.updateShape`.
 [[nodiscard]] std::optional<std::int32_t> bed(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                               std::int32_t stateId, const wire::common::Identifier& block) {
     const std::string facing = propertyOf(stateId, "facing");
@@ -238,24 +232,15 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return changed(world, x, y, z, stateId, block, "occupied", occupied);
 }
 
-/// parity: `DoorBlock.updateShape`: each half copies the other's **whole state** but for its own
-/// half, which is what keeps a door open on both halves and closes it on both. The check is
-/// `instanceof DoorBlock`, so any door will do and the block travels with the state: an oak half
-/// under an iron one turns into iron rather than breaking. The bed, which has the same shape, is the
-/// opposite on both counts (`neighbourState.is(this)`, and it copies only `OCCUPIED`).
+/// parity: `DoorBlock.updateShape`.
 [[nodiscard]] std::optional<std::int32_t> door(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                std::int32_t stateId, std::optional<registry::BlockFace> towards) {
     const std::string half = propertyOf(stateId, "half");
     if (half.empty()) {
         return std::nullopt;
     }
-    // parity: `DoorBlock.updateShape` only comes apart when the news arrives **along its own axis and
-    // from the side its other half is on**: `half == LOWER` listens up and `half == UPPER` listens
-    // down. From anywhere else a lone half stays put, which is what a command can leave behind.
+    // parity: `DoorBlock.updateShape` only comes apart when the news arrives **along its own axis and.
     const registry::BlockFace mine = half == "lower" ? registry::BlockFace::Up : registry::BlockFace::Down;
-    // No side at all is a block settling as it arrives, which in the jar is
-    // `Block.updateFromNeighbourShapes` walking all six: for a door only the twin's side answers, so
-    // that walk lands here.
     const bool arriving = !towards.has_value();
     if (!arriving && *towards != mine) {
         return std::nullopt;
@@ -264,9 +249,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     const wire::common::Identifier* otherBlock = registry::blockStateDefinitions::blockOf(other);
     const bool isDoor = otherBlock != nullptr && otherBlock->path().ends_with("_door");
     if (!isDoor || propertyOf(other, "half") == half) {
-        // parity: `BlockInput.place` falls back to what was written when the shape walk answers air
-        // (`if (state.isAir()) state = this.state`), so a half that arrives alone stays where it is.
-        // Only news from the twin's side can break one.
+        // parity: `BlockInput.place` falls back to what was written when the shape walk answers air.
         if (arriving) {
             return std::nullopt;
         }
@@ -281,19 +264,12 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return apply(world, x, y, z, stateId, *wanted);
 }
 
-/// The other half of a double chest.
 [[nodiscard]] std::string otherHalf(const std::string& type) { return type == "left" ? "right" : "left"; }
 
-/// parity: `ChestBlock.updateShape`, which is only half of the pairing: it follows a neighbour that
-/// has already claimed the side facing it, and it goes back to single when the chest it was paired
-/// with is gone. Two chests becoming a double one is decided when the second is placed.
-/// parity: every copper chest is in `#minecraft:copper_chests`, which is the whole family, waxed
-/// included. Nothing else ends in `copper_chest`.
+/// parity: `ChestBlock.updateShape`.
 [[nodiscard]] bool isCopperChest(std::string_view path) { return path.ends_with("copper_chest"); }
 
-/// parity: `ChestBlock.chestCanConnectTo` is `is(this)`, the block itself, and
-/// `CopperChestBlock` overrides it with the tag: an exposed copper chest and an oxidized one make
-/// one double chest, where an oak chest and a trapped chest never do.
+/// parity: `ChestBlock.chestCanConnectTo` is `is(this)`, the block itself, and.
 [[nodiscard]] bool chestsPair(const wire::common::Identifier& block, const wire::common::Identifier& other) {
     return block == other || (isCopperChest(block.path()) && isCopperChest(other.path()));
 }
@@ -317,9 +293,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
             if (propertyOf(neighbour, "facing") != facing || propertyOf(neighbour, "type") != otherHalf(mine)) {
                 continue;
             }
-            // parity: `CopperChestBlock.updateShape` ends in
-            // `neighbourState.getBlock().withPropertiesOf(blockState)`, so the half that joins takes
-            // the other one's oxidation and keeps its own facing and side.
+            // parity: `CopperChestBlock.updateShape` ends in.
             return becomes(world, x, y, z, stateId, *neighbourBlock, "type", mine);
         }
         return std::nullopt;
@@ -330,8 +304,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     const bool stillThere = partnerBlock != nullptr && chestsPair(block, *partnerBlock) &&
                             propertyOf(partner, "facing") == facing && propertyOf(partner, "type") == otherHalf(type);
     if (stillThere) {
-        // parity: the same last line, which also runs when the half already beside it changes
-        // oxidation rather than when it arrives. `apply` answers nothing when the state does not move.
+        // parity: the same last line, which also runs when the half already beside it changes.
         return becomes(world, x, y, z, stateId, *partnerBlock, "type", type);
     }
     return changed(world, x, y, z, stateId, block, "type", "single");
@@ -365,9 +338,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 /// parity: `ChorusPlantBlock.updateShape`, six faces of it.
 [[nodiscard]] std::optional<std::int32_t> chorusPlant(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                       std::int32_t stateId, const wire::common::Identifier& block) {
-    // parity: the shape update asks `canSurvive` **first**, and a plant that cannot stay is left
-    // exactly as it is while its turn is booked: it keeps the `down` it had for one more tick.
-    // Measured in `tallostorre`.
+    // parity: the shape update asks `canSurvive` **first**.
     if (!chorusPlantSurvives(world, x, y, z)) {
         return std::nullopt;
     }
@@ -410,11 +381,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return (propertyOf(stateId, "vertical_direction") != "up") == pointsDown;
 }
 
-/// parity: `SpeleothemBlock.calculateSpeleothemThickness`, whose answer depends on what the piece in
-/// front already is and not only on whether there is one: a spike hanging off a tip is a frustum,
-/// and the one against the ceiling is only the base while nothing is behind it.
-///
-/// A tip meeting another tip head on merges, which is the pair that catches a drop of water.
+/// parity: `SpeleothemBlock.calculateSpeleothemThickness`.
 [[nodiscard]] std::optional<std::int32_t> dripstoneThickness(WorldState& world, std::int32_t x, std::int32_t y,
                                                              std::int32_t z, std::int32_t stateId,
                                                              const wire::common::Identifier& block) {
@@ -445,9 +412,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return isCarpet(stateId) && propertyOf(stateId, face) != "none";
 }
 
-/// parity: `MossyCarpetBlock.getUpdatedState`: a side keeps standing while there is a wall to hold
-/// it, grows tall under another carpet's side, and drops when the carpet below has none. A carpet
-/// left with no sides at all and no base is gone.
+/// parity: `MossyCarpetBlock.getUpdatedState`.
 [[nodiscard]] std::optional<std::int32_t> mossCarpet(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                      std::int32_t stateId, const wire::common::Identifier& block) {
     const bool base = propertyOf(stateId, "bottom") == "true";
@@ -486,7 +451,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return apply(world, x, y, z, stateId, *reshaped);
 }
 
-/// parity: `HugeMushroomBlock.updateShape`: a face touching another cap stops being drawn.
+/// parity: `HugeMushroomBlock.updateShape`.
 [[nodiscard]] std::optional<std::int32_t> hugeMushroom(WorldState& world, std::int32_t x, std::int32_t y,
                                                        std::int32_t z, std::int32_t stateId,
                                                        const wire::common::Identifier& block) {
@@ -504,7 +469,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return apply(world, x, y, z, stateId, *reshaped);
 }
 
-/// parity: `BellBlock.updateShape`, which pairs a wall bell with the wall on its other side.
+/// parity: `BellBlock.updateShape`.
 [[nodiscard]] std::optional<std::int32_t> bell(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                std::int32_t stateId, const wire::common::Identifier& block) {
     const std::string attachment = propertyOf(stateId, "attachment");
@@ -542,10 +507,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     }
 }
 
-/// parity: `ConcretePowderBlock.touchesLiquid`, quirk included: the loop reads the square it looked
-/// at last to decide whether to look down, and on the first turn that square is the powder itself.
-/// A powder is never water, so the block **underneath** never hardens it, which is why a column of
-/// powder poured into a pool only sets where the water touches its sides.
+/// parity: `ConcretePowderBlock.touchesLiquid`.
 [[nodiscard]] std::int32_t readAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     return world.blockState(x, y, z).value_or(registry::blocks::air().stateId);
 }
@@ -564,7 +526,6 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return false;
 }
 
-/// The concrete this powder sets into.
 [[nodiscard]] std::optional<std::int32_t> setInto(const wire::common::Identifier& block) {
     const std::string_view path = block.path();
     if (!path.ends_with(kPowderSuffix)) {
@@ -575,7 +536,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
         wire::common::Identifier::vanilla(std::string{path.substr(0, path.size() - kPowder.size())}), {}, std::nullopt);
 }
 
-/// parity: `ConcretePowderBlock.updateShape`, which sets the powder the moment water reaches it.
+/// parity: `ConcretePowderBlock.updateShape`.
 [[nodiscard]] std::optional<std::int32_t> concretePowder(WorldState& world, std::int32_t x, std::int32_t y,
                                                          std::int32_t z, std::int32_t stateId,
                                                          const wire::common::Identifier& block) {
@@ -589,9 +550,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return set;
 }
 
-/// parity: `MultifaceBlock.updateShape`, which takes off the **face** whose hold has gone and answers
-/// air only when that was the last one. A lichen growing on a wall and on the floor that loses the
-/// wall stays on the floor; before this it kept a face attached to nothing.
+/// parity: `MultifaceBlock.updateShape`.
 [[nodiscard]] std::optional<std::int32_t> multiface(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                     std::int32_t stateId, const wire::common::Identifier& block,
                                                     std::optional<registry::BlockFace> towards) {
@@ -604,8 +563,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     if (here == faces.end() || here->second != "true") {
         return std::nullopt;
     }
-    // parity: `canAttachTo` asks the neighbour for a full face on the side that looks back here, and
-    // takes the collision box as well as the support shape: leaves hold a vine and hold no torch.
+    // parity: `canAttachTo` asks the neighbour for a full face on the side that looks back here.
     const std::int32_t neighbour = stateAt(world, x + offsetX(*towards), y + offsetY(*towards), z + offsetZ(*towards));
     if (registry::blockShapes::canAttachTo(neighbour, facing(*towards))) {
         return std::nullopt;
@@ -625,10 +583,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return written;
 }
 
-/// parity: `VineBlock.getUpdatedState`, the multiface rule with one addition: a horizontal face that
-/// has lost its wall survives anyway when the vine **above** has that same face, which is what lets a
-/// curtain of vines hang off a single block. `updateShape` recomputes every face, not just the one
-/// the news came from, and answers air when none is left.
+/// parity: `VineBlock.getUpdatedState`.
 [[nodiscard]] std::optional<std::int32_t> vine(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                std::int32_t stateId, const wire::common::Identifier& block,
                                                std::optional<registry::BlockFace> towards) {
@@ -642,9 +597,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     const std::map<std::string, std::string> overhead =
         vineAbove ? registry::blockStateDefinitions::propertiesOf(above) : std::map<std::string, std::string>{};
     if (const auto up = faces.find("up"); up != faces.end() && up->second == "true") {
-        // parity: `isAcceptableNeighbour(level, above, DOWN)` tests the **up** face of the block over
-        // it, not its underside. It reads odd and it only matters for a block that is full on one
-        // side and not the other.
+        // parity: `isAcceptableNeighbour(level, above, DOWN)` tests the **up** face of the block over.
         up->second = registry::blockShapes::isFaceSturdy(above, registry::BlockFace::Up) ? "true" : "false";
     }
     for (const registry::BlockFace face : kHorizontal) {
@@ -752,8 +705,7 @@ std::optional<std::int32_t> landedConcrete(WorldState& world, std::int32_t x, st
     if (block == nullptr) {
         return std::nullopt;
     }
-    // parity: `ConcretePowderBlock.shouldSolidify`, which counts the square it landed in as well as
-    // the six around it, so powder dropped straight into a pool sets where it stops.
+    // parity: `ConcretePowderBlock.shouldSolidify`.
     if (!registry::blockFluids::hasWaterFluid(replaced) && !touchesWaterImpl(world, x, y, z)) {
         return std::nullopt;
     }

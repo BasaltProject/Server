@@ -101,8 +101,7 @@ bool shouldCreateFromThunder(LoadedWorld& world, std::int32_t x, std::int32_t y,
     if (!below.has_value()) {
         return true;
     }
-    // parity: the test is against the tag `lightning_rods`, which is the eight stages of copper the
-    // rod oxidises through and not the one block: an exposed rod protects the same.
+    // parity: the test is against the tag `lightning_rods`.
     const Identifier* block = reg::blockStateDefinitions::blockOf(*below);
     return block == nullptr || !block->path().ends_with("lightning_rod");
 }
@@ -121,7 +120,6 @@ MobSpawnForest buildActivationForest(entity::ServerEntity& horse, random::Random
         contextOf(equipment, levelRandom, specialMultiplier, biome, gameTime, difficulty, entityRandomFactory);
     MobSpawnForestBuilder builder;
     MobSpawnNode& originalRider = createSkeleton(builder, horse.x, horse.y, horse.z, context, equipment);
-    // The trap horse already exists in the world, so its rider mounts it by id rather than by node.
     static_cast<void>(builder.mountExternal(originalRider, horse.entityId()));
 
     for (std::int32_t index = 0; index < 3; index++) {

@@ -19,7 +19,6 @@ constexpr std::string_view kShield = "minecraft:shield";
     return held.has_value() && held->id == kShield;
 }
 
-/// The hand a sneak raises: the main hand first, then the off hand, as the use it stands for.
 [[nodiscard]] std::optional<std::int32_t> shieldHand(const player::PlayerSession& player) {
     const std::int32_t main = PlayerInventory::kHotbarStart + player.inventory.heldSlot();
     if (holdsShield(player, main)) {
@@ -31,7 +30,6 @@ constexpr std::string_view kShield = "minecraft:shield";
     return std::nullopt;
 }
 
-/// Raises the shield in the hand a sneak lifts it with, keeps its count, or drops it.
 void raise(player::PlayerSession& player, const std::int64_t gameTime) {
     const std::optional<std::int32_t> hand = player.sneaking && !player.dead ? shieldHand(player) : std::nullopt;
     if (player.blockingSlot.has_value() && hand != player.blockingSlot) {
@@ -45,7 +43,7 @@ void raise(player::PlayerSession& player, const std::int64_t gameTime) {
         ++player.blockingTicks;
         return;
     }
-    // parity: `ItemCooldowns.isOnCooldown`: an axe's blow keeps the shield down until it runs out.
+    // parity: `ItemCooldowns.isOnCooldown`.
     if (player::onCooldownFor(player, wire::common::Identifier::vanilla("shield"), gameTime)) {
         return;
     }

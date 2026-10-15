@@ -10,10 +10,10 @@
 namespace basalt::server::runtime::entity::entityPhysics {
 namespace {
 
-/// parity: `Entity.getBlockBounciness`, which gives anything that is not alive four fifths of it.
+/// parity: `Entity.getBlockBounciness`.
 constexpr float kNonLivingBounceShare = 0.8F;
 
-/// parity: `getBlockPosBelowThatAffectsMyMovement`, which looks half a block under the feet.
+/// parity: `getBlockPosBelowThatAffectsMyMovement`.
 constexpr double kFrictionProbeDepth = 0.5;
 
 /// parity: the block whose bounce the entity feels, which is not always the one it stands in.
@@ -42,8 +42,7 @@ void move(world::WorldState& world, ServerEntity& entity, double gravity, double
     entity.z += moved[2];
     entity.onGround = moved[1] != entity.velocityY && entity.velocityY < 0.0;
 
-    // parity: `Entity.restituteMovementAfterCollisions`: a stopped axis is zeroed unless the block
-    // underneath bounces, and only slime and beds do.
+    // parity: `Entity.restituteMovementAfterCollisions`.
     const float bounciness =
         entity.onGround ? registry::blockMovement::bouncinessOf(blockUnder(world, entity)) * kNonLivingBounceShare
                         : 0.0F;

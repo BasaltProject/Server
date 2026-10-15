@@ -150,8 +150,7 @@ TemplateBlockProcessor templateBlockProcessors::protectFeatures() {
 
 TemplateBlockProcessor templateBlockProcessors::lavaSubmerged() {
     return [](std::int32_t input, std::int32_t world, StructurePos) -> std::optional<std::int32_t> {
-        // parity: `Block.isShapeFullBlock`, a full cube and not merely something solid: a slab or a
-        // stair keeps the lava around it, a netherrack block displaces it.
+        // parity: `Block.isShapeFullBlock`.
         if (pathOf(world) == "lava" && !registry::blockShapes::isSolidRender(input)) {
             return state("lava");
         }

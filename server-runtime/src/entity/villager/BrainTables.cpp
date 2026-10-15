@@ -15,8 +15,6 @@ constexpr float kSpeed = 0.5F;
 /// parity: `VillagerGoalPackages.STROLL_SPEED_MODIFIER`.
 constexpr float kStroll = 0.4F;
 
-/// Which job-site predicate an `AcquirePoi` or `ValidateNearbyPoi` reads, worked out from the
-/// profession at the time rather than baked into the table.
 enum PoiSource : std::int32_t { kFixed = 0, kHeld = 1, kAcquirable = 2 };
 
 struct Child {
@@ -26,7 +24,6 @@ struct Child {
 
 class Builder {
 public:
-    /// A top-level behaviour. Answers its index.
     std::uint8_t add(Activity activity, std::uint8_t priority, Node node) {
         node.activity = activity;
         node.priority = priority;
@@ -36,13 +33,12 @@ public:
         return index;
     }
 
-    /// A composite whose children follow it.
     void addGate(Activity activity, std::uint8_t priority, Node gate, std::initializer_list<Child> children) {
         const std::uint8_t index = add(activity, priority, gate);
         fill(index, children);
     }
 
-    /// parity: `BehaviorBuilder.sequence(triggerIf(...), gate)`, a condition around one composite.
+    /// parity: `BehaviorBuilder.sequence(triggerIf(...), gate)`.
     void addGuardedGate(Activity activity, std::uint8_t priority, Kind guard, Node gate,
                         std::initializer_list<Child> children) {
         const std::uint8_t outer = add(activity, priority, Node{.kind = guard});
@@ -61,8 +57,7 @@ public:
     }
 
     [[nodiscard]] BrainTable finish() {
-        // parity: `availableBehaviorsByPriority`, a tree map of priorities, each walking its
-        // activities and each of those its behaviours in the order they were added.
+        // parity: `availableBehaviorsByPriority`.
         std::ranges::stable_sort(table_.top, [this](std::uint8_t one, std::uint8_t other) {
             const Node& first = table_.nodes[one];
             const Node& second = table_.nodes[other];
@@ -319,8 +314,7 @@ void danger(Builder& builder) {
 
 [[nodiscard]] BrainTable build(bool baby, bool farmer) {
     Builder builder;
-    // parity: the activities in the order the provider adds them: work or play, then the core,
-    // meet, rest, idle, panic, pre-raid, raid and hide.
+    // parity: the provider's activity order: work or play, core, meet, rest, idle, panic, pre-raid, raid, hide.
     if (baby) {
         play(builder);
     } else {

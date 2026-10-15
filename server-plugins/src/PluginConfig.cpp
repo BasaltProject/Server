@@ -4,11 +4,9 @@
 #include <utility>
 
 namespace basalt::server::plugins::pluginConfig {
-
 std::expected<wire::common::toml::TomlTable, PluginLoadError>
 load(const std::map<std::string, std::string, std::less<>>& files) {
     wire::common::toml::TomlTable out;
-    // The map is already ordered by its key, which is what makes the result the same every run.
     for (const auto& [relative, path] : files) {
         if (!relative.ends_with(".toml")) {
             continue;
@@ -43,5 +41,4 @@ load(const std::map<std::string, std::string, std::less<>>& files) {
     }
     return out;
 }
-
 } // namespace basalt::server::plugins::pluginConfig

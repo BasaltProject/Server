@@ -18,7 +18,6 @@ constexpr std::int32_t kDayTicks = 24000;
 constexpr float kMinRate = 1.0E-5F;
 constexpr float kMaxRate = 1000.0F;
 
-/// One world with the clock it runs on, or the reason it has none.
 struct Clock {
     world::LoadedWorld* world = nullptr;
     std::string name;
@@ -28,7 +27,7 @@ struct Clock {
     return {Identifier::vanilla("overworld"), Identifier::vanilla("the_end")};
 }
 
-/// parity: `TimeCommand.wrapTime`, which is what makes a huge tick count still fit a result.
+/// parity: `TimeCommand.wrapTime`.
 [[nodiscard]] std::int32_t wrap(std::int64_t ticks) {
     return static_cast<std::int32_t>(ticks % std::numeric_limits<std::int32_t>::max());
 }
@@ -109,8 +108,7 @@ struct Clock {
     return wrap(clock->world->clock().totalTicks());
 }
 
-/// parity: `time query <timeline>`, the position inside a timeline's period, and `repetition`, how
-/// many whole periods have passed. A timeline that belongs to another clock is refused.
+/// parity: `time query <timeline>`.
 [[nodiscard]] Parsed<std::int32_t> queryTimeline(const CommandContext& context, bool named, bool repetitions) {
     const std::expected<Clock, CommandSyntaxError> clock = clockOf(context, named);
     if (!clock.has_value()) {
@@ -141,7 +139,6 @@ struct Clock {
     return wrap(value);
 }
 
-/// The verbs, declared once for the bare form and once under `of <clock>`, as vanilla does.
 void buildActions(const CommandNodeBuilder& root, bool named) {
     root.literal("set", [named](const CommandNodeBuilder& set) {
         set.argument("time", timeArgument(0), [named](const CommandNodeBuilder& time) {
@@ -162,8 +159,7 @@ void buildActions(const CommandNodeBuilder& root, bool named) {
         });
     });
     root.literal("add", [named](const CommandNodeBuilder& add) {
-        // parity: `TimeArgument.time(Integer.MIN_VALUE)`. Only `add` accepts a negative, and it then
-        // clamps at zero rather than running the clock backwards.
+        // parity: `TimeArgument.time(Integer.MIN_VALUE)`.
         add.argument("time", timeArgument(std::numeric_limits<std::int32_t>::min()),
                      [named](const CommandNodeBuilder& time) {
                          time.executes([named](const CommandContext& context) { return addTime(context, named); });

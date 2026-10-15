@@ -32,19 +32,12 @@ class BlockChangeBroadcaster;
 class BossBarView;
 class ExplosionSystem;
 
-/// The wither's reach into the world: how it is built, what its heads shoot, the blocks it breaks
-/// and the bar its watchers see.
-///
-/// parity: `WitherSkullBlock.checkSpawn`, the world half of `WitherBoss` and `WitherSkull.onHit`.
 class WitherSystem {
 public:
     struct Options {
         std::function<std::int64_t()> nextSeed;
-        /// `wither_summon_base_blocks` and `wither_immune`.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
-        /// Where the advancement for raising one goes, which is to whoever is near it.
         world::AdvancementTriggers* advancementTriggers = nullptr;
-        /// A status effect given to a mob.
         std::function<bool(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            entity::ServerEntity& mob, const world::ActiveEffect& effect)>
             mobEffect;
@@ -59,36 +52,27 @@ public:
 
     [[nodiscard]] static bool isWither(const entity::ServerEntity& entity);
 
-    /// The state of a wither, made on first use for one that came from a command or the disk.
     [[nodiscard]] static entity::witherBoss::WitherState& stateOf(entity::ServerEntity& wither);
 
-    /// A block just went down by hand there. parity: `WitherSkullBlock.setPlacedBy`.
     void placed(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
-    /// parity: the part of `WitherBoss.aiStep` before `super.aiStep`: rising to the target and
-    /// following it.
+    /// parity: the part of `WitherBoss.aiStep` before `super.aiStep`.
     void beforeTurn(world::LoadedWorld& world, const std::vector<entity::ServerEntity*>& living,
                     entity::ServerEntity& wither);
 
-    /// parity: `WitherBoss.customServerAiStep`.
     void afterTurn(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                    const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& wither);
 
-    /// The middle head's shot at its target. parity: `performRangedAttack(target, power)`.
     void shootAtTarget(world::LoadedWorld& world, entity::ServerEntity& wither);
 
-    /// parity: `WitherSkull.onHitEntity` and `onHit`. `mob` or `player` is who it struck, if anyone.
     void skullLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                      entity::ServerEntity& skull, entity::ServerEntity* mob, player::PlayerSession* player);
 
     /// parity: `WitherBoss.dropCustomDeathLoot`, the star that never despawns.
     void dropStar(world::LoadedWorld& world, const entity::ServerEntity& wither);
 
-    /// parity: the bar of a wither that is already dying, which stays up for its twenty turns of
-    /// death because the boss event only goes when the entity does.
     void keepBar(world::LoadedWorld& world, entity::ServerEntity& wither);
 
-    /// Takes the bars of withers that took no turn since the last call from whoever saw them.
     void sweepBars();
 
 private:

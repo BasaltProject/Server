@@ -152,8 +152,7 @@ constexpr double kQuarterTurn = static_cast<double>(std::numbers::pi_v<float> / 
     return water(mob.world, at) || hasMalus(mob, at) ? std::nullopt : std::optional{at};
 }
 
-/// parity: `RandomPos.generateRandomPos` weighed by `Bee.getWalkTargetValue`, ten for air, or by
-/// `PathfinderMob`'s zero for everybody else.
+/// parity: `RandomPos.generateRandomPos` weighed by `Bee.getWalkTargetValue` (ten for air) or `PathfinderMob`'s zero.
 template <typename Supplier>
 [[nodiscard]] std::optional<Block> bestOf(MobContext& mob, Supplier supply) {
     const bool bee = bees::isBee(mob.mob.type());

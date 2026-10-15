@@ -12,7 +12,6 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 /// A plugin's two lanes must not walk the same random sequence.
 [[nodiscard]] std::uint64_t seedFor(std::string_view pluginId, std::int32_t lane) {
     std::uint64_t hash = 0;
@@ -21,7 +20,6 @@ namespace {
     }
     return (hash * 31) + static_cast<std::uint64_t>(lane);
 }
-
 } // namespace
 
 LoadedPlugin::LoadedPlugin(PluginManifest manifest, std::shared_ptr<PluginPackage> pkg, wire::common::Logger log,
@@ -269,7 +267,6 @@ std::unique_ptr<lua::LuaSandbox> PluginHost::sandboxFor(LoadedPlugin& plugin, st
 bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<PluginPackage>& pkg) {
     wire::common::Logger log{"plugin/" + manifest.id};
     const std::optional<std::string> source = pkg->readText(manifest.main);
-    // A package that only exports modules is a library, and a library has nothing to run.
     const bool library = !source.has_value() && !manifest.exports.modules.empty();
     if (!source.has_value() && !library) {
         log.error([&manifest] {
@@ -292,9 +289,6 @@ bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<Plu
     }
     auto plugin = std::make_unique<LoadedPlugin>(manifest, pkg, std::move(log), *config, folderPath, *files);
 
-    // Said once, at load, and not at the first call: a plugin that asked for something it did not
-    // get should be visible to the operator before it misbehaves, and the plugin itself simply does
-    // not get the global.
     const std::set<PluginPermission> granted = allowed(manifest.id);
     std::vector<std::string> missing;
     for (const PluginPermission asked : manifest.capabilities.asks()) {
@@ -315,8 +309,6 @@ bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<Plu
         });
     }
 
-    // Compiled once and bound into each lane: a prototype is finished code and shared safely, and it
-    // is the compile that costs, not the libraries.
     const std::string chunkName = "@" + manifest.id + "/" + manifest.main;
     std::unique_ptr<lua::LuaSandbox> first = sandboxFor(*plugin, 0);
     if (first == nullptr) {
@@ -361,9 +353,6 @@ bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<Plu
             }
         }
     }
-    // A plugin whose own file failed while running has not loaded, whatever it managed to register
-    // before it fell over: half a plugin is worse than none, and the log already says what went
-    // wrong.
     if (loaded.failures > 0 || loaded.disabled) {
         loaded.log.error([&manifest] { return manifest.id + " failed while loading and is off"; });
         LoadedPlugin* target = &loaded;
@@ -391,8 +380,6 @@ void PluginHost::stop(LoadedPlugin& plugin) {
         plugin.log.warn(
             [&what, &error] { return "could not retire " + std::string{what} + ": " + std::string{error}; });
     });
-    // The ledger above already took them out one by one; this is the belt to its braces, so a
-    // handler cannot outlive its plugin even if a registration was written wrong.
     events_.removeAll(plugin.manifest.id);
     plugin.instances.clear();
     plugin.commands.clear();
@@ -407,8 +394,6 @@ std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& 
     if (std::optional<std::vector<std::uint8_t>> found = plugin.pkg->read(*own); found.has_value()) {
         return found;
     }
-    // Past its own `src/`, the first part is whose the module is: `require("economy.api")` is
-    // `src/api.lua` of the plugin `economy`, and only if `economy` says that module is public.
     const std::size_t dot = requested.find('.');
     if (dot == std::string_view::npos) {
         return std::nullopt;
@@ -419,9 +404,6 @@ std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& 
     if (!file.has_value()) {
         return std::nullopt;
     }
-    // Its own code under its own id: `require("me.util")` from inside `me` is the same file as
-    // `require("util")`, and a library that names its own modules the way everyone else does should
-    // not have to write them differently.
     if (id == plugin.manifest.id) {
         return plugin.pkg->read(*file);
     }
@@ -430,11 +412,8 @@ std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& 
         return std::nullopt;
     }
     if (!owner->manifest.exports.exportsModule(module)) {
-        // Not "no such module": it is there and it is private, and saying which is the difference
-        // between a one-line fix and an afternoon.
         return std::nullopt;
     }
     return owner->pkg->read(*file);
 }
-
 } // namespace basalt::server::plugins

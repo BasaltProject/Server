@@ -10,8 +10,7 @@
 namespace basalt::server::runtime::world::vineGrowth {
 namespace {
 
-/// parity: `VineBlock.isAcceptableNeighbour` over `MultifaceBlock.canAttachTo`: the face the
-/// neighbour turns towards the vine has to be a solid one.
+/// parity: `VineBlock.isAcceptableNeighbour` over `MultifaceBlock.canAttachTo`.
 [[nodiscard]] bool clingsTo(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                             std::string_view facing) {
     const std::optional<std::int32_t> neighbour = world.blockState(x, y, z);
@@ -103,8 +102,7 @@ void vine(WorldState& world, const GameRuleValues& gameRules, std::int32_t x, st
         growthSupport::set(world, x, y, z, *climbed, changes);
         return;
     }
-    // parity: a vine never takes its own underside. Falling through would ask the block at its own
-    // position for a face and be refused, but for the wrong reason.
+    // parity: a vine never takes its own underside. Falling through would ask the block at its own.
     if (facing == "down") {
         return;
     }
@@ -114,13 +112,10 @@ void vine(WorldState& world, const GameRuleValues& gameRules, std::int32_t x, st
     }
     const std::int32_t sideX = x + growthSupport::offsetX(facing);
     const std::int32_t sideZ = z + growthSupport::offsetZ(facing);
-    // Air is refused here rather than below, where it would be refused for having no solid face:
-    // the block has to be there before it can be held on to.
     const std::optional<std::int32_t> beside = world.blockState(sideX, y, sideZ);
     if (!beside.has_value() || *beside == registry::blocks::air().stateId) {
         return;
     }
-    // Something to hold on to right there: take that face.
     if (!clingsTo(world, sideX, y, sideZ, facing)) {
         return;
     }

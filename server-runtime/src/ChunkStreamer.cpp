@@ -94,7 +94,6 @@ void ChunkStreamer::sendInitialChunks(const server::world::ChunkTracker::Delta& 
         ChunkBatchFinishedPacket{.batchSize = static_cast<std::int32_t>(loginChunks.size())}.write(buffer);
     });
 
-    // Everything else the view distance covers, queued for the outbound loop to stream.
     std::set<std::pair<std::int32_t, std::int32_t>> sent;
     for (const Chunk* chunk : loginChunks) {
         sent.emplace(chunk->chunkX(), chunk->chunkZ());
@@ -258,7 +257,6 @@ void ChunkStreamer::setRequestedViewDistance(std::int32_t distance) {
         return;
     }
     requestedViewDistance_ = distance;
-    // Before the first join there is no view yet to move.
     if (viewRadius_ > 0) {
         applyDelta(chunkTracker_.update(centerChunkX_, centerChunkZ_, trackedRadius()));
     }
@@ -313,15 +311,13 @@ void ChunkStreamer::streamChunksAround(double x, double z) {
                                           static_cast<std::int32_t>(squaredDistanceToCenter(pos.x, pos.z)));
     }
     prefetchAhead(chunkX, chunkZ, chunkX - previousCenterX, chunkZ - previousCenterZ);
-    // Unloads go out straight away rather than waiting behind generation: the client can drop what
-    // it no longer needs before the replacements are even built.
+    // Unloads go out at once: the client can drop what it no longer needs before replacements are built.
     for (const ChunkPos& pos : delta.toUnload) {
         owner_->sendCompressed(ForgetLevelChunkPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             ForgetLevelChunkPacket{.chunkX = pos.x, .chunkZ = pos.z}.write(buffer);
         });
     }
-    // No flush here: the outbound loop is the only drainer, so the client's requested rate is
-    // honoured, and the read thread never stalls on a burst of chunk encoding and zlib.
+    // No flush: the outbound loop is the only drainer, so the requested rate holds and reads never stall on encoding.
 }
 
 void ChunkStreamer::prefetchAhead(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t movedX, std::int32_t movedZ) {
@@ -382,16 +378,11 @@ std::int32_t ChunkStreamer::flushReadyChunks(std::int32_t limit) {
             }
             Chunk* chunk = owner_->world().chunkIfLoaded(pos.x, pos.z);
             if (chunk == nullptr) {
-                // Requested, then unloaded again before it could be sent. Ask for it once more
-                // rather than waiting for ever on a chunk nothing is going to produce: the tracker
-                // already believes the client has it, so nothing else would.
+                // Unloaded before it was sent: ask again, the tracker thinks the client has it and nothing else would.
                 owner_->generationQueue().request(pos.x, pos.z,
                                                   static_cast<std::int32_t>(squaredDistanceToCenter(pos.x, pos.z)));
                 continue;
             }
-            // parity: vanilla only sends a chunk once it is FULL, which it cannot be until the eight
-            // around it exist: light worked out with a neighbour missing lets the sky in from
-            // nowhere, and the client keeps whatever it is sent.
             if (!neighboursLoaded(pos.x, pos.z)) {
                 left.push_back(pos);
                 continue;

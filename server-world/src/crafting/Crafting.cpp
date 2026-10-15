@@ -8,8 +8,6 @@
 namespace basalt::server::world::crafting {
 namespace {
 
-/// The four hooks, mirroring the mutable ones the frozen Kotlin keeps on its companion objects: what
-/// they answer belongs to the item registry, which this module deliberately does not depend on.
 hooks::RemainderOf& remainderHook() {
     static hooks::RemainderOf hook;
     return hook;
@@ -30,10 +28,6 @@ hooks::DyeColourOf& dyeColourHook() {
     return hook;
 }
 
-/// Whether every item can be assigned to a distinct ingredient it satisfies: a bipartite perfect
-/// matching by augmenting paths. Vanilla answers the same question through `StackedContents.canCraft`;
-/// craftability is a pure yes or no with no randomness in it, so any correct matching reaches the
-/// same accept or reject.
 bool tryAssign(std::size_t itemIndex, const std::vector<loot::ItemStack>& items,
                const std::vector<Ingredient>& ingredients, std::vector<std::int32_t>& assignedItem,
                std::vector<bool>& visited) {
@@ -172,8 +166,7 @@ bool Ingredient::testOptional(const std::optional<Ingredient>& ingredient, const
 
 namespace {
 
-/// parity: `Util.isSymmetrical`: a width-1 pattern is trivially symmetrical, otherwise every slot
-/// must equal its horizontal mirror.
+/// parity: `Util.isSymmetrical`.
 [[nodiscard]] bool isSymmetrical(const Recipe& recipe) {
     if (recipe.width == 1) {
         return true;
@@ -204,8 +197,7 @@ namespace {
     return true;
 }
 
-/// parity: `TransmuteRecipe.matches` and `assemble`: one input, one to eight materials, and the
-/// input's components on whatever comes out.
+/// parity: `TransmuteRecipe.matches` and `assemble`.
 [[nodiscard]] std::optional<loot::ItemStack> transmuted(const Recipe& recipe, const CraftingInput& input) {
     if (recipe.ingredients.size() != 2 || input.ingredientCount() < recipe.materialMin + 1 ||
         input.ingredientCount() > recipe.materialMax + 1) {
@@ -273,7 +265,6 @@ bool Recipe::matches(const CraftingInput& input) const {
     case RecipeKind::Brewing:
     case RecipeKind::Cooking:
     case RecipeKind::Stonecutting:
-        // A cooking recipe or a stonecutter holds one item, so the grid form is one non-empty slot.
         return input.ingredientCount() == 1 && ingredient.test(input.item(0, 0));
     case RecipeKind::Smithing:
         // A smithing recipe is never a crafting-table recipe, whatever is in the grid.
@@ -309,8 +300,7 @@ std::vector<std::optional<loot::ItemStack>> Recipe::remainingItems(const Craftin
             kept.push_back(std::move(left));
         }
     }
-    // parity: `BookCloningRecipe.getRemainingItems`, which puts the book being copied back: it is the
-    // one recipe whose source survives being crafted with.
+    // parity: `BookCloningRecipe.getRemainingItems`.
     if (kind != RecipeKind::Special || specialKind != SpecialKind::BookCloning) {
         return kept;
     }

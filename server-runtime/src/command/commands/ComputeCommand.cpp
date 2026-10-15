@@ -26,8 +26,7 @@ using wire::text::Component;
 
 enum class Source : std::uint8_t { Default, Block, Entity };
 
-/// parity: `LootContextSources.ContextDecorator.createParams`: `THIS_ENTITY` is the source's own
-/// entity and `ORIGIN` its position; the `block` form adds the block state there.
+/// parity: `LootContextSources.ContextDecorator.createParams`.
 [[nodiscard]] server::world::loot::LootContext contextOf(const CommandContext& context, world::RealLootTables* tables,
                                                          Source source) {
     server::world::loot::LootContext loot;
@@ -57,8 +56,7 @@ enum class Source : std::uint8_t { Default, Block, Entity };
     return loot;
 }
 
-/// parity: `Float.toString`, the shortest digits with a ".0" on whole numbers and "E" notation
-/// outside [1e-3, 1e7).
+/// parity: `Float.toString`.
 [[nodiscard]] std::string javaFloat(float value) {
     if (std::isnan(value)) {
         return "NaN";
@@ -84,7 +82,6 @@ enum class Source : std::uint8_t { Default, Block, Entity };
     return mantissa + "E" + std::to_string(exponent);
 }
 
-/// The provider as JSON, the id standing for itself so a reference resolves through the registry.
 [[nodiscard]] wire::common::JsonValue jsonOf(const ResourceOrInline& named) {
     return named.inlineValue.value_or(
         wire::common::JsonValue::of(named.id.has_value() ? named.id->toString() : std::string{}));

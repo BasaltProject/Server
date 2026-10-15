@@ -17,15 +17,12 @@ class WorldState;
 
 namespace basalt::server::runtime::entity::ai {
 
-/// Where a ground mob picks to walk next, ten tries at a time and the best of them kept.
-///
-/// parity: `RandomPos`, `DefaultRandomPos` and `LandRandomPos`, draw for draw. The answer is the
-/// bottom centre of the chosen block.
+/// parity: `RandomPos`, `DefaultRandomPos` and `LandRandomPos`, draw for draw.
 namespace randomPos {
 
 using Spot = std::array<double, 3>;
 
-/// parity: `PathfinderMob.getWalkTargetValue`, zero unless the caller weighs spots its own way.
+/// parity: `PathfinderMob.getWalkTargetValue`.
 using Weight = std::function<double(std::int32_t x, std::int32_t y, std::int32_t z)>;
 
 /// parity: `DefaultRandomPos.getPos`.
@@ -38,7 +35,7 @@ using Weight = std::function<double(std::int32_t x, std::int32_t y, std::int32_t
                                                     random::RandomSource& random, std::int32_t horizontal,
                                                     std::int32_t vertical, const Spot& towards, double maxRadians);
 
-/// parity: `DefaultRandomPos.getPosAway`, within a quarter turn of straight away from `away`.
+/// parity: `DefaultRandomPos.getPosAway`.
 [[nodiscard]] std::optional<Spot> defaultPosAway(world::WorldState& world, const ServerEntity& mob,
                                                  random::RandomSource& random, std::int32_t horizontal,
                                                  std::int32_t vertical, const Spot& away);

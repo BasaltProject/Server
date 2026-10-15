@@ -32,7 +32,6 @@ namespace {
     return block->stateId;
 }
 
-/// A chunk with something in it, so an empty one and a saved one are told apart.
 [[nodiscard]] Chunk filled(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t height) {
     Chunk chunk{chunkX, chunkZ};
     for (std::int32_t x = 0; x < 16; ++x) {
@@ -61,14 +60,12 @@ TEST_CASE("a chunk saved is a chunk read back") {
     CHECK(store.regionPath(0, 0) == root + "/world/region/r.0.0.linear");
     CHECK(store.regionPath(-2, 3) == root + "/world/region/r.-2.3.linear");
 
-    // Nothing on disk, so the chunk has never been generated.
     CHECK_FALSE(store.loadChunk(0, 0).has_value());
 
     std::vector<Chunk> chunks;
     chunks.push_back(filled(0, 0, 70));
     CHECK(save(store, chunks, 1234) == 1);
     CHECK(fileIO::exists(store.regionPath(0, 0)));
-    // Saving is what makes a chunk clean, so the next sweep leaves it alone.
     CHECK_FALSE(chunks[0].isDirty());
 
     const std::optional<Chunk> read = store.loadChunk(0, 0);
@@ -77,7 +74,6 @@ TEST_CASE("a chunk saved is a chunk read back") {
     CHECK(read->chunkZ() == 0);
     CHECK(read->blockStateId(5, 70, 5) == stoneState());
     CHECK(read->blockStateId(5, 71, 5) == registry::blocks::air().stateId);
-    // A chunk straight off disk is not a chunk to write back: nothing in it differs from the file.
     CHECK_FALSE(read->isDirty());
 }
 
@@ -90,7 +86,6 @@ TEST_CASE("chunks land in the region they belong to, negative coordinates includ
     chunks.push_back(filled(31, 31, 65));
     chunks.push_back(filled(32, 0, 66));
     chunks.push_back(filled(-1, -1, 67));
-    // Three regions: (0,0) twice, (1,0) once and (-1,-1) once.
     CHECK(save(store, chunks, 10) == 3);
     CHECK(fileIO::exists(store.regionPath(0, 0)));
     CHECK(fileIO::exists(store.regionPath(1, 0)));
@@ -98,9 +93,7 @@ TEST_CASE("chunks land in the region they belong to, negative coordinates includ
 
     CHECK(store.loadChunk(31, 31)->blockStateId(0, 65, 0) == stoneState());
     CHECK(store.loadChunk(32, 0)->blockStateId(0, 66, 0) == stoneState());
-    // The one at (-1,-1) is slot (31,31) of region (-1,-1), which the masking has to agree on.
     CHECK(store.loadChunk(-1, -1)->blockStateId(0, 67, 0) == stoneState());
-    // And its neighbours in that region were never saved.
     CHECK_FALSE(store.loadChunk(-2, -2).has_value());
 }
 
@@ -111,8 +104,7 @@ TEST_CASE("a region west of the origin is not the region north of it") {
     std::vector<Chunk> chunks;
     chunks.push_back(filled(-1, 0, 64));
     chunks.push_back(filled(-1, -1, 65));
-    // Two regions, (-1,0) and (-1,-1): packed without masking the low half they are the same key
-    // and one of the two is lost.
+    // Packed without masking the low half, (-1,0) and (-1,-1) are the same key and one of the two is lost.
     CHECK(save(store, chunks, 1) == 2);
     CHECK(fileIO::exists(store.regionPath(-1, 0)));
     CHECK(fileIO::exists(store.regionPath(-1, -1)));
@@ -128,8 +120,6 @@ TEST_CASE("the timestamp a save was given is the one in the file") {
     chunks.push_back(filled(1, 2, 64));
     CHECK(save(store, chunks, 1700000000) == 1);
 
-    // Read back through the format itself: the stamp is what another tool sorts saves by, and
-    // nothing in this store's own interface exposes it.
     const std::optional<std::vector<std::uint8_t>> bytes = fileIO::readBytes(store.regionPath(0, 0));
     REQUIRE(bytes.has_value());
     const std::expected<basalt::server::world::region::LinearRegion, basalt::server::world::region::LinearError>
@@ -147,7 +137,6 @@ TEST_CASE("the region kept is the one most recently used") {
         one.push_back(filled(region * 32, 0, 64));
         CHECK(save(store, one, 1) == 1);
     }
-    // Asking for the first one again puts it back at the head of the queue.
     CHECK(store.loadChunk(0, 0).has_value());
 
     std::vector<Chunk> third;
@@ -155,8 +144,6 @@ TEST_CASE("the region kept is the one most recently used") {
     CHECK(save(store, third, 1) == 1);
     CHECK(store.cachedRegionCount() == 2);
 
-    // With the files gone, what answers is what is still cached: the one that was asked for last,
-    // not the one that was written last.
     CHECK(fileIO::remove(store.regionPath(0, 0)));
     CHECK(fileIO::remove(store.regionPath(1, 0)));
     CHECK(store.loadChunk(0, 0).has_value());
@@ -177,7 +164,6 @@ TEST_CASE("a region file is rewritten whole, however few of its chunks changed")
     second.push_back(filled(3, 0, 100));
     CHECK(save(store, second, 2) == 1);
 
-    // The rewrite kept the seven it did not touch and replaced the one it did.
     CHECK(store.loadChunk(5, 0)->blockStateId(0, 69, 0) == stoneState());
     CHECK(store.loadChunk(3, 0)->blockStateId(0, 100, 0) == stoneState());
     CHECK(store.loadChunk(3, 0)->blockStateId(0, 67, 0) == registry::blocks::air().stateId);
@@ -194,7 +180,6 @@ TEST_CASE("saving nothing writes nothing") {
 
 TEST_CASE("the cache keeps a few regions and lets the rest go") {
     const std::string root = scratch("region-store-cache");
-    // Two regions and a budget nothing reaches, so what is measured is the count alone.
     RegionStore store{"world", root, basalt::server::world::kOverworldHeight, 2, 1024LL * 1024 * 1024};
 
     std::vector<Chunk> chunks;
@@ -202,18 +187,15 @@ TEST_CASE("the cache keeps a few regions and lets the rest go") {
         chunks.push_back(filled(region * 32, 0, 64));
     }
     CHECK(save(store, chunks, 1) == 4);
-    // All four staged writes at once, and a region holding one is never evicted: between flushes
-    // the cache runs past its ceiling by exactly the regions waiting to be written.
+    // A region holding a staged write is never evicted: between flushes the cache runs past its ceiling.
     CHECK(store.cachedRegionCount() == 4);
 
-    // The ceiling is enforced when the next region arrives, which is the moment it costs anything.
     std::vector<Chunk> later;
     later.push_back(filled(4 * 32, 0, 64));
     CHECK(save(store, later, 2) == 1);
     CHECK(store.cachedRegionCount() <= 2);
     CHECK(store.cachedRegionBytes() > 0);
 
-    // And what was dropped is read again from disk rather than lost.
     for (std::int32_t region = 0; region < 5; ++region) {
         CAPTURE(region);
         CHECK(store.loadChunk(region * 32, 0).has_value());
@@ -222,15 +204,12 @@ TEST_CASE("the cache keeps a few regions and lets the rest go") {
 
 TEST_CASE("a region with unsaved writes stays cached however small the budget") {
     const std::string root = scratch("region-store-dirty");
-    // One region and no budget at all: everything is over the ceiling the moment it is cached.
     RegionStore store{"world", root, basalt::server::world::kOverworldHeight, 1, 1};
 
     std::vector<Chunk> chunks;
     for (std::int32_t region = 0; region < 3; ++region) {
         chunks.push_back(filled(region * 32, 0, 64));
     }
-    // Every one of them is written, which is only possible if a region holding staged writes is
-    // never evicted before it is flushed.
     CHECK(save(store, chunks, 1) == 3);
     for (std::int32_t region = 0; region < 3; ++region) {
         CAPTURE(region);
@@ -249,8 +228,6 @@ TEST_CASE("what a save spent, split into the two halves an operator can act on")
         chunks.push_back(filled(at % 32, at / 32, 64));
     }
     CHECK(save(store, chunks, 1) > 0);
-    // Sixty-four chunks of NBT is tens of milliseconds of encoding, so a save that reports none of
-    // it is not measuring: the split is the whole point of keeping the two figures apart.
     CHECK(store.encodeMillis() > 0);
     CHECK(store.writeMillis() >= 0);
 }
@@ -261,7 +238,5 @@ TEST_CASE("a region file that is not one reads as an unsaved chunk") {
     fileIO::createDirectories(root + "/world/region");
     fileIO::writeBytes(store.regionPath(0, 0), std::vector<std::uint8_t>(64, 0));
 
-    // Not a crash and not an empty chunk: whatever is there is not a region, so nothing is loaded
-    // and the chunk is generated instead.
     CHECK_FALSE(store.loadChunk(0, 0).has_value());
 }

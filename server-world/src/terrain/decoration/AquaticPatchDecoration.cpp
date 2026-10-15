@@ -40,9 +40,6 @@ constexpr std::int32_t kVegetalDecorationStep = 9;
     return block != nullptr && block->path() == "water";
 }
 
-/// The patch region plus the ocean-floor scan the aquatic features need. Outside the chunk that scan
-/// walks the neighbour reader rather than the heightmap, because a heightmap only exists for the
-/// chunk that owns it.
 class AquaticRegion {
 public:
     AquaticRegion(Chunk& chunk, ExternalStateReader externalBlockState, BlockWriteObserver observer)
@@ -160,7 +157,7 @@ const std::vector<AquaticSpec>& specs() {
 
 [[nodiscard]] DecorationPos above(const DecorationPos& position) { return {position.x, position.y + 1, position.z}; }
 
-/// parity: the 26.3 `offset` of the aquatic patches, a zero-width y trapezoid included: it still draws.
+/// parity: the 26.3 `offset` of the aquatic patches.
 [[nodiscard]] DecorationPos offsetWithinSeven(random::RandomSource& random, const DecorationPos& origin) {
     const std::int32_t dx = random.nextInt(8) - random.nextInt(8);
     const std::int32_t dy = random.nextInt(1) - random.nextInt(1);
@@ -168,7 +165,7 @@ const std::vector<AquaticSpec>& specs() {
     return {origin.x + dx, origin.y + dy, origin.z + dz};
 }
 
-/// parity: `HeightmapPlacement` on `OCEAN_FLOOR`, which drops a column with nothing above the floor.
+/// parity: `HeightmapPlacement` on `OCEAN_FLOOR`.
 [[nodiscard]] std::optional<DecorationPos> onOceanFloor(const AquaticRegion& region, const DecorationPos& position,
                                                         ChunkHeight bounds) {
     const std::int32_t y = region.oceanFloor(position.x, position.z);
@@ -178,7 +175,7 @@ const std::vector<AquaticSpec>& specs() {
     return DecorationPos{position.x, y, position.z};
 }
 
-/// parity: `seagrass_*`, a weighted pick between a tall plant that wants water above and a short one.
+/// parity: `seagrass_*`.
 void placeSeagrass(AquaticRegion& region, random::RandomSource& random, const DecorationPos& target,
                    std::int32_t tallWeight, ChunkHeight bounds) {
     const bool tall = random.nextInt(100) < tallWeight;
@@ -189,8 +186,7 @@ void placeSeagrass(AquaticRegion& region, random::RandomSource& random, const De
         }
         return;
     }
-    // parity: the tall entry's own filter, then `SimpleBlockFeature`'s double plant check, which
-    // wants the same fluid above, so a flowing block does not do.
+    // parity: the tall entry's filter, then `SimpleBlockFeature`'s double plant check wants the same fluid above.
     if (!isWaterBlock(region.get(above(target))) || !survives ||
         region.get(above(target)) != registry::blocks::water().stateId) {
         return;
@@ -204,7 +200,7 @@ void placeSeagrass(AquaticRegion& region, random::RandomSource& random, const De
     region.set(above(target), *upper);
 }
 
-/// parity: `sea_pickle`, a simple block whose pickle count is drawn before the survival test.
+/// parity: `sea_pickle`.
 void placeSeaPickle(AquaticRegion& region, random::RandomSource& random, const DecorationPos& target,
                     ChunkHeight bounds) {
     const std::int32_t stateId = stateIdOf("sea_pickle") + random.nextInt(4) * 2;
@@ -219,8 +215,7 @@ void placeSeaPickle(AquaticRegion& region, random::RandomSource& random, const D
            position.y > bounds.minY() && aquaticsupport::seagrassSupport(below(region, position));
 }
 
-/// parity: `BlockColumnFeature` with kelp's two layers, a 0..9 stalk and one tip, truncated from the
-/// stalk first where the column runs out of water two blocks up.
+/// parity: `BlockColumnFeature` with kelp's two layers, truncated from the stalk first.
 void placeKelp(AquaticRegion& region, random::RandomSource& random, const DecorationPos& origin) {
     std::int32_t stalk = random.nextInt(10);
     std::int32_t tip = 1;

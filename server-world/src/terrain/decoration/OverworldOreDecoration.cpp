@@ -184,10 +184,7 @@ bool placeVein(PlacementRegion& region, random::RandomSource& random, std::int32
         const std::int32_t maxX = std::max(mth::floor(centerX + radius), minX);
         const std::int32_t maxY = std::max(mth::floor(centerY + radius), minY);
         const std::int32_t maxZ = std::max(mth::floor(centerZ + radius), minZ);
-        // parity: each distance is divided by the radius and compared against one, which is not the
-        // same as comparing squared distances against a squared radius once floating point is
-        // involved. A blob this size is mostly edge, and which edge cells are visited also decides
-        // how many draws the air-exposure check makes.
+        // parity: distances are divided by the radius before comparing, which differs from squared in floating point.
         for (std::int32_t x = minX; x <= maxX; ++x) {
             const double xd = (x + 0.5 - centerX) / radius;
             if (xd * xd >= 1.0) {

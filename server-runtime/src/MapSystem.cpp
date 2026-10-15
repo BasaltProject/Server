@@ -62,18 +62,17 @@ constexpr std::array<std::string_view, 17> kMapItems{"minecraft:filled_map",
                                                      "minecraft:abandoned_camp_map",
                                                      "minecraft:warm_ocean_ruins_map"};
 
-/// Vanilla's inventory order, hotbar first, mapped onto this server's slots.
 [[nodiscard]] std::int32_t vanillaMainSlot(std::int32_t index) {
     return index < PlayerInventory::kHotbarSize ? PlayerInventory::kHotbarStart + index
                                                 : index - PlayerInventory::kHotbarSize;
 }
 
-/// parity: `EntityEquipment`'s enum order after the main hand: off hand, feet, legs, chest, head.
+/// parity: `EntityEquipment`'s enum order after the main hand.
 constexpr std::array<std::int32_t, 5> kEquipmentTickOrder{PlayerInventory::kOffhandSlot, 39, 38, 37, 36};
 /// parity: `Inventory.EQUIPMENT_SLOT_MAPPING`: feet, legs, chest, head, off hand.
 constexpr std::array<std::int32_t, 5> kEquipmentSyncOrder{39, 38, 37, 36, PlayerInventory::kOffhandSlot};
 
-/// parity: `Direction.get2DDataValue` of a frame's `Facing`, which is `Direction`'s 3D id.
+/// parity: `Direction.get2DDataValue` of a frame's `Facing`.
 [[nodiscard]] std::int32_t twoDimensionalValue(std::int32_t facing) {
     constexpr std::array<std::int32_t, 6> kValues{-1, -1, 2, 0, 1, 3};
     return facing >= 0 && facing < 6 ? kValues[static_cast<std::size_t>(facing)] : -1;
@@ -214,8 +213,6 @@ void MapSystem::tickCarriedBy(maps::MapData& data, PlayerSession& ticking, const
                                    static_cast<double>(other->yaw), std::nullopt);
             }
         } else {
-            // parity: the jar removes from the list it is walking and still steps on, so the holder
-            // after a removed one waits for the next tick.
             holders.erase(holders.begin() + static_cast<std::ptrdiff_t>(index));
             data.removeDecoration(name);
         }
@@ -239,8 +236,7 @@ void MapSystem::update(world::LoadedWorld& world, maps::MapData& data, PlayerSes
     }
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
     const maps::ScanWorld scan{
-        // parity: `Level.getChunk`, which loads or generates a chunk the map reaches rather than
-        // leaving that part of it blank.
+        // parity: `Level.getChunk`.
         .chunkAt = [&world](std::int32_t chunkX, std::int32_t chunkZ) -> const server::world::Chunk* {
             return &world.state().getOrGenerateChunk(chunkX, chunkZ);
         },
@@ -370,8 +366,7 @@ bool MapSystem::tooManyMarkers(const wire::nbt::NbtCompound& components) {
 }
 
 void MapSystem::sweepFrames(world::LoadedWorld& world, const std::vector<entity::ServerEntity*>& frames) {
-    // parity: `ItemFrame.onKilled`. A frame taken out of the world any other way than the ones that
-    // call `frameLostMap` takes its marker with it on the next framed-map pass.
+    // parity: `ItemFrame.onKilled`.
     std::vector<std::pair<maps::BlockPos, std::int32_t>> gone;
     storage_->forEachLoaded([&](std::int32_t id, maps::MapData& data) {
         if (data.frames().empty() || data.dimension() != world.levelKey()) {
@@ -451,7 +446,7 @@ std::optional<bool> MapSystem::useOnBanner(PlayerSession& player, world::LoadedW
         return std::nullopt;
     }
     const std::optional<std::int32_t> id = mapIdOf(held->components);
-    // parity: `ItemStack.useOn` counts a use for any success, which is all but a refused banner.
+    // parity: `ItemStack.useOn` counts a use for any success.
     const std::string used = storage::stats::used(held->id);
     const std::unique_lock<std::mutex> lock = storage_->lock();
     maps::MapData* data = id.has_value() ? storage_->get(*id) : nullptr;

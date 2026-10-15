@@ -50,8 +50,7 @@ std::optional<std::int32_t> terrainStateAt(const Chunk& chunk, const std::int32_
     if (y < bounds.minY() || y > bounds.maxY()) {
         return std::nullopt;
     }
-    // parity: a spring counts the blocks around itself through the level, so on a chunk border it
-    // sees the next chunk. This was the last reader in the Nether that refused the outside.
+    // parity: a spring counts surrounding blocks through the level, so it sees the next chunk.
     return chunk.decorationBlockStateId(x, y, z);
 }
 

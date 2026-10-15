@@ -23,7 +23,6 @@ using wire::protocol::play::Gamemode;
 namespace brain = entity::wardenBrain;
 namespace mth = wire::common::mth;
 
-/// What a noise leads back to, as the warden sees it.
 struct Somebody {
     std::int32_t id = 0;
     double x = 0.0;
@@ -38,8 +37,7 @@ struct Somebody {
     std::optional<std::int32_t> ownerId;
 };
 
-/// parity: `GameEventTags.WARDEN_CAN_LISTEN`: every vibration but a flap, the shriek, and a
-/// sensor's click.
+/// parity: `GameEventTags.WARDEN_CAN_LISTEN`.
 [[nodiscard]] bool listensTo(std::string_view event) {
     if (event == "shriek" || event == world::vibrations::kTendrilsClicking) {
         return true;
@@ -47,7 +45,7 @@ struct Somebody {
     return event != "flap" && world::vibrations::frequencyOf(event) > 0;
 }
 
-/// parity: `AngerLevel.byAnger(getActiveAnger())`: the target's anger, or the highest of all.
+/// parity: `AngerLevel.byAnger(getActiveAnger())`.
 [[nodiscard]] std::int32_t activeAnger(const ServerEntity& warden) {
     if (warden.targetId.has_value()) {
         return entity::wardens::angerAt(warden, *warden.targetId);
@@ -163,8 +161,7 @@ void MobActionSystem::wardenHears(world::LoadedWorld& world, const std::vector<P
         if (record.gameTime == state.heardTime && seen <= state.heardCount) {
             continue;
         }
-        // parity: `Listener.handleGameEvent`: deaf while one is on its way, and only to what it can
-        // hear, from somebody it could fight, within sixteen blocks and past no wool.
+        // parity: `Listener.handleGameEvent`.
         if (state.travelling.has_value() || !listensTo(record.event)) {
             continue;
         }
@@ -199,7 +196,7 @@ void MobActionSystem::wardenHears(world::LoadedWorld& world, const std::vector<P
         state.heardTime = lastTime;
         state.heardCount = countAtLast;
     }
-    // parity: `VibrationSystem.Ticker.tick`: last tick's pick sets off, then travels a block a tick.
+    // parity: `VibrationSystem.Ticker.tick`.
     if (!state.travelling.has_value() && state.candidate.has_value() && state.candidate->tick < now) {
         state.travelling = std::exchange(state.candidate, std::nullopt);
         state.travelTicks = mth::floor(static_cast<double>(state.travelling->distance));

@@ -16,7 +16,7 @@ using player::PlayerSession;
 using wire::protocol::play::Gamemode;
 namespace neutral = entity::neutralAnger;
 
-/// parity: `ZombifiedPiglin`'s constants: twenty to thirty-nine seconds of anger, the first growl
+/// parity: `ZombifiedPiglin`'s constants.
 /// within a second, and a call to the others every four to six.
 constexpr std::int32_t kAngerMin = 20 * 20;
 constexpr std::int32_t kAngerMax = 39 * 20;
@@ -100,7 +100,7 @@ void MobActionSystem::tickNeutralMob(world::LoadedWorld& world, ServerEntity& mo
     if (mob.type().path() != "enderman") {
         return;
     }
-    // parity: `Enderman.setTarget`: the attacking speed with a target, and none of it or the stare
+    // parity: `Enderman.setTarget`.
     // without one.
     auto& speed = mob.attributeModifiers["minecraft:movement_speed"];
     if (mob.targetId.has_value()) {
@@ -149,7 +149,7 @@ void MobActionSystem::tickZombifiedPiglin(world::LoadedWorld& world, ServerEntit
     if (anger.legacyTime.has_value()) {
         anger.endTime = now + *std::exchange(anger.legacyTime, std::nullopt);
     }
-    // parity: `setTarget`, which rolls the first growl and the first call the moment a target appears.
+    // parity: `setTarget`.
     if (mob.targetId.has_value() && !anger.hadTarget) {
         anger.firstSoundIn = random.nextInt(kFirstSoundMax + 1);
         anger.nextAlertIn = kAlertMin + random.nextInt(kAlertMax - kAlertMin + 1);

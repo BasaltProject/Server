@@ -6,16 +6,9 @@
 struct lua_State;
 
 namespace basalt::server::lua {
-
 class LuaArgs;
 class LuaSandbox;
 
-/// One value kept alive outside the stack: a plugin's handler, held until it is unregistered. A
-/// registry reference has to be released or the value is never collected, and owning it here is what
-/// makes an unregistered handler actually go away.
-///
-/// A reference belongs to the state that made it: moving one between sandboxes is a bug this cannot
-/// catch.
 class LuaRef {
 public:
     LuaRef() = default;
@@ -30,23 +23,18 @@ public:
 
     ~LuaRef();
 
-    /// Takes the value on top of the stack, popping it.
     [[nodiscard]] static LuaRef take(lua_State* state);
 
-    /// Takes the value at `index` without disturbing the stack.
     [[nodiscard]] static LuaRef of(lua_State* state, std::int32_t index);
 
     [[nodiscard]] bool valid() const noexcept { return state_ != nullptr; }
 
-    /// Pushes the value back onto its own state's stack. Pushes nil when there is nothing held.
     void push() const;
 
-    /// The same, for a call that is building its arguments through the facade.
     void push(LuaArgs& lua) const;
 
     [[nodiscard]] lua_State* state() const noexcept { return state_; }
 
-    /// Drops the reference now rather than at destruction, for a handler that was unregistered.
     void release();
 
 private:
@@ -55,5 +43,4 @@ private:
     lua_State* state_ = nullptr;
     std::int32_t ref_ = 0;
 };
-
 } // namespace basalt::server::lua

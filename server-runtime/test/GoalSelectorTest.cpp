@@ -26,7 +26,6 @@ using basalt::wire::common::Uuid;
 
 namespace {
 
-/// A goal that records what it was told to do, and answers whatever the test sets.
 class Recording final : public Goal {
 public:
     Recording(std::string name, std::set<GoalFlag> flags, bool interruptable = true)
@@ -138,7 +137,6 @@ TEST_CASE("the lower priority number wins a flag, and the loser is stopped") {
     auto low = std::make_unique<Recording>("low", std::set{GoalFlag::Move});
     Recording& highRef = *high;
     Recording& lowRef = *low;
-    // Registered worst first, so the order of registration is not what decides it.
     selector.add(5, std::move(low));
     selector.add(1, std::move(high));
 
@@ -148,13 +146,11 @@ TEST_CASE("the lower priority number wins a flag, and the loser is stopped") {
 
     MobContext context = fixture.context();
     selector.tick(context);
-    // parity: the pass walks the goals in registration order and replaces, so the worse one can
-    // start and be stopped again within the same tick. What is left running is what matters.
+    // parity: Mob goal pass replaces in registration order, so the worse goal may start and stop in one tick.
     CHECK(running(highRef));
     CHECK_FALSE(running(lowRef));
     CHECK(lowRef.stops == 1);
 
-    // The winner stops wanting it, so the other one takes the flag on the next decision.
     highRef.usable = false;
     selector.tick(context);
     CHECK(highRef.stops == 1);
@@ -190,7 +186,6 @@ TEST_CASE("a goal that cannot be interrupted keeps its flag whatever outranks it
     selector.add(1, std::move(better));
 
     MobContext context = fixture.context();
-    // The stubborn one is registered first and takes the flag; the better one cannot have it.
     selector.tick(context);
     selector.tick(context);
     CHECK(stubbornRef.starts == 1);

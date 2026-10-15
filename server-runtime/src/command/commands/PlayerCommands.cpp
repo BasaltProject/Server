@@ -17,7 +17,7 @@ namespace {
 using wire::protocol::play::Gamemode;
 using wire::text::Component;
 
-/// parity: `DamageTypes.GENERIC_KILL`'s message id, which the client renders as "<name> died".
+/// parity: `DamageTypes.GENERIC_KILL`'s message id.
 constexpr std::string_view kDeathGenericKill = "genericKill";
 
 [[nodiscard]] std::string modeName(Gamemode mode) {
@@ -34,9 +34,7 @@ constexpr std::string_view kDeathGenericKill = "genericKill";
     }
 }
 
-/// parity: `GameModeCommand.logGamemodeChange`, including who is told what. Changing your own mode
-/// reports once to you; changing someone else's tells them separately with `gameMode.changed` and
-/// reports to you with their name.
+/// parity: `GameModeCommand.logGamemodeChange`, including who is told what.
 [[nodiscard]] std::int32_t setMode(const CommandContext& context, const std::vector<player::PlayerSession*>& targets,
                                    Gamemode mode) {
     std::int32_t changed = 0;
@@ -120,17 +118,14 @@ void KillCommand::build(const CommandNodeBuilder& root) const {
                 continue;
             }
             if (entity::ServerEntity* entity = target.entity(); entity != nullptr) {
-                // parity: `EnderDragon.kill` overrides the living one: it is removed where it
-                // stands, with none of the two hundred ticks of dying, and the fight is told.
+                // parity: `EnderDragon.kill` overrides the living one: it is removed where it stands.
                 const auto& environmentWorlds = context.environment().options().worlds;
                 const auto inWorld = environmentWorlds.find(target.worldName());
                 if (context.environment().options().killOutright && inWorld != environmentWorlds.end() &&
                     context.environment().options().killOutright(*inWorld->second, *entity)) {
                     continue;
                 }
-                // parity: `/kill` kills, so what it kills drops what it would have dropped. Only a
-                // living thing then lies there for the twenty ticks of `tickDeath`: `Entity.kill`
-                // removes a minecart or a boat on the spot, and `LivingEntity.kill` does not.
+                // parity: `/kill` kills, so what it kills drops what it would have dropped.
                 entity->health = 0.0;
                 entity->killed = true;
                 if (reg::entityAttributes::isLiving(entity->type())) {
@@ -188,8 +183,7 @@ void HelpCommand::build(const CommandNodeBuilder& root) const {
             return context.matching(names);
         });
         command.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
-            // parity: `HelpCommand` parses the whole greedy line and describes the node it
-            // reached, echoing the input before each usage line.
+            // parity: `HelpCommand` parses the whole greedy line and describes the node it reached.
             const std::string* line = context.get<std::string>("command");
             if (line == nullptr) {
                 return 0;

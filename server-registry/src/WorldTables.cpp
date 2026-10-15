@@ -1,5 +1,3 @@
-// Generated from the real 26.3 server jar and from the registries vanilla builds in code.
-// Regenerate rather than edit: every number here is a fact about the game, not a decision.
 
 #include <basalt/server/registry/World.hpp>
 
@@ -8,7 +6,6 @@
 
 namespace basalt::server::registry {
 namespace {
-
 constexpr std::array<std::pair<std::int32_t, std::string_view>, 67> kBiomeIdsTable = {{
     {0, "plains"},
     {1, "sunflower_plains"},
@@ -190,8 +187,6 @@ constexpr std::array<InstrumentEntry, 27> kInstrumentsTable = {{
     {"custom_head", "ui.button.click", NoteBlockInstrument::Kind::Custom},
 }};
 
-/// Flattened, with the type repeated on each of its blocks: twenty one types and a hundred
-/// blocks between them, and the rows of one type are contiguous.
 constexpr std::array<std::pair<std::string_view, std::string_view>, 46> kPoiBlocksTable = {{
     {"armorer", "blast_furnace"},
     {"butcher", "smoker"},
@@ -240,7 +235,6 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 46> kPoiBloc
     {"lightning_rod", "waxed_weathered_lightning_rod"},
     {"lightning_rod", "waxed_oxidized_lightning_rod"},
 }};
-
 } // namespace
 
 std::span<const std::pair<std::int32_t, std::string_view>> biomeIdsTable() { return kBiomeIdsTable; }
@@ -250,5 +244,4 @@ std::span<const std::string_view> customStatsTable() { return kCustomStatsTable;
 std::span<const InstrumentEntry> instrumentsTable() { return kInstrumentsTable; }
 
 std::span<const std::pair<std::string_view, std::string_view>> poiBlocksTable() { return kPoiBlocksTable; }
-
 } // namespace basalt::server::registry

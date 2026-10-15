@@ -26,8 +26,6 @@ using wire::text::kWhite;
 
 [[nodiscard]] std::string rate(double value) { return decimals(value, 2); }
 
-/// Three decimals for durations, because the work being measured is often under a millisecond and
-/// two decimals rendered a real 0.004ms tick as `0.00`, which reads as "no data".
 [[nodiscard]] std::string millis(double value) { return decimals(value, 3); }
 
 [[nodiscard]] std::string padded(const std::string& text, std::size_t width) {
@@ -42,7 +40,6 @@ TimingsCommand::TimingsCommand(wire::common::Timings& timings, wire::common::Tic
       report_(&report), nowNanos_(std::move(nowNanos)) {}
 
 void TimingsCommand::build(const CommandNodeBuilder& root) const {
-    /// The one screen worth reading in chat; everything else goes in the file.
     root.executes([this](const CommandContext& context) -> Parsed<std::int32_t> {
         const std::int64_t now = nowNanos_ ? nowNanos_() : 0;
         const CommandSource& source = context.source();

@@ -11,9 +11,7 @@ class WorldState;
 
 namespace basalt::server::runtime::entity {
 
-/// The breeze: sliding about its target, leaping behind it and firing wind charges.
-///
-/// parity: `Breeze`, `BreezeAi`, `Shoot`, `LongJump`, `ShootWhenStuck`, `Slide` and `BreezeUtil`.
+/// parity: `Breeze`.
 namespace breezes {
 
 /// parity: `Shoot`'s fifteen ticks of charging, four of recovering and ten of cooldown.
@@ -28,7 +26,6 @@ inline constexpr std::int64_t kLongJumpDuration = 200;
 /// parity: `Sensor.wasEntityAttackableLastNTicks(body, 100)`.
 inline constexpr std::int64_t kRememberTarget = 100;
 
-/// The poses a breeze moves between.
 enum class Pose : std::uint8_t { Standing, Sliding, LongJumping, Inhaling, Shooting };
 
 struct BreezeState {
@@ -50,7 +47,7 @@ struct BreezeState {
     std::int64_t shootEnd = 0;
     bool jumping = false;
     std::int64_t jumpEnd = 0;
-    /// parity: `SlideToTargetSink`, the idle walk with its own pose, twenty to forty ticks at most.
+    /// parity: `SlideToTargetSink`.
     bool sliding = false;
     std::int64_t slideEnd = 0;
     std::int32_t idleTicks = 0;
@@ -59,8 +56,7 @@ struct BreezeState {
 
 [[nodiscard]] BreezeState& stateOf(ServerEntity& breeze);
 
-/// parity: `BreezeUtil.randomPointBehindTarget`: four to eight blocks behind where the enemy looks,
-/// give or take a gaussian quarter turn.
+/// parity: `BreezeUtil.randomPointBehindTarget`.
 [[nodiscard]] ai::brainKit::Vec pointBehind(const ai::brainKit::Vec& enemy, float headYaw,
                                             random::RandomSource& random);
 

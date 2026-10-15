@@ -1,6 +1,3 @@
-// Samples a dense grid of NormalNoise, the shape a density function evaluates during world
-// generation, and reports nanoseconds per sample. The number it prints is meant to be read next to
-// earlier runs of this same bench.
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/world/noise/Noise.hpp>

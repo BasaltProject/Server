@@ -59,7 +59,7 @@ constexpr double kBulletSize = 0.3125;
 void MobActionSystem::shulkerPeek(ServerEntity& shulker, std::int32_t amount) {
     shulkers::ShulkerState& state = shulkers::stateOf(shulker);
     world::LoadedWorld* world = worldOf(shulker);
-    // parity: `setRawPeekAmount`, which replaces the armour, sounds and raises the game event on every
+    // parity: `setRawPeekAmount`.
     // call, even one that does not change the lid.
     auto& armor = shulker.attributeModifiers[std::string{entity::attribute::kArmor}];
     armor.erase(std::string{kCoveredModifier});
@@ -127,7 +127,7 @@ void MobActionSystem::tickShulker(world::LoadedWorld& world, const std::vector<P
                                   random::RandomSource& random) {
     shulkers::ShulkerState& state = shulkers::stateOf(shulker);
     const std::span<ServerEntity* const> others{living};
-    // parity: what `Shulker.hurtServer` does once a hit lands: a wounded shulker teleports one time
+    // parity: what `Shulker.hurtServer` does once a hit lands.
     // in four, and one struck by a bullet with its lid open splits.
     if (shulker.health < state.healthSeen && state.struckBy.has_value()) {
         const std::string struck = *std::exchange(state.struckBy, std::nullopt);
@@ -242,7 +242,7 @@ void MobActionSystem::tickShulkerBullet(world::LoadedWorld& world, const std::ve
         }
     }
     shulkers::steer(bullet, state, target.has_value());
-    // parity: `ProjectileUtil.getHitResultOnMoveVector`, the block first and then whoever is nearer.
+    // parity: `ProjectileUtil.getHitResultOnMoveVector`.
     const double toX = bullet.x + bullet.velocityX;
     const double toY = bullet.y + bullet.velocityY;
     const double toZ = bullet.z + bullet.velocityZ;

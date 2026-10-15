@@ -39,42 +39,24 @@ class LoadedWorld;
 
 namespace basalt::server::runtime::plugins {
 
-/// Where the object model reaches the rest of the server.
-///
-/// Callbacks rather than a back-reference to the whole thing: what these objects need is a handful
-/// of lookups, and taking them one by one is what lets a test stand one up without a server.
 struct ModelHooks {
-    /// The world a name belongs to, or null when it is not loaded.
     std::function<world::LoadedWorld*(const std::string& name)> worldFor;
-    /// Every loaded world, by name, and which one is the default.
     std::function<std::vector<world::LoadedWorld*>()> allWorlds;
     std::function<std::string()> defaultWorldName;
-    /// The permission groups as they stand right now, which `/reload` can swap under a running
-    /// server.
     std::function<const config::GroupsConfig&()> groups;
-    /// Puts a mob into a world through the same path a natural spawn takes.
     std::function<entity::ServerEntity*(world::LoadedWorld& world, const wire::common::Identifier& type, double x,
                                         double y, double z)>
         spawnMob;
-    /// Making a world, which only the server can do: it owns the folder, the seed and the scheduler.
     std::function<world::LoadedWorld*(const std::string& name, config::WorldDimension dimension, config::WorldType type,
                                       std::optional<std::int64_t> seed)>
         makeWorld;
-    /// Where an NPC goes when a plugin makes one, and the ids it is given.
     NpcRegistry* npcs = nullptr;
     std::function<std::int32_t()> nextEntityId;
 };
 
-/// The server's own objects, seen through the plugin API's handles.
-///
-/// Handles, not copies: everything here reads the live thing when it is asked, and a handle to
-/// somebody who left answers `online = false` rather than a stale name and a health of 20. The
-/// writes go through the same paths a command would, so a plugin setting a gamemode fires the same
-/// event and sends the same packets.
 [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef>
 playerRefFor(player::PlayerRegistry& registry, std::string uuid, std::string name, ModelHooks hooks);
 
-/// Who is connected, and who was.
 class RegistryPlayers final : public server::plugins::PluginPlayers {
 public:
     RegistryPlayers(player::PlayerRegistry& registry, ModelHooks hooks)
@@ -91,7 +73,6 @@ private:
     ModelHooks hooks_;
 };
 
-/// The worlds this server has.
 class LoadedWorlds final : public server::plugins::PluginWorlds {
 public:
     LoadedWorlds(ModelHooks hooks, std::function<std::vector<player::PlayerSession*>()> players)
@@ -113,11 +94,6 @@ private:
     std::function<std::vector<player::PlayerSession*>()> players_;
 };
 
-/// A plugin's placeholders, in the server's own registry.
-///
-/// Registering here is what makes `%arena_wins%` work in the MOTD and the sidebar without those
-/// knowing a plugin exists. The prefix is the plugin's id, so two of them cannot collide by
-/// accident.
 class RegistryPlaceholders final : public server::plugins::PluginPlaceholders {
 public:
     RegistryPlaceholders(wire::common::placeholder::PlaceholderRegistry& registry,
@@ -133,14 +109,9 @@ public:
 private:
     wire::common::placeholder::PlaceholderRegistry* registry_;
     server::plugins::PluginPlayers* players_;
-    /// Rendering for a player needs the session the slot is typed on.
     std::function<std::vector<player::PlayerSession*>()> sessions_;
 };
 
-/// A plugin's data, in the player database, with the plugin's own id on every row.
-///
-/// The isolation is the shape of the calls rather than a check inside them: there is no way to ask
-/// this for another plugin's namespace, because every query takes the caller's id and filters on it.
 class DatabasePluginStorage final : public server::plugins::PluginStorage {
 public:
     explicit DatabasePluginStorage(std::function<storage::PlayerStore*()> store) : store_(std::move(store)) {}
@@ -165,10 +136,6 @@ private:
     std::function<storage::PlayerStore*()> store_;
 };
 
-/// Windows a plugin draws, opened on the session of whoever is looking at one.
-///
-/// All it does is find the connection: the window itself is the session's business, because that is
-/// where the container machinery and the socket already are.
 class SessionMenus final : public server::plugins::PluginMenus {
 public:
     explicit SessionMenus(player::PlayerRegistry& registry) : registry_(&registry) {}

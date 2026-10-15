@@ -5,11 +5,6 @@
 namespace basalt::server::runtime::command::commands {
 
 /// parity: `SummonCommand`.
-///
-/// What appears is a real entity of the right type at the right place, which is what the client
-/// draws and what the other entity commands then act on. It has no AI and does not move on its own:
-/// behaviour is the entity work, not the command's, and pretending otherwise here would be worse
-/// than the gap.
 class SummonCommand final : public Command {
 public:
     explicit SummonCommand(player::PlayerRegistry& players);
@@ -20,10 +15,9 @@ private:
     player::PlayerRegistry* players_;
 };
 
-/// parity: `DamageCommand`, minus the damage type, which needs the damage type registry to matter.
+/// parity: `DamageCommand`.
 class DamageCommand final : public Command {
 public:
-    /// `damageTypes` is what the completion lists, or unset where no jar is loaded.
     explicit DamageCommand(std::function<std::vector<wire::common::Identifier>()> damageTypes = {});
 
     void build(const CommandNodeBuilder& root) const override;
@@ -40,7 +34,7 @@ public:
     void build(const CommandNodeBuilder& root) const override;
 };
 
-/// parity: `RotateCommand`, all three forms: an absolute rotation, facing a point, facing an entity.
+/// parity: `RotateCommand`.
 class RotateCommand final : public Command {
 public:
     RotateCommand();
@@ -57,10 +51,6 @@ public:
 };
 
 /// parity: `AttributeCommand`, base values and modifiers.
-///
-/// A modifier is applied in vanilla's own order (`add_value`, then `add_multiplied_base` against
-/// the base, then `add_multiplied_total` against the running total), so `get` reports the same
-/// number a real server would.
 class AttributeCommand final : public Command {
 public:
     AttributeCommand();

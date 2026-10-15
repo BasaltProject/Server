@@ -11,15 +11,10 @@
 namespace basalt::server::runtime::world::containerOpeners {
 namespace {
 
-/// The same packing a block position uses on the wire, which is unique within a world, and taken
-/// from there rather than written again here.
 [[nodiscard]] std::int64_t packed(std::int32_t x, std::int32_t y, std::int32_t z) {
     return wire::protocol::play::BlockPos{.x = x, .y = y, .z = z}.pack();
 }
 
-/// What is open, by world and then by position. Behind a lock rather than the frozen Kotlin's
-/// compare-and-set over an immutable map: C++ has nowhere to keep the old map alive for a reader
-/// that is still walking it.
 std::mutex& lock() {
     static std::mutex instance;
     return instance;
@@ -30,7 +25,6 @@ std::map<std::string, std::map<std::int64_t, std::int32_t>, std::less<>>& state(
     return instance;
 }
 
-/// Whether anything at all is open, so the common answer needs neither the lock nor a lookup.
 std::atomic<bool>& anyOpen() {
     static std::atomic<bool> instance{false};
     return instance;

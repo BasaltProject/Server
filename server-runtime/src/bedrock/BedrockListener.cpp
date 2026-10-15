@@ -10,14 +10,11 @@
 namespace basalt::server::runtime::bedrock {
 namespace {
 
-/// A client's own words, cut down to what a log line can carry: plain ascii, colour codes gone,
-/// and short enough to read at a glance.
 [[nodiscard]] std::string printable(const std::string_view said) {
     constexpr std::size_t kMaxLength = 100;
     std::string out;
     for (std::size_t at = 0; at < said.size(); ++at) {
         const auto letter = static_cast<unsigned char>(said[at]);
-        // The other edition's colour escape is two bytes of utf-8, and what follows it is the code.
         if (letter == 0xc2U && at + 2 < said.size() && static_cast<unsigned char>(said[at + 1]) == 0xa7U) {
             at += 2;
             continue;
@@ -33,7 +30,6 @@ namespace {
     return out;
 }
 
-/// What one line of a stack request is called, for the log line that says what a client asked for.
 [[nodiscard]] std::string stackActionName(const wire::bedrock::BedrockStackActionType type) {
     switch (type) {
     case wire::bedrock::BedrockStackActionType::Take:
@@ -72,23 +68,14 @@ using wire::bedrock::BedrockConnection;
 using wire::bedrock::BedrockPacket;
 using wire::bedrock::RakSession;
 
-/// How long a poll waits for a datagram before going round again. Twenty milliseconds is two ticks
-/// of nothing, which is short enough that an acknowledgement is never late and long enough that an
-/// idle server is not a spinning thread.
+// Twenty milliseconds: short enough that an acknowledgement is never late, long enough not to spin when idle.
 constexpr int kPollTimeoutMillis = 20;
 
-/// What a client is told to draw before it has asked for anything.
 constexpr std::int32_t kInitialRadius = 4;
 
-/// How much one turn may hand to a client. A join used to glue every column into a single batch of
-/// well over a megabyte: one RakNet message split into a thousand parts, none of them worth
-/// anything until the last one arrived. A turn's worth at a time is the same bytes in pieces a
-/// client can read as they land.
+// A join glued every column into one batch of over a megabyte; sending a turn's worth at a time keeps pieces readable.
 constexpr std::size_t kTurnBytes = 64U * 1024U;
 
-/// Above this a packet is named in the log on its way out. A join is made of a handful of these and
-/// a stream of small ones, so naming only the big ones says what a slow join was busy with, and
-/// leaves the last one in the log when a client reads something it cannot.
 constexpr std::size_t kLargePacketBytes = 1024;
 
 [[nodiscard]] std::uint64_t nowMillis() {
@@ -97,8 +84,7 @@ constexpr std::size_t kLargePacketBytes = 1024;
             .count());
 }
 
-/// A semicolon separates every field of the line a Bedrock client reads, so one inside the message
-/// would shift everything after it. A newline would do worse.
+// A semicolon separates the fields of the line a client reads, so one in the message would shift the rest.
 [[nodiscard]] std::string oneLine(std::string_view text) {
     std::string clean;
     clean.reserve(text.size());
@@ -114,8 +100,6 @@ constexpr std::size_t kLargePacketBytes = 1024;
     return clean;
 }
 
-/// A Bedrock server list shows two lines, and a Java message of the day is written as two. The
-/// first is the name, the second is whatever the operator put under it.
 [[nodiscard]] std::pair<std::string, std::string> splitMotd(std::string_view text) {
     const std::size_t newline = text.find('\n');
     if (newline == std::string_view::npos) {
@@ -126,8 +110,6 @@ constexpr std::size_t kLargePacketBytes = 1024;
 
 } // namespace
 
-/// One client: its transport, its protocol state, the player the server made of it, and the
-/// mailbox anyone else writes to.
 struct BedrockListener::Session {
     RakSession& transport;
     BedrockConnection connection;
@@ -137,8 +119,7 @@ struct BedrockListener::Session {
     bool started = false;
     /// TEMPORARY: said once per client, not once per packet.
     bool saidBadInput = false;
-    /// Which kinds of packet this server has already been seen to ignore, so the log names each one
-    /// once rather than every tick.
+    // Packet kinds already seen ignored, so the log names each once rather than every tick.
     std::set<std::uint16_t> unanswered;
 
     Session(RakSession& session, std::shared_ptr<const wire::bedrock::EcKeyPair> keys, std::string gameVersion,
@@ -168,8 +149,7 @@ void BedrockMailbox::post(const std::uint16_t packetId, std::vector<std::uint8_t
         return;
     }
     if (last) {
-        // Ahead of everything still waiting, and the drain is bounded: a goodbye queued behind a
-        // world's worth of columns would take several turns to reach, and there are none left.
+        // Ahead of everything waiting, and bounded: a goodbye behind a world of columns would arrive too late.
         items_.clear();
     }
     items_.push_back(Item{packetId, std::move(body), last});
@@ -213,8 +193,7 @@ std::string BedrockListener::prefixedName(std::string_view gamertag) const {
 }
 
 wire::common::Uuid BedrockListener::uuidOf(std::string_view xuid) {
-    // The same shape as the offline uuid vanilla derives from a name, with a prefix of its own so
-    // the two spaces cannot meet.
+    // Prefixed so this space cannot meet the offline uuids vanilla derives from a name.
     return wire::common::Uuid::nameBased("BedrockPlayer:" + std::string{xuid});
 }
 
@@ -222,8 +201,7 @@ std::string BedrockListener::advertisement() const {
     const Status status = hooks_.status ? hooks_.status() : Status{"Basalt", 0, 20};
     const auto [motd, subMotd] = splitMotd(status.motd);
 
-    // The order is the client's, not ours: edition, the line, the protocol, the version, who is on,
-    // how many fit, the server's own id, the second line, the game mode twice, and the two ports.
+    // The field order is the client's, not ours.
     std::string line = "MCPE;";
     line += motd + ";";
     line += std::to_string(wire::bedrock::kNativeBedrockProtocol) + ";";
@@ -296,14 +274,11 @@ void BedrockListener::stop() {
     if (thread_.joinable()) {
         thread_.join();
     }
-    // One last turn of the post, now that nobody else can touch a session: whoever was told the
-    // server is closing was told it after the thread had stopped, and their goodbye is still here.
+    // One last turn of the post: goodbyes queued after the thread stopped are still here.
     for (const auto& [peer, session] : sessions_) {
         deliverMail(*session);
     }
-    // And one turn of the socket to put it on the wire. Everything above only queues: the bytes of
-    // a session reach the network inside the poll, and the thread that was doing the polling is the
-    // one that just stopped.
+    // And one turn of the socket: everything above only queues, and bytes reach the network inside the poll.
     if (server_ != nullptr) {
         server_->poll(nowMillis(), 0);
     }
@@ -317,12 +292,10 @@ std::size_t BedrockListener::sessionCount() const { return sessions_.size(); }
 
 void BedrockListener::run() {
     while (running_.load()) {
-        // Before the poll rather than after it: what the poll flushes is what is queued now, so a
-        // line left by another thread goes out on this turn instead of the next.
+        // Before the poll: it flushes what is queued now, so another thread's line goes out this turn.
         const bool open = accepting_.load();
         for (const auto& [peer, session] : sessions_) {
-            // Once the door is closed the server is saving these same players: the post keeps
-            // running so their goodbye reaches them, but nothing here touches them any more.
+            // After the door closes the server is saving these players: only the post runs, so goodbyes arrive.
             if (session->player != nullptr && open) {
                 session->player->tick();
             }
@@ -333,7 +306,7 @@ void BedrockListener::run() {
 }
 
 void BedrockListener::onConnect(RakSession& session) {
-    // Shutting down. Letting one in here means a player who joins mid-save and is never saved.
+    // Shutting down: letting one in means a player who joins mid-save and is never saved.
     if (!accepting_.load()) {
         return;
     }
@@ -362,7 +335,6 @@ void BedrockListener::onConnect(RakSession& session) {
     entry.connection.onReady([this, &entry] { onReady(entry); });
     entry.connection.onPacket([this, &entry](BedrockPacket packet, wire::io::ByteBuffer& body) {
         if (packet == BedrockPacket::RequestChunkRadius) {
-            // The client asks for a draw distance of its own once it is in.
             const auto radius = wire::bedrock::readRequestChunkRadius(body);
             if (!radius) {
                 return;
@@ -385,7 +357,7 @@ void BedrockListener::onConnect(RakSession& session) {
                 });
             }
             if (input.has_value()) {
-                // Before the click, because it is what decides what the click means.
+                // Before the click, because it decides what the click means.
                 entry.player->setSneaking(input->sneaking);
                 entry.player->setStance(input->onGround, input->sprinting);
                 if (input->flying.has_value()) {
@@ -408,16 +380,12 @@ void BedrockListener::onConnect(RakSession& session) {
                                             input->itemUse->face, input->itemUse->clickX, input->itemUse->clickY,
                                             input->itemUse->clickZ, input->itemUse->hotbarSlot);
                 }
-                /// One clicks the air, which is a throw, a drink, or a bow starting to bend.
                 constexpr std::int32_t kUseInAir = 1;
 
                 if (input->itemUse.has_value() && input->itemUse->action == kUseInAir) {
                     entry.player->useItemInAir(input->itemUse->hotbarSlot);
                 }
                 if (input->stackRequest.has_value()) {
-                    // What the client asked for, by line, before anything acts on it. A request
-                    // this build refuses says why here rather than only failing: the lines that
-                    // craft are the ones this server cannot answer yet.
                     logger_.debug([&input] {
                         std::string lines;
                         for (const wire::bedrock::BedrockStackAction& action : input->stackRequest->actions) {
@@ -444,16 +412,13 @@ void BedrockListener::onConnect(RakSession& session) {
             return;
         }
         if (packet == BedrockPacket::InventoryTransaction && entry.player) {
-            /// Zero interacts with the entity, one hits it.
             constexpr std::int32_t kAttack = 1;
 
-            /// Zero lets go of a bow, one swallows what was being eaten.
             constexpr std::int32_t kConsume = 1;
 
             const wire::bedrock::BedrockTransaction transaction =
                 wire::bedrock::readTransaction(body, entry.connection.protocolVersion());
-            // A mouthful finishing arrives the same way a hit does: this client eats on its own
-            // clock and this is the only word the server gets that it is done.
+            // A finished mouthful arrives like a hit: the client eats on its own clock and this is the only word of it.
             if (transaction.itemRelease.has_value()) {
                 if (transaction.itemRelease->action == kConsume) {
                     entry.player->finishEating(transaction.itemRelease->hotbarSlot);
@@ -468,7 +433,6 @@ void BedrockListener::onConnect(RakSession& session) {
             if (transaction.entityUse->action == kAttack) {
                 entry.player->attack(transaction.entityUse->runtimeEntityId);
             } else {
-                // Everything that is not a hit: sitting in a cart, feeding an animal, shearing.
                 entry.player->useOnEntity(transaction.entityUse->runtimeEntityId);
             }
             return;
@@ -481,8 +445,6 @@ void BedrockListener::onConnect(RakSession& session) {
             return;
         }
         if (packet == BedrockPacket::Interact && entry.player) {
-            /// What the client calls asking for its own bag. The others are mouse-overs and
-            /// vehicles, which this server settles without being told.
             constexpr std::int32_t kOpenInventory = 6;
 
             const auto interact = wire::bedrock::readInteract(body);
@@ -529,9 +491,7 @@ void BedrockListener::onConnect(RakSession& session) {
             return;
         }
         if (packet == BedrockPacket::LevelSoundEvent && entry.player) {
-            // That edition asks the server to play back a sound its own client already decided on:
-            // eating, swinging, a bucket. It goes back to whoever asked and to nobody else, which is
-            // what stops one client's noise reaching everybody.
+            // That edition asks for a sound its client already decided on; it goes only to whoever asked.
             entry.mailbox->post(static_cast<std::uint16_t>(packet),
                                 std::vector<std::uint8_t>{body.readable().begin(), body.readable().end()});
             return;
@@ -590,7 +550,6 @@ void BedrockListener::onConnect(RakSession& session) {
             return;
         }
         if (packet == BedrockPacket::BlockEntityData && entry.player) {
-            // The only block whose own data a client sends back: what was typed into a sign.
             const auto edit = wire::bedrock::readSignEdit(body);
             if (edit.has_value()) {
                 entry.player->editSign(edit->x, edit->y, edit->z, edit->text);
@@ -598,10 +557,6 @@ void BedrockListener::onConnect(RakSession& session) {
             return;
         }
         if (packet == BedrockPacket::PacketViolationWarning) {
-            // parity: Geyser logs this and nothing else, because it is the one packet a client
-            // sends about the server's own writing. It does not go further here: a line the client
-            // could not read is this door's bug to fix, and throwing the player out over it turns
-            // one wrong field into a disconnection.
             const std::optional<wire::bedrock::BedrockPacketViolation> violation =
                 wire::bedrock::readPacketViolationWarning(body);
             if (violation.has_value()) {
@@ -616,8 +571,6 @@ void BedrockListener::onConnect(RakSession& session) {
             return;
         }
         if (packet == BedrockPacket::ShowCredits && entry.player) {
-            // parity: the other door leaves the poem by asking to respawn, which is what takes a
-            // player out of the end once they have read it.
             const std::optional<wire::bedrock::BedrockCredits> credits = wire::bedrock::readShowCredits(body);
             if (credits.has_value() && *credits == wire::bedrock::BedrockCredits::Finished) {
                 entry.player->respawn();
@@ -625,8 +578,6 @@ void BedrockListener::onConnect(RakSession& session) {
             return;
         }
         if (packet == BedrockPacket::EntityEvent && entry.player) {
-            // parity: the one a client sends is its own eating, and it waits to hear it back before
-            // it makes the noise. It goes to whoever asked and to nobody else.
             const std::optional<wire::bedrock::BedrockEntityEventIn> event = wire::bedrock::readEntityEvent(body);
             if (event.has_value() &&
                 event->event == static_cast<std::uint8_t>(wire::bedrock::BedrockEntityEvent::EatingItem)) {
@@ -659,8 +610,6 @@ void BedrockListener::onConnect(RakSession& session) {
             return;
         }
         if (packet == BedrockPacket::FilterText && entry.player) {
-            // parity: the other door filters nothing, so everything typed comes back approved. A
-            // client whose filter is on waits for this before it shows what was typed at all.
             const std::optional<std::string> text = wire::bedrock::readFilterText(body);
             if (text.has_value()) {
                 wire::io::ByteBuffer out;
@@ -677,9 +626,7 @@ void BedrockListener::onConnect(RakSession& session) {
             }
             return;
         }
-        // Everything this server has no answer for, named once each. A client asks for far more
-        // than it is told, and which of those asks go unanswered is not something the reference
-        // implementation's own list can say: only a real client can.
+        // Named once each: only a real client can say which of its many asks go unanswered.
         if (entry.unanswered.insert(static_cast<std::uint16_t>(packet)).second) {
             logger_.debug([packet] {
                 return "Nothing answers Bedrock " +
@@ -699,9 +646,7 @@ void BedrockListener::onMessage(RakSession& session, std::span<const std::uint8_
 }
 
 void BedrockListener::onDisconnect(RakSession& session) {
-    // A client that said goodbye read something it did not like; one that simply went quiet was not
-    // being reached. The counts say which, and a burst that stops being acknowledged halfway names
-    // the transport rather than the packet.
+    // The counts tell a client that disliked a packet from one that went quiet; a stalled burst names the transport.
     logger_.debug([&session] {
         const wire::bedrock::RakSession::Stats& stats = session.stats();
         return std::string{"Bedrock session ended: the client "} +
@@ -714,7 +659,6 @@ void BedrockListener::onDisconnect(RakSession& session) {
                std::to_string(stats.splitParts) + " part(s).";
     });
     if (const auto found = sessions_.find(session.peer()); found != sessions_.end()) {
-        // Their skin leaves with them: nobody else needs to draw somebody who is not here.
         skins_->forget(
             uuidOf(found->second->login.xuid.empty() ? found->second->login.name : found->second->login.xuid));
     }
@@ -737,8 +681,7 @@ void BedrockListener::onReady(Session& session) {
         logger_.warn([&drop] { return "Leaving out of the Bedrock join: " + drop; });
     }
 
-    // How big each piece of the burst is, which is what says whether a client that never answers
-    // is choking on one packet's contents or on the size of it.
+    // Piece sizes tell whether a client that never answers chokes on one packet's contents or on the size.
     const auto note = [this](const std::string_view what, const std::size_t bytes) {
         logger_.debug([what, bytes] {
             return "Bedrock join: " + std::string{what} + " is " + std::to_string(bytes) + " byte(s).";
@@ -755,8 +698,7 @@ void BedrockListener::onReady(Session& session) {
     info.yaw = spawn.yaw;
     info.pitch = spawn.pitch;
     info.playerGameType = spawn.gamemode;
-    // The client is told where its eyes are, not its feet, which is the same offset it reports
-    // back on every movement.
+    // The client is told where its eyes are, the same offset it reports back on every movement.
     info.y += wire::bedrock::kPlayerEyeHeight;
     info.vanillaVersion = gameVersion_;
     info.serverId = "basalt";
@@ -767,8 +709,7 @@ void BedrockListener::onReady(Session& session) {
     session.connection.sendPacket(BedrockPacket::StartGame, body.readable());
     note("start_game", body.readableBytes());
 
-    // What a client is told about the world before it is told it is in it. A real client reads
-    // start_game, finds it knows nothing about what lives here, and leaves without a word.
+    // A real client reads start_game, finds it knows nothing of what lives here, and leaves without a word.
     body.clear();
     if (!dropping("biomes")) {
         wire::bedrock::writeBiomeDefinitionList(body);
@@ -776,8 +717,7 @@ void BedrockListener::onReady(Session& session) {
         note("biomes", body.readableBytes());
     }
 
-    // Which item is which number, said by the server rather than agreed by version. It goes before
-    // anything that could carry an item, which is everything after this point.
+    // Item numbers are said by the server and go before anything that could carry an item.
     body.clear();
     if (!dropping("items")) {
         wire::bedrock::writeItemComponent(body, session.connection.protocolVersion());
@@ -803,14 +743,12 @@ void BedrockListener::onReady(Session& session) {
         note("creative", body.readableBytes());
     }
 
-    // The handful of rules that stop the client acting where this server already does.
     body.clear();
     wire::bedrock::writeGameRulesChanged(body, session.connection.protocolVersion());
     session.connection.sendPacket(BedrockPacket::GameRulesChanged, body.readable());
     note("gamerules", body.readableBytes());
 
-    // The looks 26.2 moved out of metadata and into properties of their own. Named once for each
-    // kind that has one: a value for a property the client was never declared draws nothing.
+    // A value for a property the client was never declared draws nothing, so each kind that has one is named once.
     for (const std::string_view farmAnimal : {"minecraft:pig", "minecraft:cow", "minecraft:chicken"}) {
         static constexpr std::array<std::string_view, 3> kClimates{"temperate", "warm", "cold"};
         body.clear();
@@ -819,15 +757,13 @@ void BedrockListener::onReady(Session& session) {
     }
     note("entity properties", body.readableBytes());
 
-    // The cameras a client may be put behind. Named once and never again: an instruction that
-    // points at a preset the client was not told about is dropped.
+    // An instruction pointing at a preset the client was not told about is dropped, so presets are named once.
     body.clear();
     wire::bedrock::writeCameraPresets(body, session.connection.protocolVersion());
     session.connection.sendPacket(BedrockPacket::CameraPresets, body.readable());
     note("camera presets", body.readableBytes());
 
-    // What can be crafted, which on this door is the client's own copy of the recipe book: a grid
-    // shows no result at all unless the recipe behind it came from here.
+    // A grid shows no result unless the recipe behind it came from here, so the client's recipe book is ours.
     body.clear();
     wire::bedrock::writeCraftingData(body,
                                      hooks_.recipes ? hooks_.recipes() : std::vector<wire::bedrock::BedrockRecipe>{},
@@ -852,9 +788,7 @@ void BedrockListener::onReady(Session& session) {
                                                     static_cast<std::int32_t>(info.z), kInitialRadius * 16);
     session.connection.sendPacket(BedrockPacket::NetworkChunkPublisherUpdate, body.readable());
 
-    // No empty columns here any more: the player made just below asks the world for the real
-    // ones, which answer the same question and answer it with blocks in them. Sending a hole
-    // first and the ground a moment later is worse than sending the ground a moment later.
+    // No empty columns: sending a hole first and the ground a moment later is worse than the ground a moment later.
 
     session.connection.flush();
 
@@ -871,13 +805,11 @@ void BedrockListener::onReady(Session& session) {
     joining.protocol = session.connection.protocolVersion();
     joining.mailbox = session.mailbox;
     joining.skins = skins_;
-    // What the client said it looks like, kept for everybody else to draw. One that sent nothing
-    // readable is remembered as nothing, and whoever draws it falls back to a flat colour.
     if (!session.login.skinPixels.empty()) {
         wire::bedrock::SkinInfo skin;
         skin.skinId = session.login.skinId.empty() ? joining.name : session.login.skinId;
         if (!session.login.skinGeometry.empty()) {
-            // Keeping the default here is what says "the geometry you already have".
+            // Keeping the default is what says: the geometry you already have.
             skin.resourcePatch = session.login.skinGeometry;
         }
         skin.width = session.login.skinWidth;
@@ -902,8 +834,7 @@ void BedrockListener::deliverMail(Session& session) {
         }
         session.connection.sendPacket(static_cast<BedrockPacket>(item.packetId), item.body);
         if (item.last) {
-            // The goodbye was written by whoever posted it, so this only has to stop: the client
-            // leaves on its own once it has read it, and RakNet clears the session up after.
+            // The goodbye was written by whoever posted it; the client leaves on its own and RakNet clears the session.
             session.connection.flush();
             session.connection.close();
             return;

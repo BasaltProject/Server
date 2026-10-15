@@ -124,7 +124,6 @@ void addPaleMossHanger(Chunk& chunk, random::RandomSource& random, std::int32_t 
     setBlock(chunk, x, y, z, tipTrue);
 }
 
-/// The lowest layer of a tree's own support, which is its roots when they sit below the trunk.
 [[nodiscard]] std::vector<BlockPos> lowestTrunkOrRootPositions(const TreeDecoratorContext& context) {
     if (context.roots.empty()) {
         return context.logs;

@@ -75,7 +75,7 @@ using wire::protocol::play::Gamemode;
 using wire::protocol::play::SetEntityDataPacket;
 using wire::protocol::play::SoundSource;
 
-/// parity: `VehicleEntity.hurtServer`: a cart takes ten a point and comes apart past forty.
+/// parity: `VehicleEntity.hurtServer`.
 
 constexpr double kSprintKnockback = 0.5;
 constexpr double kSweepSpeedLimit = 0.003;
@@ -158,7 +158,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         breakVehicle(*session, *target);
         return;
     }
-    // parity: `ItemFrame.hurtServer`, which is not a hit point of damage: it either empties the
+    // parity: `ItemFrame.hurtServer`.
     // frame or takes it off the wall.
     if (world::itemFrames::isFrame(target->type())) {
         breakFrame(*session, *target);
@@ -168,7 +168,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         breakCushion(*session, *target);
         return;
     }
-    // parity: `BlockAttachedEntity.hurtServer` on a knot: it goes, untied, and its mobs lose the lead.
+    // parity: `BlockAttachedEntity.hurtServer` on a knot.
     if (target->type().path() == "leash_knot") {
         target->removed = true;
         owner_->broadcastSound("minecraft:entity.lead.untied", target->x, target->y, target->z, SoundSource::Neutral);
@@ -182,7 +182,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         }
         return;
     }
-    // parity: `ShulkerBullet.hurtServer`: any blow breaks it, with its sound and a burst of crits.
+    // parity: `ShulkerBullet.hurtServer`.
     if (entity::shulkers::isBullet(target->type())) {
         session->ticksSinceSwing = 0;
         owner_->broadcastSound("entity.shulker_bullet.hurt", target->x, target->y, target->z, SoundSource::Hostile);
@@ -211,7 +211,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     const player::playerAttributes::DefinitionOf definitionOf = [enchantments](const Identifier& id) {
         return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
     };
-    // parity: `Player.attack` reads the attack damage and speed attributes, weapon and effects in.
+    // parity: `Player.attack` reads the attack damage and speed attributes.
     const float strength = player::combat::attackStrengthScale(
         session->ticksSinceSwing, player::playerAttributes::valueOf(*session, "minecraft:attack_speed", definitionOf));
     session->ticksSinceSwing = 0;
@@ -221,7 +221,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         spinning_
             ? session->autoSpinDamage
             : static_cast<float>(player::playerAttributes::valueOf(*session, "minecraft:attack_damage", definitionOf));
-    // parity: what the enchantments add rides on the swing but not on the critical, and is put back
+    // parity: what the enchantments add rides on the swing but not on the critical, and is put back.
     // on top after the charge and the critical have had the base to themselves.
     const world::realEntityTypeTags::TagMembers* entityTags = owner_->options().entityTypeTags;
     const world::weaponDamage::Victim victim{
@@ -267,12 +267,12 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
                             {.entity = target->uuid()});
     const player::BreakContext blocks = owner_->blockInteraction().breakContext();
     const player::pvp::Context melee = meleeContext(blocks);
-    // parity: `causeExtraKnockback`: the attribute and the knockback enchantment halved, and the half
+    // parity: `causeExtraKnockback`.
     // a sprinting hit adds, along the attacker's facing; the 0.4 every hit is worth was inside it.
     player::pvp::knockMob(*session, *target,
                           player::pvp::knockbackOf(melee, *session, heldStack) +
                               (knockbackAttack ? static_cast<float>(kSprintKnockback) : 0.0F));
-    // parity: `isSweepAttack`: a sword, on the ground, walking, and a swing that is neither a
+    // parity: `isSweepAttack`: a sword, on the ground, walking, and a swing that is neither a.
     // critical nor a sprinting one.
     const bool sweep = fullStrength && !critical && !knockbackAttack && session->onGround &&
                        owner_->lastStepSquared < kSweepSpeedLimit * kSweepSpeedLimit && weapon.has_value() &&
@@ -283,11 +283,11 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     }
     broadcastDamageEvent(*target, damageType, session->entityId());
     broadcastMotion(*target);
-    // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it: one sends a
+    // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
     // monster after whoever swung, the other sends an animal running.
     target->hurtBy = session->entityId();
     entity::entityCombat::rememberPlayer(*target, session->uuid());
-    // parity: `Warden.hurtServer`, which adds the angry threshold plus twenty to whoever hit it.
+    // parity: `Warden.hurtServer`.
     if (entity::wardens::isWarden(target->type())) {
         entity::wardens::anger(*target, session->entityId(), entity::wardens::kHurt);
         MobActionSystem::wardenStruck(*target, session->entityId(), true, 0.0);
@@ -309,7 +309,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
                                SoundSource::Players);
     }
     session->stats.addDamageDealt(result.damage);
-    // parity: `itemAttackInteraction`: the mace's smash, the post-attack enchantments, the wear.
+    // parity: `itemAttackInteraction`.
     player::pvp::itemAttackInteraction(melee, *world, *session, nullptr, target, heldStack,
                                        PlayerInventory::kHotbarStart + session->inventory.heldSlot());
     session->food.addExhaustion(kAttackExhaustion);
@@ -397,11 +397,11 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     if (entity == nullptr || entity->removed) {
         return;
     }
-    // parity: `ItemFrame.interact`, which comes before anything a mob would do with the click.
+    // parity: `ItemFrame.interact`.
     if (world::itemFrames::isFrame(entity->type()) && useItemFrame(*session, *entity)) {
         return;
     }
-    // parity: `Entity.interact`'s leashes, before the mob's own `mobInteract`, and the knot's own.
+    // parity: `Entity.interact`'s leashes.
     if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr) {
         const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
         const std::int32_t slot =
@@ -444,7 +444,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             return;
         }
     }
-    // parity: `Minecart.interact` seats whoever clicked it; `MinecartChest` opens its chest instead,
+    // parity: `Minecart.interact` seats whoever clicked it.
     // and the other carts have no seat.
     if (world::detectorRails::isMinecart(entity->type())) {
         if (entity->type().path() == "minecart") {
@@ -454,7 +454,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         } else if (entity->type().path() == "chest_minecart") {
             owner_->menus().openEntityChest(*session, *entity);
         } else if (entity->type().path() == "furnace_minecart" && owner_->options().vehicles != nullptr) {
-            // parity: `MinecartFurnace.interact`: a piece of fuel from that hand, spent unless the
+            // parity: `MinecartFurnace.interact`: a piece of fuel from that hand, spent unless the.
             // player has infinite materials.
             const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
             const std::int32_t slot = mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot()
@@ -476,7 +476,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     }
     // parity: `AbstractBoat.interact`, a seat for a player not crouching.
     if (entity::boats::isBoat(entity->type())) {
-        // parity: `AbstractChestBoat.interact`: a seat first, and the chest to a crouching player or
+        // parity: `AbstractChestBoat.interact`.
         // when there is no seat to be had.
         if (!boardBoat(*session, *entity) && entity::boats::hasChest(entity->type()) &&
             (session->sneaking ||
@@ -501,7 +501,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     if (tameOrSit(*world, *session, *entity)) {
         return;
     }
-    // parity: `Allay.mobInteract`: an item to carry, the item back, or a shard while it dances.
+    // parity: `Allay.mobInteract`.
     if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr && entity::allays::isAllay(entity->type())) {
         const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
         const std::int32_t slot =
@@ -595,7 +595,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         return;
     }
     const std::optional<Identifier> item = parsedOrNothing(held->id);
-    // parity: `ZombieVillager.mobInteract`, where the apple is taken only when the cure starts.
+    // parity: `ZombieVillager.mobInteract`.
     if (item.has_value() && item->path() == "golden_apple" && entity->type().path() == "zombie_villager") {
         MobActionSystem* mobs = owner_->options().mobs;
         if (mobs != nullptr && mobs->startCure(*world, *entity, session->uuid()) &&
@@ -625,7 +625,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         }
         return;
     }
-    // parity: `Armadillo.mobInteract`: a brush takes a scute off, and a curled one takes nothing else.
+    // parity: `Armadillo.mobInteract`.
     if (entity->type().path() == "armadillo") {
         MobActionSystem* mobs = owner_->options().mobs;
         if (item.has_value() && item->path() == "brush" && mobs != nullptr && mobs->brushArmadillo(*world, *entity)) {
@@ -652,7 +652,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     if (!item.has_value() || !entity::breeding::isFood(entity->type(), *item)) {
         return;
     }
-    // parity: `Animal.mobInteract` feeds a grown one into love and a calf into growing faster, and
+    // parity: `Animal.mobInteract` feeds a grown one into love and a calf into growing faster.
     // does nothing at all to one that is neither.
     const std::optional<world::TriggerItem> used = world::triggerFacts::itemOf(held);
     if (entity::breeding::canFallInLove(*entity)) {
@@ -702,7 +702,7 @@ bool CombatHandler::useItemFrame(PlayerSession& session, ServerEntity& frame) {
         return false;
     }
     broadcastFrame(frame);
-    // parity: both halves of `interact` end in `updateNeighbourForOutputSignal`, which is what tells
+    // parity: both halves of `interact` end in `updateNeighbourForOutputSignal`.
     // the comparator reading the frame that its number moved.
     const std::array<std::int32_t, 3> square = world::itemFrames::squareOf(frame);
     world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), square[0], square[1], square[2],
@@ -822,7 +822,7 @@ void CombatHandler::breakVehicle(PlayerSession& session, ServerEntity& vehicle) 
     if (world == nullptr || vehicles == nullptr) {
         return;
     }
-    // parity: `Player.attack` against something not alive: the same swing, no critical, and the
+    // parity: `Player.attack` against something not alive.
     // hit handed to `VehicleEntity.hurtServer`.
     const std::optional<storage::StoredItemStack>& heldStack = session.inventory.heldItem();
     world::RealEnchantments* enchantments = owner_->options().enchantments;
@@ -873,7 +873,7 @@ void CombatHandler::breakCushion(PlayerSession& session, ServerEntity& cushion) 
     if (world == nullptr) {
         return;
     }
-    // parity: `BlockAttachedEntity.hurtServer` kills it and `Cushion.dropItem` follows: the sound
+    // parity: `BlockAttachedEntity.hurtServer` kills it and `Cushion.dropItem` follows.
     // always, the item only outside creative and with `entity_drops` on.
     for (const std::int32_t passenger : cushion.passengerIds) {
         for (PlayerSession* rider : owner_->playersInSameWorld()) {
@@ -907,13 +907,13 @@ void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {
         return;
     }
     const std::optional<server::world::loot::ItemStack> shown = world::itemFrames::shownIn(frame);
-    // parity: `dropItem` puts nothing in the world for a creative player or with `entity_drops` off,
+    // parity: `dropItem` puts nothing in the world for a creative player or with `entity_drops` off.
     // and the frame is emptied either way.
     const bool drops = session.gamemode != Gamemode::Creative && world->gameRules().get(world::gameRules::kEntityDrops);
     if (shown.has_value()) {
         static_cast<void>(frame.sourceNbt->remove("Item"));
         broadcastFrame(frame);
-        // parity: `dropItem` takes the map's marker off unless drops are off, where only a frame
+        // parity: `dropItem` takes the map's marker off unless drops are off, where only a frame.
         // coming down on its own does.
         if (world->gameRules().get(world::gameRules::kEntityDrops) && owner_->options().maps != nullptr) {
             owner_->options().maps->frameLostMap(shown->components, frame);
@@ -928,7 +928,7 @@ void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {
             owner_->blockInteraction().spawnDroppedItem(frame.type(), 1, frame.x, frame.y, frame.z);
         }
     }
-    // parity: both halves raise `GameEvent.BLOCK_CHANGE`, and a comparator reading the frame has to
+    // parity: both halves raise `GameEvent.BLOCK_CHANGE`.
     // hear that it is empty now.
     const std::array<std::int32_t, 3> square = world::itemFrames::squareOf(frame);
     world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), square[0], square[1], square[2],

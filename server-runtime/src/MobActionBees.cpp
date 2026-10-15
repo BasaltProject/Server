@@ -84,7 +84,7 @@ void markDirty(world::LoadedWorld& world, const Pos& at) {
     }
 }
 
-/// parity: `EnvironmentAttributes.BEES_STAY_IN_HIVE`: any rain at all, then the overworld's night.
+/// parity: `EnvironmentAttributes.BEES_STAY_IN_HIVE`.
 [[nodiscard]] bool staysInHive(const world::LoadedWorld& world) {
     if (world.weather().rainLevel() > 0.0F) {
         return true;
@@ -130,7 +130,7 @@ void MobActionSystem::tickBee(world::LoadedWorld& world, const std::vector<Playe
         }
         updateBeeAnger(world, bee, random);
     }
-    // parity: the rest of `Bee.aiStep`: three countdowns, the roll, and a hive that went away.
+    // parity: the rest of `Bee.aiStep`.
     state.stayOutOfHive = std::max(state.stayOutOfHive - 1, 0);
     state.hiveCooldown = std::max(state.hiveCooldown - 1, 0);
     state.flowerCooldown = std::max(state.flowerCooldown - 1, 0);
@@ -281,7 +281,7 @@ void MobActionSystem::enterHive(ServerEntity& bee, const Pos& hive) {
     // parity: `discard`, gone into the hive without dying.
     bee.removed = true;
     markDirty(*world, hive);
-    // parity: `BeehiveBlockEntity.setChanged`, which lets everybody out again if fire is near.
+    // parity: `BeehiveBlockEntity.setChanged`.
     if (beehives::isFireNearby(world->state(), hive)) {
         emptyHive(*world, hive, stateId, nullptr, beehives::Release::Emergency);
     }
@@ -328,8 +328,7 @@ bool MobActionSystem::growBeeCrop(ServerEntity& bee, const Pos& pos) {
     const std::string ageText = propertyOf(*below, "age");
     const std::int32_t age = ageText.empty() ? 0 : std::stoi(ageText);
     std::optional<std::int32_t> grown;
-    // parity: `CropBlock.getStateForAge`, `StemBlock.AGE`, `SweetBerryBushBlock.AGE` and cave vines'
-    // bone meal, which is their berries.
+    // parity: `CropBlock.getStateForAge`.
     if (path == "wheat" || path == "carrots" || path == "potatoes") {
         grown = age < 7 ? withProperty(*below, "age", std::to_string(age + 1)) : std::nullopt;
     } else if (path == "beetroots") {
@@ -391,7 +390,7 @@ bool MobActionSystem::releaseOccupant(world::LoadedWorld& world, const Pos& hive
     random::RandomSource random = freshRandom();
     entity::bees::BeeState& bee = entity::bees::stateOf(*created, random);
     bee.hive = hive;
-    // parity: `setBeeReleaseData`: the time inside counts towards growing up and off the love.
+    // parity: `setBeeReleaseData`.
     const std::int32_t ticks = occupant.getInt("ticks_in_hive");
     if (!tag.getBoolean("AgeLocked")) {
         if (created->age < 0) {
@@ -453,7 +452,7 @@ bool MobActionSystem::tickBeehive(world::LoadedWorld& world, std::int32_t x, std
     if (entity == nullptr || !stateId.has_value() || !isHiveState(*stateId)) {
         return false;
     }
-    // parity: `BeehiveBlock.updateShape`: fire arriving beside it sends every bee out at once.
+    // parity: `BeehiveBlock.updateShape`.
     bool fireBeside = false;
     for (const auto& side : std::array<Pos, 6>{{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}}) {
         const std::optional<std::int32_t> neighbour = world.state().blockState(x + side[0], y + side[1], z + side[2]);
@@ -490,7 +489,6 @@ bool MobActionSystem::tickBeehive(world::LoadedWorld& world, std::int32_t x, std
         broadcaster_->sendEffects(watchersOf(world), x, y, z, *stateId,
                                   {world::blockEffect::Sound{.name = "block.beehive.work"}});
     }
-    // The stay counts moved on whether or not anybody left.
     return true;
 }
 

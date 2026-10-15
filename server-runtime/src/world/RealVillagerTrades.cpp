@@ -17,11 +17,9 @@ using wire::common::Identifier;
 using wire::common::JsonObject;
 using wire::common::JsonValue;
 
-/// parity: `DataComponents.ADDITIONAL_TRADE_COST`, which only lives on a stack until it is priced.
+/// parity: `DataComponents.ADDITIONAL_TRADE_COST`.
 constexpr std::string_view kAdditionalTradeCost = "minecraft:additional_trade_cost";
 
-/// A whole number written either way round: the jar writes counts as integers and the discount as a
-/// fraction, and a field is read for what it is rather than for how it was spelled.
 [[nodiscard]] std::optional<double> numberOf(const JsonValue* value) {
     if (value == nullptr) {
         return std::nullopt;
@@ -56,8 +54,7 @@ constexpr std::string_view kAdditionalTradeCost = "minecraft:additional_trade_co
     return count.has_value() ? static_cast<std::int32_t>(*count) : fallback;
 }
 
-/// parity: the `values` of a tag file, as ids. Nothing here resolves a nested tag: a level's tag
-/// lists its trades outright.
+/// parity: the `values` of a tag file.
 [[nodiscard]] std::vector<Identifier> idsOf(std::string_view json) {
     std::vector<Identifier> ids;
     const std::expected<JsonValue, wire::common::JsonError> parsed = wire::common::parseJson(json);
@@ -83,7 +80,6 @@ constexpr std::string_view kAdditionalTradeCost = "minecraft:additional_trade_co
     return ids;
 }
 
-/// A holder set as written: one id, a list of them, or a single `#tag`.
 [[nodiscard]] std::vector<std::string> idsOrTagOf(const JsonValue* value) {
     std::vector<std::string> ids;
     if (value == nullptr) {
@@ -101,7 +97,6 @@ constexpr std::string_view kAdditionalTradeCost = "minecraft:additional_trade_co
     return ids;
 }
 
-/// Whether an enchantment is one the set names, a tag being asked of the roll's own registries.
 [[nodiscard]] bool listsEnchantment(const std::vector<std::string>& set, const std::string& enchantment,
                                     const server::world::loot::LootContext& context) {
     if (set.size() == 1 && set.front().starts_with('#')) {
@@ -196,8 +191,7 @@ std::optional<trades::Offer> RealVillagerTrades::offerOf(const VillagerTrade& tr
     if (result.count <= 0 || result.item.path() == "air") {
         return std::nullopt;
     }
-    // parity: `ADDITIONAL_TRADE_COST` comes off the result and onto the first price, doubled for a
-    // book storing one of the listed enchantments.
+    // parity: `ADDITIONAL_TRADE_COST` comes off the result and onto the first price.
     std::int32_t additional = result.components.getInt(kAdditionalTradeCost);
     static_cast<void>(result.components.remove(kAdditionalTradeCost));
     if (!trade.doubleTradePriceEnchantments.empty()) {

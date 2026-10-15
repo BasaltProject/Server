@@ -43,7 +43,7 @@ constexpr float kTippedScale = 0.125F;
 constexpr float kHarm = 6.0F;
 constexpr float kHeal = 4.0F;
 
-/// parity: `Arrow.doPostHurtEffects` and `SpectralArrow`'s: the potion the arrow carries, or glowing.
+/// parity: `Arrow.doPostHurtEffects` and `SpectralArrow`'s.
 [[nodiscard]] std::vector<world::ActiveEffect> effectsOf(const ServerEntity& arrow) {
     if (arrow.type().path() == "spectral_arrow") {
         return {world::ActiveEffect{.effect = wire::common::Identifier::vanilla("glowing"),
@@ -95,7 +95,7 @@ void CombatSystem::arrowEffects(world::LoadedWorld& world, const std::vector<Pla
 }
 
 void CombatSystem::deflectArrow(ServerEntity& arrow) {
-    // parity: `ProjectileDeflection.REVERSE` then `scale(0.2)`: back at a tenth of the speed, turned
+    // parity: `ProjectileDeflection.REVERSE` then `scale(0.2)`.
     // round by a little over half a turn either way.
     constexpr double kReverse = -0.5;
     arrow.velocityX *= kReverse * kArrowBounce;
@@ -123,7 +123,7 @@ void CombatSystem::arrowTriggers(const world::LoadedWorld& world, const std::vec
     }
     world::triggerFacts::playerHurtEntity(*triggers, world, **shooter, mob, damage, world::damageTypes::kArrow,
                                           world::triggerFacts::ofEntity(world, arrow));
-    // parity: `AbstractArrow.onHitEntity`: a piercing arrow names all it killed on every hit, any
+    // parity: `AbstractArrow.onHitEntity`.
     // other only the one it just killed.
     std::vector<wire::common::Identifier> killed;
     if (arrow.pierceLevel > 0) {
@@ -158,7 +158,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
     if (!target.has_value()) {
         return ArrowHit::Missed;
     }
-    // parity: `AbstractArrow.onHitEntity`: the damage is the speed times the arrow's own two points,
+    // parity: `AbstractArrow.onHitEntity`.
     // rounded up.
     const double speed = std::sqrt((arrow.velocityX * arrow.velocityX) + (arrow.velocityY * arrow.velocityY) +
                                    (arrow.velocityZ * arrow.velocityZ));
@@ -183,7 +183,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
                    firedByPlayer(watchers, arrow) ? arrow.ownerId : std::nullopt);
         return ArrowHit::Stopped;
     }
-    // parity: `AbstractArrow.onHitEntity` on a vehicle: the hit, a burning arrow's fire, and the
+    // parity: `AbstractArrow.onHitEntity` on a vehicle.
     // arrow gone unless it pierces.
     if (target->mob != nullptr &&
         (world::detectorRails::isMinecart(target->mob->type()) || entity::boats::isBoat(target->mob->type()))) {
@@ -226,7 +226,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         if (!piercing) {
             ++mob.arrowCount;
         }
-        // parity: `Warden.hurtServer` angers it at whoever shot, and fights them within five blocks.
+        // parity: `Warden.hurtServer` angers it at whoever shot.
         if (arrow.ownerId.has_value() && entity::wardens::isWarden(mob.type())) {
             static_cast<void>(entity::wardens::anger(mob, *arrow.ownerId, entity::wardens::kHurt));
             for (const PlayerSession* shooter : watchers) {
@@ -252,7 +252,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         }
         return piercing ? ArrowHit::Pierced : ArrowHit::Stopped;
     }
-    // parity: a raised shield makes `hurtServer` answer false and the arrow turns back, unless it
+    // parity: a raised shield makes `hurtServer` answer false and the arrow turns back.
     // pierces, which no shield stops.
     const bool shielded = !piercing && player::shieldFaces(*target->player, fromX, fromZ);
     if (target->player->connection().hurt) {

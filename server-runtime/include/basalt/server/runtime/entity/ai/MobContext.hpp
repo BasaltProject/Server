@@ -20,10 +20,8 @@ class WorldState;
 
 namespace basalt::server::runtime::entity::ai {
 
-/// A player, as the goals see one: where they are, and what they are holding.
 struct PlayerView {
     std::int32_t entityId = 0;
-    /// Their uuid, which is how a pet knows its own owner.
     std::string uuid;
     double x = 0.0;
     double y = 0.0;
@@ -39,29 +37,23 @@ struct PlayerView {
     bool sprinting = false;
     /// parity: `Player.isSwimming`, sprinting in water.
     bool swimming = false;
-    /// Where they are looking, which is what an enderman reads.
     float yaw = 0.0F;
     float pitch = 0.0F;
-    /// The boat or other vehicle it steers, and whether it moved sideways last tick.
     /// parity: `getControllingPassenger` and `hasMovedHorizontallyRecently`.
     std::optional<std::int32_t> vehicleId;
     bool movedHorizontally = false;
-    /// The way it faces, 0 south, 1 west, 2 north, 3 east. parity: `Entity.getDirection`.
+    /// parity: `Entity.getDirection`.
     std::int32_t facing = 0;
     /// parity: `Player.isSleeping` and `getSleepTimer`, which a cat on the bed reads.
     bool sleeping = false;
     std::int32_t sleepTicks = 0;
-    /// parity: `LivingEntity.PLAYER_NOT_WEARING_DISGUISE_ITEM`, inverted: a carved pumpkin on the head.
+    /// parity: `LivingEntity.PLAYER_NOT_WEARING_DISGUISE_ITEM`.
     bool gazeDisguised = false;
-    /// parity: `Abilities.flying` and `Entity.isInWater`, which keep a parrot off the shoulder.
+    /// parity: `Abilities.flying` and `Entity.isInWater`.
     bool flying = false;
     bool inWater = false;
 };
 
-/// What a goal can make the world do beyond moving its own mob.
-///
-/// An interface rather than a bundle of callbacks: a goal calls a dozen of these, and naming each
-/// one is what keeps the seam readable. The runtime supplies the one implementation.
 class MobActions {
 public:
     MobActions() = default;
@@ -78,7 +70,7 @@ public:
 
     virtual void hurtMob(ServerEntity& mob, ServerEntity& target, float damage) = 0;
 
-    /// parity: `Animal.spawnChildFromBreeding`, which is the world's to do and not the goal's.
+    /// parity: `Animal.spawnChildFromBreeding`.
     virtual void breed(ServerEntity& mob, ServerEntity& partner) = 0;
 
     /// parity: `EatBlockGoal`, which eats the grass under or in front of the mob.
@@ -93,13 +85,13 @@ public:
     /// parity: `Ghast.setCharging` and `Blaze.setCharged`, the tell before a shot.
     virtual void setCharging(ServerEntity& mob, bool charging) = 0;
 
-    /// parity: `LargeFireball` and `SmallFireball`, thrown from the mob at what it is aiming at.
+    /// parity: `LargeFireball` and `SmallFireball`.
     virtual void shootFireball(ServerEntity& mob, double targetX, double targetY, double targetZ, bool large) = 0;
 
     /// parity: `Guardian`'s beam, which the client draws from the mob to whatever it names.
     virtual void setBeamTarget(ServerEntity& mob, std::optional<std::int32_t> targetId) = 0;
 
-    /// parity: `SpellcasterIllager.setIsCastingSpell`, the pose and the particles while it casts.
+    /// parity: `SpellcasterIllager.setIsCastingSpell`.
     virtual void setCasting(ServerEntity& mob, bool casting) = 0;
 
     /// parity: `Witch.performRangedAttack`, a splash potion thrown at somebody.
@@ -112,18 +104,16 @@ public:
     /// parity: `Evoker.EvokerSummonSpellGoal`, which is where vexes come from.
     virtual void summonVexes(ServerEntity& mob, std::int32_t count) = 0;
 
-    /// parity: an effect put on a player by something that is not a potion they drank; `sourceId` is
-    /// the entity `addEffect` names as its source.
     virtual void applyEffect(std::int32_t playerId, std::string_view effect, std::int32_t durationTicks,
                              std::int32_t amplifier, std::optional<std::int32_t> sourceId) = 0;
 
     /// parity: `Villager` sleeping, which is a pose the client draws lying in the bed.
     virtual void setSleeping(ServerEntity& mob, bool sleeping) = 0;
 
-    /// parity: `EnderMan.teleport`, which is a move plus the sound and particles at both ends.
+    /// parity: `EnderMan.teleport`.
     virtual void teleported(ServerEntity& mob) = 0;
 
-    /// parity: `AbstractSkeleton.performRangedAttack`, an arrow at 1.6 with the difficulty's spread.
+    /// parity: `AbstractSkeleton.performRangedAttack`.
     virtual void shootArrow(ServerEntity& mob, double targetX, double targetY, double targetZ, float power) = 0;
 
     /// parity: `Llama.spit`, aimed at a third of the target's height, with its sound.
@@ -133,11 +123,11 @@ public:
     /// parity: `Roar.start`, the warden's roar at somebody it is about to fight.
     virtual void wardenRoar(ServerEntity& /*warden*/, std::int32_t /*targetId*/) {}
 
-    /// parity: `Warden.increaseAngerAt`, with the listening sound it makes when `sound` is set.
+    /// parity: `Warden.increaseAngerAt`.
     virtual void wardenAngered(ServerEntity& /*warden*/, std::int32_t /*suspectId*/, std::int32_t /*amount*/,
                                bool /*sound*/) {}
 
-    /// parity: `Container.startOpen` and `stopOpen` from a copper golem: the lid and its sound.
+    /// parity: `Container.startOpen` and `stopOpen` from a copper golem.
     virtual void golemOpensChest(ServerEntity& /*golem*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/,
                                  bool /*open*/) {}
 
@@ -150,19 +140,16 @@ public:
     /// parity: `Entity.playSound` from the mob itself.
     virtual void mobSound(ServerEntity& /*mob*/, std::string_view /*sound*/) {}
 
-    /// What the mob holds changed, so everyone watching has to see it.
     virtual void heldItemChanged(ServerEntity& /*mob*/) {}
 
-    /// A pet's sitting or lying pose changed, so everyone watching has to see it.
     virtual void poseChanged(ServerEntity& /*mob*/) {}
 
-    /// parity: `ShoulderRidingEntity.setEntityOnShoulder`. Answers whether it sat down.
+    /// parity: `ShoulderRidingEntity.setEntityOnShoulder`.
     virtual bool sitOnShoulder(ServerEntity& /*parrot*/, std::int32_t /*playerId*/) { return false; }
 
     /// parity: `Container.setChanged`: the chunk is saved and a comparator reads it again.
     virtual void containerChanged(ServerEntity& /*mob*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/) {}
 
-    /// An item lying in the world, as a goal sees it.
     struct ItemView {
         std::int32_t entityId = 0;
         double x = 0.0;
@@ -170,14 +157,12 @@ public:
         double z = 0.0;
     };
 
-    /// parity: `Dolphin.ALLOWED_ITEMS` in the mob's box grown by `grow`: alive, in water and free to
-    /// take, in the level's own order.
+    /// parity: `Dolphin.ALLOWED_ITEMS`.
     [[nodiscard]] virtual std::vector<ItemView> itemsInWater(const ServerEntity& /*mob*/, double /*grow*/) {
         return {};
     }
 
-    /// parity: `Dolphin.ItemGoal.drop`, the held stack thrown ahead with forty ticks before anyone may
-    /// take it. Answers whether it held anything.
+    /// parity: `Dolphin.ItemGoal.drop`.
     virtual bool throwHeldItem(ServerEntity& /*mob*/) { return false; }
 
     /// parity: `ServerLevel.findNearestMapStructure(#dolphin_located, pos, 50, false)`.
@@ -197,26 +182,25 @@ public:
     /// parity: `RandomStandGoal.start`: up on its hind legs with its ambient sound.
     virtual void horseRears(ServerEntity& /*horse*/) {}
 
-    /// parity: `LivingEntity.dropFromGiftLootTable`: a gift table rolled for this mob, dropped in front
-    /// of it.
+    /// parity: `LivingEntity.dropFromGiftLootTable`.
     virtual void dropGift(ServerEntity& /*mob*/, std::string_view /*table*/) {}
 
     /// parity: `Shulker.setRawPeekAmount`: the lid, its armour, its sound and its game event.
     virtual void shulkerPeek(ServerEntity& /*shulker*/, std::int32_t /*amount*/) {}
 
-    /// parity: `ShulkerAttackGoal`'s `new ShulkerBullet(level, shulker, target, axis)` and its sound.
+    /// parity: `ShulkerAttackGoal`'s `new ShulkerBullet(level.
     virtual void shootShulkerBullet(ServerEntity& /*shulker*/, std::int32_t /*targetId*/) {}
 
-    /// parity: `PathfindToRaidGoal.recruitNearby`, the idle raiders around this one joining its raid.
+    /// parity: `PathfindToRaidGoal.recruitNearby`.
     virtual void recruitRaiders(ServerEntity& /*raider*/) {}
 
-    /// parity: `Raider.pickUpItem` for an ominous banner, which makes the raider its wave's captain.
+    /// parity: `Raider.pickUpItem` for an ominous banner.
     virtual void takeRaidBanner(ServerEntity& /*raider*/, std::int32_t /*itemId*/) {}
 
     /// parity: `Raider.setCelebrating`.
     virtual void setCelebrating(ServerEntity& /*raider*/, bool /*celebrating*/) {}
 
-    /// A hive as a bee sees it. parity: `getBeehiveBlockEntity`, `isFull` and `isFireNearby`.
+    /// parity: `getBeehiveBlockEntity`, `isFull` and `isFireNearby`.
     struct HiveView {
         bool loaded = false;
         bool hive = false;
@@ -231,7 +215,7 @@ public:
     /// parity: `BeehiveBlockEntity.addOccupant`, which takes the bee out of the world.
     virtual void enterHive(ServerEntity& /*bee*/, const std::array<std::int32_t, 3>& /*hive*/) {}
 
-    /// parity: `PoiManager.getInRange(#bee_home, pos, radius, ANY)`, in the manager's own order.
+    /// parity: `PoiManager.getInRange(#bee_home, pos, radius, ANY)`.
     [[nodiscard]] virtual std::vector<std::array<std::int32_t, 3>> beeHomesNear(const ServerEntity& /*bee*/,
                                                                                 std::int32_t /*radius*/) {
         return {};
@@ -242,21 +226,15 @@ public:
 
     [[nodiscard]] virtual bool raining(const ServerEntity& /*bee*/) { return false; }
 
-    /// parity: `BeeGrowCropGoal.tick` on one square below the bee. Answers whether it grew.
+    /// parity: `BeeGrowCropGoal.tick` on one square below the bee.
     virtual bool growBeeCrop(ServerEntity& /*bee*/, const std::array<std::int32_t, 3>& /*pos*/) { return false; }
 
-    /// Whether a block is in a block tag, which 26.3 decides teleports and jumps with. Without the
-    /// server's tags nothing is in any, which a goal reads as the tag-free rule.
     [[nodiscard]] virtual std::optional<bool> blockTagged(std::string_view /*tag*/,
                                                           const wire::common::Identifier& /*block*/) const {
         return std::nullopt;
     }
 };
 
-/// Everything one mob's goals are allowed to see this tick.
-///
-/// The mob and the world are the two halves vanilla's goals hold as fields; the rest is what this
-/// build has to hand them explicitly, since a goal here cannot reach into the server.
 class MobContext {
 public:
     world::WorldState& world;
@@ -289,12 +267,11 @@ public:
     std::optional<RaiderRaid> raid;
     /// parity: `Attributes.MOVEMENT_SPEED` for this mob, with its modifiers.
     double speed = 0.0;
-    /// parity: `Level.getSkyDarken` and the dimension's sky and `ambientLight`, what the light of
-    /// a square elsewhere is read with.
+    /// parity: `Level.getSkyDarken`.
     std::int32_t skyDarken = 0;
     bool hasSkylight = true;
     float ambientLight = 0.0F;
-    /// parity: `Level.getSeaLevel` and `getMinY`, which a phantom's anchor and a bat's aim read.
+    /// parity: `Level.getSeaLevel` and `getMinY`.
     std::int32_t seaLevel = 63;
     std::int32_t minY = -64;
 

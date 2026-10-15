@@ -21,7 +21,7 @@ currentCost(const Offer& offer) {
     server::world::loot::ItemStack first = offer.costA;
     first.count = priceOf(offer, offer.costA, server::registry::itemStacking::maxStackSize(offer.costA.item));
     std::optional<server::world::loot::ItemStack> second;
-    // parity: `MerchantOffer.getCostB` asks for its base count, untouched by demand or discounts.
+    // parity: `MerchantOffer.getCostB` asks for its base count.
     if (offer.costB.has_value()) {
         second = *offer.costB;
     }

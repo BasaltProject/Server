@@ -142,7 +142,7 @@ std::shared_ptr<const ArgumentType> swingAnimationArgument() {
 }
 
 const std::vector<SlotSourceValue>& slotRanges() {
-    // parity: `SlotRanges.SLOTS`, the equipment slots at `EquipmentSlot.getIndex` of 98, 100 and 105.
+    // parity: `SlotRanges.SLOTS`.
     static const std::vector<SlotSourceValue> ranges = [] {
         std::vector<SlotSourceValue> built;
         built.push_back({.name = "contents", .slots = {0}});

@@ -29,7 +29,7 @@ using wire::text::Component;
                                   Component::translatable("commands.team.option." + std::string{what} + ".unchanged")};
 }
 
-/// parity: `TeamColor`'s own lowercase names, which is how `/team modify color` reports one.
+/// parity: `TeamColor`'s own lowercase names.
 [[nodiscard]] std::string teamColorName(play::TeamColor color) {
     static constexpr std::array<std::string_view, 16> kNames{
         "black",     "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple",  "gold",   "gray",
@@ -52,8 +52,6 @@ void TeamCommand::build(const CommandNodeBuilder& root) const {
         }
         return team;
     };
-    // The edition that has teams is told the team; the one that has none is told what the names
-    // over the heads read as now, which is the only part of a team it can draw.
     const auto broadcast = [this](const CommandContext& context, const play::SetPlayerTeamPacket& packet) {
         const std::vector<player::PlayerSession*> online = context.environment().players().snapshot();
         for (const player::PlayerSession* player : online) {
@@ -252,7 +250,6 @@ void TeamCommand::build(const CommandNodeBuilder& root) const {
 
     root.literal("modify", [teamOf, changed](const CommandNodeBuilder& form) {
         form.argument("team", teamArgument(), [teamOf, changed](const CommandNodeBuilder& named) {
-            /// The three text fields differ only in which one they land on and what they then say.
             for (const auto& [what, field] : std::array<std::pair<std::string_view, Component Team::*>, 3>{
                      {{"displayName", &Team::displayName}, {"prefix", &Team::prefix}, {"suffix", &Team::suffix}}}) {
                 named.literal(std::string{what}, [what, field, teamOf, changed](const CommandNodeBuilder& one) {
@@ -268,8 +265,7 @@ void TeamCommand::build(const CommandNodeBuilder& root) const {
                                          if (wanted == nullptr) {
                                              return 0;
                                          }
-                                         // parity: only the display name refuses a repeat; the two
-                                         // affixes take one silently.
+                                         // parity: only the display name refuses a repeat.
                                          if (what == "displayName" && (*team)->*field == *wanted) {
                                              return std::unexpected{unchanged("name")};
                                          }
@@ -319,7 +315,6 @@ void TeamCommand::build(const CommandNodeBuilder& root) const {
                 });
             });
 
-            /// The two flags differ only in which field they move and the half of the key they name.
             for (const auto& [what, field] : std::array<std::pair<std::string_view, bool Team::*>, 2>{
                      {{"friendlyfire", &Team::friendlyFire},
                       {"seeFriendlyInvisibles", &Team::seeFriendlyInvisibles}}}) {
@@ -356,7 +351,6 @@ void TeamCommand::build(const CommandNodeBuilder& root) const {
                     });
             }
 
-            /// The two visibilities take the same four words and land on different fields.
             for (const auto& [what, field] :
                  std::array<std::pair<std::string_view, play::NameTagVisibility Team::*>, 2>{
                      {{"nametagVisibility", &Team::nameTagVisibility},

@@ -23,9 +23,7 @@ constexpr std::int32_t kUpperFloorOffset = 4;
     return box.move(StructurePos{x, y, z});
 }
 
-/// parity: `StructurePiecesBuilder` as `MineshaftPieces` uses it. Holds the pieces added so far so a
-/// candidate box can be rejected for overlapping one, which is what keeps a shaft from folding back
-/// into itself.
+/// parity: `StructurePiecesBuilder` as `MineshaftPieces` uses it.
 class Builder {
 public:
     explicit Builder(random::RandomSource& random) : random_(&random) {}
@@ -33,10 +31,8 @@ public:
     [[nodiscard]] std::vector<MineshaftPiece>& pieces() noexcept { return pieces_; }
 
     void addRoom(std::int32_t west, std::int32_t north);
-    /// Returns the vertical offset applied, which is what sets the structure's start y.
     std::int32_t moveBelowSeaLevel(std::int32_t seaLevel, std::int32_t minY);
 
-    /// The mesa variant is lifted to the surface instead of buried. Same return.
     std::int32_t moveToSurface(std::int32_t seaLevel, const mineshaftLayout::SurfaceHeightAt& surfaceHeightAt);
 
     void offsetPiecesVertically(std::int32_t dy);
@@ -49,7 +45,7 @@ private:
 
     [[nodiscard]] std::optional<StructureBoundingBox> bounds() const;
 
-    /// parity: `MineshaftPieces.generateAndAddPiece`, including its 80-block leash to the room.
+    /// parity: `MineshaftPieces.generateAndAddPiece`.
     std::optional<std::size_t> generateAndAddPiece(std::size_t startIndex, std::int32_t footX, std::int32_t footY,
                                                    std::int32_t footZ, StructureDirection direction,
                                                    std::int32_t depth);
@@ -58,7 +54,7 @@ private:
                                                                   std::int32_t footZ, StructureDirection direction,
                                                                   std::int32_t genDepth);
 
-    /// parity: the `MineShaftCorridor` constructor, whose rolls come after its box is accepted.
+    /// parity: the `MineShaftCorridor` constructor.
     [[nodiscard]] MineshaftPiece corridor(StructureBoundingBox box, StructureDirection direction,
                                           std::int32_t genDepth);
 
@@ -73,7 +69,6 @@ private:
     void addCorridorChildren(std::size_t startIndex, std::size_t pieceIndex);
     void addCrossingChildren(std::size_t startIndex, std::size_t pieceIndex);
     void addStairsChildren(std::size_t startIndex, std::size_t pieceIndex);
-    /// Four passes around the room, each stepping along a wall and opening a passage or not.
     [[nodiscard]] std::vector<StructureBoundingBox> addRoomChildren(std::size_t roomIndex);
 
     random::RandomSource* random_;
@@ -131,8 +126,7 @@ std::int32_t Builder::moveToSurface(std::int32_t seaLevel, const mineshaftLayout
     const std::int32_t centreY = box->minY + ((box->maxY - box->minY + 1) / 2);
     const std::int32_t centreZ = box->minZ + ((box->maxZ - box->minZ + 1) / 2);
     const std::int32_t surfaceHeight = surfaceHeightAt(centreX, centreZ);
-    // parity: a shaft under water stays at sea level; above it, `randomBetweenInclusive` picks a
-    // height between sea level and the surface, and that draw only happens in that case.
+    // parity: a shaft under water stays at sea level.
     const std::int32_t target =
         surfaceHeight <= seaLevel ? seaLevel : seaLevel + random_->nextInt(surfaceHeight - seaLevel + 1);
     const std::int32_t dy = target - centreY;
@@ -347,7 +341,6 @@ void Builder::addCorridorChildren(std::size_t startIndex, std::size_t pieceIndex
     if (depth >= kMaxDepth) {
         return;
     }
-    // Side passages every five blocks along the corridor, one roll each.
     if (!orientation.has_value() || !axisIsZ(*orientation)) {
         for (std::int32_t x = box.minX + 3; x + 3 <= box.maxX; x += 5) {
             const std::int32_t roll = random_->nextInt(5);
@@ -504,8 +497,7 @@ mineshaftLayout::Assembly mineshaftLayout::assemble(std::int64_t seed, std::int3
                                                     const SurfaceHeightAt& surfaceHeightAt) {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, chunkX, chunkZ);
-    // parity: `MineshaftStructure.findGenerationPoint` throws this first draw away, and every roll of
-    // the whole shaft hangs off what comes after it.
+    // parity: `MineshaftStructure.findGenerationPoint` throws this first draw away.
     static_cast<void>(random.nextDouble());
     Builder builder{random};
     builder.addRoom(chunkX * 16 + 2, chunkZ * 16 + 2);

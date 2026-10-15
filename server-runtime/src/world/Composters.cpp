@@ -14,9 +14,7 @@ namespace {
 
 constexpr std::int32_t kAlwaysChance = 100;
 
-/// parity: each item's `minecraft:compostable` component, which `Items` sets in code, as the chance
-/// in percent of the `compostable/<low|low_medium|medium|medium_high|always_add_one>` provider it
-/// names: 30, 50, 65, 85 and 100.
+/// parity: each item's `minecraft:compostable` component.
 constexpr std::array<std::pair<std::string_view, std::int32_t>, 122> kCompostables{{
     {"acacia_leaves", 30},
     {"acacia_sapling", 30},
@@ -165,8 +163,6 @@ constexpr std::array<std::pair<std::string_view, std::int32_t>, 122> kCompostabl
     return instance;
 }
 
-/// Writes a new level, answering the change. Nothing when the state does not exist, which cannot
-/// happen for a level the caller worked out from the one that is there.
 [[nodiscard]] std::optional<BlockChange> fillTo(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                 std::int32_t stateId, std::int32_t level) {
     const std::optional<std::int32_t> turned =
@@ -177,10 +173,7 @@ constexpr std::array<std::pair<std::string_view, std::int32_t>, 122> kCompostabl
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
-/// parity: the `compostable/*` context providers `ComposterBlock.addLayer` evaluates, written out
-/// here because the composter has no reach into the jar: always one for `always_add_one` or an empty
-/// composter (the `match_block` case, no draw), else one `nextInt(100)` against a two-entry weighted
-/// list that gives one layer when the draw falls under the chance. 26.2 drew `nextDouble` instead.
+/// parity: the `compostable/*` context providers `ComposterBlock.addLayer` evaluates.
 [[nodiscard]] std::int32_t layersFor(std::int32_t level, std::int32_t chance, random::RandomSource& random) {
     if (chance >= kAlwaysChance || level == 0) {
         return 1;

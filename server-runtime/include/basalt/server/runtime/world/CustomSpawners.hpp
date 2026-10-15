@@ -17,10 +17,7 @@ namespace basalt::server::runtime::world {
 
 class LoadedWorld;
 
-/// Minecraft 26.2's Overworld custom spawner for insomnia phantoms.
-///
-/// parity: `PhantomSpawner`. Its own clock, its own difficulty roll, and the player's own
-/// `time_since_rest`, which is why phantoms are a punishment for not sleeping rather than weather.
+/// parity: `PhantomSpawner`.
 class PhantomSpawner {
 public:
     using Spawn = std::function<void(const SpawnRequest&)>;
@@ -32,7 +29,6 @@ private:
     std::int32_t nextTick_ = 0;
 };
 
-/// One cat the spawner asked for, with the world conditions its variant is chosen from.
 struct CatSpawnRequest {
     double x = 0.0;
     double y = 0.0;
@@ -42,7 +38,6 @@ struct CatSpawnRequest {
     std::optional<wire::common::Identifier> biome;
 };
 
-/// Minecraft 26.2's Overworld custom spawner for village and swamp-hut cats.
 class CatSpawner {
 public:
     using Spawn = std::function<void(const CatSpawnRequest&)>;
@@ -60,7 +55,6 @@ private:
     std::int32_t nextTick_ = 0;
 };
 
-/// One member of a patrol, and whether it is the captain carrying the banner.
 struct PatrolSpawnRequest {
     double x = 0.0;
     double y = 0.0;
@@ -69,10 +63,7 @@ struct PatrolSpawnRequest {
     std::optional<wire::common::Identifier> biome;
 };
 
-/// Minecraft 26.2's Overworld custom spawner for pillager patrols.
-///
-/// parity: `PatrolSpawner`. A patrol appears away from a village, in the dark, after the fifth day,
-/// and the whole group is abandoned if its captain has nowhere to stand.
+/// parity: `PatrolSpawner`.
 class PatrolSpawner {
 public:
     /// Answers whether the member was really spawned, which is what decides if the rest follow.
@@ -85,8 +76,7 @@ private:
     std::int32_t nextTick_ = 0;
 };
 
-/// Where the trader appeared and what it walks back to. parity: the trader remembers a wandering
-/// origin, which is what stops it walking off the map.
+/// parity: the trader remembers a wandering origin, which stops it walking off the map.
 struct WanderingTraderSpawnRequest {
     double x = 0.0;
     double y = 0.0;
@@ -102,22 +92,16 @@ struct TraderLlamaSpawnRequest {
     double z = 0.0;
 };
 
-/// What the spawner keeps between restarts, which is a real save field in vanilla.
 struct WanderingTraderSpawnState {
     std::int32_t spawnDelay = 24000;
     std::int32_t spawnChance = 25;
 };
 
-/// Minecraft 26.2's persisted periodic wandering-trader spawner.
 class WanderingTraderSpawner {
 public:
-    /// Answers the trader's entity id, or nothing when the caller refused to make one: the llamas
-    /// need something to follow, so no trader means no llamas either.
     using SpawnTrader = std::function<std::optional<std::int32_t>(const WanderingTraderSpawnRequest&)>;
     using SpawnLlama = std::function<void(const TraderLlamaSpawnRequest&, std::int32_t traderId)>;
 
-    /// `random` is the spawner's own stream, separate from the level's: vanilla gives this one its
-    /// own so the trader's arrival does not shift what else spawns that tick.
     explicit WanderingTraderSpawner(WanderingTraderSpawnState state = {},
                                     random::RandomSource random = random::RandomSource::legacy(0));
 
@@ -136,17 +120,13 @@ private:
     std::int32_t tickDelay_ = 1200;
 };
 
-/// One zombie of a siege, placed on the ground it was found standing on.
 struct VillageSiegeSpawnRequest {
     double x = 0.0;
     double y = 0.0;
     double z = 0.0;
 };
 
-/// Minecraft 26.2's midnight village zombie siege.
-///
-/// parity: `VillageSiege`. The roll happens at a fixed time of night, once; a siege that is on sends
-/// twenty zombies in over the following seconds, and darkness ending cancels the whole thing.
+/// parity: `VillageSiege`.
 class VillageSiegeSpawner {
 public:
     using Spawn = std::function<void(const VillageSiegeSpawnRequest&)>;

@@ -13,10 +13,6 @@
 namespace basalt::server::runtime::world {
 
 /// parity: `ServerClockManager.ClockInstance`.
-///
-/// 26.2 replaced "day time plus game time" with clocks that carry a rate: a tick adds `rate` to a
-/// fractional accumulator and only whole units move `totalTicks`, which is what makes
-/// `/time rate 0.5` run half-speed days rather than skipping every other tick.
 class WorldClock {
 public:
     /// parity: the `day` timeline's period, which is what a marker's ticks are taken modulo.
@@ -39,17 +35,14 @@ public:
 
     [[nodiscard]] float partialTick() const noexcept { return partialTick_; }
 
-    /// Advances one tick, answering whether `totalTicks` moved so a caller can skip a pointless
-    /// sync.
     bool tick(bool advanceTime);
 
     void setTotalTicks(std::int64_t ticks);
 
-    /// parity: `ServerClockManager.addTicks`, which clamps at zero rather than going negative.
+    /// parity: `ServerClockManager.addTicks`.
     void addTicks(std::int32_t ticks);
 
-    /// What the client is told: zero rate when paused, so it stops interpolating instead of
-    /// drifting.
+    /// Zero rate when paused, so the client stops interpolating instead of drifting.
     [[nodiscard]] float networkRate(bool advanceTime) const noexcept;
 
     /// parity: the four `show_in_commands` markers of the `minecraft:day` timeline.
@@ -67,17 +60,10 @@ private:
     float partialTick_ = 0.0F;
 };
 
-/// Rain and thunder for one world.
-///
-/// parity: `ServerLevel.advanceWeatherCycle`, counters included. The three countdowns are what make
-/// the cycle work: `clearWeatherTime` forces clear weather while it runs (that is what
-/// `/weather clear <duration>` sets), and outside it `rainTime` and `thunderTime` each count down
-/// to a *flip* rather than to a state, which is why a fresh world with every counter at zero starts
-/// by drawing a delay instead of raining on its first tick.
+/// parity: `ServerLevel.advanceWeatherCycle`.
 class WorldWeather {
 public:
-    /// parity: `ServerLevel.RAIN_DELAY`, `RAIN_DURATION`, `THUNDER_DELAY`, `THUNDER_DURATION`, as
-    /// inclusive ranges.
+    /// parity: `ServerLevel.RAIN_DELAY`.
     static constexpr std::pair<std::int32_t, std::int32_t> kRainDelay{12000, 180000};
     static constexpr std::pair<std::int32_t, std::int32_t> kRainDuration{12000, 24000};
     static constexpr std::pair<std::int32_t, std::int32_t> kThunderDelay{12000, 180000};
@@ -89,25 +75,21 @@ public:
     std::int32_t thunderTime = 0;
     std::int32_t clearWeatherTime = 0;
 
-    /// parity: `ServerLevel.advanceWeatherCycle`. The counters only move with the `advanceWeather`
-    /// game rule; the two levels ramp either way, because they chase the flags and not the clock.
+    /// parity: `ServerLevel.advanceWeatherCycle`.
     void tick(random::RandomSource& random, bool advanceCycle);
 
-    /// parity: `MinecraftServer.setWeatherParameters`, which `/weather` calls with these four.
+    /// parity: `MinecraftServer.setWeatherParameters`.
     void set(std::int32_t clearTime, std::int32_t weatherTime, bool raining, bool thundering);
 
-    /// A duration for a `/weather` that was given none, from the same ranges vanilla samples.
     [[nodiscard]] static std::int32_t randomDuration(std::pair<std::int32_t, std::int32_t> range,
                                                      random::RandomSource& random);
 
-    /// parity: `Level.getRainLevel(1.0F)`, which on the server is the level itself: the `o` twin
-    /// only exists to interpolate a partial tick, and the server always asks for a whole one.
+    /// parity: `Level.getRainLevel(1.0F)`.
     [[nodiscard]] float rainLevel() const noexcept { return rainLevel_; }
 
     [[nodiscard]] float thunderLevel() const noexcept { return thunderLevel_; }
 
-    /// parity: `Level.isRaining` and `Level.isThundering` ask the **level**, not the flag, so a
-    /// `/weather rain` takes 21 ticks to count and a `/weather thunder` 91.
+    /// parity: `Level.isRaining`.
     [[nodiscard]] bool isRaining() const noexcept { return rainLevel_ > kRainingAt; }
 
     [[nodiscard]] bool isThundering() const noexcept { return thunderLevel_ > kThunderingAt; }

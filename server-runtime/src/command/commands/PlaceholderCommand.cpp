@@ -61,11 +61,6 @@ using wire::text::kWhite;
         .component = Component::text("'" + name + "' is not online. Only online players can be asked about.")}};
 }
 
-/// Who the text is about: a name, `me`, or `--null` for deliberately nobody.
-///
-/// `--null` is not the same as leaving the argument out. It is how an operator checks what a server
-/// list line or a console message will do, where there really is no player, without having to log
-/// out to find out.
 [[nodiscard]] std::expected<PlaceholderContext, CommandSyntaxError> subjectOf(const CommandContext& context) {
     const auto* subject = context.get<std::string>("subject");
     if (subject == nullptr || *subject == "--null") {
@@ -78,7 +73,6 @@ using wire::text::kWhite;
     return PlaceholderContext{}.with(placeholder::playerSlot(), *player);
 }
 
-/// Who the text can be about: whoever is online, plus the two keywords `subjectOf` accepts.
 [[nodiscard]] std::vector<std::string> subjects(const SuggestionContext& context) {
     std::vector<std::string> named;
     for (const player::PlayerSession* player : context.environment().players().snapshot()) {
@@ -89,15 +83,12 @@ using wire::text::kWhite;
     return named;
 }
 
-/// Substitutes, and reports every name that could not be filled in rather than leaving it quiet.
 [[nodiscard]] std::string substitute(const CommandContext& context, const PlaceholderContext& placeholderContext,
                                      const std::string& text) {
     return placeholders::substitute(
         text, context.environment().placeholders(), placeholderContext,
         [&context](std::string_view name, const PlaceholderValue& value) -> std::optional<std::string> {
             context.source().sendSystemMessage(problem(std::string{name}, value));
-            // Kept as written: this command exists to show what a line does, and a blank where a
-            // placeholder was is exactly what nobody can debug.
             return std::nullopt;
         });
 }
@@ -112,8 +103,6 @@ using wire::text::kWhite;
 PlaceholderCommand::PlaceholderCommand() : Command("placeholder", permissionLevel::kAdmins, {"placeholders"}) {}
 
 void PlaceholderCommand::build(const CommandNodeBuilder& root) const {
-    /// The three forms that take one subject and one piece of text, differing only in where the
-    /// answer goes.
     enum class Destination : std::uint8_t { Caller, Everyone, Dispatcher };
     const auto parseForm = [](const CommandNodeBuilder& node, Destination where) {
         node.argument("subject", wordArgument(), [where](const CommandNodeBuilder& subject) {
@@ -168,9 +157,7 @@ void PlaceholderCommand::build(const CommandNodeBuilder& root) const {
                                 .with(placeholder::otherPlayerSlot(), *second);
                         context.source().sendSystemMessage(wire::text::miniMessage::parse(
                             substitute(context, placeholderContext, textOf(context, "text"))));
-                        // No placeholder Basalt itself registers looks at the second player yet. The
-                        // context is here so a plugin's can, which is the only way one ever could: a
-                        // relational placeholder needs somewhere to put the other side.
+                        // No placeholder Basalt itself registers looks at the second player yet.
                         context.source().sendSystemMessage(
                             hint("No built-in placeholder is relational yet; this is for plugins to use."));
                         return 1;
@@ -181,8 +168,6 @@ void PlaceholderCommand::build(const CommandNodeBuilder& root) const {
     });
 
     root.literal("info", [](const CommandNodeBuilder& form) {
-        // Greedy, not a word: an operator types the name the way it appears in a file, and
-        // `%basalt_player_x%` is not a bare word to the parser.
         form.argument("name", greedyStringArgument(), [](const CommandNodeBuilder& named) {
             named.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
                 std::string name = textOf(context, "name");
@@ -207,7 +192,6 @@ void PlaceholderCommand::build(const CommandNodeBuilder& root) const {
                     return 0;
                 }
                 context.source().sendSystemMessage(hint("%" + name + "% is served by '" + *identifier + "'."));
-                // Resolved against whoever asked, since that is the situation they are asking about.
                 const PlaceholderContext here =
                     PlaceholderContext{}.with(placeholder::playerSlot(), context.source().player());
                 const PlaceholderValue value = registry.resolve(name, here);
@@ -260,8 +244,6 @@ void PlaceholderCommand::build(const CommandNodeBuilder& root) const {
                     const std::string one = "%" + wanted + "_" + name + "%";
                     listed += listed.empty() ? one : ", " + one;
                 }
-                // One line, because a hundred of them one per line is unreadable in chat and a wall
-                // in the console either way.
                 context.source().sendSystemMessage(Component::text(listed, kGray));
                 return static_cast<std::int32_t>(names.size());
             });

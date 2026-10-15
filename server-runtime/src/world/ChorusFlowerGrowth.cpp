@@ -78,8 +78,7 @@ void plant(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
 void chorusFlower(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                   random::RandomSource& random, std::vector<BlockChange>& changes) {
     const std::int32_t air = registry::blocks::air().stateId;
-    // parity: `above.getY() <= level.getMaxY()` needs no test of its own here. The chunk refuses to
-    // answer for a position past the top of the world, so the air check above already covers it.
+    // parity: `above.getY() <= level.getMaxY()` needs no test of its own here.
     if (world.blockState(x, y + 1, z) != air) {
         return;
     }
@@ -98,8 +97,7 @@ void chorusFlower(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
     if (isGround(belowPath)) {
         grows = true;
     } else if (belowPath == "chorus_plant") {
-        // parity: a stem taller than four is measured no further, and the roll that lets it keep
-        // climbing gets easier when the pillar stands on ground of its own.
+        // parity: a stem taller than four is measured no further, and the roll that lets it keep.
         std::int32_t height = 1;
         for (std::int32_t at = 0; at < 4; ++at) {
             const std::string test = pathAt(world, x, y - height - 1, z);
@@ -144,7 +142,6 @@ void chorusFlower(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
         if (world.blockState(branchX, y - 1, branchZ) != air) {
             continue;
         }
-        // The side the branch comes from is the one allowed to hold the flower it grew out of.
         if (!sidesEmpty(world, branchX, y, branchZ, opposite(facing))) {
             continue;
         }

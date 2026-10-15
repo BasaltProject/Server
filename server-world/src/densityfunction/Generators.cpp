@@ -30,7 +30,7 @@ private:
     float value_;
 };
 
-/// parity: the beardifier's `ContextBoundSampler`, falling back to zero without a structure.
+/// parity: the beardifier's `ContextBoundSampler`.
 class BeardifierSampler final : public DensitySampler {
 public:
     [[nodiscard]] float sampleValue(SamplerContext& context, std::int32_t x, std::int32_t y,
@@ -71,7 +71,7 @@ private:
     double yScale_;
 };
 
-/// parity: `NoiseFunction.ShiftedXzSampler` and `ShiftedXyzSampler`. A null `shiftY` is the xz one.
+/// parity: `NoiseFunction.ShiftedXzSampler` and `ShiftedXyzSampler`.
 class ShiftedNoiseSampler final : public DensitySampler {
 public:
     ShiftedNoiseSampler(Sampler shiftX, Sampler shiftY, Sampler shiftZ, std::shared_ptr<const noise::Noise> noise,
@@ -129,7 +129,7 @@ private:
     double yScale_;
 };
 
-/// parity: `ShiftNoiseFunction.ShiftB`'s sampler, which reads the noise with x and z swapped.
+/// parity: `ShiftNoiseFunction.ShiftB`'s sampler.
 class ShiftBSampler final : public DensitySampler {
 public:
     explicit ShiftBSampler(std::shared_ptr<const noise::Noise> noise) : noise_(std::move(noise)) {}
@@ -322,7 +322,7 @@ private:
     float factor_;
 };
 
-/// parity: `BlendedNoise.createFbm`, octaves from the coarsest down with doubling amplitude.
+/// parity: `BlendedNoise.createFbm`.
 [[nodiscard]] std::shared_ptr<const noise::NoiseStack> createFbm(random::RandomSource& random, std::int32_t firstOctave,
                                                                  double smearScaleY, double valueFactor) {
     const std::int32_t octaves = -firstOctave + 1;

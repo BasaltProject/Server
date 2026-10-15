@@ -35,8 +35,6 @@ using server::world::ChunkScheduledTick;
 
 namespace {
 
-/// A generated entity that acts, rather than one the chunk only draws: a mob, or a pillar's
-/// crystal, which burns, explodes and heals the dragon.
 [[nodiscard]] bool becomesLive(const server::world::ChunkGeneratedEntity& entity) {
     return entity::mobs::isMob(entity.type) || endCrystals::isCrystal(entity.type);
 }
@@ -51,8 +49,6 @@ WorldState::WorldState(std::vector<Chunk> initialChunks, LoadOrGenerate loadOrGe
                    std::int32_t chunkZ) { return server::world::noiseWorldGenerator::generate(chunkX, chunkZ); }),
       primedTntQueue_(mutex_), pendingDecorations_(mutex_), sculkSensors_(mutex_), entityRegistry_(mutex_),
       itemPhysics_(mutex_, lockedBlockAccessor()) {
-    // Tests and embedders may seed a world with detached generated chunks. Production starts empty,
-    // but those chunks still deserve the same cross-border handoff an install gives.
     for (Chunk& chunk : initialChunks) {
         const std::int64_t chunkKey = key(chunk.chunkX(), chunk.chunkZ());
         chunksByPos_.emplace(chunkKey, std::make_unique<Chunk>(std::move(chunk)));
@@ -115,9 +111,6 @@ WorldState::ChunkMemory WorldState::chunkMemory() const {
 }
 
 std::vector<Chunk*> WorldState::dirtyChunks() const {
-    // Snapshotted under the lock and filtered outside it: every generation worker needs this same
-    // lock twice per chunk, and holding it across a scan of everything loaded is how the thread
-    // doing the scanning ends up never being scheduled at all.
     std::vector<Chunk*> dirty;
     for (Chunk* chunk : snapshot()) {
         if (chunk->isDirty()) {
@@ -216,8 +209,6 @@ Chunk& WorldState::getOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) 
     if (generated.has_value()) {
         return install(std::move(*generated));
     }
-    // It turned up while this was generating, or it is already on its way in from a worker: the
-    // install is a task on the owner, so waiting on the owner's own thread has to run it.
     Chunk* arrived = chunkIfLoaded(chunkX, chunkZ);
     while (arrived == nullptr) {
         sched::Owner* target = installOwner_ != nullptr ? installOwner_ : owner_;
@@ -232,8 +223,7 @@ Chunk& WorldState::getOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) 
 
 void WorldState::queueBlockEvent(BlockEvent event) {
     const WorldWriteLock lock{mutex_};
-    // parity: `ServerLevel.blockEvents` is a set, so the same event booked twice in one turn happens
-    // once. A piston that hears two neighbours light up in the same tick moves once, not twice.
+    // parity: `ServerLevel.blockEvents` is a set.
     const bool already = std::ranges::any_of(blockEvents_, [&event](const BlockEvent& queued) {
         return queued.x == event.x && queued.y == event.y && queued.z == event.z && queued.block == event.block &&
                queued.first == event.first && queued.second == event.second;
@@ -290,8 +280,6 @@ std::int32_t WorldState::torchToggleCount(const std::int32_t x, const std::int32
 
 namespace {
 
-/// North, south, west and east of a marked block, in the order the shape rules ask for them, or
-/// nothing when one of them lives in a chunk that is not here yet.
 [[nodiscard]] std::optional<std::array<std::int32_t, 4>>
 horizontalNeighbours(Chunk& chunk, const server::world::ChunkShapeUpdate& mark,
                      const std::function<Chunk*(std::int32_t, std::int32_t)>& chunkAt) {
@@ -311,10 +299,7 @@ horizontalNeighbours(Chunk& chunk, const server::world::ChunkShapeUpdate& mark,
     return around;
 }
 
-/// parity: `LevelChunk.postProcessGeneration` running `Block.updateFromNeighbourShapes` over what
-/// the structure pieces marked, and the same pass `StructureTemplate.placeInWorld` ends with. Only
-/// the connecting blocks and the stairs are redone here; a torch losing its support is a different
-/// check and is not one of these.
+/// parity: `LevelChunk.postProcessGeneration` running `Block.updateFromNeighbourShapes` over what.
 void redoShapes(Chunk& chunk, const std::function<Chunk*(std::int32_t, std::int32_t)>& chunkAt) {
     static constexpr std::array<std::pair<registry::BlockFace, std::string_view>, 4> kSides{
         {{registry::BlockFace::North, "north"},
@@ -377,11 +362,8 @@ Chunk& WorldState::installLocked(Chunk chunk) {
         return chunkAtLocked(key(otherX, otherZ));
     };
     redoShapes(installed, chunkAtPos);
-    // Every sculk sensor the chunk brought with it, so a footstep next to one that nobody has ever
-    // touched is still heard.
     sculkSensors_.rememberChunk(installed);
-    // parity: the points of interest the generator's writes registered, which vanilla collects as
-    // each block is placed. A write that landed in a neighbour already here is noted there too.
+    // parity: the points of interest the generator's writes registered, which vanilla collects as.
     poi_.chunkInstalled(installed);
     for (const server::world::ChunkGeneratedBlockWrite& write : spilledWrites) {
         if ((write.x >> 4) == chunkX && (write.z >> 4) == chunkZ) {
@@ -393,8 +375,6 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     }
     // parity: a debug world places its grid without updates, so nothing is settled after it.
     if (settlesGeneration_) {
-        // The leaf distances settle once every write aimed at this chunk has landed, which is here and
-        // not at the end of its own decoration: a neighbour's leaf arrives later and carries a stale one.
         const server::world::terrain::decoration::tree::leafDistances::BlockAt worldBlockAt =
             [this](std::int32_t x, std::int32_t y, std::int32_t z) -> std::int32_t {
             return blockStateLocked(x, y, z).value_or(0);
@@ -406,18 +386,14 @@ Chunk& WorldState::installLocked(Chunk chunk) {
                 server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldBlockAt);
             }
         }
-        // parity: the same post-processing takes back a bush the finished light leaves too bright. The
-        // features cannot know it while they run, because nothing has lit the chunk yet.
+        // parity: the same post-processing takes back a bush the finished light leaves too bright. The.
         const server::world::terrain::decoration::bushSurvival::NeighbourAt neighbourAt =
             [&chunkAtPos](std::int32_t otherX, std::int32_t otherZ) -> const server::world::Chunk* {
             return chunkAtPos(otherX, otherZ);
         };
         server::world::terrain::decoration::bushSurvival::settle(installed, neighbourAt, hasSkylight_);
     }
-    // parity: `LevelChunk.postProcessGeneration` ticks every fluid the aquifer marked, which is what
-    // starts a lake running. Scheduling is this world's way of saying the same thing.
-    // A feature's marks are the same list in vanilla: a fluid there ticks, and a block that falls
-    // reshapes, which books its fall.
+    // parity: `LevelChunk.postProcessGeneration` ticks every fluid the aquifer marked.
     for (const std::span<const server::world::ChunkShapeUpdate> marks :
          {installed.fluidUpdates(), installed.shapeUpdates()}) {
         for (const server::world::ChunkShapeUpdate& mark : marks) {
@@ -460,7 +436,6 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     pendingDecorations_.addPendingGeneratedEntities(installed.takeGeneratedEntitiesMatching(
         [](const server::world::ChunkGeneratedEntity& entity) { return becomesLive(entity); }));
 
-    // The neighbours were lit without this chunk, so their light let the sky in through where it
     // now stands. parity: vanilla relights a chunk's neighbourhood on load.
     for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
         for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
@@ -495,8 +470,6 @@ void WorldState::installLater(Chunk chunk, std::function<void()> installed) {
         }
         return;
     }
-    // Moved into the task rather than captured by reference: whoever asked for the chunk is not
-    // waiting for it, and by the time the owner runs this their own copy is gone.
     target->submit([this, moved = std::make_shared<Chunk>(std::move(chunk)), installed = std::move(installed)]() {
         Chunk& placed = install(std::move(*moved));
         if (const std::function<void(Chunk&)> handler = chunkInstalledHandler()) {
@@ -518,8 +491,6 @@ std::optional<std::int32_t> WorldState::blockStateLocked(std::int32_t x, std::in
     if (chunk == nullptr) {
         return std::nullopt;
     }
-    // Above the sky or below the bedrock is not a block, which is what a mob that fell out of the
-    // world asks about: the chunk refuses the question rather than answering it.
     if (y < chunk->verticalBounds().minY() || y > chunk->verticalBounds().maxY()) {
         return std::nullopt;
     }
@@ -542,31 +513,23 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     if (chunk == nullptr) {
         return false;
     }
-    // parity: `Level.setBlock` refuses a position outside build height rather than throwing, which
-    // is what a plugin or a piston reaching past the sky asks for. The frozen Kotlin let the chunk
-    // throw instead, and the throw came out on the tick thread.
+    // parity: `Level.setBlock` refuses a position outside build height rather than throwing.
     if (y < chunk->verticalBounds().minY() || y > chunk->verticalBounds().maxY()) {
         return false;
     }
-    // parity: `BlockEntity.preRemoveSideEffects`, which every container runs when its block goes.
-    // Queued rather than spawned because this call already holds the world's lock, and done before
-    // the write, which is what takes the block entity away. Skipped when the flags carry 256.
-    //
-    // Cheap tests first: this is the hottest write in the server and usually the state did not move.
+    // parity: `BlockEntity.preRemoveSideEffects`.
     const std::int32_t was = chunk->blockStateId(x & 15, y, z & 15);
     const auto blockChanges = [](std::int32_t before, std::int32_t after) {
         const wire::common::Identifier* from = registry::blockStateDefinitions::blockOf(before);
         const wire::common::Identifier* to = registry::blockStateDefinitions::blockOf(after);
-        // parity: `shouldChangedStateKeepBlockEntity`: a copper chest that weathers, waxes or is
-        // scraped keeps its block entity, so nothing falls out of it either.
+        // parity: `shouldChangedStateKeepBlockEntity`: a copper chest that weathers, waxes or is.
         return from != nullptr && to != nullptr && *from != *to &&
                !registry::weathering::keepsBlockEntity(from->path(), to->path());
     };
     if (sideEffects == SideEffects::kRun && was != stateId && chunk->blockEntityCount() > 0 &&
         blockChanges(was, stateId)) {
         const server::world::ChunkBlockEntity* held = chunk->blockEntityAt(x & 15, y, z & 15);
-        // parity: `ShulkerBoxBlockEntity.preRemoveSideEffects` is empty on purpose, because what the
-        // box held goes with the box. It is the one container in the game that keeps its contents.
+        // parity: `ShulkerBoxBlockEntity.preRemoveSideEffects` is empty on purpose.
         const bool keepsContents = held != nullptr && shulkers::isShulkerBox(held->type().path());
         const std::optional<std::int32_t> size =
             held == nullptr || keepsContents ? std::nullopt : containers::sizeOf(held->type().path());
@@ -594,12 +557,7 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     }
     const bool changed = chunk->setBlockStateId(x & 15, y, z & 15, stateId);
     if (changed) {
-        // parity: `LevelChunk.setBlockState` gives a state that owns a block entity one whenever
-        // none is there, whatever flags the write carried; the entity that weathering kept was
-        // already checked above and survives the write. `moving_piston` is the one the jar never
-        // leaves default: `moveBlocks` replaces the fresh entity with the carrying one in the same
-        // breath, and so does the piston here, so a default one would only sit under the settle
-        // pass that runs between the two writes.
+        // parity: `LevelChunk.setBlockState` gives a state that owns a block entity one whenever.
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
         if (block != nullptr && block->path() != "moving_piston" &&
             registry::blockEntityTypes::ofBlock(*block) != nullptr &&
@@ -618,9 +576,6 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
             shapeChanges_[shapeChangeCount_ % kShapeChangeMemory] = {x, y, z};
             ++shapeChangeCount_;
         }
-        // A skylight opening or a torch reaches across chunk borders. Cached whole-chunk light is
-        // cheaper than incremental light here, but every cached neighbour that could have read the
-        // old block must be discarded together.
         for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
             for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
                 if (Chunk* neighbour = chunkAtLocked(key((x >> 4) + offsetX, (z >> 4) + offsetZ));
@@ -699,15 +654,10 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
     std::vector<std::array<std::int32_t, 4>> found;
     const WorldWriteLock lock{mutex_};
     for (const auto& [chunkKey, chunk] : chunksByPos_) {
-        // Nothing to advance, and most chunks have nothing: the same walk without this ran the
-        // whole loaded world through two empty vectors twenty times a second.
         if (chunk->scheduledTickCount() == 0) {
             continue;
         }
-        // parity: a chunk that is loaded and not ticking is frozen: `ChunkMap` takes its
-        // `LevelTicks` container away, so its turns neither run nor count down. Ours used to walk
-        // every loaded chunk, and a clock three chunks from spawn kept going with nobody connected
-        // where 26.2 stops it (`spawnsigue`).
+        // parity: a chunk that is loaded and not ticking is frozen: `ChunkMap` takes its.
         if (ticking && !ticking(chunk->chunkX(), chunk->chunkZ())) {
             continue;
         }
@@ -720,9 +670,7 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
                                                         static_cast<std::int32_t>(index)});
         }
     }
-    // parity: `ScheduledTick.INTRA_TICK_DRAIN_ORDER`, priority first and then the order they were
-    // booked in. Without it the order was whichever chunk the map walked first, so two components
-    // due on the same turn ran in an order that had nothing to do with the game.
+    // parity: `ScheduledTick.INTRA_TICK_DRAIN_ORDER`.
     std::ranges::stable_sort(
         found, [&due](const std::array<std::int32_t, 4>& left, const std::array<std::int32_t, 4>& right) {
             const ChunkScheduledTick& one = due[static_cast<std::size_t>(left[3])];
@@ -748,8 +696,6 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
 void WorldState::openTurn(const Ticking& ticking) {
     const WorldWriteLock lock{mutex_};
     for (const auto& [chunkKey, chunk] : chunksByPos_) {
-        // The same two gates the passes use: nothing booked here, or a chunk that is frozen because
-        // nobody is ticking it, and its turns neither run nor count down.
         if (chunk->scheduledTickCount() == 0 || (ticking && !ticking(chunk->chunkX(), chunk->chunkZ()))) {
             continue;
         }
@@ -871,8 +817,6 @@ std::vector<entity::ServerEntity*> WorldState::entitiesIn(std::int32_t chunkX, s
 
 std::vector<std::pair<std::int32_t, std::int32_t>> WorldState::chunksWithEntities() const {
     std::vector<std::pair<std::int32_t, std::int32_t>> chunks = entityRegistry_.chunksWithEntities();
-    // An item on the floor is an entity too. Leaving it out meant a chunk whose only change was a
-    // stack rolling across it was never written down, and what came back was where it used to be.
     for (const DroppedItem& item : itemPhysics_.items()) {
         const std::pair<std::int32_t, std::int32_t> at{static_cast<std::int32_t>(std::floor(item.x)) >> 4,
                                                        static_cast<std::int32_t>(std::floor(item.z)) >> 4};

@@ -9,8 +9,6 @@
 
 namespace basalt::server::plugins {
 namespace {
-
-/// What the two metatable functions share, kept alive by the closures that hold it.
 struct Fields {
     std::string kind;
     std::map<std::string, PluginObject::Reader, std::less<>> readers;
@@ -36,7 +34,6 @@ struct Fields {
         return out;
     }
 };
-
 } // namespace
 
 void pushValue(lua::LuaArgs& lua, const PluginValue& value) {
@@ -128,5 +125,4 @@ void PluginObject::push(lua::LuaArgs& lua) && {
     lua.setField("__tostring");
     lua.setMetatable(-2);
 }
-
 } // namespace basalt::server::plugins

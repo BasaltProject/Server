@@ -31,7 +31,6 @@ std::vector<PickedItem> pickupNearbyItems(
             continue;
         }
         if (allowed && !allowed(session, removed->item.toString(), removed->count, removed->entityId)) {
-            // Put it back exactly as it was: nobody has been told anything yet.
             static_cast<void>(world.spawnItem(*removed));
             continue;
         }
@@ -39,15 +38,13 @@ std::vector<PickedItem> pickupNearbyItems(
             .id = removed->item.toString(), .count = removed->count, .components = removed->components});
         const std::int32_t picked = removed->count - leftover;
         if (picked <= 0) {
-            // Nowhere for it to go: put it back exactly as it was, nothing happened.
             static_cast<void>(world.spawnItem(*removed));
             continue;
         }
-        // parity: `ItemEntity.playerTouch` counts the whole stack it touched, even when only some fit.
+        // parity: `ItemEntity.playerTouch` counts the whole stack it touched.
         session.stats.increment(storage::stats::pickedUp(removed->item.toString()), removed->count);
         PickedItem row{.item = *removed, .picked = picked, .leftover = leftover};
         if (leftover > 0) {
-            // Only some of it fit: the same entity, fewer items, still sitting where it was.
             removed->count = leftover;
             static_cast<void>(world.spawnItem(*removed));
         }

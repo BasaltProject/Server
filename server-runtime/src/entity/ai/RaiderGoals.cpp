@@ -149,7 +149,7 @@ bool RaiderMoveThroughVillageGoal::canUse(MobContext& mob) {
     if (!raiding(mob)) {
         return false;
     }
-    // parity: `PoiManager.getRandom`, the homes in range shuffled and the first not yet visited.
+    // parity: `PoiManager.getRandom`.
     std::vector<world::poi::PoiRecord> homes;
     mob.world.poi().inRange(world::poi::maskOf(world::poi::PoiType::kHome), blockOf(mob.mob), kHomeSearch,
                             world::poi::Occupancy::kAny, homes);

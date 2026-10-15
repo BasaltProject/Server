@@ -36,9 +36,6 @@ constexpr std::int32_t kDropLimit = 4;
     return state.has_value() && reg::blockShapes::isEmptyShape(*state);
 }
 
-/// The spot a mob would stand on at these coordinates: out of the ground if it is inside it, and
-/// down onto it if it is over it.
-///
 /// parity: `RandomPos.moveUpOutOfSolid` and the drop `WalkNodeEvaluator` allows underneath.
 [[nodiscard]] std::optional<std::array<std::int32_t, 3>> groundAt(world::WorldState& world, std::int32_t x,
                                                                   std::int32_t y, std::int32_t z) {
@@ -62,8 +59,7 @@ constexpr std::int32_t kDropLimit = 4;
     return std::array<std::int32_t, 3>{x, standing, z};
 }
 
-/// parity: `PathfinderMob.getWalkTargetValue`, which is zero for anything that will do; here it
-/// simply refuses what cannot be stood on, which is what makes a wander stay on the ground.
+/// parity: `PathfinderMob.getWalkTargetValue`.
 [[nodiscard]] double walkTargetValue(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> ground = world.blockState(x, y - 1, z);
     if (!ground.has_value() || reg::blockShapes::isEmptyShape(*ground)) {
@@ -84,7 +80,6 @@ constexpr std::int32_t kDropLimit = 4;
     return dx * dx + dz * dz >= kArrived * kArrived;
 }
 
-/// The node it is walking to now, stepping on when it arrives. Nothing when the path is walked out.
 [[nodiscard]] std::optional<std::array<double, 3>> nextNode(ServerEntity& mob) {
     if (!mob.path.has_value()) {
         if (mob.walkTarget.has_value() && farFrom(mob, *mob.walkTarget)) {
@@ -115,7 +110,7 @@ constexpr std::int32_t kDropLimit = 4;
     return from + std::clamp(difference, -limit, limit);
 }
 
-/// parity: `MoveControl.tick`, which turns at most thirty degrees a tick towards the target.
+/// parity: `MoveControl.tick`.
 void turnTowards(ServerEntity& mob, double dx, double dz) {
     const auto wanted = static_cast<float>(std::atan2(dz, dx) * 180.0 / std::numbers::pi) - 90.0F;
     mob.yaw = approachAngle(mob.yaw, wanted, kTurnRate);
@@ -144,8 +139,7 @@ std::optional<std::array<double, 3>> strollTarget(world::WorldState& world, cons
         const std::int32_t x = blockOf(mob.x) + random.nextInt(2 * range + 1) - range;
         const std::int32_t y = blockOf(mob.y) + random.nextInt(2 * height + 1) - height;
         const std::int32_t z = blockOf(mob.z) + random.nextInt(2 * range + 1) - range;
-        // parity: `LandRandomPos.movePosUpOutOfSolid`, which lifts a spot out of the ground rather
-        // than throwing it away: on real terrain nearly every raw guess is inside a hill.
+        // parity: `LandRandomPos.movePosUpOutOfSolid` lifts a spot out of the ground instead of discarding it.
         const std::optional<std::array<std::int32_t, 3>> standing = groundAt(world, x, y, z);
         if (!standing.has_value()) {
             continue;

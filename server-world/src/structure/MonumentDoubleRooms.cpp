@@ -15,10 +15,8 @@ namespace {
 
 [[nodiscard]] MonumentRoom* up(const MonumentRoom& room) { return room.connection(ordinal(StructureDirection::Up)); }
 
-/// A room on the ground floor sits on the monument's own base, so it lays no floor of its own.
 [[nodiscard]] bool aboveGround(const MonumentRoom& room) { return room.index() / 25 > 0; }
 
-/// The doorways of the lower pair, west half on the left and east half on the right.
 void lowerDoors(const MonumentBrush& brush, const MonumentRoom& west, const MonumentRoom& east) {
     if (opening(west, StructureDirection::South)) {
         brush.waterBox(3, 1, 0, 4, 2, 0);
@@ -202,7 +200,6 @@ void monumentDoubleRooms::doubleY(const MonumentBrush& brush, const MonumentRoom
     brush.box(1, 4, 5, 1, 4, 5, light);
     brush.box(5, 4, 5, 5, 4, 6, light);
     brush.box(6, 4, 5, 6, 4, 5, light);
-    // The lower storey draws its four walls, then the upper one draws the same four again.
     const MonumentRoom* storey = &lower;
     for (std::int32_t y = 1; y <= 5; y += 4) {
         wallOrDoor(brush, *storey, StructureDirection::South, y, 0);
@@ -242,7 +239,6 @@ void monumentDoubleRooms::doubleYz(const MonumentBrush& brush, const MonumentRoo
         brush.box(1, y, 0, 6, y, 0, block);
         brush.box(1, y, 15, 6, y, 15, block);
     }
-    // The pillar between the two halves is dark prismarine banded with two courses of lantern.
     for (std::int32_t y = 1; y <= 7; ++y) {
         brush.box(3, y, 7, 4, y, 8, y == 2 || y == 6 ? monumentPalette::lamp() : monumentPalette::baseBlack());
     }

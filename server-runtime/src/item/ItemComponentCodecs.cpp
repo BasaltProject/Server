@@ -24,21 +24,18 @@ using wire::nbt::NbtType;
 using wire::protocol::play::ItemComponent;
 namespace dataComponent = wire::protocol::play::dataComponent;
 
-/// `minecraft:enchantments`, where an enchanted stack keeps its levels by name.
 constexpr std::string_view kEnchantments = "minecraft:enchantments";
 constexpr std::string_view kStoredEnchantments = "minecraft:stored_enchantments";
 
 /// parity: `Rarity`'s own order, which is what its `idMapper` stream codec writes.
 constexpr std::array<std::string_view, 4> kRarities{"common", "uncommon", "rare", "epic"};
 
-/// The components whose whole payload is one number.
 constexpr std::array<std::pair<std::string_view, std::int32_t>, 4> kNumbers{
     {{"minecraft:max_stack_size", dataComponent::kMaxStackSize},
      {"minecraft:max_damage", dataComponent::kMaxDamage},
      {"minecraft:damage", dataComponent::kDamage},
      {"minecraft:repair_cost", dataComponent::kRepairCost}}};
 
-/// The components that carry nothing but their own presence.
 constexpr std::array<std::pair<std::string_view, std::int32_t>, 2> kUnits{
     {{"minecraft:unbreakable", dataComponent::kUnbreakable},
      {"minecraft:creative_slot_lock", dataComponent::kCreativeSlotLock}}};
@@ -185,7 +182,6 @@ std::optional<ItemComponent> toWire(std::string_view name, const NbtTag& value, 
                                                               ItemComponent::Flag{.value = *flag != 0}}}
                                 : std::nullopt;
     }
-    // Everything else with a network form of its own is written straight into bytes.
     return itemComponentPayloads::encode(name, value);
 }
 
@@ -250,7 +246,6 @@ std::optional<std::pair<std::string, NbtTag>> toStored(const ItemComponent& comp
     if (const auto* custom = component.as<ItemComponent::CustomData>(); custom != nullptr) {
         return std::pair{name, NbtTag::ofCompound(custom->tag)};
     }
-    // A map a creative client moves has to keep which map it is.
     if (const auto* raw = component.as<ItemComponent::Raw>(); raw != nullptr) {
         wire::io::ByteBuffer payload = wire::io::ByteBuffer::wrap(raw->payload);
         const std::int32_t value = wire::protocol::varInt::read(payload);

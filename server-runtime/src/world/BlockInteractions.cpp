@@ -35,11 +35,9 @@ namespace {
 
 using Properties = std::map<std::string, std::string>;
 
-/// parity: `BlockSetType.canOpenByHand`, which is false for exactly one family that exists as a
-/// block: iron. (`BlockSetType.GOLD` says the same, but no gold door was ever registered.)
+/// parity: `BlockSetType.canOpenByHand`.
 constexpr std::string_view kIron = "iron";
 
-/// The button families whose set uses the stone sounds and the shorter press.
 constexpr std::array<std::string_view, 5> kStoneButtons{"stone", "polished_blackstone", "copper", "gold", "iron"};
 
 /// parity: the sound sets, which are per wood rather than per block.
@@ -52,7 +50,6 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 6> kSoundSet
     {"iron", "iron"},
 }};
 
-/// The weathering prefixes a copper block wears, which its sound set does not.
 constexpr std::array<std::string_view, 4> kWeathering{"waxed_", "exposed_", "weathered_", "oxidized_"};
 
 enum class Toggle { Door, Trapdoor, FenceGate, Lever, Button };
@@ -66,8 +63,7 @@ enum class Toggle { Door, Trapdoor, FenceGate, Lever, Button };
     return found == properties.end() ? std::string{} : found->second;
 }
 
-/// parity: `RepeaterBlock.DELAY` starts at one, which is what a repeater without a readable delay
-/// reads as. `from_chars` leaves the value alone when it fails, so the initializer is that default.
+/// parity: `RepeaterBlock.DELAY` starts at one.
 [[nodiscard]] std::int32_t delayOf(const Properties& properties) {
     const std::string text = valueOf(properties, "delay");
     std::int32_t value = 1;
@@ -84,8 +80,7 @@ enum class Toggle { Door, Trapdoor, FenceGate, Lever, Button };
     return false;
 }
 
-/// parity: every weathering stage of a copper door shares `BlockSetType.COPPER`, so an exposed or
-/// waxed one sounds like a plain copper one rather than falling back to wood.
+/// parity: every weathering stage of a copper door shares `BlockSetType.COPPER`.
 [[nodiscard]] std::string_view familyOf(std::string_view path) {
     for (const std::string_view prefix : kWeathering) {
         if (path.starts_with(prefix)) {
@@ -112,8 +107,7 @@ enum class Toggle { Door, Trapdoor, FenceGate, Lever, Button };
     return face == "west" ? "east" : "west";
 }
 
-/// parity: `CopperGolemStatueBlock`'s four poses, in the order the enum declares them, which is what
-/// `getAnalogOutputSignal` turns into one to four. The eight copper stages share the block.
+/// parity: `CopperGolemStatueBlock`'s four poses.
 constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "running", "star"};
 
 [[nodiscard]] bool isCopperGolemStatue(std::string_view path) {
@@ -148,8 +142,7 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
     return std::nullopt;
 }
 
-/// parity: `BlockSetType`'s button sounds, which do not follow its other sounds: a copper, gold or
-/// iron button clicks like stone, and only the four wood families have their own.
+/// parity: `BlockSetType`'s button sounds.
 [[nodiscard]] std::string_view buttonSoundSet(const wire::common::Identifier& block) {
     const std::string_view path = block.path();
     if (startsWithAny(path, kStoneButtons)) {
@@ -203,11 +196,7 @@ bool isCycleable(std::int32_t stateId) {
         return false;
     }
     const std::string_view path = block->path();
-    // parity: `DaylightDetectorBlock.useWithoutItem` cycles `inverted`, and
-    // `RedStoneWireBlock.useWithoutItem` turns a cross into a dot and back. Both are components you
-    // set up by clicking them, and the bench cannot press anything, so neither was here.
-    // parity: `CopperGolemStatueBlock.useItemOn` turns the statue one pose on for anything that is
-    // not an axe, an empty hand included, and the pose is what a comparator beside it reads.
+    // parity: `DaylightDetectorBlock.useWithoutItem` cycles `inverted`, and.
     return path == "repeater" || path == "comparator" || path == "daylight_detector" || isCopperGolemStatue(path) ||
            redstoneWire::isWire(stateId);
 }
@@ -239,8 +228,7 @@ std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_
     const std::string property{propertyOf(*kind)};
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
     const bool open = valueOf(properties, property) != "true";
-    // parity: `ButtonBlock.useWithoutItem` does nothing to a button already down. Its own scheduled
-    // tick is what lets it back up.
+    // parity: `ButtonBlock.useWithoutItem` does nothing to a button already down.
     if (*kind == Toggle::Button && !open) {
         return std::nullopt;
     }
@@ -263,9 +251,7 @@ std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_
         changes.push_back(BlockChange{.x = atX, .y = atY, .z = atZ, .stateId = *flipped});
     };
 
-    // parity: `FenceGateBlock.useWithoutItem` turns a gate that is about to open and happens to face
-    // **away** from whoever opened it, so it always swings out of their way. Only on the way open,
-    // and only from the opposite side; from either end of its own line it is left alone.
+    // parity: `FenceGateBlock.useWithoutItem` turns a gate that is about to open and happens to face.
     if (*kind == Toggle::FenceGate && open && playerYaw.has_value()) {
         const std::string_view wanted = playerFacing(*playerYaw);
         if (valueOf(properties, "facing") == oppositeName(wanted)) {
@@ -277,16 +263,11 @@ std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_
         }
     }
     flip(x, y, z);
-    // parity: `TrapDoorBlock.toggle` books the water's turn when the door it just flipped is holding
-    // some, and it is one of only two places in the whole block package that book a fluid outside an
-    // `updateShape`. Both of its callers, a hand through `useWithoutItem` and a wind charge through
-    // `onExplosionHit`, come through here. The gate is not waterlogged wood: a fence gate carries no
-    // `waterlogged` at all, so only the trapdoor can reach this.
+    // parity: `TrapDoorBlock.toggle` books the water's turn when the door it just flipped is holding.
     if (*kind == Toggle::Trapdoor && valueOf(properties, "waterlogged") == "true") {
         world.scheduleFluidTick(x, y, z, fluidId(FluidKind::Water, true), fluidFlow::kWaterTickDelay);
     }
     if (*kind == Toggle::Door) {
-        // The other half, whichever way round this one is.
         const bool upper = valueOf(properties, "half") == "upper";
         flip(x, upper ? y - 1 : y + 1, z);
     }
@@ -330,9 +311,7 @@ std::optional<BlockCycle> cycle(WorldState& world, std::int32_t x, std::int32_t 
                           .pitch = subtracting ? kComparePitch : kSubtractPitch,
                           .volume = kComparatorVolume};
     }
-    // parity: `CopperGolemStatueBlock.updatePose`, `POSE.getNextPose()` written with flag three. The
-    // next pose wraps round, because `getNextPose` is a `ByIdMap.continuous` with `ZERO` out of
-    // bounds: after `star` comes `standing` again.
+    // parity: `CopperGolemStatueBlock.updatePose`.
     if (isCopperGolemStatue(path)) {
         const std::string pose{valueOf(properties, "copper_golem_pose")};
         const auto found = std::ranges::find(kGolemPoses, pose);
@@ -347,8 +326,7 @@ std::optional<BlockCycle> cycle(WorldState& world, std::int32_t x, std::int32_t 
         return BlockCycle{.stateId = *turned, .sound = std::string{"block.copper_golem_statue.become_statue"}};
     }
     if (path == "daylight_detector") {
-        // parity: the detector writes `inverted` on its own with `setBlock(..., 2)` and then lets
-        // `updateSignalStrength` write the new reading, which is the write that tells anybody.
+        // parity: the detector writes `inverted` on its own with `setBlock(..., 2)` and then lets.
         const bool inverted = valueOf(properties, "inverted") == "true";
         const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(
             *block, Properties{{"inverted", inverted ? "false" : "true"}}, *stateId);

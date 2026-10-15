@@ -11,8 +11,7 @@
 namespace basalt::server::runtime::sched {
 namespace {
 
-/// A small number per thread rather than a hash of the thread id: nothing collides with the zero
-/// that means "nobody has claimed this".
+// Small per-thread numbers, not a hash: nothing collides with the zero meaning nobody has claimed this.
 [[nodiscard]] std::uint64_t currentThreadId() noexcept {
     static std::atomic<std::uint64_t> next{1};
     static thread_local const std::uint64_t id = next.fetch_add(1);
@@ -42,7 +41,6 @@ void Owner::bindToCurrentThread() noexcept { boundThread_.store(currentThreadId(
 TaskHandle Owner::submit(std::function<void()> task) {
     TaskHandle handle;
     if (isClosed()) {
-        // Nobody is going to run it, and saying so is better than holding it for ever.
         handle.cancel();
         return handle;
     }
@@ -62,8 +60,7 @@ TaskHandle Owner::schedule(std::int32_t delayTicks, std::function<void()> task) 
         return handle;
     }
     const std::lock_guard<std::mutex> lock{mutex_};
-    // A negative delay is not a task from the past: the clamp and the `<= 0` below say the same
-    // thing here, and it stays so that `pending` and a merge see a number that means what it says.
+    // A negative delay is not a task from the past; the clamp keeps `pending` and merges seeing a meaningful number.
     delayed_.push_back(ScheduledTask{.handle = handle, .task = std::move(task), .dueInTicks = std::max(delayTicks, 0)});
     return handle;
 }
@@ -82,7 +79,6 @@ TaskHandle Owner::scheduleAtEnd(std::function<void()> task) {
 TaskHandle Owner::submitConsole(std::function<void()> task) {
     TaskHandle handle;
     if (isClosed()) {
-        // Nobody is going to run it, and saying so is better than holding it for ever.
         handle.cancel();
         return handle;
     }
@@ -103,7 +99,6 @@ std::size_t Owner::runEndOfTick(const FailureHandler& onFailure) { return drain(
 
 void Owner::advanceTick() {
     const std::lock_guard<std::mutex> lock{mutex_};
-    // Nothing waiting is the common case by far, and this is what saves scanning for it.
     if (delayed_.empty()) {
         return;
     }
@@ -144,8 +139,7 @@ void Owner::close() {
 }
 
 void Owner::drainInto(Owner& other) {
-    // Console input keeps its slot in the owner that survives: it runs at the turn's console
-    // point wherever that turn now lives.
+    // Console input keeps its slot in the surviving owner and runs at the turn's console point.
     std::deque<ScheduledTask> console;
     {
         const std::lock_guard<std::mutex> lock{mutex_};
@@ -204,22 +198,16 @@ void Owner::check(std::string_view what) const {
 }
 
 std::size_t Owner::drain(std::deque<ScheduledTask>& queue, const FailureHandler& onFailure) {
-    // Only the owning thread runs the queue. A second thread draining it runs a world's work off
-    // the thread that owns that world, which is the whole point of an owner. It is a bug in the
-    // caller, so it says so.
+    // Only the owning thread runs the queue: draining elsewhere runs a world's work off its owner, a caller bug.
     if (isClaimed() && !isCurrent()) {
         throw std::logic_error{"'" + name_ + "' was drained from a thread that does not own it"};
     }
-    // The turn's work leaves the owner entirely rather than resting in a buffer it still holds. A
-    // task may drain this owner again, since saving a world does and `/stop` saves from inside a
-    // task: a buffer the owner still knows about is one that nested turn swaps back into the queue,
-    // and closing the owner then frees the task it is standing inside.
+    // The turn leaves the owner entirely: a nested drain (a save inside `/stop`) would swap a retained buffer back.
     std::deque<ScheduledTask> turn;
     {
         const std::lock_guard<std::mutex> lock{mutex_};
         queue.swap(turn);
     }
-    // An empty turn is the common case for most owners, and this is what keeps it free.
     if (turn.empty()) {
         return 0;
     }
@@ -228,8 +216,7 @@ std::size_t Owner::drain(std::deque<ScheduledTask>& queue, const FailureHandler&
         if (task.handle.isCancelled()) {
             continue;
         }
-        // One task that throws costs itself and nothing else: the rest of this turn belongs to
-        // whoever else asked, and dropping them would lose a player's packets for a tick.
+        // One task that throws costs only itself; dropping the rest would lose a player's packets for a tick.
         try {
             task.task();
             ++ran;

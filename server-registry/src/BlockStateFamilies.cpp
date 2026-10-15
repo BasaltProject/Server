@@ -11,7 +11,6 @@
 
 namespace basalt::server::registry::blockStateFamilies {
 namespace {
-
 [[nodiscard]] std::int32_t defaultState(std::string_view path) {
     const BlockState* found = blocks::named(path);
     if (found == nullptr) {
@@ -29,7 +28,6 @@ namespace {
     return ids;
 }
 
-/// Whether the id falls in `[first, first + span]` of any of those family defaults, and which.
 [[nodiscard]] std::optional<std::int32_t> familyStart(const std::vector<std::int32_t>& defaults, std::int32_t stateId,
                                                       std::int32_t span) {
     for (const std::int32_t candidate : defaults) {
@@ -99,7 +97,6 @@ const std::vector<std::int32_t>& growingVineHeadDefaults() {
     }
     return found->second;
 }
-
 } // namespace
 
 bool isLeavesState(std::int32_t stateId) { return stateId >= leavesFirst() && stateId <= leavesLast(); }
@@ -118,8 +115,6 @@ std::optional<std::int32_t> withLeafDistance(std::int32_t stateId, std::int32_t 
     if (!isLeavesState(stateId)) {
         return std::nullopt;
     }
-    // The four persistent/waterlogged states sit in order under each distance, counted from the
-    // block's own first state: the range is not aligned to four since 26.3.
     const std::int32_t start = leafStateRangeStart(stateId);
     return start + (distance - 1) * 4 + (stateId - start) % 4;
 }
@@ -310,5 +305,4 @@ std::int32_t ironBarsStateId(bool north, bool east, bool south, bool west) {
     }
     return defaultState("iron_bars") - enabledBits;
 }
-
 } // namespace basalt::server::registry::blockStateFamilies

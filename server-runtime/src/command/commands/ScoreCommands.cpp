@@ -14,7 +14,7 @@ namespace {
 
 using wire::text::Component;
 
-/// parity: `GameRule.getCommandResult`, which is the integer itself, or 0/1 for a boolean.
+/// parity: `GameRule.getCommandResult`.
 [[nodiscard]] std::int32_t commandResult(std::string_view value) {
     std::int32_t number = 0;
     const auto result = std::from_chars(value.data(), value.data() + value.size(), number);

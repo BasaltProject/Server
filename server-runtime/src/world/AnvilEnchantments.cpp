@@ -15,8 +15,7 @@ using wire::common::Identifier;
 using wire::nbt::NbtCompound;
 using wire::nbt::NbtTag;
 
-/// parity: `EnchantmentHelper.getComponentType`: a book keeps what it is carrying somewhere else,
-/// because what is written in it is not on it.
+/// parity: `EnchantmentHelper.getComponentType`.
 [[nodiscard]] std::string_view componentFor(const storage::StoredItemStack& stack) {
     return stack.id == "minecraft:enchanted_book" ? itemComponents::kStoredEnchantments : itemComponents::kEnchantments;
 }

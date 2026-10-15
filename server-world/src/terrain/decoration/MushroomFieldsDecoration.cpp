@@ -17,8 +17,7 @@ constexpr std::int32_t kVegetalDecorationStep = 9;
     return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
-// parity: placed_feature/mushroom_island_vegetation.json has no count modifier, so it is exactly one
-// scattered position per chunk, and only then the real random_boolean_selector draw.
+// parity: `mushroom_island_vegetation` has no count modifier, one position per chunk.
 const std::vector<PlacementModifier>& islandModifiers() {
     static const std::vector<PlacementModifier> modifiers = {inSquarePlacement(), heightmapPlacement()};
     return modifiers;

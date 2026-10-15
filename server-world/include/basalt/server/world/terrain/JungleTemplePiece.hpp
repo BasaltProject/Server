@@ -11,9 +11,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// parity: `JungleTemplePiece`. Twelve by fifteen, so each chunk writes its own part against the
-/// clip. The one thing that cannot be reordered: the moss selector draws a float for every position
-/// of a box, inside the chunk or not, and only then is the write clipped.
+/// parity: `JungleTemplePiece`.
 class JungleTemplePiece {
 public:
     static constexpr std::int32_t kWidth = 12;
@@ -38,8 +36,7 @@ private:
     void buildArrowTrap() const;
     void buildLeverPuzzle() const;
 
-    /// parity: `generateBox` with the moss stone selector. The draw happens for every position of
-    /// the box and the clip is applied after, so this must not skip anything.
+    /// parity: `generateBox` with the moss stone selector.
     void mossBox(std::int32_t x0, std::int32_t y0, std::int32_t z0, std::int32_t x1, std::int32_t y1,
                  std::int32_t z1) const;
     void airBox(std::int32_t x0, std::int32_t y0, std::int32_t z0, std::int32_t x1, std::int32_t y1,
@@ -50,7 +47,6 @@ private:
     void putLoot(std::int32_t worldX, std::int32_t worldY, std::int32_t worldZ, std::string_view type,
                  std::string_view table, std::int64_t seed) const;
 
-    /// A dispenser's facing is a plain property, so it turns with the piece like any other block.
     [[nodiscard]] std::string transformedFacing(std::string_view facing) const;
 
     void set(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) const;

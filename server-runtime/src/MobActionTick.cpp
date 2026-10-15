@@ -130,7 +130,7 @@ void MobActionSystem::tickBreath(world::LoadedWorld& world, const std::vector<Pl
             .value_or(0);
     };
     const auto isWater = [](std::int32_t state) { return world::fluidFlow::kindOf(state) == world::FluidKind::Water; };
-    // parity: `isEyeInFluid`, which also asks whether the eye is under the water's own surface.
+    // parity: `isEyeInFluid`.
     const double eyeY = mob.y + entity::mobBreathing::eyeHeightOf(mob);
     const std::int32_t eyeBlockY = wire::common::mth::floor(eyeY);
     const std::int32_t eyeState = stateAt(mob.x, eyeY, mob.z);
@@ -198,12 +198,10 @@ void MobActionSystem::tickBreath(world::LoadedWorld& world, const std::vector<Pl
     }
 }
 
-/// parity: `LivingEntity.aiStep`'s travel half, which is not the goals': gravity, the path it is
-/// already on, and where it is looking.
+/// parity: `LivingEntity.aiStep`.
 void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, double speed,
                                 random::RandomSource* random, const std::optional<std::array<double, 3>>& target) {
-    // parity: every flier's own move control and travel; the ones on `FlyingPathNavigation` follow
-    // their path first.
+    // parity: `FlyingPathNavigation`.
     if (entity::flyers::flies(mob.type())) {
         // parity: a bee's navigation holds still while it pollinates.
         if (entity::flyingMovement::usesFlyingPath(mob.type()) && (mob.bee == nullptr || !mob.bee->pollinating)) {
@@ -219,7 +217,7 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
         mob.velocityY *= 0.6;
     }
     entity::ai::navigation::tick(world.state(), mob);
-    // parity: `CreakingMoveControl` and `CreakingLookControl` do nothing while it is frozen; it still falls.
+    // parity: `CreakingMoveControl` and `CreakingLookControl` do nothing while it is frozen.
     if (mob.creaking != nullptr && !mob.creaking->canMove) {
         entity::ai::moveControl::stop(mob);
         entity::ai::moveControl::tick(world.state(), mob, speed);
@@ -233,7 +231,6 @@ namespace {
 
 using BrainTick = void (MobActionSystem::*)(world::LoadedWorld&, entity::ai::MobContext&);
 
-/// The mobs whose AI is a brain this build runs itself, and its turn.
 [[nodiscard]] BrainTick brainOf(const wire::common::Identifier& type) {
     const std::string_view path = type.path();
     if (entity::allays::isAllay(type)) {
@@ -287,11 +284,8 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     if (mob.goals == nullptr) {
         mob.goals = entity::ai::mobGoals::forType(mob.type());
     }
-    // parity: the goals are `Mob.serverAiStep` and the travel below is `LivingEntity.aiStep`, which
-    // every living thing runs whether or not anything is driving it. Leaving early here left a mob
-    // this build has no goals for hanging in the air: a copper golem put down on a chest never fell
-    // the eighth of a block onto its lid.
-    // parity: `Raider.aiStep`, which looks for a raid to join before `Mob.aiStep` runs the goals.
+    // parity: `Mob.serverAiStep`.
+    // parity: `Raider.aiStep`.
     const bool raider = RaidSystem::isRaider(mob);
     if (raider) {
         raids_->tickRaider(world, mob);
@@ -304,8 +298,7 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     entity::ai::MobContext context{.world = world.state(),
                                    .mob = mob,
                                    .random = random,
-                                   // The tick's own snapshot, taken once for the whole world: asking for it per mob
-                                   // turned a pen of cows into a copy of the entity list per cow per tick.
+                                   // One snapshot per tick for the whole world: per mob it copied the entity list.
                                    .entities = living,
                                    .players = views,
                                    .actions = *this,
@@ -321,17 +314,16 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                    .ambientLight = config::dimensionFacts(world.declaration().dimension).ambientLight,
                                    .seaLevel = config::dimensionFacts(world.declaration().dimension).seaLevel,
                                    .minY = config::dimensionFacts(world.declaration().dimension).chunkHeight.minY()};
-    // parity: `Allay.customServerAiStep`, the brain every tick instead of goals.
-    // parity: the brain-driven mobs' `customServerAiStep`, the brain every tick instead of goals.
-    // parity: the tadpole is an `AbstractFish` that keeps the fish goals and runs its brain after them.
+    // parity: `Allay.customServerAiStep`.
+    // parity: `customServerAiStep`.
+    // parity: `AbstractFish`.
     const bool goalsToo = mob.goals != nullptr && mob.type().path() == "tadpole";
     if (brain != nullptr && !goalsToo) {
         (this->*brain)(world, context);
         travelMob(world, mob, context.speed, &random);
         return;
     }
-    // parity: `Mob.serverAiStep`, which decides on every other tick and staggers the mobs by their
-    // own id so they do not all think on the same one.
+    // parity: `Mob.serverAiStep`.
     if ((mob.tickCount + mob.entityId()) % 2 != 0) {
         mob.goals->tickRunning(context, false);
     } else {
@@ -359,8 +351,7 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
 }
 
 void MobActionSystem::tickVexLife(const std::vector<PlayerSession*>& watchers, ServerEntity& vex) {
-    // parity: `Vex.tick`: once its life runs out, a point of starving every second. The count is
-    // kept as `life_ticks` in what it saves.
+    // parity: `Vex.tick`.
     if (vex.flight.limitedLifeTicks < 0 && vex.sourceNbt.has_value() && vex.sourceNbt->contains("life_ticks")) {
         vex.flight.limitedLifeTicks = vex.sourceNbt->getInt("life_ticks");
     }
@@ -383,8 +374,7 @@ void MobActionSystem::tickVexLife(const std::vector<PlayerSession*>& watchers, S
     }
 }
 
-/// parity: `Blaze.customServerAiStep`: a new height to keep above its target every five seconds, and
-/// a lift whenever the target's eyes are higher than that over its own.
+/// parity: `Blaze.customServerAiStep`.
 void MobActionSystem::blazeRises(ServerEntity& blaze, std::optional<double> targetEye, random::RandomSource& random) {
     ServerEntity::Flight& flight = blaze.flight;
     if (--flight.blazeHeightOffsetTicks <= 0) {
@@ -405,8 +395,7 @@ void MobActionSystem::activateSkeletonTrap(world::LoadedWorld& world, ServerEnti
 std::int32_t MobActionSystem::lightAt(world::LoadedWorld& world, const std::array<std::int32_t, 3>& position) {
     const std::int32_t block = world::worldLight::blockLight(world.state(), position[0], position[1], position[2]);
     const std::int32_t sky = world::worldLight::skyLight(world.state(), position[0], position[1], position[2]);
-    // parity: `Entity.getLightLevelDependentMagicValue`, whose sky half is darkened by the time of
-    // day. Night is taken as darkness rather than tracking the sky brightness itself.
+    // parity: `Entity.getLightLevelDependentMagicValue`.
     const std::int32_t daylight = world::beds::isNight(world.clock().totalTicks()) ? 0 : sky;
     return std::max(block, daylight);
 }
@@ -446,8 +435,7 @@ void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& g
         return;
     }
     const std::vector<PlayerSession*> watchers = watchersOf(world);
-    // parity: `SnowGolem.aiStep` walks four corners a quarter of a block out, which is what leaves a
-    // trail two squares wide when the golem walks along a seam.
+    // parity: `SnowGolem.aiStep`.
     for (std::int32_t corner = 0; corner < 4; ++corner) {
         const auto x = static_cast<std::int32_t>(std::floor(golem.x + ((corner % 2 * 2) - 1) * 0.25));
         const auto y = static_cast<std::int32_t>(std::floor(golem.y));
@@ -460,8 +448,7 @@ void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& g
         if (!world.state().setBlockState(x, y, z, snow->stateId)) {
             continue;
         }
-        // parity: `setBlockAndUpdate` is flag 3, so the clients hear about the layer first and the
-        // squares around it after, which is the order `Level.setBlock` does the two in.
+        // parity: `setBlockAndUpdate`.
         broadcaster_->announceBlock(watchers, world::BlockChange{.x = x, .y = y, .z = z, .stateId = snow->stateId});
         broadcaster_->notifyAround(world, watchers, x, y, z, here);
         world::vibrations::emit(world.state(), "block_place", x + 0.5, y + 0.5, z + 0.5, world.gameTime(),
@@ -480,8 +467,7 @@ void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntit
     if (table == nullptr) {
         return;
     }
-    // parity: an entity's table rolls on the stream it names, `minecraft:entities/<type>`, so the
-    // same world drops the same number of chops off the same pig.
+    // parity: `minecraft:entities/<type>`.
     random::RandomSource scratch = freshRandom();
     random::RandomSource& random =
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
@@ -506,7 +492,7 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
     if (entry == nullptr || (hooks_.breedAllowed && !hooks_.breedAllowed(world, animal, partner))) {
         return;
     }
-    // parity: `Frog.spawnChildFromBreeding`: no child, a frog carrying spawn to lay by the water.
+    // parity: `Frog.spawnChildFromBreeding`.
     const bool frog = animal.type().path() == "frog";
     const wire::common::Identifier childType =
         entity::horses::isHorse(animal.type()) ? entity::horses::offspringType(animal, partner) : animal.type();
@@ -542,7 +528,7 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
         }
         world.state().spawnEntity(std::move(baby));
     }
-    // parity: `finalizeSpawnChildFromBreeding` credits whoever fed either parent, the first one first.
+    // parity: `finalizeSpawnChildFromBreeding` credits whoever fed either parent.
     const std::optional<std::string>& cause = animal.loveCause.has_value() ? animal.loveCause : partner.loveCause;
     if (cause.has_value() && hooks_.bredAnimals) {
         hooks_.bredAnimals(*cause, animal.type(), partner.type(), childType);

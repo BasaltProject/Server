@@ -24,7 +24,6 @@ using wire::text::Component;
     return Component::text("[").append(title).append(Component::text("]")).color(colour);
 }
 
-/// Criteria written before a namespace was required name their trigger bare.
 [[nodiscard]] std::string triggerKey(std::string_view trigger) {
     return trigger.find(':') == std::string_view::npos ? "minecraft:" + std::string{trigger} : std::string{trigger};
 }
@@ -69,8 +68,6 @@ void AdvancementTriggers::reindex() {
         }
         for (const auto& [name, criterion] : advancement->criteria) {
             if (criterion.condition.kind == adv::ConditionKind::InventoryItems) {
-                // Indexed by every item that can satisfy the *first* matcher: the rest are checked
-                // when the candidate comes up, and one entry per matcher would repeat the work.
                 if (criterion.condition.matchers.empty()) {
                     continue;
                 }
@@ -209,7 +206,6 @@ void AdvancementTriggers::fire(std::string_view trigger, std::string_view player
     if (found == byTrigger_.end()) {
         return;
     }
-    // Only what is still open is worth building the player's context for; most fire every tick.
     std::vector<std::pair<const CriterionRef*, const adv::GenericCondition*>> open;
     for (const CriterionRef& candidate : found->second) {
         const adv::Advancement* advancement = advancements_->find(candidate.advancement);
@@ -324,7 +320,7 @@ bool AdvancementTriggers::accepts(const adv::GenericCondition& condition, const 
     }
     for (const auto& [field, bounds] : condition.numbers) {
         const auto number = event.numbers.find(field);
-        // parity: `UsedEnderEyeTrigger` is the one number held squared, and `matchesSqr` squares the bounds.
+        // parity: `UsedEnderEyeTrigger` is the one number held squared.
         const bool squared = field == "distance";
         if (number == event.numbers.end() ||
             !(squared ? bounds.testSquared(number->second) : bounds.test(number->second))) {

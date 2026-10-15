@@ -6,16 +6,13 @@
 
 namespace basalt::server::random {
 namespace {
-
 constexpr std::uint64_t kModulusMask = 281474976710655ULL;
 constexpr std::uint64_t kMultiplier = 25214903917ULL;
 constexpr std::uint64_t kIncrement = 11ULL;
 
 constexpr float kFloatMultiplier = 5.9604645E-8F;
-// parity: vanilla widens a float literal here, and the widened value is not the nearest double to
-// 1.110223E-16. Writing it as a double would change the low bits of every nextDouble.
+// parity: vanilla widens a float literal here.
 constexpr double kDoubleMultiplier = static_cast<double>(1.110223E-16F);
-
 } // namespace
 
 RandomSource RandomSource::legacy(std::int64_t seed) noexcept {
@@ -37,8 +34,6 @@ RandomSource RandomSource::xoroshiro(std::int64_t seedLo, std::int64_t seedHi) n
 RandomSource RandomSource::xoroshiro(Seed128bit seed) noexcept { return xoroshiro(seed.lo, seed.hi); }
 
 namespace {
-
-/// The spare a chunk's decoration shares between its features, and whether one is in scope.
 struct SharedGaussianState {
     bool active = false;
     bool have = false;
@@ -46,7 +41,6 @@ struct SharedGaussianState {
 };
 
 thread_local SharedGaussianState tSharedGaussian;
-
 } // namespace
 
 RandomSource::SharedGaussian::SharedGaussian() noexcept {
@@ -69,7 +63,7 @@ void RandomSource::setSeed(std::int64_t seed) noexcept {
     } else {
         generator_ = Xoroshiro128PlusPlus{upgradeSeedTo128bit(seed)};
     }
-    // parity: `WorldgenRandom.setSeed` never clears the spare, so a shared one survives the reseed.
+    // parity: `WorldgenRandom.setSeed` never clears the spare.
     if (!(bitAlgorithms_ && tSharedGaussian.active)) {
         resetGaussian();
     }
@@ -128,8 +122,7 @@ std::int64_t RandomSource::nextLong() noexcept {
     if (bitAlgorithms_ || algorithm_ == Algorithm::Legacy) {
         const std::int32_t upper = next(32);
         const std::int32_t lower = next(32);
-        // parity: vanilla adds a sign-extended int to the shifted upper half, so a negative lower
-        // half borrows from the upper one instead of just filling the low bits.
+        // parity: vanilla adds a sign-extended int to the shifted upper half.
         return static_cast<std::int64_t>((static_cast<std::uint64_t>(static_cast<std::uint32_t>(upper)) << 32) +
                                          static_cast<std::uint64_t>(static_cast<std::int64_t>(lower)));
     }
@@ -199,9 +192,6 @@ void RandomSource::consumeCount(int rounds) noexcept {
     }
 }
 
-// A worldgen view forks its inner source, not itself: vanilla's WorldgenRandom delegates both of
-// these. For a legacy source that is the same draw either way; for xoroshiro it is not, which is
-// why both read the generator directly instead of going through nextLong().
 RandomSource RandomSource::fork() noexcept {
     if (algorithm_ == Algorithm::Legacy) {
         return legacy(nextLong());
@@ -219,5 +209,4 @@ PositionalRandomFactory RandomSource::forkPositional() noexcept {
     const std::int64_t hi = rawNextLong();
     return PositionalRandomFactory::xoroshiro(lo, hi);
 }
-
 } // namespace basalt::server::random

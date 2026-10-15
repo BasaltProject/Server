@@ -130,7 +130,7 @@ void ContainerMenuController::sendAnvilCost() {
 }
 
 bool ContainerMenuController::mayPickup(const MenuSlot& slot) const {
-    // parity: `MerchantResultSlot.mayPickup`, only while the payments pay for the active offer.
+    // parity: `MerchantResultSlot.mayPickup`.
     if (const auto* block = std::get_if<player::menuSlot::Block>(&slot);
         openMerchant_ && block != nullptr && block->index == VillagerTradeController::kResult) {
         return owner_->trades().mayTakeResult();
@@ -142,7 +142,7 @@ bool ContainerMenuController::mayPickup(const MenuSlot& slot) const {
     if (block == nullptr || block->index != Menu::kAnvilResult) {
         return true;
     }
-    // parity: `AnvilMenu.mayPickup`: the levels have to be there, and there has to be a price.
+    // parity: `AnvilMenu.mayPickup`.
     const PlayerSession* session = owner_->playerSession();
     if (session == nullptr || anvilCost_ <= 0) {
         return false;

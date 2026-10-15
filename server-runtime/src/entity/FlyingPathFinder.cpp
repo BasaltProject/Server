@@ -32,8 +32,7 @@ constexpr float kFudging = 1.5F;
     return std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
 }
 
-/// What one square costs to fly through, negative when blocked. parity: `FlyNodeEvaluator.findAcceptedNode`
-/// over `getPathTypeOfMob`.
+/// Cost of flying through one square, negative when blocked. parity: `FlyNodeEvaluator.findAcceptedNode`.
 class Costs {
 public:
     Costs(world::WorldState& world, const Footprint& size, const Mob& mob) : world_(&world), size_(size), mob_(&mob) {}

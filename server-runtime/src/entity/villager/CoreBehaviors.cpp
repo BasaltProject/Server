@@ -40,8 +40,6 @@ constexpr double kHalfPi = static_cast<double>(static_cast<float>(std::numbers::
     return open != properties.end() && open->second == "true";
 }
 
-// --- Swim -----------------------------------------------------------------------------------------
-
 bool swimWanted(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     // parity: `isInFluidDeeperThan(getFluidJumpThreshold())` or lava.
     return ai::inWater(ctx.mob.world, ctx.self) || blockPath(ctx, look::blockPosition(ctx.self)) == "lava";
@@ -52,8 +50,6 @@ void swimTick(Ctx& ctx, const Node& node, NodeState& /*state*/) {
         livingMovement::jump(ctx.mob.world, ctx.self);
     }
 }
-
-// --- InteractWithDoor ---------------------------------------------------------------------------
 
 /// parity: `isMobComingThroughDoor` for a neighbour of the same kind.
 [[nodiscard]] bool comingThrough(const ServerEntity& other, const BlockPos& door) {
@@ -141,8 +137,6 @@ bool doorTrigger(Ctx& ctx, const Node& /*node*/, NodeState& state) {
     return true;
 }
 
-// --- LookAtTargetSink ---------------------------------------------------------------------------
-
 bool lookCheck(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) { return ctx.mem.lookTarget.present(); }
 
 bool lookStill(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
@@ -165,8 +159,6 @@ void lookTick(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
 }
 
 void lookStop(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) { ctx.mem.lookTarget.erase(); }
-
-// --- VillagerPanicTrigger -----------------------------------------------------------------------
 
 [[nodiscard]] bool scared(const Ctx& ctx) { return ctx.mem.hurtBy.present() || ctx.mem.nearestHostile.present(); }
 
@@ -191,8 +183,6 @@ void panicTick(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
         brain::spawnGolemIfNeeded(ctx, 3);
     }
 }
-
-// --- WakeUp, ReactToBell, SetRaidStatus, UpdateActivityFromSchedule ------------------------------
 
 bool wakeUp(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     if (brain::isActive(ctx.state, Activity::kRest) || !ctx.self.sleeping) {
@@ -230,15 +220,12 @@ bool updateSchedule(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     return true;
 }
 
-// --- MoveToTargetSink ---------------------------------------------------------------------------
-
 [[nodiscard]] bool reached(Ctx& ctx, const WalkTarget& target) {
     const std::optional<BlockPos> at = look::block(ctx, target.target);
     return at.has_value() && look::manhattan(*at, look::blockPosition(ctx.self)) <= target.closeEnough;
 }
 
-/// parity: `MoveToTargetSink.tryComputePath`, a partial path accepted, and a step towards the target
-/// when there is none at all.
+/// parity: `MoveToTargetSink.tryComputePath`.
 [[nodiscard]] bool computePath(Ctx& ctx, NodeState& state, const WalkTarget& target) {
     const std::optional<BlockPos> goal = look::block(ctx, target.target);
     if (!goal.has_value()) {
@@ -360,8 +347,6 @@ void moveStop(Ctx& ctx, const Node& /*node*/, NodeState& state) {
     state.pos.reset();
 }
 
-// --- LookAndFollowTradingPlayerSink -------------------------------------------------------------
-
 bool followCheck(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     const std::optional<std::int32_t> trader = ctx.state.tradingPlayer;
     return trader.has_value() && look::player(ctx, *trader) != nullptr && !ai::inWater(ctx.mob.world, ctx.self) &&
@@ -379,8 +364,6 @@ void followStop(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     ctx.mem.walkTarget.erase();
     ctx.mem.lookTarget.erase();
 }
-
-// --- GoToWantedItem -------------------------------------------------------------------------------
 
 bool goToWantedItem(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     if (ctx.mem.walkTarget.present() || !ctx.mem.nearestVisibleWantedItem.present()) {

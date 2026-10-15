@@ -80,8 +80,7 @@ void PluginsCommand::build(const command::CommandNodeBuilder& root) const {
                 }
                 context.success(grey(std::string{server::plugins::surfaceName(surface)}));
                 for (std::size_t index = 0; index < onIt.size(); index++) {
-                    // First is whoever wins with no conditions in play; a predicate can still move
-                    // it per player, and saying so is better than pretending the list is final.
+                    // First is whoever wins with no conditions; a predicate can still move it per player.
                     Component standing = yellow(" waiting");
                     if (onIt[index]->yielded) {
                         standing = red(" let go");
@@ -117,7 +116,6 @@ void PluginsCommand::build(const command::CommandNodeBuilder& root) const {
         node.executes([](const command::CommandContext& context) {
             const std::vector<std::string> names = packetNames::all();
             context.success(grey(std::to_string(names.size()) + " packet(s) a plugin can name:"));
-            // Grouped by direction, because that is how a plugin looks for one.
             for (const std::string_view side : {"serverbound", "clientbound"}) {
                 std::vector<std::string> theirs;
                 const std::string prefix = std::string{side} + ".";

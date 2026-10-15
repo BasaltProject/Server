@@ -7,7 +7,7 @@
 namespace basalt::server::runtime::player {
 namespace {
 
-/// parity: `Inventory.findSlotMatchingItem`, which walks vanilla's order: the hotbar, then the rows.
+/// parity: `Inventory.findSlotMatchingItem`.
 [[nodiscard]] std::optional<std::int32_t> slotMatching(const PlayerInventory& inventory,
                                                        const storage::StoredItemStack& picked) {
     for (std::int32_t index = 0; index < PlayerInventory::kMainSlots; ++index) {
@@ -40,7 +40,7 @@ bool pickItemFor(PlayerSession& session, const storage::StoredItemStack& picked)
     if (session.gamemode != wire::protocol::play::Gamemode::Creative) {
         return false;
     }
-    // parity: `Inventory.addAndPickItem`: what is in the way moves to a free slot, or is overwritten.
+    // parity: `Inventory.addAndPickItem`.
     inventory.setHeldSlot(inventory.suitableHotbarSlot());
     const std::int32_t target = PlayerInventory::kHotbarStart + inventory.heldSlot();
     const std::optional<storage::StoredItemStack> displaced = inventory.at(target);

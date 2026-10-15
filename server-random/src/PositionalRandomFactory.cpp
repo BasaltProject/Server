@@ -4,7 +4,6 @@
 #include <cstdint>
 
 namespace basalt::server::random {
-
 RandomSource PositionalRandomFactory::at(std::int32_t x, std::int32_t y, std::int32_t z) const noexcept {
     const std::int64_t seed = positionalSeed(x, y, z);
     if (algorithm_ == RandomSource::Algorithm::Legacy) {
@@ -27,5 +26,4 @@ RandomSource PositionalRandomFactory::fromSeed(std::int64_t seed) const noexcept
     }
     return RandomSource::xoroshiro(seed ^ seedLo_, seed ^ seedHi_);
 }
-
 } // namespace basalt::server::random

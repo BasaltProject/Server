@@ -30,9 +30,7 @@ ServerEntity& prime(world::WorldState& world, const std::int32_t x, const std::i
     // parity: `TntBlock.explode` spawns it at the middle of the block it was.
     auto entity = std::make_unique<ServerEntity>(entityId, wire::common::Uuid::random(), type(), protocolType, x + 0.5,
                                                  static_cast<double>(y), z + 0.5);
-    // parity: `PrimedTnt`'s constructor hops it a fifth of a block up and pushes it a fiftieth to one
-    // side, so a block of tnt that is lit leaves the ground rather than sitting where it was.
-    // Measured in `hojagrande`, where the jar's takes a dozen ticks to come back down on the leaf.
+    // parity: `PrimedTnt`'s constructor hops it 0.2 up and pushes it 0.02 sideways.
     entity->velocityX = -std::sin(angle) * kPrimeDrift;
     entity->velocityY = kPrimeHop;
     entity->velocityZ = -std::cos(angle) * kPrimeDrift;
@@ -41,8 +39,7 @@ ServerEntity& prime(world::WorldState& world, const std::int32_t x, const std::i
 }
 
 bool tick(world::WorldState& world, ServerEntity& entity) {
-    // parity: `PrimedTnt`'s own constructor, which starts at eighty: a block of TNT summoned rather
-    // than lit still has a fuse, and without this it went off on its first tick.
+    // parity: `PrimedTnt` starts with a fuse of 80, so a summoned block still has one.
     if (entity.fuse == ServerEntity::kNoFuse) {
         entity.fuse = kDefaultFuse;
     }

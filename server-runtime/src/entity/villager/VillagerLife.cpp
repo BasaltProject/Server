@@ -330,7 +330,7 @@ namespace {
     return {&memories.home, &memories.jobSite, &memories.potentialJobSite, &memories.meetingPoint};
 }
 
-/// parity: `GlobalPos` memories of another dimension, which every behaviour checks and ignores.
+/// parity: `GlobalPos` memories of another dimension.
 void setAsideForeignPositions(VillagerState& state) {
     const std::array<Memory<BlockPos>*, 4> slots = globalPositions(state.memories);
     for (std::size_t index = 0; index < slots.size(); ++index) {
@@ -347,7 +347,6 @@ void setAsideForeignPositions(VillagerState& state) {
     }
 }
 
-/// A position set this turn belongs to this world and replaces whatever was set aside.
 void claimPositions(VillagerState& state) {
     const std::array<Memory<BlockPos>*, 4> slots = globalPositions(state.memories);
     for (std::size_t index = 0; index < slots.size(); ++index) {

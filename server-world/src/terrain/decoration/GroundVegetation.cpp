@@ -128,8 +128,7 @@ void desertDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const
 const BiomeVegetalDecoration& desertDecoration::decoration() {
     static const BiomeVegetalDecoration built = [](Chunk& chunk, random::RandomSource& random) {
         dryGrassDecoration::desert()(chunk, random);
-        // parity: placed_feature/patch_dead_bush_2.json, worldSurfaceSquaredWithCount(2) plus
-        // copyAndAdd. The outer count is two here and twenty in the badlands variant.
+        // parity: `patch_dead_bush_2`, worldSurfaceSquaredWithCount(2) plus copyAndAdd.
         const SimpleBlockFeature feature{constant("dead_bush")};
         runFromChunkCorner(chunk, random,
                            {countPlacement(2), inSquarePlacement(), heightmapPlacement(), countPlacement(4),
@@ -142,8 +141,7 @@ const BiomeVegetalDecoration& desertDecoration::decoration() {
 const BiomeVegetalDecoration& badlandsDecoration::decoration() {
     static const BiomeVegetalDecoration built = [](Chunk& chunk, random::RandomSource& random) {
         dryGrassDecoration::badlands()(chunk, random);
-        // parity: placed_feature/patch_dead_bush_badlands.json, worldSurfaceSquaredWithCount(20)
-        // plus copyAndAdd.
+        // parity: `patch_dead_bush_badlands`, worldSurfaceSquaredWithCount(20) plus copyAndAdd.
         const SimpleBlockFeature feature{constant("dead_bush")};
         runFromChunkCorner(chunk, random,
                            {countPlacement(20), inSquarePlacement(), heightmapPlacement(), countPlacement(4),

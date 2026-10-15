@@ -1,5 +1,3 @@
-// Generated from the real 26.3 server jar. Regenerate rather than edit: every number here is a
-// fact about the game, not a decision.
 
 #include <basalt/server/registry/VanillaBlocks.hpp>
 
@@ -8,7 +6,6 @@
 
 namespace basalt::server::registry {
 namespace {
-
 constexpr std::array<std::pair<std::int32_t, std::string_view>, 1286> kDefaultBlockStatesTable = {{
     {0, "air"},
     {1, "stone"},
@@ -5012,7 +5009,6 @@ constexpr std::array<BlockHardnessEntry, 1286> kBlockHardnessTable = {{
     {"zombie_head", 1.0F, false, 1.0F},
     {"zombie_wall_head", 1.0F, false, 1.0F},
 }};
-
 } // namespace
 
 std::span<const std::pair<std::int32_t, std::string_view>> defaultBlockStatesTable() {
@@ -5024,5 +5020,4 @@ std::span<const std::pair<std::int32_t, std::string_view>> blockIdsTable() { ret
 std::span<const std::string_view> blockStatePropertiesTable() { return kBlockStateDefinitions; }
 
 std::span<const BlockHardnessEntry> blockHardnessTable() { return kBlockHardnessTable; }
-
 } // namespace basalt::server::registry

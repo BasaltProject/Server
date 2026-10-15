@@ -157,7 +157,7 @@ std::int32_t PlayerInventory::add(const storage::StoredItemStack& stack) {
 }
 
 std::optional<std::int32_t> PlayerInventory::slotWithRoomFor(const storage::StoredItemStack& stack) const {
-    // parity: `Inventory.getSlotWithRemainingSpace`: the held slot, the off hand, then the main slots.
+    // parity: `Inventory.getSlotWithRemainingSpace`.
     const auto hasRoom = [&](std::int32_t slot) {
         const std::optional<storage::StoredItemStack>& existing = slots_[static_cast<std::size_t>(slot)];
         return existing.has_value() && sameStack(*existing, stack) && maxStackIn(*existing) > 1 &&
@@ -301,15 +301,11 @@ PlayerInventory::toWireStack(const std::optional<storage::StoredItemStack>& stac
     if (!parsed.has_value()) {
         return std::nullopt;
     }
-    // An item this build's registry does not know is left out rather than sent as some other item:
-    // a wrong id is a wrong item in someone's hand.
+    // An item unknown to this registry is left out, since a wrong id is a wrong item in hand.
     const reg::Item* item = reg::items::registry().byName(*parsed);
     if (item == nullptr) {
         return std::nullopt;
     }
-    // An enchantment whose id the client was never sent would draw as a missing entry, so an
-    // unresolved one is dropped rather than guessed: the resolver is only set once the enchantment
-    // registry has actually gone out.
     const item::itemComponentCodecs::EnchantmentId resolve =
         enchantmentIds_ ? enchantmentIds_ : [](const Identifier&) { return std::optional<std::int32_t>{}; };
     return wire::protocol::play::WireItemStack{.itemId = item->protocolId,

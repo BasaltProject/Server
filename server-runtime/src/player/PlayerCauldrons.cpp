@@ -66,8 +66,7 @@ enum class Contents : std::uint8_t { Empty, Water, Lava, PowderSnow };
     return false;
 }
 
-/// parity: `ItemUtils.createFilledResult`: a creative hand keeps its stack and gains the result once
-/// unless `limitCreative` is off, anyone else spends one and gets the result back in its place.
+/// parity: `ItemUtils.createFilledResult`.
 void fillResult(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, std::int32_t slot,
                 const StoredItemStack& held, const StoredItemStack& result, bool limitCreative = true) {
     const bool creative = player.gamemode == Gamemode::Creative;
@@ -145,7 +144,7 @@ void emptyBucket(const BreakContext& context, PlayerSession& player, world::Load
     playSound(context, world, x, y, z, cauldron, std::move(sound));
 }
 
-/// parity: `fillBucket`: the bucket takes what the cauldron held, and the cauldron is empty.
+/// parity: `fillBucket`.
 void fillBucket(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, std::int32_t x,
                 std::int32_t y, std::int32_t z, std::int32_t slot, const StoredItemStack& held, std::string filled,
                 std::string sound) {
@@ -285,7 +284,7 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
         lowerFillLevel(context, world, x, y, z, "water_cauldron", level);
         return true;
     }
-    // parity: `shulkerBoxInteraction`, a dyed box turned back into the plain one, contents and all.
+    // parity: `shulkerBoxInteraction`.
     if (id->path().ends_with("_shulker_box")) {
         StoredItemStack washed = *held;
         washed.id = "minecraft:shulker_box";

@@ -47,9 +47,7 @@ const std::set<std::string, std::less<>>& supportBlocks() {
     return paths;
 }
 
-/// parity: a boulder is up to three blobs whose origin drifts by one per blob, so its body reaches
-/// past the chunk edge often. Vanilla writes there through the `WorldGenLevel`; dropping those writes
-/// loses the half of every boulder that a neighbouring chunk seeded. Coordinates are world ones.
+/// parity: a boulder is up to three blobs drifting by one, so its body crosses chunk edges; coordinates are world.
 [[nodiscard]] std::int32_t get(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
     if (y < bounds.minY() || y > bounds.maxY()) {
@@ -96,8 +94,7 @@ void forestRockDecoration::placeAt(Chunk& chunk, random::RandomSource& random, s
                     const std::int32_t dx = blobX - originX;
                     const std::int32_t dy = blobY - originY;
                     const std::int32_t dz = blobZ - originZ;
-                    // parity: the squared distance is an int compared against a float radius, so the
-                    // comparison happens in float and the widening is where vanilla puts it.
+                    // parity: the squared int distance is compared against a float radius in float.
                     if (static_cast<float>(dx * dx + dy * dy + dz * dz) <= radiusSquared) {
                         set(chunk, blobX, blobY, blobZ, stateIdOf("mossy_cobblestone"));
                     }
@@ -119,8 +116,7 @@ void forestRockDecoration::decorate(Chunk& chunk, std::int64_t seed,
     for (std::int32_t attempt = 0; attempt < 2; ++attempt) {
         const std::int32_t localX = random.nextInt(16);
         const std::int32_t localZ = random.nextInt(16);
-        // parity: `forest_rock`'s placement asks for `MOTION_BLOCKING`, not the world surface, so the
-        // ferns and the grass of an old growth taiga do not lift the boulder a block.
+        // parity: `forest_rock` asks for `MOTION_BLOCKING`, not the world surface.
         const std::int32_t y = chunk.heightAt(localX, localZ, HeightmapType::MotionBlocking);
         const std::int32_t worldX = chunk.chunkX() * 16 + localX;
         const std::int32_t worldZ = chunk.chunkZ() * 16 + localZ;

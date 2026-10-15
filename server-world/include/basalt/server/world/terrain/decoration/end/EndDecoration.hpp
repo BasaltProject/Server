@@ -14,7 +14,6 @@ namespace endRawDecoration {
 
 void decorate(Chunk& chunk, std::int64_t seed, const TheEndBiomeSource& biomeSource);
 
-/// One island at one position, which is what `/place feature` runs.
 void placeAt(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z);
 
 } // namespace endRawDecoration
@@ -31,7 +30,6 @@ namespace endVegetalDecoration {
 
 void decorate(Chunk& chunk, std::int64_t seed, const NoiseRouter& router, const TheEndBiomeSource& biomeSource);
 
-/// One plant grown at one position rather than scattered over a chunk.
 bool placeAt(Chunk& chunk, random::RandomSource& random, const NoiseRouter& router, std::int32_t x, std::int32_t y,
              std::int32_t z);
 
@@ -42,8 +40,6 @@ namespace endSurfaceStructuresDecoration {
 
 void decorate(Chunk& chunk, std::int64_t seed, const NoiseRouter& router, const TheEndBiomeSource& biomeSource);
 
-/// Every spike of this seed that reaches into the chunk, which is what `/place feature` runs for
-/// `end_spike`.
 bool placeSpikesIn(Chunk& chunk, std::int64_t seed);
 
 } // namespace endSurfaceStructuresDecoration

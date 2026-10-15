@@ -44,7 +44,6 @@ enum class Fluid : std::uint8_t { None, Water, Lava };
     return isSpeleothem(pathOf(stateId)) && propertyOf(stateId, "thickness") == "tip";
 }
 
-/// The next piece up or down the same stalactite.
 [[nodiscard]] bool continues(std::int32_t stateId, std::int32_t from) {
     return pathOf(stateId) == pathOf(from) && isStalactite(stateId);
 }
@@ -53,8 +52,7 @@ enum class Fluid : std::uint8_t { None, Water, Lava };
     return world.blockState(x, y, z).value_or(reg::blocks::air().stateId);
 }
 
-/// parity: `getFluidState().getType()` compared with the source fluids, and the mud that counts as
-/// water where water does not dry up.
+/// parity: `getFluidState().getType()` compared with the source fluids.
 [[nodiscard]] Fluid fluidAt(std::int32_t stateId, bool evaporates) {
     if (pathOf(stateId) == "mud") {
         return evaporates ? Fluid::None : Fluid::Water;
@@ -66,8 +64,7 @@ enum class Fluid : std::uint8_t { None, Water, Lava };
     return *kind == FluidKind::Water ? Fluid::Water : Fluid::Lava;
 }
 
-/// parity: `getFluidAboveStalactite` over `findRootBlock`: the fluid over the block the stalactite
-/// hangs from, with where it is and what block holds it.
+/// parity: `getFluidAboveStalactite` over `findRootBlock`.
 struct Above {
     Position at{};
     Fluid fluid = Fluid::None;
@@ -111,8 +108,7 @@ struct Above {
     return std::nullopt;
 }
 
-/// parity: `canDripThrough`: air, or a see-through block with no fluid and nothing in the middle
-/// four pixels of its column.
+/// parity: `canDripThrough`.
 [[nodiscard]] bool dripsThrough(std::int32_t stateId) {
     if (stateId == reg::blocks::air().stateId || pathOf(stateId) == "cave_air" || pathOf(stateId) == "void_air") {
         return true;
@@ -134,8 +130,7 @@ struct Above {
     return true;
 }
 
-/// parity: each cauldron's `canReceiveStalactiteDrip`: the empty one takes either fluid, the water
-/// one only water, the other two nothing.
+/// parity: each cauldron's `canReceiveStalactiteDrip`.
 [[nodiscard]] bool receives(std::int32_t stateId, Fluid fluid) {
     const std::string_view path = pathOf(stateId);
     return (path == "cauldron" && fluid != Fluid::None) || (path == "water_cauldron" && fluid == Fluid::Water);

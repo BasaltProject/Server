@@ -128,8 +128,7 @@ std::vector<world::trades::Offer>& offersOf(world::RealVillagerTrades& trades, S
     while (offers.level < reached) {
         ++offers.level;
         const world::TradeSet& set = trades.tradeSet(villager.profession, offers.level);
-        // parity: the roll's `THIS_ENTITY` and `ORIGIN`, and the one flag that lets a modifier
-        // price an enchantment into the trade.
+        // parity: the roll's `THIS_ENTITY` and `ORIGIN`.
         server::world::loot::LootContext context;
         if (world::RealLootTables* tables = trades.lootTables(); tables != nullptr) {
             tables->prepareAt(context, world, villager.x, villager.y, villager.z);
@@ -154,8 +153,7 @@ std::vector<world::trades::Offer>& offersOf(world::RealVillagerTrades& trades, S
         while (found < wanted && !pool.empty()) {
             const auto roll = static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(pool.size())));
             const world::VillagerTrade* trade = pool[roll];
-            // parity: without duplicates the pick leaves the pool first; with them, only a pick that
-            // gave nothing does.
+            // parity: without duplicates the pick leaves the pool first; with them, only a pick that gave nothing does.
             if (!set.allowDuplicates) {
                 pool.erase(pool.begin() + static_cast<std::ptrdiff_t>(roll));
             }

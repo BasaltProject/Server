@@ -26,8 +26,6 @@ constexpr std::int32_t kMaxAttempts = 10000;
     return found == nullptr ? none : *found;
 }
 
-/// Whether the tag was actually new. Tags live on the player session or on the entity, whichever
-/// this target is; a dropped item can be tagged in vanilla but here keeps none to give back.
 bool addTag(const CommandTarget& target, const std::string& tag) {
     if (player::PlayerSession* session = target.player(); session != nullptr) {
         return session->tags.insert(tag).second;
@@ -57,7 +55,6 @@ bool removeTag(const CommandTarget& target, const std::string& tag) {
     return false;
 }
 
-/// The one shape `add` and `remove` share: count what changed, refuse when nothing did.
 [[nodiscard]] Parsed<std::int32_t> changeTags(const CommandContext& context, bool adding) {
     const std::vector<CommandTarget>& targets = targetsOf(context);
     const auto* tag = context.get<std::string>("name");
@@ -139,7 +136,6 @@ void TagCommand::build(const CommandNodeBuilder& root) const {
 
 namespace {
 
-/// One relaxation pass. Answers true once nothing had to move, which is when the spread is done.
 bool spreadApart(std::vector<std::pair<double, double>>& positions, double spreadDistance) {
     bool settled = true;
     for (std::size_t i = 0; i < positions.size(); i++) {

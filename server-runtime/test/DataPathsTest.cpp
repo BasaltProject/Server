@@ -14,7 +14,6 @@ using basalt::wire::nbt::NbtTag;
 
 namespace {
 
-/// A compound written as SNBT, which is how a command would have given it.
 [[nodiscard]] NbtCompound compoundOf(const std::string& text) {
     const auto parsed = basalt::wire::nbt::snbt::parse(text);
     REQUIRE(parsed.has_value());
@@ -46,7 +45,6 @@ TEST_CASE("a list is read by index and by filter") {
     REQUIRE(byFilter.has_value());
     CHECK(printed(*byFilter) == "9");
 
-    // A dot inside a filter is part of the filter, not a step of its own.
     const NbtCompound dotted = compoundOf(R"({crew:[{id:"a.b",age:1}]})");
     CHECK(dataPaths::resolve(NbtTag::ofCompound(dotted), R"(crew[{id:"a.b"}].age)").has_value());
 
@@ -56,7 +54,6 @@ TEST_CASE("a list is read by index and by filter") {
 
 TEST_CASE("a filter matches only when every key it names matches") {
     const NbtCompound root = compoundOf(R"({crew:[{name:"bo",rank:{level:2}},{name:"jo",rank:{level:5}}]})");
-    // Recursive: the nested compound is matched key by key too.
     CHECK(dataPaths::resolve(NbtTag::ofCompound(root), R"(crew[{rank:{level:5}}].name)").has_value());
     CHECK_FALSE(dataPaths::resolve(NbtTag::ofCompound(root), R"(crew[{name:"bo",rank:{level:5}}])").has_value());
 }
@@ -69,7 +66,6 @@ TEST_CASE("merge takes the incoming value except where both sides are compounds"
     CHECK(printed(*dataPaths::resolve(NbtTag::ofCompound(merged), "a.x")) == "1");
     CHECK(printed(*dataPaths::resolve(NbtTag::ofCompound(merged), "a.y")) == "9");
     CHECK(printed(*dataPaths::resolve(NbtTag::ofCompound(merged), "a.z")) == "8");
-    // Not both compounds, so the incoming one simply replaces it.
     CHECK(dataPaths::resolve(NbtTag::ofCompound(merged), "b.deep").has_value());
 }
 
@@ -79,10 +75,8 @@ TEST_CASE("set writes a chain of keys and leaves the original alone") {
     REQUIRE(written.has_value());
     CHECK(printed(*dataPaths::resolve(NbtTag::ofCompound(*written), "a.c.d")) == "5");
     CHECK(printed(*dataPaths::resolve(NbtTag::ofCompound(*written), "a.b")) == "1");
-    // A copy: the compound that was handed in still says what it said.
     CHECK_FALSE(dataPaths::resolve(NbtTag::ofCompound(root), "a.c.d").has_value());
 
-    // An index needs a list to land in.
     CHECK_FALSE(dataPaths::set(root, "a[0]", NbtTag::ofInt(1)).has_value());
     CHECK_FALSE(dataPaths::set(root, "", NbtTag::ofInt(1)).has_value());
 }
@@ -93,7 +87,6 @@ TEST_CASE("set and remove reach list elements by index, from the end, and by fil
     REQUIRE(moved.has_value());
     CHECK(*dataPaths::resolve(NbtTag::ofCompound(*moved), "Pos[1]") == NbtTag::ofDouble(70.0));
     CHECK(*dataPaths::resolve(NbtTag::ofCompound(*moved), "Pos[-1]") == NbtTag::ofDouble(3.0));
-    // One element type per list: an int does not go among doubles.
     CHECK_FALSE(dataPaths::set(root, "Pos[0]", NbtTag::ofInt(1)).has_value());
 
     const std::optional<NbtCompound> counted = dataPaths::set(root, R"(Items[{id:"b"}].n)", NbtTag::ofInt(9));

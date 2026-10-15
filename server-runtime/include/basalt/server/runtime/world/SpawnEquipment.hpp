@@ -17,30 +17,20 @@
 
 namespace basalt::server::runtime::world {
 
-/// The jar as the two classes here read it: a directory listing and a file reader.
-///
-/// Callbacks rather than `ServerJarAssets`, for the same reason every other registry here takes
-/// them: this needs the operator's own copy of the game, and a test has none to give.
+/// Callbacks rather than `ServerJarAssets`: only this needs the operator's copy of the game, and a test has none.
 struct SpawnEquipmentJar {
     std::function<std::vector<std::string>(std::string_view prefix)> entriesUnder;
     std::function<std::optional<std::string>(std::string_view name)> readText;
 };
 
-/// Exact 26.2 `mob_spawn_equipment` enchantment-provider evaluator.
-///
-/// Every draw is made whether or not it changes anything: the enchantment a mob gets is invisible
-/// next to the spawn stream it shares with everything else in the chunk, and skipping a draw here
-/// moves every roll after it.
 class SpawnEquipmentEnchantments {
 public:
     explicit SpawnEquipmentEnchantments(const SpawnEquipmentJar& jar,
                                         wire::common::Logger logger = wire::common::Logger{"Spawn equipment"});
 
-    /// Applies the provider to `stack`, consuming every draw even when no enchantment is available.
     void enchant(wire::nbt::NbtCompound& stack, random::RandomSource& random, float specialMultiplier) const;
 
 private:
-    /// An item or a tag of them, as `supported_items` and `exclusive_set` are both written.
     struct Selector {
         std::optional<wire::common::Identifier> id;
         std::optional<wire::common::Identifier> tag;
@@ -85,11 +75,9 @@ private:
     std::map<wire::common::Identifier, std::set<wire::common::Identifier>> enchantmentTags_;
 };
 
-/// Type-specific spawn equipment and its exact enchantment RNG.
 class SpawnEquipmentFinalizer {
 public:
-    /// Today's date, so the Halloween head is testable rather than a thing that happens once a year.
-    /// Answers whether it is 31 October where the server is.
+    /// Makes the Halloween head testable; answers whether it is 31 October where the server is.
     using IsHalloween = std::function<bool()>;
 
     explicit SpawnEquipmentFinalizer(const SpawnEquipmentJar& jar, IsHalloween isHalloween = {});
@@ -108,7 +96,6 @@ public:
                                             random::RandomSource& random, float specialMultiplier,
                                             std::string_view difficulty) const;
 
-    /// The guaranteed helmet and provider pass applied after a skeleton trap rider's finalizer.
     void finalizeSkeletonTrapEquipment(wire::nbt::NbtCompound& data, random::RandomSource& random,
                                        float specialMultiplier) const;
 
@@ -134,8 +121,7 @@ private:
     IsHalloween isHalloween_;
 };
 
-/// The finalizer used where there is no jar, which is every test and every server that has not
-/// downloaded one. It equips mobs and rolls the same draws; only the enchantments come out empty.
+/// Used where there is no jar: it equips mobs and rolls the same draws, only the enchantments come out empty.
 [[nodiscard]] const SpawnEquipmentFinalizer& spawnEquipmentWithoutAssets();
 
 } // namespace basalt::server::runtime::world

@@ -9,11 +9,9 @@ namespace basalt::server::runtime {
 namespace {
 
 constexpr float kMillisPerSecond = 1000.0F;
-/// How many ticks behind the loop tolerates before it stops trying to catch up.
 constexpr std::int64_t kCatchUpLimit = 20;
 constexpr std::int64_t kSweepPollMillis = 5;
 constexpr std::int64_t kStopDrainMillis = 30'000;
-/// Fifteen minutes, the longest window reported.
 constexpr int kWindowSeconds = 900;
 constexpr std::int64_t kMinAutosaveTicks = 100;
 
@@ -29,18 +27,13 @@ using Clock = std::chrono::steady_clock;
 
 void sleepMillis(std::int64_t millis) { std::this_thread::sleep_for(std::chrono::milliseconds{millis}); }
 
-/// Counts ticks against the clock, in one-second buckets.
-///
-/// Buckets rather than a running average of tick durations because they answer the question actually
-/// being asked: not "how long did a tick take" but "how many happened", which is the one that
-/// notices a loop that stalled completely.
+// Buckets count how many ticks happened, which notices a loop that stalled completely.
 class TickMeter {
 public:
     TickRates tick() {
         const std::int64_t second = std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - start_).count();
         if (second != currentSecond_) {
-            // Fill in whole seconds where nothing ticked at all, or a stall would read as a gap
-            // rather than as the zero it was.
+            // Fill whole seconds where nothing ticked, or a stall would read as a gap rather than a zero.
             const std::int64_t gaps = std::min<std::int64_t>(second - currentSecond_, kWindowSeconds);
             for (std::int64_t filled = 0; filled < gaps; filled++) {
                 seconds_.push_back(filled == 0 ? currentCount_ : 0);
@@ -57,8 +50,6 @@ public:
     }
 
 private:
-    /// Ticks per second over the last `window` seconds, or the nominal rate before that much has
-    /// passed.
     [[nodiscard]] double rateOver(int window) const {
         if (seconds_.empty()) {
             return static_cast<double>(TickLoop::kTicksPerSecond);
@@ -155,27 +146,22 @@ void TickLoop::runTicks() {
             options_.onTick(!skip);
         }
         if (options_.saveIntervalSeconds > 0 && --ticksUntilSave <= 0) {
-            // parity: `MinecraftServer.autoSave`, which recomputes the interval each time from the
-            // rate the server is running at.
+            // parity: `MinecraftServer.autoSave`.
             ticksUntilSave = nextAutosaveInterval();
             sweepRequested_.store(true, std::memory_order_relaxed);
         }
-        // Unloading is not gated on the save interval: a server told not to write periodically still
-        // must not hold every chunk anyone has walked through.
+        // Unloading is not gated on the save interval: a server that never saves periodically must still drop chunks.
         if (unloadIntervalTicks_ > 0 && tick % unloadIntervalTicks_ == 0) {
             unloadRequested_.store(true, std::memory_order_relaxed);
         }
 
-        // Recorded before the sleep, so it is the work that is measured and not the wait.
         durations_.record(nanosSince(clock), nanosSince(started));
         const TickRates rates = meter.tick();
         oneMinute_.store(rates.oneMinute, std::memory_order_relaxed);
         fiveMinutes_.store(rates.fiveMinutes, std::memory_order_relaxed);
         fifteenMinutes_.store(rates.fifteenMinutes, std::memory_order_relaxed);
 
-        // Slept towards an absolute deadline, not for "a tick minus the work": sleeping promises at
-        // least what it is asked for, and that drift alone held an idle server at 17 TPS. A sprint
-        // runs flat out, so its deadline follows the work.
+        // Slept towards an absolute deadline: sleep overshoot alone held an idle server at 17 TPS.
         if (sprinting) {
             nextTickMillis = millisSince(clock);
             continue;
@@ -186,8 +172,7 @@ void TickLoop::runTicks() {
         if (remaining > 0) {
             sleepMillis(remaining);
         } else if (remaining < -kTickMillis * kCatchUpLimit) {
-            // Too far behind to catch up by running faster; skip the backlog rather than spin
-            // through it, which is what turns a stall into a spiral.
+            // Too far behind: skip the backlog rather than spin through it, which turns a stall into a spiral.
             nextTickMillis = millisSince(clock);
         }
     }
@@ -221,10 +206,7 @@ void TickLoop::stop() {
         sleepMillis(kSweepPollMillis);
         waited += kSweepPollMillis;
     }
-    // A stop from inside the tick itself (a signal noticed mid-tick, `/stop` run on the owner) is
-    // the ticker asking to join itself, which is a hard error. It is left to finish its own turn
-    // and the destructor does the join, because that one runs on whoever is tearing the server
-    // down and never on the ticker.
+    // A stop from inside the tick would make the ticker join itself, so the destructor does the join.
     if (ticker_.joinable() && ticker_.get_id() != std::this_thread::get_id()) {
         ticker_.join();
     }

@@ -15,14 +15,12 @@
 
 namespace basalt::server::registry::blockSupport {
 namespace {
-
 constexpr std::int32_t kNone = 0;
 constexpr std::int32_t kSturdy = 1;
 constexpr std::int32_t kCentre = 2;
 constexpr std::int32_t kRigid = 3;
 constexpr std::int32_t kFirstSet = 4;
 
-/// 0 means it stands anywhere, 1 means a rule this build does not model.
 constexpr std::int32_t kAlways = 0;
 constexpr std::int32_t kUnknown = 1;
 constexpr std::int32_t kFirstRule = 2;
@@ -66,15 +64,12 @@ constexpr std::string_view kIndexAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi
 }
 
 struct Table {
-    /// Twelve entries per rule: the six directions dry, then the same six in water.
     std::vector<std::array<std::int32_t, kDirections * 2>> rules;
     std::vector<std::vector<std::uint8_t>> sets;
     std::vector<std::int32_t> byState;
     std::vector<bool> randomTicking;
     std::vector<bool> redstoneConductors;
     std::unordered_map<std::int32_t, PushReaction> pushReactions;
-    /// Which block owns each state, and which states are water or hold it. Built with the rest: the
-    /// table is read from several threads, so it is finished before anyone can see it.
     std::vector<std::int32_t> blockOfState;
     std::vector<bool> waterlike;
 };
@@ -155,7 +150,6 @@ struct Table {
             }
             const auto id = blockIds.find(block->path());
             table.blockOfState[state] = id == blockIds.end() ? -1 : id->second;
-            // Every level of water, not just the source block, which is one state of sixteen.
             if (block->path() == "water") {
                 table.waterlike[state] = true;
                 continue;
@@ -206,7 +200,6 @@ struct Table {
         return contains(table().sets[static_cast<std::size_t>(requirement - kFirstSet)], blockRegistryIdOf(neighbour));
     }
 }
-
 } // namespace
 
 bool needsSupport(std::int32_t stateId) { return ruleOf(stateId) != kAlways; }
@@ -266,5 +259,4 @@ std::int32_t blockRegistryIdOf(std::int32_t stateId) {
     }
     return built.blockOfState[static_cast<std::size_t>(stateId)];
 }
-
 } // namespace basalt::server::registry::blockSupport

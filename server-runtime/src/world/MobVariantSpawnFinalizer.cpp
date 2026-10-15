@@ -78,8 +78,7 @@ void writeBrainMemories(NbtCompound& data, const std::vector<std::pair<std::stri
     return large | ((pattern % kTropicalSmallPatterns) << 8) | (baseColor << 16) | (patternColor << 24);
 }
 
-/// parity: `PriorityProvider.pick` still calls `nextInt(1)` after reducing the registry to one
-/// match, so the draw happens whatever the biome turns out to be.
+/// parity: `PriorityProvider.pick` still calls `nextInt(1)` after reducing the registry to one.
 [[nodiscard]] std::string_view selectTemperatureVariant(std::string_view biome, random::RandomSource& random,
                                                         const std::set<std::string, std::less<>>& warm,
                                                         const std::set<std::string, std::less<>>& cold) {

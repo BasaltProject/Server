@@ -108,7 +108,6 @@ void StopwatchCommand::build(const CommandNodeBuilder& root) const {
         });
     });
 
-    /// `restart` and `remove` differ only in which of the two they call and what they then say.
     const auto act = [this](bool removing) {
         return [this, removing](const CommandContext& context) -> Parsed<std::int32_t> {
             const auto* named = context.get<Identifier>("id");

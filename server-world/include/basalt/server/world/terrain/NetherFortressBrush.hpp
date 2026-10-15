@@ -9,8 +9,7 @@
 
 namespace basalt::server::world::terrain::netherFortressPieces {
 
-/// parity: the shared per-piece geometry and block helpers of `NetherFortressPieces`. A piece is
-/// written facing north and turned whole, so every coordinate goes through here.
+/// parity: the shared per-piece geometry and block helpers of `NetherFortressPieces`.
 class Brush {
 public:
     Brush(const Piece& piece, Chunk& chunk, const structure::StructureBoundingBox& clip)
@@ -49,7 +48,6 @@ private:
     structure::StructureBoundingBox clip_;
 };
 
-/// The state id of a vanilla block with the given properties, or air when the jar has neither.
 [[nodiscard]] std::int32_t stateOf(std::string_view path, const std::map<std::string, std::string>& properties);
 
 } // namespace basalt::server::world::terrain::netherFortressPieces

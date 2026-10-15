@@ -88,9 +88,7 @@ void addResident(Chunk& chunk, StructurePos position, std::string_view type) {
                                                   .data = std::move(data)});
 }
 
-/// parity: `WoodlandMansionStructure.afterPlace`. Every column of this chunk that stands under the
-/// house is carried down in cobblestone until it meets something solid, so a mansion on a slope
-/// grows its own foundation.
+/// parity: `WoodlandMansionStructure.afterPlace` carries every column under the house down in cobblestone.
 void foundation(Chunk& chunk, const StructureBoundingBox& clip, const StructureBoundingBox& bounds,
                 const std::vector<StructureBoundingBox>& here) {
     if (here.empty()) {
@@ -157,8 +155,7 @@ std::optional<StructurePos> WoodlandMansionStructureGenerator::lowestCornerOf(st
     }
     const std::int32_t blockX = chunkX * 16 + 7;
     const std::int32_t blockZ = chunkZ * 16 + 7;
-    // parity: `getFirstOccupiedHeight` is the base height minus one, the last solid block rather
-    // than the first free one above it, which is what puts the mansion's floor on the ground.
+    // parity: `getFirstOccupiedHeight` is the base height minus one.
     const auto corner = [this](std::int32_t x, std::int32_t z) { return surfaceHeightAt_(x, z) - 1; };
     const std::int32_t lowest =
         std::min(std::min(corner(blockX, blockZ), corner(blockX, blockZ + offsetZ)),
@@ -200,8 +197,7 @@ void WoodlandMansionStructureGenerator::placeMarkers(Chunk& chunk, const structu
             chunk.setBlockStateId(localX, marker.pos.y, localZ, registry::blocks::air().stateId);
             addResident(chunk, marker.pos, marker.metadata == "Mage" ? "evoker" : "vindicator");
         } else if (marker.metadata == "Group of Allays") {
-            // parity: one to three of them, and the count comes off the level's own random, which no
-            // seed reproduces; a positional draw stands in.
+            // parity: the count comes off the level's own random, so a positional draw stands in.
             random::RandomSource source = random::RandomSource::legacy(0);
             const std::int32_t count =
                 source.forkPositional().at(marker.pos.x, marker.pos.y, marker.pos.z).nextInt(3) + 1;
@@ -217,8 +213,7 @@ void WoodlandMansionStructureGenerator::placeMarkers(Chunk& chunk, const structu
 
 namespace {
 
-/// parity: the rotation is drawn before the ground is looked at, so a mansion the ground rejects
-/// still costs the roll.
+/// parity: the rotation is drawn before the ground is checked.
 [[nodiscard]] StructureRotation drawRotation(random::RandomSource& random) {
     static constexpr std::array<StructureRotation, 4> kRotations{
         StructureRotation::None, StructureRotation::Clockwise90, StructureRotation::Clockwise180,
@@ -246,7 +241,7 @@ WoodlandMansionStructureGenerator::mansionStart(std::int64_t seed, std::int32_t 
 
     rotation = drawRotation(startRandom);
     const std::optional<StructurePos> origin = lowestCornerOf(chunkX, chunkZ, rotation);
-    // parity: `Structure.isValidBiome` reads the stub, which for a mansion is that lowest corner.
+    // parity: `Structure.isValidBiome` reads the stub.
     if (!origin.has_value() || (!forPlacement && !mansionBiomes_.contains(biomeAt_(origin->x, origin->y, origin->z)))) {
         return {};
     }

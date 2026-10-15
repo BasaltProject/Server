@@ -11,10 +11,7 @@ namespace basalt::server::runtime::entity {
 
 class ServerEntity;
 
-/// A fishing bobber: how it is cast and how a fish finds it.
-///
-/// parity: `FishingHook`. The part that asks the world (moving, water, loot) is the caller's; what
-/// is here is the state machine and its rolls.
+/// parity: `FishingHook`.
 namespace fishingHooks {
 
 /// parity: `DATA_HOOKED_ENTITY` and `DATA_BITING`.
@@ -45,16 +42,15 @@ struct HookState {
     random::RandomSource random = random::RandomSource::legacy(0);
 };
 
-/// parity: the `FishingHook(Player, ...)` constructor: where the bobber starts and how it flies off.
+/// parity: the `FishingHook(Player, ...)` constructor.
 void cast(ServerEntity& hook, HookState& state, double ownerX, double ownerEyeY, double ownerZ, float yaw, float pitch);
 
-/// What a lure turn shows, and what it needs to see.
 struct Surroundings {
     std::function<void(std::string_view particle, double x, double y, double z, std::int32_t count, double dx,
                        double dy, double dz, double speed)>
         particles;
     std::function<void(float volume, float pitch)> splash;
-    /// Whether the block at the point is plain water. parity: `BlockState.is(Blocks.WATER)`.
+    /// parity: `BlockState.is(Blocks.WATER)`.
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> isWater;
     bool rainingAbove = false;
     bool skyAbove = true;
@@ -63,16 +59,15 @@ struct Surroundings {
 /// parity: `FishingHook.catchingFish`, one turn of the fish coming, circling and biting.
 void catchingFish(ServerEntity& hook, HookState& state, const Surroundings& around);
 
-/// What one block is to open water. parity: `FishingHook.OpenWaterType`.
+/// parity: `FishingHook.OpenWaterType`.
 enum class WaterLayer : std::uint8_t { AboveWater, InsideWater, Invalid };
 
-/// parity: `FishingHook.calculateOpenWater`, a five by five column checked from one below to two
-/// above.
+/// parity: `FishingHook.calculateOpenWater`.
 [[nodiscard]] bool
 calculateOpenWater(std::int32_t x, std::int32_t y, std::int32_t z,
                    const std::function<WaterLayer(std::int32_t, std::int32_t, std::int32_t)>& layerAt);
 
-/// parity: `Mth.nextInt` and `Mth.nextFloat`, which answer the low bound when the range is empty.
+/// parity: `Mth.nextInt` and `Mth.nextFloat`.
 [[nodiscard]] std::int32_t nextIntBetween(random::RandomSource& random, std::int32_t low, std::int32_t high);
 
 [[nodiscard]] float nextFloatBetween(random::RandomSource& random, float low, float high);

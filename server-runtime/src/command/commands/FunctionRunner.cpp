@@ -136,8 +136,7 @@ void FunctionRunner::deferUntilReturn(const CommandDispatcher& dispatcher, std::
         }
         deferUntilReturn(*at, source, std::move(functions), std::move(onDone));
     };
-    // parity: an instantiation failure here is `commands.execute.function.instantiationFailure`,
-    // reported and the source dropped.
+    // parity: an instantiation failure here is `commands.execute.function.instantiationFailure`.
     if (!defer(dispatcher, *source, *first, nullptr, std::move(rest)).has_value()) {
         onDone(std::nullopt);
     }
@@ -156,9 +155,7 @@ void FunctionRunner::settle(const CommandDispatcher& dispatcher, Frame& finished
 
 std::optional<FunctionRunner::Returned> FunctionRunner::runFrames(const CommandDispatcher& dispatcher,
                                                                   std::size_t base) {
-    // parity: `ExecutionContext.runCommandQueue`: one command at a time off the top of the stack, a
-    // queued function's commands in front of the rest of its caller's, and what waited on a
-    // function told once it returns.
+    // parity: `ExecutionContext.runCommandQueue`.
     while (frames_.size() > base) {
         Frame& top = frames_.back();
         if (exhausted_ || top.returned.has_value() || top.next >= top.lines.size()) {

@@ -7,8 +7,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `RangedCrossbowAttackGoal`: close to inside its range, wind the crossbow for a second and
-/// a quarter, let it go, and wait before the next one.
+/// parity: `RangedCrossbowAttackGoal`.
 class CrossbowAttackGoal final : public Goal {
 public:
     CrossbowAttackGoal(double speedModifier, double attackRadius);
@@ -33,8 +32,7 @@ private:
     std::int32_t seeTime_ = 0;
 };
 
-/// parity: `Witch.performRangedAttack`: which potion it throws depends on how far away you are and
-/// what you already have on you, and it drinks one itself when it is hurt.
+/// parity: `Witch.performRangedAttack`.
 class ThrowPotionGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
@@ -53,11 +51,9 @@ private:
     std::int32_t attackDelay_ = 0;
 };
 
-/// parity: `SpellcasterIllager`'s own rhythm: a spell is cast after a wind-up, and then nothing for
-/// a while. The evoker's fangs and vexes, and the illusioner's blindness, all hang off this.
+/// parity: `SpellcasterIllager`.
 class CastSpellGoal final : public Goal {
 public:
-    /// Which spell this goal casts.
     enum class Spell : std::uint8_t { Fangs, SummonVexes, Blindness };
 
     CastSpellGoal(Spell spell, std::int32_t castingTime, std::int32_t cooldown);

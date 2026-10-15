@@ -9,7 +9,7 @@
 
 namespace basalt::server::runtime::world::potionEffects {
 
-/// parity: `PotionContents.forEachEffect`: the potion's own effects, then the custom ones, each with
+/// parity: `PotionContents.forEachEffect`.
 /// its duration scaled and floored, never below a tick.
 [[nodiscard]] std::vector<ActiveEffect> of(const wire::nbt::NbtCompound& potionContents, float durationScale);
 

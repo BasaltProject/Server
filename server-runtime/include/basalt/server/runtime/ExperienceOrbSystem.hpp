@@ -23,13 +23,9 @@ class ServerEntity;
 
 namespace basalt::server::runtime {
 
-/// Experience lying about as orbs: where it comes from, how it drifts to a player and what it gives.
-///
-/// parity: `ExperienceOrb`. The value, count, age and health live in the entity's tag under vanilla's
-/// keys, which is also how vanilla saves them.
+/// parity: `ExperienceOrb`.
 class ExperienceOrbSystem {
 public:
-    /// parity: `DATA_VALUE`.
     static constexpr std::uint8_t kValueDataIndex = 8;
 
     struct Options {
@@ -42,8 +38,7 @@ public:
 
     [[nodiscard]] static std::int32_t valueOf(const entity::ServerEntity& orb);
 
-    /// parity: `ExperienceOrb.award`: the amount split into vanilla's sizes, each one joining an orb
-    /// nearby of the same size when the dice allow.
+    /// parity: `ExperienceOrb.award`.
     void award(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount);
 
     /// One orb of exactly this value, never merged. parity: `new ExperienceOrb(level, x, y, z, value)`.
@@ -52,10 +47,8 @@ public:
     void tick(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
               const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& orb);
 
-    /// Takes damage off an orb. parity: `ExperienceOrb.hurtServer`.
     static void hurt(entity::ServerEntity& orb, float damage);
 
-    /// Counts every player's pickup delay down. parity: `Player.takeXpDelay`.
     void tickPlayers(const std::vector<player::PlayerSession*>& players);
 
 private:

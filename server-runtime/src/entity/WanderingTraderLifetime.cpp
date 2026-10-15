@@ -18,7 +18,6 @@ ServerEntity* byId(const std::vector<ServerEntity*>& entities, std::int32_t enti
     return nullptr;
 }
 
-/// Reattaches a leash to whoever is holding it, or gives up on it once the grace is spent.
 void resolveLeash(ServerEntity& entity, const std::vector<ServerEntity*>& entities) {
     if (entity.leashHolderId.has_value() && byId(entities, *entity.leashHolderId) != nullptr) {
         return;

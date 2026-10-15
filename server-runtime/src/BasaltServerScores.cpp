@@ -132,7 +132,7 @@ void BasaltServer::tickScoreCriteria() {
             updateCriterion("level", player->name(), set(recorded.level));
         }
     }
-    // parity: `ServerPlayer.awardStat` and `resetStat`, which reach the objectives counting them.
+    // parity: `ServerPlayer.awardStat` and `resetStat`.
     for (PlayerSession* player : online) {
         for (const auto& [key, change] : player->stats.takeChanges()) {
             const std::string criterion = scoreboard::Objective::criterionOfStat(key);

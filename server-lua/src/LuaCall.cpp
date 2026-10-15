@@ -10,8 +10,6 @@ extern "C" {
 
 namespace basalt::server::lua {
 namespace {
-
-/// Where the call a thread belongs to lives, keyed by the thread itself.
 constexpr const char* kCallsKey = "basalt.calls";
 
 struct HostBody {
@@ -30,8 +28,6 @@ int releaseHost(lua_State* state) {
     return static_cast<HostBody*>(lua_touserdata(state, lua_upvalueindex(1)));
 }
 
-/// The userdata is created with a metatable that frees the body when the state closes, so a host
-/// function's captured state has the same lifetime as the sandbox it was installed on.
 [[nodiscard]] HostBody* newBody(lua_State* state) {
     void* memory = lua_newuserdatauv(state, sizeof(HostBody), 0);
     auto* body = new (memory) HostBody{};
@@ -42,16 +38,9 @@ int releaseHost(lua_State* state) {
     lua_setmetatable(state, -2);
     return body;
 }
-
 } // namespace
 
-/// The one thing allowed to reach a call's privates from a C callback.
 struct CallAccess {
-    /// The call a thread is running under, or nothing when it is not running under one at all.
-    ///
-    /// What the state holds is a bare pointer, not a handle: what keeps the call alive while it is
-    /// paused is the call's own `self_`, and a handle here as well would be a second owner that only
-    /// a garbage collection could let go of.
     [[nodiscard]] static LuaCall* of(lua_State* thread) {
         lua_getfield(thread, LUA_REGISTRYINDEX, kCallsKey);
         lua_pushthread(thread);
@@ -69,8 +58,6 @@ struct CallAccess {
         lua_pop(thread, 1);
     }
 
-    /// Clears the entry as soon as the call is over. The weak keys would get there on their own at
-    /// the next collection; this is what makes a finished thread's slot gone rather than pending.
     static void forget(lua_State* thread) {
         lua_getfield(thread, LUA_REGISTRYINDEX, kCallsKey);
         lua_pushthread(thread);
@@ -84,8 +71,6 @@ struct CallAccess {
         return bodyOf(state)->immediate(args);
     }
 
-    /// Continuation for a waiting function: what runs when the plugin is resumed. There is nothing
-    /// left to do, so it answers no values.
     static int afterWait(lua_State*, int, lua_KContext) { return 0; }
 
     static int waiting(lua_State* thread) {
@@ -98,8 +83,6 @@ struct CallAccess {
             return luaL_error(thread, "'%s' cannot be used from here: it needs to be able to wait", body->name.c_str());
         }
         call->arranged_ = true;
-        // The handle the scheduler is given owns the call: everything else about it is a bare
-        // pointer, so this is what keeps a paused turn alive until somebody resumes it or drops it.
         body->arrange([held = call->shared_from_this()] {
             if (!held->finished_) {
                 held->arranged_ = false;
@@ -125,8 +108,6 @@ std::shared_ptr<LuaCall> LuaCall::start(LuaSandbox& sandbox, std::int32_t argume
     if (lua_isnil(main, -1)) {
         lua_pop(main, 1);
         lua_newtable(main);
-        // Weak keys, or the table would be the one thing keeping every thread that ever ran alive:
-        // it is an index from a running thread to its call, not a list of what has been.
         lua_newtable(main);
         lua_pushliteral(main, "k");
         lua_setfield(main, -2, "__mode");
@@ -137,10 +118,7 @@ std::shared_ptr<LuaCall> LuaCall::start(LuaSandbox& sandbox, std::int32_t argume
     }
 
     lua_State* thread = lua_newthread(main);
-    // The thread is anchored in the registry: a paused call has nothing else holding it, and a
-    // collected thread mid-pause is a plugin that silently stops.
     const std::int32_t threadRef = luaL_ref(main, LUA_REGISTRYINDEX);
-    // The function and its arguments move from the sandbox's stack onto the thread's.
     lua_xmove(main, thread, argumentCount + 1);
 
     std::shared_ptr<LuaCall> call{new LuaCall{sandbox, thread, threadRef, std::move(onDone)}};
@@ -167,7 +145,6 @@ void LuaCall::step(std::int32_t argumentCount) {
     }
     CallAccess::forget(thread_);
     if (onDone_) {
-        // Moved out first: the callback may drop the last reference to this call.
         const Done done = std::move(onDone_);
         onDone_ = nullptr;
         done(failure);
@@ -175,7 +152,6 @@ void LuaCall::step(std::int32_t argumentCount) {
 }
 
 namespace {
-
 void installBody(LuaSandbox& sandbox, const std::string& name, HostBody built, lua_CFunction entry) {
     lua_State* state = sandbox.state();
     HostBody* body = newBody(state);
@@ -184,7 +160,6 @@ void installBody(LuaSandbox& sandbox, const std::string& name, HostBody built, l
     lua_pushcclosure(state, entry, 1);
     lua_setglobal(state, name.c_str());
 }
-
 } // namespace
 
 void pushHostFunction(LuaArgs& lua, const std::string& name, std::function<std::int32_t(LuaArgs&)> body) {
@@ -222,5 +197,4 @@ std::expected<std::int32_t, LuaFailure> callSync(LuaSandbox& sandbox, const LuaR
     }
     return lua_gettop(state) - before;
 }
-
 } // namespace basalt::server::lua

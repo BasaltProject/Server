@@ -39,8 +39,6 @@ namespace definitions = server::registry::blockStateDefinitions;
     return occupied != properties.end() && occupied->second == "true";
 }
 
-// --- InteractWith -------------------------------------------------------------------------------------
-
 bool interactWith(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     Memory<std::int32_t>* target = ctx.mem.entity(node.memory);
     if (target == nullptr || ctx.mem.walkTarget.present() || !ctx.mem.visibleLivingEntities.present()) {
@@ -76,8 +74,6 @@ bool interactWith(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     }
     return true;
 }
-
-// --- SetWalkTargetFromLookTarget, SetEntityLookTarget, SocializeAtBell -----------------------------
 
 bool walkToLookTarget(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     if (ctx.mem.walkTarget.present() || !ctx.mem.lookTarget.present()) {
@@ -122,8 +118,6 @@ bool socializeAtBell(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     }
     return true;
 }
-
-// --- JumpOnBed ----------------------------------------------------------------------------------------
 
 [[nodiscard]] bool onOrOverBed(Ctx& ctx) {
     const BlockPos at = look::blockPosition(ctx.self);
@@ -172,8 +166,6 @@ void jumpTick(Ctx& ctx, const Node& /*node*/, NodeState& state) {
         state.i2 = 5;
     }
 }
-
-// --- PlayTagWithOtherKids ----------------------------------------------------------------------------
 
 [[nodiscard]] std::optional<std::int32_t> chasing(Ctx& ctx, std::int32_t kid) {
     const VillagerState* theirs = look::villagerState(ctx, kid);
@@ -237,8 +229,6 @@ bool playTag(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     return true;
 }
 
-// --- VillagerMakeLove -----------------------------------------------------------------------------------
-
 [[nodiscard]] ServerEntity* breedPartner(Ctx& ctx) {
     if (!ctx.mem.breedTarget.present()) {
         return nullptr;
@@ -267,7 +257,7 @@ void loveStart(Ctx& ctx, const Node& /*node*/, NodeState& state) {
     state.t0 = ctx.now + 275 + ctx.random.nextInt(50);
 }
 
-/// parity: `VillagerMakeLove.tryToGiveBirth`: a free bed it can reach first, then the baby.
+/// parity: `VillagerMakeLove.tryToGiveBirth`.
 void giveBirth(Ctx& ctx, ServerEntity& other) {
     std::vector<world::poi::PoiRecord> homes;
     ctx.poi.inRange(world::poi::maskOf(world::poi::PoiType::kHome), look::blockPosition(ctx.self), 48,
@@ -319,8 +309,6 @@ void loveTick(Ctx& ctx, const Node& /*node*/, NodeState& state) {
 }
 
 void loveStop(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) { ctx.mem.breedTarget.erase(); }
-
-// --- SleepInBed -------------------------------------------------------------------------------------------
 
 bool sleepCheck(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     if (!ctx.mem.home.present() || ctx.self.vehicleId.has_value()) {
@@ -377,8 +365,6 @@ void sleepStop(Ctx& ctx, const Node& /*node*/, NodeState& state) {
         state.t0 = ctx.now + 40;
     }
 }
-
-// --- InsideBrownianWalk ------------------------------------------------------------------------------
 
 bool insideBrownianWalk(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     if (ctx.mem.walkTarget.present()) {

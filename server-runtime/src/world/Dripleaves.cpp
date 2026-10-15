@@ -14,8 +14,6 @@ namespace {
     return instance;
 }
 
-/// By value on purpose: `propertiesOf` hands back a map that dies with this call, and a view into it
-/// would dangle.
 [[nodiscard]] std::string tiltIn(std::int32_t stateId) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto found = properties.find("tilt");
@@ -76,8 +74,7 @@ std::optional<BlockChange> stoodOn(WorldState& world, std::string_view worldName
     if (!stateId.has_value() || !isDripleaf(*stateId) || tiltIn(*stateId) != "none") {
         return std::nullopt;
     }
-    // parity: a leaf held up by a signal does not start tipping at all, which is what makes a
-    // dripleaf gate rather than a trapdoor that always drops.
+    // parity: a leaf held up by a signal does not start tipping at all, which is what makes a.
     if (redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0) {
         return std::nullopt;
     }

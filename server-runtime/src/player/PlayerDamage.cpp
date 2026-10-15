@@ -50,15 +50,13 @@ constexpr std::int32_t kPlayerHitMemoryTicks = 100;
 
 using wire::common::Identifier;
 
-/// parity: `LivingEntity.invulnerableDuration`, and the half of it inside which only a bigger hit
-/// lands.
+/// parity: `LivingEntity.invulnerableDuration` and the half inside.
 constexpr std::int32_t kHurtCooldownTicks = 20;
 constexpr std::int32_t kCooldownHalfTicks = 10;
 
 constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
 
-/// parity: the shield's `blocks_attacks`: a quarter second up, ninety degrees either side, wear from
-/// three damage, and an axe's five seconds.
+/// parity: `blocks_attacks`.
 constexpr std::int32_t kShieldDelayTicks = 5;
 constexpr float kBlockingAngleDegrees = 90.0F;
 constexpr float kShieldWearThreshold = 3.0F;
@@ -88,7 +86,7 @@ void playAround(const PlayerSession& session, std::string_view sound, float volu
     }
 }
 
-/// parity: `LivingEntity.getSecondsToDisableBlocking`, an axe's `weapon` component in the attacker's hand.
+/// parity: `LivingEntity.getSecondsToDisableBlocking`.
 [[nodiscard]] float secondsToDisable(std::int32_t attackerId, const DamageContext& context) {
     if (context.registry != nullptr) {
         for (const PlayerSession* attacker : context.registry->snapshot()) {
@@ -128,9 +126,7 @@ void playAround(const PlayerSession& session, std::string_view sound, float volu
 
 struct Blocked {
     float amount = 0.0F;
-    /// Whether the attacker was a body that the shield pushed back against.
     bool pushed = false;
-    /// What the attacker's own `blockedByItem` shoved the defender with.
     std::optional<entity::shieldBlows::Push> thrown;
 };
 
@@ -144,7 +140,7 @@ attackerAnswers(const PlayerSession& session, std::int32_t attackerId, const Dam
     }
     random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
     const entity::shieldBlows::Reply reply = entity::shieldBlows::blocked(*attacker, session.x, session.z, 0.0, random);
-    // parity: `Ravager.blockedByItem`'s stun: its sound, and event 39 that starts the client's count.
+    // parity: `Ravager.blockedByItem`'s stun.
     if (reply.stunned && context.registry != nullptr) {
         const wire::protocol::play::EntityEventPacket stun{.entityId = attacker->entityId(), .eventId = kStunEvent};
         for (const PlayerSession* heard : context.registry->snapshot()) {
@@ -162,8 +158,7 @@ attackerAnswers(const PlayerSession& session, std::int32_t attackerId, const Dam
     return reply.push;
 }
 
-/// parity: `LivingEntity.applyItemBlocking` for a shield, with `hurtBlockingItem` and
-/// `Player.blockUsingItem`.
+/// parity: `LivingEntity.applyItemBlocking` for a shield.
 [[nodiscard]] Blocked blockWithShield(PlayerSession& session, float damage, const std::optional<Identifier>& damageType,
                                       const std::optional<entity::DamageSource>& source, const DamageContext& context) {
     if (damage <= 0.0F || !session.blockingSlot.has_value() || session.blockingTicks < kShieldDelayTicks) {
@@ -181,7 +176,7 @@ attackerAnswers(const PlayerSession& session, std::int32_t attackerId, const Dam
     const float blocked = damage;
     // parity: `BlocksAttacks.hurtBlockingItem`, every blocked hit before any wear.
     statAwards::used(session, shield->id);
-    // parity: `ItemDamageFunction`, nothing under three and the floor of one plus the hit above it.
+    // parity: `ItemDamageFunction`.
     if (blocked >= kShieldWearThreshold && session.gamemode != wire::protocol::play::Gamemode::Creative) {
         random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
         const item::ItemDamageEffects effects{[&context](const Identifier& id) {
@@ -218,7 +213,6 @@ attackerAnswers(const PlayerSession& session, std::int32_t attackerId, const Dam
     return answer;
 }
 
-/// Tells everyone in the player's world that they were hit, through each one's own connection.
 void showDamage(const PlayerSession& session, const std::optional<Identifier>& damageType,
                 const std::int32_t causeEntityId, const DamageContext& context) {
     // Held by value: a `path()` off the optional is a view into a temporary once the ternary ends.
@@ -256,9 +250,7 @@ void showDamage(const PlayerSession& session, const std::optional<Identifier>& d
     }
 }
 
-/// parity: `LivingEntity.knockback` as it lands on a player, plus the hurt animation. A blocked hit
-/// first runs `blockedByItem`, whose half-block push points the other way and is halved by the
-/// default one after it; a blocked hit also draws no hurt direction.
+/// parity: `LivingEntity.knockback`.
 void pushAway(PlayerSession& session, const entity::DamageSource& source, bool blocked, double resistance) {
     const double towardsX = source.x - session.x;
     const double towardsZ = source.z - session.z;
@@ -295,7 +287,6 @@ void pushAway(PlayerSession& session, const entity::DamageSource& source, bool b
         });
 }
 
-/// A push the server decides on its own, sent as the player's new motion.
 void shove(PlayerSession& session, const entity::shieldBlows::Push& push) {
     session.deltaMovement = {push.x, push.y, push.z};
     if (session.connection().pushBack) {
@@ -313,7 +304,6 @@ void shove(PlayerSession& session, const entity::shieldBlows::Push& push) {
         });
 }
 
-/// The hit as `DamagePredicate` reads it: before and after the shield, and who is behind it.
 [[nodiscard]] world::TriggerDamage triggerDamageOf(float original, float taken, bool blocked,
                                                    const std::optional<Identifier>& damageType,
                                                    std::string_view deathMessageId,
@@ -387,8 +377,7 @@ float damageAfterProtection(const PlayerSession& session, const float amount,
         worn.push_back(session.inventory.at(slot));
     }
     if (!world::realDamageTypeTags::isIn(*tags, world::realDamageTypeTags::kBypassesArmour, *damageType)) {
-        // parity: `CombatRules.getDamageAfterAbsorb` with `getArmorValue`, the attribute floored, and
-        // the toughness attribute as it is.
+        // parity: `CombatRules.getDamageAfterAbsorb` with `getArmorValue` floored and toughness as is.
         const playerAttributes::DefinitionOf definitionOf = definitionsOf(context);
         const playerAttributes::Modifiers modifiers = playerAttributes::modifiersOf(session, definitionOf);
         const auto attribute = [&session, &modifiers](std::string_view name) {
@@ -455,8 +444,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     if (session->dead || session->invulnerable()) {
         return;
     }
-    // parity: `ServerPlayer.hurtServer` asks `canHarmPlayer` of whoever is behind the hit, the
-    // shooter of a projectile included: the pvp rule, then the teams' friendly fire.
+    // parity: `ServerPlayer.hurtServer`.
     if (source.has_value() && context.registry != nullptr) {
         const std::int32_t responsible = source->ownerId.value_or(source->entityId);
         const world::LoadedWorld* world = context.world ? context.world() : nullptr;
@@ -470,8 +458,6 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     }
     // parity: `Player.hurtServer` throws off whatever sits on the shoulders.
     session->shoulderDropPending = true;
-    // A player is an entity too, so it is the same hook; what changes is that the choke point for a
-    // player is here rather than in the entity's own combat.
     float incoming = amount;
     if (context.damaged) {
         const std::optional<float> allowed =
@@ -485,8 +471,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     // parity: the shield takes its share before anything else looks at the hit.
     const Blocked blocked = blockWithShield(*session, incoming, damageType, source, context);
     incoming -= blocked.amount;
-    // parity: `LivingEntity.hurt`'s cooldown: inside the half second after a hit, only a bigger one
-    // lands, and only by the difference. It is what stops lava and burning stacking.
+    // parity: `LivingEntity.hurt`'s cooldown.
     const float dealt = incoming;
     const bool cooling = session->invulnerableTicks > kCooldownHalfTicks;
     if (cooling) {
@@ -523,8 +508,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         } else {
             showDamage(*session, damageType, source.has_value() ? source->entityId : -1, context);
         }
-        // parity: a hit the shield took whole deals no knockback; only the attacker's own shove lands.
-        // parity: `hurtServer` skips `dealDefaultKnockback` for a type in `no_knockback`.
+        // parity: `hurtServer`.
         const bool fullyBlocked = blocked.amount > 0.0F && incoming <= 0.0F;
         if (source.has_value() && !fullyBlocked) {
             if (!tagged(context, "no_knockback", damageType)) {
@@ -540,8 +524,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         hit = triggerDamageOf(amount, dealt, blocked.amount > 0.0F, damageType, deathMessageId, source, context);
     }
 
-    // parity: `hurtServer` ends in `ENTITY_HURT_PLAYER` whatever the shield, the armour and a totem
-    // left, so it goes out on every way out from here.
+    // parity: `hurtServer` ends in `ENTITY_HURT_PLAYER` whatever the shield.
     struct ScopeExit {
         std::function<void()> run;
 
@@ -552,7 +535,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         }
         context.triggers->fire("entity_hurt_player", session->name(), session->uuid().toString(),
                                world::TriggerEvent{.damage = hit});
-        // parity: `PLAYER_HURT_ENTITY` for the player behind the hit, a player being an entity too.
+        // parity: `PLAYER_HURT_ENTITY` for the player behind the hit.
         if (!source.has_value() || context.registry == nullptr || !context.triggers->listensTo("player_hurt_entity")) {
             return;
         }
@@ -571,7 +554,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     if (afterArmour <= 0.0F) {
         return;
     }
-    // parity: `LivingEntity.hurt` takes it out of absorption first, and only the rest off health.
+    // parity: `LivingEntity.hurt` takes it out of absorption first.
     const float absorbed = std::min(session->absorption, afterArmour);
     if (absorbed > 0.0F && absorbed < kLargestCountedDamage) {
         statAwards::award(*session, "damage_absorbed", std::lround(absorbed * 10.0F));
@@ -586,8 +569,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     if (damage <= 0.0F) {
         return;
     }
-    // parity: `resolvePlayerResponsibleForDamage`, a player's hit remembered for a hundred ticks,
-    // and `setLastHurtByMob` for anything else that hit them.
+    // parity: `resolvePlayerResponsibleForDamage`.
     if (source.has_value() && context.registry != nullptr) {
         const std::int32_t responsible = source->ownerId.value_or(source->entityId);
         bool byPlayer = false;
@@ -607,8 +589,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         }
     }
     session->stats.addDamageTaken(damage);
-    // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` right where the health comes off, so
-    // absorption alone makes none. A player is an entity too and this is their half of that line.
+    // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE`.
     if (world::LoadedWorld* world = context.world ? context.world() : nullptr; world != nullptr) {
         world::vibrations::emit(world->state(), "entity_damage", session->x, session->y, session->z, world->gameTime());
     }
@@ -622,8 +603,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
             return;
         }
     }
-    // parity: `getKillCredit().awardKillScore`: `ENTITY_KILLED_PLAYER` names the player who hit
-    // them last, else the mob, whatever this blow was.
+    // parity: `getKillCredit().awardKillScore`.
     if (session->health() <= 0.0F && hit.has_value()) {
         std::optional<::basalt::server::world::loot::EntityFacts> credit;
         world::LoadedWorld* world = context.world ? context.world() : nullptr;

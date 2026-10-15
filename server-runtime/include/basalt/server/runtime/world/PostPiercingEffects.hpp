@@ -11,13 +11,9 @@
 
 namespace basalt::server::runtime::world {
 
-/// What a weapon's enchantments do to whoever just jabbed with it.
-///
-/// parity: `EnchantmentHelper.doPostPiercingAttackEffects` over each enchantment's
-/// `minecraft:post_piercing_attack` entries, which is where lunge lives.
+/// parity: `doPostPiercingAttackEffects` over `minecraft:post_piercing_attack`.
 namespace postPiercing {
 
-/// The user as the requirements read it.
 struct User {
     bool player = true;
     bool riding = false;
@@ -38,7 +34,6 @@ struct Sound {
     float pitch = 1.0F;
 };
 
-/// Everything the entries that passed their requirements add up to.
 struct Outcome {
     std::int32_t itemDamage = 0;
     float exhaustion = 0.0F;

@@ -58,8 +58,7 @@ const std::set<std::string, std::less<>>& replaceable() {
     return StructureBoundingBox{x, y, z, x + kDepth - 1, y + kHeight - 1, z + kWidth - 1};
 }
 
-/// parity: `ScatteredFeaturePiece` plus `SwampHutPiece`, kept together because the hut is the only
-/// user: the shared base class exists in the jar for the pyramids and the igloo.
+/// parity: `ScatteredFeaturePiece` plus `SwampHutPiece`.
 class Piece {
 public:
     Piece(std::int32_t west, std::int32_t north, StructureDirection orientation)
@@ -73,17 +72,14 @@ public:
 
     [[nodiscard]] const StructureBoundingBox& bounds() const noexcept { return bounds_; }
 
-    /// parity: `updateAverageGroundHeight`, which averages `MOTION_BLOCKING_NO_LEAVES` over the whole
-    /// footprint and drops the box onto it. Vanilla only averages the columns inside the chunk being
-    /// written; here that is every column, because the piece never leaves its chunk.
+    /// parity: `updateAverageGroundHeight` averages every footprint column since the piece never leaves its chunk.
     bool settleOnGround(const Chunk& chunk);
 
     void place(Chunk& chunk) const;
 
 private:
     void placeRoof(Chunk& chunk) const;
-    /// parity: the witch and the cat, both persistent and both at the same block. Vanilla guards each
-    /// with a flag so a re-entered chunk does not spawn a second one; a chunk here generates once.
+    /// parity: vanilla guards each spawn with a flag; a chunk here generates once.
     void spawnResidents(Chunk& chunk) const;
 
     void box(Chunk& chunk, std::int32_t x0, std::int32_t y0, std::int32_t z0, std::int32_t x1, std::int32_t y1,
@@ -247,7 +243,6 @@ void Piece::place(Chunk& chunk) const {
     set(chunk, fence, 1, 2, 1);
     set(chunk, fence, 5, 2, 1);
     placeRoof(chunk);
-    // The four stilts, poured down from under the floor until they hit something solid.
     for (std::int32_t z = 2; z <= 7; z += 5) {
         for (std::int32_t x = 1; x <= 5; x += 4) {
             fillColumnDown(chunk, log, x, -1, z);
@@ -275,7 +270,7 @@ bool SwampHutStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunkX
     if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
         return false;
     }
-    // parity: `onTopOfChunkCenter` over `WORLD_SURFACE_WG`, which is where the biome is tested.
+    // parity: `onTopOfChunkCenter` over `WORLD_SURFACE_WG`.
     const std::int32_t centreX = chunkX * 16 + 8;
     const std::int32_t centreZ = chunkZ * 16 + 8;
     const std::int32_t stubY = surfaceHeightAt_(centreX, centreZ) - 1;
@@ -284,7 +279,7 @@ bool SwampHutStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunkX
 
 void SwampHutStructureGenerator::placeHut(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
                                           bool forPlacement) {
-    // parity: `Structure.GenerationContext`'s own random, independent of the decoration stream.
+    // parity: `Structure.GenerationContext`'s own random.
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, chunkX, chunkZ);
 
@@ -313,7 +308,7 @@ void SwampHutStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
         return;
     }
 
-    // parity: `onTopOfChunkCenter` over `WORLD_SURFACE_WG`, which is where the biome is tested.
+    // parity: `onTopOfChunkCenter` over `WORLD_SURFACE_WG`.
     const std::int32_t centreX = chunkX * 16 + 8;
     const std::int32_t centreZ = chunkZ * 16 + 8;
     if (biomePath(biomeAt_(centreX, surfaceHeightAt_(centreX, centreZ) - 1, centreZ)) != kBiome) {

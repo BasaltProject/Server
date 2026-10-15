@@ -9,7 +9,6 @@
 namespace basalt::server::runtime::world {
 namespace {
 
-/// The same packing the chunk map uses: twenty-six bits of x and z around twelve of y.
 [[nodiscard]] std::int64_t blockKey(std::int32_t x, std::int32_t y, std::int32_t z) {
     return ((static_cast<std::int64_t>(x) & 0x3ffffff) << 38) | ((static_cast<std::int64_t>(z) & 0x3ffffff) << 12) |
            (static_cast<std::int64_t>(y) & 0xfff);
@@ -21,8 +20,7 @@ namespace {
 
 [[nodiscard]] std::int32_t unpackBlockZ(std::int64_t packed) { return static_cast<std::int32_t>(packed << 26 >> 38); }
 
-/// parity: the two blocks that listen. A vein of sculk in the deep dark writes them straight into
-/// the section, with no block entity, so the state is the only thing that names them there.
+/// parity: the two blocks that listen. A vein of sculk in the deep dark writes them straight into.
 [[nodiscard]] bool isSensorState(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     return block != nullptr && (block->path() == "sculk_sensor" || block->path() == "calibrated_sculk_sensor");
@@ -60,9 +58,6 @@ void SculkSensorTracker::rememberChunk(const server::world::Chunk& chunk) {
             keep(baseX + entity.localX(), entity.y(), baseZ + entity.localZ());
         }
     }
-    // A sensor the terrain generator wrote has no block entity of its own here, so the list above
-    // misses the whole of the deep dark. The palette answers cheaply whether a section can hold one,
-    // and only the few that can are walked.
     const std::int32_t minY = chunk.verticalBounds().minY();
     for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
         const server::world::ChunkSection& section = chunk.section(index);
@@ -90,8 +85,6 @@ void SculkSensorTracker::forgetChunk(std::int32_t chunkX, std::int32_t chunkZ) {
 }
 
 bool SculkSensorTracker::hasNear(double x, double y, double z, std::int32_t range) const {
-    // Asked before the lock, as the frozen Kotlin did: on a server where nothing has touched a
-    // sensor this is every footstep of every player, and the answer is always the same one.
     if (sculkSensors_.empty()) {
         return false;
     }

@@ -12,7 +12,6 @@
 
 namespace basalt::server::registry {
 namespace {
-
 using wire::common::Identifier;
 
 [[nodiscard]] Identifier vanilla(std::string_view path) { return Identifier::vanilla(std::string{path}); }
@@ -45,17 +44,14 @@ using wire::common::Identifier;
     return value;
 }
 
-/// A name-keyed table built once from one of the generated lists.
 template <typename T, typename Build>
 [[nodiscard]] const std::unordered_map<Identifier, T>& lazyTable(Build build) {
     static const std::unordered_map<Identifier, T> table = build();
     return table;
 }
-
 } // namespace
 
 namespace itemArmour {
-
 const ArmourPiece* of(const Identifier& item) {
     static const std::unordered_map<Identifier, ArmourPiece> table = [] {
         std::unordered_map<Identifier, ArmourPiece> built;
@@ -69,11 +65,9 @@ const ArmourPiece* of(const Identifier& item) {
     const auto found = table.find(item);
     return found == table.end() ? nullptr : &found->second;
 }
-
 } // namespace itemArmour
 
 namespace itemWeapons {
-
 const WeaponStats* of(const Identifier& item) {
     static const std::unordered_map<Identifier, WeaponStats> table = [] {
         std::unordered_map<Identifier, WeaponStats> built;
@@ -87,12 +81,10 @@ const WeaponStats* of(const Identifier& item) {
     const auto found = table.find(item);
     return found == table.end() ? nullptr : &found->second;
 }
-
 } // namespace itemWeapons
 
 namespace itemStacking {
 namespace {
-
 [[nodiscard]] const std::unordered_map<std::string_view, ItemStackingEntry>& table() {
     static const std::unordered_map<std::string_view, ItemStackingEntry> built = [] {
         std::unordered_map<std::string_view, ItemStackingEntry> table;
@@ -112,7 +104,6 @@ namespace {
     }();
     return built;
 }
-
 } // namespace
 
 const ItemStackingEntry* of(const Identifier& item) {
@@ -148,11 +139,9 @@ std::int32_t cooldownTicks(const Identifier& item) {
     const ItemStackingEntry* entry = of(item);
     return entry == nullptr ? 0 : entry->cooldownTicks;
 }
-
 } // namespace itemStacking
 
 namespace itemDurability {
-
 const Entry* of(const Identifier& item) {
     static const std::unordered_map<Identifier, Entry> table = [] {
         std::unordered_map<Identifier, Entry> built;
@@ -171,12 +160,10 @@ std::int32_t maxDamageOf(const Identifier& item) {
 }
 
 bool isDamageable(const Identifier& item) { return of(item) != nullptr; }
-
 } // namespace itemDurability
 
 namespace itemBlocks {
 namespace {
-
 struct Table {
     std::unordered_map<Identifier, Identifier> byItem;
     std::unordered_map<Identifier, Identifier> byBlock;
@@ -193,7 +180,6 @@ struct Table {
     }();
     return built;
 }
-
 } // namespace
 
 Identifier of(const Identifier& item) {
@@ -205,11 +191,9 @@ Identifier itemOf(const Identifier& block) {
     const auto found = table().byBlock.find(block);
     return found == table().byBlock.end() ? block : found->second;
 }
-
 } // namespace itemBlocks
 
 namespace craftingRemainders {
-
 const Identifier* of(const Identifier& item) {
     static const std::unordered_map<Identifier, Identifier> table = [] {
         std::unordered_map<Identifier, Identifier> built;
@@ -221,11 +205,9 @@ const Identifier* of(const Identifier& item) {
     const auto found = table.find(item);
     return found == table.end() ? nullptr : &found->second;
 }
-
 } // namespace craftingRemainders
 
 namespace trimMaterials {
-
 const Identifier* of(const Identifier& item) {
     static const std::unordered_map<Identifier, Identifier> table = [] {
         std::unordered_map<Identifier, Identifier> built;
@@ -237,11 +219,9 @@ const Identifier* of(const Identifier& item) {
     const auto found = table.find(item);
     return found == table.end() ? nullptr : &found->second;
 }
-
 } // namespace trimMaterials
 
 namespace fuels {
-
 std::int32_t burnTicks(const Identifier& item) {
     static const std::unordered_map<std::string_view, std::int32_t> table = [] {
         std::unordered_map<std::string_view, std::int32_t> built;
@@ -255,13 +235,11 @@ std::int32_t burnTicks(const Identifier& item) {
 }
 
 bool isFuel(const Identifier& item) { return burnTicks(item) > 0; }
-
 } // namespace fuels
 
 namespace dyeColours {
 namespace {
-
-/// parity: `DyeColor`'s own textureDiffuseColor, in its own declaration order.
+// parity: `DyeColor`'s own textureDiffuseColor, in its own declaration order.
 constexpr std::array<std::pair<std::string_view, std::int32_t>, 16> kDyes = {{
     {"white_dye", 16383998},
     {"orange_dye", 16351261},
@@ -280,7 +258,6 @@ constexpr std::array<std::pair<std::string_view, std::int32_t>, 16> kDyes = {{
     {"red_dye", 11546150},
     {"black_dye", 1908001},
 }};
-
 } // namespace
 
 std::optional<std::int32_t> of(const Identifier& item) {
@@ -290,12 +267,10 @@ std::optional<std::int32_t> of(const Identifier& item) {
     const auto found = std::ranges::find(kDyes, item.path(), &std::pair<std::string_view, std::int32_t>::first);
     return found == kDyes.end() ? std::nullopt : std::optional{found->second};
 }
-
 } // namespace dyeColours
 
 namespace weathering {
 namespace {
-
 struct Table {
     std::unordered_map<std::string_view, std::string_view> next;
     std::unordered_map<std::string_view, std::string_view> previous;
@@ -310,7 +285,6 @@ struct Table {
             table.next.emplace(from, to);
             previous.emplace(to, from);
         }
-        // Walk back up each chain to see how far along a block already is.
         const auto stageOf = [&previous](std::string_view block) {
             std::int32_t stage = 0;
             std::string_view current = block;
@@ -331,7 +305,6 @@ struct Table {
     }();
     return built;
 }
-
 } // namespace
 
 std::optional<std::string_view> next(std::string_view block) {
@@ -359,7 +332,5 @@ bool keepsBlockEntity(std::string_view from, std::string_view to) {
     }
     return false;
 }
-
 } // namespace weathering
-
 } // namespace basalt::server::registry

@@ -14,8 +14,6 @@ using wire::common::toml::TomlTable;
 
 namespace {
 
-/// Every mode an operator may write, in the order the enum declares them, for the message that
-/// lists them.
 [[nodiscard]] std::string everyModeName() {
     std::string names;
     for (const ForwardingMode mode : {ForwardingMode::None, ForwardingMode::BungeeCord, ForwardingMode::BungeeGuard,
@@ -58,8 +56,7 @@ std::expected<ProxyForwarding, std::string> fromToml(const TomlTable& root, std:
         .tokens = std::move(tokens),
         .propertyName = std::string{table->string("property-name").value_or(ProxyForwarding::kSafeNetProperty)},
     };
-    // A mode without its secret refuses every login anyway, and finding that out one player at a
-    // time is worse than being told here.
+    // A mode without its secret refuses every login, and finding that out one player at a time is worse.
     if (const std::optional<std::string> broken = forwarding.misconfiguration(); broken.has_value()) {
         return std::unexpected(std::string{path} + ": " + *broken);
     }

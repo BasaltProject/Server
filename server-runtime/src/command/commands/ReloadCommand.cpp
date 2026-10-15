@@ -17,8 +17,6 @@ ReloadCommand::ReloadCommand(config::LiveConfigs& live, std::function<void()> on
 
 void ReloadCommand::build(const CommandNodeBuilder& root) const {
     const auto reload = [this](const CommandContext& context) -> Parsed<std::int32_t> {
-        // Every file first, then the swap: a reload that applied three files and gave up on the
-        // fourth would leave the server in a state no file on disk describes.
         std::expected<config::ConfigSnapshot, std::string> next =
             config::LiveConfigs::read(directory_, context.environment().logger());
         if (next.has_value()) {

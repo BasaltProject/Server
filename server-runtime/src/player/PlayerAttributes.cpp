@@ -134,7 +134,7 @@ void addDefaults(const Identifier& item, std::string_view slot, Modifiers& into)
     return shaped->getFloat("value");
 }
 
-/// parity: `EnchantmentHelper.forEachModifier(stack, slot)`, each modifier's id suffixed by the slot.
+/// parity: `EnchantmentHelper.forEachModifier(stack, slot)`.
 void addEnchantments(const storage::StoredItemStack& stack, std::string_view slot, const DefinitionOf& definitionOf,
                      Modifiers& into) {
     if (!definitionOf) {

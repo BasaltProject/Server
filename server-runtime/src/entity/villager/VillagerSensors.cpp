@@ -102,7 +102,7 @@ constexpr std::array<std::int32_t, kSensorCount> kScanRate{20, 20, 20, 20, 20, 2
     return lineOfSight(ctx, found->x, eyeY(*found), found->z);
 }
 
-/// parity: `NearestLivingEntitySensor`: everything alive in the box grown by the follow range.
+/// parity: `NearestLivingEntitySensor`.
 void senseLiving(Ctx& ctx) {
     const Aabb box =
         Aabb::of(ctx.self.x, ctx.self.y, ctx.self.z, ctx.self.width(), ctx.self.height()).inflate(kFollowRange);
@@ -171,7 +171,7 @@ void sensePlayers(Ctx& ctx) {
     }
 }
 
-/// parity: `NearestItemSensor`, the nearest wanted item it can see within thirty-two blocks.
+/// parity: `NearestItemSensor`.
 void senseItems(Ctx& ctx) {
     constexpr double kHorizontal = 32.0;
     constexpr double kVertical = 16.0;
@@ -192,7 +192,7 @@ void senseItems(Ctx& ctx) {
     ctx.mem.nearestVisibleWantedItem.erase();
 }
 
-/// parity: `NearestBedSensor`, a baby's look for a bed it can reach, five candidates at a time.
+/// parity: `NearestBedSensor`.
 void senseBed(Ctx& ctx) {
     if (!look::isBaby(ctx.self)) {
         return;

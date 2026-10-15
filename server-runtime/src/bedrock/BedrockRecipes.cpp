@@ -9,12 +9,9 @@ namespace {
 
 namespace crafting = server::world::crafting;
 
-/// The screen a stonecutter's recipes belong to, which is what tells them from a table's.
 constexpr std::string_view kStonecutterTag = "stonecutter";
 
-/// What one ingredient is on the other edition: the tag it came from when it had one, and the item
-/// itself when it did not. An ingredient of several items with no tag behind it can only be sent as
-/// one of them, which is the one thing here that is not a faithful translation.
+// An ingredient of several items with no tag can only be sent as one of them: not a faithful translation.
 [[nodiscard]] wire::bedrock::BedrockIngredient ingredientOf(const crafting::Ingredient& ingredient) {
     if (ingredient.items.empty()) {
         return {};
@@ -32,7 +29,6 @@ constexpr std::string_view kStonecutterTag = "stonecutter";
         .count = 1};
 }
 
-/// The stack a recipe makes, by the number this server gave that item at login.
 [[nodiscard]] wire::bedrock::BedrockItemStack resultOf(const server::world::loot::ItemStack& stack) {
     const wire::bedrock::ItemName* named = wire::bedrock::bedrockItem(stack.item.toString());
     if (named == nullptr) {
@@ -42,8 +38,7 @@ constexpr std::string_view kStonecutterTag = "stonecutter";
         .runtimeId = named->palettePlace + 1, .count = stack.count, .data = named->data};
 }
 
-/// Whether every cell of this recipe is something that edition has a name for. One unknown item
-/// makes the whole recipe unsendable: a cell the client cannot read is worse than a missing recipe.
+// One unknown item makes the recipe unsendable: a cell the client cannot read is worse than a missing recipe.
 [[nodiscard]] bool sendable(const wire::bedrock::BedrockRecipe& recipe) {
     if (recipe.result.runtimeId == 0 || recipe.result.count <= 0) {
         return false;
@@ -95,8 +90,6 @@ BedrockRecipeList bedrockRecipes(const world::RealRecipes& recipes) {
         ++netId;
         out.recipes.push_back(std::move(built));
     }
-    // A stonecutter's recipes travel in the same list under a screen of their own: one thing in,
-    // one thing out, which that client draws as a row of buttons.
     for (const crafting::Recipe* recipe : recipes.stonecutting()) {
         wire::bedrock::BedrockRecipe built;
         built.id = "minecraft:stonecutter_" + std::to_string(netId);

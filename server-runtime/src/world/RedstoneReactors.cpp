@@ -22,9 +22,7 @@ namespace {
 using registry::BlockFace;
 using Properties = std::map<std::string, std::string>;
 
-/// parity: `NeighborUpdater.UPDATE_ORDER`, the order `updateNeighborsAt` tells the six squares in.
-/// It is not `Direction.values()`, and with the turns now sorted by when they were booked it decides
-/// which of two components on the same turn goes first.
+/// parity: `NeighborUpdater.UPDATE_ORDER`.
 constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
                                                 BlockFace::Up,   BlockFace::North, BlockFace::South};
 
@@ -53,11 +51,9 @@ void write(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned, .effects = std::move(effects)});
 }
 
-/// parity: `DoorBlock.playSound` and its two cousins, which is the same sound a hand makes and the
-/// same tenth of a tone of randomness.
+/// parity: `DoorBlock.playSound` and its two cousins.
 [[nodiscard]] std::vector<BlockEffect> openSound(std::int32_t stateId, bool open, random::RandomSource& random) {
-    // parity: `DoorBlock.playSound` and its two cousins, the same sound a hand makes. It used to be a
-    // callback nobody ever filled in, so a door opened by redstone swung in silence.
+    // parity: `DoorBlock.playSound` and its two cousins.
     const std::optional<std::string> sound = blockInteractions::redstoneSound(stateId, open);
     if (!sound.has_value()) {
         return {};
@@ -71,10 +67,7 @@ void write(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
                                .pitch = (random.nextFloat() * 0.1F) + 0.9F}};
 }
 
-/// parity: `Level.gameEvent(source, event, pos)`, which sends it from the middle of the square. The
-/// tracker is asked first because a door on a clock raises one of these every pulse and the search
-/// around a noise is a cube of thirty three a side, and it is asked for the **calibrated** radius:
-/// a calibrated sensor hears twice as far, so a narrower question deafens it past eight blocks.
+/// parity: `Level.gameEvent(source, event, pos)`.
 void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32_t y, std::int32_t z,
            std::int64_t gameTime) {
     if (!world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
@@ -83,14 +76,11 @@ void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32
     vibrations::emit(world, event, x + 0.5, y + 0.5, z + 0.5, gameTime);
 }
 
-/// parity: `DoorBlock.neighborChanged`, which asks about its own half *and* the other one: a door
-/// opens from a signal reaching either end of it.
+/// parity: `DoorBlock.neighborChanged`.
 void door(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
           std::int32_t stateId, const Properties& properties, std::int64_t gameTime, std::vector<BlockChange>& changes,
           random::RandomSource& random, std::optional<std::int32_t> told) {
-    // parity: `if (!this.defaultBlockState().is(block) && ...)`, the first half of the condition. A
-    // door does not answer another door of its own kind, which is what keeps its two halves from
-    // setting each other off. The trapdoor and the fence gate carry no such guard.
+    // parity: `if (!this.defaultBlockState().is(block) && ...)`.
     if (told.has_value() && pathOf(*told) == pathOf(stateId)) {
         return;
     }
@@ -100,16 +90,14 @@ void door(WorldState& world, std::string_view worldName, std::int32_t x, std::in
     if (signal == poweredIn(properties)) {
         return;
     }
-    // parity: `DoorBlock.neighborChanged` raises the event **only when the door really swings**, not
-    // every time `powered` moves: a door already open that gets a second signal makes no noise.
+    // parity: `DoorBlock.neighborChanged` raises the event **only when the door really swings**.
     if (signal != (valueOf(properties, "open") == "true")) {
         heard(world, signal ? "block_open" : "block_close", x, y, z, gameTime);
     }
     const Properties wanted{{"powered", signal ? "true" : "false"}, {"open", signal ? "true" : "false"}};
     write(world, x, y, z, stateId, wanted, changes, openSound(stateId, signal, random));
 
-    // parity: `DoorBlock.updateShape`, where the other half copies this one rather than deciding for
-    // itself. Without it a door opens halfway, which is not a state vanilla can be in.
+    // parity: `DoorBlock.updateShape`.
     const std::int32_t twinY = y + otherHalf;
     const std::optional<std::int32_t> twin = world.blockState(x, twinY, z);
     if (!twin.has_value() || pathOf(*twin) != pathOf(stateId)) {
@@ -118,7 +106,7 @@ void door(WorldState& world, std::string_view worldName, std::int32_t x, std::in
     write(world, x, twinY, z, *twin, wanted, changes);
 }
 
-/// parity: `TrapDoorBlock` and `FenceGateBlock`, which follow the signal with both properties.
+/// parity: `TrapDoorBlock` and `FenceGateBlock`.
 void openable(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
               std::int32_t stateId, const Properties& properties, std::int64_t gameTime,
               std::vector<BlockChange>& changes, random::RandomSource& random) {
@@ -126,24 +114,19 @@ void openable(WorldState& world, std::string_view worldName, std::int32_t x, std
     if (signal == poweredIn(properties)) {
         return;
     }
-    // parity: `TrapDoorBlock.neighborChanged` and `FenceGateBlock.neighborChanged`, both of which
-    // only make a noise when `open` itself moves.
+    // parity: `TrapDoorBlock.neighborChanged` and `FenceGateBlock.neighborChanged`.
     if (signal != (valueOf(properties, "open") == "true")) {
         heard(world, signal ? "block_open" : "block_close", x, y, z, gameTime);
     }
     write(world, x, y, z, stateId, {{"powered", signal ? "true" : "false"}, {"open", signal ? "true" : "false"}},
           changes, openSound(stateId, signal, random));
-    // parity: `TrapDoorBlock.neighborChanged` ends by booking the water's turn when the door holds
-    // some, which is the other half of the pair `TrapDoorBlock.toggle` opens. `FenceGateBlock` shares
-    // this function and books nothing: it has no `waterlogged` to hold water with.
+    // parity: `TrapDoorBlock.neighborChanged` ends by booking the water's turn when the door holds.
     if (pathOf(stateId).ends_with("_trapdoor") && valueOf(properties, "waterlogged") == "true") {
         world.scheduleFluidTick(x, y, z, fluidId(FluidKind::Water, true), fluidFlow::kWaterTickDelay);
     }
 }
 
-/// parity: `HopperBlock.checkPoweredState`, which is the whole of it: a hopper with any signal
-/// touching it is `enabled=false`, at once and with no delay. The tick already reads that property
-/// to decide whether to move an item; nothing was ever writing it.
+/// parity: `HopperBlock.checkPoweredState`.
 void hopperReact(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes) {
     const bool enabled = valueOf(properties, "enabled") == "true";
@@ -154,8 +137,7 @@ void hopperReact(WorldState& world, std::string_view worldName, std::int32_t x, 
     write(world, x, y, z, stateId, {{"enabled", wanted ? "true" : "false"}}, changes);
 }
 
-/// parity: `RedstoneLampBlock.neighborChanged`: it lights at once and books four ticks to go out, so
-/// a signal that blinks does not make the lamp blink with it.
+/// parity: `RedstoneLampBlock.neighborChanged`.
 void lampReact(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
                std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes) {
     const bool lit = valueOf(properties, "lit") == "true";
@@ -170,8 +152,7 @@ void lampReact(WorldState& world, std::string_view worldName, std::int32_t x, st
     write(world, x, y, z, stateId, {{"lit", "true"}}, changes);
 }
 
-/// parity: `AbstractSkullBlock.neighborChanged`, which just carries the signal into `powered`. The
-/// client makes a piglin head move its mouth with it; from here it is one more state that follows.
+/// parity: `AbstractSkullBlock.neighborChanged`.
 void skull(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
            std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes) {
     const bool signal = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0;
@@ -181,8 +162,7 @@ void skull(WorldState& world, std::string_view worldName, std::int32_t x, std::i
     write(world, x, y, z, stateId, {{"powered", signal ? "true" : "false"}}, changes);
 }
 
-/// parity: `CopperBulbBlock.checkAndFlip`: the bulb keeps its light and flips it on the *rising*
-/// edge only, which is what makes it a T flip-flop in one block.
+/// parity: `CopperBulbBlock.checkAndFlip`.
 void bulb(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
           std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes) {
     const bool powered = poweredIn(properties);
@@ -204,8 +184,7 @@ void bulb(WorldState& world, std::string_view worldName, std::int32_t x, std::in
     write(world, x, y, z, stateId, wanted, changes, std::move(effects));
 }
 
-/// parity: `NoteBlock.neighborChanged`, which plays the note on the way up only: a signal going away
-/// is silent.
+/// parity: `NoteBlock.neighborChanged`.
 void noteBlock(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
                std::int32_t stateId, const Properties& properties, std::int64_t gameTime,
                std::vector<BlockChange>& changes) {
@@ -215,8 +194,7 @@ void noteBlock(WorldState& world, std::string_view worldName, std::int32_t x, st
     }
     std::vector<BlockEffect> effects =
         signal ? noteBlocks::playNote(world, x, y, z, stateId) : std::vector<BlockEffect>{};
-    // parity: `NoteBlock.playNote` raises `NOTE_BLOCK_PLAY` beside the sound, and only when the note
-    // really sounds: a note block with something on top of it is silent and so is the event.
+    // parity: `NoteBlock.playNote` raises `NOTE_BLOCK_PLAY` beside the sound.
     if (!effects.empty()) {
         heard(world, "note_block_play", x, y, z, gameTime);
     }
@@ -243,7 +221,7 @@ void noteBlock(WorldState& world, std::string_view worldName, std::int32_t x, st
     return 2;
 }
 
-/// parity: `BellBlock.neighborChanged` into `attemptToRing`, which swings it the way it faces.
+/// parity: `BellBlock.neighborChanged` into `attemptToRing`.
 void bell(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
           std::int32_t stateId, const Properties& properties, std::int64_t gameTime,
           std::vector<BlockChange>& changes) {
@@ -253,8 +231,7 @@ void bell(WorldState& world, std::string_view worldName, std::int32_t x, std::in
     }
     std::vector<BlockEffect> effects;
     if (signal) {
-        // parity: `BellBlock.attemptToRing` raises `BLOCK_CHANGE`, which is eleven, beside the sound.
-        // Only the ring: letting the signal go rings nothing and says nothing.
+        // parity: `BellBlock.attemptToRing` raises `BLOCK_CHANGE`.
         heard(world, "block_change", x, y, z, gameTime);
         effects.push_back(blockEffect::Event{.b0 = 1, .b1 = facingValue(valueOf(properties, "facing"))});
         effects.push_back(blockEffect::Sound{.name = "block.bell.use",
@@ -265,18 +242,14 @@ void bell(WorldState& world, std::string_view worldName, std::int32_t x, std::in
     write(world, x, y, z, stateId, {{"powered", signal ? "true" : "false"}}, changes, std::move(effects));
 }
 
-/// parity: `TntBlock.neighborChanged`, which lights it and takes the block away. What is left is the
-/// entity, which the caller spawns when it sees the block go.
+/// parity: `TntBlock.neighborChanged`.
 void tnt(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
          bool tntExplodes, std::vector<BlockChange>& changes) {
-    // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off, and `neighborChanged`
-    // only removes the block when it answered true, so the tnt stays where it is.
+    // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off.
     if (!tntExplodes) {
         return;
     }
-    // parity: `neighborChanged` does not look at `unstable`. That property is read in one place only,
-    // `playerWillDestroy`, where it decides whether breaking the block by hand lights it: a signal
-    // lights an unstable block exactly as it lights any other.
+    // parity: `neighborChanged` does not look at `unstable`.
     if (redstone::bestNeighbourSignal(world, worldName, x, y, z) <= 0) {
         return;
     }
@@ -321,14 +294,11 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         bulb(world, worldName, x, y, z, *stateId, properties, changes);
         return;
     }
-    // A `piston_head` ends the same way and is not one of these, so the `powered` property is what
-    // tells them apart: only a skull carries it.
     if ((path.ends_with("_skull") || path.ends_with("_head")) && properties.contains("powered")) {
         skull(world, worldName, x, y, z, *stateId, properties, changes);
         return;
     }
-    // parity: `BigDripleafBlock.neighborChanged`, the whole of it: a signal puts the leaf back up
-    // and holds it there, which is what makes a dripleaf a redstone block and not only a plant.
+    // parity: `BigDripleafBlock.neighborChanged`.
     if (path == "big_dripleaf") {
         if (const std::optional<BlockChange> flat = dripleaves::react(world, worldName, x, y, z, gameTime);
             flat.has_value()) {
@@ -340,19 +310,14 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         noteBlock(world, worldName, x, y, z, *stateId, properties, gameTime, changes);
         return;
     }
-    // parity: `CommandBlock.neighborChanged`, which is only `setPoweredAndUpdate`. The block never
-    // changes state for a signal: what moves is its block entity, and the turn it books.
+    // parity: `CommandBlock.neighborChanged`.
     if (commandBlocks::modeOf(path).has_value()) {
         commandBlocks::onSignal(world, x, y, z, redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0);
         return;
     }
-    // parity: `StructureBlock.neighborChanged` and `TestBlock.neighborChanged`, which keep their
-    // `powered` in the **block entity** and not in the state. What the rising edge sets off (loading
-    // or saving a structure, starting a test) is not here: those need a structure or a test to run.
+    // parity: `StructureBlock.neighborChanged` and `TestBlock.neighborChanged`.
     if (path == "structure_block" || path == "test_block") {
-        // parity: `TestBlock.neighborChanged` does nothing at all for a block in `start` mode: that
-        // one is the source of the signal, and its `powered` is the test framework's to move. Only
-        // the modes that listen keep it from the world.
+        // parity: `TestBlock.neighborChanged` does nothing at all for a block in `start` mode.
         if (path == "test_block" && valueOf(properties, "mode") == "start") {
             return;
         }
@@ -399,11 +364,9 @@ const wire::common::Identifier& lamp() {
     return instance;
 }
 
-/// parity: the blocks whose `onPlace` reads `hasNeighborSignal`. Everything else that reacts to a
-/// signal does it only from `neighborChanged`, which never reaches the square that changed.
+/// parity: the blocks whose `onPlace` reads `hasNeighborSignal`.
 [[nodiscard]] bool readsPowerOnPlace(const std::string_view path) {
-    // parity: the shelf is not one of them. `ShelfBlock.onPlace` only joins or breaks its side chain
-    // (`SideChainPartBlock`), and the signal is read in `neighborChanged` alone.
+    // parity: the shelf is not one of them. `ShelfBlock.onPlace` only joins or breaks its side chain.
     return path == "tnt" || path == "hopper" || path.ends_with("copper_bulb") || path == "powered_rail" ||
            path == "activator_rail" || path == "detector_rail";
 }
@@ -478,7 +441,6 @@ std::optional<BlockChange> lampTick(WorldState& world, std::string_view worldNam
     if (!stateId.has_value() || pathOf(*stateId) != "redstone_lamp") {
         return std::nullopt;
     }
-    // An unlit lamp has nothing to turn off, which the write below would work out for itself.
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
     if (valueOf(properties, "lit") != "true") {
         return std::nullopt;

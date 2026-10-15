@@ -23,7 +23,7 @@ namespace mth = wire::common::mth;
 /// parity: the `Dolphin.ALLOWED_ITEMS` box, eight blocks every way.
 constexpr double kItemReach = 8.0;
 constexpr double kItemSpeed = static_cast<double>(1.2F);
-/// parity: `DolphinSwimToTreasureGoal`, a hundred ticks of air at least and the 1.3 it swims at.
+/// parity: `DolphinSwimToTreasureGoal`.
 constexpr std::int32_t kTreasureAir = 100;
 constexpr double kTreasureSpeed = 1.3;
 
@@ -107,7 +107,7 @@ void DolphinSwimToTreasureGoal::tick(MobContext& mob) {
     if (!treasure_.has_value()) {
         return;
     }
-    // parity: `Dolphin.closeToNextPos`, within twelve of the navigation's target, or no path at all.
+    // parity: `Dolphin.closeToNextPos`.
     bool close = false;
     if (mob.mob.walkTarget.has_value()) {
         const double dx = std::floor((*mob.mob.walkTarget)[0]) + 0.5 - mob.mob.x;

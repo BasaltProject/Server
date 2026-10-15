@@ -16,14 +16,13 @@ namespace {
 namespace mth = wire::common::mth;
 namespace brain = wardenBrain;
 
-/// parity: `NearestLivingEntitySensor`'s sixteen blocks and `Sniffing`'s six across, twenty up.
+/// parity: `NearestLivingEntitySensor`'s sixteen blocks and `Sniffing`'s six across.
 constexpr double kSenseRange = 16.0;
 constexpr double kSniffAngerXZ = 6.0;
 constexpr double kSniffAngerY = 20.0;
 constexpr double kInvestigateSpeed = static_cast<double>(0.7F);
 
-/// Where the nearest thing it may fight stands, and its id. parity: `WardenEntitySensor`: the
-/// nearest player first, and only then anything else.
+/// Nearest fightable thing and its id. parity: `WardenEntitySensor`: nearest player first.
 struct Nearest {
     std::int32_t id = 0;
     double x = 0.0;

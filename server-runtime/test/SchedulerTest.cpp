@@ -15,7 +15,6 @@ using namespace basalt::server::runtime::sched;
 
 namespace {
 
-/// Restores strict mode however the test leaves it, since it is process-wide.
 struct StrictMode {
     explicit StrictMode(bool strict) : previous_(ownership::isStrict()) { ownership::setStrict(strict); }
 
@@ -28,7 +27,6 @@ private:
     bool previous_;
 };
 
-/// A failure handler that keeps what it was told rather than rethrowing it.
 struct Collected {
     std::vector<std::string> messages;
 
@@ -44,8 +42,6 @@ TEST_CASE("an unclaimed owner runs what it is given there and then") {
     CHECK_FALSE(owner.isClaimed());
     CHECK_FALSE(owner.isClosed());
 
-    // Nobody owns it yet, so whoever is holding it is the owner: a world built by a test, or one
-    // that exists before the first tick.
     std::int32_t ran = 0;
     owner.submit([&ran] { ++ran; });
     CHECK(ran == 1);
@@ -81,8 +77,6 @@ TEST_CASE("what a task adds belongs to the next turn, which is what bounds one")
     Owner owner{"world"};
     owner.bindToCurrentThread();
 
-    // Submitted from the owning thread while draining, so it runs inline rather than queueing: a
-    // chain of gameplay does not wait a tick for its own next step.
     std::int32_t ran = 0;
     std::thread{[&owner, &ran] {
         owner.submit([&owner, &ran] {
@@ -99,10 +93,7 @@ TEST_CASE("a task that drains its own owner does not take the turn it is standin
     Owner owner{"world"};
     owner.bindToCurrentThread();
 
-    // Saving a world drains its owner, and `/stop` saves from inside a task queued on that owner.
-    // With the turn parked in a buffer the owner still held, this nested drain swapped it back into
-    // the queue: closing the owner then freed the task that was running, and the second task of the
-    // turn ran twice.
+    // Saving drains the owner and `/stop` saves from a task on it; a retained turn buffer was swapped back and freed.
     std::int32_t first = 0;
     std::int32_t second = 0;
     std::thread{[&owner, &first, &second] {
@@ -137,8 +128,6 @@ TEST_CASE("a cancelled task does not run, whether it was queued, delayed or at t
     CHECK(owner.runPending() == 0);
     CHECK(owner.pending() == 0);
 
-    // One still turns away when it is cancelled is dropped where it waits, rather than counting
-    // down for turns nobody is going to use it for.
     const TaskHandle waiting = owner.schedule(20, [&ran] { ++ran; });
     CHECK(owner.pending() == 1);
     waiting.cancel();
@@ -150,7 +139,6 @@ TEST_CASE("a cancelled task does not run, whether it was queued, delayed or at t
     CHECK(owner.runEndOfTick() == 0);
     CHECK(ran == 0);
 
-    // A copy of a handle is the same handle, which is what makes handing one around safe.
     TaskHandle shared;
     std::thread{[&] { shared = owner.submit([&ran] { ++ran; }); }}.join();
     const TaskHandle copy = shared;
@@ -166,11 +154,9 @@ TEST_CASE("a delay is counted in turns, and zero means the next one") {
 
     owner.schedule(0, [&ran] { ran.emplace_back("now"); });
     owner.schedule(2, [&ran] { ran.emplace_back("later"); });
-    // A negative delay is not a task from the past: it is due next turn, like zero.
     owner.schedule(-5, [&ran] { ran.emplace_back("negative"); });
     CHECK(owner.pending() == 3);
 
-    // Nothing runs until the turn it was scheduled for, and nothing runs without a turn at all.
     CHECK(owner.runPending() == 0);
     CHECK(ran.empty());
 
@@ -199,7 +185,6 @@ TEST_CASE("the end of a turn runs after the turn's own work") {
     CHECK(ran == std::vector<std::string>{"start"});
     CHECK(owner.runEndOfTick() == 1);
     CHECK(ran == std::vector<std::string>{"start", "end"});
-    // The two queues are separate: draining one does not drain the other.
     CHECK(owner.runEndOfTick() == 0);
 }
 
@@ -220,7 +205,6 @@ TEST_CASE("one task that throws costs itself and nothing else") {
     CHECK(ran == 2);
     CHECK(failures.messages == std::vector<std::string>{"first", "second"});
 
-    // Without a handler the throw is the caller's, which is what a test wants to see.
     std::thread{[&] { owner.submit([] { throw std::runtime_error{"loud"}; }); }}.join();
     CHECK_THROWS_AS(owner.runPending(), std::runtime_error);
 }
@@ -236,7 +220,6 @@ TEST_CASE("a closed owner runs nothing and hands back cancelled handles") {
 
     owner.close();
     CHECK(owner.isClosed());
-    // What was waiting is cancelled rather than run, and the handles say so.
     CHECK(queued.isCancelled());
     CHECK(delayed.isCancelled());
     CHECK(atEnd.isCancelled());
@@ -245,7 +228,6 @@ TEST_CASE("a closed owner runs nothing and hands back cancelled handles") {
     CHECK(owner.runEndOfTick() == 0);
     CHECK(ran == 0);
 
-    // And nothing new is taken, rather than being held for ever.
     const TaskHandle after = owner.submit([&ran] { ++ran; });
     CHECK(after.isCancelled());
     CHECK(owner.schedule(1, [&ran] { ++ran; }).isCancelled());
@@ -261,7 +243,6 @@ TEST_CASE("a merge moves the work queued on the owner that goes away") {
     survivor.bindToCurrentThread();
     std::vector<std::string> ran;
 
-    // Queued from another thread, because an owner that is current runs its work on the spot.
     std::thread{[&] {
         gone.submit([&ran] { ran.emplace_back("queued"); });
         gone.scheduleAtEnd([&ran] { ran.emplace_back("at end"); });
@@ -273,20 +254,16 @@ TEST_CASE("a merge moves the work queued on the owner that goes away") {
 
     gone.drainInto(survivor);
     CHECK(gone.pending() == 0);
-    // The cancelled one is not carried over, and the delayed one keeps its remaining turns.
     CHECK(survivor.pending() == 3);
 
     CHECK(survivor.runPending() == 2);
     CHECK(ran == std::vector<std::string>{"queued", "at end"});
-    // Three turns to go and then the turn it runs on, which is the same count it had before the
-    // move: a merge is not a reason for a task to come due sooner or later than it asked.
     for (std::int32_t turn = 0; turn < 4; ++turn) {
         survivor.advanceTick();
         survivor.runPending();
     }
     CHECK(ran == std::vector<std::string>{"queued", "at end", "delayed"});
 
-    // Draining an owner with nothing on it is not an error and leaves the other alone.
     Owner empty{"empty"};
     empty.drainInto(survivor);
     CHECK(survivor.pending() == 0);
@@ -297,15 +274,12 @@ TEST_CASE("console input waits for the turn's console point, not its start") {
     owner.bindToCurrentThread();
     std::vector<std::string> ran;
 
-    // Queued from another thread, because an owner that is current runs its work on the spot.
     std::thread{[&] {
         owner.submitConsole([&ran] { ran.emplace_back("console"); });
         owner.submit([&ran] { ran.emplace_back("task"); });
     }}.join();
     CHECK(ran.empty());
-    // parity: `DedicatedServer.handleConsoleInputs` runs after the levels and before
-    // `playerList.tick`, so the ordinary turn work goes first and the console point asks for
-    // what was typed on its own.
+    // parity: `DedicatedServer.handleConsoleInputs`.
     CHECK(owner.runPending() == 1);
     CHECK(ran == std::vector<std::string>{"task"});
     CHECK(owner.runConsole() == 1);
@@ -333,7 +307,6 @@ TEST_CASE("a merge carries console input over to the survivor") {
 
     gone.drainInto(survivor);
     CHECK(gone.pending() == 0);
-    // It stays console input: it runs at the survivor's console point, not with its start.
     CHECK(survivor.runPending() == 0);
     CHECK(ran.empty());
     CHECK(survivor.runConsole() == 1);
@@ -344,7 +317,6 @@ TEST_CASE("strict mode says who touched what, and off it says nothing") {
     Owner owner{"world"};
     {
         const StrictMode strict{true};
-        // Nobody has claimed it, so there is nothing to enforce yet.
         CHECK_NOTHROW(owner.check("the chunk map"));
         owner.bindToCurrentThread();
         CHECK_NOTHROW(owner.check("the chunk map"));
@@ -361,14 +333,12 @@ TEST_CASE("strict mode says who touched what, and off it says nothing") {
 TEST_CASE("draining from a thread that does not own it is the caller's bug") {
     Owner owner{"world"};
     owner.bindToCurrentThread();
-    // Not a strict-mode check: two threads draining the same owner corrupt the queue whatever the
-    // flag says, so this one is always on.
+    // Not a strict-mode check: two threads draining one owner corrupt the queue whatever the flag says.
     std::thread{[&owner] {
         CHECK_THROWS_AS(owner.runPending(), std::logic_error);
         CHECK_THROWS_AS(owner.runEndOfTick(), std::logic_error);
     }}.join();
 
-    // An owner nobody has claimed is drainable by whoever is holding it.
     Owner unclaimed{"unclaimed"};
     std::thread{[&unclaimed] { CHECK(unclaimed.runPending() == 0); }}.join();
 }

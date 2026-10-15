@@ -20,8 +20,6 @@ using wire::text::Component;
     });
 }
 
-/// Who is online and (is | is not) in the operator group, which is what `/op` and `/deop` complete
-/// with.
 [[nodiscard]] std::vector<std::string> candidates(const SuggestionContext& context, bool operators) {
     std::set<std::string, std::less<>> ops;
     if (storage::PlayerRepository* repository = context.environment().options().playerRepository;
@@ -40,12 +38,6 @@ using wire::text::Component;
     return named;
 }
 
-/// Writes the membership and applies it to the player if they are online.
-///
-/// Online players resolve first: a row is only written on disconnect or on the save interval, so
-/// `op` against someone who just joined used to fail with "has never joined this server". Offline
-/// names resolve through the database, and a name in neither is refused rather than invented, since
-/// without a profile cache a guessed UUID would never match the real player.
 [[nodiscard]] std::optional<CommandSyntaxError> assign(const CommandContext& context, const std::string& playerName,
                                                        const std::string& group) {
     storage::PlayerRepository* repository = context.environment().options().playerRepository;
@@ -70,13 +62,8 @@ using wire::text::Component;
                                                                "' is online or has ever joined this server.")};
     }
 
-    // A no-op when the row does not exist yet, which is exactly the first-join case above: the
-    // session below carries the group instead, and it is written out with the rest of the player on
-    // the next save.
     repository->setGroup(uuid, group);
 
-    // Online players carry their group on the session, and their command tree is filtered by it, so
-    // both have to be refreshed or the change would only take effect on their next login.
     if (online != nullptr) {
         online->group = group;
         if (online->connection().sendCommandTree) {
@@ -86,11 +73,9 @@ using wire::text::Component;
     return std::nullopt;
 }
 
-/// The one shape `/op` and `/deop` share: a profile name, a group, and one sentence.
 void buildAssignment(const CommandNodeBuilder& root, bool toOperator, const std::string& key) {
     root.argument("targets", gameProfileArgument(), [toOperator, key](const CommandNodeBuilder& targets) {
-        // parity: `OpCommand` completes with who is online and not an operator yet; `DeOpCommands`
-        // with the operators.
+        // parity: `OpCommand` completes with who is online and not an operator yet.
         targets.suggestsFromServer([toOperator](const SuggestionContext& context) {
             return context.matching(candidates(context, !toOperator));
         });

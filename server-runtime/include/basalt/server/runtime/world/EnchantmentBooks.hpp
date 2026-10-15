@@ -11,11 +11,6 @@
 
 namespace basalt::server::runtime::world {
 
-/// What the menus read out of the jar's own enchantment files: what each one costs, what it goes
-/// on, and which of them will not sit beside each other.
-///
-/// Every field is a pointer because none of it is this struct's to own, and every answer has a
-/// sensible one for an empty jar: nothing goes on anything, and nothing costs anything.
 struct EnchantmentBooks {
     const RealEnchantments* enchantments = nullptr;
     const realItemTags::TagMembers* itemTags = nullptr;
@@ -32,20 +27,18 @@ struct EnchantmentBooks {
 
     [[nodiscard]] std::int32_t maxCost(const wire::common::Identifier& id, std::int32_t level) const;
 
-    /// parity: `Enchantment.definition().weight()`, how often the table picks it over the others.
+    /// parity: `Enchantment.definition().weight()`.
     [[nodiscard]] std::int32_t weight(const wire::common::Identifier& id) const;
 
-    /// parity: `Enchantment.isPrimaryItem`, which is what a table may put on it rather than what an
-    /// anvil may. An enchantment with no `primary_items` of its own falls back to what it goes on.
+    /// parity: `Enchantment.isPrimaryItem`.
     [[nodiscard]] bool isPrimaryFor(const wire::common::Identifier& id, const storage::StoredItemStack& stack) const;
 
-    /// Every enchantment in that tag, which is how a table is told what it may offer at all.
     [[nodiscard]] const std::set<wire::common::Identifier>& inTag(std::string_view tag) const;
 
     /// parity: `Enchantment.canEnchant`, which is the `supported_items` of its own file.
     [[nodiscard]] bool goesOn(const wire::common::Identifier& id, const storage::StoredItemStack& stack) const;
 
-    /// parity: `Enchantment.areCompatible`: each one's exclusive set is asked about the other.
+    /// parity: `Enchantment.areCompatible`.
     [[nodiscard]] bool compatible(const wire::common::Identifier& one, const wire::common::Identifier& other) const;
 
     /// parity: `EnchantmentTags.CURSE`, the only kind a grindstone leaves on.

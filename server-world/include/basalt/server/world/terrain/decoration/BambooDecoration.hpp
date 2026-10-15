@@ -23,16 +23,12 @@ void decorateFeature(std::int32_t index, Chunk& chunk, std::int64_t seed,
                      const surface::SurfaceRuleEnvironment& environment,
                      ExternalStateReader externalBlockState = nullptr);
 
-/// The jungle entry, one clump in four chunks and no podzol under it.
 [[nodiscard]] BiomeVegetalDecoration light();
 
-/// The bamboo jungle entry, noise-driven and podzol a fifth of the time.
 [[nodiscard]] BiomeVegetalDecoration dense();
 
-/// The vanilla placed feature names this step draws.
 [[nodiscard]] const std::set<std::string, std::less<>>& placedIds();
 
-/// One clump at one position, which is what `/place feature` runs.
 bool placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin, std::string_view placedFeature);
 
 } // namespace bambooDecoration

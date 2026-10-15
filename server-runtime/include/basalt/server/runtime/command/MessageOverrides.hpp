@@ -11,16 +11,6 @@
 
 namespace basalt::server::runtime::command {
 
-/// Replaces what a command answers, by the translation key it would have sent.
-///
-/// Keyed by translation key rather than by command, because that is what a message *is* here: no
-/// command holds its text, it sends `commands.gamemode.success.self` and the client looks it up.
-/// Which also explains the cost, and why the file says so plainly: an overridden message stops
-/// being a key and becomes literal text, so every client sees the operator's language instead of
-/// its own.
-///
-/// Applied at the one place command feedback leaves the server, not inside each command, so no
-/// command has to know this exists and none can forget to.
 class MessageOverrides {
 public:
     MessageOverrides(std::map<std::string, std::string, std::less<>> messages,
@@ -28,10 +18,6 @@ public:
 
     [[nodiscard]] bool isEmpty() const noexcept { return messages_.empty(); }
 
-    /// The message with every overridden translatable swapped out, or the message itself when
-    /// nothing matches, which is the normal case and costs one map lookup per node.
-    ///
-    /// The player is who the placeholders resolve against; a console message has none.
     [[nodiscard]] wire::text::Component apply(const wire::text::Component& message,
                                               const player::PlayerSession* player) const;
 

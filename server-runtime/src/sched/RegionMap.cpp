@@ -8,14 +8,10 @@
 namespace basalt::server::runtime::sched::regionMap {
 
 std::vector<std::unordered_set<std::int64_t>> components(const std::unordered_set<std::int64_t>& sections) {
-    // Nothing loaded is the common answer while a world is starting or emptying, and the sort
-    // below is what it saves.
     if (sections.empty()) {
         return {};
     }
-    // Grown from the lowest key up rather than from wherever the hash puts its first element: which
-    // region survives a merge follows from the order the groups come out in, and that must not
-    // depend on how a set happened to be laid out in memory.
+    // Grown from the lowest key up: which region survives a merge must not depend on hash layout.
     std::vector<std::int64_t> seeds{sections.begin(), sections.end()};
     std::ranges::sort(seeds);
 
@@ -36,8 +32,6 @@ std::vector<std::unordered_set<std::int64_t>> components(const std::unordered_se
             const std::int32_t z = sectionZ(current);
             for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
                 for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
-                    // Skipping the section itself, which is already out of `remaining` and would
-                    // be turned away below anyway.
                     if (offsetX == 0 && offsetZ == 0) {
                         continue;
                     }
@@ -52,9 +46,7 @@ std::vector<std::unordered_set<std::int64_t>> components(const std::unordered_se
         }
         groups.push_back(std::move(group));
     }
-    // Biggest first: when two groups become one, the survivor should be the one that already owns
-    // most of the map, so the fewest tasks and entities have to change hands. Stable, so two groups
-    // of the same size keep the order they were found in, which is by their lowest section.
+    // Biggest first so a merge survivor already owns most of the map; stable, so ties keep lowest-section order.
     std::ranges::stable_sort(groups,
                              [](const std::unordered_set<std::int64_t>& left,
                                 const std::unordered_set<std::int64_t>& right) { return left.size() > right.size(); });

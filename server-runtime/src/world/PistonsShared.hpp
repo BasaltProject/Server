@@ -12,11 +12,6 @@
 #include <string>
 #include <string_view>
 
-/// What both halves of the piston need: the names of the six faces, what a piston is, what sticks to
-/// what, and one step along a face.
-///
-/// It is a header of its own because the piston is two files: what a push moves (`Pistons.cpp`) and
-/// what happens while it is moving (`PistonSlide.cpp`).
 namespace basalt::server::runtime::world::pistons::internal {
 
 using registry::BlockFace;
@@ -24,7 +19,7 @@ using registry::BlockFace;
 /// parity: `PistonBaseBlock.TRIGGER_EXTEND` and `TRIGGER_CONTRACT`.
 inline constexpr std::int32_t kExtend = 0;
 inline constexpr std::int32_t kContract = 1;
-/// parity: `checkIfExtend`'s second kind of pull back, the one that catches a head still sliding out.
+/// parity: `checkIfExtend`'s second kind of pull back.
 inline constexpr std::int32_t kContractSliding = 2;
 
 inline constexpr std::string_view kExtendSound = "block.piston.extend";
@@ -82,7 +77,7 @@ inline constexpr std::array<BlockFace, 6> kAllFaces{BlockFace::Down,  BlockFace:
            path == "reinforced_deepslate";
 }
 
-/// parity: `Blocks.SLIME_BLOCK` and `Blocks.HONEY_BLOCK`, the two that carry their neighbours.
+/// parity: `Blocks.SLIME_BLOCK` and `Blocks.HONEY_BLOCK`.
 [[nodiscard]] inline bool isSticky(std::int32_t stateId) {
     const std::string path = pathOf(stateId);
     return path == "slime_block" || path == "honey_block";

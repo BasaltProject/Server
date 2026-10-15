@@ -8,13 +8,12 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using lua::LuaArgs;
 
 constexpr std::int32_t kChunk = 16;
 constexpr double kTicksPerSecond = 20.0;
 
-// parity: what `/title` uses when nobody says otherwise, in ticks.
+// parity: the default `/title` fade-in, stay and fade-out, in ticks.
 constexpr std::int32_t kFadeIn = 10;
 constexpr std::int32_t kStay = 70;
 constexpr std::int32_t kFadeOut = 20;
@@ -23,7 +22,6 @@ constexpr std::int32_t kFadeOut = 20;
     return static_cast<std::int32_t>(std::floor(value / by));
 }
 
-/// One timing out of an options table, or the default when it is absent.
 [[nodiscard]] std::int32_t timing(LuaArgs& lua, std::int32_t index, std::string_view key, std::int32_t fallback) {
     if (index > lua.count() || !lua.isTable(index)) {
         return fallback;
@@ -34,7 +32,6 @@ constexpr std::int32_t kFadeOut = 20;
     return answer;
 }
 
-/// The strings of an array-shaped field, for an item's lore.
 [[nodiscard]] std::vector<std::string> stringsOf(LuaArgs& lua, std::int32_t index) {
     std::vector<std::string> out;
     if (!lua.isTable(index)) {
@@ -49,7 +46,6 @@ constexpr std::int32_t kFadeOut = 20;
     return out;
 }
 
-/// Enchantment id to level, out of a table of them.
 [[nodiscard]] std::map<std::string, std::int32_t> levelsOf(LuaArgs& lua, std::int32_t index) {
     std::map<std::string, std::int32_t> out;
     if (!lua.isTable(index)) {
@@ -63,8 +59,6 @@ constexpr std::int32_t kFadeOut = 20;
     return out;
 }
 
-/// A stored value comes back as what it was written as: a plugin that wrote 7 should not have to
-/// remember it is reading "7".
 void pushStored(LuaArgs& lua, const std::string& stored) {
     std::int64_t whole = 0;
     const auto* end = stored.data() + stored.size();
@@ -83,7 +77,6 @@ void pushStored(LuaArgs& lua, const std::string& stored) {
     }
     lua.pushString(stored);
 }
-
 } // namespace
 
 std::optional<PluginPoint> pointFrom(LuaArgs& lua, std::int32_t index) {
@@ -176,7 +169,6 @@ void pushPosition(LuaArgs& lua, std::string world, double x, double y, double z)
         .reads("x", [x] { return PluginValue{x}; })
         .reads("y", [y] { return PluginValue{y}; })
         .reads("z", [z] { return PluginValue{z}; })
-        // The chunk it falls in, which is what a claim or a region keys on.
         .reads("chunk_x", [x] { return PluginValue{static_cast<std::int64_t>(floorDiv(x, kChunk))}; })
         .reads("chunk_z", [z] { return PluginValue{static_cast<std::int64_t>(floorDiv(z, kChunk))}; })
         .method("offset",
@@ -251,7 +243,6 @@ void pushInventory(LuaArgs& lua, const std::shared_ptr<PluginPlayerRef>& owner) 
                 })
         .method("add",
                 [owner](LuaArgs& args) {
-                    // `inv:add("minecraft:bread", 3)` and `inv:add({ ... })` are both one call.
                     const std::int32_t base = firstArgument(args);
                     std::optional<PluginItem> item = itemFrom(args, base);
                     if (!item.has_value()) {
@@ -395,7 +386,6 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
                 })
         .method("title",
                 [player, text](LuaArgs& args) {
-                    // `p:title("<gold>Go")` or `p:title(title, subtitle, { fade_in = 5, stay = 40 })`.
                     const std::int32_t base = firstArgument(args);
                     std::string subtitle;
                     if (args.isString(base + 1)) {
@@ -408,7 +398,6 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
                 })
         .method("attribute",
                 [player](LuaArgs& args) {
-                    // `p:attribute("max_health")` reads, `p:attribute("max_health", 40)` sets.
                     const std::int32_t base = firstArgument(args);
                     const std::string name = args.checkString(base);
                     if (args.isNil(base + 1)) {
@@ -432,7 +421,6 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
                 })
         .method("particle",
                 [player](LuaArgs& args) {
-                    // `p:particle("minecraft:flame", pos, count, spread)`, the position optional.
                     const std::int32_t base = firstArgument(args);
                     const std::string name = args.checkString(base);
                     const std::optional<PluginPoint> point = pointFrom(args, base + 1);
@@ -445,9 +433,6 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
                 })
         .method("effect",
                 [player](LuaArgs& args) {
-                    // `p:effect("minecraft:speed", seconds, level)`, with no seconds meaning for ever
-                    // and zero meaning take it away. The level a player reads is one above the
-                    // amplifier the protocol carries, so the argument follows the player.
                     const std::int32_t base = firstArgument(args);
                     const std::string name = args.checkString(base);
                     const double seconds = args.numberOr(base + 1, -1.0);
@@ -475,7 +460,6 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
                     return 1;
                 })
         .method("teleport", [player](LuaArgs& args) {
-            // `p:teleport(pos)`, `p:teleport(x, y, z)` or `p:teleport(world, x, y, z)`.
             const std::int32_t first = firstArgument(args);
             const std::optional<PluginPoint> point = pointFrom(args, first);
             if (point.has_value()) {
@@ -492,5 +476,4 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
         });
     std::move(object).push(lua);
 }
-
 } // namespace basalt::server::plugins

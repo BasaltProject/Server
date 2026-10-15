@@ -11,9 +11,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// A long jump to a spot a few blocks off, and the landing: the goat's and the frog's.
-///
-/// parity: `LongJumpToRandomPos`, `LongJumpToPreferredBlock`, `LongJumpMidJump` and `LongJumpUtil`.
+/// parity: `LongJumpToRandomPos`.
 namespace longJump {
 
 struct Spec {
@@ -46,8 +44,7 @@ struct State {
 
 enum class Event : std::uint8_t { None, Jumped, Landed };
 
-/// parity: `LongJumpUtil.calculateJumpVectorForAngle`: the launch that lands on `target` at this
-/// angle, if one within `maxVelocity` exists and, when asked, clears the blocks on the way.
+/// parity: `LongJumpUtil.calculateJumpVectorForAngle`.
 [[nodiscard]] std::optional<brainKit::Vec> vectorForAngle(MobContext& context, const brainKit::Vec& target,
                                                           float maxVelocity, std::int32_t angle, double width,
                                                           double height, bool checkCollision);
@@ -55,10 +52,8 @@ enum class Event : std::uint8_t { None, Jumped, Landed };
 /// parity: `defaultAcceptableLandingSpot`: something whole below and nothing in the way.
 [[nodiscard]] bool defaultAcceptable(const MobContext& mob, const brainKit::Block& target);
 
-/// One turn of the jump activity: a landing to finish, or a spot to pick and leap at.
 [[nodiscard]] Event tick(MobContext& mob, State& state, const Spec& spec, brainKit::Look& look);
 
-/// The cooldown's own countdown, which the core runs every turn.
 void countDown(State& state);
 
 } // namespace longJump

@@ -98,8 +98,7 @@ ServerEntity* NaturalSpawningSystem::materializeVillageSiegeZombie(world::Loaded
     if (!spawnAllowed(world, zombie, siege.x, siege.y, siege.z, "event")) {
         return nullptr;
     }
-    // parity: `VillageSiege` finalizes the zombie at the origin and only then moves it, which is
-    // what keeps whatever it is riding where the finalizer put it.
+    // parity: `VillageSiege`.
     const world::MobSpawnContext context{.random = &random,
                                          .specialMultiplier = specialMultiplierAt(world, 0, 0),
                                          .difficulty = world.difficulty(),
@@ -224,8 +223,7 @@ ServerEntity* NaturalSpawningSystem::materializeForest(world::LoadedWorld& world
                                                        std::string_view eventReason, bool checkMain,
                                                        const std::function<void(ServerEntity&)>& initialize) {
     ServerEntity* main = nullptr;
-    // Recursive rather than iterative because a passenger tree is one: each mob is spawned before
-    // whatever rides it, so the rider has a vehicle id to point at.
+    // Recursive because a passenger tree is one: each mob spawns before its rider, so the rider has a vehicle id.
     const auto materialize = [&](auto&& self, const server::world::ChunkGeneratedEntity& descriptor,
                                  ServerEntity* vehicle) -> void {
         // The forest keeps its own copy of the main mob, so it is found by value, not by address.
@@ -246,7 +244,6 @@ ServerEntity* NaturalSpawningSystem::materializeForest(world::LoadedWorld& world
         ServerEntity* resolvedVehicle = vehicle;
         if (resolvedVehicle == nullptr) {
             for (const world::MobExternalVehicleLink& link : forest.externalVehicleLinks) {
-                // A link holds its own copy of the passenger, so it is matched by value too.
                 if (link.passenger == descriptor) {
                     resolvedVehicle = world.state().entity(link.vehicleId);
                     break;

@@ -10,7 +10,7 @@
 
 namespace basalt::server::runtime::world {
 
-/// parity: `PlaceCommand.placeStructure`, which generates a structure at the chunk holding the
+/// parity: `PlaceCommand.placeStructure`.
 /// given position, skipping the placement grid and the biome checks. `boundsAt` reports what a
 /// start there would cover, or nothing when the structure's own conditions reject the chunk;
 /// `place` writes the part of that start landing in the chunk it is given, like the worldgen pass

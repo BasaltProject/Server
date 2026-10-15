@@ -69,8 +69,6 @@ std::optional<WorldMetadata> WorldMetadata::read(const std::string& worldRoot) {
     }
     const std::int32_t version = root->getInt(kVersionKey);
     if (version != kFormatVersion) {
-        // A file this build cannot read is not a file to overwrite: whoever wrote it knows more
-        // about the world on disk than this process does.
         throw std::runtime_error{pathFor(worldRoot) + " is format version " + std::to_string(version) +
                                  ", this build reads " + std::to_string(kFormatVersion)};
     }

@@ -71,7 +71,7 @@ using wire::nbt::NbtTag;
     return true;
 }
 
-/// parity: `NbtPathArgument.IndexedElementNode`, where a negative index counts from the end.
+/// parity: `NbtPathArgument.IndexedElementNode`.
 [[nodiscard]] std::optional<std::size_t> indexIn(const NbtList& list, std::int32_t index) {
     const std::int64_t actual = index < 0 ? static_cast<std::int64_t>(list.size()) + index : index;
     if (actual < 0 || actual >= static_cast<std::int64_t>(list.size())) {
@@ -80,12 +80,10 @@ using wire::nbt::NbtTag;
     return static_cast<std::size_t>(actual);
 }
 
-/// What a write does where its path ends: put the value there, or take what is there away.
 struct Write {
     const NbtTag* value = nullptr;
 };
 
-/// Replaces one element, keeping the list of one element type.
 [[nodiscard]] bool replaceElement(NbtList& list, std::size_t at, const NbtTag& value) {
     if (list.size() == 1 && value.type() != list.elementType()) {
         list = NbtList{value.type(), {value}};
@@ -98,8 +96,6 @@ struct Write {
     return true;
 }
 
-/// Applies the write at every node the path reaches below `node`, answering how many it changed.
-/// parity: `NbtPathArgument.NbtPath.set` and `remove`, which fan out over every match.
 std::int32_t apply(NbtTag& node, std::span<const Step> path, const Write& write) {
     const Step& step = path.front();
     const bool last = path.size() == 1;
@@ -250,8 +246,6 @@ std::optional<NbtTag> resolve(const NbtTag& root, std::string_view path) {
     }
     NbtTag current = root;
     for (const Step& step : *walk) {
-        // Copied out before `current` is reassigned: the tag being read lives inside `current`'s own
-        // storage, and assigning over it first would destroy what is being copied.
         std::optional<NbtTag> next;
         if (step.kind == Step::Kind::Key) {
             const auto* compound = current.get<NbtCompound>();

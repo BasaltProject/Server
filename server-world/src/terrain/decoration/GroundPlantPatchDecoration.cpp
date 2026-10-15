@@ -94,7 +94,7 @@ struct PatchSpec {
 
 const std::vector<PatchSpec>& specs() {
     static const std::vector<PatchSpec> built = {
-        // parity: `patch_red_shrub`, the dappled forest's bush, on `WORLD_SURFACE_WG` with no rarity.
+        // parity: `patch_red_shrub`.
         {"patch_red_shrub", 7, 1, 8, {"dappled_forest"}, Provider::RedShrub},
         {"patch_dead_bush",
          65,
@@ -129,9 +129,7 @@ void placeCandidate(PatchRegion& region, random::RandomSource& random, const Dec
     if (target.y < bounds.minY() || target.y > bounds.maxY() || !registry::blocks::isAir(region.get(target))) {
         return;
     }
-    // parity: the provider draws here, after the air check but before the support check, so a
-    // candidate on unsuitable ground still consumes its value. Moving this below the support test
-    // reads the same but desynchronises the stream.
+    // parity: the provider draws after the air check and before the support check.
     const std::int32_t stateId = providerState(spec.provider, random);
     if (target.y == bounds.minY()) {
         return;
@@ -155,8 +153,7 @@ void placeSpec(const PlacementContext& context, PatchRegion& region, random::Ran
         }
         const std::int32_t x = context.chunk().chunkX() * 16 + random.nextInt(16);
         const std::int32_t z = context.chunk().chunkZ() * 16 + random.nextInt(16);
-        // parity: the three dead bush patches name `WORLD_SURFACE_WG`, the two dry grass ones
-        // `MOTION_BLOCKING`.
+        // parity: dead bush patches use `WORLD_SURFACE_WG`, dry grass ones `MOTION_BLOCKING`.
         const std::int32_t y = spec.heightmap == HeightmapType::WorldSurface
                                    ? context.worldgenHeight(x & 15, z & 15, spec.heightmap)
                                    : context.height(x & 15, z & 15, spec.heightmap);

@@ -27,7 +27,6 @@ using basalt::wire::protocol::play::Gamemode;
 
 namespace {
 
-/// A registry of players plus the environment around them, which is all a selector reads.
 struct World {
     PlayerRegistry registry;
     std::vector<std::unique_ptr<PlayerSession>> players;
@@ -168,7 +167,6 @@ TEST_CASE("a name filter can be inverted, and only once the other way") {
     CHECK(world.select("@a[name=Steve]").size() == 1);
     CHECK(world.select("@a[name=!Steve]").size() == 1);
     CHECK(world.select("@a[name=!Steve,name=!Alex]").empty());
-    // Two positives can never both match, so vanilla refuses the pair outright.
     CHECK(world.refuses("@a[name=Steve,name=Alex]"));
 }
 
@@ -191,7 +189,6 @@ TEST_CASE("a tag filter asks about the scoreboard tags a player carries") {
 
     CHECK(world.select("@a[tag=chosen]").size() == 1);
     CHECK(world.select("@a[tag=!chosen]").size() == 1);
-    // An empty tag asks whether they carry none at all.
     CHECK(world.select("@a[tag=]").size() == 1);
 }
 
@@ -234,7 +231,6 @@ TEST_CASE("a type filter takes a real type and refuses one nobody registered") {
     CHECK(world.select("@e[type=player]").size() == 1);
     CHECK(world.select("@e[type=cow]").empty());
     CHECK(world.refuses("@e[type=minecraft:not_a_thing]"));
-    // Two positive types can never both match.
     CHECK(world.refuses("@e[type=cow,type=pig]"));
     CHECK_FALSE(world.refuses("@e[type=!cow,type=!pig]"));
 }
@@ -273,7 +269,6 @@ TEST_CASE("a scores filter with no scoreboard behind it matches nobody") {
     world.add("Steve");
 
     CHECK(world.select("@a[scores={kills=1..}]").empty());
-    // An empty set is not a filter at all.
     CHECK(world.select("@a[scores={}]").size() == 1);
     CHECK(world.refuses("@a[scores={kills=1},scores={deaths=1}]"));
 }

@@ -15,8 +15,6 @@
 
 namespace basalt::server::world::structure {
 
-/// Loads a real NBT structure piece by its `minecraft:...` location string, or null if unavailable.
-/// Separate from `TemplateLoader`, which the features key by identifier instead.
 using PoolTemplateLoader = std::function<const StructureTemplate*(std::string_view)>;
 
 /// parity: `StructureTemplatePool.Projection`.
@@ -30,12 +28,7 @@ namespace structureRotations {
 
 } // namespace structureRotations
 
-/// parity: `StructurePoolElement`, narrowed to the element kinds real village pools use. No mirror:
-/// vanilla's jigsaw runtime never mirrors pieces, and pre-mirrored variants are baked as separate
-/// NBT files.
-///
-/// A kind-tagged value rather than a class hierarchy, so a pool is a plain vector and an element can
-/// be copied into one by weight without an allocation per repeat.
+/// parity: `StructurePoolElement`.
 class StructurePoolElement {
 public:
     enum class Kind : std::uint8_t { Empty, LegacySingle, List, Feature };
@@ -43,10 +36,7 @@ public:
     /// parity: `EmptyPoolElement`.
     [[nodiscard]] static StructurePoolElement empty();
 
-    /// parity: `SinglePoolElement` and `LegacySinglePoolElement`. `ignoreAir` captures their
-    /// meaningful placement difference: legacy pieces use `STRUCTURE_AND_AIR` while modern single
-    /// pieces only ignore structure blocks. Every real village piece is legacy; every bastion piece
-    /// is modern.
+    /// parity: `SinglePoolElement` and `LegacySinglePoolElement`. `ignoreAir` captures their.
     [[nodiscard]] static StructurePoolElement legacySingle(std::string location, StructureProcessorList processors,
                                                            StructureProjection projection, bool ignoreAir = true);
 
@@ -54,9 +44,7 @@ public:
     [[nodiscard]] static StructurePoolElement list(std::vector<StructurePoolElement> elements,
                                                    StructureProjection projection);
 
-    /// parity: `FeaturePoolElement`: a placed worldgen feature as a village piece, used by the real
-    /// desert, savanna, snowy and taiga `decor` and `trees` pools. Zero-sized like the real one and
-    /// carrying its one synthetic downward connector.
+    /// parity: `FeaturePoolElement`.
     [[nodiscard]] static StructurePoolElement feature(std::string feature, StructureProjection projection);
 
     [[nodiscard]] Kind kind() const noexcept { return kind_; }

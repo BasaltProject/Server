@@ -48,7 +48,6 @@ constexpr std::string_view kLibraryLoot = "minecraft:chests/stronghold_library";
                                                   {"waterlogged", "false"}});
 }
 
-/// The upper floor of the tall library: plank deck, fence railing, ladder and chandelier.
 void balcony(const StrongholdBrush& brush) {
     brush.box(1, 5, 1, 3, 5, 13, planks());
     brush.box(10, 5, 1, 12, 5, 13, planks());
@@ -104,8 +103,7 @@ void strongholdLibrary::place(const StrongholdBrush& brush, const StrongholdPiec
     const std::int32_t height = piece.tall ? 11 : 6;
     brush.shell(0, 0, 0, 13, height - 1, 14);
     brush.door(piece.entryDoor, 4, 1, 0);
-    // parity: the cobwebs draw over the whole 10 by 4 by 13 volume, one roll per block, before any
-    // shelf goes in.
+    // parity: the cobwebs draw over the whole 10 by 4 by 13 volume, one roll per block, before any shelf goes in.
     brush.fill().generateMaybeBox(brush.random(), 0.07F, 2, 1, 1, 11, 4, 13, cobweb(), cobweb(), false, false);
     for (std::int32_t depth = 1; depth <= 13; ++depth) {
         if ((depth - 1) % 4 == 0) {

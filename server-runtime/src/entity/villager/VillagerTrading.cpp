@@ -16,10 +16,10 @@ constexpr std::int32_t kUnhappyTicks = 40;
 /// parity: `VillagerData.NEXT_LEVEL_XP_THRESHOLDS`.
 constexpr std::array<std::int32_t, 5> kLevelThresholds{0, 10, 70, 150, 250};
 constexpr std::int32_t kLastLevel = 5;
-/// parity: `Villager.rewardTradeXp`: the regeneration of a promotion and the orb it adds to.
+/// parity: `Villager.rewardTradeXp`.
 constexpr std::int32_t kPromotionRegeneration = 200;
 constexpr std::int32_t kPromotionOrbBonus = 5;
-/// parity: `ambientSoundTime > -getAmbientSoundInterval() + 20`, twenty ticks after a reset.
+/// parity: `ambientSoundTime > -getAmbientSoundInterval() + 20`.
 constexpr std::int32_t kTradeSoundGap = 20;
 /// parity: `Mob.getAmbientSoundInterval`, which neither trader overrides.
 constexpr std::int32_t kAmbientInterval = 80;
@@ -40,7 +40,7 @@ void resetSpecialPrices(ServerEntity& villager) {
     }
 }
 
-/// parity: `Villager.updateSpecialPrices`: the buyer's reputation, then the hero's discount.
+/// parity: `Villager.updateSpecialPrices`.
 void updateSpecialPrices(ServerEntity& villager, std::vector<world::trades::Offer>& offers, VillagerWorld& world,
                          std::int32_t playerId, const std::string& playerUuid) {
     resetSpecialPrices(villager);
@@ -66,7 +66,7 @@ void updateSpecialPrices(ServerEntity& villager, std::vector<world::trades::Offe
            villager.villagerExperience >= kLevelThresholds[static_cast<std::size_t>(level)];
 }
 
-/// parity: `Villager.increaseMerchantCareer`, the new level's trades rolled straight away.
+/// parity: `Villager.increaseMerchantCareer`.
 void increaseMerchantCareer(ServerEntity& villager, VillagerWorld& world) {
     villager.villagerLevel++;
     if (!villager.sourceNbt.has_value()) {
@@ -99,7 +99,7 @@ bool startTrading(ServerEntity& villager, VillagerWorld& world, std::int32_t pla
     if (mainHand && noOffers) {
         setUnhappy(villager, world);
     }
-    // parity: `TALKED_TO_VILLAGER`, awarded for the main hand whether or not there are offers.
+    // parity: `TALKED_TO_VILLAGER`.
     if (talked != nullptr) {
         *talked = mainHand;
     }

@@ -18,8 +18,7 @@ constexpr double kSpikeDistance = 42.0;
 } // namespace
 
 const std::vector<EndSpike>& forSeed(std::int64_t seed) {
-    // Every End chunk asks for these, so several generation workers reach the cache at once. The
-    // reference outlives the lock because a map keeps its nodes where they are and nothing erases.
+    // The reference outlives the lock because map nodes never move and nothing erases.
     static std::mutex mutex;
     static std::map<std::int64_t, std::vector<EndSpike>> cache;
     const std::scoped_lock lock{mutex};
@@ -27,8 +26,7 @@ const std::vector<EndSpike>& forSeed(std::int64_t seed) {
     if (found != cache.end()) {
         return found->second;
     }
-    // parity: `SpikeConfiguration`'s own shuffle of the ten sizes, seeded from the world seed's first
-    // legacy draw.
+    // parity: `SpikeConfiguration` shuffles the ten sizes seeded from the world seed's first legacy draw.
     random::RandomSource keySource = random::RandomSource::legacy(seed);
     const std::int64_t key = keySource.nextLong() & 65535LL;
     std::vector<std::int32_t> sizes(kCount);

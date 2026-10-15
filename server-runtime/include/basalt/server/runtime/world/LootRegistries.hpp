@@ -15,11 +15,7 @@ namespace basalt::server::runtime::world {
 
 class RealEnchantments;
 
-/// What a loot roll asks the registries: the enchantments an enchanting function draws from and the
-/// tags a `tag` entry or `set_instrument` picks over, in the order the jar keeps them.
-///
-/// parity: `TagLoader.build` keeps each tag in file order, and a random pick is an index into it, so
-/// the sorted tag tables the rest of the server uses would pick a different disc.
+/// parity: `TagLoader.build`.
 class LootRegistries {
 public:
     struct Jar {
@@ -35,12 +31,10 @@ public:
 
     [[nodiscard]] const server::world::loot::Enchanting& enchanting() const noexcept { return enchanting_; }
 
-    /// A tag's members in file order, for `item`, `enchantment` or `instrument`. Empty for any other.
     [[nodiscard]] std::vector<wire::common::Identifier> tagMembers(std::string_view registry,
                                                                    const wire::common::Identifier& tag) const;
 
 private:
-    /// An enchantment's `supported_items`, `primary_items` or `exclusive_set`: ids or one `#tag`.
     struct Selector {
         std::vector<wire::common::Identifier> ids;
         std::optional<wire::common::Identifier> tag;

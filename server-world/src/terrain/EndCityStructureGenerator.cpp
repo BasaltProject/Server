@@ -133,8 +133,7 @@ std::vector<endCityPieces::Piece> EndCityStructureGenerator::buildCity(std::int6
         std::min({surfaceHeightAt(startX, startZ), surfaceHeightAt(startX, startZ + offsetZ),
                   surfaceHeightAt(startX + offsetX, startZ), surfaceHeightAt(startX + offsetX, startZ + offsetZ)});
     const std::string_view biome = biomeSource_->biomeAtQuart(startX >> 2, startY >> 2, startZ >> 2);
-    // parity: `EndCityStructure.findGenerationPoint` keeps the y 60 floor and drops the biome test
-    // when `/place structure` asks with its always-true predicate.
+    // parity: `EndCityStructure.findGenerationPoint` keeps the y 60 floor and drops the biome test.
     if (startY < kMinStartY || (!forPlacement && !isEndCityBiome(biome))) {
         return {};
     }
@@ -234,8 +233,7 @@ void EndCityStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
         random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
     random::setFeatureSeed(random, decorationSeed, kEndCityStructureIndex, kSurfaceStructuresStep);
     for (const CityReference& reference : references) {
-        // The blocks alone leave the chunk unable to say what it holds: without the start nothing
-        // knows a position is inside a city. parity: the start belongs to the chunk it began in.
+        // parity: the start belongs to the chunk it began in.
         std::vector<StructureBoundingBox> boxes;
         boxes.reserve(reference.pieces->size());
         for (const endCityPieces::Piece& piece : *reference.pieces) {
@@ -243,8 +241,6 @@ void EndCityStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
         }
         if (std::optional<structure::StructureStartRecord> start =
                 structure::StructureStartRecord::of(std::string{kName}, reference.chunkX, reference.chunkZ, boxes)) {
-            // The full box covers the whole city; the pieces kept are the ones this chunk holds,
-            // which is all a question about a position inside it can need.
             std::erase_if(start->pieces,
                           [&clip](const StructureBoundingBox& piece) { return !piece.intersects(clip); });
             chunk.structures().add(std::move(*start));

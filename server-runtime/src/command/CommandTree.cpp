@@ -23,7 +23,7 @@ using wire::protocol::play::CommandSuggestion;
     return result;
 }
 
-/// parity: `SharedSuggestionProvider.matchesSubStr`, which restarts at every `.`, `_` or `/`.
+/// parity: `SharedSuggestionProvider.matchesSubStr`.
 [[nodiscard]] bool matchesSubString(std::string_view pattern, std::string_view input) {
     constexpr std::array<char, 3> kSplitters{'.', '_', '/'};
     std::size_t index = 0;

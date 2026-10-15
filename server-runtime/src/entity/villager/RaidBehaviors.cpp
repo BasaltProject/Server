@@ -12,8 +12,6 @@
 namespace basalt::server::runtime::entity::villager {
 namespace {
 
-// --- VillagerCalmDown and SetWalkTargetAwayFrom ---------------------------------------------------
-
 bool calmDown(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     const bool scared = ctx.mem.hurtBy.present() || ctx.mem.nearestHostile.present() ||
                         (ctx.mem.hurtByEntity.present() && look::distanceSqr(ctx, *ctx.mem.hurtByEntity.value) <= 36.0);
@@ -49,8 +47,6 @@ bool walkAwayFrom(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     return true;
 }
 
-// --- RingBell and ResetRaidStatus ---------------------------------------------------------------------
-
 bool ringBell(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     if (!ctx.mem.meetingPoint.present()) {
         return false;
@@ -85,8 +81,6 @@ bool resetRaidStatus(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     }
     return true;
 }
-
-// --- MoveToSkySeeingSpot and CelebrateVillagersSurvivedRaid --------------------------------------
 
 /// parity: `MoveToSkySeeingSpot.hasNoBlocksAbove`.
 [[nodiscard]] bool noBlocksAbove(Ctx& ctx, const BlockPos& pos) {
@@ -139,8 +133,6 @@ void celebrateTick(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
         ctx.world.launchFirework(ctx.self, colour, flight);
     }
 }
-
-// --- SetHiddenState -------------------------------------------------------------------------------------
 
 bool setHiddenState(Ctx& ctx, const Node& node, NodeState& state) {
     if (!ctx.mem.hidingPlace.present() || !ctx.mem.heardBellTime.present()) {

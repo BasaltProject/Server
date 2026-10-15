@@ -12,11 +12,9 @@ namespace basalt::server::runtime::world {
 /// parity: `StemBlock.randomTick`, pumpkin and melon stems.
 namespace stemGrowth {
 
-/// parity: `StemBlock.MAX_AGE`, after which the stem grows a fruit instead of ageing.
 inline constexpr std::int32_t kMaxAge = 7;
 
-/// parity: `StemBlock.randomTick`: the same growth speed a crop has, and at full age a fruit on one
-/// of the four sides with the stem turned to face it.
+/// parity: `StemBlock.randomTick`.
 void stem(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, float speed,
           random::RandomSource& random, std::vector<BlockChange>& changes, bool hasSkylight = true);
 

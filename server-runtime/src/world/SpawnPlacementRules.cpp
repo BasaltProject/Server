@@ -21,14 +21,12 @@ namespace reg = server::registry;
 
 using wire::common::Identifier;
 
-/// The predicate `SpawnPlacements` registers for a type.
 enum class Rule : std::uint8_t {
     Mob,
     Monster,
     AnyLightMonster,
     SurfaceMonster,
     Animal,
-    /// An animal rule over a block tag of its own, which never ignores the light.
     TaggedAnimal,
     Axolotl,
     SurfaceWaterAnimal,
@@ -210,7 +208,6 @@ constexpr std::int32_t kPatrolBlockLight = 8;
     return config::dimensionFacts(world.declaration().dimension);
 }
 
-/// What the rules below ask of one block.
 class Probe {
 public:
     Probe(LoadedWorld& world, const SpawnRuleFacts& facts) : world_(world), facts_(facts) {}
@@ -268,8 +265,7 @@ private:
     const SpawnRuleFacts& facts_;
 };
 
-/// parity: `Mob.checkMobSpawnRules`. A spawner never asks the block below; anything else asks
-/// `BlockState.isValidSpawn`, taken here as its default of a sturdy top and emission under fourteen.
+/// parity: `Mob.checkMobSpawnRules`.
 [[nodiscard]] bool mobRules(const Probe& probe, MobSpawnReason reason, std::int32_t x, std::int32_t y, std::int32_t z) {
     if (isSpawner(reason)) {
         return true;
@@ -294,7 +290,7 @@ private:
     return probe.blockTagged(x, y - 1, z, "minecraft:animals_spawnable_on") && bright;
 }
 
-/// parity: `WaterAnimal.checkSurfaceWaterAnimalSpawnRules`, which the ageable water creatures copy.
+/// parity: `WaterAnimal.checkSurfaceWaterAnimalSpawnRules`.
 [[nodiscard]] bool surfaceWaterRules(const Probe& probe, std::int32_t x, std::int32_t y, std::int32_t z) {
     constexpr std::int32_t kDepth = 13;
     const std::int32_t seaLevel = probe.seaLevel();
@@ -302,7 +298,7 @@ private:
            probe.isBlock(x, y + 1, z, "water");
 }
 
-/// parity: `Drowned.checkDrownedSpawnRules`, whose frequency roll is drawn even when it cannot pass.
+/// parity: `Drowned.checkDrownedSpawnRules`.
 [[nodiscard]] bool drownedRules(const Probe& probe, MobSpawnReason reason, std::int32_t x, std::int32_t y,
                                 std::int32_t z, random::RandomSource& random) {
     if (!probe.isWaterFluid(x, y - 1, z) && !isSpawner(reason)) {
@@ -346,8 +342,7 @@ private:
     return probe.blockTagged(x, y - 1, z, "minecraft:bats_spawnable_on") && mobRules(probe, reason, x, y, z);
 }
 
-/// parity: `Slime.checkSlimeSpawnRules`: a spawner only asks the mob rules, anything else the
-/// swamp surface and the slime chunks, each roll drawn in its own order.
+/// parity: `Slime.checkSlimeSpawnRules`.
 [[nodiscard]] bool slimeRules(const Probe& probe, MobSpawnReason reason, std::int32_t x, std::int32_t y, std::int32_t z,
                               random::RandomSource& random) {
     if (probe.peaceful()) {
@@ -433,7 +428,7 @@ private:
     case Rule::Bat:
         return batRules(probe, reason, x, y, z, random);
     case Rule::InfestationMob: {
-        // parity: `Endermite` and `Silverfish` alike: no player within five blocks unless a spawner.
+        // parity: `Endermite` and `Silverfish` alike.
         constexpr double kPlayerRange = 5.0;
         return mobRules(probe, reason, x, y, z) && (isSpawner(reason) || !probe.playerWithin(x, y, z, kPlayerRange));
     }
@@ -515,8 +510,7 @@ bool isDarkEnoughToSpawn(LoadedWorld& world, std::int32_t x, std::int32_t y, std
     if (worldLight::skyLight(world.state(), x, y, z, facts.hasSkylight) > random.nextInt(kSkyRollBound)) {
         return false;
     }
-    // parity: `DimensionType.MonsterSettings`: the overworld allows no block light and rolls zero to
-    // seven, the Nether ignores block light and tests against seven, the End allows none and fifteen.
+    // parity: `DimensionType.MonsterSettings`.
     std::int32_t blockLightLimit = 0;
     std::optional<std::int32_t> fixedLightTest;
     switch (world.declaration().dimension) {
@@ -547,8 +541,7 @@ std::int32_t maxLocalRawBrightness(LoadedWorld& world, std::int32_t x, std::int3
 }
 
 float lightLevelDependentMagicValue(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    // parity: `DimensionType.ambientLight`: nothing in the overworld, a tenth in the Nether and a
-    // quarter in the End.
+    // parity: `DimensionType.ambientLight`.
     float ambient = 0.0F;
     switch (world.declaration().dimension) {
     case config::WorldDimension::Nether:

@@ -41,7 +41,6 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kFaces{{
            (static_cast<std::int64_t>(y) & 0xFFF);
 }
 
-/// Takes the water out of one position, answering whether there was any to take.
 [[nodiscard]] bool drink(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                          const OnChanged& onChanged) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);

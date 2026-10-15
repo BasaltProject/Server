@@ -21,7 +21,6 @@ using wire::protocol::play::RecipeBookEntry;
 using wire::protocol::play::RecipeDisplay;
 using wire::protocol::play::SlotDisplay;
 
-/// Protocol ids, dropping anything this build's item registry does not know.
 [[nodiscard]] std::vector<std::int32_t> itemIds(const std::set<std::string, std::less<>>& items) {
     std::vector<std::int32_t> ids;
     for (const std::string& name : items) {
@@ -36,7 +35,6 @@ using wire::protocol::play::SlotDisplay;
     return ids;
 }
 
-/// One slot: a single item, or a choice between the items an ingredient accepts.
 [[nodiscard]] std::optional<SlotDisplay> slotFor(const std::set<std::string, std::less<>>& items) {
     const std::vector<std::int32_t> ids = itemIds(items);
     if (ids.empty()) {
@@ -53,7 +51,6 @@ using wire::protocol::play::SlotDisplay;
     return SlotDisplay{SlotDisplay::Composite{.options = std::move(options)}};
 }
 
-/// Where this recipe sits in the numbered list the client indexes by.
 [[nodiscard]] std::optional<std::int32_t> numberOf(const RealRecipes& recipes, const Identifier& id) {
     const auto found = recipes.ids().find(id);
     if (found == recipes.ids().end()) {
@@ -84,8 +81,6 @@ std::optional<RecipeBookEntry> entryFor(const RealRecipes& recipes, const Identi
     display.craftingStation = station.value_or(SlotDisplay{SlotDisplay::Empty{}});
     std::vector<std::vector<std::int32_t>> requirements;
 
-    // The book's furnace tabs come with the furnace menu, the stonecutter and the smithing table
-    // draw their own lists, and a special has no fixed shape to draw at all.
     if (recipe->kind == crafting::RecipeKind::Shaped) {
         display.grid = RecipeDisplay::Grid{.width = recipe->width, .height = recipe->height};
         for (const std::optional<crafting::Ingredient>& cell : recipe->shape) {

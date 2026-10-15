@@ -11,7 +11,6 @@ extern "C" {
 
 namespace basalt::server::plugins {
 namespace {
-
 [[nodiscard]] std::string joined(const std::vector<std::string>& values, std::string_view separator) {
     std::string out;
     for (const std::string& value : values) {
@@ -24,16 +23,13 @@ namespace {
 }
 
 [[nodiscard]] bool carries(const PluginEventType& type, std::string_view field) { return type.indexOf(field) >= 0; }
-
 } // namespace
 
-/// The one thing allowed to reach a view's privates from a C callback.
 struct ViewAccess {
     [[nodiscard]] static PluginEventView* of(lua_State* state) {
         return static_cast<PluginEventView*>(lua_touserdata(state, lua_upvalueindex(1)));
     }
 
-    /// Refuses to answer once the handler has returned, or once the event has been fired again.
     static void check(lua_State* state, PluginEventView& view) {
         if (view.generation_ != view.event_->generation() || !view.event_->live()) {
             luaL_error(state, "this %s event is over: it cannot be read or changed after the handler returns",
@@ -84,8 +80,6 @@ struct ViewAccess {
             return luaL_error(state, "a %s event cannot be cancelled: it is telling you, not asking",
                               view.event_->type().name().c_str());
         }
-        // Both `e:cancel()` and `e:cancel(message)` land here, and `e.cancel()` too: the first
-        // argument is the table when it was called with a colon.
         lua::LuaArgs lua{state};
         std::int32_t first = 1;
         if (lua.isTable(1)) {
@@ -184,15 +178,12 @@ std::unique_ptr<PluginEventView> PluginEventView::create(lua::LuaSandbox& sandbo
 
     lua_newtable(state);
     lua_newtable(state);
-    // The cancel function is an upvalue of `__index` rather than a field of the table: nothing of
-    // the event is in the table itself, so both metamethods always run.
     lua_pushlightuserdata(state, view.get());
     lua_pushcclosure(state, &ViewAccess::cancel, 1);
     lua_pushlightuserdata(state, view.get());
     lua_pushvalue(state, -2);
     lua_pushcclosure(state, &ViewAccess::index, 2);
     lua_setfield(state, -3, "__index");
-    // The cancel closure itself is no longer needed on the stack.
     lua_pop(state, 1);
     lua_pushlightuserdata(state, view.get());
     lua_pushcclosure(state, &ViewAccess::newIndex, 1);
@@ -205,5 +196,4 @@ std::unique_ptr<PluginEventView> PluginEventView::create(lua::LuaSandbox& sandbo
 void PluginEventView::bind() { generation_ = event_->generation(); }
 
 void PluginEventView::push(lua::LuaArgs& lua) const { lua_rawgeti(lua.state(), LUA_REGISTRYINDEX, tableRef_); }
-
 } // namespace basalt::server::plugins

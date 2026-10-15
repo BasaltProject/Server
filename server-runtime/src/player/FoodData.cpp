@@ -23,7 +23,7 @@ constexpr float kSwimExhaustionPerCm = 0.01F;
 constexpr float kJumpExhaustion = 0.05F;
 constexpr float kSprintJumpExhaustion = 0.2F;
 
-/// parity: `Math.round(float)`, which is a floor of the value plus a half and not a round to even.
+/// parity: `Math.round(float)`.
 [[nodiscard]] std::int32_t rounded(float value) { return static_cast<std::int32_t>(std::floor(value + 0.5F)); }
 
 } // namespace
@@ -101,8 +101,7 @@ void FoodData::tick(Difficulty difficulty, float health, float maxHealth, const 
 }
 
 float FoodData::movementExhaustion(double dx, double dy, double dz, bool sprinting, bool onGround, bool inWater) {
-    // parity: `Player.checkMovementStatistics` charges for swimming in three dimensions and for
-    // sprinting in two, and for nothing else a player does on their own feet.
+    // parity: `Player.checkMovementStatistics`.
     const double distance = inWater ? std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) : std::sqrt((dx * dx) + (dz * dz));
     const std::int32_t centimetres = rounded(static_cast<float>(distance) * 100.0F);
     if (centimetres <= 0) {

@@ -57,7 +57,6 @@ constexpr std::string_view kLeaderZombieBonus = "minecraft:leader_zombie_bonus";
     return byte != nullptr && *byte != 0;
 }
 
-/// One recursive finalization of something this zombie created, always as its own group.
 void finalizeChild(MobSpawnForestBuilder& builder, MobSpawnNode& child, const MobSpawnContext& context) {
     MobSpawnGroupData group;
     random::RandomSource entityRandom = context.entityRandom();
@@ -72,8 +71,7 @@ void maybeSpawnChickenJockey(MobSpawnForestBuilder& builder, MobSpawnNode& zombi
     }
     random::RandomSource& random = *context.random;
     if (random.nextFloat() < kChickenJockeyChance) {
-        // parity: a jockey first looks for a chicken already standing there, and rides nothing at
-        // all when there is none: it does not fall through to making one.
+        // parity: a jockey first looks for a chicken already standing there, and rides nothing at.
         if (builder.environment().nearbyUnriddenChicken) {
             if (const std::optional<std::int32_t> chicken = builder.environment().nearbyUnriddenChicken(zombie);
                 chicken.has_value()) {

@@ -170,8 +170,7 @@ void HurtByTargetGoal::start(MobContext& mob) {
             return;
         }
     }
-    // parity: `alertOthers`, the same kind within the follow range across and ten up or down that
-    // has nothing to fight yet.
+    // parity: `alertOthers`.
     const double within = followRange(mob);
     for (ServerEntity* other : mob.entities) {
         if (other == &mob.mob || other->removed || other->dying || other->type() != mob.mob.type() ||
@@ -207,9 +206,7 @@ bool MeleeAttackGoal::withinReach(const MobContext& mob, const TargetView& targe
 }
 
 bool MeleeAttackGoal::canUse(MobContext& mob) {
-    // parity: `MeleeAttackGoal.canUse` asks its navigation for a path first and gives up when there
-    // is none and the target is out of reach: that is what leaves a mob free to wander instead of
-    // standing still facing somebody it cannot get to.
+    // parity: `MeleeAttackGoal.canUse`.
     const std::optional<TargetView> target = targetOf(mob);
     if (!target.has_value()) {
         return false;
@@ -272,14 +269,12 @@ void MeleeAttackGoal::tick(MobContext& mob) {
 
 namespace {
 
-/// Whoever the warden is angriest at, if they are still here and still worth hitting.
 [[nodiscard]] std::optional<std::int32_t> suspect(MobContext& mob) {
     const std::optional<std::int32_t> angriest = wardens::target(mob.mob);
     if (!angriest.has_value()) {
         return std::nullopt;
     }
-    // It has to still be here and still be worth hitting: a creative or spectating player is
-    // neither, and a suspect who logged out or died is nobody to walk towards.
+    // It must still be here and worth hitting: a creative, spectating, logged-out or dead suspect is nobody to walk to.
     if (const PlayerView* player = mob.playerById(*angriest); player != nullptr) {
         return player->targetable ? angriest : std::nullopt;
     }
@@ -305,7 +300,7 @@ void AngerTargetGoal::stop(MobContext& mob) { mob.mob.targetId.reset(); }
 
 void AngerTargetGoal::tick(MobContext& mob) {
     const std::optional<std::int32_t> angriest = suspect(mob);
-    // parity: `SetRoarTarget`: somebody new is roared at first, and fought only once the roar ends.
+    // parity: `SetRoarTarget`.
     if (angriest.has_value() && !mob.mob.targetId.has_value()) {
         if (!wardenBrain::isBusy(mob.mob)) {
             mob.actions.wardenRoar(mob.mob, *angriest);

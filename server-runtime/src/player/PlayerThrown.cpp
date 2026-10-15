@@ -23,7 +23,7 @@ using wire::protocol::play::Gamemode;
 constexpr std::string_view kEnderPearl = "ender_pearl";
 constexpr std::string_view kSoundPearlThrow = "entity.ender_pearl.throw";
 
-/// parity: `ThrowableProjectileItem.use`, which throws at this speed and with this spread.
+/// parity: `ThrowableProjectileItem.use`.
 constexpr float kPearlPower = 1.5F;
 constexpr float kPearlUncertainty = 1.0F;
 
@@ -36,7 +36,7 @@ constexpr std::string_view kBow = "bow";
 constexpr std::string_view kArrowItem = "minecraft:arrow";
 constexpr std::string_view kSoundArrowShoot = "entity.arrow.shoot";
 
-/// parity: `BowItem`, twenty ticks to a full draw and a tenth of it before anything flies.
+/// parity: `BowItem`.
 constexpr float kBowDrawTicks = 20.0F;
 constexpr float kMinBowPower = 0.1F;
 constexpr float kBowPowerScale = 3.0F;
@@ -47,7 +47,6 @@ constexpr float kBowUncertainty = 1.0F;
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
-/// The way an aim points, as the projectiles want it.
 struct Aim {
     double x = 0.0;
     double y = 0.0;
@@ -62,7 +61,6 @@ struct Aim {
                .z = static_cast<double>(std::cos(yaw) * std::cos(pitch))};
 }
 
-/// One off the stack in that slot, and the slot said out loud.
 void spendOne(const BreakContext& context, PlayerSession& player, const std::int32_t slot) {
     const std::optional<storage::StoredItemStack>& stack = player.inventory.at(slot);
     if (!stack.has_value()) {
@@ -158,8 +156,7 @@ void shootBowFor(const BreakContext& context, PlayerSession& player, world::Load
         player.y + kThrowEyeHeight, player.z, aim.x, aim.y, aim.z, power * kBowPowerScale, kBowUncertainty, random);
     arrow.ownerId = player.entityId();
     arrow.critical = power >= 1.0F;
-    // parity: `ProjectileWeaponItem.useAmmo`: creative, or Infinity on a plain arrow, spends nothing
-    // and marks the arrow `intangible_projectile`, which only a creative player may pick back up.
+    // parity: `ProjectileWeaponItem.useAmmo`.
     const bool infinite =
         creative || (ammo.id == kArrowItem && player::enchantmentLevel(*held, Identifier::vanilla("infinity")) > 0);
     arrow.arrowPickup =

@@ -6,13 +6,10 @@
 
 namespace basalt::server::storage::sql {
 namespace {
-
-/// `SQLITE_OMIT_AUTOINIT` is on, so the library is initialised here rather than by the first open.
 void initialiseOnce() {
     static const int status = sqlite3_initialize();
     static_cast<void>(status);
 }
-
 } // namespace
 
 Statement::Statement(Statement&& other) noexcept
@@ -34,7 +31,6 @@ void Statement::bind(std::int32_t parameter, std::int64_t value) { sqlite3_bind_
 void Statement::bind(std::int32_t parameter, double value) { sqlite3_bind_double(handle_, parameter, value); }
 
 void Statement::bind(std::int32_t parameter, std::string_view value) {
-    // SQLITE_TRANSIENT: the statement outlives the caller's string in every use here.
     sqlite3_bind_text(handle_, parameter, value.data(), static_cast<int>(value.size()), SQLITE_TRANSIENT);
 }
 
@@ -156,11 +152,6 @@ std::optional<Database> Database::open(const std::string& path) {
     }
     Database database;
     database.handle_ = handle;
-    // WAL is what makes one file safe to write while it is being read, so a save on a connection
-    // thread stalls nobody. `synchronous = NORMAL` is its documented companion: fsync on checkpoint
-    // rather than on every commit. The failure that accepts is losing the last transactions if the
-    // machine loses power; a crash of this process alone still cannot corrupt the file, which is the
-    // property `playerdata/<uuid>.dat` does not have.
     database.exec("PRAGMA journal_mode = WAL");
     database.exec("PRAGMA synchronous = NORMAL");
     database.exec("PRAGMA foreign_keys = ON");
@@ -203,8 +194,6 @@ std::vector<std::string> Database::tables() {
 
 std::vector<std::string> Database::columns(std::string_view table) {
     std::vector<std::string> names;
-    // A table name cannot be a bound parameter in a pragma, so it is spliced. Every caller here
-    // passes a name this build wrote itself, read back from `sqlite_master`.
     Statement statement = prepare("PRAGMA table_info(\"" + std::string{table} + "\")");
     while (statement.step()) {
         names.push_back(statement.text(1));
@@ -225,5 +214,4 @@ void Database::raise(std::string_view what) {
         error_ = std::string{what};
     }
 }
-
 } // namespace basalt::server::storage::sql

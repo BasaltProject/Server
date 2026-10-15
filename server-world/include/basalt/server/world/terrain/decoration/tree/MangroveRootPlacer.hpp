@@ -20,7 +20,6 @@ public:
     /// parity: `RootPlacer.getTrunkOrigin`.
     [[nodiscard]] std::int32_t trunkOriginY(random::RandomSource& random, std::int32_t originY) const;
 
-    /// Roots are simulated whole before any block is written: one blocked position rejects the tree.
     bool placeRoots(Chunk& chunk, random::RandomSource& random, std::int32_t originX, std::int32_t originY,
                     std::int32_t originZ, std::int32_t trunkOriginY) const;
 

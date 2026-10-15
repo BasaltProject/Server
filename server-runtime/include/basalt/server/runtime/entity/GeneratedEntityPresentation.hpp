@@ -13,11 +13,9 @@ namespace basalt::server::runtime::entity {
 
 class ServerEntity;
 
-/// Metadata needed to render immutable entities emitted by structure templates.
 [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>
 generatedEntityMetadata(std::string_view type, const wire::nbt::NbtCompound& data);
 
-/// One piece of gear a generated entity was written wearing.
 struct GeneratedEquipment {
     wire::protocol::play::SetEquipmentPacket::SlotType slot =
         wire::protocol::play::SetEquipmentPacket::SlotType::MainHand;
@@ -28,7 +26,7 @@ struct GeneratedEquipment {
 
 [[nodiscard]] std::vector<GeneratedEquipment> generatedEntityEquipment(const wire::nbt::NbtCompound& data);
 
-/// parity: `VehicleEntity`'s hurt clock, direction and damage, and what each vehicle adds on top.
+/// parity: `VehicleEntity`'s hurt clock.
 struct VehicleData {
     std::int32_t hurtTime = 0;
     std::int32_t hurtDir = 1;
@@ -43,20 +41,17 @@ struct VehicleData {
     friend bool operator==(const VehicleData&, const VehicleData&) = default;
 };
 
-/// What a minecart or a boat shows, or nothing for anything else.
 [[nodiscard]] std::optional<VehicleData> vehicleDataOf(const ServerEntity& entity);
 
-/// Initial non-default vehicle fields, or the ones that changed since `before`.
 void appendVehicleChanges(std::vector<wire::protocol::play::SetEntityDataPacket::Entry>& entries,
                           const VehicleData& now, const VehicleData* before);
 
-/// The live synchronized fields this server mutates after an entity has spawned.
 struct RuntimeEntityMetadata {
     std::int32_t airSupply = 0;
     std::optional<bool> baby;
     std::optional<std::int32_t> cubeSize;
     std::optional<std::int8_t> horseFlags;
-    /// parity: `AbstractChestedHorse.DATA_ID_CHEST` and `Camel.DASH`, both the byte after the flags.
+    /// parity: `AbstractChestedHorse.DATA_ID_CHEST` and `Camel.DASH`.
     std::optional<bool> horseChest;
     std::optional<bool> camelDash;
     /// parity: `ThrownTrident.ID_LOYALTY` and `ID_FOIL`, after `AbstractArrow`'s three.
@@ -67,7 +62,7 @@ struct RuntimeEntityMetadata {
     std::optional<bool> creakingActive;
     std::optional<bool> creakingTearingDown;
     std::optional<std::optional<wire::protocol::play::BlockPos>> creakingHome;
-    /// parity: `EndCrystal`'s beam and base, which change while a dragon is being called back.
+    /// parity: `EndCrystal`'s beam and base.
     std::optional<std::optional<wire::protocol::play::BlockPos>> crystalBeam;
     std::optional<bool> crystalBottom;
     /// parity: `EnderDragon.DATA_PHASE`, which the client animates by.
@@ -78,18 +73,16 @@ struct RuntimeEntityMetadata {
     std::optional<float> cloudRadius;
     std::optional<bool> cloudWaiting;
     std::optional<wire::protocol::play::SetEntityDataPacket::ParticleValue> cloudParticle;
-    /// parity: `FishingHook`'s hooked entity, as its id plus one, and whether a fish is biting.
+    /// parity: `FishingHook`'s hooked entity.
     std::optional<std::int32_t> hookedEntity;
     std::optional<bool> hookBiting;
-    /// parity: `LivingEntity.DATA_EFFECT_PARTICLES` and `DATA_EFFECT_AMBIENCE_ID`, the effect swirl.
+    /// parity: `LivingEntity.DATA_EFFECT_PARTICLES` and `DATA_EFFECT_AMBIENCE_ID`.
     std::optional<wire::protocol::play::SetEntityDataPacket::ParticlesValue> effectParticles;
     std::optional<bool> effectsAmbient;
-    /// parity: `Entity.DATA_POSE`, for the mobs whose pose this server changes, and the warden's
-    /// `CLIENT_ANGER_LEVEL`.
+    /// parity: `Entity.DATA_POSE`.
     std::optional<wire::protocol::play::Pose> pose;
     std::optional<std::int32_t> wardenAnger;
     /// parity: `CopperGolem`'s weathering and the pose it works a chest in.
-    /// parity: `WitherSkull.DATA_DANGEROUS`, which is what the client draws blue.
     std::optional<bool> dangerousSkull;
     std::optional<std::int32_t> copperWeather;
     std::optional<std::int32_t> copperPose;
@@ -97,7 +90,7 @@ struct RuntimeEntityMetadata {
     std::optional<std::int32_t> shulkerFace;
     std::optional<std::int32_t> shulkerPeek;
     std::optional<std::int32_t> shulkerColor;
-    /// parity: `FireworkRocketEntity`'s item, who it is stuck to and whether it was shot at an angle.
+    /// parity: `FireworkRocketEntity`'s item.
     std::optional<wire::protocol::play::WireItemStack> fireworkItem;
     std::optional<std::optional<std::int32_t>> fireworkAttached;
     /// parity: `LivingEntity.DATA_STINGER_COUNT_ID`.
@@ -108,7 +101,7 @@ struct RuntimeEntityMetadata {
     /// parity: `Sniffer.DATA_STATE` and `DATA_DROP_SEED_AT_TICK`.
     std::optional<std::int32_t> snifferState;
     std::optional<std::int32_t> snifferDropSeed;
-    /// parity: `Pufferfish`'s PUFF_STATE, the integer right after `AbstractFish`'s moving flag.
+    /// parity: `Pufferfish`'s PUFF_STATE.
     std::optional<std::int32_t> pufferfishPuff;
     /// parity: `Camel.LAST_POSE_CHANGE_TICK`.
     std::optional<std::int64_t> camelPoseTick;
@@ -136,7 +129,6 @@ struct RuntimeEntityMetadata {
     std::optional<bool> goatRightHorn;
     std::optional<VehicleData> vehicle;
 
-    /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>
     changesFrom(const RuntimeEntityMetadata* previous) const;
 

@@ -26,8 +26,6 @@ namespace basalt::server::runtime {
 
 class BlockChangeBroadcaster;
 
-/// The conduit's turn: its frame, the power it hands out and the monsters it strikes.
-///
 /// parity: `ConduitBlockEntity.serverTick`.
 class ConduitSystem {
 public:
@@ -38,7 +36,6 @@ public:
 
     ConduitSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster, Options options);
 
-    /// One conduit's turn over its saved fields. Answers whether they changed.
     bool tick(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, wire::nbt::NbtCompound& data);
 
 private:
