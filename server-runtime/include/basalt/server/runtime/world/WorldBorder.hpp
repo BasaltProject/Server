@@ -3,6 +3,7 @@
 #include <basalt/wire/nbt/NbtTag.hpp>
 #include <basalt/wire/protocol/play/BorderPackets.hpp>
 
+#include <array>
 #include <cstdint>
 
 namespace basalt::server::runtime::world {
@@ -50,6 +51,9 @@ public:
 
     /// parity: `WorldBorder.isWithinBounds(double, double)`.
     [[nodiscard]] bool contains(double x, double z) const;
+
+    /// parity: `WorldBorder.clampToBounds`, as the block column the point falls in.
+    [[nodiscard]] std::array<std::int32_t, 2> clampColumn(double x, double z) const;
 
     void settle();
 
