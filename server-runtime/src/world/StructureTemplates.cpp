@@ -19,17 +19,21 @@ using Template = server::world::structure::StructureTemplate;
     return "data/" + id.namespaceName() + "/structure/" + id.path() + ".nbt";
 }
 
-[[nodiscard]] bool portable(const Identifier& id) {
-    const auto valid = [](char c, bool slash) {
-        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' ||
-               (slash && c == '/');
-    };
-    const auto clean = [&valid](const std::string& text, bool slash) {
-        return !text.empty() && text.front() != '/' && text.find("..") == std::string::npos &&
-               text.find("//") == std::string::npos &&
-               std::ranges::all_of(text, [&](char c) { return valid(c, slash); });
-    };
-    return clean(id.namespaceName(), false) && clean(id.path(), true);
+[[nodiscard]] bool plainSegments(std::string_view text) {
+    if (text.empty() || text.find('\\') != std::string_view::npos || text.find('\0') != std::string_view::npos) {
+        return false;
+    }
+    std::size_t start = 0;
+    while (start <= text.size()) {
+        std::size_t end = text.find('/', start);
+        end = end == std::string_view::npos ? text.size() : end;
+        const std::string_view part = text.substr(start, end - start);
+        if (part.empty() || part == "." || part == "..") {
+            return false;
+        }
+        start = end + 1;
+    }
+    return true;
 }
 
 } // namespace
@@ -54,7 +58,7 @@ const Template* StructureTemplates::find(const Identifier& id) {
     std::string refusal;
     // parity: the generated directory is the first source a template is looked for in.
     std::optional<std::vector<std::uint8_t>> generated;
-    if (generatedRoot_.has_value() && portable(id)) {
+    if (generatedRoot_.has_value()) {
         std::ifstream file{*generatedRoot_ / id.namespaceName() / "structure" / (id.path() + ".nbt"), std::ios::binary};
         if (file) {
             generated = std::vector<std::uint8_t>{std::istreambuf_iterator<char>{file}, {}};
@@ -103,10 +107,10 @@ bool StructureTemplates::store(const Identifier& id, const wire::nbt::NbtCompoun
     if (!toDisk) {
         return true;
     }
-    if (!generatedRoot_.has_value() || !portable(id)) {
+    const std::filesystem::path file = generatedFile(id);
+    if (file.empty()) {
         return false;
     }
-    const std::filesystem::path file = *generatedRoot_ / id.namespaceName() / "structure" / (id.path() + ".nbt");
     std::error_code failed;
     std::filesystem::create_directories(file.parent_path(), failed);
     const std::expected<std::vector<std::uint8_t>, wire::io::CompressionError> packed =
@@ -127,9 +131,10 @@ void StructureTemplates::forget(const Identifier& id) {
 }
 
 std::filesystem::path StructureTemplates::generatedFile(const Identifier& id) const {
-    return generatedRoot_.has_value() && portable(id)
-               ? *generatedRoot_ / id.namespaceName() / "structure" / (id.path() + ".nbt")
-               : std::filesystem::path{};
+    if (!generatedRoot_.has_value() || !plainSegments(id.namespaceName()) || !plainSegments(id.path())) {
+        return {};
+    }
+    return *generatedRoot_ / id.namespaceName() / "structure" / (id.path() + ".nbt");
 }
 
 std::optional<wire::nbt::NbtCompound> StructureTemplates::read(const Identifier& id) {
