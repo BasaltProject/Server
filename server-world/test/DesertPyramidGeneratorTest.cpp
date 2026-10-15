@@ -146,3 +146,57 @@ TEST_CASE("the desert pyramids rise where the frozen kotlin raises them") {
 
     SUBCASE("fourthSeed") { check(run(4321, "minecraft:desert"), 4055, 10, 4, 6340709082413145088LL); }
 }
+
+TEST_CASE("placing a pyramid writes what generation writes, without a start record") {
+    const std::int64_t seed = 720;
+    const auto [startX, startZ] = DesertPyramidStructureGenerator::grid().candidateChunk(seed, 0, 0);
+    const std::string desert{"minecraft:desert"};
+    DesertPyramidStructureGenerator generator{[&desert](std::int32_t x, std::int32_t y, std::int32_t z) -> std::string {
+                                                  const bool centred = (x & 15) == 8 && (z & 15) == 8;
+                                                  return centred && y == surfaceAt(x, z) - 1
+                                                             ? desert
+                                                             : std::string{"minecraft:ocean"};
+                                              },
+                                              surfaceAt};
+
+    std::optional<structure::StructureBoundingBox> bounds;
+    std::size_t naturalStarts = 0;
+    for (std::int32_t dx = 0; dx < 2; ++dx) {
+        for (std::int32_t dz = 0; dz < 2; ++dz) {
+            Chunk natural = desertChunk(startX + dx, startZ + dz);
+            generator.generateInto(natural, seed);
+            naturalStarts += natural.structures().starts().size();
+            Chunk placed = desertChunk(startX + dx, startZ + dz);
+            generator.placeAt(placed, seed, startX, startZ);
+            if (dx == 0 && dz == 0) {
+                const std::optional<structure::StructureBoundingBox> asked =
+                    generator.placeBoundsAt(seed, startX, startZ);
+                REQUIRE(asked.has_value());
+                bounds = asked;
+            }
+            for (std::int32_t y = 30; y <= 90; ++y) {
+                for (std::int32_t z = 0; z < 16; ++z) {
+                    for (std::int32_t x = 0; x < 16; ++x) {
+                        CHECK(natural.blockStateId(x, y, z) == placed.blockStateId(x, y, z));
+                    }
+                }
+            }
+            CHECK(natural.blockEntities().size() == placed.blockEntities().size());
+            for (std::size_t index = 0; index < natural.blockEntities().size(); ++index) {
+                CHECK(natural.blockEntities()[index].data().getLong("LootTableSeed", 0) ==
+                      placed.blockEntities()[index].data().getLong("LootTableSeed", 0));
+            }
+            // parity: `PlaceCommand.placeStructure` registers no start.
+            CHECK(placed.structures().starts().empty());
+        }
+    }
+    // The piece is 21 by 21 from the chunk corner, so the start covers its own chunk and the three
+    // across its positive edges.
+    REQUIRE(bounds.has_value());
+    CHECK((bounds->minX >> 4) == startX);
+    CHECK((bounds->minZ >> 4) == startZ);
+    CHECK((bounds->maxX >> 4) == startX + 1);
+    CHECK((bounds->maxZ >> 4) == startZ + 1);
+    // Every chunk the pyramid covers records the start in the worldgen path; placement records none.
+    CHECK(naturalStarts == 4);
+}

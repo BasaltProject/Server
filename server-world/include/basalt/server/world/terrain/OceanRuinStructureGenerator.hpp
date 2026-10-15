@@ -35,6 +35,17 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: where a ruin of this kind (`cold` picks the templates
+    /// and loot) started at this chunk would write. Ruins never fail to generate, so the bounds are
+    /// always the conservative reach of a parent ruin plus its cluster: two chunks out in every
+    /// direction.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ, bool cold) const;
+
+    /// Writes the part of the ruin of this kind started at (chunkX, chunkZ) that lands in `chunk`,
+    /// like the worldgen pass does, but without the grid and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, bool cold) const;
+
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
     /// Whether a ruin of that kind starts in this chunk, which is what `/locate` and an explorer map
@@ -42,7 +53,10 @@ public:
     [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, bool warm) const;
 
 private:
-    void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
+    /// `forPlacementCold`, when set, means `/place structure`: the grid and biome checks are skipped
+    /// and the variant is the one named on the command line.
+    void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                   std::optional<bool> forPlacementCold = std::nullopt) const;
 
     /// parity: `addPiece`. A warm ruin is one template; a cold one is three, rotted 0.9, 0.7, 0.5.
     [[nodiscard]] std::vector<structure::StructureBoundingBox>

@@ -35,6 +35,18 @@ public:
     /// Writes into `chunk` whatever any nearby mineshaft puts there.
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: the bounds of the shaft of this type started at this
+    /// chunk with the frequency roll and biome checks skipped, or nothing when the layout came up
+    /// empty.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox>
+    placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, structure::MineshaftType type) const;
+
+    /// Writes the part of the shaft of this type started at (chunkX, chunkZ) that lands in `chunk`,
+    /// like the worldgen pass does, but without the frequency roll and biome checks and without
+    /// recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                 structure::MineshaftType type) const;
+
     [[nodiscard]] const structure::StructurePlacementGrid& grid() const noexcept { return grid_; }
 
     /// Which mineshaft, if any, starts at this chunk. parity: `ChunkGenerator` picks by weight from

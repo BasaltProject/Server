@@ -217,8 +217,8 @@ bool OceanMonumentStructureGenerator::startsAt(std::int64_t seed, std::int32_t c
 }
 
 void OceanMonumentStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
-                                                std::int32_t chunkZ) {
-    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
+                                                std::int32_t chunkZ, bool forPlacement) {
+    if (!forPlacement && !grid().isStructureChunk(seed, chunkX, chunkZ)) {
         return;
     }
     if (!surroundingIsOcean(chunkX, chunkZ)) {
@@ -230,7 +230,7 @@ void OceanMonumentStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed,
     const std::int32_t centreX = chunkX * 16 + 8;
     const std::int32_t centreZ = chunkZ * 16 + 8;
     const std::int32_t groundY = oceanFloorAt_(centreX, centreZ) - 1;
-    if (!monumentBiomes_.contains(noiseBiomeAt_(centreX >> 2, groundY >> 2, centreZ >> 2))) {
+    if (!forPlacement && !monumentBiomes_.contains(noiseBiomeAt_(centreX >> 2, groundY >> 2, centreZ >> 2))) {
         return;
     }
 
@@ -272,11 +272,31 @@ void OceanMonumentStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed,
         const structure::StructurePieceFill fill{*box, orientation, chunk, clip};
         draw(piece, structure::MonumentBrush{fill, seaLevel_, clip}, random);
     }
+    if (forPlacement) {
+        // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
+        return;
+    }
     chunk.structures().add(structure::StructureStartRecord{.structure = std::string{kName},
                                                            .chunkX = chunkX,
                                                            .chunkZ = chunkZ,
                                                            .fullBounds = shellBox,
                                                            .pieces = std::move(here)});
+}
+
+std::optional<structure::StructureBoundingBox>
+OceanMonumentStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+    static_cast<void>(seed);
+    if (!surroundingIsOcean(chunkX, chunkZ)) {
+        return std::nullopt;
+    }
+    const std::int32_t west = chunkX * 16 - 29;
+    const std::int32_t north = chunkZ * 16 - 29;
+    return structure::StructureBoundingBox{west, kBaseY, north, west + 57, kBaseY + 22, north + 57};
+}
+
+void OceanMonumentStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
+                                              std::int32_t chunkZ) {
+    placeFrom(chunk, seed, chunkX, chunkZ, /*forPlacement=*/true);
 }
 
 void OceanMonumentStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {

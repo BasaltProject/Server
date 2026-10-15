@@ -377,6 +377,14 @@ std::vector<PlacedStructurePiece> VillageStructureGenerator::assemblePool(std::s
     return assemble(pool, chunkX, chunkZ, maxDepth, seed, samplers, random);
 }
 
+void VillageStructureGenerator::placeAt(Chunk& chunk, const wire::common::Identifier& structure, std::int32_t chunkX,
+                                        std::int32_t chunkZ, std::int64_t seed) const {
+    const std::optional<std::vector<PlacedStructurePiece>> pieces = assembleAt(structure, chunkX, chunkZ, seed);
+    if (pieces.has_value()) {
+        placeInto(chunk, *pieces, seed);
+    }
+}
+
 void VillageStructureGenerator::placeInto(Chunk& chunk, const std::vector<PlacedStructurePiece>& pieces,
                                           std::int64_t seed) const {
     const StructureBoundingBox clip = chunkClip(chunk.chunkX(), chunk.chunkZ(), 0);

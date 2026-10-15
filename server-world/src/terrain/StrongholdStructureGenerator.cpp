@@ -183,6 +183,40 @@ void StrongholdStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed)
     }
 }
 
+std::optional<structure::StructureBoundingBox>
+StrongholdStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::vector<structure::StrongholdPiece>& pieces = layoutFor(chunkX, chunkZ, seed);
+    if (pieces.empty()) {
+        return std::nullopt;
+    }
+    return wholeBox(pieces);
+}
+
+void StrongholdStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    const structure::StructureBoundingBox clip = chunkClip(chunk.chunkX(), chunk.chunkZ());
+    const std::vector<structure::StrongholdPiece>& pieces = layoutFor(chunkX, chunkZ, seed);
+    bool anythingHere = false;
+    for (const structure::StrongholdPiece& piece : pieces) {
+        if (piece.box.intersects(clip)) {
+            anythingHere = true;
+            break;
+        }
+    }
+    if (!anythingHere) {
+        return;
+    }
+    random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
+    const std::int64_t decorationSeed =
+        random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
+    random::setFeatureSeed(random, decorationSeed, kStructureIndex, kSurfaceStructuresStep);
+    for (const structure::StrongholdPiece& piece : pieces) {
+        if (piece.box.intersects(clip)) {
+            draw(chunk, piece, clip, random);
+        }
+    }
+    // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
+}
+
 std::optional<std::pair<std::int32_t, std::int32_t>> StrongholdStructureGenerator::locate(std::int32_t fromX,
                                                                                           std::int32_t fromZ) const {
     ensureRings();

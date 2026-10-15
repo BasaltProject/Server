@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/RandomSequences.hpp>
 #include <basalt/server/runtime/world/RegionStore.hpp>
 #include <basalt/server/runtime/world/StructureLocator.hpp>
+#include <basalt/server/runtime/world/StructurePlacer.hpp>
 #include <basalt/server/runtime/world/WorldBorder.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/runtime/world/WorldMetadata.hpp>
@@ -48,6 +49,8 @@ struct LoadedWorldOptions {
     server::world::terrain::VillageStructureGenerator* villageGenerator = nullptr;
     server::world::terrain::VillageStructureGenerator* campGenerator = nullptr;
     std::vector<StructureLocator> structureLocators;
+    /// The single-generator structures `/place structure` can generate on the spot.
+    std::vector<StructurePlacer> structurePlacers;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator = nullptr;
     /// Where the climate search says this world's spawn chunk is; the origin without one.
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder;
@@ -203,6 +206,9 @@ public:
     /// The single-generator structures `/locate` can find besides the sets and the stronghold.
     [[nodiscard]] const std::vector<StructureLocator>& structureLocators() const noexcept { return structureLocators_; }
 
+    /// The single-generator structures `/place structure` can generate besides the sets.
+    [[nodiscard]] const std::vector<StructurePlacer>& structurePlacers() const noexcept { return structurePlacers_; }
+
     [[nodiscard]] server::world::terrain::StrongholdStructureGenerator* strongholdGenerator() const noexcept {
         return strongholdGenerator_;
     }
@@ -293,6 +299,7 @@ private:
     server::world::terrain::VillageStructureGenerator* villageGenerator_ = nullptr;
     server::world::terrain::VillageStructureGenerator* campGenerator_ = nullptr;
     std::vector<StructureLocator> structureLocators_;
+    std::vector<StructurePlacer> structurePlacers_;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator_ = nullptr;
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder_;
     std::function<void(server::world::Chunk&, std::int64_t, const std::string&)> spawnMobs_;

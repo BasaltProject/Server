@@ -10,6 +10,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <vector>
 
 namespace basalt::server::world::terrain {
 
@@ -30,13 +31,30 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: the bounds of the mansion started at this chunk with
+    /// the grid and biome checks skipped, or nothing when its own conditions (the y 60 floor) reject
+    /// the chunk.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ);
+
+    /// Writes the part of the mansion started at (chunkX, chunkZ) that lands in `chunk`, like the
+    /// worldgen pass does, but without the grid and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
     /// Whether a mansion starts in this chunk, which is what `/locate` asks.
     [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
 private:
-    void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+    void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                   bool forPlacement = false);
+
+    /// The house a start at this chunk builds: rotation draw, lowest corner and the mansion grid, in
+    /// `findGenerationPoint`'s order. `forPlacement` skips the biome check.
+    [[nodiscard]] std::vector<structure::MansionPiece> mansionStart(std::int64_t seed, std::int32_t chunkX,
+                                                                    std::int32_t chunkZ, bool forPlacement,
+                                                                    structure::StructureRotation& rotation) const;
 
     /// parity: the `Chest*` and mob markers. The chest faces the way its marker names once the
     /// house's own rotation is applied; a mob marker leaves air behind it.

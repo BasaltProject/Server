@@ -238,25 +238,33 @@ bool WoodlandMansionStructureGenerator::startsAt(std::int64_t seed, std::int32_t
     return origin.has_value() && mansionBiomes_.contains(biomeAt_(origin->x, origin->y, origin->z));
 }
 
-void WoodlandMansionStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
-                                                  std::int32_t chunkZ) {
-    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
-        return;
-    }
-
+std::vector<structure::MansionPiece>
+WoodlandMansionStructureGenerator::mansionStart(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                                bool forPlacement, structure::StructureRotation& rotation) const {
     random::RandomSource startRandom = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(startRandom, seed, chunkX, chunkZ);
 
-    const StructureRotation rotation = drawRotation(startRandom);
+    rotation = drawRotation(startRandom);
     const std::optional<StructurePos> origin = lowestCornerOf(chunkX, chunkZ, rotation);
     // parity: `Structure.isValidBiome` reads the stub, which for a mansion is that lowest corner.
-    if (!origin.has_value() || !mansionBiomes_.contains(biomeAt_(origin->x, origin->y, origin->z))) {
-        return;
+    if (!origin.has_value() || (!forPlacement && !mansionBiomes_.contains(biomeAt_(origin->x, origin->y, origin->z)))) {
+        return {};
     }
 
     std::vector<structure::MansionPiece> pieces;
     const structure::MansionGrid mansion{startRandom};
     structure::mansionPlacer::createMansion(pieces, startRandom, *origin, rotation, mansion);
+    return pieces;
+}
+
+void WoodlandMansionStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
+                                                  std::int32_t chunkZ, bool forPlacement) {
+    if (!forPlacement && !grid().isStructureChunk(seed, chunkX, chunkZ)) {
+        return;
+    }
+
+    structure::StructureRotation rotation = structure::StructureRotation::None;
+    const std::vector<structure::MansionPiece> pieces = mansionStart(seed, chunkX, chunkZ, forPlacement, rotation);
     if (pieces.empty()) {
         return;
     }
@@ -295,13 +303,37 @@ void WoodlandMansionStructureGenerator::placeFrom(Chunk& chunk, std::int64_t see
         return;
     }
     foundation(chunk, clip, *whole, here);
-    if (!here.empty()) {
-        chunk.structures().add(structure::StructureStartRecord{.structure = std::string{kName},
-                                                               .chunkX = chunkX,
-                                                               .chunkZ = chunkZ,
-                                                               .fullBounds = *whole,
-                                                               .pieces = std::move(here)});
+    if (here.empty() || forPlacement) {
+        // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
+        return;
     }
+    chunk.structures().add(structure::StructureStartRecord{.structure = std::string{kName},
+                                                           .chunkX = chunkX,
+                                                           .chunkZ = chunkZ,
+                                                           .fullBounds = *whole,
+                                                           .pieces = std::move(here)});
+}
+
+std::optional<structure::StructureBoundingBox>
+WoodlandMansionStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    structure::StructureRotation rotation = structure::StructureRotation::None;
+    const std::vector<structure::MansionPiece> pieces =
+        mansionStart(seed, chunkX, chunkZ, /*forPlacement=*/true, rotation);
+    std::optional<structure::StructureBoundingBox> whole;
+    for (const structure::MansionPiece& piece : pieces) {
+        const structure::StructureTemplate* found = templateOf_(std::string{kTemplatePrefix} + piece.templateName);
+        if (found == nullptr) {
+            continue;
+        }
+        const StructureBoundingBox box = found->getBoundingBox(piece.position, piece.rotation, kPivot, piece.mirror);
+        whole = whole.has_value() ? unionOf(*whole, box) : box;
+    }
+    return whole;
+}
+
+void WoodlandMansionStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
+                                                std::int32_t chunkZ) {
+    placeFrom(chunk, seed, chunkX, chunkZ, /*forPlacement=*/true);
 }
 
 void WoodlandMansionStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {

@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -29,13 +30,24 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: the shell bounds of the monument started at this chunk
+    /// with the grid and centre-biome checks skipped. The surrounding-ocean sweep stays, being a
+    /// condition of `OceanMonumentStructure.findGenerationPoint` itself; it can refuse the position.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ) const;
+
+    /// Writes the part of the monument started at (chunkX, chunkZ) that lands in `chunk`, like the
+    /// worldgen pass does, but without the grid and centre-biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
     /// Whether a monument starts in this chunk, which is what `/locate` and an explorer map ask.
     [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
 private:
-    void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+    void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                   bool forPlacement = false);
 
     /// parity: the radius-29 sweep around the ninth block of the chunk. It is a cube of biome cells,
     /// not a circle, and one cell outside the tag is enough to refuse the monument.

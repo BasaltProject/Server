@@ -108,6 +108,22 @@ public:
            std::int32_t maxCells = kDefaultSearchCells,
            const std::function<bool(std::int32_t, std::int32_t)>& skip = {});
 
+    /// parity: `PlaceCommand.placeStructure`: assembles the start at a chunk the grid did not pick,
+    /// skipping the grid check and the biome acceptance, as vanilla's `Structure.generate` with an
+    /// always-true biome predicate does. Not cached: the answer differs from worldgen's at a chunk
+    /// the biome would refuse.
+    [[nodiscard]] std::optional<std::vector<structure::PlacedStructurePiece>>
+    assembleAt(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
+
+    /// The union of what `assembleAt` at this chunk would place, which is what a placed start's
+    /// bounding box covers.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ);
+
+    /// Writes the part of the start assembled at (chunkX, chunkZ) that lands in `chunk`, reusing
+    /// `assembleAt` so a placed structure is the assembled one.
+    void placeAt(Chunk& chunk, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
+
 private:
     struct CandidateKey {
         std::int64_t seed = 0;
@@ -131,6 +147,11 @@ private:
     /// would dangle as soon as another worker triggered that mid-read.
     [[nodiscard]] std::shared_ptr<const std::vector<structure::PlacedStructurePiece>>
     assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ, std::int64_t seed);
+
+    /// The assembly itself, shared by the cached worldgen path and the uncached `/place` path.
+    /// `forPlacement` skips the grid check and accepts any biome.
+    [[nodiscard]] std::vector<structure::PlacedStructurePiece>
+    buildStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ, std::int64_t seed, bool forPlacement);
 
     [[nodiscard]] std::int32_t surfaceHeightAt(std::int32_t x, std::int32_t z, Samplers& samplers) const;
 

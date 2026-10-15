@@ -308,12 +308,13 @@ bool OceanRuinStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunk
     return cold.has_value() && *cold != warm;
 }
 
-void OceanRuinStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
-                                            std::int32_t chunkZ) const {
-    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
+void OceanRuinStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                            std::optional<bool> forPlacementCold) const {
+    const bool placement = forPlacementCold.has_value();
+    if (!placement && !grid().isStructureChunk(seed, chunkX, chunkZ)) {
         return;
     }
-    const std::optional<bool> cold = chooseVariant(seed, chunkX, chunkZ);
+    const std::optional<bool> cold = placement ? forPlacementCold : chooseVariant(seed, chunkX, chunkZ);
     if (!cold.has_value()) {
         return;
     }
@@ -347,7 +348,8 @@ void OceanRuinStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std
             touching.push_back(box);
         }
     }
-    if (touching.empty()) {
+    if (touching.empty() || placement) {
+        // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
         return;
     }
     const std::optional<structure::StructureStartRecord> whole =
@@ -360,6 +362,21 @@ void OceanRuinStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std
                                                            .chunkZ = chunkZ,
                                                            .fullBounds = whole->fullBounds,
                                                            .pieces = std::move(touching)});
+}
+
+std::optional<structure::StructureBoundingBox> OceanRuinStructureGenerator::placeBoundsAt(std::int64_t seed,
+                                                                                          std::int32_t chunkX,
+                                                                                          std::int32_t chunkZ,
+                                                                                          bool cold) const {
+    static_cast<void>(seed);
+    static_cast<void>(cold);
+    return structure::StructureBoundingBox{(chunkX - 2) * 16,     kOverworldHeight.minY(), (chunkZ - 2) * 16,
+                                           (chunkX + 3) * 16 - 1, kOverworldHeight.maxY(), (chunkZ + 3) * 16 - 1};
+}
+
+void OceanRuinStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                          bool cold) const {
+    placeFrom(chunk, seed, chunkX, chunkZ, cold);
 }
 
 void OceanRuinStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
