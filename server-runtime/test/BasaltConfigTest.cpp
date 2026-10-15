@@ -404,3 +404,20 @@ TEST_CASE("a server with no properties beside it gets the untouched default") {
     CHECK(config->port == 25565);
     CHECK(*fileIO::readText(directory.pathOf("server.toml")) == kServerDefaultToml);
 }
+
+TEST_CASE("Java listen addresses are explicit literals with optional IPv6 dual stack") {
+    const auto defaults = parsed("");
+    CHECK(defaults.javaBind == "0.0.0.0");
+    CHECK_FALSE(defaults.javaDualStack);
+    const auto local = parsed("[network.java]\nbind = '127.0.0.1'");
+    CHECK(local.javaBind == "127.0.0.1");
+    const auto ipv6 = parsed("[network.java]\nbind = '::1'\ndual-stack = true");
+    CHECK(ipv6.javaBind == "::1");
+    CHECK(ipv6.javaDualStack);
+    for (const auto text : {"bind = true", "bind = 'localhost'", "bind = ''", "dual-stack = true",
+                            "dual-stack = 'false'", "bind = '127.0.0.1\\u0000x'"}) {
+        const auto root = toml::parse("[network.java]\n" + std::string{text});
+        REQUIRE(root);
+        CHECK_FALSE(BasaltConfig::fromToml(*root, "config/server.toml"));
+    }
+}

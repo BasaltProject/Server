@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
 #include <basalt/wire/io/FileIO.hpp>
+#include <basalt/wire/io/TcpSocket.hpp>
 
 #include <algorithm>
 #include <charconv>
@@ -225,6 +226,15 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
                 return std::unexpected(std::string{path} + ": the java port must be between 1 and 65535");
             }
             config.port = static_cast<std::int32_t>(port.value_or(defaults.port));
+            if ((java->find("bind") && !java->string("bind")) ||
+                (java->find("dual-stack") && !java->boolean("dual-stack")))
+                return std::unexpected(std::string{path} + ": java bind must be a string and dual-stack a boolean");
+            config.javaBind = std::string{java->string("bind").value_or(defaults.javaBind)};
+            config.javaDualStack = java->boolean("dual-stack").value_or(defaults.javaDualStack);
+            if (!wire::io::TcpAddress::literal(config.javaBind, static_cast<std::uint16_t>(config.port)))
+                return std::unexpected(std::string{path} + ": java bind must be a literal IPv4 or IPv6 address");
+            if (config.javaDualStack && config.javaBind.find(':') == std::string::npos)
+                return std::unexpected(std::string{path} + ": java dual-stack requires an IPv6 bind address");
         }
         if (const TomlTable* bedrock = network->table("bedrock"); bedrock != nullptr) {
             config.bedrockEnabled = bedrock->boolean("enabled").value_or(defaults.bedrockEnabled);

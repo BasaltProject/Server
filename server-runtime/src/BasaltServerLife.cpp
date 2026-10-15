@@ -129,12 +129,16 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
     // A server for one edition only is a real thing to want, so the door that is shut is simply not
     // opened: nothing else in here knows which of the two a player came through.
     if (config_->javaEnabled) {
+        const auto address =
+            wire::io::TcpAddress::literal(config_->javaBind, static_cast<std::uint16_t>(config_->port));
+        if (!address)
+            throw std::runtime_error("Invalid Java bind address: " + config_->javaBind);
         std::expected<wire::io::TcpListener, wire::io::SocketError> bound =
-            wire::io::TcpListener::bind(static_cast<std::uint16_t>(config_->port));
+            wire::io::TcpListener::bind(*address, 128, config_->javaDualStack);
         if (!bound.has_value()) {
             // Almost always another server already on that port, which is worth saying rather than
             // leaving the operator with an error number.
-            throw std::runtime_error("Could not bind port " + std::to_string(config_->port) +
+            throw std::runtime_error("Could not bind " + config_->javaBind + " port " + std::to_string(config_->port) +
                                      ". Another server is probably already running on it; stop it or change `port` in "
                                      "[network.java] of config/server.toml.");
         }
