@@ -557,6 +557,31 @@ TEST_CASE("everything the block held up comes down, whichever side it was on") {
                        {7, 64, 8}, {9, 64, 8}, {8, 64, 7}, {8, 64, 9}, {8, 63, 8}, {8, 65, 8}});
 }
 
+TEST_CASE("a notice issued from inside a neighbour update runs before the faces still waiting on it") {
+    Loaded loaded;
+    // Four repeaters hanging in the air: R1 west of the change and R2 east of it, R3 west of R1 and
+    // R4 east of R2. Taking the block at the origin away tells R1 first and R2 second; in the jar a
+    // repeater that comes down tells from inside the face that brought it down, so R3 falls before
+    // the east face of the origin is ever told, and R4 last. A queue would leave them R1, R2, R3,
+    // R4; the jar's stack makes it R1, R3, R2, R4.
+    loaded.put(0, 64, 0, stateOf("stone"));
+    const std::int32_t repeater = stateOf("repeater");
+    loaded.put(-1, 64, 0, repeater);
+    loaded.put(1, 64, 0, repeater);
+    loaded.put(-2, 64, 0, repeater);
+    loaded.put(2, 64, 0, repeater);
+
+    loaded.put(0, 64, 0, air());
+    Report report;
+    neighbourUpdates::afterChange(loaded.context(), 0, 64, 0, stateOf("stone"), report.effects, report.onBroken());
+
+    REQUIRE(report.broken.size() == 4);
+    CHECK(report.broken[0] == std::array<std::int32_t, 4>{repeater, -1, 64, 0});
+    CHECK(report.broken[1] == std::array<std::int32_t, 4>{repeater, -2, 64, 0});
+    CHECK(report.broken[2] == std::array<std::int32_t, 4>{repeater, 1, 64, 0});
+    CHECK(report.broken[3] == std::array<std::int32_t, 4>{repeater, 2, 64, 0});
+}
+
 TEST_CASE("a block that only changed shape carries the walk on to the next one") {
     Loaded loaded;
     const std::int32_t fence = stateOf("oak_fence");

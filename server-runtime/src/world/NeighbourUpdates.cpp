@@ -997,24 +997,36 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (afterShapes) {
         afterShapes();
     }
+
     // Each square waiting to react remembers **who told it**, which one block reads: a door does not
     // answer another door of its own kind.
-    std::deque<std::pair<Position, std::optional<std::int32_t>>> reacting;
+    // parity: `CollectingNeighborUpdater` answers from a stack, not a queue: a notice issued inside a
+    // `neighborChanged` runs before the faces still waiting. A frame keeps its next face (`MultiNeighborUpdate.idx`).
+    struct Reacting {
+        Position at;
+        std::optional<std::int32_t> told;
+        std::int32_t face = 0;
+        bool started = false;
+    };
+
+    std::vector<Reacting> reacting;
     // parity: a block that changed is asked again, and so are the squares its own update reaches past
     // its six sides: a rail the one below, a sensor the one below, a rod or a hook the wall behind.
     // None feeds a signal that way; what it reaches is a neighbour left out of step. Every place
     // that collects what a reactor changed goes through here.
     const auto reactsAt = [&reacting](const BlockChange& change) {
-        reacting.push_back({{change.x, change.y, change.z}, change.stateId});
+        reacting.push_back({{change.x, change.y, change.z}, change.stateId, 0, false});
         for (const registry::BlockFace also : redstone::alsoTells(change.stateId)) {
             reacting.push_back(
                 {{change.x + registry::stepX(also), change.y + registry::stepY(also), change.z + registry::stepZ(also)},
-                 change.stateId});
+                 change.stateId,
+                 0,
+                 false});
         }
     };
     // parity: the square that changed tells with the block that **left** on the world's road and with
     // the one that arrived on a command's, the same as every other notice.
-    reacting.push_back({{x, y, z}, context.railArrivalTells ? removed : world.blockState(x, y, z)});
+    reacting.push_back({{x, y, z}, context.railArrivalTells ? removed : world.blockState(x, y, z), 0, false});
     // parity: `DiodeBlock.updateNeighborsInFront` from `onPlace` and from
     // `affectNeighborsAfterRemoval`, plus `RedstoneTorchBlock.notifyNeighbors`, which tell the square
     // they feed **and its own neighbours**. The state that has just gone is what says where a
@@ -1150,37 +1162,57 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // order is the map's and `wireReach` is what works it out.
     for (const BlockChange& change : settled) {
         for (const std::array<std::int32_t, 3>& at : redstoneComponents::wireReach(change.x, change.y, change.z)) {
-            reacting.push_back({{at[0], at[1], at[2]}, std::nullopt});
+            reacting.push_back({{at[0], at[1], at[2]}, std::nullopt, 0, false});
         }
     }
+    // The initial notices above were collected in issue order, which is the order the jar's stack
+    // answers them in; it answers from the top, so they go on reversed.
+    std::ranges::reverse(reacting);
     std::int32_t reacted = 0;
-    while (!reacting.empty() && reacted < context.maxChainedUpdates) {
-        const auto [at, told] = reacting.front();
-        reacting.pop_front();
-        ++reacted;
-        // parity: the six squares this notice reaches each run their `neighborChanged`, and a diode or
-        // a dust left without footing comes down there, from whichever side the news arrived.
-        // Measured in `diodosuelto`, where a floating repeater and dust stayed put beside a new block.
-        for (const BlockFace face : kUpdateOrder) {
-            const std::int32_t nx = at[0] + registry::stepX(face);
-            const std::int32_t ny = at[1] + registry::stepY(face);
-            const std::int32_t nz = at[2] + registry::stepZ(face);
+    while (!reacting.empty()) {
+        Reacting& current = reacting.back();
+        if (!current.started) {
+            if (reacted >= context.maxChainedUpdates) {
+                // parity: `CollectingNeighborUpdater.addAndRun` stops answering past
+                // `max-chained-neighbor-updates` and the rest of the queue is left unheard.
+                break;
+            }
+            current.started = true;
+            ++reacted;
+        }
+        if (current.face < 6) {
+            const BlockFace face = kUpdateOrder[current.face];
+            ++current.face;
+            // parity: the six squares this notice reaches each run their `neighborChanged`, and a
+            // diode or a dust left without footing comes down there, from whichever side the news
+            // arrived.
+            const std::int32_t nx = current.at[0] + registry::stepX(face);
+            const std::int32_t ny = current.at[1] + registry::stepY(face);
+            const std::int32_t nz = current.at[2] + registry::stepZ(face);
             const std::optional<bool> diode = dropUnsupportedComponent(context, nx, ny, nz, broken);
             if (!diode.has_value()) {
                 continue;
             }
             // parity: `Level.removeBlock` writes with flag three, the shape walk and the notice around
             // the square both; `DiodeBlock` then tells the neighbours of each of its six squares too.
+            // Both tells come from inside this face's `neighborChanged`: top of the stack, square first.
             reshapeOnly(context, nx, ny, nz, broken, reshaped);
-            reacting.push_back({{nx, ny, nz}, std::nullopt});
             if (*diode) {
-                for (const BlockFace also : kUpdateOrder) {
+                for (std::int32_t index = 5; index >= 0; --index) {
+                    const BlockFace also = kUpdateOrder[index];
                     reacting.push_back(
                         {{nx + registry::stepX(also), ny + registry::stepY(also), nz + registry::stepZ(also)},
-                         std::nullopt});
+                         std::nullopt,
+                         0,
+                         false});
                 }
             }
+            reacting.push_back({{nx, ny, nz}, std::nullopt, 0, false});
+            continue;
         }
+        const Position at = current.at;
+        const std::optional<std::int32_t> told = current.told;
+        reacting.pop_back();
         for (const BlockChange& change :
              redstoneReactors::update(world, context.worldName, at[0], at[1], at[2], context.gameTime, context.random,
                                       context.tntExplodes, false, told)) {
@@ -1194,7 +1226,20 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 effects.push_back(change);
             }
             redstoneComponents::watchFor(world, change.x, change.y, change.z);
-            reactsAt(change);
+            // parity: what the answer reaches past its own square is told inside this `neighborChanged`,
+            // so it goes on top of the stack.
+            std::vector<Reacting> reached;
+            for (const registry::BlockFace also : redstone::alsoTells(change.stateId)) {
+                reached.push_back({{change.x + registry::stepX(also), change.y + registry::stepY(also),
+                                    change.z + registry::stepZ(also)},
+                                   change.stateId,
+                                   0,
+                                   false});
+            }
+            for (auto it = reached.rbegin(); it != reached.rend(); ++it) {
+                reacting.push_back(*it);
+            }
+            reacting.push_back({{change.x, change.y, change.z}, change.stateId, 0, false});
         }
     }
     // parity: `DispenserBlock.neighborChanged`, which remembers it was triggered and books a turn.

@@ -2,7 +2,9 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Items.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
@@ -592,6 +594,19 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     }
     const bool changed = chunk->setBlockStateId(x & 15, y, z & 15, stateId);
     if (changed) {
+        // parity: `LevelChunk.setBlockState` gives a state that owns a block entity one whenever
+        // none is there, whatever flags the write carried; the entity that weathering kept was
+        // already checked above and survives the write. `moving_piston` is the one the jar never
+        // leaves default: `moveBlocks` replaces the fresh entity with the carrying one in the same
+        // breath, and so does the piston here, so a default one would only sit under the settle
+        // pass that runs between the two writes.
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+        if (block != nullptr && block->path() != "moving_piston" &&
+            registry::blockEntityTypes::ofBlock(*block) != nullptr &&
+            chunk->blockEntityAt(x & 15, y, z & 15) == nullptr) {
+            chunk->setBlockEntity(
+                server::world::ChunkBlockEntity{x & 15, y, z & 15, *block, blockEntityDefaults::of(*block, stateId)});
+        }
         poi_.noteBlockChange(poi::BlockPos{x, y, z}, was, stateId);
         const std::span<const std::int32_t> before = registry::blockShapes::collisionBoxes(was);
         const std::span<const std::int32_t> after = registry::blockShapes::collisionBoxes(stateId);
