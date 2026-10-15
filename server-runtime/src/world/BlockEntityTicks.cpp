@@ -126,7 +126,6 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             }
         }
     }
-    std::vector<vibrations::ShriekerArrival> shrieks;
     std::vector<BlockChange> hives;
     std::vector<std::array<std::int32_t, 3>> catalysts;
     for (const std::array<std::int32_t, 2>& position : chunks) {
@@ -148,12 +147,14 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
-            // parity: `SculkShriekerBlockEntity`'s ticker, the same countdown.
+            // parity: `SculkShriekerBlockEntity`'s ticker, the same countdown. The shriek itself
+            // answers on this very turn, inside the walk, where the jar's `onReceiveVibration`
+            // applies it.
             if (path == "sculk_shrieker") {
                 if (std::optional<vibrations::ShriekerArrival> arrival =
                         vibrations::shriekerTravelTick(world, x, y, z, gameTime, hooks.ticking);
-                    arrival.has_value()) {
-                    shrieks.push_back(std::move(*arrival));
+                    arrival.has_value() && hooks.shriekerHeard) {
+                    hooks.shriekerHeard(*arrival);
                 }
                 continue;
             }
@@ -406,13 +407,6 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             if (turned.has_value()) {
                 changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
             }
-        }
-    }
-    // parity: the jar shrieks inside the walk, on the shrieker's own turn. Deferring only differs if
-    // a later block entity in the same walk reads the shrieker, which none does today.
-    if (hooks.shriekerHeard) {
-        for (const vibrations::ShriekerArrival& arrival : shrieks) {
-            hooks.shriekerHeard(arrival);
         }
     }
     // parity: the honey a bee brought in, which the jar sets inside the hive's own turn.

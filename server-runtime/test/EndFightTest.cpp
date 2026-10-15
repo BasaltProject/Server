@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
@@ -182,6 +183,34 @@ TEST_CASE("a fresh end calls up its dragon, and four crystals by the portal call
     }
     CHECK(crystals == 10);
     CHECK(shielded == 0);
+}
+
+TEST_CASE("the fight holds its arena chunks while somebody fights and lets them go when it empties") {
+    Arena arena{scratch("end-fight-ticket")};
+    world::DragonFight* fight = arena.end->dragonFight();
+    REQUIRE(fight != nullptr);
+    static_cast<void>(world::endPodium::ensure(arena.end->state(), false));
+    const std::int64_t centre = world::ChunkGenerationQueue::pack(0, 0);
+    const std::int64_t edge = world::ChunkGenerationQueue::pack(9, 9);
+    const std::int64_t outside = world::ChunkGenerationQueue::pack(10, 0);
+
+    // The first scan runs on the opening tick (the counter starts past the interval, like a loaded
+    // fight resuming), and the ticket comes with it.
+    arena.tick();
+    CHECK(fight->dragonTicketHeld);
+    CHECK(arena.end->forcedChunks().contains(centre));
+    CHECK(arena.end->forcedChunks().contains(edge));
+    CHECK_FALSE(arena.end->forcedChunks().contains(outside));
+
+    // The last fighter leaves and the next scan takes the ticket back.
+    arena.player->x = 1000.0;
+    for (std::int32_t tick = 0; tick < 20; ++tick) {
+        arena.tick();
+    }
+    CHECK(fight->barPlayers.empty());
+    CHECK_FALSE(fight->dragonTicketHeld);
+    CHECK_FALSE(arena.end->forcedChunks().contains(centre));
+    CHECK_FALSE(arena.end->forcedChunks().contains(edge));
 }
 
 TEST_CASE("a gateway with no exit builds an island and a way back, and then always leads there") {

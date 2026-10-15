@@ -194,7 +194,9 @@ void readLoop(const std::function<CommandDispatcher*()>& current, bool editing) 
             continue;
         }
         // A command from the console reaches the world, so it runs on whoever owns it rather than on
-        // this thread. With nothing loaded there is nobody to ask, and it runs here.
+        // this thread. With nothing loaded there is nobody to ask, and it runs here. The owner holds
+        // it for the turn's console point, not its start: the jar runs console input after the
+        // levels and before `playerList.tick`.
         const CommandEnvironment& environment = dispatcher->environment();
         const auto named = environment.options().worlds.find(environment.options().defaultWorldName);
         world::LoadedWorld* defaultWorld = named == environment.options().worlds.end() ? nullptr : named->second;
@@ -225,7 +227,7 @@ void readLoop(const std::function<CommandDispatcher*()>& current, bool editing) 
         if (defaultWorld == nullptr) {
             run();
         } else {
-            static_cast<void>(defaultWorld->owner().submit(run));
+            static_cast<void>(defaultWorld->owner().submitConsole(run));
         }
     }
 }

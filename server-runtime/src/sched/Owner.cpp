@@ -34,7 +34,7 @@ bool Owner::isClaimed() const noexcept { return boundThread_.load() != 0; }
 
 std::size_t Owner::pending() const {
     const std::lock_guard<std::mutex> lock{mutex_};
-    return incoming_.size() + atEnd_.size() + delayed_.size();
+    return incoming_.size() + atEnd_.size() + delayed_.size() + console_.size();
 }
 
 void Owner::bindToCurrentThread() noexcept { boundThread_.store(currentThreadId()); }
@@ -79,7 +79,25 @@ TaskHandle Owner::scheduleAtEnd(std::function<void()> task) {
     return handle;
 }
 
+TaskHandle Owner::submitConsole(std::function<void()> task) {
+    TaskHandle handle;
+    if (isClosed()) {
+        // Nobody is going to run it, and saying so is better than holding it for ever.
+        handle.cancel();
+        return handle;
+    }
+    if (isCurrent() || !isClaimed()) {
+        task();
+        return handle;
+    }
+    const std::lock_guard<std::mutex> lock{mutex_};
+    console_.push_back(ScheduledTask{.handle = handle, .task = std::move(task), .dueInTicks = 0});
+    return handle;
+}
+
 std::size_t Owner::runPending(const FailureHandler& onFailure) { return drain(incoming_, onFailure); }
+
+std::size_t Owner::runConsole(const FailureHandler& onFailure) { return drain(console_, onFailure); }
 
 std::size_t Owner::runEndOfTick(const FailureHandler& onFailure) { return drain(atEnd_, onFailure); }
 
@@ -113,15 +131,34 @@ void Owner::close() {
     for (const ScheduledTask& task : atEnd_) {
         task.handle.cancel();
     }
+    for (const ScheduledTask& task : console_) {
+        task.handle.cancel();
+    }
     for (const ScheduledTask& task : delayed_) {
         task.handle.cancel();
     }
     incoming_.clear();
     atEnd_.clear();
+    console_.clear();
     delayed_.clear();
 }
 
 void Owner::drainInto(Owner& other) {
+    // Console input keeps its slot in the owner that survives: it runs at the turn's console
+    // point wherever that turn now lives.
+    std::deque<ScheduledTask> console;
+    {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        console.swap(console_);
+    }
+    if (!console.empty()) {
+        const std::lock_guard<std::mutex> lock{other.mutex_};
+        for (ScheduledTask& task : console) {
+            if (!task.handle.isCancelled()) {
+                other.console_.push_back(std::move(task));
+            }
+        }
+    }
     std::vector<ScheduledTask> moved;
     {
         const std::lock_guard<std::mutex> lock{mutex_};

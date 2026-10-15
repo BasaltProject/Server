@@ -177,8 +177,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             // same queue at once.
             timings_.of("tick.tasks").time([&region, &onTaskFailure, worldRuns] {
                 // parity: a frozen turn does not move the clock, so nothing waiting on a delay comes
-                // due, but what is already queued still runs: that is how a console command lands
-                // while `/tick freeze` holds.
+                // due, but what is already queued still runs.
                 if (worldRuns) {
                     region.owner().advanceTick();
                 }
@@ -190,16 +189,31 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             if (shuttingDown_.load()) {
                 return;
             }
-            // Whatever those commands killed or lit goes off now, frozen or not.
-            //
-            // KNOWN GAP, not parity: vanilla runs queued tasks after `processPacketsAndTick`, so a
-            // console command lands after the world's turn, and `tickDeath` and a primed tnt are
-            // ordinary entity ticks there. Moving this needs its own measurement first.
-            tickDeaths(world, region);
-            tickPrimedTnt(world);
+            // What the console typed runs at the turn's console point, not at its top: parity:
+            // `DedicatedServer.tickConnection`'s `handleConsoleInputs`, which the jar runs after
+            // the levels and before `playerList.tick` (see the drain before the player tick
+            // below).
+            const auto drainConsole = [this, &region, &onTaskFailure] {
+                if (region.isPrimary() && region.worldName() == worldRegistry_->defaultWorld().name()) {
+                    static_cast<void>(region.owner().runConsole(onTaskFailure));
+                }
+            };
             if (!worldRuns) {
+                // parity: a frozen turn still takes console input, which is how `/tick unfreeze`
+                // reaches the world at all. It lands before the deaths and the tnt it may cause,
+                // as it did from the top of the turn.
+                drainConsole();
+                if (shuttingDown_.load()) {
+                    return;
+                }
+                tickDeaths(world, region);
+                tickPrimedTnt(world);
                 return;
             }
+            // Whatever those commands killed or lit goes off now: a running turn has already
+            // drained the console queue, and this pair only sees what it did.
+            tickDeaths(world, region);
+            tickPrimedTnt(world);
 
             const auto step = [this, &world](std::string_view what, auto&& body) {
                 try {
@@ -264,6 +278,12 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             if (region.isPrimary()) {
                 step("Effect tick", [this, &world] { statusEffects_->tickEffects(world); });
                 step("Raid tick", [this, &world] { raids_->tickRaids(world); });
+                // parity: console input runs after the levels and before `playerList.tick`; the
+                // closest this turn has, the per-player tick below.
+                drainConsole();
+                if (shuttingDown_.load()) {
+                    return;
+                }
                 step("Player tick", [this, &world] { environment_->tickPlayers(world); });
                 step("Map tick", [this, &world] { maps_->tickPlayers(world); });
                 step("Sleep tick", [this, &world] { environment_->tickSleep(world); });
