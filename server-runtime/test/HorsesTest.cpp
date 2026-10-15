@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/world/FallLanding.hpp>
 
 #include <doctest.h>
 
@@ -16,6 +17,7 @@ using basalt::wire::common::Identifier;
 using basalt::wire::common::Uuid;
 namespace horses = basalt::server::runtime::entity::horses;
 namespace registry = basalt::server::registry;
+namespace fallLanding = basalt::server::runtime::world::fallLanding;
 
 namespace {
 
@@ -71,4 +73,41 @@ TEST_CASE("a llama holds a third of a horse's temper and takes carpets, not sadd
     donkey->tamedHorse = true;
     CHECK(horses::wearableFor(*donkey, Identifier::vanilla("saddle")) == horses::Wearable::Saddle);
     CHECK(horses::wearableFor(*donkey, Identifier::vanilla("iron_horse_armor")) == horses::Wearable::None);
+}
+
+TEST_CASE("a horse's fall is halved by its own attributes and handed to its riders") {
+    // parity: `AbstractHorse.createBaseHorseAttributes`, a safe fall of six at half damage, shared by
+    // the camel; `LivingEntity.calculateFallDamage` floors the rest.
+    auto horse = spawn(1, "horse");
+    const double safe = horse->attributeWithModifiers("minecraft:safe_fall_distance");
+    const double multiplier = horse->attributeWithModifiers("minecraft:fall_damage_multiplier");
+    CHECK(safe == doctest::Approx(6.0));
+    CHECK(multiplier == doctest::Approx(0.5));
+    const fallLanding::Landing plain{};
+    CHECK(fallLanding::damage(6.0, plain, safe, multiplier) == 0);
+    CHECK(fallLanding::damage(8.0, plain, safe, multiplier) == 1);
+    CHECK(fallLanding::damage(12.0, plain, safe, multiplier) == 3);
+    // parity: the riders' own `causeFallDamage` recomputes with their attributes, so a hay block's
+    // modifier lands on them the same way it landed on the mount.
+    CHECK(fallLanding::damage(12.0, fallLanding::Landing{.damageMultiplier = 0.2F}, safe, multiplier) == 0);
+}
+
+TEST_CASE("only the horse-like rear up, for twenty ticks, and the flag reaches the metadata") {
+    auto horse = spawn(1, "horse");
+    horses::HorseState& state = horses::stateOf(*horse);
+    state.eating = true;
+    horses::standIfPossible(*horse);
+    CHECK(state.standing);
+    CHECK(state.standCounter == 20);
+    CHECK_FALSE(state.eating);
+    CHECK((horses::flagsOf(*horse) & horses::kFlagStanding) != 0);
+    CHECK(horses::canRear(horse->type()));
+    auto camel = spawn(2, "camel");
+    CHECK_FALSE(horses::canRear(camel->type()));
+    horses::standIfPossible(*camel);
+    CHECK_FALSE(horses::stateOf(*camel).standing);
+    auto llama = spawn(3, "llama");
+    CHECK_FALSE(horses::canRear(llama->type()));
+    horses::standIfPossible(*llama);
+    CHECK_FALSE(horses::stateOf(*llama).standing);
 }

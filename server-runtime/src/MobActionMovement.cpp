@@ -127,12 +127,14 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
     }
     const bool horse =
         path == "horse" || path == "donkey" || path == "mule" || path == "skeleton_horse" || path == "zombie_horse";
-    const bool mount = horse || path == "llama" || path == "trader_llama" || path == "camel" || path == "camel_husk";
+    const bool camel = path == "camel" || path == "camel_husk";
+    const bool mount = horse || camel || path == "llama" || path == "trader_llama";
     // parity: `LivingEntity.causeFallDamage` hands the fall on before anything, a mount only once hurt.
     if (!mount) {
         propagateFall(world, mob, fallen, landing);
     }
-    if (horse && distance > 1.0) {
+    // parity: `AbstractHorse.causeFallDamage`, shared by the camel, whose land sound is the horse's.
+    if ((horse || camel) && distance > 1.0) {
         movementSound(world, mob, mob.age < 0 ? "entity.horse.land_baby" : "entity.horse.land", 0.4F, 1.0F);
     }
     // parity: `Creeper.causeFallDamage` burns the fuse down by half as much again as the fall.
@@ -148,16 +150,22 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
         return;
     }
     const bool llama = path == "llama" || path == "trader_llama";
-    if (!horse && !llama) {
+    if (!mount) {
         movementSound(world, mob, steps::fallSound(mob.type(), damage), 1.0F, 1.0F);
     }
-    // parity: `playBlockFallSound`, the block under the feet at half its volume and three quarters its pitch.
-    if (!server::registry::blocks::isAir(onState)) {
-        const server::registry::BlockSoundTypeEntry& sound = server::registry::blockSounds::of(onState);
-        movementSound(world, mob, sound.fallSound, sound.volume * 0.5F, sound.pitch * 0.75F);
+    const auto blockFallSound = [&] {
+        // parity: `playBlockFallSound`, the block under the feet at half its volume and three quarters its pitch.
+        if (!server::registry::blocks::isAir(onState)) {
+            const server::registry::BlockSoundTypeEntry& sound = server::registry::blockSounds::of(onState);
+            movementSound(world, mob, sound.fallSound, sound.volume * 0.5F, sound.pitch * 0.75F);
+        }
+    };
+    if (!mount) {
+        blockFallSound();
     }
-    // parity: `Llama.causeFallDamage` hurts only past six blocks.
+    // parity: `Llama.causeFallDamage` hurts nobody below six blocks, though the block still sounds.
     if (llama && fallen < 6.0) {
+        blockFallSound();
         return;
     }
     entity::entityCombat::blame(mob, std::nullopt, -1, wire::common::Identifier::vanilla("player"));
@@ -170,7 +178,10 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
                                    result.died);
     }
     if (mount) {
+        // parity: `AbstractHorse.causeFallDamage` and the llama's: hurt, hand the fall to the riders,
+        // then sound the block landed on.
         propagateFall(world, mob, fallen, landing);
+        blockFallSound();
     }
 }
 
