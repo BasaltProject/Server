@@ -226,8 +226,8 @@ void ClientSession::drainFrames() {
     wire::io::ByteBuffer frame;
     while (true) {
         frame.clear();
-        const std::expected<bool, wire::protocol::FramingError> read =
-            wire::protocol::packetFraming::tryReadFrame(incoming_, compressionEnabled_, frame);
+        const std::expected<bool, wire::protocol::FramingError> read = wire::protocol::packetFraming::tryReadFrame(
+            incoming_, compressionEnabled_, frame, options_.compressionThreshold);
         if (!read.has_value()) {
             // One malformed frame costs one connection, not the thread reading it.
             logger_.debug([] { return "Dropping a connection whose frame could not be read."; });
@@ -342,7 +342,10 @@ void ClientSession::sendUncompressed(std::int32_t id, const std::function<void(w
     wire::protocol::varInt::write(body, id);
     writeBody(body);
     wire::io::ByteBuffer frame;
-    wire::protocol::packetFraming::writeUncompressed(frame, body.readable());
+    if (!wire::protocol::packetFraming::writeUncompressed(frame, body.readable())) {
+        connection_.close();
+        return;
+    }
     writeToSocket(frame);
 }
 
