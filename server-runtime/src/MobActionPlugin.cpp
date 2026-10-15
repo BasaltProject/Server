@@ -253,25 +253,19 @@ std::int32_t MobActionSystem::pluginZombify(ServerEntity& villager) {
     const entity::mobConversions::Conversion conversion{
         .into = wire::common::Identifier::vanilla("zombie_villager"),
         .finalize = entity::mobConversions::Conversion::Finalize::ZombieVillager};
-    const bool converted =
-        convertMob(*world, watchersOf(*world), villager, conversion, [&villagerData](wire::nbt::NbtCompound& tag) {
+    std::int32_t spawnedId = -1;
+    const bool converted = convertMob(
+        *world, watchersOf(*world), villager, conversion,
+        [&villagerData](wire::nbt::NbtCompound& tag) {
             for (const std::string_view key : {"VillagerData", "Offers", "Gossips", "Xp"}) {
                 if (const wire::nbt::NbtTag* value = villagerData.find(key)) {
                     tag.set(key, *value);
                 }
             }
             tag.putBoolean("VillagerDataFinalized", true);
-        });
-    if (!converted) {
-        return -1;
-    }
-    std::int32_t found = -1;
-    for (const ServerEntity* candidate : world->state().entities()) {
-        if (candidate->type().path() == "zombie_villager" && candidate->entityId() > found) {
-            found = candidate->entityId();
-        }
-    }
-    return found;
+        },
+        &spawnedId);
+    return converted ? spawnedId : -1;
 }
 
 } // namespace basalt::server::runtime

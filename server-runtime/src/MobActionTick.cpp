@@ -6,8 +6,8 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
-#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
@@ -324,6 +324,16 @@ void MobActionSystem::retarget(world::LoadedWorld& world, ServerEntity& mob,
     }
     std::optional<std::int32_t> next = mob.targetId;
     mob.targetId = hooks_.targetChanged(world, mob, previous, next) ? next : previous;
+    if (mob.targetId.has_value() && mob.targetId != previous) {
+        const std::int32_t id = *mob.targetId;
+        const ServerEntity* found = world.state().entity(id);
+        const std::vector<PlayerSession*> watchers = watchersOf(world);
+        const bool player =
+            std::ranges::any_of(watchers, [id](const PlayerSession* each) { return each->entityId() == id; });
+        if ((found == nullptr || found->removed) && !player) {
+            mob.targetId = previous;
+        }
+    }
 }
 
 void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
