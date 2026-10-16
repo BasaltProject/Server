@@ -1,7 +1,7 @@
 #pragma once
 
-#include <basalt/server/plugins/PluginPackage.hpp>
 #include <basalt/wire/common/toml/Toml.hpp>
+#include <basalt/wire/plugins/PluginPackage.hpp>
 
 #include <expected>
 #include <functional>
@@ -11,6 +11,6 @@
 namespace basalt::server::plugins::pluginConfig {
 inline constexpr std::string_view kRootFile = "config.toml";
 
-[[nodiscard]] std::expected<wire::common::toml::TomlTable, PluginLoadError>
+[[nodiscard]] std::expected<wire::common::toml::TomlTable, wire::plugins::PluginLoadError>
 load(const std::map<std::string, std::string, std::less<>>& files);
 } // namespace basalt::server::plugins::pluginConfig

@@ -731,7 +731,8 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         .gatewayBeam =
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
                 const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
-                if (!state.has_value()) {
+                if (!state.has_value() ||
+                    (options_.triggerGatewayCooldown && !options_.triggerGatewayCooldown(world, x, y, z))) {
                     return;
                 }
                 for (PlayerSession* watcher : watchersOf(world)) {

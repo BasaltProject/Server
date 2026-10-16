@@ -86,6 +86,10 @@ public:
     [[nodiscard]] std::optional<std::array<double, 3>> enterGateway(world::LoadedWorld& world,
                                                                     const std::array<double, 6>& box);
 
+    /// parity: `TheEndGatewayBlockEntity.triggerCooldown`; false while it is still cooling down.
+    [[nodiscard]] bool triggerGatewayCooldown(const world::LoadedWorld& world, std::int32_t x, std::int32_t y,
+                                              std::int32_t z);
+
     void tickSubmersion(world::LoadedWorld& world);
 
     void tickTime(world::LoadedWorld& world);

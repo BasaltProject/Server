@@ -89,6 +89,8 @@ public:
         std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            wire::nbt::NbtCompound& data)>
             tickConduit;
+        std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
+            triggerGatewayCooldown;
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
         /// parity: `Armadillo.brushOffScute` from the dispenser's brush behaviour.
         std::function<bool(world::LoadedWorld& world, entity::ServerEntity& armadillo)> brushArmadillo;

@@ -492,13 +492,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     plugins_->setTimings(
         [this](const std::string& pluginId, std::int64_t nanos) { timings_.of("plugin." + pluginId).record(nanos); });
     plugins_->setAllowed([this](const std::string& id) {
-        std::set<server::plugins::PluginPermission> granted;
+        std::set<wire::plugins::PluginPermission> granted;
         const auto found = config_->pluginAllowances.find(id);
         if (found == config_->pluginAllowances.end()) {
             return granted;
         }
         for (const std::string& name : found->second) {
-            const std::optional<server::plugins::PluginPermission> permission = server::plugins::permissionOf(name);
+            const std::optional<wire::plugins::PluginPermission> permission = wire::plugins::permissionOf(name);
             if (permission.has_value()) {
                 granted.insert(*permission);
             }
@@ -778,6 +778,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                        wire::nbt::NbtCompound& data) {
                     return conduits_ != nullptr && conduits_->tick(world, x, y, z, data);
+                },
+            .triggerGatewayCooldown =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+                    return environment_ == nullptr || environment_->triggerGatewayCooldown(world, x, y, z);
                 },
             .shriekerHeard =
                 [this](world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival) {

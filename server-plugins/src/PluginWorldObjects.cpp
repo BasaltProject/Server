@@ -212,6 +212,24 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
                     }
                     return 1;
                 })
+        .method("block_state",
+                [world](LuaArgs& args) {
+                    const std::optional<PluginPoint> point = pointFrom(args, args.count() >= 2 ? 2 : 1);
+                    const std::int32_t base = args.count() >= 4 ? 2 : 1;
+                    const std::optional<std::string> state =
+                        point.has_value() ? world->blockState(static_cast<std::int32_t>(std::floor(point->x)),
+                                                              static_cast<std::int32_t>(std::floor(point->y)),
+                                                              static_cast<std::int32_t>(std::floor(point->z)))
+                                          : world->blockState(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                              static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                              static_cast<std::int32_t>(args.checkInteger(base + 2)));
+                    if (state.has_value()) {
+                        args.pushString(*state);
+                    } else {
+                        args.pushNil();
+                    }
+                    return 1;
+                })
         .method("set_block",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);
