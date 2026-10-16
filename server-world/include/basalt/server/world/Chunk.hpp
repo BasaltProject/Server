@@ -36,6 +36,9 @@ inline constexpr std::size_t kHeightmapCount = 4;
 
 [[nodiscard]] bool heightmapMatches(HeightmapType type, std::int32_t stateId);
 
+/// parity: `BlockTags.BLOCKS_MOTION_IN_HEIGHTMAP(_NO_LEAVES)`, one flag per block state; applies to later queries.
+void useHeightmapBlockSets(const std::vector<bool>& blocksMotion, const std::vector<bool>& blocksMotionNoLeaves);
+
 class Chunk {
 public:
     explicit Chunk(std::int32_t chunkX, std::int32_t chunkZ, ChunkHeight bounds = kOverworldHeight);

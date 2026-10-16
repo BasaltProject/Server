@@ -47,6 +47,12 @@ public:
 
     void demand(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t priority);
 
+    /// parity: `ChunkMap.FORCED_TICKET_LEVEL`, the chunk and `fullRadius` rings full, decorated out to `decorateRadius`.
+    void demandArea(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t fullRadius, std::int32_t decorateRadius,
+                    std::int32_t priority);
+
+    void releaseArea(std::int32_t chunkX, std::int32_t chunkZ);
+
     std::size_t retainWhere(const std::function<bool(std::int32_t, std::int32_t)>& keep);
 
     bool step();
@@ -72,6 +78,12 @@ public:
 private:
     struct Entry;
     struct Request;
+
+    struct Area {
+        std::int32_t priority = 0;
+        std::int32_t fullRadius = 0;
+        std::int32_t decorateRadius = 0;
+    };
     struct Task;
 
     void refreshWants();
@@ -86,6 +98,7 @@ private:
     mutable std::mutex mutex_;
     std::unordered_map<std::int64_t, std::unique_ptr<Entry>> entries_;
     std::unordered_map<std::int64_t, Request> requests_;
+    std::unordered_map<std::int64_t, Area> areas_;
     std::unordered_set<std::int64_t> full_;
     std::unordered_set<std::int64_t> busy_;
     std::unordered_set<std::int64_t> decorating_;

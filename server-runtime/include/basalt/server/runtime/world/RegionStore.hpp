@@ -3,6 +3,7 @@
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/server/world/region/LinearRegion.hpp>
+#include <basalt/wire/common/logging/Logger.hpp>
 
 #include <cstdint>
 #include <list>
@@ -90,6 +91,11 @@ private:
     std::list<Entry> cached_;
     std::unordered_map<std::int64_t, std::list<Entry>::iterator> byKey_;
     std::unordered_set<std::int64_t> dirtyRegions_;
+
+    /// Chunks and regions that exist on disk but cannot be read: never written over, or the world is lost.
+    std::unordered_set<std::int64_t> unreadableChunks_;
+    std::unordered_set<std::int64_t> unreadableRegions_;
+    wire::common::Logger logger_{"Regions"};
 
     std::int64_t encodeMillis_ = 0;
     std::int64_t writeMillis_ = 0;

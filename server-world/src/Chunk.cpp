@@ -8,7 +8,10 @@
 #include <basalt/server/world/terrain/ProtoRegion.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <utility>
 
@@ -36,7 +39,7 @@ struct HeightmapTables {
     std::array<std::vector<bool>, kHeightmapCount> matches;
 };
 
-[[nodiscard]] const HeightmapTables& tables() {
+[[nodiscard]] const HeightmapTables& baseline() {
     static const HeightmapTables built = [] {
         HeightmapTables tables;
         tables.stateCount = registry::blocks::stateCount();
@@ -50,6 +53,16 @@ struct HeightmapTables {
         return tables;
     }();
     return built;
+}
+
+// Replaced only when a pack is (re)loaded; a superseded table is kept, since a reader may still hold it.
+std::atomic<const HeightmapTables*> installed{nullptr};
+std::mutex retiredLock;
+std::vector<std::unique_ptr<HeightmapTables>> retired;
+
+[[nodiscard]] const HeightmapTables& tables() {
+    const HeightmapTables* current = installed.load(std::memory_order_acquire);
+    return current != nullptr ? *current : baseline();
 }
 
 /// parity: `LevelChunk.setBlockState`.
@@ -67,6 +80,25 @@ struct HeightmapTables {
 }
 
 } // namespace
+
+void useHeightmapBlockSets(const std::vector<bool>& blocksMotion, const std::vector<bool>& blocksMotionNoLeaves) {
+    auto owned = std::make_unique<HeightmapTables>(baseline());
+    HeightmapTables* built = owned.get();
+    const auto fromSet = [&built](const std::vector<bool>& set, HeightmapType type) {
+        for (std::int32_t stateId = 0; stateId < built->stateCount; ++stateId) {
+            const bool member =
+                static_cast<std::size_t>(stateId) < set.size() && set[static_cast<std::size_t>(stateId)];
+            built->matches[static_cast<std::size_t>(type)][static_cast<std::size_t>(stateId)] =
+                member || (type != HeightmapType::OceanFloor && registry::blockFluids::hasFluid(stateId));
+        }
+    };
+    fromSet(blocksMotion, HeightmapType::OceanFloor);
+    fromSet(blocksMotion, HeightmapType::MotionBlocking);
+    fromSet(blocksMotionNoLeaves, HeightmapType::MotionBlockingNoLeaves);
+    const std::scoped_lock guard{retiredLock};
+    retired.push_back(std::move(owned));
+    installed.store(built, std::memory_order_release);
+}
 
 bool heightmapMatches(HeightmapType type, std::int32_t stateId) {
     const HeightmapTables& built = tables();

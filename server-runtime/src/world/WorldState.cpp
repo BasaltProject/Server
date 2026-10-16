@@ -394,10 +394,14 @@ Chunk& WorldState::installLocked(Chunk chunk) {
             return blockStateLocked(x, y, z).value_or(0);
         };
         server::world::terrain::decoration::tree::leafDistances::settle(installed, worldBlockAt);
-        for (const auto& [dx, dz] :
-             std::array<std::pair<std::int32_t, std::int32_t>, 4>{{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}}) {
-            if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz); neighbour != nullptr) {
-                server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldBlockAt);
+        // All eight: a diagonal neighbour's leaves are within six blocks of this chunk's logs too, and
+        // once the whole 3x3 is in every chunk has been measured against its final neighbourhood.
+        for (std::int32_t dx = -1; dx <= 1; ++dx) {
+            for (std::int32_t dz = -1; dz <= 1; ++dz) {
+                if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz);
+                    neighbour != nullptr && (dx != 0 || dz != 0)) {
+                    server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldBlockAt);
+                }
             }
         }
         // parity: the same post-processing takes back a bush the finished light leaves too bright. The.

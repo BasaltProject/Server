@@ -15,7 +15,8 @@ namespace {
 namespace registry = basalt::server::registry;
 
 constexpr std::int32_t kMaxLeafDistance = 7;
-constexpr std::int32_t kSpan = 18;
+constexpr std::int32_t kMargin = kMaxLeafDistance - 1;
+constexpr std::int32_t kSpan = 16 + (2 * kMargin);
 
 constexpr std::array<std::array<std::int32_t, 3>, 6> kSides{
     {{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}};
@@ -24,12 +25,13 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kSides{
 
 void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
     const ChunkHeight bounds = chunk.verticalBounds();
+    // Only the sections that hold a leaf or a log are worth walking: a chunk keeps two dozen and a
+    // forest touches two of them, so the whole column would be twenty times the work for nothing.
     std::int32_t lowSection = -1;
     std::int32_t highSection = -1;
     for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
-        const bool interesting = chunk.section(index).mayContain([](std::int32_t stateId) {
-            return registry::blockStateFamilies::isLeavesState(stateId) || treeBlockRules::isLogState(stateId);
-        });
+        const bool interesting = chunk.section(index).mayContain(
+            [](std::int32_t stateId) { return registry::blockStateFamilies::isLeavesState(stateId); });
         if (!interesting) {
             continue;
         }
@@ -41,22 +43,22 @@ void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
     if (lowSection < 0) {
         return;
     }
-    const std::int32_t firstY = std::max(bounds.minY(), bounds.minY() + lowSection * 16 - 1);
-    const std::int32_t lastY = std::min(bounds.maxY(), bounds.minY() + highSection * 16 + 16);
+    // A leaf short of seven has a log within six steps, so six blocks round the chunk hold every path
+    // that decides one of its leaves. Measured from the logs alone and never from what a neighbour's
+    // leaf already says, the answer depends on the blocks and not on which chunk arrived first.
+    const std::int32_t firstY = std::max(bounds.minY(), bounds.minY() + lowSection * 16 - kMargin);
+    const std::int32_t lastY = std::min(bounds.maxY(), bounds.minY() + highSection * 16 + 15 + kMargin);
     const std::int32_t height = lastY - firstY + 1;
     const std::int32_t baseX = chunk.chunkX() * 16;
     const std::int32_t baseZ = chunk.chunkZ() * 16;
     const auto index = [height](std::int32_t x, std::int32_t y, std::int32_t z) {
-        return ((x + 1) * kSpan + (z + 1)) * height + y;
+        return ((x + kMargin) * kSpan + (z + kMargin)) * height + y;
     };
 
-    // Only leaves and logs are kept, a full column copy would be a megabyte per chunk.
     std::vector<std::uint8_t> kind(static_cast<std::size_t>(kSpan) * kSpan * static_cast<std::size_t>(height), 0);
-    // parity: `LeavesBlock.updateDistanceAt` relaxes against the neighbour.
-    std::vector<std::uint8_t> outside(kind.size(), kMaxLeafDistance);
     bool anyLeaf = false;
-    for (std::int32_t x = -1; x <= 16; ++x) {
-        for (std::int32_t z = -1; z <= 16; ++z) {
+    for (std::int32_t x = -kMargin; x < 16 + kMargin; ++x) {
+        for (std::int32_t z = -kMargin; z < 16 + kMargin; ++z) {
             const bool inside = x >= 0 && x < 16 && z >= 0 && z < 16;
             for (std::int32_t y = 0; y < height; ++y) {
                 const std::int32_t worldY = firstY + y;
@@ -64,11 +66,7 @@ void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
                     inside ? chunk.blockStateId(x, worldY, z) : blockAt(baseX + x, worldY, baseZ + z);
                 if (registry::blockStateFamilies::isLeavesState(stateId)) {
                     kind[static_cast<std::size_t>(index(x, y, z))] = 1;
-                    anyLeaf = true;
-                    if (const std::optional<std::int32_t> carried = registry::blockStateFamilies::leafDistance(stateId);
-                        !inside && carried.has_value()) {
-                        outside[static_cast<std::size_t>(index(x, y, z))] = static_cast<std::uint8_t>(*carried);
-                    }
+                    anyLeaf = anyLeaf || inside;
                 } else if (treeBlockRules::isLogState(stateId)) {
                     kind[static_cast<std::size_t>(index(x, y, z))] = 2;
                 }
@@ -81,15 +79,12 @@ void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
 
     std::vector<std::uint8_t> reached(kind.size(), kMaxLeafDistance);
     std::deque<std::array<std::int32_t, 3>> pending;
-    for (std::int32_t x = -1; x <= 16; ++x) {
-        for (std::int32_t z = -1; z <= 16; ++z) {
+    for (std::int32_t x = -kMargin; x < 16 + kMargin; ++x) {
+        for (std::int32_t z = -kMargin; z < 16 + kMargin; ++z) {
             for (std::int32_t y = 0; y < height; ++y) {
                 const auto slot = static_cast<std::size_t>(index(x, y, z));
                 if (kind[slot] == 2) {
                     reached[slot] = 0;
-                    pending.push_back({x, y, z});
-                } else if (kind[slot] == 1 && outside[slot] < kMaxLeafDistance) {
-                    reached[slot] = outside[slot];
                     pending.push_back({x, y, z});
                 }
             }
@@ -106,7 +101,7 @@ void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
             const std::int32_t nx = cell[0] + side[0];
             const std::int32_t ny = cell[1] + side[1];
             const std::int32_t nz = cell[2] + side[2];
-            if (nx < -1 || nx > 16 || nz < -1 || nz > 16 || ny < 0 || ny >= height) {
+            if (nx < -kMargin || nx >= 16 + kMargin || nz < -kMargin || nz >= 16 + kMargin || ny < 0 || ny >= height) {
                 continue;
             }
             const auto slot = static_cast<std::size_t>(index(nx, ny, nz));

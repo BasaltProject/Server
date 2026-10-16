@@ -558,9 +558,20 @@ void decodeStructures(const NbtCompound* tag, structure::ChunkStructures& into) 
 } // namespace
 
 std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bounds) {
+    const std::int32_t saved = tag.getInt("DataVersion");
+    if (saved > kDataVersion) {
+        return std::unexpected(ChunkNbtError{std::format(
+            "saved by a newer version of the game (data version {}, this build reads up to {})", saved, kDataVersion)});
+    }
+    if (saved > 0 && saved < kDataVersion) {
+        NbtCompound upgraded = tag;
+        datafix::upgrade(datafix::Domain::Chunk, upgraded, saved, {.overworld = bounds.minY() == -64});
+        upgraded.putInt("DataVersion", kDataVersion);
+        return read(upgraded, bounds);
+    }
     const std::optional<ChunkStage> stage = stageOf(tag.getString("Status"));
     if (!stage.has_value()) {
-        return std::unexpected(ChunkNbtError{"saved before it had terrain"});
+        return std::unexpected(ChunkNbtError{"saved before it had terrain", false});
     }
     Chunk chunk{tag.getInt("xPos"), tag.getInt("zPos"), bounds};
     chunk.setStage(*stage);
