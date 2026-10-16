@@ -459,8 +459,34 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
                        .left = minusOne(stack),
                        .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *placed}};
     }
-    // parity: the brush entry, which brushes an armadillo standing in the square in front and.
+    // parity: the brush entry, which brushes an armadillo standing in the square in front and
+    // takes sixteen of the brush's durability for it.
     if (stack.item == brush()) {
+        for (entity::ServerEntity* armadillo : context.world.entities()) {
+            if (armadillo->removed || armadillo->type().path() != "armadillo") {
+                continue;
+            }
+            const double half = armadillo->width() / 2.0;
+            if (armadillo->x + half <= tx || armadillo->x - half >= tx + 1 ||
+                armadillo->y + armadillo->height() <= ty || armadillo->y >= ty + 1 || armadillo->z + half <= tz ||
+                armadillo->z - half >= tz + 1) {
+                continue;
+            }
+            if (!hooks.brushArmadillo || !hooks.brushArmadillo(*armadillo)) {
+                continue;
+            }
+            // parity: `ItemStack.hurtAndBreak(16, level, null, ...)`.
+            const storage::StoredItemStack held{
+                .id = stack.item.toString(), .count = stack.count, .components = stack.components};
+            const std::optional<storage::StoredItemStack> after = item::itemWear::hurt(held, 16, context.random);
+            if (!after.has_value()) {
+                return Special{.handled = true, .left = std::nullopt};
+            }
+            ItemStack left = stack;
+            left.count = after->count;
+            left.components = after->components;
+            return Special{.handled = true, .left = left};
+        }
         return Special{.refused = true};
     }
     // parity: the armor stand entry, which stands one in the square in front whatever is there, at.

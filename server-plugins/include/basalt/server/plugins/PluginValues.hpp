@@ -1,6 +1,6 @@
 #pragma once
 
-#include <basalt/server/lua/LuaArgs.hpp>
+#include <basalt/wire/lua/LuaArgs.hpp>
 
 #include <cstdint>
 #include <map>
@@ -24,7 +24,7 @@ inline constexpr std::string_view kPlayerMark = "__player_uuid";
 
 inline constexpr std::int32_t kMaxCrossDepth = 8;
 
-[[nodiscard]] PluginCrossValue crossOut(lua::LuaArgs& lua, std::int32_t index, std::int32_t depth = 0);
+[[nodiscard]] PluginCrossValue crossOut(wire::lua::LuaArgs& lua, std::int32_t index, std::int32_t depth = 0);
 
-[[nodiscard]] std::vector<PluginCrossValue> crossArguments(lua::LuaArgs& lua);
+[[nodiscard]] std::vector<PluginCrossValue> crossArguments(wire::lua::LuaArgs& lua);
 } // namespace basalt::server::plugins

@@ -12,9 +12,11 @@
 #include <basalt/server/runtime/entity/ai/RandomPos.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSpear.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/common/Mth.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -34,11 +36,13 @@ using piglins::PiglinState;
 struct Sense {
     std::optional<std::int32_t> nemesis;
     std::optional<std::int32_t> huntableHoglin;
+    std::optional<std::int32_t> babyHoglin;
     std::optional<std::int32_t> zombified;
     std::optional<std::int32_t> playerNotWearingGold;
     std::optional<std::int32_t> playerHoldingLoved;
     std::optional<std::int32_t> attackablePlayer;
     std::vector<ServerEntity*> adultPiglins;
+    std::int32_t visibleAdultPiglins = 0;
     std::int32_t adultHoglins = 0;
     std::optional<piglins::Pos> repellent;
     std::optional<std::int32_t> wantedItem;
@@ -53,6 +57,34 @@ thread_local Sense tSense;
 [[nodiscard]] bool isBaby(const ServerEntity& mob) { return mob.age < 0; }
 
 [[nodiscard]] bool isZombified(std::string_view path) { return path == "zombified_piglin" || path == "zoglin"; }
+
+/// parity: `VehicleSystem.sendPassengers`, the packet a mount change announces.
+void sendPassengers(const ServerEntity& vehicle, const std::vector<PlayerSession*>& watchers) {
+    const wire::protocol::play::SetPassengersPacket packet{.vehicleId = vehicle.entityId(),
+                                                           .passengerIds = vehicle.passengerIds};
+    for (PlayerSession* player : watchers) {
+        if (player->connection().sendPlayPacket) {
+            player->connection().sendPlayPacket(wire::protocol::play::SetPassengersPacket::kId,
+                                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        }
+    }
+}
+
+/// parity: `Piglin.startRiding`: a baby stacks on the hoglin's top passenger, three deep.
+ServerEntity* topPassengerOf(world::LoadedWorld& world, ServerEntity& vehicle, std::int32_t depth) {
+    ServerEntity* top = &vehicle;
+    for (std::int32_t level = 0; level < depth; ++level) {
+        if (top->passengerIds.empty()) {
+            break;
+        }
+        ServerEntity* next = world.state().entity(top->passengerIds.front());
+        if (next == nullptr) {
+            break;
+        }
+        top = next;
+    }
+    return top;
+}
 
 void settle(kit::Memory<bool>& memory, std::int64_t now) {
     if (memory.until < -1) {
@@ -97,6 +129,8 @@ void MobActionSystem::tickPiglin(world::LoadedWorld& world, entity::ai::MobConte
         state.activity = Activity::Avoid;
     } else if (!state.brute && state.celebrateLocation.has(now)) {
         state.activity = Activity::Celebrate;
+    } else if (!state.brute && state.rideTarget.has(now)) {
+        state.activity = Activity::Ride;
     } else {
         state.activity = Activity::Idle;
     }
@@ -128,6 +162,16 @@ void MobActionSystem::tickPiglin(world::LoadedWorld& world, entity::ai::MobConte
     if (!state.celebrateLocation.has(now)) {
         state.dancing = false;
     }
+    // parity: `PiglinAi.updateActivity`, a rider without `RIDE_TARGET` climbs down.
+    if (!state.rideTarget.has(now) && isBaby(piglin) && piglin.vehicleId.has_value()) {
+        if (ServerEntity* vehicle = context.entityById(*piglin.vehicleId);
+            vehicle != nullptr && vehicle->type().path() == "hoglin" && isBaby(*vehicle)) {
+            std::erase(vehicle->passengerIds, piglin.entityId());
+            sendPassengers(*vehicle, watchersOf(world));
+            piglin.vehicleId.reset();
+            piglin.boardingCooldown = 60;
+        }
+    }
     piglinActivity(world, context, state);
     kit::moveToTarget(context, state.motion);
     kit::lookAtTarget(context, state.look);
@@ -145,6 +189,23 @@ void MobActionSystem::piglinSense(world::LoadedWorld& world, entity::ai::MobCont
     Sense& sense = tSense;
     sense = Sense{};
     const double range = piglin.attributeWithModifiers("minecraft:follow_range");
+    // parity: `NearestLivingEntitySensor` fills `NEAREST_LIVING_ENTITIES` without a vision filter,
+    // which `PiglinSpecificSensor` only applies to the memories it names `NEAREST_VISIBLE_*`.
+    const double half = piglin.width() / 2.0;
+    for (const ServerEntity* other : context.entities) {
+        if (other == &piglin || other->removed || other->dying || other->health <= 0.0) {
+            continue;
+        }
+        const double otherHalf = other->width() / 2.0;
+        if (other->x + otherHalf < piglin.x - half - range || other->x - otherHalf > piglin.x + half + range ||
+            other->y + other->height() < piglin.y - range || other->y > piglin.y + piglin.height() + range ||
+            other->z + otherHalf < piglin.z - half - range || other->z - otherHalf > piglin.z + half + range) {
+            continue;
+        }
+        if ((other->type().path() == "piglin" || other->type().path() == "piglin_brute") && !isBaby(*other)) {
+            sense.adultPiglins.push_back(const_cast<ServerEntity*>(other));
+        }
+    }
     for (const kit::Seen& seen : kit::nearby(context, range)) {
         if (seen.mob != nullptr) {
             const std::string_view type = seen.type;
@@ -156,9 +217,11 @@ void MobActionSystem::piglinSense(world::LoadedWorld& world, entity::ai::MobCont
                     if (!sense.huntableHoglin.has_value() && huntable) {
                         sense.huntableHoglin = seen.id;
                     }
+                } else if (!sense.babyHoglin.has_value()) {
+                    sense.babyHoglin = seen.id;
                 }
             } else if (type == "piglin_brute" || (type == "piglin" && !isBaby(*seen.mob))) {
-                sense.adultPiglins.push_back(seen.mob);
+                ++sense.visibleAdultPiglins;
             } else if (!sense.nemesis.has_value() && (type == "wither_skeleton" || type == "wither")) {
                 sense.nemesis = seen.id;
             } else if (!sense.zombified.has_value() && isZombified(type)) {
@@ -279,6 +342,16 @@ void MobActionSystem::piglinCore(world::LoadedWorld& world, entity::ai::MobConte
                                    context.distanceSquaredTo((*zombified)[0], (*zombified)[1], (*zombified)[2]) < 36.0;
         if (nearZombified && !state.avoidTarget.has(now)) {
             state.avoidTarget.setFor(*sense.zombified, now, sample(context.random, piglins::kAvoidZombified));
+        }
+        // parity: `babySometimesRideBabyHoglin`, a `SetEntityLookTargetSometimes.Ticker` on the level's random.
+        if (isBaby(piglin) && !state.rideTarget.has(now) && sense.babyHoglin.has_value()) {
+            if (state.rideTicker == 0) {
+                state.rideTicker = sample(context.random, piglins::kRideStartInterval);
+            }
+            if (--state.rideTicker <= 0) {
+                state.rideTicker = sample(context.random, piglins::kRideStartInterval);
+                state.rideTarget.setFor(*sense.babyHoglin, now, sample(context.random, piglins::kRideDuration));
+            }
         }
         // parity: `StopHoldingItemIfNoLongerAdmiring`, which keeps a shield.
         if (!state.admiring.has(now)) {
@@ -486,7 +559,8 @@ void MobActionSystem::piglinActivity(world::LoadedWorld& world, entity::ai::MobC
         if (avoided != nullptr) {
             const std::string_view type = avoided->type().path();
             if (type == "hoglin") {
-                if (static_cast<std::int32_t>(sense.adultPiglins.size()) + 1 >= sense.adultHoglins) {
+                // parity: `piglinsOutnumberHoglins`, the visible counts plus itself.
+                if (sense.visibleAdultPiglins + 1 >= sense.adultHoglins) {
                     state.avoidTarget.erase();
                 }
             } else if (isZombified(type) && sense.zombified != avoided->entityId()) {
@@ -550,7 +624,50 @@ void MobActionSystem::piglinActivity(world::LoadedWorld& world, entity::ai::MobC
         }
         break;
     }
-    case Activity::Ride:
+    case Activity::Ride: {
+        // parity: `initRideHoglinActivity`, `Mount.create(0.8)` then `DismountOrSkipMounting.create(8, ...)`.
+        ServerEntity* vehicle = piglin.vehicleId.has_value() ? context.entityById(*piglin.vehicleId) : nullptr;
+        if (vehicle == nullptr && state.rideTarget.has(now)) {
+            vehicle = context.entityById(*state.rideTarget.value);
+        }
+        const auto hurtRecently = [](const ServerEntity& mob) {
+            // parity: `wasHurtRecently`, the `HURT_BY` memory of the last hundred ticks.
+            return mob.lastHurtByMobTimestamp > 0 && mob.tickCount - mob.lastHurtByMobTimestamp <= 100;
+        };
+        const bool stopRiding = vehicle == nullptr || vehicle->removed || vehicle->dying || vehicle->health <= 0.0 ||
+                                context.distanceSquaredTo(vehicle->x, vehicle->y, vehicle->z) >= 64.0 ||
+                                !isBaby(*vehicle) || hurtRecently(piglin) || hurtRecently(*vehicle) ||
+                                (vehicle->type().path() == "piglin" && !vehicle->vehicleId.has_value());
+        if (stopRiding) {
+            if (piglin.vehicleId.has_value()) {
+                if (ServerEntity* ridden = context.entityById(*piglin.vehicleId); ridden != nullptr) {
+                    std::erase(ridden->passengerIds, piglin.entityId());
+                    sendPassengers(*ridden, watchersOf(world));
+                }
+                piglin.vehicleId.reset();
+                piglin.boardingCooldown = 60;
+            }
+            state.rideTarget.erase();
+            break;
+        }
+        if (!piglin.vehicleId.has_value()) {
+            // parity: `Mount.create`, within one it climbs on, otherwise it walks over at 0.8.
+            if (context.distanceSquaredTo(vehicle->x, vehicle->y, vehicle->z) < 1.0) {
+                ServerEntity& ridden = isBaby(piglin) && vehicle->type().path() == "hoglin"
+                                           ? *topPassengerOf(world, *vehicle, 3)
+                                           : *vehicle;
+                if (std::ranges::find(ridden.passengerIds, piglin.entityId()) == ridden.passengerIds.end()) {
+                    ridden.passengerIds.push_back(piglin.entityId());
+                    piglin.vehicleId = ridden.entityId();
+                    sendPassengers(ridden, watchersOf(world));
+                }
+            } else {
+                state.look = kit::Look{.entity = vehicle->entityId()};
+                kit::walkTo(state.motion, {vehicle->x, vehicle->y, vehicle->z}, 0.8F, 1, vehicle->entityId());
+            }
+        }
+        break;
+    }
     case Activity::Idle:
         if (!state.brute && sense.playerHoldingLoved.has_value() && !state.look.entity.has_value()) {
             state.look = kit::Look{.entity = sense.playerHoldingLoved};
@@ -704,6 +821,10 @@ void MobActionSystem::piglinFight(world::LoadedWorld& world, entity::ai::MobCont
         piglin.targetId.reset();
         state.crossbow = piglins::Crossbow::Uncharged;
         state.chargingCrossbow = false;
+        state.spear = piglins::SpearStatus::Approach;
+        state.spearChargePos.reset();
+        state.spearFleeingPos.reset();
+        state.spearFleeingTime = 0;
         return;
     }
     const bool crossbow = entity::mobEquipment::holds(piglin, "crossbow");
@@ -711,8 +832,17 @@ void MobActionSystem::piglinFight(world::LoadedWorld& world, entity::ai::MobCont
     const double dx = target->x - piglin.x;
     const double dy = target->y - piglin.y;
     const double dz = target->z - piglin.z;
-    const bool inRange = crossbow ? (dx * dx) + (dy * dy) + (dz * dz) < 64.0 : kit::withinMeleeRange(context, *target);
+    const double distanceSquared = (dx * dx) + (dy * dy) + (dz * dz);
+    const bool inRange = crossbow ? distanceSquared < 64.0 : kit::withinMeleeRange(context, *target);
     state.look = kit::Look{.entity = piglin.targetId};
+    const std::optional<server::world::loot::ItemStack> mainHand =
+        entity::mobEquipment::get(piglin, entity::mobEquipment::Slot::MainHand);
+    const bool spear = mainHand.has_value() && player::spear::of(mainHand->item.toString()) != nullptr;
+    if (spear) {
+        // parity: `SpearApproach`, `SpearAttack` and `SpearRetreat`, in that order.
+        piglinSpearFight(world, context, state, *target, distanceSquared);
+        return;
+    }
     if (inRange) {
         state.motion.walk.reset();
     } else {
@@ -726,6 +856,10 @@ void MobActionSystem::piglinFight(world::LoadedWorld& world, entity::ai::MobCont
             state.huntedRecently.setFor(true, now, sample(context.random, piglins::kTimeBetweenHunts));
         }
         return;
+    }
+    // parity: `BackUpIfTooClose`, a sideways step off whenever the target comes within five.
+    if (distanceSquared < 25.0) {
+        entity::ai::moveControl::strafe(piglin, -0.75, 0.0, 0.75);
     }
     // parity: `CrossbowAttack`.
     if (!inRange) {
@@ -756,6 +890,100 @@ void MobActionSystem::piglinFight(world::LoadedWorld& world, entity::ai::MobCont
         shootArrow(piglin, target->x, target->y + (target->height / 3.0), target->z, 1.6F);
         state.crossbow = piglins::Crossbow::Uncharged;
         break;
+    }
+}
+
+void MobActionSystem::piglinSpearFight(world::LoadedWorld& world, entity::ai::MobContext& context, PiglinState& state,
+                                       const entity::ai::TargetView& target, double distanceSquared) {
+    ServerEntity& piglin = context.mob;
+    const std::optional<server::world::loot::ItemStack> mainHand =
+        entity::mobEquipment::get(piglin, entity::mobEquipment::Slot::MainHand);
+    const player::spear::Spear* spear = mainHand.has_value() ? player::spear::of(mainHand->item.toString()) : nullptr;
+    if (spear == nullptr) {
+        return;
+    }
+    // parity: the ridden distance bonus both reposition behaviours give a passenger.
+    const std::int32_t mountDistance = piglin.vehicleId.has_value() ? 2 : 0;
+    const kit::Vec targetPos{target.x, target.y, target.z};
+    const auto awayFromTarget = [&](double maxDistance) {
+        const int horizontal = static_cast<std::int32_t>(std::max(1.0, maxDistance));
+        return entity::ai::randomPos::landPosAway(context.world, piglin, context.random, horizontal, 7, targetPos);
+    };
+    switch (state.spear) {
+    case piglins::SpearStatus::Approach: {
+        // parity: `SpearApproach`, walking up at full speed until ten blocks away.
+        if (distanceSquared > 100.0) {
+            kit::walkTo(state.motion, targetPos, 1.0F, 0, piglin.targetId);
+            return;
+        }
+        // parity: `SpearApproach.stop`, which hands over to the charge.
+        state.spear = piglins::SpearStatus::Charging;
+        // parity: `SpearAttack.start`, the kinetic weapon's own use duration.
+        state.spearEngageTime = spear->delayTicks + spear->damage.maxDurationTicks;
+        state.spearChargePos.reset();
+        return;
+    }
+    case piglins::SpearStatus::Charging: {
+        // parity: `SpearAttack`, the charge runs its engage time then hands over to the retreat.
+        --state.spearEngageTime;
+        if (state.spearEngageTime <= 0) {
+            state.spear = piglins::SpearStatus::Retreat;
+            state.spearChargePos.reset();
+            return;
+        }
+        if (state.spearChargePos.has_value()) {
+            // parity: the charge position, walked off at repositioning speed until the path ends.
+            kit::walkTo(state.motion,
+                        kit::Vec{(*state.spearChargePos)[0] + 0.5, static_cast<double>((*state.spearChargePos)[1]),
+                                 (*state.spearChargePos)[2] + 0.5},
+                        1.0F, 0);
+            if (!state.motion.walk.has_value() || entity::ai::navigation::isDone(piglin)) {
+                state.spearChargePos.reset();
+            }
+            return;
+        }
+        kit::walkTo(state.motion, targetPos, 1.0F, 0, piglin.targetId);
+        if (distanceSquared < 4.0 || entity::ai::navigation::isDone(piglin)) {
+            const double distance = std::sqrt(distanceSquared);
+            if (const std::optional<kit::Vec> away = awayFromTarget(7 + mountDistance - distance); away.has_value()) {
+                state.spearChargePos =
+                    kit::Block{mth::floor((*away)[0]), mth::floor((*away)[1]), mth::floor((*away)[2])};
+            } else {
+                state.spearChargePos.reset();
+            }
+        }
+        return;
+    }
+    case piglins::SpearStatus::Retreat: {
+        // parity: `SpearRetreat`, a position away kept for a hundred ticks at most.
+        if (!state.spearFleeingPos.has_value()) {
+            const double distance = std::sqrt(distanceSquared);
+            const std::optional<kit::Vec> away = awayFromTarget(11 + mountDistance - distance);
+            if (!away.has_value()) {
+                state.spear = piglins::SpearStatus::Approach;
+                state.spearFleeingTime = 0;
+                return;
+            }
+            state.spearFleeingPos = kit::Block{mth::floor((*away)[0]), mth::floor((*away)[1]), mth::floor((*away)[2])};
+            state.spearFleeingTime = 0;
+        }
+        if (state.spearFleeingTime >= 100 || !state.motion.walk.has_value()) {
+            // parity: `SpearRetreat.stop`, which puts the approach back on.
+            state.motion.walk.reset();
+            state.spearFleeingTime = 0;
+            state.spearFleeingPos.reset();
+            state.spearChargePos.reset();
+            state.spear = piglins::SpearStatus::Approach;
+            return;
+        }
+        ++state.spearFleeingTime;
+        kit::walkTo(state.motion,
+                    kit::Vec{(*state.spearFleeingPos)[0] + 0.5, static_cast<double>((*state.spearFleeingPos)[1]),
+                             (*state.spearFleeingPos)[2] + 0.5},
+                    1.0F, 0);
+        static_cast<void>(world);
+        return;
+    }
     }
 }
 

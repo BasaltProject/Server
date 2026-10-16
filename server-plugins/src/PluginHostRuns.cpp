@@ -1,7 +1,7 @@
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/server/plugins/PluginPacketView.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -56,7 +56,7 @@ void PluginWatchdog::interruptAll(const std::vector<std::unique_ptr<LoadedPlugin
 }
 
 void PluginAnnouncements::announce(PluginHost& host, LoadedPlugin& plugin, const std::string& name,
-                                   lua::LuaRef handler) {
+                                   wire::lua::LuaRef handler) {
     static_cast<void>(host);
     const std::int64_t id = nextId_++;
     listeners_[name].push_back(Listener{.plugin = &plugin, .handler = std::move(handler), .id = id});
@@ -72,14 +72,14 @@ void PluginAnnouncements::announce(PluginHost& host, LoadedPlugin& plugin, const
     }));
 }
 
-std::int32_t PluginAnnouncements::emit(PluginHost& host, const std::string& name, const lua::LuaRef& payload) {
+std::int32_t PluginAnnouncements::emit(PluginHost& host, const std::string& name, const wire::lua::LuaRef& payload) {
     const auto found = listeners_.find(name);
     if (found == listeners_.end()) {
         return 0;
     }
     std::int32_t heard = 0;
     // A copy, because a listener may register or drop one while this runs.
-    std::vector<std::pair<LoadedPlugin*, const lua::LuaRef*>> targets;
+    std::vector<std::pair<LoadedPlugin*, const wire::lua::LuaRef*>> targets;
     targets.reserve(found->second.size());
     for (const Listener& listener : found->second) {
         targets.emplace_back(listener.plugin, &listener.handler);
@@ -89,7 +89,7 @@ std::int32_t PluginAnnouncements::emit(PluginHost& host, const std::string& name
             continue;
         }
         const bool ran = host.ask(*plugin, *handler, "emit " + name,
-                                  [&payload](lua::LuaArgs& lua) {
+                                  [&payload](wire::lua::LuaArgs& lua) {
                                       payload.push(lua);
                                       return 1;
                                   },
@@ -102,7 +102,7 @@ std::int32_t PluginAnnouncements::emit(PluginHost& host, const std::string& name
 }
 
 bool PluginHost::inside(LoadedPlugin& plugin, std::string_view why,
-                        const std::function<std::optional<lua::LuaFailure>(PluginInstance&)>& body) {
+                        const std::function<std::optional<wire::lua::LuaFailure>(PluginInstance&)>& body) {
     if (plugin.disabled || plugin.instances.empty()) {
         return false;
     }
@@ -111,7 +111,7 @@ bool PluginHost::inside(LoadedPlugin& plugin, std::string_view why,
     instance.deciderDepth++;
     watchdog_.mark(plugin.manifest.id);
     const std::chrono::steady_clock::time_point startedAt = std::chrono::steady_clock::now();
-    const std::optional<lua::LuaFailure> failure = body(instance);
+    const std::optional<wire::lua::LuaFailure> failure = body(instance);
     instance.deciderDepth--;
     watchdog_.clear();
     if (recordTime_) {
@@ -127,46 +127,46 @@ bool PluginHost::inside(LoadedPlugin& plugin, std::string_view why,
     return true;
 }
 
-bool PluginHost::ask(LoadedPlugin& plugin, const lua::LuaRef& fn, std::string_view why,
-                     const std::function<std::int32_t(lua::LuaArgs&)>& pushArguments,
-                     const std::function<void(lua::LuaArgs&)>& read) {
+bool PluginHost::ask(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, std::string_view why,
+                     const std::function<std::int32_t(wire::lua::LuaArgs&)>& pushArguments,
+                     const std::function<void(wire::lua::LuaArgs&)>& read) {
     return inside(plugin, why, [&fn, &pushArguments, &read](PluginInstance& instance) {
-        const std::expected<std::int32_t, lua::LuaFailure> answered =
-            lua::callSync(*instance.sandbox, fn, pushArguments, read ? 1 : 0);
+        const std::expected<std::int32_t, wire::lua::LuaFailure> answered =
+            wire::lua::callSync(*instance.sandbox, fn, pushArguments, read ? 1 : 0);
         if (!answered.has_value()) {
             return std::optional{answered.error()};
         }
-        lua::LuaArgs results{instance.sandbox->state()};
+        wire::lua::LuaArgs results{instance.sandbox->state()};
         if (read) {
             read(results);
         }
         results.pop(*answered);
-        return std::optional<lua::LuaFailure>{};
+        return std::optional<wire::lua::LuaFailure>{};
     });
 }
 
-void PluginHost::enter(LoadedPlugin& plugin, PluginInstance& instance, const lua::LuaRef& fn, std::string_view why,
-                       const std::function<std::int32_t(lua::LuaArgs&)>& pushArguments) {
+void PluginHost::enter(LoadedPlugin& plugin, PluginInstance& instance, const wire::lua::LuaRef& fn,
+                       std::string_view why, const std::function<std::int32_t(wire::lua::LuaArgs&)>& pushArguments) {
     if (plugin.disabled || !fn.valid()) {
         return;
     }
     instance.sandbox->refill();
-    lua::LuaArgs lua{instance.sandbox->state()};
+    wire::lua::LuaArgs lua{instance.sandbox->state()};
     fn.push(lua);
     const std::int32_t argumentCount = pushArguments ? pushArguments(lua) : 0;
     const std::string reason{why};
     LoadedPlugin* target = &plugin;
-    static_cast<void>(lua::LuaCall::start(*instance.sandbox, argumentCount,
-                                          [this, target, reason](std::optional<lua::LuaFailure> failure) {
-                                              if (!failure.has_value()) {
-                                                  target->strikes = 0;
-                                                  return;
-                                              }
-                                              report(*target, *failure, reason);
-                                          }));
+    static_cast<void>(wire::lua::LuaCall::start(*instance.sandbox, argumentCount,
+                                                [this, target, reason](std::optional<wire::lua::LuaFailure> failure) {
+                                                    if (!failure.has_value()) {
+                                                        target->strikes = 0;
+                                                        return;
+                                                    }
+                                                    report(*target, *failure, reason);
+                                                }));
 }
 
-void PluginHost::report(LoadedPlugin& plugin, const lua::LuaFailure& failure, std::string_view why) {
+void PluginHost::report(LoadedPlugin& plugin, const wire::lua::LuaFailure& failure, std::string_view why) {
     plugin.strikes++;
     plugin.failures++;
     const std::string reason = failure.outOfBudget()   ? "ran out of its turn"
@@ -193,12 +193,12 @@ void PluginHost::resuming(LoadedPlugin& plugin, const std::function<void()>& res
     plugin.strikes = 0;
 }
 
-std::string PluginHost::answer(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPlayerRef* player,
+std::string PluginHost::answer(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPlayerRef* player,
                                std::string_view why) {
     std::string said;
     static_cast<void>(ask(
         plugin, fn, why,
-        [this, &plugin, player](lua::LuaArgs& args) {
+        [this, &plugin, player](wire::lua::LuaArgs& args) {
             if (player == nullptr) {
                 args.pushNil();
             } else {
@@ -206,15 +206,16 @@ std::string PluginHost::answer(LoadedPlugin& plugin, const lua::LuaRef& fn, Plug
             }
             return 1;
         },
-        [&said](lua::LuaArgs& args) { said = args.toText(-1); }));
+        [&said](wire::lua::LuaArgs& args) { said = args.toText(-1); }));
     return said;
 }
 
-bool PluginHost::asks(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPlayerRef* player, std::string_view why) {
+bool PluginHost::asks(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPlayerRef* player,
+                      std::string_view why) {
     bool answered = false;
     static_cast<void>(ask(
         plugin, fn, why,
-        [this, &plugin, player](lua::LuaArgs& args) {
+        [this, &plugin, player](wire::lua::LuaArgs& args) {
             if (player == nullptr) {
                 args.pushNil();
             } else {
@@ -222,13 +223,14 @@ bool PluginHost::asks(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPlayerR
             }
             return 1;
         },
-        [&answered](lua::LuaArgs& args) { answered = args.booleanOr(-1, false); }));
+        [&answered](wire::lua::LuaArgs& args) { answered = args.booleanOr(-1, false); }));
     return answered;
 }
 
-void PluginHost::clicked(LoadedPlugin& plugin, const lua::LuaRef& handler, PluginPlayerRef& player, std::int32_t slot) {
+void PluginHost::clicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, PluginPlayerRef& player,
+                         std::int32_t slot) {
     static_cast<void>(ask(plugin, handler, "menu click",
-                          [this, &plugin, &player, slot](lua::LuaArgs& args) {
+                          [this, &plugin, &player, slot](wire::lua::LuaArgs& args) {
                               args.pushTable();
                               pushPlayer(args, player.shared_from_this(), &services_->storage(), plugin.manifest.id,
                                          &plugin.text);
@@ -240,7 +242,7 @@ void PluginHost::clicked(LoadedPlugin& plugin, const lua::LuaRef& handler, Plugi
                           {}));
 }
 
-void PluginHost::npcClicked(LoadedPlugin& plugin, const lua::LuaRef& handler, const std::string& playerUuid) {
+void PluginHost::npcClicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, const std::string& playerUuid) {
     const std::shared_ptr<PluginPlayerRef> player = services_->players().byUuid(playerUuid);
     if (player == nullptr) {
         return;
@@ -248,9 +250,9 @@ void PluginHost::npcClicked(LoadedPlugin& plugin, const lua::LuaRef& handler, co
     static_cast<void>(answer(plugin, handler, player.get(), "npc click"));
 }
 
-void PluginHost::deliverPacket(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPacket& packet) {
+void PluginHost::deliverPacket(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPacket& packet) {
     static_cast<void>(ask(plugin, fn, "packet " + packet.name,
-                          [this, &plugin, &packet](lua::LuaArgs& args) {
+                          [this, &plugin, &packet](wire::lua::LuaArgs& args) {
                               pushPacket(args, packet, *this, plugin);
                               return 1;
                           },

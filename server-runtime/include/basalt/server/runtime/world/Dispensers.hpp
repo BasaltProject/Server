@@ -51,6 +51,8 @@ struct Hooks {
         launchFirework;
     /// parity: `BeehiveBlock.releaseBeesAndResetHoneyLevel(..., BEE_RELEASED)`.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> releaseHive;
+    /// parity: `Armadillo.brushOffScute`, the loot, sound and interaction event of a brushing.
+    std::function<bool(entity::ServerEntity& armadillo)> brushArmadillo;
 };
 
 struct Result {

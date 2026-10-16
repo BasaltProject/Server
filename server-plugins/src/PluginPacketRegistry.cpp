@@ -6,7 +6,7 @@
 #include <utility>
 
 namespace basalt::server::plugins {
-PluginHandle PluginPacketRegistry::add(LoadedPlugin& plugin, const std::string& name, lua::LuaRef fn,
+PluginHandle PluginPacketRegistry::add(LoadedPlugin& plugin, const std::string& name, wire::lua::LuaRef fn,
                                        PluginEventPriority priority, bool observer) {
     const std::int64_t id = nextId_++;
     std::vector<Listener>& list = listeners_[name];
@@ -39,7 +39,7 @@ bool PluginPacketRegistry::fire(PluginPacket& packet) {
     }
     packet.clear();
     // The listeners by address, because delivering one may register or drop another.
-    std::vector<std::pair<LoadedPlugin*, const lua::LuaRef*>> targets;
+    std::vector<std::pair<LoadedPlugin*, const wire::lua::LuaRef*>> targets;
     targets.reserve(found->second.size());
     std::vector<bool> observers;
     observers.reserve(found->second.size());

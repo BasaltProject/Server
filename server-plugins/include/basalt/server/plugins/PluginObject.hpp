@@ -1,6 +1,6 @@
 #pragma once
 
-#include <basalt/server/lua/LuaArgs.hpp>
+#include <basalt/wire/lua/LuaArgs.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -16,9 +16,9 @@ using PluginValue = std::variant<std::monostate, bool, std::int64_t, double, std
 class PluginObject {
 public:
     using Reader = std::function<PluginValue()>;
-    using Pusher = std::function<void(lua::LuaArgs&)>;
-    using Writer = std::function<void(lua::LuaArgs&, std::int32_t index)>;
-    using Method = std::function<std::int32_t(lua::LuaArgs&)>;
+    using Pusher = std::function<void(wire::lua::LuaArgs&)>;
+    using Writer = std::function<void(wire::lua::LuaArgs&, std::int32_t index)>;
+    using Method = std::function<std::int32_t(wire::lua::LuaArgs&)>;
 
     explicit PluginObject(std::string kind) : kind_(std::move(kind)) {}
 
@@ -30,7 +30,7 @@ public:
 
     PluginObject& method(std::string name, Method body);
 
-    void push(lua::LuaArgs& lua) &&;
+    void push(wire::lua::LuaArgs& lua) &&;
 
 private:
     std::string kind_;
@@ -40,7 +40,7 @@ private:
     std::map<std::string, Method, std::less<>> methods_;
 };
 
-void pushValue(lua::LuaArgs& lua, const PluginValue& value);
+void pushValue(wire::lua::LuaArgs& lua, const PluginValue& value);
 
-[[nodiscard]] std::int32_t firstArgument(const lua::LuaArgs& lua);
+[[nodiscard]] std::int32_t firstArgument(const wire::lua::LuaArgs& lua);
 } // namespace basalt::server::plugins

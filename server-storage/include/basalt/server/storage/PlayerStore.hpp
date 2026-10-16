@@ -4,7 +4,7 @@
 #include <basalt/server/storage/PlayerRepository.hpp>
 #include <basalt/server/storage/PluginDataRepository.hpp>
 #include <basalt/server/storage/ProgressRepository.hpp>
-#include <basalt/server/storage/Sqlite.hpp>
+#include <basalt/wire/sql/Sqlite.hpp>
 
 #include <expected>
 #include <memory>
@@ -34,16 +34,16 @@ public:
 
     [[nodiscard]] PluginDataRepository& pluginData() noexcept { return pluginData_; }
 
-    [[nodiscard]] sql::Database& database() noexcept { return *database_; }
+    [[nodiscard]] wire::sql::Database& database() noexcept { return *database_; }
 
     [[nodiscard]] bool isOpen() const noexcept { return open_; }
 
     void close();
 
 private:
-    explicit PlayerStore(std::unique_ptr<sql::Database> database);
+    explicit PlayerStore(std::unique_ptr<wire::sql::Database> database);
 
-    std::unique_ptr<sql::Database> database_;
+    std::unique_ptr<wire::sql::Database> database_;
     PlayerRepository players_;
     AccessRepository access_;
     ProgressRepository progress_;

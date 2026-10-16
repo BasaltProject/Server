@@ -91,7 +91,7 @@ constexpr std::string_view kColumns =
     return decoded.has_value() ? *decoded : StoredInventory::empty(fallbackSize);
 }
 
-[[nodiscard]] StoredPlayer readRow(const sql::Statement& row) {
+[[nodiscard]] StoredPlayer readRow(const wire::sql::Statement& row) {
     StoredPlayer player;
     player.uuid = row.text(0);
     player.name = row.text(1);
@@ -138,7 +138,7 @@ constexpr std::string_view kColumns =
     return player;
 }
 
-[[nodiscard]] std::vector<PlayerSummary> summaries(sql::Statement& statement) {
+[[nodiscard]] std::vector<PlayerSummary> summaries(wire::sql::Statement& statement) {
     std::vector<PlayerSummary> found;
     while (statement.step()) {
         found.push_back(PlayerSummary{.uuid = statement.text(0),
@@ -150,7 +150,7 @@ constexpr std::string_view kColumns =
 } // namespace
 
 std::optional<StoredPlayer> PlayerRepository::loadOne(std::string_view sql, std::string_view key) {
-    sql::Statement statement = database_->prepare(sql);
+    wire::sql::Statement statement = database_->prepare(sql);
     statement.bind(1, key);
     if (!statement.step()) {
         return std::nullopt;
@@ -169,13 +169,13 @@ std::optional<StoredPlayer> PlayerRepository::loadByName(std::string_view name) 
 }
 
 bool PlayerRepository::exists(std::string_view uuid) {
-    sql::Statement statement = database_->prepare("SELECT EXISTS(SELECT 1 FROM player WHERE uuid = ?)");
+    wire::sql::Statement statement = database_->prepare("SELECT EXISTS(SELECT 1 FROM player WHERE uuid = ?)");
     statement.bind(1, uuid);
     return statement.step() && statement.integer(0) != 0;
 }
 
 void PlayerRepository::save(const StoredPlayer& player) {
-    sql::Statement statement = database_->prepare(R"(
+    wire::sql::Statement statement = database_->prepare(R"(
 INSERT INTO player(
     uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch,
     health, food, saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode,
@@ -259,21 +259,21 @@ bool PlayerRepository::setGroup(std::string_view uuid, const std::optional<std::
     if (!exists(uuid)) {
         return false;
     }
-    sql::Statement statement = database_->prepare("UPDATE player SET group_name = ? WHERE uuid = ?");
+    wire::sql::Statement statement = database_->prepare("UPDATE player SET group_name = ? WHERE uuid = ?");
     statement.bind(1, group);
     statement.bind(2, uuid);
     return statement.execute();
 }
 
 void PlayerRepository::setLastIp(std::string_view uuid, const std::optional<std::string>& address) {
-    sql::Statement statement = database_->prepare("UPDATE player SET last_ip = ? WHERE uuid = ?");
+    wire::sql::Statement statement = database_->prepare("UPDATE player SET last_ip = ? WHERE uuid = ?");
     statement.bind(1, address);
     statement.bind(2, uuid);
     statement.execute();
 }
 
 std::optional<std::string> PlayerRepository::findNameByAddress(std::string_view address) {
-    sql::Statement statement =
+    wire::sql::Statement statement =
         database_->prepare("SELECT name FROM player WHERE last_ip = ? ORDER BY last_seen DESC LIMIT 1");
     statement.bind(1, address);
     if (!statement.step()) {
@@ -283,26 +283,27 @@ std::optional<std::string> PlayerRepository::findNameByAddress(std::string_view 
 }
 
 std::vector<PlayerSummary> PlayerRepository::findInGroup(std::string_view group) {
-    sql::Statement statement =
+    wire::sql::Statement statement =
         database_->prepare("SELECT uuid, name, NULL FROM player WHERE group_name = ? ORDER BY name");
     statement.bind(1, group);
     return summaries(statement);
 }
 
 void PlayerRepository::remove(std::string_view uuid) {
-    sql::Statement statement = database_->prepare("DELETE FROM player WHERE uuid = ?");
+    wire::sql::Statement statement = database_->prepare("DELETE FROM player WHERE uuid = ?");
     statement.bind(1, uuid);
     statement.execute();
 }
 
 std::int64_t PlayerRepository::count() {
-    sql::Statement statement = database_->prepare("SELECT count(*) FROM player");
+    wire::sql::Statement statement = database_->prepare("SELECT count(*) FROM player");
     return statement.step() ? statement.integer(0) : 0;
 }
 
 std::map<StoredGamemode, std::int64_t> PlayerRepository::countByGamemode() {
     std::map<StoredGamemode, std::int64_t> counts;
-    sql::Statement statement = database_->prepare("SELECT gamemode, count(*) AS total FROM player GROUP BY gamemode");
+    wire::sql::Statement statement =
+        database_->prepare("SELECT gamemode, count(*) AS total FROM player GROUP BY gamemode");
     while (statement.step()) {
         counts[gamemodeById(static_cast<std::int32_t>(statement.integer(0)))] += statement.integer(1);
     }
@@ -310,20 +311,21 @@ std::map<StoredGamemode, std::int64_t> PlayerRepository::countByGamemode() {
 }
 
 std::vector<PlayerSummary> PlayerRepository::findLastSeenBefore(std::int64_t epochSeconds) {
-    sql::Statement statement =
+    wire::sql::Statement statement =
         database_->prepare("SELECT uuid, name, last_seen FROM player WHERE last_seen < ? ORDER BY last_seen");
     statement.bind(1, epochSeconds);
     return summaries(statement);
 }
 
 std::vector<PlayerSummary> PlayerRepository::findInWorld(std::string_view world) {
-    sql::Statement statement = database_->prepare("SELECT uuid, name, NULL FROM player WHERE world = ? ORDER BY name");
+    wire::sql::Statement statement =
+        database_->prepare("SELECT uuid, name, NULL FROM player WHERE world = ? ORDER BY name");
     statement.bind(1, world);
     return summaries(statement);
 }
 
 std::vector<PlayerSummary> PlayerRepository::findWithPlayTimeAtLeast(std::int64_t ticks) {
-    sql::Statement statement = database_->prepare(
+    wire::sql::Statement statement = database_->prepare(
         "SELECT uuid, name, play_time_ticks FROM player WHERE play_time_ticks >= ? ORDER BY play_time_ticks DESC");
     statement.bind(1, ticks);
     return summaries(statement);

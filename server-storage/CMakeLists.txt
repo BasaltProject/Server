@@ -6,11 +6,10 @@ basalt_module(server-storage
         src/PluginDataRepository.cpp
         src/ProgressRepository.cpp
         src/Schema.cpp
-        src/Sqlite.cpp
         src/StorageNbt.cpp
         src/StoredPlayer.cpp
         src/VanillaPlayerData.cpp
-    DEPENDS basalt::wire-common basalt::wire-nbt basalt::sqlite
+    DEPENDS basalt::wire-common basalt::wire-nbt basalt::wire-sqlite
 )
 
 basalt_test(server-storage-test

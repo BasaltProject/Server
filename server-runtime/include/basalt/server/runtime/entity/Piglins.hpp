@@ -35,10 +35,15 @@ inline constexpr std::size_t kInventorySize = 8;
 inline constexpr std::array<std::int32_t, 2> kTimeBetweenHunts{30 * 20, 120 * 20};
 inline constexpr std::array<std::int32_t, 2> kRetreatDuration{5 * 20, 20 * 20};
 inline constexpr std::array<std::int32_t, 2> kAvoidZombified{5 * 20, 7 * 20};
+inline constexpr std::array<std::int32_t, 2> kRideStartInterval{10 * 20, 40 * 20};
+inline constexpr std::array<std::int32_t, 2> kRideDuration{10 * 20, 30 * 20};
 
 enum class Activity : std::uint8_t { Idle, AdmireItem, Fight, Avoid, Celebrate, Ride };
 
 enum class Crossbow : std::uint8_t { Uncharged, Charging, Charged, ReadyToAttack };
+
+/// parity: `SpearAttack.SpearStatus`.
+enum class SpearStatus : std::uint8_t { Approach, Charging, Retreat };
 
 using Pos = std::array<std::int32_t, 3>;
 
@@ -71,6 +76,11 @@ struct PiglinState {
     std::int32_t crossbowDelay = 0;
     bool chargingCrossbow = false;
     std::int32_t rideTicker = 0;
+    SpearStatus spear = SpearStatus::Approach;
+    std::int32_t spearEngageTime = 0;
+    std::optional<Pos> spearChargePos;
+    std::int32_t spearFleeingTime = 0;
+    std::optional<Pos> spearFleeingPos;
     std::optional<std::int32_t> wantedItem;
     bool memoriesSeeded = false;
     std::int64_t lastTick = 0;

@@ -282,6 +282,13 @@ void setForward(ServerEntity& mob, double speedModifier) {
     mob.movingForward = true;
 }
 
+void strafe(ServerEntity& mob, double strafe, double forward, double speedModifier) {
+    mob.strafing = true;
+    mob.strafeRight = strafe;
+    mob.strafeForward = forward;
+    mob.moveSpeed = speedModifier;
+}
+
 void stop(ServerEntity& mob) {
     mob.moving = false;
     mob.movingForward = false;
@@ -319,6 +326,13 @@ void tick(world::WorldState& world, ServerEntity& mob, double speed) {
         mob.movingForward = false;
         const double ahead = speed * mob.moveSpeed;
         livingMovement::travel(world, mob, ahead, 0.0, ahead);
+        return;
+    }
+    if (mob.strafing) {
+        // parity: `MoveControl.Operation.STRAFE`, `travel` on the raw strafe inputs at its speed.
+        mob.strafing = false;
+        const double amount = speed * mob.moveSpeed;
+        livingMovement::travel(world, mob, mob.strafeForward * amount, mob.strafeRight * amount, amount);
         return;
     }
     if (!mob.moving) {

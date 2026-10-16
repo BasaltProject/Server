@@ -7,7 +7,7 @@
 #include <utility>
 
 namespace basalt::server::plugins {
-void PluginChannelHost::listenOn(LoadedPlugin& plugin, const std::string& channel, lua::LuaRef fn) {
+void PluginChannelHost::listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn) {
     const std::int64_t id = nextId_++;
     channels_[channel].push_back(ChannelListener{.plugin = &plugin, .fn = std::move(fn), .id = id});
     static_cast<void>(plugin.registrations.add("channel(" + channel + ")", [this, channel, id] {
@@ -32,7 +32,7 @@ void PluginChannelHost::channelMessage(PluginHost& host, const std::string& chan
     }
     const std::shared_ptr<PluginPlayerRef> player = host.services().players().byUuid(playerUuid);
     // A copy, because a listener may register or drop one while this runs.
-    std::vector<std::pair<LoadedPlugin*, const lua::LuaRef*>> targets;
+    std::vector<std::pair<LoadedPlugin*, const wire::lua::LuaRef*>> targets;
     targets.reserve(found->second.size());
     for (const ChannelListener& listener : found->second) {
         targets.emplace_back(listener.plugin, &listener.fn);
@@ -42,7 +42,7 @@ void PluginChannelHost::channelMessage(PluginHost& host, const std::string& chan
             continue;
         }
         static_cast<void>(host.ask(*plugin, *fn, "channel " + channel,
-                                   [&host, plugin, &player, bytes](lua::LuaArgs& args) {
+                                   [&host, plugin, &player, bytes](wire::lua::LuaArgs& args) {
                                        if (player == nullptr) {
                                            args.pushNil();
                                        } else {

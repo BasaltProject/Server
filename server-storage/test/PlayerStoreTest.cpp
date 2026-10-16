@@ -29,7 +29,7 @@ TEST_CASE("a database missing a column this build needs is refused, not used") {
         const std::expected<std::unique_ptr<PlayerStore>, PlayerDatabaseSchemaError> current = PlayerStore::open(path);
         REQUIRE(current.has_value());
         (*current)->close();
-        std::optional<sql::Database> old = sql::Database::open(path);
+        std::optional<basalt::wire::sql::Database> old = basalt::wire::sql::Database::open(path);
         REQUIRE(old.has_value());
         REQUIRE(old->exec("DROP INDEX player_last_seen"));
         REQUIRE(old->exec("ALTER TABLE player DROP COLUMN last_seen"));

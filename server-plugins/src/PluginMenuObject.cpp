@@ -7,7 +7,7 @@
 
 namespace basalt::server::plugins {
 namespace {
-using lua::LuaArgs;
+using wire::lua::LuaArgs;
 } // namespace
 
 std::shared_ptr<LuaMenu> LuaMenu::create(PluginMenus& menus, PluginPlayers& players, std::string title,
@@ -55,7 +55,7 @@ void LuaMenu::push(LuaArgs& lua) {
                     }
                     self->items_.insert_or_assign(slot, *item);
                     if (args.isFunction(base + 2)) {
-                        self->handlers_.insert_or_assign(slot, lua::LuaRef::of(args.state(), base + 2));
+                        self->handlers_.insert_or_assign(slot, wire::lua::LuaRef::of(args.state(), base + 2));
                     } else {
                         self->handlers_.erase(slot);
                     }

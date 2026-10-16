@@ -1,6 +1,6 @@
 #pragma once
 
-#include <basalt/server/storage/Sqlite.hpp>
+#include <basalt/wire/sql/Sqlite.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -41,7 +41,7 @@ struct WhitelistEntry {
 
 class AccessRepository {
 public:
-    explicit AccessRepository(sql::Database& database) : database_(&database) {}
+    explicit AccessRepository(wire::sql::Database& database) : database_(&database) {}
 
     [[nodiscard]] std::optional<StoredSpawnPoint> spawnPointOf(std::string_view uuid);
 
@@ -68,6 +68,6 @@ public:
     bool removeFromWhitelist(std::string_view uuid);
 
 private:
-    sql::Database* database_;
+    wire::sql::Database* database_;
 };
 } // namespace basalt::server::storage

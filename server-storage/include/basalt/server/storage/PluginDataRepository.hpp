@@ -1,6 +1,6 @@
 #pragma once
 
-#include <basalt/server/storage/Sqlite.hpp>
+#include <basalt/wire/sql/Sqlite.hpp>
 
 #include <cstdint>
 #include <map>
@@ -13,7 +13,7 @@
 namespace basalt::server::storage {
 class PluginDataRepository {
 public:
-    explicit PluginDataRepository(sql::Database& database) : database_(&database) {}
+    explicit PluginDataRepository(wire::sql::Database& database) : database_(&database) {}
 
     [[nodiscard]] std::optional<std::string> get(std::string_view plugin, std::string_view uuid, std::string_view key);
 
@@ -30,6 +30,6 @@ public:
     void purge(std::string_view plugin);
 
 private:
-    sql::Database* database_;
+    wire::sql::Database* database_;
 };
 } // namespace basalt::server::storage

@@ -48,6 +48,9 @@ void setWanted(ServerEntity& mob, double x, double y, double z, double speedModi
 /// parity: `CubeMobMoveControl`.
 void setForward(ServerEntity& mob, double speedModifier);
 
+/// parity: `MoveControl.strafe`.
+void strafe(ServerEntity& mob, double strafe, double forward, double speedModifier);
+
 void stop(ServerEntity& mob);
 
 void tick(world::WorldState& world, ServerEntity& mob, double speed);

@@ -1,5 +1,5 @@
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <charconv>
 #include <cmath>
@@ -8,7 +8,7 @@
 
 namespace basalt::server::plugins {
 namespace {
-using lua::LuaArgs;
+using wire::lua::LuaArgs;
 
 constexpr std::int32_t kChunk = 16;
 constexpr double kTicksPerSecond = 20.0;
@@ -311,7 +311,7 @@ void pushPlayerData(LuaArgs& lua, PluginStorage& storage, std::string pluginId, 
     PluginStorage* store = &storage;
     lua.pushTable();
     lua.pushTable();
-    lua::pushHostFunction(lua, "data.index", [store, pluginId, uuid](LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, "data.index", [store, pluginId, uuid](LuaArgs& args) {
         const std::optional<std::string> stored = store->playerValue(pluginId, uuid, args.checkString(2));
         if (!stored.has_value()) {
             args.pushNil();
@@ -321,7 +321,7 @@ void pushPlayerData(LuaArgs& lua, PluginStorage& storage, std::string pluginId, 
         return 1;
     });
     lua.setField("__index");
-    lua::pushHostFunction(lua, "data.newindex", [store, pluginId, uuid](LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, "data.newindex", [store, pluginId, uuid](LuaArgs& args) {
         const std::string key = args.checkString(2);
         store->setPlayerValue(pluginId, uuid, key, args.isNil(3) ? std::nullopt : std::optional{args.toText(3)});
         return 0;

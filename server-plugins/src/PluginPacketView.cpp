@@ -7,7 +7,7 @@
 
 namespace basalt::server::plugins {
 namespace {
-using lua::LuaArgs;
+using wire::lua::LuaArgs;
 
 [[nodiscard]] std::vector<std::uint8_t> bytesFrom(LuaArgs& lua, std::int32_t index) {
     if (!lua.isTable(index)) {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <basalt/server/lua/LuaArgs.hpp>
+#include <basalt/wire/lua/LuaArgs.hpp>
 
 #include <cstdint>
 #include <map>
@@ -16,7 +16,7 @@ public:
 
     void load();
 
-    [[nodiscard]] std::string resolve(std::string_view message, lua::LuaArgs* lua, std::int32_t arguments) const;
+    [[nodiscard]] std::string resolve(std::string_view message, wire::lua::LuaArgs* lua, std::int32_t arguments) const;
 
     [[nodiscard]] std::optional<std::string> translation(std::string_view key) const;
 

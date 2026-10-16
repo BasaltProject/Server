@@ -28,6 +28,10 @@ class LoadedWorld;
 class RealRecipes;
 } // namespace basalt::server::runtime::world
 
+namespace basalt::server::runtime::entity {
+class ServerEntity;
+}
+
 namespace basalt::server::runtime::sched {
 class Region;
 }
@@ -86,6 +90,8 @@ public:
                            wire::nbt::NbtCompound& data)>
             tickConduit;
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
+        /// parity: `Armadillo.brushOffScute` from the dispenser's brush behaviour.
+        std::function<bool(world::LoadedWorld& world, entity::ServerEntity& armadillo)> brushArmadillo;
         MobSpawnerSystem* mobSpawners = nullptr;
     };
 

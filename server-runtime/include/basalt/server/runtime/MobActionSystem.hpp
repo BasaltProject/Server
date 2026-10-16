@@ -591,6 +591,9 @@ private:
     void piglinIdle(world::LoadedWorld& world, entity::ai::MobContext& context, entity::piglins::PiglinState& state,
                     bool moving);
     void piglinFight(world::LoadedWorld& world, entity::ai::MobContext& context, entity::piglins::PiglinState& state);
+    void piglinSpearFight(world::LoadedWorld& world, entity::ai::MobContext& context,
+                          entity::piglins::PiglinState& state, const entity::ai::TargetView& target,
+                          double distanceSquared);
     void piglinPicksUp(world::LoadedWorld& world, entity::ServerEntity& piglin, entity::piglins::PiglinState& state);
     void piglinStopHoldingOffhand(world::LoadedWorld& world, entity::ServerEntity& piglin,
                                   entity::piglins::PiglinState& state, bool barter);

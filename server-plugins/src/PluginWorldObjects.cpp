@@ -1,5 +1,5 @@
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <cmath>
 #include <cstdint>
@@ -7,7 +7,7 @@
 
 namespace basalt::server::plugins {
 namespace {
-using lua::LuaArgs;
+using wire::lua::LuaArgs;
 
 [[nodiscard]] std::string nameLines(LuaArgs& lua, std::int32_t index) {
     if (lua.isString(index)) {
@@ -270,8 +270,9 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
                     args.pushField(options, "on_click");
                     std::function<void(const std::string&)> onClick;
                     if (args.isFunction(-1) && shared->onNpcClick) {
-                        lua::LuaRef handler = lua::LuaRef::of(args.state(), -1);
-                        const std::shared_ptr<lua::LuaRef> held = std::make_shared<lua::LuaRef>(std::move(handler));
+                        wire::lua::LuaRef handler = wire::lua::LuaRef::of(args.state(), -1);
+                        const std::shared_ptr<wire::lua::LuaRef> held =
+                            std::make_shared<wire::lua::LuaRef>(std::move(handler));
                         const WorldHooks::NpcClick call = shared->onNpcClick;
                         onClick = [held, call](const std::string& uuid) { call(*held, uuid); };
                     }

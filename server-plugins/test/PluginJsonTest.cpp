@@ -1,7 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginJson.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <doctest.h>
 
@@ -9,7 +9,7 @@
 #include <string>
 
 using namespace basalt::server::plugins;
-using namespace basalt::server::lua;
+using namespace basalt::wire::lua;
 
 namespace {
 class Fixture {

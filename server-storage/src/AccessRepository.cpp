@@ -5,7 +5,7 @@ namespace {
 constexpr std::string_view kBanColumns = "subject, kind, name, reason, source, created_at, expires_at";
 constexpr std::string_view kWhitelistColumns = "uuid, name, added_at";
 
-[[nodiscard]] BanRecord readBan(const sql::Statement& row, BanKind kind) {
+[[nodiscard]] BanRecord readBan(const wire::sql::Statement& row, BanKind kind) {
     return BanRecord{.subject = row.text(0),
                      .kind = kind,
                      .name = row.textOrNull(2),
@@ -15,7 +15,7 @@ constexpr std::string_view kWhitelistColumns = "uuid, name, added_at";
                      .expiresAtEpochSeconds = row.integerOrNull(6)};
 }
 
-[[nodiscard]] WhitelistEntry readWhitelist(const sql::Statement& row) {
+[[nodiscard]] WhitelistEntry readWhitelist(const wire::sql::Statement& row) {
     return WhitelistEntry{.uuid = row.text(0), .name = row.text(1), .addedAtEpochSeconds = row.integer(2)};
 }
 } // namespace
@@ -23,7 +23,8 @@ constexpr std::string_view kWhitelistColumns = "uuid, name, added_at";
 std::string_view storedNameOf(BanKind kind) { return kind == BanKind::Player ? "player" : "ip"; }
 
 std::optional<StoredSpawnPoint> AccessRepository::spawnPointOf(std::string_view uuid) {
-    sql::Statement statement = database_->prepare("SELECT uuid, world, x, y, z, yaw FROM spawn_point WHERE uuid = ?");
+    wire::sql::Statement statement =
+        database_->prepare("SELECT uuid, world, x, y, z, yaw FROM spawn_point WHERE uuid = ?");
     statement.bind(1, uuid);
     if (!statement.step()) {
         return std::nullopt;
@@ -37,7 +38,7 @@ std::optional<StoredSpawnPoint> AccessRepository::spawnPointOf(std::string_view 
 }
 
 void AccessRepository::setSpawnPoint(const StoredSpawnPoint& point) {
-    sql::Statement statement =
+    wire::sql::Statement statement =
         database_->prepare("INSERT OR REPLACE INTO spawn_point(uuid, world, x, y, z, yaw) VALUES (?, ?, ?, ?, ?, ?)");
     statement.bind(1, point.uuid);
     statement.bind(2, point.world);
@@ -49,13 +50,13 @@ void AccessRepository::setSpawnPoint(const StoredSpawnPoint& point) {
 }
 
 void AccessRepository::clearSpawnPoint(std::string_view uuid) {
-    sql::Statement statement = database_->prepare("DELETE FROM spawn_point WHERE uuid = ?");
+    wire::sql::Statement statement = database_->prepare("DELETE FROM spawn_point WHERE uuid = ?");
     statement.bind(1, uuid);
     statement.execute();
 }
 
 std::optional<BanRecord> AccessRepository::banOf(std::string_view subject, BanKind kind) {
-    sql::Statement statement =
+    wire::sql::Statement statement =
         database_->prepare("SELECT " + std::string{kBanColumns} + " FROM ban WHERE subject = ? AND kind = ?");
     statement.bind(1, subject);
     statement.bind(2, storedNameOf(kind));
@@ -67,7 +68,7 @@ std::optional<BanRecord> AccessRepository::banOf(std::string_view subject, BanKi
 
 std::vector<BanRecord> AccessRepository::bans(BanKind kind) {
     std::vector<BanRecord> found;
-    sql::Statement statement =
+    wire::sql::Statement statement =
         database_->prepare("SELECT " + std::string{kBanColumns} + " FROM ban WHERE kind = ? ORDER BY created_at");
     statement.bind(1, storedNameOf(kind));
     while (statement.step()) {
@@ -77,7 +78,7 @@ std::vector<BanRecord> AccessRepository::bans(BanKind kind) {
 }
 
 void AccessRepository::ban(const BanRecord& record) {
-    sql::Statement statement =
+    wire::sql::Statement statement =
         database_->prepare("INSERT OR REPLACE INTO ban(subject, kind, name, reason, source, created_at, expires_at) "
                            "VALUES (?, ?, ?, ?, ?, ?, ?)");
     statement.bind(1, record.subject);
@@ -94,7 +95,7 @@ bool AccessRepository::pardon(std::string_view subject, BanKind kind) {
     if (!banOf(subject, kind).has_value()) {
         return false;
     }
-    sql::Statement statement = database_->prepare("DELETE FROM ban WHERE subject = ? AND kind = ?");
+    wire::sql::Statement statement = database_->prepare("DELETE FROM ban WHERE subject = ? AND kind = ?");
     statement.bind(1, subject);
     statement.bind(2, storedNameOf(kind));
     return statement.execute();
@@ -102,7 +103,7 @@ bool AccessRepository::pardon(std::string_view subject, BanKind kind) {
 
 std::vector<WhitelistEntry> AccessRepository::whitelist() {
     std::vector<WhitelistEntry> found;
-    sql::Statement statement =
+    wire::sql::Statement statement =
         database_->prepare("SELECT " + std::string{kWhitelistColumns} + " FROM whitelist ORDER BY name");
     while (statement.step()) {
         found.push_back(readWhitelist(statement));
@@ -111,14 +112,14 @@ std::vector<WhitelistEntry> AccessRepository::whitelist() {
 }
 
 bool AccessRepository::isWhitelisted(std::string_view uuid) {
-    sql::Statement statement = database_->prepare("SELECT 1 FROM whitelist WHERE uuid = ?");
+    wire::sql::Statement statement = database_->prepare("SELECT 1 FROM whitelist WHERE uuid = ?");
     statement.bind(1, uuid);
     return statement.step();
 }
 
 std::optional<WhitelistEntry> AccessRepository::whitelistedByName(std::string_view name) {
-    sql::Statement statement = database_->prepare("SELECT " + std::string{kWhitelistColumns} +
-                                                  " FROM whitelist WHERE name = ? COLLATE NOCASE LIMIT 1");
+    wire::sql::Statement statement = database_->prepare("SELECT " + std::string{kWhitelistColumns} +
+                                                        " FROM whitelist WHERE name = ? COLLATE NOCASE LIMIT 1");
     statement.bind(1, name);
     if (!statement.step()) {
         return std::nullopt;
@@ -127,7 +128,7 @@ std::optional<WhitelistEntry> AccessRepository::whitelistedByName(std::string_vi
 }
 
 void AccessRepository::addToWhitelist(const WhitelistEntry& entry) {
-    sql::Statement statement =
+    wire::sql::Statement statement =
         database_->prepare("INSERT OR REPLACE INTO whitelist(uuid, name, added_at) VALUES (?, ?, ?)");
     statement.bind(1, entry.uuid);
     statement.bind(2, entry.name);
@@ -139,7 +140,7 @@ bool AccessRepository::removeFromWhitelist(std::string_view uuid) {
     if (!isWhitelisted(uuid)) {
         return false;
     }
-    sql::Statement statement = database_->prepare("DELETE FROM whitelist WHERE uuid = ?");
+    wire::sql::Statement statement = database_->prepare("DELETE FROM whitelist WHERE uuid = ?");
     statement.bind(1, uuid);
     return statement.execute();
 }

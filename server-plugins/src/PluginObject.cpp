@@ -1,5 +1,5 @@
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginObject.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -36,7 +36,7 @@ struct Fields {
 };
 } // namespace
 
-void pushValue(lua::LuaArgs& lua, const PluginValue& value) {
+void pushValue(wire::lua::LuaArgs& lua, const PluginValue& value) {
     if (std::holds_alternative<std::monostate>(value)) {
         lua.pushNil();
     } else if (const auto* flag = std::get_if<bool>(&value); flag != nullptr) {
@@ -57,7 +57,7 @@ void pushValue(lua::LuaArgs& lua, const PluginValue& value) {
     }
 }
 
-std::int32_t firstArgument(const lua::LuaArgs& lua) { return lua.count() >= 1 && lua.isTable(1) ? 2 : 1; }
+std::int32_t firstArgument(const wire::lua::LuaArgs& lua) { return lua.count() >= 1 && lua.isTable(1) ? 2 : 1; }
 
 PluginObject& PluginObject::reads(std::string name, Reader reader) {
     readers_.emplace(std::move(name), std::move(reader));
@@ -79,7 +79,7 @@ PluginObject& PluginObject::method(std::string name, Method body) {
     return *this;
 }
 
-void PluginObject::push(lua::LuaArgs& lua) && {
+void PluginObject::push(wire::lua::LuaArgs& lua) && {
     auto fields = std::make_shared<Fields>(Fields{.kind = std::move(kind_),
                                                   .readers = std::move(readers_),
                                                   .pushers = std::move(pushers_),
@@ -87,10 +87,10 @@ void PluginObject::push(lua::LuaArgs& lua) && {
                                                   .methods = std::move(methods_)});
     lua.pushTable();
     lua.pushTable();
-    lua::pushHostFunction(lua, fields->kind + ".index", [fields](lua::LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, fields->kind + ".index", [fields](wire::lua::LuaArgs& args) {
         const std::string key = args.checkString(2);
         if (const auto method = fields->methods.find(key); method != fields->methods.end()) {
-            lua::pushHostFunction(args, fields->kind + "." + key, method->second);
+            wire::lua::pushHostFunction(args, fields->kind + "." + key, method->second);
             return 1;
         }
         if (const auto pusher = fields->pushers.find(key); pusher != fields->pushers.end()) {
@@ -105,7 +105,7 @@ void PluginObject::push(lua::LuaArgs& lua) && {
         return 1;
     });
     lua.setField("__index");
-    lua::pushHostFunction(lua, fields->kind + ".newindex", [fields](lua::LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, fields->kind + ".newindex", [fields](wire::lua::LuaArgs& args) {
         const std::string key = args.checkString(2);
         const auto writer = fields->writers.find(key);
         if (writer == fields->writers.end()) {
@@ -118,7 +118,7 @@ void PluginObject::push(lua::LuaArgs& lua) && {
     });
     lua.setField("__newindex");
     const std::string kind = fields->kind;
-    lua::pushHostFunction(lua, kind + ".tostring", [kind](lua::LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, kind + ".tostring", [kind](wire::lua::LuaArgs& args) {
         args.pushString(kind);
         return 1;
     });
