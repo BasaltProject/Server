@@ -1,5 +1,3 @@
-#include "RuleErrors.hpp"
-
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 
@@ -11,30 +9,26 @@ namespace {
 using wire::common::toml::TomlTable;
 
 [[nodiscard]] std::int32_t whole(const TomlTable& table, std::string_view key, std::int32_t fallback,
-                                 std::int64_t least) {
-    return ruleErrors::whole(table, key, fallback, least, 1 << 20);
+                                 std::int64_t least, std::int64_t most = 1 << 20) {
+    return static_cast<std::int32_t>(std::clamp<std::int64_t>(table.integer(key).value_or(fallback), least, most));
 }
 
 [[nodiscard]] float decimal(const TomlTable& table, std::string_view key, float fallback, double least) {
-    return static_cast<float>(ruleErrors::real(table, key, fallback, least, 1.0E9));
+    return static_cast<float>(std::max(table.real(key).value_or(fallback), least));
 }
 
 [[nodiscard]] std::int32_t tristate(const TomlTable& table, std::string_view key, std::int32_t fallback) {
-    if (table.find(key) == nullptr) {
-        return fallback;
-    }
     if (const std::optional<bool> truth = table.boolean(key); truth.has_value()) {
         return *truth ? 1 : 2;
     }
     if (const std::optional<std::string_view> word = table.string(key); word.has_value()) {
         return *word == "true" ? 1 : (*word == "false" ? 2 : 0);
     }
-    ruleErrors::report(key, "must be true, false or \"default\"");
     return fallback;
 }
 
 [[nodiscard]] bool flag(const TomlTable& table, std::string_view key, bool fallback) {
-    return ruleErrors::flag(table, key, fallback);
+    return table.boolean(key).value_or(fallback);
 }
 
 } // namespace
@@ -56,9 +50,9 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
         rules.blocks.spongeAbsorptionRadius =
             whole(*table, "sponge-absorption-radius", rules.blocks.spongeAbsorptionRadius, 1);
         rules.blocks.pistonBlockPushLimit =
-            whole(*table, "piston-block-push-limit", rules.blocks.pistonBlockPushLimit, 1);
+            whole(*table, "piston-block-push-limit", rules.blocks.pistonBlockPushLimit, 1, 4096);
         rules.blocks.poweredRailActivationRange =
-            whole(*table, "powered-rail-activation-range", rules.blocks.poweredRailActivationRange, 1);
+            whole(*table, "powered-rail-activation-range", rules.blocks.poweredRailActivationRange, 1, 256);
         rules.blocks.magmaBlockDamageWhenSneaking =
             flag(*table, "magma-block-damage-when-sneaking", rules.blocks.magmaBlockDamageWhenSneaking);
         rules.blocks.bedExplode = flag(*table, "bed-explode", rules.blocks.bedExplode);
@@ -108,7 +102,7 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
         rules.blocks.stonecutterDamage = decimal(*table, "stonecutter-damage", rules.blocks.stonecutterDamage, 0);
         rules.blocks.spawnerDeactivateByRedstone =
             flag(*table, "spawner-deactivate-by-redstone", rules.blocks.spawnerDeactivateByRedstone);
-        rules.blocks.lightningRodRange = whole(*table, "lightning-rod-range", rules.blocks.lightningRodRange, 1);
+        rules.blocks.lightningRodRange = whole(*table, "lightning-rod-range", rules.blocks.lightningRodRange, 1, 4096);
         rules.blocks.farmlandDisableTrampling =
             flag(*table, "farmland-disable-trampling", rules.blocks.farmlandDisableTrampling);
         rules.blocks.farmlandOnlyPlayersTrample =
