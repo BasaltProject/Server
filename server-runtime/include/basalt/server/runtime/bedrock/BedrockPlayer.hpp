@@ -315,6 +315,7 @@ private:
         std::uint32_t id = 0;
         std::vector<std::int32_t> slots;
         std::function<void(std::int32_t)> onClick;
+        std::function<void(const std::string&)> onFields;
     };
 
     void sendColumn(std::int32_t chunkX, std::int32_t chunkZ);
