@@ -154,3 +154,36 @@ TEST_CASE("a blob this build cannot read is refused, not misread") {
     badCount.set("Slots", nbt::NbtTag::ofList(std::move(countList)));
     CHECK(refusal(nbt::nbtIO::write(nbt::NbtTag::ofCompound(badCount))) == "inventory blob has 0 items in slot 1");
 }
+
+TEST_CASE("a 26.x player keeps the armour and the offhand it wears in equipment") {
+    using namespace basalt::wire::nbt;
+    NbtCompound sword;
+    sword.putString("id", "minecraft:iron_sword");
+    sword.putInt("count", 1);
+    sword.putByte("Slot", 0);
+    NbtList inventory{NbtType::Compound, {}};
+    inventory.push(NbtTag::ofCompound(sword));
+    NbtCompound helmet;
+    helmet.putString("id", "minecraft:iron_helmet");
+    helmet.putInt("count", 1);
+    NbtCompound shield;
+    shield.putString("id", "minecraft:shield");
+    shield.putInt("count", 1);
+    NbtCompound equipment;
+    equipment.set("head", NbtTag::ofCompound(helmet));
+    equipment.set("offhand", NbtTag::ofCompound(shield));
+    NbtCompound root;
+    root.putInt("DataVersion", 5023);
+    root.set("Inventory", NbtTag::ofList(inventory));
+    root.set("equipment", NbtTag::ofCompound(equipment));
+
+    const std::vector<std::uint8_t> bytes = nbtIO::write(NbtTag::ofCompound(root));
+    const auto player = basalt::server::storage::vanillaPlayerData::read(
+        "u", "n", bytes,
+        [](std::span<const std::uint8_t> raw) { return std::vector<std::uint8_t>(raw.begin(), raw.end()); }, 0,
+        "world");
+    REQUIRE(player.has_value());
+    CHECK(player->inventory.slots[0]->id == "minecraft:iron_sword");
+    CHECK(player->inventory.slots[39]->id == "minecraft:iron_helmet");
+    CHECK(player->inventory.slots[40]->id == "minecraft:shield");
+}

@@ -94,7 +94,9 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
                 spawnMobs_(chunk, gameTime_, difficulty_);
             }
             portals_.scan(chunk);
-            server::world::leafDistances::assign(chunk);
+            if (generated) {
+                server::world::leafDistances::assign(chunk);
+            }
         };
         hooks.persist = [this](std::vector<Chunk> chunks) {
             std::vector<Chunk*> held;
@@ -276,7 +278,7 @@ std::optional<Chunk> LoadedWorld::loadOrGenerateChunk(std::int32_t chunkX, std::
     chunk.setStage(server::world::ChunkStage::Full);
     portals_.scan(chunk);
     // Off the tick thread, and once: from here on a leaf knows its own distance. parity: not in a debug
-    if (declaration_.type != config::WorldType::Debug) {
+    if (!stored.has_value() && declaration_.type != config::WorldType::Debug) {
         server::world::leafDistances::assign(chunk);
     }
     return chunk;
