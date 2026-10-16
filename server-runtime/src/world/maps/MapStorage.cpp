@@ -44,10 +44,17 @@ using wire::nbt::NbtTag;
 
 std::string MapStorage::pathOf(std::string_view name) const { return directory_ + "/" + std::string{name} + ".dat"; }
 
+std::optional<NbtCompound> MapStorage::read(std::string_view name) const {
+    if (std::optional<NbtCompound> found = unwrapped(pathOf(name)); found.has_value() || fallback_.empty()) {
+        return found;
+    }
+    return unwrapped(fallback_ + "/" + std::string{name} + ".dat");
+}
+
 MapData* MapStorage::get(std::int32_t id) {
     auto found = maps_.find(id);
     if (found == maps_.end()) {
-        const std::optional<NbtCompound> data = unwrapped(pathOf(std::to_string(id)));
+        const std::optional<NbtCompound> data = read(std::to_string(id));
         found = maps_.emplace(id, data.has_value() ? MapData::load(*data) : std::nullopt).first;
     }
     return found->second.has_value() ? &*found->second : nullptr;
@@ -57,7 +64,7 @@ void MapStorage::set(std::int32_t id, MapData data) { maps_.insert_or_assign(id,
 
 std::int32_t MapStorage::nextId() {
     if (!lastId_.has_value()) {
-        const std::optional<NbtCompound> index = unwrapped(pathOf("last_id"));
+        const std::optional<NbtCompound> index = read("last_id");
         lastId_ = index.has_value() ? index->getInt("map", -1) : -1;
     }
     indexDirty_ = true;
@@ -67,7 +74,7 @@ std::int32_t MapStorage::nextId() {
 bool MapStorage::claimed(const std::string& key) {
     if (!claims_.has_value()) {
         claims_.emplace();
-        if (const std::optional<NbtCompound> stored = unwrapped(pathOf("structure_claims")); stored.has_value()) {
+        if (const std::optional<NbtCompound> stored = read("structure_claims"); stored.has_value()) {
             if (const wire::nbt::NbtList* list = stored->getList("claims"); list != nullptr) {
                 for (const NbtTag& element : list->elements()) {
                     if (const std::string* text = element.get<std::string>(); text != nullptr) {

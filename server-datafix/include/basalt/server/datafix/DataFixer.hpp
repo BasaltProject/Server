@@ -10,7 +10,8 @@ namespace basalt::server::datafix {
 inline constexpr std::int32_t kCurrentVersion = 5023;
 
 /// What the root being upgraded is, since a fix may only make sense for one of them.
-enum class Domain : std::uint8_t { Chunk, Player };
+/// `Entities` is the `entities/` file of a vanilla chunk, `Entities` list included.
+enum class Domain : std::uint8_t { Chunk, Player, Entities };
 
 struct Context {
     /// parity: `__context.dimension`, which `BlendingDataFix` reads.

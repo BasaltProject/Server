@@ -1,6 +1,7 @@
 #include "FixSupport.hpp"
 
 #include <cstddef>
+#include <functional>
 
 namespace basalt::server::datafix {
 
@@ -41,6 +42,43 @@ std::string_view plainTranslationKey(const NbtTag* component) {
         return {};
     }
     return fields->getString("translate");
+}
+
+namespace {
+
+void withPassengers(NbtCompound& entity, const std::function<void(NbtCompound&)>& edit) {
+    edit(entity);
+    NbtTag* passengers = entity.find("Passengers");
+    NbtList* list = passengers == nullptr ? nullptr : passengers->get<NbtList>();
+    if (list == nullptr) {
+        return;
+    }
+    for (std::size_t i = 0; i < list->size(); ++i) {
+        if (NbtCompound* rider = (*list)[i].get<NbtCompound>(); rider != nullptr) {
+            withPassengers(*rider, edit);
+        }
+    }
+}
+
+} // namespace
+
+void forEachEntity(Domain domain, NbtCompound& root, const std::function<void(NbtCompound&)>& edit) {
+    if (domain == Domain::Player) {
+        withPassengers(root, edit);
+        return;
+    }
+    // parity: Basalt keeps the entities of a chunk in its own key, shaped as vanilla's entity files shape them.
+    const std::string_view key = domain == Domain::Entities ? "Entities" : "basalt_entities";
+    NbtTag* held = root.find(key);
+    NbtList* list = held == nullptr ? nullptr : held->get<NbtList>();
+    if (list == nullptr) {
+        return;
+    }
+    for (std::size_t i = 0; i < list->size(); ++i) {
+        if (NbtCompound* entity = (*list)[i].get<NbtCompound>(); entity != nullptr) {
+            withPassengers(*entity, edit);
+        }
+    }
 }
 
 } // namespace basalt::server::datafix

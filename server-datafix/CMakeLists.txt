@@ -4,6 +4,7 @@ basalt_module(server-datafix
         src/FixSupport.cpp
         src/Fixes4000.cpp
         src/Fixes4300.cpp
+        src/EntityFixes.cpp
         src/Fixes4996.cpp
         src/ItemWalk.cpp
         src/TextFixes.cpp

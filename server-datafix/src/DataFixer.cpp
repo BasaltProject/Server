@@ -16,6 +16,7 @@ using wire::nbt::NbtTag;
         std::vector<Fix> built;
         addFixesFrom4000(built);
         addTextFixes(built);
+        addEntityFixes(built);
         addFixesFrom4300(built);
         addFixesFrom4996(built);
         std::ranges::stable_sort(built, {}, &Fix::version);
@@ -50,6 +51,13 @@ void apply(const Fix& fix, Domain domain, NbtCompound& root, const Context& cont
                 }
             });
         }
+        break;
+    case Target::Entity:
+        forEachEntity(domain, root, [&](NbtCompound& entity) {
+            if (fix.blockEntityId.empty() || namespaced(entity.getString("id")) == fix.blockEntityId) {
+                fix.apply(entity, context);
+            }
+        });
         break;
     case Target::Root:
         fix.apply(root, context);
