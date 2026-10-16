@@ -211,3 +211,33 @@ TEST_CASE("entities saved before 1.21.5 get their equipment, drop chances and th
     CHECK(file.getList("Entities")->elements()[1].get<NbtCompound>()->getString("id") == "minecraft:birch_boat");
     CHECK(file.getList("Entities")->elements()[2].get<NbtCompound>()->getString("id") == "minecraft:lingering_potion");
 }
+
+TEST_CASE("an item frame and a turtle keep their positions as block positions") {
+    NbtCompound frame;
+    frame.putString("id", "minecraft:item_frame");
+    frame.putInt("TileX", 10);
+    frame.putInt("TileY", 64);
+    frame.putInt("TileZ", -3);
+    NbtCompound turtle;
+    turtle.putString("id", "minecraft:turtle");
+    turtle.putInt("HomePosX", 1);
+    turtle.putInt("HomePosY", 2);
+    turtle.putInt("HomePosZ", 3);
+    turtle.putBoolean("HasEgg", true);
+    turtle.putInt("TravelPosX", 9);
+    NbtList entities{NbtType::Compound, {}};
+    entities.push(NbtTag::ofCompound(frame));
+    entities.push(NbtTag::ofCompound(turtle));
+    NbtCompound file;
+    file.set("Entities", NbtTag::ofList(entities));
+    basalt::server::datafix::upgrade(Domain::Entities, file, 4189);
+
+    const NbtCompound* fixedFrame = file.getList("Entities")->elements()[0].get<NbtCompound>();
+    CHECK(fixedFrame->getIntArray("block_pos").size() == 3);
+    CHECK(fixedFrame->getIntArray("block_pos")[2] == -3);
+    CHECK_FALSE(fixedFrame->contains("TileX"));
+    const NbtCompound* fixedTurtle = file.getList("Entities")->elements()[1].get<NbtCompound>();
+    CHECK(fixedTurtle->getIntArray("home_pos")[1] == 2);
+    CHECK(fixedTurtle->getBoolean("has_egg"));
+    CHECK_FALSE(fixedTurtle->contains("TravelPosX"));
+}

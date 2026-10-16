@@ -2,10 +2,13 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/world/DripstoneGrowth.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 #include <basalt/server/runtime/world/StalactiteDrips.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/server/runtime/world/WorldClock.hpp>
 
 #include <algorithm>
 #include <array>
@@ -49,11 +52,23 @@ void placeTip(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
     growthSupport::set(world, x, y, z, *tip, changes);
 }
 
+/// parity: `Block.pushEntitiesUp` from mud, 14/16 tall, to a full block of clay.
+void pushEntitiesUp(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    constexpr double kMudHeight = 14.0 / 16.0;
+    const entity::Aabb gained{
+        static_cast<double>(x), y + kMudHeight, static_cast<double>(z), x + 1.0, y + 1.0, z + 1.0};
+    for (entity::ServerEntity* other : world.entitiesIn(x >> 4, z >> 4)) {
+        if (entity::Aabb::of(other->x, other->y, other->z, other->width(), other->height()).intersects(gained)) {
+            other->y = y + 1.0;
+        }
+    }
+}
+
 } // namespace
 
 void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                random::RandomSource& random, std::vector<BlockChange>& changes, const bool evaporates,
-               const LevelEvent& levelEvent) {
+               const LevelEvent& levelEvent, const WorldClock* clock) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
         return;
@@ -68,6 +83,11 @@ void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
             if (transfer->clay.has_value()) {
                 const auto [cx, cy, cz] = *transfer->clay;
                 growthSupport::set(world, cx, cy, cz, registry::blocks::named("clay")->stateId, changes);
+                pushEntitiesUp(world, cx, cy, cz);
+                if (clock != nullptr) {
+                    // parity: `PointedDripstoneBlock.maybeTransferFluid` ends the clay with `BLOCK_CHANGE`.
+                    vibrations::emit(world, "block_change", cx + 0.5, cy + 0.5, cz + 0.5, clock->totalTicks());
+                }
             } else if (transfer->cauldron.has_value()) {
                 const auto [cx, cy, cz] = *transfer->cauldron;
                 const wire::common::Identifier* cauldron =
