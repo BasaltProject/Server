@@ -143,9 +143,20 @@ void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
     if (!rules.player.canSkipNight) {
         return;
     }
-    world.clock().setTotalTicks(world::beds::nextMorning(world.clock().totalTicks()));
-    world.weather().raining = world.weather().raining && !rules.mechanics.rainStopsAfterSleep;
-    world.weather().thundering = world.weather().thundering && !rules.mechanics.thunderStopsAfterSleep;
+    if (world.gameRules().get(world::gameRules::kAdvanceTime)) {
+        world.clock().setTotalTicks(world::beds::nextMorning(world.clock().totalTicks()));
+    }
+    // parity: `ServerLevel.resetWeatherCycle` zeroes the timers too, or the old rain flips back on when its timer ends.
+    if (world.gameRules().get(world::gameRules::kAdvanceWeather) && world.weather().isRaining()) {
+        if (rules.mechanics.rainStopsAfterSleep) {
+            world.weather().rainTime = 0;
+            world.weather().raining = false;
+        }
+        if (rules.mechanics.thunderStopsAfterSleep) {
+            world.weather().thunderTime = 0;
+            world.weather().thundering = false;
+        }
+    }
     for (PlayerSession* player : players) {
         if (player->connection().wakeUp) {
             player->connection().wakeUp();
