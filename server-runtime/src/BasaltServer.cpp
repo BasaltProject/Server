@@ -319,6 +319,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             maps_->save();
         }
         saveSchedule();
+        saveScoreboard();
+        saveBossBars();
     };
     persistence_ = std::make_unique<PersistenceCoordinator>(
         std::move(persistenceHooks), playerRegistry_, *playerStore_, commandStorage_, metrics_,
@@ -347,6 +349,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     whitelistEnforced_ = config.whitelist;
 
     vanillaData_.lootTables.useScoreboard(&scoreboard_);
+    loadScoreboard();
+    loadBossBars();
 
     CommandWiring wiring;
     wiring.players = &playerRegistry_;

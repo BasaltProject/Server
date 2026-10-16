@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/wire/nbt/NbtTag.hpp>
 #include <basalt/wire/protocol/play/BorderPackets.hpp>
 
 #include <cstdint>
@@ -49,6 +50,11 @@ public:
     [[nodiscard]] bool contains(double x, double z) const;
 
     void settle();
+
+    /// parity: `WorldBorder.Settings`, as the `world_border` saved data keeps it.
+    [[nodiscard]] wire::nbt::NbtCompound encode() const;
+
+    void restore(const wire::nbt::NbtCompound& settings);
 
 private:
     double centerX_ = 0.0;

@@ -49,6 +49,9 @@ struct WorldMetadata {
     /// parity: the `ender_dragon_fight` saved data, kept only by a world that has the fight.
     std::optional<wire::nbt::NbtCompound> dragonFight;
 
+    /// parity: the `world_border` saved data, `WorldBorder.Settings`.
+    std::optional<wire::nbt::NbtCompound> worldBorder;
+
     friend bool operator==(const WorldMetadata&, const WorldMetadata&) = default;
 
     [[nodiscard]] static std::string pathFor(const std::string& worldRoot) { return worldRoot + "/level.nbt"; }

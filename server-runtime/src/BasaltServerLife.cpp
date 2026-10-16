@@ -317,9 +317,14 @@ void BasaltServer::shutdown() {
                                                 [&name](server::plugins::PluginEvent& event) { event.set(0, name); }));
         world->saveDirty();
         world->flushRegions();
+        // The clock, weather and rules no chunk carries are written with the rest, not only by an autosave.
+        world->saveMetadata();
     }
+    commandStorage_.save();
     maps_->save();
     saveSchedule();
+    saveScoreboard();
+    saveBossBars();
     // Queued work is cancelled rather than run against worlds that are already written.
     worldRegistry_->scheduler().close();
     playerStore_.reset();

@@ -125,6 +125,9 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
             metadata_.dragonFight.has_value() ? DragonFight::decode(*metadata_.dragonFight) : DragonFight{});
         dragonFight_->shuffleGateways(metadata_.seed);
     }
+    if (metadata_.worldBorder.has_value()) {
+        border_.restore(*metadata_.worldBorder);
+    }
     weather_.raining = metadata_.raining;
     weather_.rainTime = metadata_.rainTime;
     weather_.thundering = metadata_.thundering;
@@ -229,6 +232,7 @@ void LoadedWorld::saveMetadata() {
     saved.difficulty = difficulty_;
     saved.difficultyLocked = difficultyLocked_;
     saved.defaultGamemode = defaultGamemode_;
+    saved.worldBorder = border_.encode();
     if (dragonFight_ != nullptr) {
         saved.dragonFight = dragonFight_->encode();
     }
