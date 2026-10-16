@@ -115,11 +115,12 @@ std::optional<RecipeBookEntry> entryFor(const RealRecipes& recipes, const Identi
 namespace {
 
 void send(const player::PlayerSession& target, const RealRecipes& recipes, const std::vector<Identifier>& ids,
-          bool replace) {
+          const std::set<Identifier>& highlighted, bool replace) {
     std::vector<RecipeBookEntry> entries;
     for (const Identifier& id : ids) {
         std::optional<RecipeBookEntry> entry = entryFor(recipes, id);
         if (entry.has_value()) {
+            entry->highlight = highlighted.contains(id);
             entries.push_back(std::move(*entry));
         }
     }
@@ -133,8 +134,23 @@ void send(const player::PlayerSession& target, const RealRecipes& recipes, const
 
 } // namespace
 
-void resend(const player::PlayerSession& target, const RealRecipes& recipes, const std::vector<Identifier>& ids) {
-    send(target, recipes, ids, true);
+void resend(const player::PlayerSession& target, const RealRecipes& recipes, const std::vector<Identifier>& ids,
+            const std::set<Identifier>& highlighted) {
+    send(target, recipes, ids, highlighted, true);
+}
+
+void sendSettings(const player::PlayerSession& target, const std::map<std::int32_t, std::pair<bool, bool>>& settings) {
+    if (!target.connection().sendPlayPacket) {
+        return;
+    }
+    wire::protocol::play::RecipeBookSettingsPacket packet;
+    for (const auto& [book, flags] : settings) {
+        if (book >= 0 && book < wire::protocol::play::kRecipeBookTypes) {
+            packet.types[static_cast<std::size_t>(book)] = {.open = flags.first, .filtering = flags.second};
+        }
+    }
+    target.connection().sendPlayPacket(wire::protocol::play::RecipeBookSettingsPacket::kId,
+                                       [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
 }
 
 void add(const player::PlayerSession& target, const RealRecipes& recipes, const std::vector<Identifier>& ids) {
@@ -142,6 +158,9 @@ void add(const player::PlayerSession& target, const RealRecipes& recipes, const 
     for (const Identifier& id : ids) {
         std::optional<RecipeBookEntry> entry = entryFor(recipes, id);
         if (entry.has_value()) {
+            // parity: `ServerRecipeBook.addRecipes` flags each new recipe for the notification and the new marker.
+            entry->notification = true;
+            entry->highlight = true;
             entries.push_back(std::move(*entry));
         }
     }

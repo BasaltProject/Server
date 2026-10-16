@@ -5,7 +5,9 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/RecipePackets.hpp>
 
+#include <map>
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace basalt::server::runtime::world::recipeBook {
@@ -20,7 +22,9 @@ void remove(const player::PlayerSession& target, const RealRecipes& recipes,
 
 /// parity: `ServerRecipeBook.sendInitialRecipeBook`.
 void resend(const player::PlayerSession& target, const RealRecipes& recipes,
-            const std::vector<wire::common::Identifier>& ids);
+            const std::vector<wire::common::Identifier>& ids, const std::set<wire::common::Identifier>& highlighted);
+
+void sendSettings(const player::PlayerSession& target, const std::map<std::int32_t, std::pair<bool, bool>>& settings);
 
 [[nodiscard]] std::optional<wire::protocol::play::RecipeBookEntry> entryFor(const RealRecipes& recipes,
                                                                             const wire::common::Identifier& id);

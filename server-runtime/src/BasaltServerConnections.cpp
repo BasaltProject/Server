@@ -4,14 +4,61 @@
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/plugins/PacketNames.hpp>
+#include <basalt/wire/common/json/Json.hpp>
+#include <basalt/wire/text/ComponentJson.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
+#include <expected>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
 
 namespace basalt::server::runtime {
 namespace {
+
+// parity: `DedicatedServerProperties.getServerPackInfo`.
+std::optional<ClientSession::Options::ResourcePack> resourcePackOf(const config::BasaltConfig& config) {
+    if (config.resourcePackUrl.empty()) {
+        return std::nullopt;
+    }
+    const wire::common::Logger logger{"ResourcePack"};
+    const std::string& hash = config.resourcePackSha1;
+    const bool sha1 = hash.size() == 40 && std::ranges::all_of(hash, [](char c) { return std::isxdigit(c) != 0; });
+    if (hash.empty()) {
+        logger.warn([] {
+            return std::string{"You specified a resource pack without providing a sha1 hash. Pack will be updated on "
+                               "the client only if you change the name of the pack."};
+        });
+    } else if (!sha1) {
+        logger.warn([] { return std::string{"Invalid sha1 for resource-pack-sha1"}; });
+    }
+    wire::common::Uuid id = wire::common::Uuid::nameBased(config.resourcePackUrl);
+    if (config.resourcePackId.empty()) {
+        logger.warn([&id] { return "resource-pack-id missing, using default of " + id.toString(); });
+    } else if (const std::optional<wire::common::Uuid> parsed = wire::common::Uuid::parse(config.resourcePackId);
+               parsed.has_value()) {
+        id = *parsed;
+    } else {
+        logger.warn([&config] { return "Failed to parse '" + config.resourcePackId + "' into UUID"; });
+        return std::nullopt;
+    }
+    std::optional<wire::text::Component> prompt;
+    if (!config.resourcePackPrompt.empty()) {
+        const std::expected<wire::common::JsonValue, wire::common::JsonError> json =
+            wire::common::parseJson(config.resourcePackPrompt);
+        if (json.has_value()) {
+            prompt = wire::text::componentJson::deserialize(*json);
+        }
+    }
+    return ClientSession::Options::ResourcePack{.id = id,
+                                                .url = config.resourcePackUrl,
+                                                .hash = hash,
+                                                .required = config.requireResourcePack,
+                                                .prompt = prompt};
+}
 
 [[nodiscard]] std::mt19937_64& scratchRandom() {
     static thread_local std::mt19937_64 random{std::random_device{}()};
@@ -59,6 +106,8 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     // parity: `DedicatedServer.enforceSecureProfile`.
     options.enforceSecureProfile = config_->enforceSecureProfile && options_.sessionService != nullptr &&
                                    options_.servicesKeys != nullptr && options_.servicesKeys->canValidateProfileKeys();
+    options.bugReportLink = config_->bugReportLink;
+    options.resourcePack = resourcePackOf(*config_);
     options.forwarding = config_->forwarding;
     options.playerRegistry = &playerRegistry_;
     options.worlds = namedWorlds();

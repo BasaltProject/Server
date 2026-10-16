@@ -120,6 +120,22 @@ CREATE TABLE IF NOT EXISTS known_recipe (
     PRIMARY KEY (uuid, recipe)
 );
 
+-- Per book: whether the client had it open and was filtering to craftable. Book numbers are RecipeBookType ordinals.
+CREATE TABLE IF NOT EXISTS recipe_book_setting (
+    uuid TEXT NOT NULL,
+    book INTEGER NOT NULL,
+    open INTEGER NOT NULL,
+    filtering INTEGER NOT NULL,
+    PRIMARY KEY (uuid, book)
+);
+
+-- Recipes learnt but not yet looked at: the client marks them as new.
+CREATE TABLE IF NOT EXISTS recipe_highlight (
+    uuid TEXT NOT NULL,
+    recipe TEXT NOT NULL,
+    PRIMARY KEY (uuid, recipe)
+);
+
 -- What plugins keep about players, one namespace each. Keyed by the plugin's id: a plugin can only
 -- ever see rows with its own id in them, so two of them cannot read or overwrite each other by
 -- accident, and neither can touch the columns the server itself depends on. Uninstalling a plugin

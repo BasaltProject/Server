@@ -147,6 +147,30 @@ std::string mergeLegacyProperties(std::string_view templateText,
             replaceOnce("enforce-secure-profile = true", "enforce-secure-profile = " + std::string{*enforce});
         }
     }
+    if (const auto link = imported("bug-report-link");
+        link.has_value() && link->find_first_of("\"\\\n") == std::string_view::npos) {
+        replaceOnce("bug-report-link = \"\"", "bug-report-link = \"" + std::string{*link} + "\"");
+    }
+    const auto tomlString = [](std::string_view text) {
+        std::string quoted = "\"";
+        for (const char c : text) {
+            if (c == '"' || c == '\\') {
+                quoted += '\\';
+            }
+            quoted += c;
+        }
+        return quoted + "\"";
+    };
+    for (const std::string_view key :
+         {"resource-pack", "resource-pack-sha1", "resource-pack-id", "resource-pack-prompt"}) {
+        if (const auto value = imported(key);
+            value.has_value() && value->find_first_of("\n\r") == std::string_view::npos) {
+            replaceOnce(std::string{key} + " = \"\"", std::string{key} + " = " + tomlString(*value));
+        }
+    }
+    if (const auto required = imported("require-resource-pack"); required == "true" || required == "false") {
+        replaceOnce("require-resource-pack = false", "require-resource-pack = " + std::string{*required});
+    }
     // parity: `DedicatedServerProperties.getDatapackConfig`, comma-separated and trimmed.
     const auto packList = [](std::string_view listed) {
         std::string toml = "[";
@@ -204,6 +228,13 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
         config.maxPlayers = static_cast<std::int32_t>(server->integer("max-players").value_or(defaults.maxPlayers));
         config.onlineMode = server->boolean("online-mode").value_or(defaults.onlineMode);
         config.enforceSecureProfile = server->boolean("enforce-secure-profile").value_or(defaults.enforceSecureProfile);
+        config.bugReportLink = std::string{server->string("bug-report-link").value_or(defaults.bugReportLink)};
+        config.resourcePackUrl = std::string{server->string("resource-pack").value_or(defaults.resourcePackUrl)};
+        config.resourcePackSha1 = std::string{server->string("resource-pack-sha1").value_or(defaults.resourcePackSha1)};
+        config.resourcePackId = std::string{server->string("resource-pack-id").value_or(defaults.resourcePackId)};
+        config.requireResourcePack = server->boolean("require-resource-pack").value_or(defaults.requireResourcePack);
+        config.resourcePackPrompt =
+            std::string{server->string("resource-pack-prompt").value_or(defaults.resourcePackPrompt)};
         config.gamemode = std::string{server->string("gamemode").value_or(defaults.gamemode)};
         config.whitelist = server->boolean("whitelist").value_or(defaults.whitelist);
     }

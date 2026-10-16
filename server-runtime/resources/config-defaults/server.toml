@@ -21,6 +21,25 @@ online-mode = true
 # fetched at startup; unsigned chat from a player then is refused.
 enforce-secure-profile = true
 
+# Link the client lists as "Report Bug" in its pause menu, as vanilla's bug-report-link does.
+# Only http and https are accepted; empty sends none.
+bug-report-link = ""
+
+# Resource pack offered to every player on joining, as vanilla's resource-pack does. Empty sends none.
+resource-pack = ""
+
+# SHA-1 of the pack, 40 hex digits. Without it the client only refetches when the URL changes.
+resource-pack-sha1 = ""
+
+# UUID that identifies the pack to the client; derived from the URL when empty.
+resource-pack-id = ""
+
+# Kick players who decline the pack.
+require-resource-pack = false
+
+# Message shown with the offer, as a JSON text component. Empty shows none.
+resource-pack-prompt = ""
+
 # Game mode new players join in: survival, creative, adventure or spectator.
 gamemode = "survival"
 

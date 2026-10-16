@@ -384,6 +384,16 @@ void ClientSession::enterConfiguration() {
         wire::protocol::configuration::BrandPacket{.brand = "Basalt " + std::string{buildInfo::kMinecraftVersion}}
             .write(buffer);
     });
+    // parity: `ServerLinks`, which holds the bug report link alone; `Util.parseAndValidateUntrustedUri`.
+    const bool serverLinksKnown = handshake_.has_value() && handshake_->protocolVersion == buildInfo::kProtocolVersion;
+    if (serverLinksKnown &&
+        (options_.bugReportLink.starts_with("http://") || options_.bugReportLink.starts_with("https://"))) {
+        sendCompressed(wire::protocol::configuration::ServerLinksPacket::kId, [this](wire::io::ByteBuffer& buffer) {
+            wire::protocol::configuration::ServerLinksPacket{
+                .links = {{wire::protocol::configuration::kBugReportLinkType, options_.bugReportLink}}}
+                .write(buffer);
+        });
+    }
     // parity: `ClientboundUpdateEnabledFeaturesPacket`.
     if (handshake_.has_value() && handshake_->protocolVersion == buildInfo::kProtocolVersion) {
         std::vector<std::string> features{"minecraft:vanilla"};
@@ -412,6 +422,13 @@ void ClientSession::enterConfiguration() {
 void ClientSession::handleConfiguration(std::int32_t packetId, wire::io::ByteBuffer& body) {
     if (packetId == wire::protocol::configuration::SelectKnownPacksPacket::kServerboundId) {
         sendRegistriesThenFinish();
+        return;
+    }
+    if (packetId == wire::protocol::configuration::ResourcePackResponsePacket::kConfigurationId) {
+        if (const auto response = wire::protocol::configuration::ResourcePackResponsePacket::read(body);
+            response.has_value()) {
+            handleResourcePackResponse(*response, true);
+        }
         return;
     }
     if (packetId == wire::protocol::configuration::kFinishConfigurationId) {
@@ -480,6 +497,53 @@ void ClientSession::sendRegistriesThenFinish() {
     sendCompressed(wire::protocol::configuration::TagsPacket::kId, [&groups](wire::io::ByteBuffer& buffer) {
         wire::protocol::configuration::TagsPacket{.groups = groups}.write(buffer);
     });
+    // parity: `ServerResourcePackConfigurationTask`, which holds the next task until the client answers for good.
+    if (options_.resourcePack.has_value() && handshake_.has_value() &&
+        handshake_->protocolVersion == buildInfo::kProtocolVersion) {
+        const Options::ResourcePack& pack = *options_.resourcePack;
+        awaitingResourcePack_ = true;
+        sendCompressed(
+            wire::protocol::configuration::ResourcePackPushPacket::kConfigurationId,
+            [&pack](wire::io::ByteBuffer& buffer) {
+                wire::protocol::configuration::ResourcePackPushPacket{
+                    .id = pack.id, .url = pack.url, .hash = pack.hash, .required = pack.required, .prompt = pack.prompt}
+                    .write(buffer);
+            });
+        return;
+    }
+    finishConfiguration();
+}
+
+void ClientSession::handleResourcePackResponse(
+    const wire::protocol::configuration::ResourcePackResponsePacket& response, bool configuring) {
+    // parity: `ServerCommonPacketListenerImpl.handleResourcePackResponse`.
+    if (response.action == wire::protocol::configuration::ResourcePackResponsePacket::kDeclined &&
+        options_.resourcePack.has_value() && options_.resourcePack->required) {
+        const wire::text::Component reason =
+            wire::text::Component::translatable("multiplayer.requiredTexturePrompt.disconnect");
+        if (configuring) {
+            sendCompressed(wire::protocol::configuration::ConfigurationDisconnectPacket::kId,
+                           [&reason](wire::io::ByteBuffer& buffer) {
+                               wire::protocol::configuration::ConfigurationDisconnectPacket{.reason = reason}.write(
+                                   buffer);
+                           });
+            closeWhenDrained_.store(true);
+            if (!outbox_.isOpen()) {
+                outbox_.close();
+                connection_.close();
+            }
+        } else {
+            disconnect(reason);
+        }
+        return;
+    }
+    if (configuring && awaitingResourcePack_ && response.terminal()) {
+        awaitingResourcePack_ = false;
+        finishConfiguration();
+    }
+}
+
+void ClientSession::finishConfiguration() {
     sendCompressed(wire::protocol::configuration::kFinishConfigurationId, [](wire::io::ByteBuffer&) {});
     // Same at the other end: a client with no configuration phase will not answer that this one is over.
     if (handshake_.has_value() && handshake_->protocolVersion < mv::protocolVersions::kV1_20_2) {

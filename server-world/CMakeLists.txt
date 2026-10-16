@@ -179,6 +179,7 @@ basalt_module(server-world
     src/advancement/AdvancementJson.cpp
     src/crafting/Crafting.cpp
     src/crafting/RecipeJson.cpp
+    src/crafting/StackedContents.cpp
     src/crafting/SpecialCrafting.cpp
     src/loot/ContextNumbers.cpp
     src/loot/Loot.cpp

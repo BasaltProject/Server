@@ -24,6 +24,7 @@
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
+#include <basalt/server/runtime/world/RecipeBook.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
@@ -578,6 +579,14 @@ void ClientSession::enterPlay() {
     // Advancements and recipe book go first: `limited_crafting` consults the book on the first click.
     if (options_.progress != nullptr) {
         options_.progress->load(player.uuid().toString());
+        if (options_.recipes != nullptr) {
+            // parity: `ServerRecipeBook.sendInitialRecipeBook`.
+            const std::string uuid = player.uuid().toString();
+            const std::set<wire::common::Identifier> known = options_.progress->knownRecipes(uuid);
+            world::recipeBook::sendSettings(player, options_.progress->bookSettings(uuid));
+            world::recipeBook::resend(player, *options_.recipes, {known.begin(), known.end()},
+                                      options_.progress->highlightedRecipes(uuid));
+        }
     }
     if (options_.advancements != nullptr) {
         options_.advancements->join(player.uuid().toString());
@@ -858,6 +867,40 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         const std::optional<play::ServerboundSetBeaconPacket> packet = play::ServerboundSetBeaconPacket::read(body);
         if (packet.has_value()) {
             menus_->setBeaconEffects(packet->primary, packet->secondary);
+        }
+        return;
+    }
+    if (packetId == wire::protocol::configuration::ResourcePackResponsePacket::kPlayId) {
+        if (const auto response = wire::protocol::configuration::ResourcePackResponsePacket::read(body);
+            response.has_value()) {
+            handleResourcePackResponse(*response, false);
+        }
+        return;
+    }
+    if (packetId == play::RecipeBookChangeSettingsPacket::kId) {
+        const std::optional<play::RecipeBookChangeSettingsPacket> packet =
+            play::RecipeBookChangeSettingsPacket::read(body);
+        if (packet.has_value() && playerSession_ != nullptr && options_.progress != nullptr && packet->bookType >= 0 &&
+            packet->bookType < play::kRecipeBookTypes) {
+            options_.progress->setBookSetting(playerSession_->uuid().toString(), packet->bookType, packet->open,
+                                              packet->filtering);
+        }
+        return;
+    }
+    if (packetId == play::RecipeBookSeenPacket::kId) {
+        const std::optional<play::RecipeBookSeenPacket> packet = play::RecipeBookSeenPacket::read(body);
+        if (packet.has_value() && playerSession_ != nullptr && options_.progress != nullptr &&
+            options_.recipes != nullptr && packet->recipeId >= 0 &&
+            packet->recipeId < static_cast<std::int32_t>(options_.recipes->ids().size())) {
+            options_.progress->removeHighlight(playerSession_->uuid().toString(),
+                                               *std::next(options_.recipes->ids().begin(), packet->recipeId));
+        }
+        return;
+    }
+    if (packetId == play::PlaceRecipePacket::kId) {
+        const std::optional<play::PlaceRecipePacket> packet = play::PlaceRecipePacket::read(body);
+        if (packet.has_value()) {
+            menus_->placeRecipe(*packet);
         }
         return;
     }
