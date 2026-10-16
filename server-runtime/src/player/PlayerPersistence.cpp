@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <expected>
 #include <string>
@@ -20,6 +21,18 @@ namespace {
 [[nodiscard]] wire::nbt::NbtCompound entityDataOf(const PlayerSession& session) {
     wire::nbt::NbtCompound data;
     data.putInt("Score", session.experience.score());
+    // parity: `Entity.saveWithoutId` and `LivingEntity.addAdditionalSaveData`.
+    data.putShort("Air", static_cast<std::int16_t>(session.airSupply));
+    data.putShort("Fire", static_cast<std::int16_t>(session.fireTicks));
+    data.putDouble("fall_distance", session.fallDistance);
+    data.putFloat("AbsorptionAmount", session.absorption);
+    if (session.lastDeath.has_value()) {
+        wire::nbt::NbtCompound death;
+        death.putString("dimension", session.lastDeath->dimensionName);
+        death.putIntArray(
+            "pos", {session.lastDeath->location.x, session.lastDeath->location.y, session.lastDeath->location.z});
+        data.set("LastDeathLocation", wire::nbt::NbtTag::ofCompound(std::move(death)));
+    }
     if (session.shoulderLeft.has_value()) {
         data.set("ShoulderEntityLeft", wire::nbt::NbtTag::ofCompound(*session.shoulderLeft));
     }
@@ -111,6 +124,20 @@ void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
                                                                .warningLevel = stored.wardenSpawnTracker[1],
                                                                .cooldownTicks = stored.wardenSpawnTracker[2]};
     session.experience.setScore(stored.entityData.getInt("Score"));
+    if (stored.entityData.contains("Air")) {
+        session.airSupply = stored.entityData.getShort("Air");
+    }
+    session.fireTicks = std::max<std::int32_t>(0, stored.entityData.getShort("Fire"));
+    session.fallDistance = stored.entityData.getDouble("fall_distance");
+    session.absorption = stored.entityData.getFloat("AbsorptionAmount");
+    session.lastDeath.reset();
+    if (const wire::nbt::NbtCompound* death = stored.entityData.getCompound("LastDeathLocation"); death != nullptr) {
+        const std::span<const std::int32_t> pos = death->getIntArray("pos");
+        if (pos.size() == 3) {
+            session.lastDeath = wire::protocol::play::GlobalPos{
+                .dimensionName = std::string{death->getString("dimension")}, .location = {pos[0], pos[1], pos[2]}};
+        }
+    }
     session.shoulderLeft = shoulderOf(stored.entityData, "ShoulderEntityLeft");
     session.shoulderRight = shoulderOf(stored.entityData, "ShoulderEntityRight");
     session.effects.clear();

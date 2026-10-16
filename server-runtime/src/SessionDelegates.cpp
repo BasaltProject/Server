@@ -120,7 +120,7 @@ play::SpawnInfo ClientSession::spawnInfo(play::Gamemode gamemode) const {
         .previousGamemode = -1,
         .isDebug = false,
         .isFlat = currentWorld_ != nullptr && currentWorld_->declaration().type == config::WorldType::Flat,
-        .death = std::nullopt,
+        .death = playerSession_ != nullptr ? playerSession_->lastDeath : std::nullopt,
         .portalCooldown = 0,
         .seaLevel =
             currentWorld_ == nullptr ? 63 : config::dimensionFacts(currentWorld_->declaration().dimension).seaLevel};
