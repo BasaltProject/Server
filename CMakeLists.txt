@@ -40,6 +40,7 @@ add_subdirectory(wire)
 include(BasaltBinary)
 
 add_subdirectory(server-random)
+add_subdirectory(server-datafix)
 add_subdirectory(server-registry)
 add_subdirectory(server-entity)
 add_subdirectory(server-storage)

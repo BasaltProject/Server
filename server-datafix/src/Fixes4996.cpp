@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace basalt::server::world::datafix {
+namespace basalt::server::datafix {
 namespace {
 
 using wire::nbt::NbtCompound;
@@ -270,4 +270,4 @@ void addFixesFrom4996(std::vector<Fix>& fixes) {
                               });
 }
 
-} // namespace basalt::server::world::datafix
+} // namespace basalt::server::datafix

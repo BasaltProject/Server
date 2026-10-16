@@ -4,7 +4,7 @@
 
 #include <functional>
 
-namespace basalt::server::world::datafix {
+namespace basalt::server::datafix {
 
 using Edit = std::function<void(wire::nbt::NbtCompound&)>;
 
@@ -14,4 +14,4 @@ void forEachStack(wire::nbt::NbtCompound& root, const Edit& edit);
 /// The `components` of every item stack under `root`.
 void forEachComponents(wire::nbt::NbtCompound& root, const Edit& edit);
 
-} // namespace basalt::server::world::datafix
+} // namespace basalt::server::datafix

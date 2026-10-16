@@ -1,10 +1,10 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <basalt/server/world/datafix/DataFixer.hpp>
+#include <basalt/server/datafix/DataFixer.hpp>
 
 #include <doctest.h>
 
 using namespace basalt::wire::nbt;
-using basalt::server::world::datafix::Domain;
+using basalt::server::datafix::Domain;
 
 namespace {
 
@@ -51,7 +51,7 @@ TEST_CASE("a 26.2 chunk is brought to 26.3") {
     chunk.putString("Status", "minecraft:carvers");
     chunk.set("block_entities", NbtTag::ofList(blockEntities));
 
-    basalt::server::world::datafix::upgrade(Domain::Chunk, chunk, 4903);
+    basalt::server::datafix::upgrade(Domain::Chunk, chunk, 4903);
 
     CHECK(chunk.getString("Status") == "minecraft:terrain");
     const NbtCompound* fixedMap = chunk.getList("block_entities")
@@ -107,7 +107,7 @@ TEST_CASE("a 1.21.4 chunk loses its light and gains iron chains and tooltip disp
     chunk.putBoolean("isLightOn", true);
     chunk.set("sections", NbtTag::ofList(sections));
     chunk.set("block_entities", NbtTag::ofList(blockEntities));
-    basalt::server::world::datafix::upgrade(Domain::Chunk, chunk, 4189);
+    basalt::server::datafix::upgrade(Domain::Chunk, chunk, 4189);
 
     CHECK_FALSE(chunk.contains("isLightOn"));
     const NbtCompound* fixedSection = chunk.getList("sections")->elements()[0].get<NbtCompound>();
@@ -145,7 +145,7 @@ TEST_CASE("sign text saved as JSON becomes components with the new events") {
     NbtCompound chunk;
     chunk.set("block_entities", NbtTag::ofList(blockEntities));
 
-    basalt::server::world::datafix::upgrade(Domain::Chunk, chunk, 4189);
+    basalt::server::datafix::upgrade(Domain::Chunk, chunk, 4189);
 
     const NbtCompound* fixed =
         chunk.getList("block_entities")->elements()[0].get<NbtCompound>()->getCompound("front_text");

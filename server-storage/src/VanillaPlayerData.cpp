@@ -1,3 +1,4 @@
+#include <basalt/server/datafix/DataFixer.hpp>
 #include <basalt/server/storage/VanillaPlayerData.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
@@ -118,10 +119,17 @@ std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std:
     if (!read.has_value()) {
         return std::unexpected(StorageFormatError{std::string{uuid} + ".dat is not readable NBT"});
     }
-    const NbtCompound* root = read->tag.get<NbtCompound>();
-    if (root == nullptr) {
+    const NbtCompound* saved = read->tag.get<NbtCompound>();
+    if (saved == nullptr) {
         return std::unexpected(StorageFormatError{std::string{uuid} + ".dat is not an NBT compound"});
     }
+    NbtCompound upgraded = *saved;
+    if (const std::int32_t version = upgraded.getInt("DataVersion"); version > server::datafix::kCurrentVersion) {
+        return std::unexpected(StorageFormatError{std::string{uuid} + ".dat was saved by a newer version of the game"});
+    } else if (version > 0 && version < server::datafix::kCurrentVersion) {
+        server::datafix::upgrade(server::datafix::Domain::Player, upgraded, version);
+    }
+    const NbtCompound* root = &upgraded;
 
     const NbtList* position = listOf(*root, "Pos");
     const NbtList* rotation = listOf(*root, "Rotation");

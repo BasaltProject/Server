@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace basalt::server::world::datafix {
+namespace basalt::server::datafix {
 
 /// The world version this build writes. parity: the `DataVersion` of 26.3.
 inline constexpr std::int32_t kCurrentVersion = 5023;
@@ -21,4 +21,4 @@ struct Context {
 void upgrade(Domain domain, wire::nbt::NbtCompound& root, std::int32_t fromVersion, const Context& context = {},
              std::int32_t toVersion = kCurrentVersion);
 
-} // namespace basalt::server::world::datafix
+} // namespace basalt::server::datafix

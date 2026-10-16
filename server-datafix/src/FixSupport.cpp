@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-namespace basalt::server::world::datafix {
+namespace basalt::server::datafix {
 
 using wire::nbt::NbtCompound;
 using wire::nbt::NbtList;
@@ -43,4 +43,4 @@ std::string_view plainTranslationKey(const NbtTag* component) {
     return fields->getString("translate");
 }
 
-} // namespace basalt::server::world::datafix
+} // namespace basalt::server::datafix
