@@ -133,11 +133,23 @@ future-protocols = "warn"
 #                player-info-forwarding-mode = "modern" on the proxy and copy its
 #                forwarding.secret into secret below. The only mode that cannot be
 #                forged, so the only one that is safe on a reachable port.
+#   basalt       Basalt Proxy's signed forwarding: this server issues a one-time
+#                challenge and accepts only a signature from a key listed in
+#                trusted-keys. It holds public keys only, so a leaked config
+#                forges nothing. Safe on a reachable port.
 mode = "none"
 
 # The shared secret for mode = "velocity". This is the content of the proxy's
 # forwarding.secret file, not the path to it.
 secret = ""
+
+# The public keys (64 hex characters each) accepted for mode = "basalt". The proxy
+# prints its key on first start. Listing two lets a key be rotated without downtime.
+trusted-keys = []
+
+# This backend's own name for mode = "basalt". It is part of what the proxy signs, so a
+# signature collected by another backend is useless here.
+backend-id = ""
 
 # The tokens accepted for mode = "bungeeguard" or "safenet". More than one so a key
 # can be rotated without a restart of everything at once.

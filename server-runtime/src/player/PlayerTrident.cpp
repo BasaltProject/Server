@@ -148,6 +148,7 @@ void release(const BreakContext& context, PlayerSession& player, world::LoadedWo
         static_cast<double>(-mth::sin(yRot) * mth::cos(xRot)), static_cast<double>(-mth::sin(xRot)),
         static_cast<double>(mth::cos(yRot) * mth::cos(xRot)), kShootPower, 1.0F, random);
     trident.ownerId = player.entityId();
+    trident.ownerUuid = player.uuid();
     trident.arrowPickup =
         creative ? entity::ServerEntity::ArrowPickup::CreativeOnly : entity::ServerEntity::ArrowPickup::Allowed;
     trident.heldItem = "trident";

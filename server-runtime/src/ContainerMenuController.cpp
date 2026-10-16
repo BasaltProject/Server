@@ -168,16 +168,16 @@ void ContainerMenuController::openChest(PlayerSession& session, const BlockPos& 
     });
     sendInventory();
     openedAt_ = pos;
-    announceOpeners(pos, block, world::containerOpeners::open(session.worldName, pos.x, pos.y, pos.z));
+    announceOpeners(pos, block, world::containerOpeners::open(session.worldName, pos.x, pos.y, pos.z), session.uuid());
     // parity: `ChestBlock`'s lid is per block entity, so both halves of a double chest open.
     if (openBlockSecond.has_value()) {
         const BlockPos at = openBlock == pos ? *openBlockSecond : *openBlock;
-        announceOpeners(at, block, world::containerOpeners::open(session.worldName, at.x, at.y, at.z));
+        announceOpeners(at, block, world::containerOpeners::open(session.worldName, at.x, at.y, at.z), session.uuid());
     }
 }
 
-void ContainerMenuController::announceOpeners(const BlockPos& pos, const std::string& block,
-                                              const std::int32_t openers) {
+void ContainerMenuController::announceOpeners(const BlockPos& pos, const std::string& block, const std::int32_t openers,
+                                              const std::optional<wire::common::Uuid> opener) {
     world::LoadedWorld* world = owner_->currentWorld();
     if (world == nullptr) {
         return;
@@ -186,7 +186,7 @@ void ContainerMenuController::announceOpeners(const BlockPos& pos, const std::st
     context.blocks = owner_->blockInteraction().breakContext();
     context.nextFloat = options_.nextFloat;
     context.nextSeed = options_.nextSeed;
-    player::announceOpeners(context, *world, pos.x, pos.y, pos.z, block, openers);
+    player::announceOpeners(context, *world, pos.x, pos.y, pos.z, block, openers, opener);
 }
 
 void ContainerMenuController::openPluginMenu(const std::string& title, std::int32_t rows,
@@ -535,11 +535,13 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
     }
     if (closing.has_value() && closingBlock.has_value()) {
         announceOpeners(*closing, *closingBlock,
-                        world::containerOpeners::close(session.worldName, closing->x, closing->y, closing->z));
+                        world::containerOpeners::close(session.worldName, closing->x, closing->y, closing->z),
+                        session.uuid());
         if (closingSecond.has_value()) {
-            announceOpeners(*closingSecond, *closingBlock,
-                            world::containerOpeners::close(session.worldName, closingSecond->x, closingSecond->y,
-                                                           closingSecond->z));
+            announceOpeners(
+                *closingSecond, *closingBlock,
+                world::containerOpeners::close(session.worldName, closingSecond->x, closingSecond->y, closingSecond->z),
+                session.uuid());
         }
     }
     openedAt_.reset();

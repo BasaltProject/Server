@@ -613,7 +613,8 @@ private:
     bool piglinEquip(world::LoadedWorld& world, entity::ServerEntity& piglin,
                      const server::world::loot::ItemStack& stack);
 
-    void allayHears(world::LoadedWorld& world, entity::ServerEntity& allay, entity::allays::AllayState& state);
+    void allayHears(world::LoadedWorld& world, entity::ServerEntity& allay, entity::allays::AllayState& state,
+                    const std::vector<player::PlayerSession*>& watchers);
 
     void allayThrows(world::LoadedWorld& world, entity::ServerEntity& allay, entity::allays::AllayState& state,
                      const std::array<double, 3>& target);

@@ -245,6 +245,20 @@ std::vector<GameEventRecord> WorldState::recentGameEvents() const {
     return gameEvents_;
 }
 
+bool WorldState::vibrationParticlePending(std::int64_t packedPos) const {
+    const WorldReadLock lock{mutex_};
+    return pendingVibrationParticles_.contains(packedPos);
+}
+
+void WorldState::setVibrationParticlePending(std::int64_t packedPos, bool pending) {
+    const WorldWriteLock lock{mutex_};
+    if (pending) {
+        pendingVibrationParticles_.insert(packedPos);
+    } else {
+        pendingVibrationParticles_.erase(packedPos);
+    }
+}
+
 std::optional<BlockEvent> WorldState::takeFirstBlockEvent() {
     const WorldWriteLock lock{mutex_};
     if (blockEvents_.empty()) {

@@ -24,6 +24,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -174,6 +175,26 @@ public:
     void recordGameEvent(GameEventRecord record);
 
     [[nodiscard]] std::vector<GameEventRecord> recentGameEvents() const;
+
+    /// parity: `VibrationSystem`'s destination, a block for sensors and an entity for the warden.
+    struct ParticleDestination {
+        std::optional<std::array<std::int32_t, 3>> block;
+        std::optional<std::pair<std::int32_t, float>> entity;
+
+        friend bool operator==(const ParticleDestination&, const ParticleDestination&) = default;
+    };
+
+    /// parity: `ServerLevel.sendParticles`; returns whether anyone within range received it.
+    using VibrationParticleSender = std::function<bool(
+        double x, double y, double z, const ParticleDestination& destination, std::int32_t arrivalTicks)>;
+
+    void setVibrationParticleSender(VibrationParticleSender sender) { vibrationParticleSender_ = std::move(sender); }
+
+    [[nodiscard]] VibrationParticleSender vibrationParticleSender() const { return vibrationParticleSender_; }
+
+    /// parity: `VibrationSystem.Data.reloadVibrationParticle`, runtime only like the memory.
+    [[nodiscard]] bool vibrationParticlePending(std::int64_t packedPos) const;
+    void setVibrationParticlePending(std::int64_t packedPos, bool pending);
 
     /// The rest stay in, so one booked while this runs still sees them and collapses against them.
     [[nodiscard]] std::optional<BlockEvent> takeFirstBlockEvent();
@@ -376,6 +397,8 @@ private:
     PendingChunkDecorations pendingDecorations_;
     std::vector<BlockEvent> blockEvents_;
     std::vector<GameEventRecord> gameEvents_;
+    VibrationParticleSender vibrationParticleSender_;
+    std::unordered_set<std::int64_t> pendingVibrationParticles_;
     std::deque<TorchToggle> torchToggles_;
     SculkSensorTracker sculkSensors_;
     std::array<std::array<std::int32_t, 3>, kShapeChangeMemory> shapeChanges_{};

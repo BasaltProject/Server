@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/wire/auth/forwarding/BasaltForwarding.hpp>
 #include <basalt/wire/auth/forwarding/ProxyForwarding.hpp>
 #include <basalt/wire/auth/forwarding/VelocityForwarding.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
@@ -33,15 +34,21 @@ public:
     [[nodiscard]] bool readsHandshake() const noexcept { return isLegacyForwarding(forwarding_.mode); }
 
     [[nodiscard]] bool asksTheProxy() const noexcept {
-        return forwarding_.mode == wire::auth::forwarding::ForwardingMode::Velocity;
+        return forwarding_.mode == wire::auth::forwarding::ForwardingMode::Velocity ||
+               forwarding_.mode == wire::auth::forwarding::ForwardingMode::Basalt;
     }
 
-    [[nodiscard]] std::string_view channel() const noexcept { return wire::auth::forwarding::velocity::kChannel; }
+    [[nodiscard]] std::string_view channel() const noexcept {
+        return forwarding_.mode == wire::auth::forwarding::ForwardingMode::Basalt
+                   ? wire::auth::forwarding::native::kChannel
+                   : wire::auth::forwarding::velocity::kChannel;
+    }
 
     [[nodiscard]] wire::auth::forwarding::ForwardingResult readHandshake(std::string_view host) const;
 
     std::int32_t beginQuery();
 
+    /// Empty when no challenge could be made, which readAnswer then refuses.
     [[nodiscard]] std::vector<std::uint8_t> query() const;
 
     [[nodiscard]] wire::auth::forwarding::ForwardingResult
@@ -52,10 +59,13 @@ public:
                                       const std::optional<std::string>& address);
 
 private:
+    [[nodiscard]] wire::auth::forwarding::ForwardingResult readNativeAnswer(std::span<const std::uint8_t> payload);
+
     wire::auth::forwarding::ProxyForwarding forwarding_;
     wire::common::Logger logger_;
     std::optional<wire::auth::forwarding::ForwardedLogin> login_;
     std::int32_t transactionId_ = kNoQuery;
+    std::optional<wire::auth::forwarding::native::Request> challenge_;
 };
 
 } // namespace basalt::server::runtime::net

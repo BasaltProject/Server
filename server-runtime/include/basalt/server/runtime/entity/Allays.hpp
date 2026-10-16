@@ -73,6 +73,10 @@ struct AllayState {
     /// parity: `VibrationSystem.Data`.
     struct Vibration {
         Pos pos{};
+        /// parity: `VibrationInfo.pos`, the exact origin the particle leaves from.
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
         float distance = 0.0F;
         std::int64_t tick = 0;
     };
@@ -80,6 +84,8 @@ struct AllayState {
     std::optional<Vibration> vibrationCandidate;
     std::optional<Vibration> vibrationTravelling;
     std::int32_t vibrationTicks = 0;
+    /// parity: `VibrationSystem.Data.reloadVibrationParticle`, runtime only like the rest.
+    bool vibrationParticlePending = false;
 };
 
 [[nodiscard]] bool isAllay(const wire::common::Identifier& type);

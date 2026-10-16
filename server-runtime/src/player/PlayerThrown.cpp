@@ -97,6 +97,7 @@ bool throwItemFor(const BreakContext& context, PlayerSession& player, world::Loa
         world.state(), *kind, context.registry->allocateEntityId(), entry->protocolId, player.x,
         player.y + kThrowEyeHeight, player.z, aim.x, aim.y, aim.z, kPearlPower, kPearlUncertainty, random);
     pearl.ownerId = player.entityId();
+    pearl.ownerUuid = player.uuid();
 
     const double roll = context.nextDouble ? context.nextDouble() : 0.5;
     const auto pitchOfSound = static_cast<float>(0.4 / ((roll * 0.4) + 0.8));
@@ -155,6 +156,7 @@ void shootBowFor(const BreakContext& context, PlayerSession& player, world::Load
         world.state(), kind, context.registry->allocateEntityId(), entry->protocolId, player.x,
         player.y + kThrowEyeHeight, player.z, aim.x, aim.y, aim.z, power * kBowPowerScale, kBowUncertainty, random);
     arrow.ownerId = player.entityId();
+    arrow.ownerUuid = player.uuid();
     arrow.critical = power >= 1.0F;
     // parity: `ProjectileWeaponItem.useAmmo`.
     const bool infinite =

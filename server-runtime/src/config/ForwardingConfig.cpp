@@ -17,13 +17,41 @@ namespace {
 [[nodiscard]] std::string everyModeName() {
     std::string names;
     for (const ForwardingMode mode : {ForwardingMode::None, ForwardingMode::BungeeCord, ForwardingMode::BungeeGuard,
-                                      ForwardingMode::SafeNet, ForwardingMode::Velocity}) {
+                                      ForwardingMode::SafeNet, ForwardingMode::Velocity, ForwardingMode::Basalt}) {
         if (!names.empty()) {
             names += ", ";
         }
         names += forwardingModeName(mode);
     }
     return names;
+}
+
+[[nodiscard]] std::optional<wire::auth::forwarding::native::PublicKey> parsePublicKey(std::string_view hex) {
+    if (hex.size() != 2 * wire::auth::forwarding::native::kPublicKeySize) {
+        return std::nullopt;
+    }
+    const auto nibble = [](char c) -> int {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    };
+    wire::auth::forwarding::native::PublicKey key{};
+    for (std::size_t i = 0; i < key.size(); ++i) {
+        const int high = nibble(hex[2 * i]);
+        const int low = nibble(hex[2 * i + 1]);
+        if (high < 0 || low < 0) {
+            return std::nullopt;
+        }
+        key[i] = static_cast<std::uint8_t>(high << 4 | low);
+    }
+    return key;
 }
 
 } // namespace
@@ -56,6 +84,15 @@ std::expected<ProxyForwarding, std::string> fromToml(const TomlTable& root, std:
         .tokens = std::move(tokens),
         .propertyName = std::string{table->string("property-name").value_or(ProxyForwarding::kSafeNetProperty)},
     };
+    for (const std::string& written : table->stringList("trusted-keys")) {
+        const auto key = parsePublicKey(written);
+        if (!key.has_value()) {
+            return std::unexpected(std::string{path} + ": trusted-keys entries must be 64 hex characters, not \"" +
+                                   written + "\"");
+        }
+        forwarding.trustedKeys.push_back(*key);
+    }
+    forwarding.backendId = std::string{table->string("backend-id").value_or("")};
     // A mode without its secret refuses every login, and finding that out one player at a time is worse.
     if (const std::optional<std::string> broken = forwarding.misconfiguration(); broken.has_value()) {
         return std::unexpected(std::string{path} + ": " + *broken);

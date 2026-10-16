@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/world/PostAttackEffects.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 
@@ -76,6 +77,10 @@ public:
     /// parity: `Level.gameEvent`.
     void emitVibration(world::LoadedWorld& world, std::string_view event, double x, double y, double z,
                        const wire::common::Uuid& source);
+
+    /// parity: `Level.gameEvent`, with the owner a `Projectile` answers for itself.
+    void emitVibration(world::LoadedWorld& world, std::string_view event, double x, double y, double z,
+                       const world::vibrations::Source& source);
 
     /// parity: `Projectile.hitTargetOrDeflectSelf`.
     void tickProjectile(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
