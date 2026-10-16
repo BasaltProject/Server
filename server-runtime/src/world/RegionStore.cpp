@@ -1,5 +1,5 @@
 #include <basalt/server/runtime/world/RegionStore.hpp>
-#include <basalt/server/world/region/AnvilRegion.hpp>
+#include <basalt/metamorph/region/AnvilRegion.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
@@ -13,7 +13,7 @@ namespace basalt::server::runtime::world {
 namespace {
 
 using server::world::Chunk;
-using server::world::region::LinearRegion;
+using metamorph::region::LinearRegion;
 
 [[nodiscard]] std::int64_t millisSince(std::chrono::steady_clock::time_point start) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
@@ -94,8 +94,8 @@ void RegionStore::mergeVanillaEntities(LinearRegion& region, std::int32_t region
     if (!bytes.has_value()) {
         return;
     }
-    const std::expected<LinearRegion, server::world::region::AnvilError> entities =
-        server::world::region::anvilRegion::read(*bytes);
+    const std::expected<LinearRegion, metamorph::region::AnvilError> entities =
+        metamorph::region::anvilRegion::read(*bytes);
     if (!entities.has_value()) {
         return;
     }
@@ -126,15 +126,15 @@ RegionStore::RegionRead RegionStore::readRegionFile(std::int32_t regionX, std::i
     if (const std::optional<std::vector<std::uint8_t>> bytes =
             wire::io::fileIO::readBytes(regionPath(regionX, regionZ));
         bytes.has_value()) {
-        std::expected<LinearRegion, server::world::region::LinearError> read = LinearRegion::read(*bytes);
+        std::expected<LinearRegion, metamorph::region::LinearError> read = LinearRegion::read(*bytes);
         return read.has_value() ? RegionRead{std::move(*read), false} : RegionRead{std::nullopt, true};
     }
     const std::string anvilPath =
         worldRoot_ + "/region/r." + std::to_string(regionX) + "." + std::to_string(regionZ) + ".mca";
     if (const std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(anvilPath);
         bytes.has_value()) {
-        std::expected<LinearRegion, server::world::region::AnvilError> read =
-            server::world::region::anvilRegion::read(*bytes);
+        std::expected<LinearRegion, metamorph::region::AnvilError> read =
+            metamorph::region::anvilRegion::read(*bytes);
         if (!read.has_value()) {
             return RegionRead{std::nullopt, true};
         }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <basalt/server/world/Chunk.hpp>
-#include <basalt/server/datafix/DataFixer.hpp>
+#include <basalt/metamorph/datafix/DataFixer.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
@@ -20,7 +20,7 @@ struct ChunkNbtError {
 namespace chunkNbt {
 
 /// The world version this build writes. parity: the `DataVersion` of 26.3.
-inline constexpr std::int32_t kDataVersion = server::datafix::kCurrentVersion;
+inline constexpr std::int32_t kDataVersion = metamorph::datafix::kCurrentVersion;
 
 inline constexpr std::string_view kEntitiesKey = "basalt_entities";
 inline constexpr std::string_view kGeneratedEntitiesKey = "basalt_generated_entities";

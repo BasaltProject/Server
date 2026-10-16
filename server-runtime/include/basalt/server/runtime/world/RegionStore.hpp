@@ -2,7 +2,7 @@
 
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
-#include <basalt/server/world/region/LinearRegion.hpp>
+#include <basalt/metamorph/region/LinearRegion.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <cstdint>
@@ -57,32 +57,32 @@ public:
 private:
     struct Entry {
         std::int64_t key = 0;
-        server::world::region::LinearRegion region;
+        metamorph::region::LinearRegion region;
     };
 
     [[nodiscard]] static std::int64_t key(std::int32_t regionX, std::int32_t regionZ);
     [[nodiscard]] static std::int32_t regionXOf(std::int64_t regionKey);
     [[nodiscard]] static std::int32_t regionZOf(std::int64_t regionKey);
 
-    [[nodiscard]] server::world::region::LinearRegion* touch(std::int64_t regionKey);
+    [[nodiscard]] metamorph::region::LinearRegion* touch(std::int64_t regionKey);
 
     /// Caller holds `mutex_`; reads from disk if needed.
-    [[nodiscard]] server::world::region::LinearRegion* region(std::int32_t regionX, std::int32_t regionZ);
+    [[nodiscard]] metamorph::region::LinearRegion* region(std::int32_t regionX, std::int32_t regionZ);
 
     struct RegionRead {
-        std::optional<server::world::region::LinearRegion> region;
+        std::optional<metamorph::region::LinearRegion> region;
         /// A file is there but cannot be read; it must be left alone.
         bool unreadable = false;
     };
 
     /// Moves the entities of a vanilla region's `entities/` file into its chunks.
-    void mergeVanillaEntities(server::world::region::LinearRegion& region, std::int32_t regionX,
+    void mergeVanillaEntities(metamorph::region::LinearRegion& region, std::int32_t regionX,
                               std::int32_t regionZ) const;
 
     /// The region from its `.linear` file or, failing that, the `.mca` of a vanilla world.
     [[nodiscard]] RegionRead readRegionFile(std::int32_t regionX, std::int32_t regionZ) const;
 
-    server::world::region::LinearRegion& store(std::int64_t regionKey, server::world::region::LinearRegion region);
+    metamorph::region::LinearRegion& store(std::int64_t regionKey, metamorph::region::LinearRegion region);
 
     /// Caller holds `mutex_`.
     [[nodiscard]] std::int64_t cachedBytesLocked() const;

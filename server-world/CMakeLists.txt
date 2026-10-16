@@ -31,9 +31,7 @@ basalt_module(server-world
         src/light/Light.cpp
         src/light/LightSpread.cpp
         src/light/LightWindow.cpp
-        src/region/AnvilRegion.cpp
         src/region/ChunkNbt.cpp
-        src/region/LinearRegion.cpp
         src/structure/StrongholdBrush.cpp
     src/structure/StrongholdCorridors.cpp
     src/structure/StrongholdLayout.cpp
@@ -233,24 +231,8 @@ basalt_module(server-world
     src/terrain/JigsawStructureGenerator.cpp
     src/terrain/JigsawStructureSettings.cpp
         src/noise/NormalNoise.cpp
-    DEPENDS basalt::server-datafix basalt::server-random basalt::server-registry basalt::wire-common
+    DEPENDS basalt::metamorph-datafix basalt::metamorph-region basalt::server-random basalt::server-registry basalt::wire-common
             basalt::wire-io basalt::wire-protocol basalt::wire-text
-)
-
-basalt_test(server-world-anvil-region-test
-    SOURCES
-        test/AnvilRegionTest.cpp
-    DEPENDS basalt::server-world
-)
-
-basalt_test(server-world-linear-region-test
-    SOURCES
-        test/LinearRegionTest.cpp
-    DEPENDS basalt::server-world
-)
-
-target_compile_definitions(server-world-linear-region-test
-    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
 basalt_test(server-world-light-test

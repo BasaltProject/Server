@@ -1,6 +1,6 @@
 #include <basalt/server/runtime/world/poi/PoiManager.hpp>
-#include <basalt/server/world/region/AnvilRegion.hpp>
-#include <basalt/server/world/region/LinearRegion.hpp>
+#include <basalt/metamorph/region/AnvilRegion.hpp>
+#include <basalt/metamorph/region/LinearRegion.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
@@ -13,7 +13,7 @@
 namespace basalt::server::runtime::world::poi {
 namespace {
 
-using server::world::region::LinearRegion;
+using metamorph::region::LinearRegion;
 using wire::nbt::NbtCompound;
 using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
@@ -122,7 +122,7 @@ void PoiManager::ensureRegionLocked(std::int32_t regionX, std::int32_t regionZ) 
     } else if (const std::optional<std::vector<std::uint8_t>> anvil =
                    wire::io::fileIO::readBytes(directory_ + "/" + regionName(regionX, regionZ, "mca"));
                anvil.has_value()) {
-        if (auto read = server::world::region::anvilRegion::read(*anvil); read.has_value()) {
+        if (auto read = metamorph::region::anvilRegion::read(*anvil); read.has_value()) {
             region = std::move(*read);
         }
     }
