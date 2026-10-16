@@ -213,6 +213,8 @@ private:
     void loadScoreboard();
     void saveScoreboard() const;
     void loadBossBars();
+    void saveStopwatches() const;
+    void loadStopwatches();
     void saveBossBars() const;
 
     void loadFunctions();

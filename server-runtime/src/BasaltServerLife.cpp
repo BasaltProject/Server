@@ -325,6 +325,7 @@ void BasaltServer::shutdown() {
     saveSchedule();
     saveScoreboard();
     saveBossBars();
+    saveStopwatches();
     // Queued work is cancelled rather than run against worlds that are already written.
     worldRegistry_->scheduler().close();
     playerStore_.reset();

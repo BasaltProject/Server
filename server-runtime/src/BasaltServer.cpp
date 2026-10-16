@@ -297,6 +297,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             .count();
     });
     commandStorage_.load();
+    loadStopwatches();
 
     PersistenceCoordinator::Hooks persistenceHooks;
     persistenceHooks.worlds = [this] { return worldRegistry_->worlds(); };
@@ -321,6 +322,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         saveSchedule();
         saveScoreboard();
         saveBossBars();
+        saveStopwatches();
     };
     persistence_ = std::make_unique<PersistenceCoordinator>(
         std::move(persistenceHooks), playerRegistry_, *playerStore_, commandStorage_, metrics_,

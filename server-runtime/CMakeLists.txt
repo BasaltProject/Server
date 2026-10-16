@@ -949,3 +949,8 @@ if(UNIX)
         DEPENDS basalt::server-runtime-core
     )
 endif()
+
+basalt_test(server-runtime-player-persistence-test
+    SOURCES test/PlayerPersistenceTest.cpp
+    DEPENDS basalt::server-runtime-core
+)

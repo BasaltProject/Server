@@ -1,7 +1,9 @@
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 
 #include <cstdint>
+#include <expected>
 #include <string>
+#include <vector>
 
 namespace basalt::server::runtime::player::playerPersistence {
 namespace {
@@ -23,6 +25,22 @@ namespace {
     }
     if (session.shoulderRight.has_value()) {
         data.set("ShoulderEntityRight", wire::nbt::NbtTag::ofCompound(*session.shoulderRight));
+    }
+    // parity: `LivingEntity.addAdditionalSaveData`, one `MobEffectInstance` each.
+    if (!session.effects.empty()) {
+        std::vector<wire::nbt::NbtTag> effects;
+        for (const auto& [id, effect] : session.effects) {
+            wire::nbt::NbtCompound entry;
+            entry.putString("id", id.toString());
+            entry.putByte("amplifier", static_cast<std::int8_t>(effect.amplifier));
+            entry.putInt("duration", effect.remainingTicks);
+            entry.putBoolean("ambient", effect.ambient);
+            entry.putBoolean("show_particles", effect.visible);
+            entry.putBoolean("show_icon", effect.showIcon);
+            effects.push_back(wire::nbt::NbtTag::ofCompound(std::move(entry)));
+        }
+        data.set("active_effects",
+                 wire::nbt::NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, std::move(effects)}));
     }
     return data;
 }
@@ -95,6 +113,25 @@ void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
     session.experience.setScore(stored.entityData.getInt("Score"));
     session.shoulderLeft = shoulderOf(stored.entityData, "ShoulderEntityLeft");
     session.shoulderRight = shoulderOf(stored.entityData, "ShoulderEntityRight");
+    session.effects.clear();
+    if (const wire::nbt::NbtList* effects = stored.entityData.getList("active_effects"); effects != nullptr) {
+        for (const wire::nbt::NbtTag& element : *effects) {
+            const wire::nbt::NbtCompound* entry = element.get<wire::nbt::NbtCompound>();
+            const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+                entry == nullptr ? std::unexpected(wire::common::IdentifierError{})
+                                 : wire::common::Identifier::parse(std::string{entry->getString("id")});
+            if (!id.has_value() || entry->getInt("duration") == 0) {
+                continue;
+            }
+            session.effects.insert_or_assign(*id,
+                                             world::ActiveEffect{.effect = *id,
+                                                                 .amplifier = entry->getByte("amplifier"),
+                                                                 .remainingTicks = entry->getInt("duration"),
+                                                                 .ambient = entry->getBoolean("ambient"),
+                                                                 .visible = entry->getBoolean("show_particles", true),
+                                                                 .showIcon = entry->getBoolean("show_icon", true)});
+        }
+    }
 }
 
 } // namespace basalt::server::runtime::player::playerPersistence

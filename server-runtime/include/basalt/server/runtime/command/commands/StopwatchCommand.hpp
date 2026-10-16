@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
 #include <map>
@@ -23,6 +24,12 @@ public:
     bool remove(const wire::common::Identifier& id);
 
     [[nodiscard]] std::optional<double> elapsedSeconds(const wire::common::Identifier& id) const;
+
+    /// parity: `Stopwatches.pack`, the milliseconds each one has run, under `stopwatches`.
+    [[nodiscard]] wire::nbt::NbtCompound encode() const;
+
+    /// parity: `Stopwatches.unpack`, each one resuming from what it had accumulated.
+    void restore(const wire::nbt::NbtCompound& packed);
 
 private:
     std::function<std::int64_t()> nowMillis_;

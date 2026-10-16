@@ -3,7 +3,9 @@
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <cstdint>
+#include <filesystem>
 #include <stdexcept>
+#include <system_error>
 #include <utility>
 
 namespace basalt::server::world::region {
@@ -142,10 +144,18 @@ bool LinearRegion::writeTo(const std::string& path, int compressionLevel) const 
     writeIntAt(header, 20, 0);
     writeLongAt(header, 24, 0);
 
-    std::optional<wire::io::FileWriter> writer = wire::io::FileWriter::open(path);
+    // Written beside the target and moved over it, so a crash leaves the old region or the new one, never half.
+    const std::string temporary = path + ".tmp";
+    std::optional<wire::io::FileWriter> writer = wire::io::FileWriter::open(temporary);
     if (!writer.has_value()) {
         return false;
     }
+    const auto abandon = [&writer, &temporary] {
+        writer->close();
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+        return false;
+    };
     writer->write(header);
 
     std::size_t compressedSize = 0;
@@ -156,18 +166,18 @@ bool LinearRegion::writeTo(const std::string& path, int compressionLevel) const 
                                                     },
                                                     compressionLevel};
         if (!compressor.valid()) {
-            return false;
+            return abandon();
         }
         if (!compressor.feed(built.table)) {
-            return false;
+            return abandon();
         }
         for (std::size_t slot = 0; slot < kSlotCount; ++slot) {
             if (present_[slot] && !compressor.feed(chunks_[slot])) {
-                return false;
+                return abandon();
             }
         }
         if (!compressor.finish()) {
-            return false;
+            return abandon();
         }
     }
 
@@ -179,6 +189,16 @@ bool LinearRegion::writeTo(const std::string& path, int compressionLevel) const 
     writeIntAt(patch, 0, static_cast<std::uint32_t>(compressedSize));
     writer->seek(20);
     writer->write(patch);
+    if (!writer->sync()) {
+        return abandon();
+    }
+    writer->close();
+    std::error_code error;
+    std::filesystem::rename(temporary, path, error);
+    if (error) {
+        std::filesystem::remove(temporary, error);
+        return false;
+    }
     return true;
 }
 

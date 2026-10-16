@@ -588,6 +588,14 @@ void ClientSession::enterPlay() {
                                       options_.progress->highlightedRecipes(uuid));
         }
     }
+    // The client knows nothing of the effects the player logged out with until it is told.
+    {
+        const float absorption = player.absorption;
+        for (const auto& [id, effect] : player.effects) {
+            uiState_->sendEffect(effect);
+        }
+        player.absorption = absorption;
+    }
     if (options_.advancements != nullptr) {
         options_.advancements->join(player.uuid().toString());
     }
