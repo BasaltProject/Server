@@ -36,7 +36,7 @@ std::optional<Moved> teleport(WorldState& world, std::int32_t x, std::int32_t y,
         }
         const std::optional<std::int32_t> at = world.blockState(tx, ty, tz);
         const std::optional<std::int32_t> below = world.blockState(tx, ty - 1, tz);
-        if (!at.has_value() || *at != air || !below.has_value() || *below == air) {
+        if (!at.has_value() || !registry::blocks::isAir(*at) || !below.has_value() || registry::blocks::isAir(*below)) {
             continue;
         }
         if (!world.setBlockState(tx, ty, tz, *egg) || !world.setBlockState(x, y, z, air)) {
