@@ -519,7 +519,7 @@ void noteChange(const Around& around, const BlockChange& change) {
         if (left > 0 && taken.has_value()) {
             taken->count = left;
             taken->countChanged = true;
-            world.spawnItem(*std::move(taken));
+            world.restoreItem(*std::move(taken));
         }
     }
     return took;

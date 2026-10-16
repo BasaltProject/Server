@@ -354,6 +354,9 @@ public:
 
     DroppedItem& spawnItem(DroppedItem dropped);
 
+    /// Puts back an item that was lifted out, without telling the plugins about a new one.
+    DroppedItem& restoreItem(DroppedItem dropped);
+
     [[nodiscard]] std::vector<DroppedItem> items() const;
 
     [[nodiscard]] std::optional<DroppedItem> itemById(std::int32_t entityId) const;

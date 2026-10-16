@@ -179,7 +179,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         // An item on the floor is its own thing here, not a `ServerEntity`, so it comes back its own way.
         if (const std::optional<world::DroppedItem> item = world::droppedItemNbt::decode(tag, allocateEntityId);
             item.has_value()) {
-            static_cast<void>(world.state().spawnItem(*item));
+            static_cast<void>(world.state().restoreItem(*item));
             continue;
         }
         for (std::unique_ptr<entity::ServerEntity>& restored :
