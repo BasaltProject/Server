@@ -341,6 +341,7 @@ private:
     std::unique_ptr<ConduitSystem> conduits_;
     std::unique_ptr<CombatSystem> combat_;
     entity::entityCombat::Hooks mobCombatHooks_;
+    std::mutex launchMutex_;
     std::map<std::string, std::int32_t> launchWatermarks_;
     std::unique_ptr<FireworkSystem> fireworks_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;
