@@ -10,6 +10,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -49,7 +50,10 @@ public:
     void clear();
     void restore();
 
-    [[nodiscard]] std::size_t size() const noexcept { return recipes_.size(); }
+    [[nodiscard]] std::size_t size() const {
+        const std::shared_lock lock{mutex_};
+        return recipes_.size();
+    }
 
     [[nodiscard]] const std::set<wire::common::Identifier>& ids() const noexcept { return ids_; }
 
@@ -61,21 +65,24 @@ public:
                                                                     const server::world::loot::ItemStack& stack) const;
 
     /// The order is the contract with the client, which sends back an index into its filtered copy of this list.
-    [[nodiscard]] const std::vector<const server::world::crafting::Recipe*>& stonecutting() const noexcept {
+    [[nodiscard]] std::vector<const server::world::crafting::Recipe*> stonecutting() const {
+        const std::shared_lock lock{mutex_};
         return stonecutting_;
     }
 
     [[nodiscard]] std::vector<const server::world::crafting::Recipe*>
     stonecuttingFor(const server::world::loot::ItemStack& stack) const;
 
-    [[nodiscard]] const std::vector<const server::world::crafting::Recipe*>& smithing() const noexcept {
+    [[nodiscard]] std::vector<const server::world::crafting::Recipe*> smithing() const {
+        const std::shared_lock lock{mutex_};
         return smithing_;
     }
 
-    [[nodiscard]] const std::vector<const server::world::crafting::Recipe*>&
+    [[nodiscard]] std::vector<const server::world::crafting::Recipe*>
     cooking(server::world::crafting::Cooker cooker) const;
 
-    [[nodiscard]] const std::vector<const server::world::crafting::Recipe*>& brewing() const noexcept {
+    [[nodiscard]] std::vector<const server::world::crafting::Recipe*> brewing() const {
+        const std::shared_lock lock{mutex_};
         return brewing_;
     }
 
@@ -98,6 +105,7 @@ private:
     void load(const Jar& jar);
     void index();
 
+    mutable std::shared_mutex mutex_;
     wire::common::Logger logger_;
     Jar jar_;
     std::deque<server::world::crafting::Recipe> recipes_;

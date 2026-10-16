@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/world/crafting/RecipeJson.hpp>
 
+#include <mutex>
 #include <algorithm>
 #include <cstdint>
 
@@ -106,6 +107,7 @@ void RealRecipes::load(const Jar& jar) {
 }
 
 const crafting::Recipe* RealRecipes::recipeFor(const Identifier& id) const {
+    const std::shared_lock lock{mutex_};
     for (std::size_t at = 0; at < parsedIds_.size(); ++at) {
         if (live_[at] && parsedIds_[at] == id) {
             return &recipes_[at];
@@ -115,6 +117,7 @@ const crafting::Recipe* RealRecipes::recipeFor(const Identifier& id) const {
 }
 
 bool RealRecipes::add(const Identifier& id, crafting::Recipe recipe) {
+    const std::unique_lock lock{mutex_};
     if (ids_.contains(id)) {
         return false;
     }
@@ -128,6 +131,7 @@ bool RealRecipes::add(const Identifier& id, crafting::Recipe recipe) {
 }
 
 bool RealRecipes::remove(const Identifier& id) {
+    const std::unique_lock lock{mutex_};
     bool removed = false;
     for (std::size_t at = 0; at < parsedIds_.size(); ++at) {
         if (live_[at] && parsedIds_[at] == id) {
@@ -143,6 +147,7 @@ bool RealRecipes::remove(const Identifier& id) {
 }
 
 std::vector<Identifier> RealRecipes::listed() const {
+    const std::shared_lock lock{mutex_};
     std::vector<Identifier> out;
     for (std::size_t at = 0; at < parsedIds_.size(); ++at) {
         if (live_[at]) {
@@ -153,12 +158,14 @@ std::vector<Identifier> RealRecipes::listed() const {
 }
 
 void RealRecipes::clear() {
+    const std::unique_lock lock{mutex_};
     std::ranges::fill(live_, false);
     ids_.clear();
     index();
 }
 
 void RealRecipes::restore() {
+    const std::unique_lock lock{mutex_};
     recipes_.clear();
     parsedIds_.clear();
     live_.clear();
@@ -170,6 +177,7 @@ void RealRecipes::restore() {
 }
 
 void RealRecipes::restoreBrewing() {
+    const std::unique_lock lock{mutex_};
     for (std::size_t at = 0; at < recipes_.size(); ++at) {
         if (recipes_[at].kind != crafting::RecipeKind::Brewing) {
             continue;
@@ -184,14 +192,15 @@ void RealRecipes::restoreBrewing() {
     index();
 }
 
-const std::vector<const crafting::Recipe*>& RealRecipes::cooking(crafting::Cooker cooker) const {
-    static const std::vector<const crafting::Recipe*> none;
+std::vector<const crafting::Recipe*> RealRecipes::cooking(crafting::Cooker cooker) const {
+    const std::shared_lock lock{mutex_};
     const auto found = cooking_.find(cooker);
-    return found == cooking_.end() ? none : found->second;
+    return found == cooking_.end() ? std::vector<const crafting::Recipe*>{} : found->second;
 }
 
 const crafting::Recipe* RealRecipes::cookingFor(crafting::Cooker cooker,
                                                 const server::world::loot::ItemStack& stack) const {
+    const std::shared_lock lock{mutex_};
     const auto found = cooking_.find(cooker);
     if (found == cooking_.end()) {
         return nullptr;
@@ -205,6 +214,7 @@ const crafting::Recipe* RealRecipes::cookingFor(crafting::Cooker cooker,
 }
 
 std::vector<const crafting::Recipe*> RealRecipes::stonecuttingFor(const server::world::loot::ItemStack& stack) const {
+    const std::shared_lock lock{mutex_};
     std::vector<const crafting::Recipe*> matching;
     for (const crafting::Recipe* recipe : stonecutting_) {
         if (recipe->accepts(&stack)) {
@@ -217,6 +227,7 @@ std::vector<const crafting::Recipe*> RealRecipes::stonecuttingFor(const server::
 const crafting::Recipe* RealRecipes::smithingFor(const server::world::loot::ItemStack* templateStack,
                                                  const server::world::loot::ItemStack* baseStack,
                                                  const server::world::loot::ItemStack* additionStack) const {
+    const std::shared_lock lock{mutex_};
     for (const crafting::Recipe* recipe : smithing_) {
         if (recipe->acceptsSmithing(templateStack, baseStack, additionStack)) {
             return recipe;
@@ -226,6 +237,7 @@ const crafting::Recipe* RealRecipes::smithingFor(const server::world::loot::Item
 }
 
 const Identifier* RealRecipes::nameOf(const crafting::Recipe* recipe) const {
+    const std::shared_lock lock{mutex_};
     for (std::size_t at = 0; at < recipes_.size(); ++at) {
         if (&recipes_[at] == recipe) {
             return &parsedIds_[at];
@@ -235,6 +247,7 @@ const Identifier* RealRecipes::nameOf(const crafting::Recipe* recipe) const {
 }
 
 std::optional<RealRecipes::Match> RealRecipes::recipeMatching(const crafting::CraftingInput& input) const {
+    const std::shared_lock lock{mutex_};
     for (std::size_t index = 0; index < recipes_.size(); ++index) {
         if (!live_[index]) {
             continue;
