@@ -93,6 +93,7 @@ std::expected<ProxyForwarding, std::string> fromToml(const TomlTable& root, std:
         forwarding.trustedKeys.push_back(*key);
     }
     forwarding.backendId = std::string{table->string("backend-id").value_or("")};
+    forwarding.offerSessionEnvelope = table->boolean("session-envelope").value_or(false);
     // A mode without its secret refuses every login, and finding that out one player at a time is worse.
     if (const std::optional<std::string> broken = forwarding.misconfiguration(); broken.has_value()) {
         return std::unexpected(std::string{path} + ": " + *broken);
