@@ -1,9 +1,11 @@
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/sched/Owner.hpp>
 #include <basalt/server/runtime/world/BiomeZoomSeed.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/server/runtime/world/WorldSpawnPoint.hpp>
 #include <basalt/server/world/LeafDistances.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
@@ -19,7 +21,10 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <functional>
+#include <future>
 #include <iterator>
+#include <memory>
 #include <set>
 
 namespace basalt::server::runtime::world {
@@ -362,17 +367,76 @@ void LoadedWorld::stashEntities(const std::vector<Chunk*>& chunks) {
     }
 }
 
+namespace {
+
+/// Runs `work` on the owner's thread and waits, or at once when that is this thread or no tick thread runs.
+template <typename R>
+R onOwner(sched::Owner& owner, std::function<R()> work) {
+    if (owner.isCurrent() || !owner.isClaimed() || !sched::Owner::tickThreadRunning()) {
+        return work();
+    }
+
+    struct Hop {
+        std::atomic<bool> taken{false};
+        std::promise<R> promise;
+    };
+
+    const auto hop = std::make_shared<Hop>();
+    const auto held = std::make_shared<std::function<R()>>(std::move(work));
+    std::future<R> answer = hop->promise.get_future();
+    owner.submit([hop, held] {
+        if (hop->taken.exchange(true)) {
+            return;
+        }
+        try {
+            hop->promise.set_value((*held)());
+        } catch (...) {
+            hop->promise.set_exception(std::current_exception());
+        }
+    });
+    while (answer.wait_for(std::chrono::milliseconds{50}) != std::future_status::ready) {
+        // The tick thread stopped with the task still queued: do it here, the worlds no longer change.
+        if (!sched::Owner::tickThreadRunning() && !hop->taken.exchange(true)) {
+            return (*held)();
+        }
+    }
+    return answer.get();
+}
+
+} // namespace
+
+std::vector<RegionStore::Snapshot> LoadedWorld::snapshotOf(const std::vector<Chunk*>& chunks) {
+    stashEntities(chunks);
+    std::vector<RegionStore::Snapshot> snapshots;
+    snapshots.reserve(chunks.size());
+    for (Chunk* chunk : chunks) {
+        snapshots.push_back(
+            RegionStore::Snapshot{chunk->chunkX(), chunk->chunkZ(), server::world::region::chunkNbt::write(*chunk)});
+        chunk->markClean();
+    }
+    return snapshots;
+}
+
 void LoadedWorld::save(const std::vector<Chunk*>& chunks) {
     if (chunks.empty()) {
         return;
     }
-    stashEntities(chunks);
+    std::vector<RegionStore::Snapshot> snapshots =
+        onOwner<std::vector<RegionStore::Snapshot>>(owner(), [this, &chunks] { return snapshotOf(chunks); });
+    writeSnapshots(std::move(snapshots));
+}
+
+void LoadedWorld::writeSnapshots(std::vector<RegionStore::Snapshot> snapshots) {
+    if (snapshots.empty()) {
+        return;
+    }
+    const std::size_t count = snapshots.size();
     const auto started = std::chrono::steady_clock::now();
-    const std::size_t written = regions_.saveChunks(chunks, static_cast<std::int32_t>(epochSeconds()));
+    const std::size_t written = regions_.saveSnapshots(std::move(snapshots), static_cast<std::int32_t>(epochSeconds()));
     const auto elapsed = std::chrono::steady_clock::now() - started;
     timings_.of("world.save").record(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count());
     logger_.debug([&] {
-        return "[" + declaration_.name + "] saved " + std::to_string(chunks.size()) + " chunk(s) across " +
+        return "[" + declaration_.name + "] saved " + std::to_string(count) + " chunk(s) across " +
                std::to_string(written) + " region(s) in " +
                std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()) + "ms (" +
                std::to_string(regions_.encodeMillis()) + "ms encoding, " + std::to_string(regions_.writeMillis()) +
@@ -382,25 +446,28 @@ void LoadedWorld::save(const std::vector<Chunk*>& chunks) {
 }
 
 void LoadedWorld::saveDirty() {
-    std::vector<Chunk*> chunks = state_.dirtyChunks();
-    std::set<std::pair<std::int32_t, std::int32_t>> already;
-    for (const Chunk* chunk : chunks) {
-        already.emplace(chunk->chunkX(), chunk->chunkZ());
-    }
-    for (Chunk* chunk : state_.chunksWithStashedEntities()) {
-        if (already.emplace(chunk->chunkX(), chunk->chunkZ()).second) {
-            chunks.push_back(chunk);
+    std::vector<RegionStore::Snapshot> snapshots = onOwner<std::vector<RegionStore::Snapshot>>(owner(), [this] {
+        std::vector<Chunk*> chunks = state_.dirtyChunks();
+        std::set<std::pair<std::int32_t, std::int32_t>> already;
+        for (const Chunk* chunk : chunks) {
+            already.emplace(chunk->chunkX(), chunk->chunkZ());
         }
-    }
-    for (const std::pair<std::int32_t, std::int32_t>& position : state_.chunksWithEntities()) {
-        if (!already.emplace(position).second) {
-            continue;
+        for (Chunk* chunk : state_.chunksWithStashedEntities()) {
+            if (already.emplace(chunk->chunkX(), chunk->chunkZ()).second) {
+                chunks.push_back(chunk);
+            }
         }
-        if (Chunk* chunk = state_.chunkIfLoaded(position.first, position.second); chunk != nullptr) {
-            chunks.push_back(chunk);
+        for (const std::pair<std::int32_t, std::int32_t>& position : state_.chunksWithEntities()) {
+            if (!already.emplace(position).second) {
+                continue;
+            }
+            if (Chunk* chunk = state_.chunkIfLoaded(position.first, position.second); chunk != nullptr) {
+                chunks.push_back(chunk);
+            }
         }
-    }
-    save(chunks);
+        return snapshotOf(chunks);
+    });
+    writeSnapshots(std::move(snapshots));
     portals_.save(worldRoot_);
     randomSequences_.save(worldRoot_);
     raids_.save(worldRoot_);
@@ -455,11 +522,13 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
         }
     }
     save(toSave);
-    const std::size_t evicted = state_.evictClean(candidates);
-    for (const Chunk* chunk : withEntities) {
-        state_.forgetEntitiesIn(chunk->chunkX(), chunk->chunkZ());
-    }
-    return evicted;
+    return onOwner<std::size_t>(owner(), [this, &candidates, &withEntities] {
+        const std::size_t evicted = state_.evictClean(candidates);
+        for (const Chunk* chunk : withEntities) {
+            state_.forgetEntitiesIn(chunk->chunkX(), chunk->chunkZ());
+        }
+        return evicted;
+    });
 }
 
 void LoadedWorld::stopGenerating(std::int64_t drainTimeoutMillis) {

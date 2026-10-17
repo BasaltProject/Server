@@ -209,6 +209,9 @@ public:
 
     void saveDirty();
 
+    /// The encoding and writing half of a save, for snapshots `snapshotOf` made on the owner.
+    void writeSnapshots(std::vector<RegionStore::Snapshot> snapshots);
+
     /// `playerPositions` holds only the players in this world.
     std::size_t unloadUnreachable(const std::vector<std::pair<std::int32_t, std::int32_t>>& playerPositions,
                                   std::int32_t spawnRadiusChunks, std::int32_t retainMarginChunks);
@@ -230,6 +233,9 @@ private:
     [[nodiscard]] std::array<double, 3> spawnBlock(std::int32_t chunkX, std::int32_t chunkZ);
 
     void stashEntities(const std::vector<server::world::Chunk*>& chunks);
+
+    /// Owner thread only: the entities stashed, the NBT of each chunk built and the chunk marked clean.
+    [[nodiscard]] std::vector<RegionStore::Snapshot> snapshotOf(const std::vector<server::world::Chunk*>& chunks);
 
     /// parity: `RandomSupport.generateUniqueSeed`, what `RandomSource.create` starts from.
     [[nodiscard]] static random::RandomSource uniqueRandom();

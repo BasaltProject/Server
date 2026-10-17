@@ -1,5 +1,5 @@
-#include <basalt/server/runtime/world/RegionStore.hpp>
 #include <basalt/metamorph/region/AnvilRegion.hpp>
+#include <basalt/server/runtime/world/RegionStore.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
@@ -12,8 +12,8 @@
 namespace basalt::server::runtime::world {
 namespace {
 
-using server::world::Chunk;
 using metamorph::region::LinearRegion;
+using server::world::Chunk;
 
 [[nodiscard]] std::int64_t millisSince(std::chrono::steady_clock::time_point start) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
@@ -133,8 +133,7 @@ RegionStore::RegionRead RegionStore::readRegionFile(std::int32_t regionX, std::i
         worldRoot_ + "/region/r." + std::to_string(regionX) + "." + std::to_string(regionZ) + ".mca";
     if (const std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(anvilPath);
         bytes.has_value()) {
-        std::expected<LinearRegion, metamorph::region::AnvilError> read =
-            metamorph::region::anvilRegion::read(*bytes);
+        std::expected<LinearRegion, metamorph::region::AnvilError> read = metamorph::region::anvilRegion::read(*bytes);
         if (!read.has_value()) {
             return RegionRead{std::nullopt, true};
         }
@@ -290,6 +289,50 @@ std::size_t RegionStore::saveChunks(std::span<Chunk* const> allChunks, std::int3
     for (Chunk* chunk : chunks) {
         chunk->markClean();
     }
+    return touched;
+}
+
+std::size_t RegionStore::saveSnapshots(std::vector<Snapshot> snapshots, std::int32_t timestamp) {
+    // A chunk that could not be read stays as it is on disk; what the world made in its place is not saved.
+    {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        std::erase_if(snapshots, [this](const Snapshot& snapshot) {
+            return unreadableChunks_.contains(key(snapshot.chunkX, snapshot.chunkZ)) ||
+                   unreadableRegions_.contains(key(snapshot.chunkX >> 5, snapshot.chunkZ >> 5));
+        });
+    }
+    if (snapshots.empty()) {
+        return 0;
+    }
+    const std::lock_guard<std::mutex> writeLock{writeMutex_};
+    std::map<std::int64_t, std::vector<const Snapshot*>> byRegion;
+    for (const Snapshot& snapshot : snapshots) {
+        byRegion[key(snapshot.chunkX >> 5, snapshot.chunkZ >> 5)].push_back(&snapshot);
+    }
+    const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    std::int64_t encodeTotal = 0;
+    for (const auto& [regionKey, regionSnapshots] : byRegion) {
+        const std::chrono::steady_clock::time_point encodeStart = std::chrono::steady_clock::now();
+        std::vector<std::pair<const Snapshot*, std::vector<std::uint8_t>>> encoded;
+        encoded.reserve(regionSnapshots.size());
+        for (const Snapshot* snapshot : regionSnapshots) {
+            encoded.emplace_back(snapshot, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(snapshot->nbt)));
+        }
+        encodeTotal += millisSince(encodeStart);
+
+        const std::lock_guard<std::mutex> lock{mutex_};
+        LinearRegion* target = region(regionXOf(regionKey), regionZOf(regionKey));
+        if (target == nullptr) {
+            target = &store(regionKey, LinearRegion{});
+        }
+        for (auto& [snapshot, bytes] : encoded) {
+            target->setChunk(snapshot->chunkX & 31, snapshot->chunkZ & 31, std::move(bytes), timestamp);
+        }
+        dirtyRegions_.insert(regionKey);
+    }
+    encodeMillis_ = encodeTotal;
+    const std::size_t touched = flushDirty();
+    writeMillis_ = millisSince(start) - encodeTotal;
     return touched;
 }
 

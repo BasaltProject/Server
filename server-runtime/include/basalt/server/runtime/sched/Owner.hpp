@@ -46,6 +46,11 @@ public:
 
     [[nodiscard]] bool isClaimed() const noexcept;
 
+    /// Whether a tick thread is draining owners at all: a task handed to one when none is would never run.
+    static void tickThreadRunning(bool running) noexcept;
+
+    [[nodiscard]] static bool tickThreadRunning() noexcept;
+
     [[nodiscard]] bool isClosed() const noexcept { return closed_.load(); }
 
     [[nodiscard]] std::size_t pending() const;
