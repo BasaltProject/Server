@@ -1,3 +1,4 @@
+#include <basalt/metamorph/datafix/LevelData.hpp>
 #include <basalt/server/runtime/world/WorldMetadata.hpp>
 #include <basalt/wire/io/Compression.hpp>
 #include <basalt/wire/io/FileIO.hpp>
@@ -102,7 +103,16 @@ std::optional<WorldMetadata> WorldMetadata::fromVanilla(const std::string& world
         metadata.thunderTime = weather->getInt("thunder_time");
         metadata.clearWeatherTime = weather->getInt("clear_weather_time");
     }
-    if (const std::optional<NbtCompound> rules = savedData(worldRoot, "game_rules"); rules.has_value()) {
+    std::optional<NbtCompound> rules = savedData(worldRoot, "game_rules");
+    if (!rules.has_value() && level != nullptr) {
+        // parity: the rules lived in `level.dat`, as strings under `GameRules` until `GameRuleRegistryFix`.
+        if (const NbtCompound* current = level->getCompound("game_rules"); current != nullptr) {
+            rules = *current;
+        } else if (const NbtCompound* old = level->getCompound("GameRules"); old != nullptr) {
+            rules = metamorph::datafix::gameRulesOfLegacy(*old);
+        }
+    }
+    if (rules.has_value()) {
         for (std::size_t i = 0; i < rules->size(); ++i) {
             const GameRule* rule = gameRules::byId(rules->names()[i]);
             if (rule == nullptr) {
