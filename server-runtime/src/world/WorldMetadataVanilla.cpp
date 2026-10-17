@@ -1,4 +1,5 @@
 #include <basalt/metamorph/datafix/LevelData.hpp>
+#include <basalt/server/runtime/world/SavedDataFiles.hpp>
 #include <basalt/server/runtime/world/WorldMetadata.hpp>
 #include <basalt/wire/io/Compression.hpp>
 #include <basalt/wire/io/FileIO.hpp>
@@ -28,11 +29,9 @@ using wire::nbt::NbtTag;
     return root == nullptr ? std::nullopt : std::optional{*root};
 }
 
-/// The `data` compound of a 26.x saved-data file, the file being `data/minecraft/<name>.dat`.
-[[nodiscard]] std::optional<NbtCompound> savedData(const std::string& worldRoot, std::string_view name) {
-    const std::optional<NbtCompound> file = readGzipped(worldRoot + "/data/minecraft/" + std::string{name} + ".dat");
-    const NbtCompound* data = file.has_value() ? file->getCompound("data") : nullptr;
-    return data == nullptr ? std::nullopt : std::optional{*data};
+[[nodiscard]] std::optional<NbtCompound> saved(const std::string& worldRoot, std::string_view name,
+                                                   std::string_view dimension = {}) {
+    return world::savedData::read(worldRoot, name, dimension);
 }
 
 [[nodiscard]] std::string gamemodeName(std::int32_t id) {
@@ -44,7 +43,7 @@ using wire::nbt::NbtTag;
 
 std::optional<WorldMetadata> WorldMetadata::fromVanilla(const std::string& worldRoot) {
     const std::optional<NbtCompound> levelFile = readGzipped(worldRoot + "/level.dat");
-    const std::optional<NbtCompound> settings = savedData(worldRoot, "world_gen_settings");
+    const std::optional<NbtCompound> settings = saved(worldRoot, "world_gen_settings");
     if (!levelFile.has_value() && !settings.has_value()) {
         return std::nullopt;
     }
@@ -91,19 +90,24 @@ std::optional<WorldMetadata> WorldMetadata::fromVanilla(const std::string& world
         metadata.thunderTime = level->getInt("thunderTime");
         metadata.clearWeatherTime = level->getInt("clearWeatherTime");
     }
-    if (const std::optional<NbtCompound> clocks = savedData(worldRoot, "world_clocks"); clocks.has_value()) {
+    if (std::optional<NbtCompound> border = saved(worldRoot, "world_border", "overworld"); border.has_value()) {
+        metadata.worldBorder = std::move(*border);
+    } else if (level != nullptr && level->contains("BorderSize")) {
+        metadata.worldBorder = metamorph::datafix::worldBorderOfLegacy(*level);
+    }
+    if (const std::optional<NbtCompound> clocks = saved(worldRoot, "world_clocks"); clocks.has_value()) {
         if (const NbtCompound* overworld = clocks->getCompound("minecraft:overworld"); overworld != nullptr) {
             metadata.timeOfDay = overworld->getLong("total_ticks");
         }
     }
-    if (const std::optional<NbtCompound> weather = savedData(worldRoot, "weather"); weather.has_value()) {
+    if (const std::optional<NbtCompound> weather = saved(worldRoot, "weather"); weather.has_value()) {
         metadata.raining = weather->getBoolean("raining");
         metadata.rainTime = weather->getInt("rain_time");
         metadata.thundering = weather->getBoolean("thundering");
         metadata.thunderTime = weather->getInt("thunder_time");
         metadata.clearWeatherTime = weather->getInt("clear_weather_time");
     }
-    std::optional<NbtCompound> rules = savedData(worldRoot, "game_rules");
+    std::optional<NbtCompound> rules = saved(worldRoot, "game_rules");
     if (!rules.has_value() && level != nullptr) {
         // parity: the rules lived in `level.dat`, as strings under `GameRules` until `GameRuleRegistryFix`.
         if (const NbtCompound* current = level->getCompound("game_rules"); current != nullptr) {
