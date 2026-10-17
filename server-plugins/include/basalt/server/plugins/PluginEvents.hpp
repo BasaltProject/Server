@@ -1,5 +1,7 @@
 #pragma once
 
+#include <basalt/wire/plugins/EventPriority.hpp>
+
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -11,11 +13,9 @@
 #include <vector>
 
 namespace basalt::server::plugins {
-enum class PluginEventPriority : std::uint8_t { First, Early, Normal, Late, Last };
-
-[[nodiscard]] std::string_view priorityName(PluginEventPriority priority);
-
-[[nodiscard]] std::optional<PluginEventPriority> priorityOf(std::string_view name);
+using PluginEventPriority = wire::plugins::EventPriority;
+using wire::plugins::priorityName;
+using wire::plugins::priorityOf;
 
 using PluginEventValue = std::variant<std::monostate, bool, std::int64_t, double, std::string>;
 
