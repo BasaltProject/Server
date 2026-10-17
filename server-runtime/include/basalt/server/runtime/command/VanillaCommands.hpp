@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
+#include <basalt/server/runtime/world/RandomSequences.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 
 #include <cstdint>
@@ -37,6 +38,7 @@ struct VanillaCommandHooks {
     commands::FunctionRunner* functionRunner = nullptr;
 
     std::function<std::int64_t()> worldSeed;
+    std::function<world::RandomSequences&()> randomSequences;
     std::function<std::int64_t()> nowMillis;
     std::function<std::int64_t()> nowEpochSeconds;
     std::function<double()> nextDouble;

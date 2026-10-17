@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/ChunkStreamer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
 #include <basalt/server/runtime/entity/Minecarts.hpp>
@@ -132,6 +133,18 @@ bool visibleTo(const ServerEntity& entity, const std::string& viewer) {
     return std::ranges::find(*entity.visibleTo, viewer) != entity.visibleTo->end();
 }
 
+/// parity: `ChunkMap.TrackedEntity.updatePlayer`, the horizontal range an entity is drawn within.
+bool inTrackingRange(const ServerEntity& entity, double viewerX, double viewerZ, std::int32_t viewDistanceChunks) {
+    const server::registry::entityTypeShapes::Shape* shape = server::registry::entityTypeShapes::of(entity.type());
+    if (shape == nullptr || shape->trackingRange <= 0) {
+        return true;
+    }
+    const double range = std::min(shape->trackingRange, viewDistanceChunks) * 16.0;
+    const double dx = viewerX - entity.x;
+    const double dz = viewerZ - entity.z;
+    return (dx * dx) + (dz * dz) <= range * range;
+}
+
 } // namespace
 
 EntityVisibilityTracker::EntityVisibilityTracker(ClientSession& owner) : owner_(&owner) {}
@@ -156,11 +169,12 @@ void EntityVisibilityTracker::syncSummonedEntities() {
     }
     const std::string me = session->uuid().toString();
     const std::vector<ServerEntity*> entities = owner_->world().entities();
+    const std::int32_t viewDistance = owner_->chunkStreamer().trackedRadius();
     for (ServerEntity* entity : entities) {
         if (entity->removed) {
             continue;
         }
-        if (!visibleTo(*entity, me)) {
+        if (!visibleTo(*entity, me) || !inTrackingRange(*entity, session->x, session->z, viewDistance)) {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
                 lastRuntimeEntityMetadata_.erase(entity->entityId());

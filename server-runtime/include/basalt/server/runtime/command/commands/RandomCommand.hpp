@@ -2,23 +2,25 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/world/RandomSequences.hpp>
 
 #include <cstdint>
-#include <map>
+#include <optional>
 
 namespace basalt::server::runtime::command::commands {
 
 /// parity: `RandomCommand`.
 class RandomCommand final : public Command {
 public:
-    explicit RandomCommand(std::function<std::int64_t()> worldSeed);
+    RandomCommand(std::function<std::int64_t()> worldSeed, std::function<world::RandomSequences&()> sequences);
 
     void build(const CommandNodeBuilder& root) const override;
 
 private:
     std::function<std::int64_t()> worldSeed_;
-    /// Mutable because `build` hands out const callbacks.
-    mutable std::map<wire::common::Identifier, random::RandomSource> sequences_;
+    std::function<world::RandomSequences&()> sequences_;
+    /// Mutable because `build` hands out const callbacks; the stream of a draw that names no sequence.
+    mutable std::optional<random::RandomSource> anonymous_;
 };
 
 } // namespace basalt::server::runtime::command::commands

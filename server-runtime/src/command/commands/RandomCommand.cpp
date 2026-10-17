@@ -45,24 +45,13 @@ constexpr std::int64_t kAnySequenceSalt = 0x5DEECE66DLL;
 
 } // namespace
 
-RandomCommand::RandomCommand(std::function<std::int64_t()> worldSeed)
-    : Command("random", permissionLevel::kAll), worldSeed_(std::move(worldSeed)) {}
+RandomCommand::RandomCommand(std::function<std::int64_t()> worldSeed,
+                             std::function<world::RandomSequences&()> sequences)
+    : Command("random", permissionLevel::kAll), worldSeed_(std::move(worldSeed)), sequences_(std::move(sequences)) {}
 
 void RandomCommand::build(const CommandNodeBuilder& root) const {
-    /// parity: `RandomSequence.createSequence`: the world seed upgraded but not mixed.
-    const auto sequenceFor = [this](const Identifier& sequence) -> random::RandomSource& {
-        const auto found = sequences_.find(sequence);
-        if (found != sequences_.end()) {
-            return found->second;
-        }
-        const random::Seed128bit seed = random::upgradeSeedTo128bitUnmixed(worldSeed_ ? worldSeed_() : 0)
-                                            .xorWith(random::seedFromHashOf(sequence.toString()))
-                                            .mixed();
-        return sequences_.emplace(sequence, random::RandomSource::xoroshiro(seed)).first->second;
-    };
-
-    const auto draw = [this, sequenceFor](const CommandContext& context, std::string_view kind,
-                                          const Identifier* sequence) -> Parsed<std::int32_t> {
+    const auto draw = [this](const CommandContext& context, std::string_view kind,
+                             const Identifier* sequence) -> Parsed<std::int32_t> {
         const auto* text = context.get<std::string>("range");
         const std::optional<std::pair<std::int32_t, std::int32_t>> range =
             text == nullptr ? std::nullopt : parseRange(*text);
@@ -71,19 +60,21 @@ void RandomCommand::build(const CommandNodeBuilder& root) const {
                 .component = Component::text("Invalid range '" + (text == nullptr ? std::string{} : *text) + "'.")}};
         }
         const auto [min, max] = *range;
-        if (min > max) {
+        // parity: `RandomCommand.randomSample`, which refuses a span of nothing and one the bound cannot hold.
+        const std::int64_t span = static_cast<std::int64_t>(max) - min;
+        if (span == 0) {
             return std::unexpected{
                 CommandSyntaxError{.component = Component::translatable("commands.random.error.range_too_small")}};
         }
-        const std::int64_t span = static_cast<std::int64_t>(max) - min + 1;
-        if (span > std::numeric_limits<std::int32_t>::max()) {
+        if (span >= std::numeric_limits<std::int32_t>::max()) {
             return std::unexpected{
                 CommandSyntaxError{.component = Component::translatable("commands.random.error.range_too_large")}};
         }
-        random::RandomSource anonymous =
-            random::RandomSource::legacy((worldSeed_ ? worldSeed_() : 0) ^ kAnySequenceSalt);
-        random::RandomSource& random = sequence == nullptr ? anonymous : sequenceFor(*sequence);
-        const std::int32_t value = min + random.nextInt(static_cast<std::int32_t>(span));
+        if (!anonymous_.has_value()) {
+            anonymous_ = random::RandomSource::legacy((worldSeed_ ? worldSeed_() : 0) ^ kAnySequenceSalt);
+        }
+        random::RandomSource& random = sequence == nullptr ? *anonymous_ : sequences_().of(*sequence);
+        const std::int32_t value = min + random.nextInt(static_cast<std::int32_t>(span + 1));
         if (kind == "roll") {
             context.environment().broadcast(Component::translatable(
                 "commands.random.roll", {context.source().displayName(), Component::text(std::to_string(value)),
@@ -113,14 +104,26 @@ void RandomCommand::build(const CommandNodeBuilder& root) const {
         if (sequence == nullptr) {
             return 0;
         }
-        sequences_.erase(*sequence);
+        if (const auto* salt = context.get<std::int32_t>("seed"); salt != nullptr) {
+            const auto* worldSeed = context.get<bool>("includeWorldSeed");
+            const auto* sequenceId = context.get<bool>("includeSequenceId");
+            sequences_().reset(*sequence, *salt, worldSeed == nullptr || *worldSeed,
+                               sequenceId == nullptr || *sequenceId);
+        } else {
+            sequences_().reset(*sequence);
+        }
         context.success(
             Component::translatable("commands.random.reset.success", {Component::text(sequence->toString())}));
         return 1;
     };
     const auto resetAll = [this](const CommandContext& context) -> Parsed<std::int32_t> {
-        const auto count = static_cast<std::int32_t>(sequences_.size());
-        sequences_.clear();
+        if (const auto* salt = context.get<std::int32_t>("seed"); salt != nullptr) {
+            const auto* worldSeed = context.get<bool>("includeWorldSeed");
+            const auto* sequenceId = context.get<bool>("includeSequenceId");
+            sequences_().setSeedDefaults(*salt, worldSeed == nullptr || *worldSeed,
+                                         sequenceId == nullptr || *sequenceId);
+        }
+        const std::int32_t count = sequences_().clear();
         context.success(
             Component::translatable("commands.random.reset.all.success", {Component::text(std::to_string(count))}));
         return count;

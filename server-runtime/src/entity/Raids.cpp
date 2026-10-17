@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/entity/Raids.hpp>
+#include <basalt/server/runtime/world/SavedDataFiles.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
@@ -25,7 +26,6 @@ constexpr std::array<Counts, 5> kCounts{Counts{0, 0, 2, 0, 1, 4, 2, 5}, Counts{0
                                         Counts{0, 0, 0, 1, 0, 1, 0, 2}};
 
 /// parity: `SavedData`'s wrapper version, the target's world version.
-constexpr std::int32_t kDataVersion = 5023;
 
 constexpr std::array<std::string_view, 4> kStatusNames{"ongoing", "victory", "loss", "stopped"};
 
@@ -39,8 +39,6 @@ constexpr std::array<std::string_view, 4> kStatusNames{"ongoing", "victory", "lo
 [[nodiscard]] std::uint64_t halfOf(std::int32_t high, std::int32_t low) {
     return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(high)) << 32U) | static_cast<std::uint32_t>(low);
 }
-
-[[nodiscard]] std::string pathFor(std::string_view worldRoot) { return std::string{worldRoot} + "/raids.nbt"; }
 
 } // namespace
 
@@ -292,14 +290,7 @@ void RaidManager::decode(const NbtCompound& tag) {
 }
 
 void RaidManager::load(std::string_view worldRoot) {
-    const std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(pathFor(worldRoot));
-    if (!bytes.has_value()) {
-        return;
-    }
-    const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::read(*bytes);
-    const NbtCompound* root = read.has_value() ? read->tag.get<NbtCompound>() : nullptr;
-    const NbtCompound* data = root == nullptr ? nullptr : root->getCompound("data");
-    if (data != nullptr) {
+    if (const std::optional<NbtCompound> data = world::savedData::read(worldRoot, "raids"); data.has_value()) {
         decode(*data);
     }
     dirty = false;
@@ -311,11 +302,7 @@ void RaidManager::save(std::string_view worldRoot) {
     }
     NbtCompound data;
     encode(data);
-    NbtCompound root;
-    root.set("data", NbtTag::ofCompound(std::move(data)));
-    root.putInt("DataVersion", kDataVersion);
-    static_cast<void>(
-        wire::io::fileIO::writeBytes(pathFor(worldRoot), wire::nbt::nbtIO::write(NbtTag::ofCompound(std::move(root)))));
+    static_cast<void>(world::savedData::write(worldRoot, "raids", std::move(data)));
     dirty = false;
 }
 

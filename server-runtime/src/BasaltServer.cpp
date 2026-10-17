@@ -387,6 +387,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.port = config.port;
     wiring.lang = options_.lang;
     wiring.pluginEvents = [this] { return plugins_ == nullptr ? nullptr : &plugins_->events(); };
+    wiring.randomSequences = [this]() -> world::RandomSequences& {
+        return worldRegistry_->defaultWorld().randomSequences();
+    };
     wiring.stopServer = [this] { shutdown(); };
     wiring.dropBrokenBlock = [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                     std::int32_t destroyedState) {

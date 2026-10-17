@@ -34,6 +34,9 @@ public:
     /// parity: `ServerPlayer.requestedViewDistance`.
     void setRequestedViewDistance(std::int32_t distance);
 
+    /// parity: `ChunkMap.getPlayerViewDistance`.
+    [[nodiscard]] std::int32_t trackedRadius() const;
+
     void streamChunksAround(double x, double z);
 
     std::int32_t flushReadyChunks(std::int32_t limit);
@@ -46,8 +49,6 @@ private:
     static constexpr std::int32_t kMinViewDistance = 2;
 
     [[nodiscard]] std::int64_t squaredDistanceToCenter(std::int32_t chunkX, std::int32_t chunkZ) const;
-
-    [[nodiscard]] std::int32_t trackedRadius() const;
 
     void applyDelta(const server::world::ChunkTracker::Delta& delta);
 
