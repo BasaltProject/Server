@@ -492,15 +492,51 @@ void WorldState::installLater(Chunk chunk, std::function<void()> installed) {
         }
         return;
     }
-    target->submit([this, moved = std::make_shared<Chunk>(std::move(chunk)), installed = std::move(installed)]() {
-        Chunk& placed = install(std::move(*moved));
-        if (const std::function<void(Chunk&)> handler = chunkInstalledHandler()) {
-            handler(placed);
+    {
+        const std::lock_guard<std::mutex> lock{installMutex_};
+        pendingInstalls_.push_back(PendingInstall{std::make_shared<Chunk>(std::move(chunk)), std::move(installed)});
+        if (installPassQueued_) {
+            return;
         }
-        if (installed) {
-            installed();
+        installPassQueued_ = true;
+    }
+    target->submit([this, target] { installPass(target); });
+}
+
+void WorldState::installPass(sched::Owner* target) {
+    // Settling a chunk's leaves reads its neighbours' blocks and costs milliseconds: a tick that took every chunk
+    // waiting for it would starve whatever else the owner has queued, a player's join included.
+    constexpr std::chrono::milliseconds kBudget{8};
+    const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+    while (true) {
+        PendingInstall next;
+        {
+            const std::lock_guard<std::mutex> lock{installMutex_};
+            if (pendingInstalls_.empty()) {
+                installPassQueued_ = false;
+                return;
+            }
+            next = std::move(pendingInstalls_.front());
+            pendingInstalls_.pop_front();
         }
-    });
+        try {
+            Chunk& placed = install(std::move(*next.chunk));
+            if (const std::function<void(Chunk&)> handler = chunkInstalledHandler()) {
+                handler(placed);
+            }
+            if (next.installed) {
+                next.installed();
+            }
+        } catch (...) {
+            // The ones still waiting must not be stranded behind a chunk that failed.
+            target->submit([this, target] { installPass(target); });
+            throw;
+        }
+        if (std::chrono::steady_clock::now() - started >= kBudget) {
+            break;
+        }
+    }
+    target->submit([this, target] { installPass(target); });
 }
 
 std::optional<std::int32_t> WorldState::blockState(std::int32_t x, std::int32_t y, std::int32_t z) const {

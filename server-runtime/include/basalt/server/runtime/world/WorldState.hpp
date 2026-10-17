@@ -376,6 +376,19 @@ private:
     PlayerCheck playerCheck_;
     sched::Owner* owner_ = nullptr;
     sched::Owner* installOwner_ = nullptr;
+
+    struct PendingInstall {
+        std::shared_ptr<server::world::Chunk> chunk;
+        std::function<void()> installed;
+    };
+
+    /// Installs generated chunks until the tick's share of time is spent, and asks the owner for another turn if any
+    /// wait.
+    void installPass(sched::Owner* target);
+
+    std::mutex installMutex_;
+    std::deque<PendingInstall> pendingInstalls_;
+    bool installPassQueued_ = false;
     std::function<std::int32_t()> regionCount_;
 
     [[nodiscard]] std::function<void(server::world::Chunk&)> chunkInstalledHandler() const {
