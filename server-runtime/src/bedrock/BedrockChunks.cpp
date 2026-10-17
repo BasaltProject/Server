@@ -6,6 +6,7 @@
 #include <basalt/server/world/ChunkSection.hpp>
 #include <basalt/wire/bedrock/BedrockBanners.hpp>
 #include <basalt/wire/bedrock/BedrockBiomes.hpp>
+#include <basalt/wire/bedrock/BedrockColumn.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
 
@@ -112,9 +113,8 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
 
     std::vector<Bed> beds;
 
-    wire::io::ByteBuffer packed{static_cast<std::size_t>(sent) * 1024};
-    std::array<std::int32_t, wire::bedrock::kSubChunkBlocks> blocks{};
-    for (std::int32_t section = 0; section < sent; ++section) {
+    // Beds are noted while the blocks are read, so no second scan finds them.
+    const wire::bedrock::FillBlocks fillBlocks = [&](const std::int32_t section, std::span<std::int32_t> blocks) {
         for (std::int32_t y = 0; y < 16; ++y) {
             for (std::int32_t z = 0; z < 16; ++z) {
                 for (std::int32_t x = 0; x < 16; ++x) {
@@ -127,50 +127,47 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
                 }
             }
         }
-        // Bedrock counts subchunks from the bottom of the world (four below zero for the overworld).
-        wire::bedrock::writeSubChunk(packed, blocks,
-                                     static_cast<std::int8_t>(chunk.verticalBounds().minSection() + section), protocol);
-    }
-
-    wire::io::ByteBuffer extras;
-    for (const Bed& bed : beds) {
-        wire::bedrock::writeBedTag(extras, (chunk.chunkX() * 16) + bed.x, bed.y, (chunk.chunkZ() * 16) + bed.z,
-                                   bed.colour);
-    }
-    for (const server::world::ChunkBlockEntity& entity : chunk.blockEntities()) {
-        const std::int32_t at = chunk.blockStateId(entity.localX(), entity.y(), entity.localZ());
-        if (const auto colour = bannerColourOf(at); colour) {
-            writeBanner(extras, (chunk.chunkX() * 16) + entity.localX(), entity.y(),
-                        (chunk.chunkZ() * 16) + entity.localZ(), *colour, entity.data());
-            continue;
-        }
-        if (!world::signs::isSign(at)) {
-            continue;
-        }
-        wire::bedrock::writeSignTag(
-            extras, (chunk.chunkX() * 16) + entity.localX(), entity.y(), (chunk.chunkZ() * 16) + entity.localZ(),
-            world::signs::plainText(entity.data(), true), world::signs::plainText(entity.data(), false),
-            world::signs::isWaxed(entity.data()));
-    }
-
+    };
     // parity: Geyser's `BiomeTranslator`.
-    wire::io::ByteBuffer biomes{static_cast<std::size_t>(sections) * 4};
-    std::array<std::int32_t, server::world::ChunkSection::kBiomes> javaIds{};
-    wire::bedrock::BiomeQuarts quarts{};
-    for (std::int32_t section = 0; section < sections; ++section) {
+    const wire::bedrock::FillBiomes fillBiomes = [&](const std::int32_t section, wire::bedrock::BiomeQuarts& quarts) {
+        std::array<std::int32_t, server::world::ChunkSection::kBiomes> javaIds{};
         chunk.section(static_cast<std::size_t>(section)).copyBiomeIdsInto(javaIds);
         for (std::size_t quart = 0; quart < javaIds.size(); ++quart) {
             quarts[quart] = bedrockBiomeOf(javaIds[quart]);
         }
-        wire::bedrock::writeBiomeSection(biomes, quarts);
-    }
+    };
 
-    wire::io::ByteBuffer body;
+    const wire::bedrock::FillBlockEntities fillTags = [&](wire::io::ByteBuffer& extras) {
+        for (const Bed& bed : beds) {
+            wire::bedrock::writeBedTag(extras, (chunk.chunkX() * 16) + bed.x, bed.y, (chunk.chunkZ() * 16) + bed.z,
+                                       bed.colour);
+        }
+        for (const server::world::ChunkBlockEntity& entity : chunk.blockEntities()) {
+            const std::int32_t at = chunk.blockStateId(entity.localX(), entity.y(), entity.localZ());
+            if (const auto colour = bannerColourOf(at); colour) {
+                writeBanner(extras, (chunk.chunkX() * 16) + entity.localX(), entity.y(),
+                            (chunk.chunkZ() * 16) + entity.localZ(), *colour, entity.data());
+                continue;
+            }
+            if (!world::signs::isSign(at)) {
+                continue;
+            }
+            wire::bedrock::writeSignTag(
+                extras, (chunk.chunkX() * 16) + entity.localX(), entity.y(), (chunk.chunkZ() * 16) + entity.localZ(),
+                world::signs::plainText(entity.data(), true), world::signs::plainText(entity.data(), false),
+                world::signs::isWaxed(entity.data()));
+        }
+    };
+
+    wire::bedrock::ColumnShape shape;
+    shape.chunkX = chunk.chunkX();
+    shape.chunkZ = chunk.chunkZ();
+    shape.minSection = chunk.verticalBounds().minSection();
+    shape.sections = sections;
+    shape.sent = sent;
+    shape.protocol = protocol;
     // The subchunk count is what was written; the biome section count is the column's own height.
-    wire::bedrock::writeLevelChunk(body, chunk.chunkX(), chunk.chunkZ(), static_cast<std::uint32_t>(sent),
-                                   packed.readable(), static_cast<std::uint32_t>(sections), 0, protocol,
-                                   extras.readable(), biomes.readable());
-    return body.toVector();
+    return wire::bedrock::encodeColumn(shape, fillBlocks, fillBiomes, fillTags);
 }
 
 } // namespace basalt::server::runtime::bedrock
