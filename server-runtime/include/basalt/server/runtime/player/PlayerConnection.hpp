@@ -167,6 +167,9 @@ struct PlayerConnection {
 
     std::function<void(std::int32_t dialogId, const world::dialogs::Dialog& dialog)> showDialog;
 
+    /// A plugin's own form: shown at once, and answered through the dialog's `submit`.
+    std::function<void(const world::dialogs::Dialog& dialog)> showForm;
+
     std::function<void(const wire::common::Uuid& waypoint, std::int32_t entityId, const std::string& style,
                        const std::optional<std::int32_t>& color, double x, double y, double z, bool tracked)>
         sendWaypoint;

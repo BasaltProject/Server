@@ -147,6 +147,10 @@ public:
 
     void close(server::plugins::PluginPlayerRef& player) override;
 
+    server::plugins::PluginHandle openForm(server::plugins::PluginPlayerRef& player,
+                                           const server::plugins::PluginForm& form,
+                                           server::plugins::PluginFormAnswer onAnswer) override;
+
     void refresh(server::plugins::PluginPlayerRef& player,
                  const std::map<std::int32_t, server::plugins::PluginItem>& items) override;
 

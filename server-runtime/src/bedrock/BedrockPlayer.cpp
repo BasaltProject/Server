@@ -831,8 +831,21 @@ void BedrockPlayer::showDialog(const world::dialogs::Dialog& dialog) {
         case world::dialogs::Press::RunCommand:
             command(pressed.value);
             return;
-        case world::dialogs::Press::RunTemplate:
-            command(world::dialogs::instantiate(pressed.value, values));
+        case world::dialogs::Press::RunTemplate: {
+            std::map<std::string, std::string> escaped = values;
+            for (const world::dialogs::Input& input : held->inputs) {
+                const auto found = escaped.find(input.key);
+                if (input.kind == world::dialogs::InputKind::Text && found != escaped.end()) {
+                    found->second = world::dialogs::escapeText(found->second);
+                }
+            }
+            command(world::dialogs::instantiate(pressed.value, escaped));
+            return;
+        }
+        case world::dialogs::Press::Callback:
+            if (held->submit) {
+                held->submit(at, values);
+            }
             return;
         case world::dialogs::Press::ShowText:
             if (session_ != nullptr && session_->connection().sendSystemMessage) {
@@ -938,8 +951,7 @@ void BedrockPlayer::showDialog(const world::dialogs::Dialog& dialog) {
                 switch (input.kind) {
                 case world::dialogs::InputKind::Text:
                     if (const auto* text = answer.get<std::string>(); text != nullptr) {
-                        values[input.key] = world::dialogs::escapeText(
-                            text->substr(0, static_cast<std::size_t>(std::max(input.maxLength, 0))));
+                        values[input.key] = text->substr(0, static_cast<std::size_t>(std::max(input.maxLength, 0)));
                     }
                     break;
                 case world::dialogs::InputKind::Boolean:

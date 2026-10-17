@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/ui/PlayerUi.hpp>
+#include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/RealBannerPatterns.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -38,6 +39,7 @@
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
+#include <basalt/wire/protocol/play/UiPackets.hpp>
 #include <basalt/wire/protocol/status/StatusPackets.hpp>
 #include <basalt/wire/text/LangTable.hpp>
 
@@ -185,6 +187,7 @@ public:
         std::function<std::vector<std::string>()> enabledFeatures;
         /// parity: `DedicatedServer.createServerLinks`; empty when unset or not http(s).
         std::string bugReportLink;
+
         struct ResourcePack {
             wire::common::Uuid id;
             std::string url;
@@ -192,6 +195,7 @@ public:
             bool required = false;
             std::optional<wire::text::Component> prompt;
         };
+
         /// parity: `MinecraftServer.getServerResourcePack`.
         std::optional<ResourcePack> resourcePack;
         std::function<config::UiConfigs()> ui;
@@ -438,6 +442,8 @@ private:
 
     void handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body);
 
+    void answerForm(const wire::protocol::play::ServerboundCustomClickActionPacket& packet);
+
     void enterPlay();
 
     void sendKeepAliveIfDue();
@@ -523,6 +529,9 @@ private:
     bool compressionEnabled_ = false;
     ui::PlayerUi playerUi_;
 
+    std::mutex formsLock_;
+    std::map<std::int32_t, std::shared_ptr<const world::dialogs::Dialog>> forms_;
+    std::int32_t nextFormId_ = 1;
     std::unique_ptr<ContainerMenuController> menus_;
     std::unique_ptr<BlockInteractionHandler> blockInteraction_;
     std::unique_ptr<ChunkStreamer> chunkStreamer_;

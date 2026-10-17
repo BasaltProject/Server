@@ -1,5 +1,6 @@
 #include <basalt/server/plugins/PluginApi.hpp>
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginFormObject.hpp>
 #include <basalt/server/plugins/PluginMenuObject.hpp>
 #include <basalt/server/plugins/PluginObject.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
@@ -452,6 +453,22 @@ void installMessaging(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
         return 1;
     });
     lua.setGlobal("menu");
+
+    wire::lua::pushHostFunction(lua, "form", [server, target](LuaArgs& args) {
+        const auto resolve = [target](const std::string& written) { return target->text.resolve(written, nullptr, 0); };
+        PluginForm described = readForm(args, 1, resolve);
+        const std::string title = described.title;
+        const std::shared_ptr<LuaForm> built =
+            LuaForm::create(server->services().menus(), server->services().players(), std::move(described),
+                            [server, target](const LuaRef& handler, PluginPlayerRef& player, const PluginForm& form,
+                                             std::size_t button, const std::map<std::string, std::string>& values) {
+                                server->formAnswered(*target, handler, player, form, button, values);
+                            });
+        static_cast<void>(target->registrations.add("form(" + title + ")", [built] { built->closeAll(); }));
+        built->push(args);
+        return 1;
+    });
+    lua.setGlobal("form");
 }
 
 [[nodiscard]] PluginEventValue eventValueOf(LuaArgs& lua, std::int32_t index) {

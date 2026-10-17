@@ -534,6 +534,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     connection.setCamera = [this](const std::int32_t entityId) { setCamera(entityId); };
 
     connection.showDialog = [this](std::int32_t, const world::dialogs::Dialog& dialog) { showDialog(dialog); };
+    connection.showForm = [this](const world::dialogs::Dialog& dialog) { showDialog(dialog); };
 
     connection.sendWaypoint = [this](const wire::common::Uuid& waypoint, const std::int32_t entityId,
                                      const std::string&, const std::optional<std::int32_t>& color, const double x,

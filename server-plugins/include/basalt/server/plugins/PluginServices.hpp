@@ -110,6 +110,32 @@ public:
     }
 };
 
+struct PluginFormField {
+    enum class Kind : std::uint8_t { Text, Toggle, Slider, Choice };
+
+    std::string key;
+    Kind kind = Kind::Text;
+    std::string label;
+    std::string initialText;
+    bool initialToggle = false;
+    double min = 0.0;
+    double max = 1.0;
+    double step = 0.0;
+    double initialNumber = 0.0;
+    std::vector<std::string> options;
+    std::string initialOption;
+};
+
+struct PluginForm {
+    std::string title;
+    std::vector<std::string> body;
+    std::vector<PluginFormField> fields;
+    std::vector<std::string> buttons;
+};
+
+/// The button pressed, from zero, and what each field held as text.
+using PluginFormAnswer = std::function<void(std::size_t button, const std::map<std::string, std::string>& values)>;
+
 class PluginMenus {
 public:
     static constexpr std::int32_t kColumns = 9;
@@ -129,6 +155,8 @@ public:
     virtual void close(PluginPlayerRef& player) = 0;
 
     virtual void refresh(PluginPlayerRef& player, const std::map<std::int32_t, PluginItem>& items) = 0;
+
+    virtual PluginHandle openForm(PluginPlayerRef&, const PluginForm&, PluginFormAnswer) { return PluginHandle{}; }
 };
 
 class PluginPacketSender {
