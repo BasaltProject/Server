@@ -48,6 +48,7 @@
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/plugins/ServerPluginServices.hpp>
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
@@ -281,6 +282,7 @@ private:
     std::unique_ptr<plugins::SessionChannels> pluginChannels_;
     std::unique_ptr<plugins::ServerPluginServices> pluginServices_;
     std::unique_ptr<server::plugins::PluginHost> plugins_;
+    plugins::EventSink eventSink_{[this] { return plugins_ == nullptr ? nullptr : &plugins_->events(); }};
 
     std::unique_ptr<BlockChangeBroadcaster> broadcaster_;
     std::unique_ptr<ExplosionSystem> explosions_;

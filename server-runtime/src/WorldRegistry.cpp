@@ -86,6 +86,7 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
     std::unique_ptr<world::LoadedWorld> world =
         std::make_unique<world::LoadedWorld>(declaration, worldsConfig_->settingsFor(declaration), std::move(metadata),
                                              options_.worldsRoot, logger_, std::move(options));
+    world->setEvents(options_.events);
     // parity: `SculkShriekerBlockEntity.tryGetPlayer`, which only the runtime can answer.
     world->state().setPlayerCheck([players = players_, holder = world.get()](const wire::common::Uuid& entity) {
         return ShriekerSystem::playerBehind(*holder, *players, entity) != nullptr;

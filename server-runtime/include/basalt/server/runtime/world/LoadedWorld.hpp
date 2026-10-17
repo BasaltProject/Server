@@ -38,6 +38,10 @@
 #include <utility>
 #include <vector>
 
+namespace basalt::server::runtime::plugins {
+class EventSink;
+}
+
 namespace basalt::server::runtime::world {
 
 struct LoadedWorldOptions {
@@ -102,6 +106,11 @@ public:
 
     /// Who owns this world's state: its chunks, its blocks and everything living in them.
     [[nodiscard]] sched::Owner& owner() const noexcept { return region_->owner(); }
+
+    void setEvents(plugins::EventSink* events) noexcept { events_ = events; }
+
+    /// Where the world tells the plugins what happens in it; never null.
+    [[nodiscard]] const plugins::EventSink& events() const noexcept;
 
     /// Who owns the block at these coordinates: always `owner` while a world is one region.
     [[nodiscard]] sched::Owner& ownerOf(std::int32_t x, std::int32_t z) const;
@@ -247,6 +256,7 @@ private:
     RandomSequences randomSequences_{metadata_.seed};
     std::mutex randomMutex_;
     random::RandomSource random_ = uniqueRandom();
+    plugins::EventSink* events_ = nullptr;
     entity::RaidManager raids_;
     wire::common::Logger logger_;
     wire::common::Timings ownTimings_;

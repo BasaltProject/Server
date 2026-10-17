@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/plugins/PluginsCommand.hpp>
+#include <basalt/server/runtime/plugins/WorldEventHooks.hpp>
 #include <basalt/server/runtime/world/BiomeTagLoader.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -201,7 +202,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                .generationMetrics = config.generationMetrics,
                                .jukeboxes = &vanillaData_.jukeboxSongs,
                                .lootTables = &vanillaData_.lootTables,
-                               .triggers = advancementTriggers_.get()},
+                               .triggers = advancementTriggers_.get(),
+                               .events = &eventSink_},
         logger_);
 
     for (const auto& [name, world] : worldRegistry_->worlds()) {
@@ -303,18 +305,18 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     PersistenceCoordinator::Hooks persistenceHooks;
     persistenceHooks.worlds = [this] { return worldRegistry_->worlds(); };
     persistenceHooks.wantsUnloadEvents = [this] {
-        return plugins_ != nullptr && plugins_->events().listening(server::plugins::pluginEventTypes::worldChunkLoad());
+        return plugins_ != nullptr &&
+               plugins_->events().listening(server::plugins::pluginEventTypes::worldChunkUnload());
     };
     persistenceHooks.chunkUnloaded = [this](const std::string& worldName, std::int32_t chunkX, std::int32_t chunkZ) {
         server::plugins::PluginEventBus* bus = plugins_ == nullptr ? nullptr : &plugins_->events();
-        static_cast<void>(
-            server::plugins::emit(bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::worldChunkLoad(),
-                                  [&worldName, chunkX, chunkZ](server::plugins::PluginEvent& event) {
-                                      event.set(0, worldName);
-                                      event.set(1, static_cast<std::int64_t>(chunkX));
-                                      event.set(2, static_cast<std::int64_t>(chunkZ));
-                                      event.set(3, false);
-                                  }));
+        static_cast<void>(server::plugins::emit(
+            bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::worldChunkUnload(),
+            [&worldName, chunkX, chunkZ](server::plugins::PluginEvent& event) {
+                event.set(0, worldName);
+                event.set(1, static_cast<std::int64_t>(chunkX));
+                event.set(2, static_cast<std::int64_t>(chunkZ));
+            }));
     };
     persistenceHooks.saveShared = [this] {
         if (maps_ != nullptr) {
@@ -528,38 +530,39 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         return granted;
     });
 
-    broadcaster_ = std::make_unique<BlockChangeBroadcaster>(
-        playerRegistry_, vanillaData_.lootTables,
+    BlockChangeBroadcaster::Hooks broadcasterHooks{
         // parity: `spawnGolemInWorld`.
-        BlockChangeBroadcaster::Hooks{
-            .summonGolem =
-                [this](world::LoadedWorld& world, std::string_view type, double x, double y, double z) {
-                    if (spawning_ == nullptr) {
-                        return;
-                    }
-                    golemSpawned(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x, y,
-                                                     z, 0.0F, "triggered", {}),
-                                 advancementTriggers_.get(), playerRegistry_.snapshot(), world.name());
-                }},
+        .summonGolem = [this](world::LoadedWorld& world, std::string_view type, double x, double y, double z) {
+            if (spawning_ == nullptr) {
+                return;
+            }
+            golemSpawned(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x, y, z, 0.0F,
+                                             "triggered", {}),
+                         advancementTriggers_.get(), playerRegistry_.snapshot(), world.name());
+        }};
+    plugins::worldEventHooks::pistons(broadcasterHooks, eventSink_);
+    broadcaster_ = std::make_unique<BlockChangeBroadcaster>(
+        playerRegistry_, vanillaData_.lootTables, std::move(broadcasterHooks),
         BlockChangeBroadcaster::Options{.nextSeed = [] { return scratchSeed(); },
                                         .blockTags = &vanillaData_.blockTags});
-    explosions_ = std::make_unique<ExplosionSystem>(
-        playerRegistry_, vanillaData_.lootTables,
-        ExplosionSystem::Hooks{
-            .struck =
-                [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
-                       double y, double z, float power, std::int32_t sourceEntityId) {
-                    combat_->hurtByExplosion(world, watchers, x, y, z, power, sourceEntityId);
-                },
-            .hiveBlown =
-                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
-                       const wire::nbt::NbtCompound& hive, std::int32_t sourceEntityId) {
-                    if (mobActions_ != nullptr) {
-                        mobActions_->hiveBlown(world, {x, y, z}, stateId, hive, sourceEntityId);
-                    }
-                }},
-        ExplosionSystem::Options{.nextSeed = [] { return scratchSeed(); },
-                                 .nextDouble = [] { return scratchDouble(); }});
+    ExplosionSystem::Hooks explosionHooks{
+        .struck =
+            [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x, double y,
+                   double z, float power, std::int32_t sourceEntityId) {
+                combat_->hurtByExplosion(world, watchers, x, y, z, power, sourceEntityId);
+            },
+        .hiveBlown =
+            [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                   const wire::nbt::NbtCompound& hive, std::int32_t sourceEntityId) {
+                if (mobActions_ != nullptr) {
+                    mobActions_->hiveBlown(world, {x, y, z}, stateId, hive, sourceEntityId);
+                }
+            }};
+    plugins::worldEventHooks::explosions(explosionHooks, eventSink_);
+    explosions_ =
+        std::make_unique<ExplosionSystem>(playerRegistry_, vanillaData_.lootTables, std::move(explosionHooks),
+                                          ExplosionSystem::Options{.nextSeed = [] { return scratchSeed(); },
+                                                                   .nextDouble = [] { return scratchDouble(); }});
     orbs_ = std::make_unique<ExperienceOrbSystem>(
         playerRegistry_, ExperienceOrbSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     fishing_ = std::make_unique<FishingSystem>(playerRegistry_, *orbs_,
@@ -580,8 +583,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                                       const std::array<double, 3>& origin) {
         static_cast<void>(maps_->explore(world, stack.components, request, origin));
     });
+    NaturalSpawningSystem::Hooks spawningHooks;
+    plugins::worldEventHooks::spawning(spawningHooks, eventSink_);
     spawning_ = std::make_unique<NaturalSpawningSystem>(
-        playerRegistry_, vanillaData_.biomeSpawns, chunkSimulation_, *spawnEquipment_, NaturalSpawningSystem::Hooks{},
+        playerRegistry_, vanillaData_.biomeSpawns, chunkSimulation_, *spawnEquipment_, std::move(spawningHooks),
         NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     // parity: the biome tags a spawner's rules ask, read once: `BiomeTagLoader` caches as it goes.
     auto spawnerBiomes = std::make_shared<std::map<std::string, std::set<std::string>, std::less<>>>();
@@ -703,6 +708,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             .blockTags = &vanillaData_.blockTags,
             .awardExperience = [this](world::LoadedWorld& world, double x, double y, double z,
                                       std::int32_t amount) { orbs_->award(world, x, y, z, amount); }});
+    RedstoneTickSystem::Hooks redstoneHooks;
+    plugins::worldEventHooks::redstone(redstoneHooks, eventSink_);
     redstone_ = std::make_unique<RedstoneTickSystem>(
         playerRegistry_, vanillaData_.recipes, *broadcaster_, chunkSimulation_,
         // parity: `BaseCommandBlock.performCommand`.
@@ -717,7 +724,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             static_cast<void>(dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line, successes));
             return successes;
         },
-        RedstoneTickSystem::Hooks{},
+        std::move(redstoneHooks),
         RedstoneTickSystem::Options{
             .nextSeed = [] { return scratchSeed(); },
             .jukeboxes = &vanillaData_.jukeboxSongs,
@@ -832,14 +839,24 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     statusEffects_ = std::make_unique<StatusEffectSystem>(
         playerRegistry_, [this](world::LoadedWorld& world, player::PlayerSession& player,
                                 const world::ActiveEffect& active) { raids_->tickOmens(world, player, active); });
+    EnvironmentTickSystem::Hooks environmentHooks;
+    plugins::worldEventHooks::environment(environmentHooks, eventSink_);
     environment_ = std::make_unique<EnvironmentTickSystem>(
         playerRegistry_, worldsConfig, model.allWorlds, chunkSimulation_, *broadcaster_, *wired_.environment,
-        *spawning_, EnvironmentTickSystem::Hooks{},
+        *spawning_, std::move(environmentHooks),
         EnvironmentTickSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                        .advancementTriggers = advancementTriggers_.get(),
                                        .difficulty = [this] { return difficulty_; }},
         logger_);
     MobActionSystem::Hooks mobHooks;
+    plugins::worldEventHooks::mobs(mobHooks, eventSink_, [this](const entity::ServerEntity& mob) {
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            if (world->state().entity(mob.entityId()) == &mob) {
+                return name;
+            }
+        }
+        return std::string{};
+    });
     withers_ = std::make_unique<WitherSystem>(
         playerRegistry_, *broadcaster_, *explosions_,
         WitherSystem::Options{.nextSeed = [] { return scratchSeed(); },

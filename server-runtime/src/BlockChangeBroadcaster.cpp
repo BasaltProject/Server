@@ -27,9 +27,11 @@
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -286,9 +288,20 @@ void BlockChangeBroadcaster::settleFrom(world::LoadedWorld& world, const std::ve
     }
 }
 
+namespace {
+
+/// parity: `Direction`, in the order a block event numbers it.
+[[nodiscard]] std::string_view directionName(const std::int32_t index) {
+    static constexpr std::array<std::string_view, 6> kNames{"down", "up", "north", "south", "west", "east"};
+    return index >= 0 && index < 6 ? kNames[static_cast<std::size_t>(index)] : std::string_view{};
+}
+
+} // namespace
+
 void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const world::BlockEvent& event,
                                             const std::vector<player::PlayerSession*>& watchers) {
-    if (hooks_.pistonAllowed && !hooks_.pistonAllowed(world, event.x, event.y, event.z)) {
+    if (hooks_.pistonAllowed &&
+        !hooks_.pistonAllowed(world, event.x, event.y, event.z, event.first == 0, directionName(event.second))) {
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
@@ -319,7 +332,7 @@ void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const wor
 std::vector<world::BlockChange>
 BlockChangeBroadcaster::finishPiston(world::LoadedWorld& world, const std::array<std::int32_t, 3>& position,
                                      const std::vector<player::PlayerSession*>& watchers) {
-    if (hooks_.pistonAllowed && !hooks_.pistonAllowed(world, position[0], position[1], position[2])) {
+    if (hooks_.pistonAllowed && !hooks_.pistonAllowed(world, position[0], position[1], position[2], false, {})) {
         return {};
     }
     std::vector<world::pistons::PlayerPosition> nearby;

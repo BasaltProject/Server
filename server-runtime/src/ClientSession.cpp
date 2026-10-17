@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventHooks.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -70,24 +71,37 @@ ClientSession::ClientSession(wire::io::TcpConnection connection, Options options
           },
           surfacesOf(*this)),
       menus_(std::make_unique<ContainerMenuController>(
-          *this, ContainerMenuController::Hooks{},
+          *this,
+          options_.events == nullptr ? ContainerMenuController::Hooks{}
+                                     : plugins::eventHooks::containerMenu(*this, *options_.events),
           ContainerMenuController::Options{
               .nextDouble = options_.nextDouble, .nextFloat = options_.nextFloat, .nextSeed = options_.nextSeed})),
       // Left unset, every broken block rolled its loot from seed zero.
       blockInteraction_(std::make_unique<BlockInteractionHandler>(
-          *this, BlockInteractionHandler::Hooks{},
+          *this,
+          options_.events == nullptr ? BlockInteractionHandler::Hooks{}
+                                     : plugins::eventHooks::blockInteraction(*this, *options_.events),
           BlockInteractionHandler::Options{
               .nextDouble = options_.nextDouble, .nextSeed = options_.nextSeed, .nextBool = options_.nextBool})),
       chunkStreamer_(std::make_unique<ChunkStreamer>(*this)),
       combat_(std::make_unique<CombatHandler>(
-          *this, CombatHandler::Hooks{},
+          *this,
+          options_.events == nullptr ? CombatHandler::Hooks{} : plugins::eventHooks::combat(*this, *options_.events),
           CombatHandler::Options{.nextDouble = options_.nextDouble, .nextSeed = options_.nextSeed})),
       entityTracker_(std::make_unique<EntityVisibilityTracker>(*this)),
       itemUseTimers_(std::make_unique<ItemUseTimers>(
-          *this, ItemUseTimers::Hooks{},
+          *this,
+          options_.events == nullptr ? ItemUseTimers::Hooks{} : plugins::eventHooks::itemUse(*this, *options_.events),
           ItemUseTimers::Options{.nextSeed = options_.nextSeed, .nextFloat = options_.nextFloat})),
-      lifecycle_(std::make_unique<PlayerLifecycle>(*this)), uiState_(std::make_unique<UiStateSync>(*this)),
-      trades_(std::make_unique<VillagerTradeController>(*this)) {}
+      lifecycle_(std::make_unique<PlayerLifecycle>(
+          *this, options_.events == nullptr ? PlayerLifecycle::Hooks{}
+                                            : plugins::eventHooks::lifecycle(*this, *options_.events))),
+      uiState_(std::make_unique<UiStateSync>(*this, options_.events == nullptr
+                                                        ? UiStateSync::Hooks{}
+                                                        : plugins::eventHooks::uiState(*this, *options_.events))),
+      trades_(std::make_unique<VillagerTradeController>(
+          *this, options_.events == nullptr ? VillagerTradeController::Hooks{}
+                                            : plugins::eventHooks::villagerTrade(*this, *options_.events))) {}
 
 ClientSession::~ClientSession() {
     streaming_.store(false);

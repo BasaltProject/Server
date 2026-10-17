@@ -29,7 +29,8 @@ namespace basalt::server::runtime {
 class BlockChangeBroadcaster {
 public:
     struct Hooks {
-        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
+        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           bool extending, std::string_view direction)>
             pistonAllowed;
 
         /// parity: `CarvedPumpkinBlock.trySpawnGolem`'s `addFreshEntity`.

@@ -1,17 +1,18 @@
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
 #include <basalt/server/runtime/world/BiomeZoomSeed.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
-#include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/server/runtime/world/WorldSpawnPoint.hpp>
 #include <basalt/server/world/LeafDistances.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
 #include <basalt/server/world/SimpleWorldGenerators.hpp>
 #include <basalt/server/world/climate/Sampler.hpp>
 #include <basalt/server/world/climate/SpawnFinder.hpp>
+#include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
@@ -337,6 +338,11 @@ void LoadedWorld::warmSpawnArea() {
     spawnOverride_ = std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(spawn_[0])),
                                                  static_cast<std::int32_t>(spawn_[1]),
                                                  static_cast<std::int32_t>(std::floor(spawn_[2]))};
+}
+
+const plugins::EventSink& LoadedWorld::events() const noexcept {
+    static const plugins::EventSink kSilent{[]() -> server::plugins::PluginEventBus* { return nullptr; }};
+    return events_ != nullptr ? *events_ : kSilent;
 }
 
 void LoadedWorld::stashEntities(const std::vector<Chunk*>& chunks) {

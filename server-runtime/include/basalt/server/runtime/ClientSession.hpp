@@ -94,6 +94,10 @@ namespace basalt::server::storage {
 class PlayerStore;
 }
 
+namespace basalt::server::runtime::plugins {
+class EventSink;
+}
+
 namespace basalt::server::runtime {
 
 class ChunkStreamer;
@@ -249,6 +253,8 @@ public:
         /// parity: `new ExperienceOrb`.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t value)> spawnOrb;
         PluginHooks plugins;
+        /// Where the session tells the plugins what happens; null in a test, and then nobody hears.
+        plugins::EventSink* events = nullptr;
     };
 
     ClientSession(wire::io::TcpConnection connection, Options options);

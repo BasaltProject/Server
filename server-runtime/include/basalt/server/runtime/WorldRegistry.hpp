@@ -26,6 +26,10 @@ class AdvancementTriggers;
 class RealLootTables;
 } // namespace basalt::server::runtime::world
 
+namespace basalt::server::runtime::plugins {
+class EventSink;
+}
+
 namespace basalt::server::runtime {
 
 /// Split out of `BasaltServer` so a world has one owner.
@@ -48,6 +52,8 @@ public:
         /// Null in a test, and then such a chest stays empty.
         world::RealLootTables* lootTables = nullptr;
         world::AdvancementTriggers* triggers = nullptr;
+        /// Null in a test, and then no plugin hears the world.
+        plugins::EventSink* events = nullptr;
     };
 
     WorldRegistry(const config::BasaltConfig& config, const config::WorldsConfig& worlds,
