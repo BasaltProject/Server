@@ -217,6 +217,10 @@ test-lanes = 1
 # "quiet" stops asking. Nothing is ever deleted on its own: /plugins purge does that.
 orphan-data = "warn"
 
+# The public keys, in hex, whose signature lets a plugin's compiled Lua (.luac) load. A package with
+# bytecode and no signature from one of these is refused, because bytecode is not checked the way source is.
+trusted-keys = []
+
 # What each plugin may reach beyond its own sandbox: "packets" sees everyone's chat,
 # "network" talks past the client, "commands" runs as the console. A plugin that asks for
 # one and is not listed here loads without it and says so. Entries go below the header.

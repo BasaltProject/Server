@@ -261,18 +261,38 @@ std::optional<std::string> PluginHost::interruptIfStuck(std::int64_t limitMillis
 void PluginHost::interruptAll() { watchdog_.interruptAll(plugins_); }
 
 std::unique_ptr<wire::lua::LuaSandbox> PluginHost::sandboxFor(LoadedPlugin& plugin, std::int32_t lane) {
-    return wire::lua::LuaSandbox::create(
+    auto sandbox = wire::lua::LuaSandbox::create(
         plugin.manifest.id, limits_, seedFor(plugin.manifest.id, lane),
         [this, &plugin](std::string_view name) { return moduleSource(plugin, name); },
         [&plugin](std::string_view line) { plugin.log.info([&line] { return std::string{line}; }); });
+    if (sandbox != nullptr) {
+        sandbox->allowBytecode(plugin.bytecodeVerified);
+    }
+    return sandbox;
 }
 
 bool PluginHost::start(const wire::plugins::PluginManifest& manifest,
                        const std::shared_ptr<wire::plugins::PluginPackage>& pkg) {
     wire::common::Logger log{"plugin/" + manifest.id};
-    const std::optional<std::string> source = pkg->readText(manifest.main);
-    const bool library = !source.has_value() && !manifest.exports.modules.empty();
-    if (!source.has_value() && !library) {
+    bool verified = false;
+    if (wire::plugins::signature::hasBytecode(*pkg)) {
+        const auto signer = wire::plugins::signature::verify(*pkg, trustedKeys_);
+        if (!signer.has_value()) {
+            log.error([&manifest, &signer] { return manifest.id + " was refused: " + signer.error(); });
+            return false;
+        }
+        verified = true;
+    }
+    std::optional<std::string> source = pkg->readText(manifest.main);
+    std::optional<std::vector<std::uint8_t>> bytecode;
+    if (verified && manifest.main.ends_with(".lua")) {
+        bytecode = pkg->read(manifest.main + "c");
+        if (bytecode.has_value()) {
+            source.reset();
+        }
+    }
+    const bool library = !source.has_value() && !bytecode.has_value() && !manifest.exports.modules.empty();
+    if (!source.has_value() && !bytecode.has_value() && !library) {
         log.error([&manifest] {
             return manifest.id + " says its code is at " + manifest.main + " and there is nothing there";
         });
@@ -294,6 +314,7 @@ bool PluginHost::start(const wire::plugins::PluginManifest& manifest,
         return false;
     }
     auto plugin = std::make_unique<LoadedPlugin>(manifest, pkg, std::move(log), *config, folderPath, *files);
+    plugin->bytecodeVerified = verified;
 
     const std::set<wire::plugins::PluginPermission> granted = allowed(manifest.id);
     std::vector<std::string> missing;
@@ -330,6 +351,8 @@ bool PluginHost::start(const wire::plugins::PluginManifest& manifest,
             return false;
         }
         prototype = std::move(*compiled);
+    } else if (bytecode.has_value()) {
+        prototype = wire::lua::LuaChunk{.chunkName = chunkName, .bytecode = std::move(*bytecode)};
     }
 
     LoadedPlugin& loaded = *plugin;
@@ -396,6 +419,11 @@ std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& 
     const std::optional<std::string> own = wire::plugins::packageLayout::moduleFile(requested);
     if (!own.has_value()) {
         return std::nullopt;
+    }
+    if (plugin.bytecodeVerified) {
+        if (std::optional<std::vector<std::uint8_t>> compiled = plugin.pkg->read(*own + "c"); compiled.has_value()) {
+            return compiled;
+        }
     }
     if (std::optional<std::vector<std::uint8_t>> found = plugin.pkg->read(*own); found.has_value()) {
         return found;

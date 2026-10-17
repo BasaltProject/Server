@@ -23,6 +23,7 @@
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/wire/auth/MojangSessionService.hpp>
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
+#include <basalt/wire/plugins/PluginSignature.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <cstdint>
@@ -497,6 +498,18 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     });
     plugins_->setTimings(
         [this](const std::string& pluginId, std::int64_t nanos) { timings_.of("plugin." + pluginId).record(nanos); });
+    std::vector<wire::plugins::signature::PublicKey> trustedKeys;
+    for (const std::string& hex : config_->pluginTrustedKeys) {
+        const auto bytes = wire::plugins::signature::fromHex(hex, 32);
+        if (!bytes.has_value()) {
+            logger_.warn([&hex] { return "plugins.trusted-keys has '" + hex + "', which is not a 64 digit hex key"; });
+            continue;
+        }
+        wire::plugins::signature::PublicKey key{};
+        std::copy(bytes->begin(), bytes->end(), key.begin());
+        trustedKeys.push_back(key);
+    }
+    plugins_->setTrustedKeys(std::move(trustedKeys));
     plugins_->setAllowed([this](const std::string& id) {
         std::set<wire::plugins::PluginPermission> granted;
         const auto found = config_->pluginAllowances.find(id);
