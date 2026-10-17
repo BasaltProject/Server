@@ -7,8 +7,7 @@
 
 namespace basalt::server::runtime::world::savedData {
 
-/// The `data` of `<root>/<name>.nbt`, else that of the gzipped file a vanilla world copied in keeps it in, brought up
-/// to date. `dimension` is the path of the dimension a per-dimension file such as raids belongs to, like `overworld`.
+/// The `data` of `<name>.nbt`, else of the vanilla file a copied world keeps it in; `dimension` homes per-dimension files.
 [[nodiscard]] std::optional<wire::nbt::NbtCompound> read(std::string_view worldRoot, std::string_view name,
                                                          std::string_view dimension = {});
 

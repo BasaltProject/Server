@@ -263,8 +263,7 @@ void putUuid(wire::nbt::NbtCompound& tag, std::string_view key, const std::optio
            (static_cast<std::int64_t>(y) & 0xfff);
 }
 
-/// parity: `VibrationSystem.Ticker.trySelectAndScheduleVibration` and `tryReloadVibrationParticle`.
-/// Returns whether a player within range received the particle.
+/// parity: `VibrationSystem.Ticker.trySelectAndScheduleVibration`; whether a player in range got the particle.
 [[nodiscard]] bool particle(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ,
                             const Noise& noise, std::int32_t travelTicks, double alpha) {
     const WorldState::VibrationParticleSender sender = world.vibrationParticleSender();

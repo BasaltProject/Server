@@ -396,8 +396,7 @@ Chunk& WorldState::installLocked(Chunk chunk) {
         if (!installed.loadedComplete()) {
             server::world::terrain::decoration::tree::leafDistances::settle(installed, worldBlockAt);
         }
-        // All eight: a diagonal neighbour's leaves are within six blocks of this chunk's logs too, and
-        // once the whole 3x3 is in every chunk has been measured against its final neighbourhood.
+        // All eight: a diagonal neighbour's leaves are within six blocks of this chunk's logs too.
         for (std::int32_t dx = -1; dx <= 1; ++dx) {
             for (std::int32_t dz = -1; dz <= 1; ++dz) {
                 if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz);
@@ -504,8 +503,7 @@ void WorldState::installLater(Chunk chunk, std::function<void()> installed) {
 }
 
 void WorldState::installPass(sched::Owner* target) {
-    // Settling a chunk's leaves reads its neighbours' blocks and costs milliseconds: a tick that took every chunk
-    // waiting for it would starve whatever else the owner has queued, a player's join included.
+    // Settling leaves costs milliseconds a chunk: taking every waiting chunk in one tick starves the owner's queue.
     constexpr std::chrono::milliseconds kBudget{8};
     const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
     while (true) {

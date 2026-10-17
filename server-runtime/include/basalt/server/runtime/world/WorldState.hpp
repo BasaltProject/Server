@@ -382,8 +382,7 @@ private:
         std::function<void()> installed;
     };
 
-    /// Installs generated chunks until the tick's share of time is spent, and asks the owner for another turn if any
-    /// wait.
+    /// Installs generated chunks until the tick's time budget is spent, then asks the owner for another turn.
     void installPass(sched::Owner* target);
 
     std::mutex installMutex_;
