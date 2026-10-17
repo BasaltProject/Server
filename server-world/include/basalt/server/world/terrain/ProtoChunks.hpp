@@ -47,8 +47,7 @@ public:
 
     void demand(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t priority);
 
-    /// parity: `ChunkMap.FORCED_TICKET_LEVEL`, the chunk and `fullRadius` rings full, decorated out to
-    /// `decorateRadius`.
+    /// parity: `ChunkMap.FORCED_TICKET_LEVEL`: `fullRadius` rings full, decorated out to `decorateRadius`.
     void demandArea(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t fullRadius, std::int32_t decorateRadius,
                     std::int32_t priority);
 
