@@ -30,7 +30,7 @@ using wire::nbt::NbtTag;
 }
 
 [[nodiscard]] std::optional<NbtCompound> saved(const std::string& worldRoot, std::string_view name,
-                                                   std::string_view dimension = {}) {
+                                               std::string_view dimension = {}) {
     return world::savedData::read(worldRoot, name, dimension);
 }
 
@@ -89,6 +89,19 @@ std::optional<WorldMetadata> WorldMetadata::fromVanilla(const std::string& world
         metadata.thundering = level->getBoolean("thundering");
         metadata.thunderTime = level->getInt("thunderTime");
         metadata.clearWeatherTime = level->getInt("clearWeatherTime");
+    }
+    if (std::optional<NbtCompound> fight = saved(worldRoot, "ender_dragon_fight", "the_end"); fight.has_value()) {
+        metadata.dragonFight = std::move(*fight);
+    } else if (const NbtCompound* old = level == nullptr ? nullptr : level->getCompound("DragonFight");
+               old != nullptr) {
+        metadata.dragonFight = metamorph::datafix::dragonFightOfLegacy(*old);
+    }
+    if (const std::optional<NbtCompound> trader = saved(worldRoot, "wandering_trader"); trader.has_value()) {
+        metadata.wanderingTraderSpawnDelay = trader->getInt("spawn_delay", 24000);
+        metadata.wanderingTraderSpawnChance = trader->getInt("spawn_chance", 25);
+    } else if (level != nullptr) {
+        metadata.wanderingTraderSpawnDelay = level->getInt("WanderingTraderSpawnDelay", 24000);
+        metadata.wanderingTraderSpawnChance = level->getInt("WanderingTraderSpawnChance", 25);
     }
     if (std::optional<NbtCompound> border = saved(worldRoot, "world_border", "overworld"); border.has_value()) {
         metadata.worldBorder = std::move(*border);
