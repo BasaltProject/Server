@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/ScoreCommands.hpp>
@@ -29,6 +30,19 @@ using wire::text::Component;
     const Parsed<world::LoadedWorld*> world = context.world();
     if (!world.has_value()) {
         return std::unexpected{world.error()};
+    }
+    namespace events = server::plugins::pluginEventTypes;
+    const std::string before = (*world)->gameRules().serialized(rule);
+    const server::plugins::PluginEvent* change = server::plugins::emit(
+        context.environment().pluginEvents(), &events::worldGameRuleChange(), [&](server::plugins::PluginEvent& event) {
+            event.set("world", (*world)->name());
+            event.set("rule", std::string{rule.id});
+            event.set("value", value);
+            event.set("from_value", before);
+            event.set("player_name", context.source().name());
+        });
+    if (change != nullptr && change->cancelled()) {
+        return commandResult(before);
     }
     (*world)->gameRules().set(rule, value);
     context.success(Component::translatable("commands.gamerule.set",

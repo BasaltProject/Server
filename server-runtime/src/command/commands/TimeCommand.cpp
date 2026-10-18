@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/TimeCommand.hpp>
@@ -56,10 +57,26 @@ struct Clock {
     return Clock{.world = *world, .name = name};
 }
 
+/// False when a listener cancelled the change of the clock.
+[[nodiscard]] bool timeAllowed(const CommandContext& context, const Clock& clock, std::int64_t to, const char* cause) {
+    namespace events = server::plugins::pluginEventTypes;
+    const server::plugins::PluginEvent* change = server::plugins::emit(
+        context.environment().pluginEvents(), &events::worldTimeSkip(), [&](server::plugins::PluginEvent& event) {
+            event.set("world", clock.name);
+            event.set("time", to);
+            event.set("from_time", clock.world->clock().totalTicks());
+            event.set("cause", std::string{cause});
+        });
+    return change == nullptr || !change->cancelled();
+}
+
 [[nodiscard]] Parsed<std::int32_t> setAbsolute(const CommandContext& context, std::int64_t ticks, bool named) {
     const std::expected<Clock, CommandSyntaxError> clock = clockOf(context, named);
     if (!clock.has_value()) {
         return std::unexpected{clock.error()};
+    }
+    if (!timeAllowed(context, *clock, ticks, "command")) {
+        return wrap(clock->world->clock().totalTicks());
     }
     clock->world->clock().setTotalTicks(ticks);
     context.environment().syncTime(*clock->world);
@@ -99,7 +116,11 @@ struct Clock {
         return std::unexpected{clock.error()};
     }
     const auto* ticks = context.get<std::int32_t>("time");
-    clock->world->clock().addTicks(ticks == nullptr ? 0 : *ticks);
+    const std::int32_t added = ticks == nullptr ? 0 : *ticks;
+    if (!timeAllowed(context, *clock, clock->world->clock().totalTicks() + added, "command")) {
+        return wrap(clock->world->clock().totalTicks());
+    }
+    clock->world->clock().addTicks(added);
     context.environment().syncTime(*clock->world);
     context.success(Component::translatable("commands.time.set.absolute",
                                             {Component::text(clock->name),

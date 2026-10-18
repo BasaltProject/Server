@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/runtime/chat/ChatBroadcast.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/Coordinates.hpp>
@@ -136,6 +137,18 @@ void DifficultyCommand::build(const CommandNodeBuilder& root) const {
                 if (sameName((*world)->difficulty(), name)) {
                     return std::unexpected{CommandSyntaxError{
                         .component = Component::translatable("commands.difficulty.failure", {Component::text(name)})}};
+                }
+                namespace events = server::plugins::pluginEventTypes;
+                const server::plugins::PluginEvent* change =
+                    server::plugins::emit(context.environment().pluginEvents(), &events::worldDifficultyChange(),
+                                          [&](server::plugins::PluginEvent& event) {
+                                              event.set("world", (*world)->name());
+                                              event.set("difficulty", name);
+                                              event.set("from_difficulty", (*world)->difficulty());
+                                              event.set("player_name", context.source().name());
+                                          });
+                if (change != nullptr && change->cancelled()) {
+                    return static_cast<std::int32_t>(difficultyOrdinal((*world)->difficulty()));
                 }
                 (*world)->setDifficulty(name);
                 const wire::protocol::play::ChangeDifficultyPacket packet{
