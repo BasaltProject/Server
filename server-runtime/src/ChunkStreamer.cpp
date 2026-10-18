@@ -313,7 +313,12 @@ std::vector<std::pair<std::int32_t, std::int32_t>> ChunkStreamer::sentChunks() c
 
 void ChunkStreamer::overrideViewDistance(const std::optional<std::int32_t> distance) {
     viewOverride_ = distance;
-    const std::int32_t radius = distance.value_or(viewRadius_);
+    if (const world::LoadedWorld* current = owner_->currentWorld(); distance.has_value() && current != nullptr) {
+        // The unload sweep keeps the view distance plus its margin around a player, so a wider view would be cut off.
+        viewOverride_ =
+            std::min(*distance, current->settings().viewDistance + current->settings().rules.tuning.unloadMarginChunks);
+    }
+    const std::int32_t radius = viewOverride_.value_or(viewRadius_);
     owner_->sendCompressed(wire::protocol::play::SetChunkCacheRadiusPacket::kId,
                            [radius](wire::io::ByteBuffer& buffer) {
                                wire::protocol::play::SetChunkCacheRadiusPacket{.radius = radius}.write(buffer);
