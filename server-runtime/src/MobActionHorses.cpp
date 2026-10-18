@@ -36,6 +36,9 @@ void MobActionSystem::tameHorse(ServerEntity& horse, std::int32_t playerId) {
         if (player->entityId() != playerId) {
             continue;
         }
+        if (hooks_.tameAllowed && !hooks_.tameAllowed(*player, horse)) {
+            return;
+        }
         horses::tame(horse, player->uuid());
         if (options_.advancementTriggers != nullptr) {
             options_.advancementTriggers->fire(
