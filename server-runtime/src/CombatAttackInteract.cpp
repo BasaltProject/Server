@@ -409,8 +409,9 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     // parity: `Animal.mobInteract` feeds a grown one into love and a calf into growing faster.
     const std::optional<world::TriggerItem> used = world::triggerFacts::itemOf(held);
     const world::LoadedWorld* herd = owner_->currentWorld();
-    const bool waiting = herd != nullptr && herd->state().gameplay().mechanics.animalBreedingCooldownSeconds > 0 &&
-                         world::breedingCooldowns::active(session->uuid().toString(), entity->type(), herd->gameTime());
+    const bool waiting =
+        herd != nullptr && herd->state().gameplay().mechanics.animalBreedingCooldownSeconds > 0 &&
+        world::breedingCooldowns::active(herd->name(), session->uuid().toString(), entity->type(), herd->gameTime());
     if (entity::breeding::canFallInLove(*entity) && !waiting) {
         entity::breeding::feed(*entity, session->uuid().toString());
     } else if (entity::breeding::canAgeUp(*entity)) {

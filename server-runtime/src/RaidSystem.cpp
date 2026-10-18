@@ -322,7 +322,7 @@ Raid* RaidSystem::createOrExtendRaid(world::LoadedWorld& world, PlayerSession& p
     static std::unordered_map<std::string, std::int64_t> cooldownEnds;
     static std::mutex cooldownLock;
     const std::int32_t cooldownSeconds = world.state().gameplay().mechanics.raidCooldownSeconds;
-    const std::string cooldownKey = player.uuid().toString();
+    const std::string cooldownKey = world.name() + "/" + player.uuid().toString();
     if (cooldownSeconds > 0) {
         const std::scoped_lock guard{cooldownLock};
         const auto waiting = cooldownEnds.find(cooldownKey);

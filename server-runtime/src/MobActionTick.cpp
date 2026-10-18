@@ -672,7 +672,7 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
         hooks_.bredAnimals(*breeder, animal.type(), partner.type(), childType);
     }
     if (breeder.has_value()) {
-        world::breedingCooldowns::record(*breeder, animal.type(), world.gameTime(),
+        world::breedingCooldowns::record(world.name(), *breeder, animal.type(), world.gameTime(),
                                          world.state().gameplay().mechanics.animalBreedingCooldownSeconds);
     }
     entity::breeding::afterBreeding(animal, partner);
