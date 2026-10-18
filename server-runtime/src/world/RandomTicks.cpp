@@ -122,7 +122,10 @@ constexpr std::int32_t kFarmlandReach = 1;
     if (before.empty() || after.empty()) {
         return false;
     }
-    const bool taken = before.ends_with("ice") || before.ends_with("snow") || before == "fire" || after == "air";
+    // parity: `SpreadingSnowyDirtBlock.randomTick` turns a covered grass block or mycelium back to dirt.
+    const bool dies = (before == "grass_block" || before == "mycelium") && after == "dirt";
+    const bool taken =
+        before.ends_with("ice") || before.ends_with("snow") || before == "fire" || after == "air" || dies;
     return before != after && taken;
 }
 
@@ -130,7 +133,7 @@ void set(const randomTicks::Context& context, std::int32_t x, std::int32_t y, st
          std::vector<BlockChange>& changes) {
     const std::int32_t from = stateAt(context.world, x, y, z);
     const std::string_view cause = stateId == airState() || isFading(from, stateId) ? "fade" : "grow";
-    if (context.mayChange && !context.mayChange(x, y, z, from, stateId, cause)) {
+    if (context.mayChange && !context.mayChange(context.worldName, x, y, z, from, stateId, cause)) {
         return;
     }
     if (!context.world.setBlockState(x, y, z, stateId)) {
