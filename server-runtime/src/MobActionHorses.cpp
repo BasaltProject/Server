@@ -122,6 +122,14 @@ void MobActionSystem::tickHorse(world::LoadedWorld& world, ServerEntity& horse, 
     constexpr std::int32_t kGrazeTicks = 50;
     constexpr std::int32_t kMouthTicks = 30;
     horses::HorseState& state = horses::stateOf(horse);
+    // parity: `AbstractHorse.tickRidden` forgets the gallop once the rider stops pushing forward.
+    bool pushing = false;
+    for (const PlayerSession* rider : watchersOf(world)) {
+        pushing = pushing || (rider->vehicleId == horse.entityId() && rider->inputForward);
+    }
+    if (!pushing) {
+        state.gallopSoundCounter = 0;
+    }
     // parity: `moveTail`'s roll, which only the client draws.
     static_cast<void>(random.nextInt(kTailOdds));
     if (horse.health > 0.0) {

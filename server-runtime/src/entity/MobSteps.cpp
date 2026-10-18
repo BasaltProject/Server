@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
+#include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/MobSteps.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -72,7 +73,7 @@ constexpr std::array kSilentSteps{
            sound.stepSound == "block.bamboo_wood.step";
 }
 
-[[nodiscard]] std::optional<Sound> horseStep(const ServerEntity& mob, std::int32_t stateId, std::int32_t above) {
+[[nodiscard]] std::optional<Sound> horseStep(ServerEntity& mob, std::int32_t stateId, std::int32_t above) {
     // parity: `AbstractHorse.playStepSound`.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block != nullptr && (block->path() == "water" || block->path() == "lava")) {
@@ -82,6 +83,17 @@ constexpr std::array kSilentSteps{
     const registry::BlockSoundTypeEntry& sound =
         registry::blockSounds::of(over != nullptr && over->path() == "snow" ? above : stateId);
     const float volume = sound.volume * 0.15F;
+    // parity: a ridden horse that can gallop walks five steps, then gallops on every third.
+    if (!mob.passengerIds.empty() && !horses::isChested(mob.type())) {
+        const std::int32_t counter = ++horses::stateOf(mob).gallopSoundCounter;
+        if (counter > 5 && counter % 3 == 0) {
+            return Sound{.name = "entity.horse.gallop", .volume = volume, .pitch = sound.pitch};
+        }
+        if (counter <= 5) {
+            return Sound{.name = "entity.horse.step_wood", .volume = volume, .pitch = sound.pitch};
+        }
+        return Sound{};
+    }
     if (woodSounding(sound)) {
         return Sound{.name = "entity.horse.step_wood", .volume = volume, .pitch = sound.pitch};
     }
@@ -104,7 +116,7 @@ Emission emissionOf(const wire::common::Identifier& type) {
     return Emission::All;
 }
 
-std::optional<Sound> ownStep(const ServerEntity& mob, std::int32_t stateId, std::int32_t above, bool inLava,
+std::optional<Sound> ownStep(ServerEntity& mob, std::int32_t stateId, std::int32_t above, bool inLava,
                              const Tagged& tagged) {
     const std::string_view path = mob.type().path();
     if (std::ranges::find(kSilentSteps, path) != kSilentSteps.end()) {

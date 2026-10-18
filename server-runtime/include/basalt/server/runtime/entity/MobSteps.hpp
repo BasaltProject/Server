@@ -26,8 +26,8 @@ struct Sound {
 
 using Tagged = std::function<bool(std::string_view tag, std::int32_t stateId)>;
 
-[[nodiscard]] std::optional<Sound> ownStep(const ServerEntity& mob, std::int32_t stateId, std::int32_t above,
-                                           bool inLava, const Tagged& tagged);
+[[nodiscard]] std::optional<Sound> ownStep(ServerEntity& mob, std::int32_t stateId, std::int32_t above, bool inLava,
+                                           const Tagged& tagged);
 
 [[nodiscard]] Sound blockStep(std::int32_t stateId);
 
