@@ -122,6 +122,12 @@ const PluginEventType& playerLevelChange() {
     return type;
 }
 
+const PluginEventType& playerCustomClick() {
+    static const PluginEventType type{
+        "player.custom_click", false, {"player_name", "player_uuid", "world", "id", "payload"}};
+    return type;
+}
+
 const PluginEventType& playerSignChange() {
     static const PluginEventType type{
         "player.sign_change",
@@ -469,7 +475,8 @@ const std::vector<const PluginEventType*>& all() {
                                                            &playerPortal(),
                                                            &raidFinish(),
                                                            &entityCombust(),
-                                                           &blockFade()};
+                                                           &blockFade(),
+                                                           &playerCustomClick()};
     return every;
 }
 } // namespace basalt::server::plugins::pluginEventTypes

@@ -49,7 +49,7 @@ namespace {
 
 TEST_CASE("the table of events is the frozen kotlin's table") {
     const std::vector<const PluginEventType*>& all = pluginEventTypes::all();
-    CHECK(all.size() == 70);
+    CHECK(all.size() == 71);
 
     std::set<std::string> names;
     std::string joined;
@@ -60,8 +60,8 @@ TEST_CASE("the table of events is the frozen kotlin's table") {
         }
         joined += describe(*type);
     }
-    CHECK(names.size() == 70);
-    CHECK(checksumOf(joined) == 4825059672451943845LL);
+    CHECK(names.size() == 71);
+    CHECK(checksumOf(joined) == -7779854544796072303LL);
 
     CHECK(describe(*all[0]) == "player.join|false|player_name,player_uuid,world|");
     CHECK(describe(*all[1]) == "player.quit|false|player_name,player_uuid,world|");
