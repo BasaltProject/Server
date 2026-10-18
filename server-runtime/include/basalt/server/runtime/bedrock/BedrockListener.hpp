@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/bedrock/BedrockCarry.hpp>
 #include <basalt/server/runtime/world/Books.hpp>
 #include <basalt/wire/bedrock/BedrockConnection.hpp>
 #include <basalt/wire/bedrock/BedrockGate.hpp>
@@ -14,10 +15,12 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 namespace basalt::server::runtime::bedrock {
 
@@ -167,6 +170,10 @@ public:
         Player() = default;
     };
 
+    using Channel = bedrock::Channel;
+    using Identity = bedrock::Identity;
+    using Carried = bedrock::Carried;
+
     struct Spawn {
         double x = 0.0;
         double y = 64.0;
@@ -192,6 +199,9 @@ public:
 
     [[nodiscard]] bool start();
 
+    /// Null when the listener is not running or no longer lets players in.
+    [[nodiscard]] std::shared_ptr<Carried> carry(const Identity& who, std::unique_ptr<Channel> channel);
+
     void closeDoor();
 
     void stop();
@@ -214,6 +224,8 @@ private:
     void onMessage(wire::bedrock::RakSession& session, std::span<const std::uint8_t> payload);
     void onDisconnect(wire::bedrock::RakSession& session);
     void onReady(Session& session);
+    void onGamePacket(Session& entry, wire::bedrock::BedrockPacket packet, wire::io::ByteBuffer& body);
+    void serveCarried();
     void deliverMail(Session& session);
     [[nodiscard]] std::string advertisement() const;
 
@@ -225,6 +237,8 @@ private:
     std::shared_ptr<const wire::bedrock::EcKeyPair> keys_;
     std::unique_ptr<wire::bedrock::RakServer> server_;
     std::unordered_map<wire::io::UdpEndpoint, std::unique_ptr<Session>> sessions_;
+    std::mutex carriedLock_;
+    std::vector<std::shared_ptr<Session>> carried_;
     std::atomic<bool> running_{false};
     std::atomic<bool> accepting_{true};
     std::shared_ptr<Skins> skins_ = std::make_shared<Skins>();

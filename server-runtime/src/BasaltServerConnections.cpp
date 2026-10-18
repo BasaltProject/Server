@@ -166,6 +166,9 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     };
     options.plugins = pluginHooks();
     options.events = &eventSink_;
+    options.carryBedrock = [this](const bedrock::Identity& who, std::unique_ptr<bedrock::Channel> channel) {
+        return bedrockListener_ == nullptr ? nullptr : bedrockListener_->carry(who, std::move(channel));
+    };
 
     // On the heap: the tick loop may hold a departed session, and its callbacks reach back into this connection.
     const std::shared_ptr<ClientSession> session =
