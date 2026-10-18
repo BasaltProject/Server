@@ -99,6 +99,8 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
         const std::optional<storage::StoredItemStack>* stack = nullptr;
         if (id == kMainhand) {
             stack = &player.inventory.heldItem();
+        } else if (constexpr std::int32_t kEnderStart = 200; id >= kEnderStart && id < kEnderStart + 27) {
+            stack = &player.enderChest[static_cast<std::size_t>(id - kEnderStart)];
         } else if (const std::optional<std::int32_t> slot = inventorySlotOf(id); slot.has_value()) {
             stack = &player.inventory.at(*slot);
         }
