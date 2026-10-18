@@ -195,15 +195,14 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
     if (chunks.empty()) {
         return;
     }
-    const world::randomTicks::Context context = randomContext(world);
-    random::RandomSource random = freshRandom();
-    std::vector<world::BlockChange> changes;
+    world::randomTicks::Context context = randomContext(world);
     if (!world.settings().rules.environment.disableIceAndSnow) {
-        changes = world::iceAndSnow::tick(world, chunks, speed, random);
+        context.precipitate = [&world](std::int32_t x, std::int32_t z, std::vector<world::BlockChange>& found) {
+            world::iceAndSnow::precipitate(world, x, z, found);
+        };
     }
-    for (world::BlockChange& change : randomTicks_.tick(context, chunks, speed, random)) {
-        changes.push_back(std::move(change));
-    }
+    random::RandomSource random = freshRandom();
+    std::vector<world::BlockChange> changes = randomTicks_.tick(context, chunks, speed, random);
     if (changes.empty()) {
         return;
     }
