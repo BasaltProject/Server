@@ -384,6 +384,30 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
         }
         world::vibrations::emit(world.state(), "step", player->x, player->y, player->z, world.gameTime(), source);
     }
+    // parity: `RedStoneOreBlock.stepOn` is `Block.stepOn`, which any entity on the ground fires.
+    for (const entity::ServerEntity* walker : world.state().entities()) {
+        if (walker->removed || !walker->onGround) {
+            continue;
+        }
+        const std::int64_t block =
+            pack(static_cast<std::int32_t>(std::floor(walker->x)), static_cast<std::int32_t>(std::floor(walker->y)),
+                 static_cast<std::int32_t>(std::floor(walker->z)));
+        const auto seen = lastFootstep_.find(walker->entityId());
+        if (seen != lastFootstep_.end() && seen->second == block) {
+            continue;
+        }
+        lastFootstep_[walker->entityId()] = block;
+        if (const std::optional<world::BlockChange> lit = world::miscGrowth::lightRedstoneOre(
+                world.state(), static_cast<std::int32_t>(std::floor(walker->x)),
+                world::pressurePlates::blockUnder(walker->y), static_cast<std::int32_t>(std::floor(walker->z)));
+            lit.has_value()) {
+            changes.push_back(*lit);
+        }
+    }
+    constexpr std::size_t kMaxRemembered = 4096;
+    if (lastFootstep_.size() > kMaxRemembered) {
+        lastFootstep_.clear();
+    }
     for (const world::BlockChange& change : changes) {
         broadcaster_->announceRedstone(world, watchers, change);
     }
