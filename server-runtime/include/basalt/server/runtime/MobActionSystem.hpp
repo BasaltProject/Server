@@ -273,6 +273,20 @@ public:
     void camelRidden(world::LoadedWorld& world, entity::ServerEntity& camel, const player::PlayerSession& rider);
 
     void tickParrot(world::LoadedWorld& world, entity::ServerEntity& parrot);
+    void flapParrot(world::LoadedWorld& world, entity::ServerEntity& parrot);
+
+    /// parity: `Parrot.flapSpeed`, `Entity.flyDist` and `Parrot.nextFlap`, with where the parrot was a tick ago.
+    struct ParrotFlap {
+        bool placed = false;
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        float flapSpeed = 0.0F;
+        float flyDist = 0.0F;
+        float nextFlap = 1.0F;
+    };
+
+    std::map<std::int32_t, ParrotFlap> parrotFlaps_;
 
     void tickPufferfish(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         entity::ServerEntity& fish, const std::vector<entity::ServerEntity*>& living);

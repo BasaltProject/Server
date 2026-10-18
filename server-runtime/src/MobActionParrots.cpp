@@ -82,7 +82,38 @@ bool MobActionSystem::imitateNearbyMobs(world::LoadedWorld& world, double x, dou
     return true;
 }
 
+void MobActionSystem::flapParrot(world::LoadedWorld& world, ServerEntity& parrot) {
+    constexpr std::size_t kMaxRemembered = 1024;
+    if (parrotFlaps_.size() > kMaxRemembered) {
+        parrotFlaps_.clear();
+    }
+    ParrotFlap& flap = parrotFlaps_[parrot.entityId()];
+    // parity: `Entity.applyMovementEmissionAndPlaySound`, a flap is measured in 0.6 of the distance moved.
+    if (flap.placed) {
+        const double dx = parrot.x - flap.x;
+        const double dy = parrot.y - flap.y;
+        const double dz = parrot.z - flap.z;
+        flap.flyDist += static_cast<float>(std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) * static_cast<double>(0.6F));
+    }
+    flap.placed = true;
+    flap.x = parrot.x;
+    flap.y = parrot.y;
+    flap.z = parrot.z;
+    // parity: `Parrot.calculateFlapping`.
+    flap.flapSpeed = std::clamp(flap.flapSpeed + ((parrot.onGround ? -1.0F : 4.0F) * 0.3F), 0.0F, 1.0F);
+    // parity: `Parrot.isFlapping` and `onFlap`.
+    if (flap.flyDist > flap.nextFlap) {
+        flap.nextFlap = flap.flyDist + (flap.flapSpeed / 2.0F);
+        if (!(parrot.sourceNbt.has_value() && silent(*parrot.sourceNbt))) {
+            random::RandomSource random = freshRandom();
+            soundAt(watchersOf(world), "entity.parrot.fly", SoundSource::Neutral, parrot.x, parrot.y, parrot.z, 0.15F,
+                    1.0F, random.nextLong());
+        }
+    }
+}
+
 void MobActionSystem::tickParrot(world::LoadedWorld& world, ServerEntity& parrot) {
+    flapParrot(world, parrot);
     // parity: `Parrot.aiStep` rolls the level's own random.
     // and not silenced.
     random::RandomSource random = freshRandom();
