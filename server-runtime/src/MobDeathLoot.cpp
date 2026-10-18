@@ -137,6 +137,18 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
     }
     world::RealLootTables* tables = lootTables_;
     tables->prepareAt(context, world, dead.x, dead.y, dead.z);
+    // parity: `SlotRanges` weapon slots of the mob itself; the model holds no other equipment.
+    context.slotsOf = [held = dead.heldItem, components = dead.heldItemComponents](std::string_view source,
+                                                                                   std::string_view slots) {
+        std::vector<::basalt::server::world::loot::ItemStack> found;
+        const bool weapon = slots == "weapon" || slots == "weapon.mainhand" || slots == "weapon.*";
+        if (source == "this" && weapon && held.has_value()) {
+            if (auto item = Identifier::parse(*held); item.has_value()) {
+                found.push_back({.item = std::move(*item), .count = 1, .components = components});
+            }
+        }
+        return found;
+    };
     // parity: `damage_source_properties` reads the source of the killing blow.
     if (!dead.lastDamageCause.empty() && options_.damageTypeTags != nullptr) {
         const Identifier type = world::triggerFacts::damageTypeOf(dead.lastDamageCause);
@@ -174,9 +186,9 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
         if (const PlayerSession* killer = players_->get(*dead.lastHurtByPlayer); killer != nullptr) {
             context.attackingPlayer = playerFacts(*killer);
             context.luck = killer->luck();
-            context.slotsOf = [killer](std::string_view source, std::string_view slots) {
+            context.slotsOf = [killer, mob = context.slotsOf](std::string_view source, std::string_view slots) {
                 const bool theirs = source == "attacker" || source == "killer" || source == "attacking_player";
-                return theirs ? slotsOfPlayer(*killer, slots) : std::vector<::basalt::server::world::loot::ItemStack>{};
+                return theirs ? slotsOfPlayer(*killer, slots) : mob(source, slots);
             };
         }
     }
