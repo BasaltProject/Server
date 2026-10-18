@@ -26,12 +26,11 @@ std::vector<PickedItem> pickupNearbyItems(
         if (!candidate.canBePickedUpByPlayer()) {
             continue;
         }
-        std::optional<world::DroppedItem> removed = world.removeItem(candidate.entityId);
-        if (!removed.has_value()) {
+        if (allowed && !allowed(session, candidate.item.toString(), candidate.count, candidate.entityId)) {
             continue;
         }
-        if (allowed && !allowed(session, removed->item.toString(), removed->count, removed->entityId)) {
-            static_cast<void>(world.restoreItem(*removed));
+        std::optional<world::DroppedItem> removed = world.removeItem(candidate.entityId);
+        if (!removed.has_value()) {
             continue;
         }
         const std::int32_t leftover = session.inventory.add(storage::StoredItemStack{
