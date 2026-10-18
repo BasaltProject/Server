@@ -270,6 +270,17 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
     }
 
     // parity: `ItemEntity.mergeWithNeighbours`.
+    std::set<Pair> denied;
+    if (mergeGate_ && mergeListened_ && mergeListened_()) {
+        const std::vector<std::pair<DroppedItem, DroppedItem>> pairs = mergeCandidates();
+        lock.unlock();
+        for (const auto& [into, from] : pairs) {
+            if (!mergeGate_(into, from)) {
+                denied.insert({into.entityId, from.entityId});
+            }
+        }
+        lock.lock();
+    }
     std::vector<std::int32_t> absorbed;
     for (std::size_t index = 0; index < droppedItems_.size(); ++index) {
         const DroppedItem& item = droppedItems_[index];
@@ -280,13 +291,37 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
         if (item.age % interval != 0) {
             continue;
         }
-        mergeWithNeighbours(index, despawned, absorbed, lock);
+        mergeWithNeighbours(index, despawned, absorbed, denied);
     }
     return despawned;
 }
 
+std::vector<std::pair<DroppedItem, DroppedItem>> DroppedItemPhysics::mergeCandidates() const {
+    std::vector<std::pair<DroppedItem, DroppedItem>> found;
+    for (std::size_t index = 0; index < droppedItems_.size(); ++index) {
+        const DroppedItem& item = droppedItems_[index];
+        const std::int32_t interval = item.crossedBlock ? kMergeMovingInterval : kMergeRestingInterval;
+        if (item.age % interval != 0 ||
+            item.count >= registry::itemStacking::maxStackSize(item.item, item.components)) {
+            continue;
+        }
+        for (std::size_t other = 0; other < droppedItems_.size(); ++other) {
+            const DroppedItem& candidate = droppedItems_[other];
+            if (other != index && candidate.item == item.item && candidate.count > 0 &&
+                sameComponents(candidate.components, item.components) &&
+                item.count + candidate.count <=
+                    registry::itemStacking::maxStackSize(candidate.item, candidate.components) &&
+                std::abs(candidate.x - item.x) <= mergeRange_ && std::abs(candidate.z - item.z) <= mergeRange_ &&
+                std::abs(candidate.y - item.y) <= kMergeHeight) {
+                found.emplace_back(item, candidate);
+            }
+        }
+    }
+    return found;
+}
+
 void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,
-                                             std::vector<std::int32_t>& absorbed, std::unique_lock<WorldMutex>& lock) {
+                                             std::vector<std::int32_t>& absorbed, const std::set<Pair>& denied) {
     const auto maxOf = [](const DroppedItem& item) {
         return registry::itemStacking::maxStackSize(item.item, item.components);
     };
@@ -294,7 +329,6 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
     if (droppedItems_[index].count >= maxOf(droppedItems_[index])) {
         return;
     }
-    std::pair<std::int32_t, std::int32_t> approved{-1, -1};
     for (std::size_t other = 0; other < droppedItems_.size();) {
         if (other == index) {
             ++other;
@@ -310,27 +344,8 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
             ++other;
             continue;
         }
-        if (mergeGate_ && approved != std::pair{item.entityId, candidate.entityId} && mergeListened_ &&
-            mergeListened_()) {
-            const DroppedItem into = item;
-            const DroppedItem from = candidate;
-            lock.unlock();
-            const bool allowed = mergeGate_(into, from);
-            lock.lock();
-            const auto intoAt = std::ranges::find_if(
-                droppedItems_, [&into](const DroppedItem& each) { return each.entityId == into.entityId; });
-            const auto fromAt = std::ranges::find_if(
-                droppedItems_, [&from](const DroppedItem& each) { return each.entityId == from.entityId; });
-            if (intoAt == droppedItems_.end() || fromAt == droppedItems_.end()) {
-                return;
-            }
-            index = static_cast<std::size_t>(intoAt - droppedItems_.begin());
-            other = static_cast<std::size_t>(fromAt - droppedItems_.begin());
-            if (!allowed) {
-                ++other;
-                continue;
-            }
-            approved = {into.entityId, from.entityId};
+        if (denied.contains({item.entityId, candidate.entityId})) {
+            ++other;
             continue;
         }
         const std::int32_t moved = std::min(std::min(maxOf(item), kMergeCap) - item.count, candidate.count);
