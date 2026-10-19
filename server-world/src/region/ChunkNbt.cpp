@@ -565,7 +565,8 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
         return std::unexpected(ChunkNbtError{std::format(
             "saved by a newer version of the game (data version {}, this build reads up to {})", saved, kDataVersion)});
     }
-    if (saved > 0 && saved < kDataVersion) {
+    // parity: `NbtUtils.getDataVersion`, a chunk saved before data versions existed counts as the oldest one.
+    if (saved < kDataVersion && (saved > 0 || tag.getCompound("Level") != nullptr)) {
         NbtCompound upgraded = tag;
         metamorph::datafix::upgrade(metamorph::datafix::Domain::Chunk, upgraded, saved,
                                     {.overworld = bounds.minY() == -64});
