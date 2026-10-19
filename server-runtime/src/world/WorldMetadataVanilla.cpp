@@ -1,4 +1,5 @@
 #include <basalt/metamorph/datafix/LevelData.hpp>
+#include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/SavedDataFiles.hpp>
 #include <basalt/server/runtime/world/WorldMetadata.hpp>
 #include <basalt/wire/io/Compression.hpp>
@@ -12,6 +13,7 @@ namespace basalt::server::runtime::world {
 namespace {
 
 using wire::nbt::NbtCompound;
+using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
 
 [[nodiscard]] std::optional<NbtCompound> readGzipped(const std::string& path) {
@@ -110,6 +112,23 @@ std::optional<WorldMetadata> WorldMetadata::fromVanilla(const std::string& world
         metadata.worldBorder = std::move(*border);
     } else if (level != nullptr && level->contains("BorderSize")) {
         metadata.worldBorder = metamorph::datafix::worldBorderOfLegacy(*level);
+    }
+    // parity: `ForcedChunkToTicketFix` and `ChunkTicketUnpackPosFix`, the forced chunks of 1.14 to 26.1 are `Forced`
+    // keys.
+    if (const std::optional<NbtCompound> tickets = saved(worldRoot, "chunk_tickets", "overworld");
+        tickets.has_value()) {
+        if (const NbtList* entries = tickets->getList("tickets"); entries != nullptr) {
+            for (const NbtTag& entry : *entries) {
+                const NbtCompound* ticket = entry.get<NbtCompound>();
+                const auto at = ticket == nullptr ? std::span<const std::int32_t>{} : ticket->getIntArray("chunk_pos");
+                if (ticket != nullptr && ticket->getString("type") == "minecraft:forced" && at.size() == 2) {
+                    metadata.forcedChunks.push_back(ChunkGenerationQueue::pack(at[0], at[1]));
+                }
+            }
+        }
+    } else if (const std::optional<NbtCompound> forced = saved(worldRoot, "chunks"); forced.has_value()) {
+        const std::span<const std::int64_t> keys = forced->getLongArray("Forced");
+        metadata.forcedChunks.assign(keys.begin(), keys.end());
     }
     if (const std::optional<NbtCompound> clocks = saved(worldRoot, "world_clocks"); clocks.has_value()) {
         if (const NbtCompound* overworld = clocks->getCompound("minecraft:overworld"); overworld != nullptr) {
