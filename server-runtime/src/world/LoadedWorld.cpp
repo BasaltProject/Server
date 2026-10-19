@@ -85,6 +85,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       difficulty_(metadata_.difficulty.value_or(settings_.difficulty)), difficultyLocked_(metadata_.difficultyLocked),
       defaultGamemode_(metadata_.defaultGamemode) {
     if (options.pipeline.terrain) {
+        terrainOf_ = options.pipeline.terrain;
         server::world::terrain::ProtoChunks::Hooks hooks = std::move(options.pipeline);
         hooks.load = [this](std::int32_t chunkX,
                             std::int32_t chunkZ) -> std::optional<server::world::terrain::ProtoChunks::Stored> {
@@ -92,6 +93,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
             if (!stored.has_value()) {
                 return std::nullopt;
             }
+            restoreBelowZero(*stored);
             const server::world::ChunkStage stage = stored->stage();
             return server::world::terrain::ProtoChunks::Stored{.chunk = std::move(*stored), .stage = stage};
         };
@@ -273,8 +275,35 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     return chunk;
 }
 
+void LoadedWorld::restoreBelowZero(Chunk& chunk) {
+    if (!chunk.needsRetrogen()) {
+        return;
+    }
+    // parity: `below_zero_retrogen`, which makes the layers under zero and keeps what the old chunk had above them.
+    const auto copyBelowZero = [&chunk](Chunk& made) {
+        const std::size_t belowZero = static_cast<std::size_t>(-chunk.verticalBounds().minSection());
+        for (std::size_t index = 0; index < belowZero && index < chunk.sectionCount(); ++index) {
+            chunk.section(index).setBlockStateIds(made.section(index).blockStateIds());
+            chunk.section(index).setBiomeIds(made.section(index).biomeIds());
+        }
+    };
+    if (terrainOf_) {
+        server::world::terrain::realTerrainGenerator::GeneratedTerrain terrain =
+            terrainOf_(chunk.chunkX(), chunk.chunkZ());
+        copyBelowZero(terrain.chunk());
+    } else {
+        Chunk made = generateChunk(chunk.chunkX(), chunk.chunkZ());
+        copyBelowZero(made);
+    }
+    chunk.setNeedsRetrogen(false);
+    chunk.invalidateHeightmaps();
+}
+
 std::optional<Chunk> LoadedWorld::loadOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     std::optional<Chunk> stored = regions_.loadChunk(chunkX, chunkZ);
+    if (stored.has_value()) {
+        restoreBelowZero(*stored);
+    }
     if (protoChunks_ != nullptr && (!stored.has_value() || stored->stage() != server::world::ChunkStage::Full)) {
         // A proto chunk on disk is the pipeline's to finish, and it reads it back itself.
         const auto started = std::chrono::steady_clock::now();
