@@ -1,7 +1,7 @@
 #pragma once
 
-#include <basalt/server/world/Chunk.hpp>
 #include <basalt/metamorph/datafix/DataFixer.hpp>
+#include <basalt/server/world/Chunk.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>

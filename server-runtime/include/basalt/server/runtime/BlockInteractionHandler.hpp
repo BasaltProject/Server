@@ -49,7 +49,8 @@ public:
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
                            const std::string& item)>
             interactAllowed;
-        std::function<bool(const player::PlayerSession& player, const std::string& item, std::int32_t count)> dropAllowed;
+        std::function<bool(const player::PlayerSession& player, const std::string& item, std::int32_t count)>
+            dropAllowed;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>
             digAllowed;
         std::function<bool(const player::PlayerSession& player, const std::string& item, std::int32_t amount,

@@ -1,8 +1,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/metamorph/region/LinearRegion.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/RegionStore.hpp>
-#include <basalt/metamorph/region/LinearRegion.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <doctest.h>
@@ -122,8 +122,8 @@ TEST_CASE("the timestamp a save was given is the one in the file") {
 
     const std::optional<std::vector<std::uint8_t>> bytes = fileIO::readBytes(store.regionPath(0, 0));
     REQUIRE(bytes.has_value());
-    const std::expected<basalt::metamorph::region::LinearRegion, basalt::metamorph::region::LinearError>
-        region = basalt::metamorph::region::LinearRegion::read(*bytes);
+    const std::expected<basalt::metamorph::region::LinearRegion, basalt::metamorph::region::LinearError> region =
+        basalt::metamorph::region::LinearRegion::read(*bytes);
     REQUIRE(region.has_value());
     CHECK(region->timestampAt(1, 2) == 1700000000);
 }

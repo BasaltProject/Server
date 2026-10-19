@@ -231,8 +231,7 @@ public:
         return block == nullptr ? std::nullopt : std::optional{block->toString()};
     }
 
-    [[nodiscard]] std::optional<std::string> blockState(std::int32_t x, std::int32_t y,
-                                                        std::int32_t z) const override {
+    [[nodiscard]] std::optional<std::string> blockState(std::int32_t x, std::int32_t y, std::int32_t z) const override {
         const std::optional<std::int32_t> stateId = world_->state().blockState(x, y, z);
         const Identifier* block = stateId.has_value() ? reg::blockStateDefinitions::blockOf(*stateId) : nullptr;
         if (block == nullptr) {
