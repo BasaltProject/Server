@@ -24,6 +24,10 @@
 #include <functional>
 #include <memory>
 
+namespace basalt::server::world::blending {
+class Blender;
+}
+
 namespace basalt::server::world::terrain {
 
 struct TerrainStructureGenerators {
@@ -73,12 +77,14 @@ private:
 /// parity: `NoiseBasedChunkGenerator`'s biomes.
 [[nodiscard]] GeneratedTerrain buildTerrain(const NoiseRouter& router,
                                             const surface::SurfaceRuleEnvironment& environment, Chunk chunk,
-                                            densityfunction::Sampler beardifier);
+                                            densityfunction::Sampler beardifier,
+                                            const blending::Blender* blender = nullptr);
 
 [[nodiscard]] GeneratedTerrain generateTerrain(const NoiseRouter& router,
                                                const surface::SurfaceRuleEnvironment& environment, std::int32_t chunkX,
                                                std::int32_t chunkZ, std::int64_t seed = 0,
-                                               const TerrainStructureGenerators& generators = {});
+                                               const TerrainStructureGenerators& generators = {},
+                                               const blending::Blender* blender = nullptr);
 
 void decorate(GeneratedTerrain& terrain, std::int64_t seed = 0, const NeighbourTerrain* neighbours = nullptr,
               const TerrainStructureGenerators& generators = {}, const structure::TemplateLoader& templates = nullptr);

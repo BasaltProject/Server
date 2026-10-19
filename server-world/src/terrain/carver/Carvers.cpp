@@ -529,7 +529,8 @@ const std::vector<std::shared_ptr<const WorldCarver>>& CarverRegistry::forBiome(
 }
 
 void carve(Chunk& chunk, std::int64_t seed, NoiseChunk& noiseChunk, const NoiseRouter& router, CarverRegistry& registry,
-           const CarverBiome& biomeAt, const TopMaterial& topMaterial) {
+           const CarverBiome& biomeAt, const TopMaterial& topMaterial,
+           const std::function<bool(std::int32_t, std::int32_t, std::int32_t)>* filter) {
     const std::int32_t minGenY = router.minY;
     const std::int32_t genDepth = router.height;
     CarvingMask mask{minGenY + 1, minGenY + genDepth - 1 - kProtectedBlocksOnTop};
@@ -575,6 +576,9 @@ void carve(Chunk& chunk, std::int64_t seed, NoiseChunk& noiseChunk, const NoiseR
             const std::int32_t worldZ = chunk.chunkZ() * 16 + localZ;
             bool hasGrass = false;
             for (std::int32_t worldY = topY; worldY >= bottomY; --worldY) {
+                if (filter != nullptr && *filter && !(*filter)(localX, worldY, localZ)) {
+                    continue;
+                }
                 const std::int32_t old = chunk.blockStateId(localX, worldY, localZ);
                 if (old == bedrock) {
                     continue;

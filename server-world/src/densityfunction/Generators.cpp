@@ -1,6 +1,7 @@
 #include "Nodes.hpp"
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/world/blending/Blender.hpp>
 #include <basalt/server/world/noise/JavaMath.hpp>
 #include <basalt/server/world/noise/Noise.hpp>
 
@@ -28,6 +29,36 @@ public:
 
 private:
     float value_;
+};
+
+/// parity: the `blend_alpha` and `blend_offset` samplers bound to the context's blender.
+class BlendFieldSampler final : public DensitySampler {
+public:
+    BlendFieldSampler(bool alpha) : alpha_(alpha) {}
+
+    [[nodiscard]] float sampleValue(SamplerContext& context, std::int32_t x, std::int32_t,
+                                    std::int32_t z) const override {
+        const blending::Blender* blender = context.blender();
+        if (blender == nullptr || blender->isEmpty()) {
+            return alpha_ ? 1.0F : 0.0F;
+        }
+        const blending::Blender::Output output = blender->blendOffsetAndFactor(x, z);
+        return alpha_ ? output.alpha : output.offset;
+    }
+
+    void sampleVolume(SamplerContext& context, DensityBuffer& output, const DensityVolume& volume) const override {
+        std::int32_t index = 0;
+        for (std::int32_t z = 0; z < volume.sizeZ; ++z) {
+            for (std::int32_t x = 0; x < volume.sizeX; ++x) {
+                for (std::int32_t y = 0; y < volume.sizeY; ++y) {
+                    output.set(index++, sampleValue(context, volume.blockX(x), volume.blockY(y), volume.blockZ(z)));
+                }
+            }
+        }
+    }
+
+private:
+    bool alpha_;
 };
 
 /// parity: the beardifier's `ContextBoundSampler`.
@@ -380,12 +411,11 @@ Interval Simple::range() const {
 }
 
 Sampler Simple::compile(CompileContext&) const {
-    // parity: there is no blending, so both blend fields take their fallback value.
     switch (type_) {
     case SimpleType::BlendAlpha:
-        return constantSampler(1.0F);
+        return std::make_shared<const BlendFieldSampler>(true);
     case SimpleType::BlendOffset:
-        return constantSampler(0.0F);
+        return std::make_shared<const BlendFieldSampler>(false);
     case SimpleType::Beardifier:
         return std::make_shared<const BeardifierSampler>();
     }

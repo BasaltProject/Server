@@ -10,6 +10,10 @@
 #include <unordered_map>
 #include <vector>
 
+namespace basalt::server::world::blending {
+class Blender;
+}
+
 namespace basalt::server::world::densityfunction {
 
 class SamplerContext;
@@ -39,6 +43,7 @@ public:
     struct Options {
         bool enableCaches = false;
         Sampler beardifier;
+        const blending::Blender* blender = nullptr;
     };
 
     explicit SamplerContext(Options options);
@@ -46,6 +51,9 @@ public:
     [[nodiscard]] ScopedBuffer acquire(std::int32_t size) { return ScopedBuffer{*this, size}; }
 
     [[nodiscard]] const DensitySampler* beardifier() const noexcept { return options_.beardifier.get(); }
+
+    /// parity: `Blender.CONTEXT_KEY`; null when the chunk has no old neighbours.
+    [[nodiscard]] const blending::Blender* blender() const noexcept { return options_.blender; }
 
     /// parity: `SamplerContext.sampleVolumeCached`.
     void sampleVolumeCached(std::int32_t cacheId, const DensitySampler& input, DensityBuffer& output,

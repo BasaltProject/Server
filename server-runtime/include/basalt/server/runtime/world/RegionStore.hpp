@@ -50,6 +50,10 @@ public:
 
     [[nodiscard]] std::optional<server::world::Chunk> loadChunk(std::int32_t chunkX, std::int32_t chunkZ);
 
+    enum class Age : std::uint8_t { Absent, Current, MaybeOld };
+
+    [[nodiscard]] Age ageOf(std::int32_t chunkX, std::int32_t chunkZ);
+
     /// Answers how many region files were rewritten: a region is recompressed whole however few of its chunks changed.
     std::size_t saveChunks(std::span<server::world::Chunk* const> chunks, std::int32_t timestamp);
 
@@ -74,6 +78,8 @@ private:
     [[nodiscard]] static std::int64_t key(std::int32_t regionX, std::int32_t regionZ);
     [[nodiscard]] static std::int32_t regionXOf(std::int64_t regionKey);
     [[nodiscard]] static std::int32_t regionZOf(std::int64_t regionKey);
+
+    [[nodiscard]] bool ensureLoaded(std::int32_t regionX, std::int32_t regionZ);
 
     [[nodiscard]] metamorph::region::LinearRegion* touch(std::int64_t regionKey);
 

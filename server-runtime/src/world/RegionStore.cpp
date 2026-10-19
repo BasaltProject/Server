@@ -1,3 +1,4 @@
+#include <basalt/metamorph/datafix/DataFixer.hpp>
 #include <basalt/metamorph/region/AnvilRegion.hpp>
 #include <basalt/server/runtime/world/RegionStore.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
@@ -7,6 +8,8 @@
 #include <chrono>
 #include <cstdint>
 #include <map>
+#include <span>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::runtime::world {
@@ -161,11 +164,28 @@ LinearRegion* RegionStore::region(std::int32_t regionX, std::int32_t regionZ) {
     return &store(regionKey, *std::move(read.region));
 }
 
-std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t chunkZ) {
-    const std::int32_t regionX = chunkX >> 5;
-    const std::int32_t regionZ = chunkZ >> 5;
-    const std::int64_t regionKey = key(regionX, regionZ);
+namespace {
 
+[[nodiscard]] std::int32_t peekDataVersion(std::span<const std::uint8_t> blob) {
+    const auto u16 = [&blob](std::size_t at) { return (blob[at] << 8) | blob[at + 1]; };
+    if (blob.size() < 5 || blob[0] != 10) {
+        return 0;
+    }
+    std::size_t at = 3 + static_cast<std::size_t>(u16(1));
+    constexpr std::string_view kName = "DataVersion";
+    if (blob.size() < at + 3 + kName.size() + 4 || blob[at] != 3 || u16(at + 1) != static_cast<int>(kName.size()) ||
+        std::string_view{reinterpret_cast<const char*>(blob.data()) + at + 3, kName.size()} != kName) {
+        return 0;
+    }
+    at += 3 + kName.size();
+    return static_cast<std::int32_t>((static_cast<std::uint32_t>(blob[at]) << 24) | (blob[at + 1] << 16) |
+                                     (blob[at + 2] << 8) | blob[at + 3]);
+}
+
+} // namespace
+
+bool RegionStore::ensureLoaded(std::int32_t regionX, std::int32_t regionZ) {
+    const std::int64_t regionKey = key(regionX, regionZ);
     bool missing = false;
     {
         const std::lock_guard<std::mutex> lock{mutex_};
@@ -183,12 +203,46 @@ std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t ch
                     });
                 }
             }
-            return std::nullopt;
+            return false;
         }
         const std::lock_guard<std::mutex> lock{mutex_};
         if (touch(regionKey) == nullptr) {
             store(regionKey, *std::move(read.region));
         }
+    }
+    return true;
+}
+
+RegionStore::Age RegionStore::ageOf(std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::int32_t regionX = chunkX >> 5;
+    const std::int32_t regionZ = chunkZ >> 5;
+    if (!ensureLoaded(regionX, regionZ)) {
+        return Age::Absent;
+    }
+    const std::lock_guard<std::mutex> lock{mutex_};
+    LinearRegion* held = touch(key(regionX, regionZ));
+    if (held == nullptr) {
+        return Age::Absent;
+    }
+    const std::span<const std::uint8_t> blob = held->chunkAt(chunkX & 31, chunkZ & 31);
+    if (blob.empty()) {
+        return Age::Absent;
+    }
+    // parity: `IOWorker.isOldChunk`, a chunk saved before the blending marker or carrying one.
+    constexpr std::string_view kMarker = "blending_data";
+    const auto text = std::string_view{reinterpret_cast<const char*>(blob.data()), blob.size()};
+    if (text.find(kMarker) != std::string_view::npos) {
+        return Age::MaybeOld;
+    }
+    return peekDataVersion(blob) < metamorph::datafix::kCurrentVersion ? Age::MaybeOld : Age::Current;
+}
+
+std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::int32_t regionX = chunkX >> 5;
+    const std::int32_t regionZ = chunkZ >> 5;
+    const std::int64_t regionKey = key(regionX, regionZ);
+    if (!ensureLoaded(regionX, regionZ)) {
+        return std::nullopt;
     }
 
     std::vector<std::uint8_t> chunkBytes;

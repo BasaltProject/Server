@@ -384,7 +384,10 @@ void ProtoChunks::runTask(Task& task) {
                 std::make_unique<realTerrainGenerator::GeneratedTerrain>(hooks_.adopt(std::move(task.stored->chunk)));
             task.made->chunk().setStage(task.stored->stage);
         } else if (task.kind == Task::Kind::Terrain) {
-            task.made = std::make_unique<realTerrainGenerator::GeneratedTerrain>(hooks_.terrain(chunkX, chunkZ));
+            const std::shared_ptr<const blending::Blender> blender =
+                hooks_.blender ? hooks_.blender(chunkX, chunkZ) : nullptr;
+            task.made =
+                std::make_unique<realTerrainGenerator::GeneratedTerrain>(hooks_.terrain(chunkX, chunkZ, blender.get()));
             task.made->chunk().setStage(ChunkStage::Terrain);
         }
         break;

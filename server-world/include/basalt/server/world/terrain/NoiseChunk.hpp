@@ -11,7 +11,11 @@
 
 namespace basalt::server::world {
 class Chunk;
+
+namespace blending {
+class Blender;
 }
+} // namespace basalt::server::world
 
 namespace basalt::server::world::terrain {
 
@@ -80,7 +84,7 @@ private:
 class NoiseChunk {
 public:
     NoiseChunk(const NoiseRouter& router, densityfunction::Sampler beardifier,
-               const densityfunction::DensityVolume& volume);
+               const densityfunction::DensityVolume& volume, const blending::Blender* blender = nullptr);
 
     [[nodiscard]] densityfunction::SamplerContext& samplers() noexcept { return samplers_; }
 

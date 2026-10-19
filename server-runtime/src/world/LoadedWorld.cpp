@@ -22,6 +22,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <future>
 #include <iterator>
@@ -97,6 +99,13 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
             const server::world::ChunkStage stage = stored->stage();
             return server::world::terrain::ProtoChunks::Stored{.chunk = std::move(*stored), .stage = stage};
         };
+        if (declaration_.dimension == config::WorldDimension::Overworld &&
+            declaration_.type != config::WorldType::Flat && declaration_.type != config::WorldType::Debug) {
+            oldTerrain_ = std::make_unique<OldTerrainBlending>(regions_);
+            hooks.blender = [this](std::int32_t chunkX, std::int32_t chunkZ) {
+                return oldTerrain_->blenderFor(chunkX, chunkZ);
+            };
+        }
         hooks.finish = [this](Chunk& chunk, bool generated) {
             if (generated && spawnMobs_) {
                 spawnMobs_(chunk, gameTime_, difficulty_);
@@ -303,8 +312,10 @@ void LoadedWorld::restoreBelowZero(Chunk& chunk) {
         }
     };
     if (terrainOf_) {
+        const std::shared_ptr<const server::world::blending::Blender> blender =
+            oldTerrain_ != nullptr ? oldTerrain_->blenderFor(chunk.chunkX(), chunk.chunkZ()) : nullptr;
         server::world::terrain::realTerrainGenerator::GeneratedTerrain terrain =
-            terrainOf_(chunk.chunkX(), chunk.chunkZ());
+            terrainOf_(chunk.chunkX(), chunk.chunkZ(), blender.get());
         copyBelowZero(terrain.chunk());
     } else {
         Chunk made = generateChunk(chunk.chunkX(), chunk.chunkZ());

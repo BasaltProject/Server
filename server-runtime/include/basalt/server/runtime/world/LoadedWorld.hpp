@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/DragonFight.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
+#include <basalt/server/runtime/world/OldTerrainBlending.hpp>
 #include <basalt/server/runtime/world/PortalIndex.hpp>
 #include <basalt/server/runtime/world/RandomSequences.hpp>
 #include <basalt/server/runtime/world/RegionStore.hpp>
@@ -284,8 +285,10 @@ private:
     PortalIndex portals_;
     /// Declared ahead of the queue whose workers step it, so it outlives them.
     std::unique_ptr<server::world::terrain::ProtoChunks> protoChunks_;
-    std::function<server::world::terrain::realTerrainGenerator::GeneratedTerrain(std::int32_t, std::int32_t)>
+    std::function<server::world::terrain::realTerrainGenerator::GeneratedTerrain(
+        std::int32_t, std::int32_t, const server::world::blending::Blender*)>
         terrainOf_;
+    std::unique_ptr<OldTerrainBlending> oldTerrain_;
     WorldState state_;
     ChunkGenerationQueue generationQueue_;
     std::array<double, 3> spawn_{8.5, 64.0, 8.5};

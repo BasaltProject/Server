@@ -469,7 +469,7 @@ public:
 
     [[nodiscard]] std::int32_t domainAxes() const override { return input_->domainAxes(); }
 
-    [[nodiscard]] Sampler compile(CompileContext& context) const override { return input_->compile(context); }
+    [[nodiscard]] Sampler compile(CompileContext& context) const override;
 
     [[nodiscard]] Function rewriteChildren(const Function& self, const RewriteRule& rule) const override;
     [[nodiscard]] bool equals(const DensityFunction& other) const override;

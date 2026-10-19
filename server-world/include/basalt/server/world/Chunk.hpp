@@ -21,6 +21,10 @@ namespace terrain {
 class ProtoRegion;
 } // namespace terrain
 
+namespace blending {
+class BlendingData;
+} // namespace blending
+
 enum class HeightmapType : std::uint8_t {
     /// parity: `Heightmap.Types.WORLD_SURFACE(_WG)`, every non-air block and fluid.
     WorldSurface,
@@ -138,6 +142,11 @@ public:
     [[nodiscard]] bool needsRetrogen() const noexcept { return needsRetrogen_; }
 
     void setNeedsRetrogen(bool needed) noexcept { needsRetrogen_ = needed; }
+
+    /// parity: `ChunkAccess.getBlendingData`, set on a chunk upgraded from before the 1.18 terrain.
+    [[nodiscard]] const std::shared_ptr<blending::BlendingData>& blendingData() const noexcept { return blending_; }
+
+    void setBlendingData(std::shared_ptr<blending::BlendingData> data) noexcept { blending_ = std::move(data); }
 
     void setSavedEntities(std::vector<wire::nbt::NbtCompound> entities);
 
@@ -287,6 +296,7 @@ private:
     std::vector<wire::nbt::NbtCompound> savedEntities_;
     bool loadedComplete_ = false;
     bool needsRetrogen_ = false;
+    std::shared_ptr<blending::BlendingData> blending_;
     std::vector<ChunkScheduledTick> blockTicks_;
     std::vector<ChunkScheduledTick> fluidTicks_;
     structure::ChunkStructures structures_;
