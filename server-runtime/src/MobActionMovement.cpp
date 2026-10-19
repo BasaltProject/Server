@@ -411,6 +411,11 @@ void MobActionSystem::emitPlayerMovement(world::LoadedWorld& world,
             player->nextStep = static_cast<float>(static_cast<std::int32_t>(player->moveDist) + 1);
         }
         if (!produced && inWater) {
+            // parity: `Entity.waterSwimSound`, as loud as the player moves; the move since last tick is the velocity.
+            const auto loudness = static_cast<float>(
+                std::sqrt((dx * dx * static_cast<double>(0.2F)) + (dy * dy) + (dz * dz * static_cast<double>(0.2F))));
+            const float pitch = 1.0F + ((random.nextFloat() - random.nextFloat()) * 0.4F);
+            sound("entity.player.swim", std::min(1.0F, loudness * 0.35F), pitch);
             world::vibrations::emit(state, "swim", player->x, player->y, player->z, world.gameTime(),
                                     {.entity = player->uuid()});
         }
