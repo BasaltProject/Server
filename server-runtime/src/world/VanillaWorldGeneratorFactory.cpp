@@ -578,11 +578,11 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
     const auto plainsEverywhere = [](std::int32_t, std::int32_t, std::int32_t) -> const std::string& {
         return kPlains;
     };
-    // parity: `FlatLevelSource` answers sea level -63 and min y 0, so strongholds sit on top of the layers.
+    // parity: `ChunkGeneratorStructureState.createForFlat` uses ring seed 0; `FlatLevelSource` has sea level -63.
     built->strongholds = std::make_unique<terrain::StrongholdStructureGenerator>(
         structure::ConcentricRingsPlacement{32, 3, 128, biomesOf(tags, "minecraft:stronghold_biased_to"),
-                                            plainsEverywhere},
-        seed, plainsEverywhere, biomesOf(tags, "minecraft:has_structure/stronghold"), -63, 0);
+                                            plainsEverywhere, true},
+        0, plainsEverywhere, biomesOf(tags, "minecraft:has_structure/stronghold"), -63, 0);
     built->generators =
         terrain::TerrainStructureGenerators{.village = built->village.get(), .stronghold = built->strongholds.get()};
 
