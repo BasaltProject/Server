@@ -176,9 +176,9 @@ void BlockTests::writeBlockEntity(world::LoadedWorld& world, const std::array<st
     chunk->markDirty();
 }
 
-std::optional<std::string> BlockTests::start(world::LoadedWorld& world, const world::TestInstance& instance,
-                                             const std::array<std::int32_t, 3>& blockAt, Reporter reporter,
-                                             const Placed& placed) {
+std::optional<std::string> BlockTests::place(world::LoadedWorld& world, const world::TestInstance& instance,
+                                             const std::array<std::int32_t, 3>& blockAt, Layout& layout,
+                                             const bool block) {
     if (!instance.structure.has_value()) {
         return "the test names no structure";
     }
@@ -187,7 +187,7 @@ std::optional<std::string> BlockTests::start(world::LoadedWorld& world, const wo
         return "there is no structure " + instance.structure->toString();
     }
     const StructurePos size = found->size();
-    const Layout layout = layoutOf(blockAt, {size.x, size.y, size.z}, instance.rotation, instance.padding);
+    layout = layoutOf(blockAt, {size.x, size.y, size.z}, instance.rotation, instance.padding);
     const StructureBoundingBox reach{layout.test.minX - 1, layout.test.minY - 1, layout.test.minZ - 1,
                                      layout.test.maxX + 1, layout.test.maxY + 1, layout.test.maxZ + 1};
     for (std::int32_t chunkX = std::min(reach.minX, blockAt[0]) >> 4; chunkX <= (std::max(reach.maxX, blockAt[0]) >> 4);
@@ -216,11 +216,25 @@ std::optional<std::string> BlockTests::start(world::LoadedWorld& world, const wo
                                              .ignoreEntities = false});
         }
     }
-    setBlock(world, blockAt[0], blockAt[1], blockAt[2], stateOf(kTestInstanceBlock));
+    if (block) {
+        setBlock(world, blockAt[0], blockAt[1], blockAt[2], stateOf(kTestInstanceBlock));
+    }
     writeBlockEntity(world, blockAt, instance.id, {size.x, size.y, size.z}, instance.rotation, "cleared", std::nullopt);
+    return std::nullopt;
+}
+
+std::optional<std::string> BlockTests::start(world::LoadedWorld& world, const world::TestInstance& instance,
+                                             const std::array<std::int32_t, 3>& blockAt, Reporter reporter,
+                                             const Placed& placed) {
+    Layout layout;
+    if (std::optional<std::string> refused = place(world, instance, blockAt, layout, true); refused.has_value()) {
+        return refused;
+    }
+    const StructurePos size = templates_->find(*instance.structure)->size();
     encase(world, layout, instance.skyAccess, true);
     if (placed) {
-        placed(reach);
+        placed(StructureBoundingBox{layout.test.minX - 1, layout.test.minY - 1, layout.test.minZ - 1,
+                                    layout.test.maxX + 1, layout.test.maxY + 1, layout.test.maxZ + 1});
     }
     // A flag left by an earlier run on the same ground must not count for this one.
     const Run fresh{.instance = instance, .worldName = world.name(), .blockAt = blockAt, .layout = layout};
@@ -236,6 +250,73 @@ std::optional<std::string> BlockTests::start(world::LoadedWorld& world, const wo
                         .layout = layout,
                         .ticks = 0,
                         .reporter = std::move(reporter)});
+    return std::nullopt;
+}
+
+std::vector<BlockTests::Found> BlockTests::find(world::LoadedWorld& world, const std::int32_t centerX,
+                                                const std::int32_t centerY, const std::int32_t centerZ,
+                                                const std::int32_t radius) const {
+    std::vector<Found> found;
+    for (std::int32_t chunkX = (centerX - radius) >> 4; chunkX <= (centerX + radius) >> 4; chunkX++) {
+        for (std::int32_t chunkZ = (centerZ - radius) >> 4; chunkZ <= (centerZ + radius) >> 4; chunkZ++) {
+            server::world::Chunk* chunk = world.state().chunkIfLoaded(chunkX, chunkZ);
+            if (chunk == nullptr) {
+                continue;
+            }
+            for (const server::world::ChunkBlockEntity& entity : chunk->blockEntities()) {
+                if (entity.type().toString() != kTestInstanceBlock) {
+                    continue;
+                }
+                const NbtCompound* data = entity.data().getCompound("data");
+                const auto test = data == nullptr
+                                      ? std::expected<Identifier, wire::common::IdentifierError>{std::unexpected{
+                                            wire::common::IdentifierError{}}}
+                                      : Identifier::parse(std::string{data->getString("test")});
+                if (!test.has_value()) {
+                    continue;
+                }
+                found.push_back(
+                    Found{*test, {(chunkX << 4) + entity.localX(), entity.y(), (chunkZ << 4) + entity.localZ()}});
+            }
+        }
+    }
+    std::ranges::sort(found, {}, [&](const Found& block) {
+        const std::int64_t dx = block.at[0] - centerX;
+        const std::int64_t dy = block.at[1] - centerY;
+        const std::int64_t dz = block.at[2] - centerZ;
+        return (dx * dx) + (dy * dy) + (dz * dz);
+    });
+    return found;
+}
+
+std::optional<std::string> BlockTests::restart(world::LoadedWorld& world, const Found& block, Reporter reporter,
+                                               const Placed& placed) {
+    const world::TestInstance* instance = instances_->find(block.test);
+    if (instance == nullptr) {
+        return "there is no test " + block.test.toString();
+    }
+    return start(world, *instance, block.at, std::move(reporter), placed);
+}
+
+std::optional<std::string> BlockTests::reset(world::LoadedWorld& world, const Found& block, const Placed& placed) {
+    const world::TestInstance* instance = instances_->find(block.test);
+    if (instance == nullptr) {
+        return "there is no test " + block.test.toString();
+    }
+    // parity: `TestInstanceBlockEntity.resetTest` puts the barriers away before it places the structure again.
+    const structure::StructureTemplate* found =
+        instance->structure.has_value() ? templates_->find(*instance->structure) : nullptr;
+    const StructurePos size = found == nullptr ? StructurePos{1, 1, 1} : found->size();
+    Layout old = layoutOf(block.at, {size.x, size.y, size.z}, instance->rotation, instance->padding);
+    encase(world, old, instance->skyAccess, false);
+    Layout layout;
+    if (std::optional<std::string> refused = place(world, *instance, block.at, layout, false); refused.has_value()) {
+        return refused;
+    }
+    if (placed) {
+        placed(StructureBoundingBox{layout.test.minX - 1, layout.test.minY - 1, layout.test.minZ - 1,
+                                    layout.test.maxX + 1, layout.test.maxY + 1, layout.test.maxZ + 1});
+    }
     return std::nullopt;
 }
 

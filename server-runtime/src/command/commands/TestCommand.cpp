@@ -207,8 +207,44 @@ TestCommand::TestCommand(const world::RealTestInstances& instances, FunctionRunn
       blockTests_(std::move(blockTests)) {}
 
 void TestCommand::build(const CommandNodeBuilder& root) const {
-    const auto runAll = [this](const CommandContext& context,
-                               const std::vector<world::TestInstance>& selected) -> Parsed<std::int32_t> {
+    // parity: `ReportGameListener`, in green when it passed and red or yellow when it did not.
+    const auto reporterFor = [this](const CommandEnvironment* environment) -> BlockTests::Reporter {
+        return [this, environment](const BlockTests::Report& report) {
+            if (report.passed) {
+                failed_.erase(report.id);
+                environment->broadcast(
+                    Component::text(report.id.toString() + " passed! (" + std::to_string(report.ticks) + "gameticks)"));
+                return;
+            }
+            failed_.insert(report.id);
+            environment->broadcast(
+                Component::text(std::string{report.required ? "" : "(optional) "} + report.id.toString() + " failed! ")
+                    .append(report.failure.has_value() ? *report.failure : Component::text("no reason")));
+        };
+    };
+    const auto syncAround = [](const CommandContext& context,
+                               const world::LoadedWorld& placedIn) -> BlockTests::Placed {
+        const CommandEnvironment* environment = &context.environment();
+        const world::LoadedWorld* where = &placedIn;
+        return [environment, where](const server::world::structure::StructureBoundingBox& box) {
+            environment->syncChunks(*where, box.minX, box.minZ, box.maxX, box.maxZ);
+        };
+    };
+    /// The test instance blocks around the source: all within `radius`, or only the nearest one.
+    const auto blocksAround = [](const CommandContext& context, BlockTests& tests, world::LoadedWorld& world,
+                                 std::int32_t radius, bool onlyNearest) {
+        const std::array<double, 3> here = context.source().position();
+        std::vector<BlockTests::Found> found = tests.find(world, static_cast<std::int32_t>(std::floor(here[0])),
+                                                          static_cast<std::int32_t>(std::floor(here[1])),
+                                                          static_cast<std::int32_t>(std::floor(here[2])), radius);
+        if (onlyNearest && found.size() > 1) {
+            found.erase(found.begin() + 1, found.end());
+        }
+        return found;
+    };
+    const auto runAll = [this, reporterFor,
+                         syncAround](const CommandContext& context,
+                                     const std::vector<world::TestInstance>& selected) -> Parsed<std::int32_t> {
         if (selected.empty()) {
             context.success(Component::translatable("commands.test.no_tests"));
             return 0;
@@ -233,27 +269,8 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
                                                              (started * kCell),
                                                          static_cast<std::int32_t>(std::floor(here[1])),
                                                          static_cast<std::int32_t>(std::floor(here[2])) + kZOffset};
-                const CommandEnvironment* environment = &context.environment();
-                const world::LoadedWorld* placedIn = *where;
                 const std::optional<std::string> refused = blockTests->start(
-                    **where, instance, origin,
-                    [this, environment](const BlockTests::Report& report) {
-                        // parity: `ReportGameListener`, in green when it passed and red or yellow when it did not.
-                        if (report.passed) {
-                            failed_.erase(report.id);
-                            environment->broadcast(Component::text(report.id.toString() + " passed! (" +
-                                                                   std::to_string(report.ticks) + "gameticks)"));
-                            return;
-                        }
-                        failed_.insert(report.id);
-                        environment->broadcast(
-                            Component::text(std::string{report.required ? "" : "(optional) "} + report.id.toString() +
-                                            " failed! ")
-                                .append(report.failure.has_value() ? *report.failure : Component::text("no reason")));
-                    },
-                    [environment, placedIn](const server::world::structure::StructureBoundingBox& box) {
-                        environment->syncChunks(*placedIn, box.minX, box.minZ, box.maxX, box.maxZ);
-                    });
+                    **where, instance, origin, reporterFor(&context.environment()), syncAround(context, **where));
                 if (refused.has_value()) {
                     failed_.insert(instance.id);
                     context.source().sendSystemMessage(
@@ -329,10 +346,46 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
     root.literal("runall", [this, runAll](const CommandNodeBuilder& form) {
         form.executes([this, runAll](const CommandContext& context) { return runAll(context, instances_->all()); });
     });
-    for (const std::string_view name : {"runthese", "runthat", "runclosest"}) {
-        root.literal(std::string{name}, [this, runAll](const CommandNodeBuilder& form) {
-            const CommandExecutor run = [this, runAll](const CommandContext& context) {
-                return runAll(context, instances_->all());
+    // parity: `TestFinder.Builder.allNearby` (15), `nearest` and `lookedAt` over the test instance blocks in the world.
+    constexpr std::int32_t kNearby = 15;
+    constexpr std::int32_t kFull = 250;
+    const auto runBlocks = [this, reporterFor, syncAround, blocksAround](const CommandContext& context,
+                                                                         std::int32_t radius,
+                                                                         bool onlyNearest) -> Parsed<std::int32_t> {
+        BlockTests* blockTests = blockTests_ ? blockTests_() : nullptr;
+        const Parsed<world::LoadedWorld*> where = context.world();
+        if (blockTests == nullptr || !where.has_value()) {
+            if (!where.has_value()) {
+                return std::unexpected{where.error()};
+            }
+            return 0;
+        }
+        const std::vector<BlockTests::Found> found = blocksAround(context, *blockTests, **where, radius, onlyNearest);
+        if (found.empty()) {
+            context.success(Component::translatable("commands.test.no_tests"));
+            return 0;
+        }
+        std::int32_t started = 0;
+        for (const BlockTests::Found& block : found) {
+            const std::optional<std::string> refused =
+                blockTests->restart(**where, block, reporterFor(&context.environment()), syncAround(context, **where));
+            if (refused.has_value()) {
+                context.source().sendSystemMessage(
+                    Component::text("  " + block.test.toString() + ": cannot start, " + *refused));
+                continue;
+            }
+            started++;
+        }
+        context.success(
+            Component::translatable("commands.test.run.running", {Component::text(std::to_string(started))}));
+        return started;
+    };
+    const std::array<std::pair<std::string_view, std::pair<std::int32_t, bool>>, 3> kNearby3{
+        {{"runthese", {kNearby, false}}, {"runthat", {kNearby, true}}, {"runclosest", {kFull, true}}}};
+    for (const auto& [name, how] : kNearby3) {
+        root.literal(std::string{name}, [runBlocks, how](const CommandNodeBuilder& form) {
+            const CommandExecutor run = [runBlocks, how](const CommandContext& context) {
+                return runBlocks(context, how.first, how.second);
             };
             form.executes(run);
             form.argument("numberOfTimes", integerArgument(0), [run](const CommandNodeBuilder& times) {
@@ -411,22 +464,87 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
         root.literal(std::string{name}, [clear](const CommandNodeBuilder& form) { form.executes(clear); });
     }
 
-    const CommandExecutor nothingPlaced = [](const CommandContext& context) -> Parsed<std::int32_t> {
-        context.success(Component::translatable("commands.test.error.no_test_instances"));
-        return 0;
+    const auto resetBlocks = [this, syncAround, blocksAround](const CommandContext& context, std::int32_t radius,
+                                                              bool onlyNearest) -> Parsed<std::int32_t> {
+        BlockTests* blockTests = blockTests_ ? blockTests_() : nullptr;
+        const Parsed<world::LoadedWorld*> where = context.world();
+        if (blockTests == nullptr || !where.has_value()) {
+            if (!where.has_value()) {
+                return std::unexpected{where.error()};
+            }
+            return 0;
+        }
+        blockTests->stopAll();
+        std::int32_t count = 0;
+        for (const BlockTests::Found& block : blocksAround(context, *blockTests, **where, radius, onlyNearest)) {
+            if (!blockTests->reset(**where, block, syncAround(context, **where)).has_value()) {
+                count++;
+            }
+        }
+        if (count == 0) {
+            return std::unexpected{
+                CommandSyntaxError{.component = Component::translatable("commands.test.reset.error.no_tests")}};
+        }
+        context.success(
+            Component::translatable("commands.test.reset.success", {Component::text(std::to_string(count))}), true);
+        return count;
     };
-    for (const std::string_view name : {"resetclosest", "resetthat", "resetthese"}) {
-        root.literal(std::string{name},
-                     [nothingPlaced](const CommandNodeBuilder& form) { form.executes(nothingPlaced); });
+    const std::array<std::pair<std::string_view, std::pair<std::int32_t, bool>>, 3> kReset{
+        {{"resetclosest", {kFull, true}}, {"resetthat", {kNearby, true}}, {"resetthese", {kNearby, false}}}};
+    for (const auto& [name, how] : kReset) {
+        root.literal(std::string{name}, [resetBlocks, how](const CommandNodeBuilder& form) {
+            form.executes([resetBlocks, how](const CommandContext& context) {
+                return resetBlocks(context, how.first, how.second);
+            });
+        });
     }
-    root.literal("locate", [this, nothingPlaced](const CommandNodeBuilder& form) {
-        form.argument("tests", resourceSelectorArgument("minecraft:test_instance"),
-                      [this, nothingPlaced](const CommandNodeBuilder& named) {
-                          named.suggestsFromServer([this](const SuggestionContext& context) {
-                              return context.matchingIds(testIds(*instances_));
-                          });
-                          named.executes(nothingPlaced);
-                      });
+    root.literal("locate", [this](const CommandNodeBuilder& form) {
+        form.argument(
+            "tests", resourceSelectorArgument("minecraft:test_instance"), [this](const CommandNodeBuilder& named) {
+                named.suggestsFromServer(
+                    [this](const SuggestionContext& context) { return context.matchingIds(testIds(*instances_)); });
+                named.executes([this](const CommandContext& context) -> Parsed<std::int32_t> {
+                    BlockTests* blockTests = blockTests_ ? blockTests_() : nullptr;
+                    const Parsed<world::LoadedWorld*> where = context.world();
+                    const auto* id = context.get<Identifier>("tests");
+                    if (blockTests == nullptr || !where.has_value() || id == nullptr) {
+                        if (!where.has_value()) {
+                            return std::unexpected{where.error()};
+                        }
+                        return 0;
+                    }
+                    context.source().sendSystemMessage(Component::translatable("commands.test.locate.started"));
+                    const std::array<double, 3> here = context.source().position();
+                    std::int32_t count = 0;
+                    for (const BlockTests::Found& block :
+                         blockTests->find(**where, static_cast<std::int32_t>(std::floor(here[0])),
+                                          static_cast<std::int32_t>(std::floor(here[1])),
+                                          static_cast<std::int32_t>(std::floor(here[2])), 250)) {
+                        if (block.test != *id) {
+                            continue;
+                        }
+                        const double dx = here[0] - block.at[0];
+                        const double dz = here[2] - block.at[2];
+                        context.success(
+                            Component::translatable("commands.test.locate.found",
+                                                    {Component::text("[" + std::to_string(block.at[0]) + ", " +
+                                                                     std::to_string(block.at[1]) + ", " +
+                                                                     std::to_string(block.at[2]) + "]"),
+                                                     Component::text(std::to_string(static_cast<std::int32_t>(
+                                                         std::floor(std::sqrt((dx * dx) + (dz * dz))))))}),
+                            false);
+                        count++;
+                    }
+                    if (count == 0) {
+                        return std::unexpected{CommandSyntaxError{
+                            .component = Component::translatable("commands.test.error.no_test_instances")}};
+                    }
+                    context.success(
+                        Component::translatable("commands.test.locate.done", {Component::text(std::to_string(count))}),
+                        true);
+                    return count;
+                });
+            });
     });
 
     // parity: `TestCommand.createNewStructure`: an empty test of the asked size, five on every side by default.
