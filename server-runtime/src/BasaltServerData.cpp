@@ -196,6 +196,22 @@ bool BasaltServer::reloadData(const std::vector<std::string>& selected) {
     }
 }
 
+void BasaltServer::runFunctionById(const wire::common::Identifier& id) {
+    if (wired_.dispatcher == nullptr || consoleSource_ == nullptr) {
+        return;
+    }
+    // parity: `TestEnvironmentDefinition.Functions.run`, the server's source as a game master, heard by nobody.
+    const command::ExecutionSource source{
+        *consoleSource_,
+        command::ExecutionSource::Changes{.permission = command::permissionLevel::kGamemasters, .silent = true}};
+    const function::ServerFunction* function = functions_.get(id);
+    if (function == nullptr) {
+        logger_.error([&id] { return "Test Batch failed for non-existent function " + id.toString(); });
+        return;
+    }
+    static_cast<void>(functionRunner_->call(*wired_.dispatcher, source, *function));
+}
+
 void BasaltServer::tickFunctions() {
     if (wired_.dispatcher == nullptr || consoleSource_ == nullptr) {
         return;

@@ -52,9 +52,10 @@ constexpr std::string_view kTestInstanceBlock = "minecraft:test_instance_block";
 
 BlockTests::BlockTests(world::StructureTemplates& templates, const world::RealTestInstances& instances,
                        const world::RealTestEnvironments& environments, const command::CommandEnvironment& environment,
-                       BlockChangeBroadcaster& broadcaster, player::PlayerRegistry& players)
+                       world::RealTestEnvironments::RunFunction runFunction, BlockChangeBroadcaster& broadcaster,
+                       player::PlayerRegistry& players)
     : templates_(&templates), instances_(&instances), environments_(&environments), environment_(&environment),
-      broadcaster_(&broadcaster), players_(&players) {}
+      runFunction_(std::move(runFunction)), broadcaster_(&broadcaster), players_(&players) {}
 
 void BlockTests::enter(world::LoadedWorld& world, Run& run) {
     if (!run.instance.environment.has_value()) {
@@ -65,7 +66,7 @@ void BlockTests::enter(world::LoadedWorld& world, Run& run) {
     run.environmentKey = world.name() + "/" + (named != nullptr ? *named : run.instance.id.toString());
     Active& active = active_[run.environmentKey];
     if (active.users++ == 0) {
-        active.undo = environments_->activate(*run.instance.environment, world, *environment_);
+        active.undo = environments_->activate(*run.instance.environment, world, *environment_, runFunction_);
     }
 }
 

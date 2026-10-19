@@ -49,7 +49,8 @@ public:
 
     BlockTests(world::StructureTemplates& templates, const world::RealTestInstances& instances,
                const world::RealTestEnvironments& environments, const command::CommandEnvironment& environment,
-               BlockChangeBroadcaster& broadcaster, player::PlayerRegistry& players);
+               world::RealTestEnvironments::RunFunction runFunction, BlockChangeBroadcaster& broadcaster,
+               player::PlayerRegistry& players);
 
     /// Puts a test instance block at `blockAt` with the template beside it and starts counting; why it cannot, if so.
     [[nodiscard]] std::optional<std::string> start(world::LoadedWorld& world, const world::TestInstance& instance,
@@ -134,6 +135,7 @@ private:
     const world::RealTestInstances* instances_;
     const world::RealTestEnvironments* environments_;
     const command::CommandEnvironment* environment_;
+    world::RealTestEnvironments::RunFunction runFunction_;
 
     struct Active {
         std::function<void()> undo;
