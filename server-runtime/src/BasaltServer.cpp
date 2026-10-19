@@ -561,7 +561,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     mobActions_->hiveBlown(world, {x, y, z}, stateId, hive, sourceEntityId);
                 }
             }};
-    blockTests_ = std::make_unique<BlockTests>(vanillaData_.structureTemplates, *broadcaster_, playerRegistry_);
+    blockTests_ = std::make_unique<BlockTests>(vanillaData_.structureTemplates, vanillaData_.testInstances,
+                                               *broadcaster_, playerRegistry_);
     plugins::worldEventHooks::explosions(explosionHooks, eventSink_);
     explosions_ =
         std::make_unique<ExplosionSystem>(playerRegistry_, vanillaData_.lootTables, std::move(explosionHooks),

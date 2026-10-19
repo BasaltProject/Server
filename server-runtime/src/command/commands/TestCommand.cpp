@@ -227,27 +227,28 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
                     return std::unexpected{where.error()};
                 }
                 const std::array<double, 3> here = context.source().position();
-                const std::array<std::int32_t, 3> origin{
-                    static_cast<std::int32_t>(std::floor(here[0])) + (started * kCell),
-                    static_cast<std::int32_t>(std::floor(here[1])), static_cast<std::int32_t>(std::floor(here[2]))};
+                // parity: `TestCommand.TEST_POS_Z_OFFSET_FROM_PLAYER`.
+                constexpr std::int32_t kZOffset = 3;
+                const std::array<std::int32_t, 3> origin{static_cast<std::int32_t>(std::floor(here[0])) +
+                                                             (started * kCell),
+                                                         static_cast<std::int32_t>(std::floor(here[1])),
+                                                         static_cast<std::int32_t>(std::floor(here[2])) + kZOffset};
                 const CommandEnvironment* environment = &context.environment();
                 const world::LoadedWorld* placedIn = *where;
                 const std::optional<std::string> refused = blockTests->start(
                     **where, instance, origin,
                     [this, environment](const BlockTests::Report& report) {
+                        // parity: `ReportGameListener`, in green when it passed and red or yellow when it did not.
                         if (report.passed) {
                             failed_.erase(report.id);
-                            environment->broadcast(Component::text("  " + report.id.toString() + ": passed in " +
-                                                                   std::to_string(report.ticks) + " tick(s)"));
+                            environment->broadcast(Component::text(report.id.toString() + " passed! (" +
+                                                                   std::to_string(report.ticks) + "gameticks)"));
                             return;
                         }
                         failed_.insert(report.id);
-                        std::vector<Component> why;
-                        if (report.failure.has_value()) {
-                            why.push_back(*report.failure);
-                        }
                         environment->broadcast(
-                            Component::text("  " + report.id.toString() + ": failed, ")
+                            Component::text(std::string{report.required ? "" : "(optional) "} + report.id.toString() +
+                                            " failed! ")
                                 .append(report.failure.has_value() ? *report.failure : Component::text("no reason")));
                     },
                     [environment, placedIn](const server::world::structure::StructureBoundingBox& box) {
@@ -381,16 +382,24 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
     });
 
     const CommandExecutor clear = [this](const CommandContext& context) -> Parsed<std::int32_t> {
-        std::int32_t cleared = static_cast<std::int32_t>(failed_.size());
         failed_.clear();
-        // parity: `/test clearall` empties the space of every test, not only the memory of the failed ones.
+        // parity: `TestCommand.DEFAULT_CLEAR_RADIUS` and `MAX_CLEAR_RADIUS`.
+        const auto* asked = context.get<std::int32_t>("radius");
+        const std::int32_t radius = std::min(asked == nullptr ? 250 : *asked, 1024);
+        std::int32_t cleared = 0;
         if (BlockTests* blockTests = blockTests_ ? blockTests_() : nullptr; blockTests != nullptr) {
             if (const Parsed<world::LoadedWorld*> where = context.world(); where.has_value()) {
-                cleared += blockTests->clearAll(**where);
+                const std::array<double, 3> here = context.source().position();
+                cleared = blockTests->clearAll(**where, static_cast<std::int32_t>(std::floor(here[0])),
+                                               static_cast<std::int32_t>(std::floor(here[2])), radius);
             }
         }
+        if (cleared == 0) {
+            return std::unexpected{
+                CommandSyntaxError{.component = Component::translatable("commands.test.clear.error.no_tests")}};
+        }
         context.success(
-            Component::translatable("commands.test.clear.success", {Component::text(std::to_string(cleared))}));
+            Component::translatable("commands.test.clear.success", {Component::text(std::to_string(cleared))}), true);
         return cleared;
     };
     root.literal("clearall", [clear](const CommandNodeBuilder& form) {
@@ -420,18 +429,55 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
                       });
     });
 
-    const CommandExecutor noStructures = [](const CommandContext&) -> Parsed<std::int32_t> {
-        return std::unexpected{CommandSyntaxError{
-            .component = Component::text("Test structures are not modelled in this build: only function tests run.")}};
+    // parity: `TestCommand.createNewStructure`: an empty test of the asked size, five on every side by default.
+    const CommandExecutor create = [this](const CommandContext& context) -> Parsed<std::int32_t> {
+        const auto* id = context.get<Identifier>("id");
+        BlockTests* blockTests = blockTests_ ? blockTests_() : nullptr;
+        const Parsed<world::LoadedWorld*> where = context.world();
+        if (id == nullptr || blockTests == nullptr) {
+            return 0;
+        }
+        if (!where.has_value()) {
+            return std::unexpected{where.error()};
+        }
+        const auto sizeOf = [&context](const char* name) {
+            const auto* asked = context.get<std::int32_t>(name);
+            return asked == nullptr ? 5 : *asked;
+        };
+        const std::array<std::int32_t, 3> size{sizeOf("width"), sizeOf("height"), sizeOf("depth")};
+        if (size[0] > 48 || size[1] > 48 || size[2] > 48) {
+            return std::unexpected{
+                CommandSyntaxError{.component = Component::translatable("commands.test.error.too_large",
+                                                                        {Component::text(std::to_string(48))})}};
+        }
+        const std::array<double, 3> here = context.source().position();
+        constexpr std::int32_t kZOffset = 3;
+        const std::array<std::int32_t, 3> at{static_cast<std::int32_t>(std::floor(here[0])),
+                                             static_cast<std::int32_t>(std::floor(here[1])),
+                                             static_cast<std::int32_t>(std::floor(here[2])) + kZOffset};
+        const CommandEnvironment* environment = &context.environment();
+        const world::LoadedWorld* placedIn = *where;
+        const std::optional<std::string> refused = blockTests->create(
+            **where, *id, at, size, [environment, placedIn](const server::world::structure::StructureBoundingBox& box) {
+                environment->syncChunks(*placedIn, box.minX, box.minZ, box.maxX, box.maxZ);
+            });
+        if (refused.has_value()) {
+            return std::unexpected{CommandSyntaxError{.component = Component::text(*refused)}};
+        }
+        context.success(Component::text("Created " + id->toString() + " at " + std::to_string(at[0]) + ", " +
+                                        std::to_string(at[1]) + ", " + std::to_string(at[2])),
+                        true);
+        return 1;
     };
-    root.literal("create", [noStructures](const CommandNodeBuilder& form) {
-        form.argument("id", resourceLocationArgument(), [noStructures](const CommandNodeBuilder& id) {
-            id.executes(noStructures);
-            id.argument("width", integerArgument(0), [noStructures](const CommandNodeBuilder& width) {
-                width.executes(noStructures);
-                width.argument("height", integerArgument(0), [noStructures](const CommandNodeBuilder& height) {
-                    height.argument("depth", integerArgument(0),
-                                    [noStructures](const CommandNodeBuilder& depth) { depth.executes(noStructures); });
+    root.literal("create", [create](const CommandNodeBuilder& form) {
+        form.argument("id", resourceLocationArgument(), [create](const CommandNodeBuilder& id) {
+            id.executes(create);
+            id.argument("width", integerArgument(1), [create](const CommandNodeBuilder& width) {
+                width.executes(create);
+                width.argument("height", integerArgument(1), [create](const CommandNodeBuilder& height) {
+                    height.executes(create);
+                    height.argument("depth", integerArgument(1),
+                                    [create](const CommandNodeBuilder& depth) { depth.executes(create); });
                 });
             });
         });

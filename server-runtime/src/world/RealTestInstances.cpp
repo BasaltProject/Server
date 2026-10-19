@@ -73,6 +73,12 @@ constexpr std::int32_t kDefaultMaxTicks = 100;
     return whole == nullptr ? fallback : static_cast<std::int32_t>(*whole);
 }
 
+[[nodiscard]] bool flagAt(const JsonObject& root, std::string_view key) {
+    const JsonValue* value = root.find(key);
+    const bool* flag = value == nullptr ? nullptr : value->get<bool>();
+    return flag != nullptr && *flag;
+}
+
 [[nodiscard]] std::string textAt(const JsonObject& root, std::string_view key, std::string fallback) {
     const JsonValue* value = root.find(key);
     const std::string* text = value == nullptr ? nullptr : value->get<std::string>();
@@ -111,6 +117,8 @@ constexpr std::int32_t kDefaultMaxTicks = 100;
         .structure = identifierAt(*object, "structure"),
         .setupTicks = wholeAt(*object, "setup_ticks", 0),
         .rotation = textAt(*object, "rotation", "none"),
+        .padding = wholeAt(*object, "padding", 0),
+        .skyAccess = flagAt(*object, "sky_access"),
     };
 }
 
