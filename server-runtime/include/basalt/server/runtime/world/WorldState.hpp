@@ -24,6 +24,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -342,6 +343,11 @@ public:
 
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>> takeStructureTriggers();
 
+    /// parity: `TestBlockEntity.triggered`, which is kept in memory and never saved.
+    void setTestTriggered(std::int32_t x, std::int32_t y, std::int32_t z, bool triggered);
+
+    [[nodiscard]] bool testTriggered(std::int32_t x, std::int32_t y, std::int32_t z) const;
+
 private:
     bool hasSkylight_ = true;
     bool settlesGeneration_ = true;
@@ -406,6 +412,7 @@ private:
     PrimedTntQueue primedTntQueue_;
     std::vector<Spilled> spilled_;
     std::vector<std::array<std::int32_t, 3>> structureTriggers_;
+    std::set<std::array<std::int32_t, 3>> triggeredTestBlocks_;
     PendingChunkDecorations pendingDecorations_;
     std::vector<BlockEvent> blockEvents_;
     std::vector<GameEventRecord> gameEvents_;

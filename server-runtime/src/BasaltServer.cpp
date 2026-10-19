@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
+#include <basalt/server/runtime/BlockTests.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
@@ -389,6 +390,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.maxPlayers = config.maxPlayers;
     wiring.port = config.port;
     wiring.lang = options_.lang;
+    wiring.blockTests = [this] { return blockTests_.get(); };
     wiring.pluginEvents = [this] { return plugins_ == nullptr ? nullptr : &plugins_->events(); };
     wiring.randomSequences = [this]() -> world::RandomSequences& {
         return worldRegistry_->defaultWorld().randomSequences();
@@ -559,6 +561,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     mobActions_->hiveBlown(world, {x, y, z}, stateId, hive, sourceEntityId);
                 }
             }};
+    blockTests_ = std::make_unique<BlockTests>(vanillaData_.structureTemplates, *broadcaster_, playerRegistry_);
     plugins::worldEventHooks::explosions(explosionHooks, eventSink_);
     explosions_ =
         std::make_unique<ExplosionSystem>(playerRegistry_, vanillaData_.lootTables, std::move(explosionHooks),

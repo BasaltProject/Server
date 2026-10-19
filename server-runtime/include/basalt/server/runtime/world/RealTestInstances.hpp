@@ -18,6 +18,10 @@ struct TestInstance {
     std::optional<wire::common::Identifier> function;
     std::int32_t maxTicks = 0;
     bool required = true;
+    /// A block based test's template, the ticks it waits before it starts, and how it is turned.
+    std::optional<wire::common::Identifier> structure;
+    std::int32_t setupTicks = 0;
+    std::string rotation = "none";
 
     [[nodiscard]] bool isFunctionTest() const;
 };

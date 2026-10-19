@@ -136,7 +136,7 @@ std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommand
         add(std::make_shared<commands::DialogCommand>(*hooks.dialogs));
     }
     if (hooks.testInstances != nullptr && hooks.functionRunner != nullptr) {
-        add(std::make_shared<commands::TestCommand>(*hooks.testInstances, *hooks.functionRunner));
+        add(std::make_shared<commands::TestCommand>(*hooks.testInstances, *hooks.functionRunner, hooks.blockTests));
     }
     if (hooks.worldSeed && hooks.randomSequences) {
         add(std::make_shared<commands::RandomCommand>(hooks.worldSeed, hooks.randomSequences));

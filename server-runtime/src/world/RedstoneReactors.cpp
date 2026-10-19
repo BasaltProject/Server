@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/world/RedstoneReactors.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/wire/common/logging/Logger.hpp>
 
 #include <array>
 #include <cstdint>
@@ -334,6 +335,19 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         chunk->markDirty();
         if (powered && path == "structure_block") {
             world.queueStructureTrigger(x, y, z);
+        }
+        // parity: `TestBlock.neighborChanged` triggers on the rising edge, and a `log` block says its message.
+        if (powered && path == "test_block") {
+            world.setTestTriggered(x, y, z, true);
+            if (valueOf(properties, "mode") == "log") {
+                const std::string message{entity->data().getString("message")};
+                if (!message.empty()) {
+                    wire::common::Logger{"Test"}.info([&] {
+                        return "Test log (at " + std::to_string(x) + ", " + std::to_string(y) + ", " +
+                               std::to_string(z) + "): " + message;
+                    });
+                }
+            }
         }
         return;
     }

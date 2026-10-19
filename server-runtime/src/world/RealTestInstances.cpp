@@ -67,6 +67,18 @@ constexpr std::int32_t kDefaultMaxTicks = 100;
     return *text != "false";
 }
 
+[[nodiscard]] std::int32_t wholeAt(const JsonObject& root, std::string_view key, std::int32_t fallback) {
+    const JsonValue* value = root.find(key);
+    const std::int64_t* whole = value == nullptr ? nullptr : value->get<std::int64_t>();
+    return whole == nullptr ? fallback : static_cast<std::int32_t>(*whole);
+}
+
+[[nodiscard]] std::string textAt(const JsonObject& root, std::string_view key, std::string fallback) {
+    const JsonValue* value = root.find(key);
+    const std::string* text = value == nullptr ? nullptr : value->get<std::string>();
+    return text == nullptr ? std::move(fallback) : *text;
+}
+
 [[nodiscard]] std::expected<TestInstance, std::string> declared(const std::string& path,
                                                                 const std::optional<std::string>& text) {
     if (!text.has_value()) {
@@ -96,6 +108,9 @@ constexpr std::int32_t kDefaultMaxTicks = 100;
         .function = function,
         .maxTicks = maxTicksAt(*object),
         .required = requiredAt(*object),
+        .structure = identifierAt(*object, "structure"),
+        .setupTicks = wholeAt(*object, "setup_ticks", 0),
+        .rotation = textAt(*object, "rotation", "none"),
     };
 }
 

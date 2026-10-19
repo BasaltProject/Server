@@ -74,6 +74,7 @@
 #include <vector>
 
 namespace basalt::server::runtime {
+class BlockTests;
 
 class BasaltServer {
 public:
@@ -318,6 +319,7 @@ private:
 
     std::optional<wire::io::TcpListener> listener_;
     std::unique_ptr<bedrock::BedrockListener> bedrockListener_;
+    std::unique_ptr<BlockTests> blockTests_;
     std::atomic<bool> accepting_{true};
     std::atomic<bool> shuttingDown_{false};
     std::atomic<bool> shutdownComplete_{false};

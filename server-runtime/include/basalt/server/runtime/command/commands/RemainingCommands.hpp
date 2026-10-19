@@ -11,6 +11,10 @@
 #include <map>
 #include <set>
 
+namespace basalt::server::runtime {
+class BlockTests;
+}
+
 namespace basalt::server::runtime::command::commands {
 
 /// parity: `WaypointCommand`.
@@ -67,13 +71,15 @@ private:
 /// parity: `TestCommand`, for the kind of test this server can actually run.
 class TestCommand final : public Command {
 public:
-    TestCommand(const world::RealTestInstances& instances, FunctionRunner& runner);
+    TestCommand(const world::RealTestInstances& instances, FunctionRunner& runner,
+                std::function<BlockTests*()> blockTests);
 
     void build(const CommandNodeBuilder& root) const override;
 
 private:
     const world::RealTestInstances* instances_;
     FunctionRunner* runner_;
+    std::function<BlockTests*()> blockTests_;
     mutable std::set<wire::common::Identifier> failed_;
 };
 

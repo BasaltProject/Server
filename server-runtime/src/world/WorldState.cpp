@@ -918,6 +918,20 @@ void WorldState::queueStructureTrigger(std::int32_t x, std::int32_t y, std::int3
     structureTriggers_.push_back({x, y, z});
 }
 
+void WorldState::setTestTriggered(std::int32_t x, std::int32_t y, std::int32_t z, bool triggered) {
+    const WorldWriteLock lock{mutex_};
+    if (triggered) {
+        triggeredTestBlocks_.insert({x, y, z});
+    } else {
+        triggeredTestBlocks_.erase({x, y, z});
+    }
+}
+
+bool WorldState::testTriggered(std::int32_t x, std::int32_t y, std::int32_t z) const {
+    const WorldReadLock lock{mutex_};
+    return triggeredTestBlocks_.contains({x, y, z});
+}
+
 std::vector<std::array<std::int32_t, 3>> WorldState::takeStructureTriggers() {
     const WorldWriteLock lock{mutex_};
     return std::exchange(structureTriggers_, {});

@@ -18,6 +18,7 @@
 #include <string>
 
 namespace basalt::server::runtime {
+class BlockTests;
 
 class TickLoop;
 class VanillaGameData;
@@ -45,6 +46,7 @@ struct CommandWiring {
     world::AdvancementTriggers* advancementTriggers = nullptr;
     function::FunctionLibrary* functions = nullptr;
     command::commands::FunctionRunner* functionRunner = nullptr;
+    std::function<BlockTests*()> blockTests;
     command::commands::FunctionSchedule* functionSchedule = nullptr;
     command::commands::DataPackControl datapacks;
     command::commands::BossBarRegistry* bossBars = nullptr;
