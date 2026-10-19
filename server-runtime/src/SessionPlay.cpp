@@ -1025,6 +1025,21 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
+    if (packetId == play::SetTestBlockPacket::kId) {
+        if (const std::optional<play::SetTestBlockPacket> packet = play::SetTestBlockPacket::read(body);
+            packet.has_value()) {
+            blockInteraction_->setTestBlock(*packet);
+        }
+        return;
+    }
+    if (packetId == play::TestInstanceBlockActionPacket::kId) {
+        if (const std::optional<play::TestInstanceBlockActionPacket> packet =
+                play::TestInstanceBlockActionPacket::read(body);
+            packet.has_value()) {
+            blockInteraction_->testInstanceBlockAction(*packet);
+        }
+        return;
+    }
     if (packetId == play::SignUpdatePacket::kId) {
         const std::optional<play::SignUpdatePacket> packet = play::SignUpdatePacket::read(body);
         if (packet.has_value()) {

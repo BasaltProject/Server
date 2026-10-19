@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
+#include <basalt/server/runtime/BlockTests.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
@@ -223,6 +224,116 @@ void BlockInteractionHandler::setStructureBlock(const play::SetStructureBlockPac
     if (const std::optional<std::int32_t> moved = structures->handle(*world, *session, packet); moved.has_value()) {
         broadcastBlockUpdate(packet.pos, *moved);
     }
+}
+
+void BlockInteractionHandler::setTestBlock(const play::SetTestBlockPacket& packet) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    PlayerSession* session = owner_->playerSession();
+    if (world == nullptr || session == nullptr || !mayUseGameMasterBlocks(*session)) {
+        return;
+    }
+    server::world::Chunk* chunk = world->state().chunkIfLoaded(packet.pos.x >> 4, packet.pos.z >> 4);
+    server::world::ChunkBlockEntity* entity =
+        chunk == nullptr ? nullptr : chunk->blockEntityAt(packet.pos.x & 15, packet.pos.y, packet.pos.z & 15);
+    if (entity == nullptr || entity->type().path() != "test_block") {
+        return;
+    }
+    // parity: `TestBlockEntity.setMode` rewrites the block's `mode` property, and the message is plain text.
+    static constexpr std::array<std::string_view, 4> kModes{"start", "log", "fail", "accept"};
+    const std::string_view mode = kModes[static_cast<std::size_t>(packet.mode)];
+    entity->data().putString("mode", std::string{mode});
+    entity->data().putString("message", packet.message);
+    chunk->markDirty();
+    const std::optional<std::int32_t> before = world->state().blockState(packet.pos.x, packet.pos.y, packet.pos.z);
+    if (before.has_value()) {
+        std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(*before);
+        properties["mode"] = std::string{mode};
+        const std::optional<std::int32_t> after =
+            reg::blocks::stateIdOf(wire::common::Identifier::vanilla("test_block"), properties);
+        if (after.has_value() && *after != *before &&
+            world->state().setBlockState(packet.pos.x, packet.pos.y, packet.pos.z, *after)) {
+            broadcastBlockUpdate(packet.pos, *after);
+        }
+    }
+    sendBlockEntity(packet.pos);
+}
+
+void BlockInteractionHandler::testInstanceBlockAction(const play::TestInstanceBlockActionPacket& packet) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    PlayerSession* session = owner_->playerSession();
+    BlockTests* tests = owner_->options().blockTests;
+    if (world == nullptr || session == nullptr || tests == nullptr || !mayUseGameMasterBlocks(*session)) {
+        return;
+    }
+    server::world::Chunk* chunk = world->state().chunkIfLoaded(packet.pos.x >> 4, packet.pos.z >> 4);
+    server::world::ChunkBlockEntity* entity =
+        chunk == nullptr ? nullptr : chunk->blockEntityAt(packet.pos.x & 15, packet.pos.y, packet.pos.z & 15);
+    if (entity == nullptr || entity->type().path() != "test_instance_block") {
+        return;
+    }
+    using Action = play::TestInstanceBlockActionPacket::Action;
+    const std::array<std::int32_t, 3> at{packet.pos.x, packet.pos.y, packet.pos.z};
+    const auto tell = [session](const wire::text::Component& message) { session->sendSystemMessage(message); };
+    if (packet.action == Action::Query || packet.action == Action::Init) {
+        // parity: `GameTestInstance.describe`, or the red line of a block that names no test.
+        play::TestInstanceBlockStatusPacket status;
+        std::optional<wire::common::Identifier> test;
+        if (packet.test.has_value()) {
+            if (auto parsed = wire::common::Identifier::parse(*packet.test); parsed.has_value()) {
+                test = std::move(*parsed);
+            }
+        }
+        const auto described = test.has_value() ? tests->describe(*test) : std::nullopt;
+        status.status = described.has_value()
+                            ? *described
+                            : wire::text::Component::translatable("test_instance.description.no_test");
+        if (packet.action == Action::Query && test.has_value()) {
+            status.size = tests->sizeOf(*test);
+        }
+        if (session->connection().sendPlayPacket) {
+            session->connection().sendPlayPacket(play::TestInstanceBlockStatusPacket::kId,
+                                                 [&status](wire::io::ByteBuffer& buffer) { status.write(buffer); });
+        }
+        return;
+    }
+    const std::optional<wire::common::Identifier> test =
+        packet.test.has_value()
+            ? wire::common::Identifier::parse(*packet.test).value_or(wire::common::Identifier::vanilla("none"))
+            : std::optional<wire::common::Identifier>{};
+    if (test.has_value()) {
+        tests->setBlockData(*world, at, *test, packet.size, packet.rotation, packet.ignoreEntities);
+    }
+    const BlockTests::Found found{.test = test.value_or(wire::common::Identifier::vanilla("none")), .at = at};
+    if (test.has_value() && packet.action == Action::Reset) {
+        if (const auto refused = tests->reset(*world, found, {}); refused.has_value()) {
+            tell(wire::text::Component::text(*refused));
+        } else {
+            tell(wire::text::Component::translatable("test_instance_block.reset_success",
+                                                     {wire::text::Component::text(test->toString())}));
+        }
+    } else if (test.has_value() && (packet.action == Action::Save || packet.action == Action::Export)) {
+        if (const auto refused = tests->save(*world, found, packet.action == Action::Export); refused.has_value()) {
+            tell(wire::text::Component::text(*refused));
+        }
+    } else if (test.has_value() && packet.action == Action::Run) {
+        tell(wire::text::Component::translatable("test_instance_block.starting",
+                                                 {wire::text::Component::text(test->toString())}));
+        const PlayerSession* watcher = session;
+        const auto refused = tests->restart(
+            *world, found,
+            [watcher](const BlockTests::Report& report) {
+                watcher->sendSystemMessage(
+                    report.passed ? wire::text::Component::text(report.id.toString() + " passed! (" +
+                                                                std::to_string(report.ticks) + "gameticks)")
+                                  : wire::text::Component::text(report.id.toString() + " failed! ")
+                                        .append(report.failure.value_or(wire::text::Component::text("no reason"))));
+            },
+            {});
+        if (refused.has_value()) {
+            tell(wire::text::Component::translatable("test_instance_block.error.no_test_structure", {}));
+        }
+    }
+    sendBlockEntity(packet.pos);
 }
 
 void BlockInteractionHandler::sendBlockEntity(const BlockPos& pos) {

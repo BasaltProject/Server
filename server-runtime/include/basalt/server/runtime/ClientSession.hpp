@@ -104,6 +104,7 @@ namespace basalt::server::runtime {
 class ChunkStreamer;
 class CombatHandler;
 class BlockChangeBroadcaster;
+class BlockTests;
 class ContainerMenuController;
 class CombatSystem;
 class VehicleSystem;
@@ -252,6 +253,7 @@ public:
         FireworkSystem* fireworks = nullptr;
         MobActionSystem* mobs = nullptr;
         StructureBlockSystem* structureBlocks = nullptr;
+        BlockTests* blockTests = nullptr;
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;
         /// parity: `new ExperienceOrb`.

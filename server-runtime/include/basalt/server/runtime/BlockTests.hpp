@@ -85,6 +85,20 @@ public:
     /// Puts the test back as its template has it and clears the block's status. parity: `resetTest`.
     [[nodiscard]] std::optional<std::string> reset(world::LoadedWorld& world, const Found& block, const Placed& placed);
 
+    /// What the test instance block's screen shows about a test. parity: `GameTestInstance.describe`.
+    [[nodiscard]] std::optional<wire::text::Component> describe(const wire::common::Identifier& test) const;
+
+    [[nodiscard]] std::optional<std::array<std::int32_t, 3>> sizeOf(const wire::common::Identifier& test) const;
+
+    /// Rewrites what a test instance block holds. parity: `TestInstanceBlockEntity.set`.
+    void setBlockData(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
+                      const wire::common::Identifier& test, const std::array<std::int32_t, 3>& size,
+                      std::int32_t rotation, bool ignoreEntities);
+
+    /// Saves the space beside a test instance block as the test's template. parity: `saveTest`; `exportToFiles` is the
+    /// export that the production server keeps disabled.
+    [[nodiscard]] std::optional<std::string> save(world::LoadedWorld& world, const Found& block, bool exportToFiles);
+
     /// Puts an empty test instance block of the given size at `blockAt`. parity: `/test create`.
     [[nodiscard]] std::optional<std::string> create(world::LoadedWorld& world, const wire::common::Identifier& id,
                                                     const std::array<std::int32_t, 3>& blockAt,
@@ -128,7 +142,7 @@ private:
     void writeBlockEntity(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
                           const wire::common::Identifier& test, const std::array<std::int32_t, 3>& size,
                           const std::string& rotation, const std::string& status,
-                          const std::optional<wire::text::Component>& error);
+                          const std::optional<wire::text::Component>& error, bool ignoreEntities = false);
     [[nodiscard]] std::vector<player::PlayerSession*> watchersOf(const world::LoadedWorld& world) const;
 
     world::StructureTemplates* templates_;

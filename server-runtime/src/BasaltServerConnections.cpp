@@ -166,6 +166,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     };
     options.plugins = pluginHooks();
     options.events = &eventSink_;
+    options.blockTests = blockTests_.get();
     options.carryBedrock = [this](const bedrock::Identity& who, std::unique_ptr<bedrock::Channel> channel) {
         return bedrockListener_ == nullptr ? nullptr : bedrockListener_->carry(who, std::move(channel));
     };
