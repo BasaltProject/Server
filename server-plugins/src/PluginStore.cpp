@@ -3,6 +3,7 @@
 #include <basalt/server/plugins/PluginStore.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
+#include <basalt/wire/plugins/PluginValue.hpp>
 
 #include <charconv>
 #include <cstdint>
@@ -13,23 +14,15 @@ namespace basalt::server::plugins {
 namespace {
 using wire::lua::LuaArgs;
 
-void pushStored(LuaArgs& lua, const std::string& stored) {
-    std::int64_t whole = 0;
-    const auto* end = stored.data() + stored.size();
-    if (std::from_chars(stored.data(), end, whole).ptr == end) {
-        lua.pushInteger(whole);
-        return;
+[[nodiscard]] std::optional<std::string> storedValue(LuaArgs& args) {
+    if (args.isNil(3)) {
+        return std::nullopt;
     }
-    double real = 0.0;
-    if (std::from_chars(stored.data(), end, real).ptr == end) {
-        lua.pushNumber(real);
-        return;
+    std::optional<std::string> encoded = wire::plugins::encodeValue(args, 3);
+    if (!encoded.has_value()) {
+        args.raise("a stored value is a boolean, a number or a string");
     }
-    if (stored == "true" || stored == "false") {
-        lua.pushBoolean(stored == "true");
-        return;
-    }
-    lua.pushString(stored);
+    return encoded;
 }
 
 void pushTop(LuaArgs& lua, PluginHost& host, const std::string& pluginId) {
@@ -47,7 +40,7 @@ void pushTop(LuaArgs& lua, PluginHost& host, const std::string& pluginId) {
             const std::shared_ptr<PluginPlayerRef> player = target->services().players().byUuid(uuid);
             args.pushString(player == nullptr ? uuid : player->name());
             args.setField("name");
-            pushStored(args, value);
+            wire::plugins::pushValue(args, value);
             args.setField("value");
             args.setIndex(position++);
         }
@@ -70,15 +63,14 @@ void pushStore(LuaArgs& lua, PluginHost& host, const std::string& pluginId) {
         if (!stored.has_value()) {
             args.pushNil();
         } else {
-            pushStored(args, *stored);
+            wire::plugins::pushValue(args, *stored);
         }
         return 1;
     });
     lua.setField("__index");
     wire::lua::pushHostFunction(lua, "store.newindex", [target, pluginId](LuaArgs& args) {
         const std::string key = args.checkString(2);
-        target->services().storage().setPlayerValue(pluginId, kServerScope, key,
-                                                    args.isNil(3) ? std::nullopt : std::optional{args.toText(3)});
+        target->services().storage().setPlayerValue(pluginId, kServerScope, key, storedValue(args));
         return 0;
     });
     lua.setField("__newindex");

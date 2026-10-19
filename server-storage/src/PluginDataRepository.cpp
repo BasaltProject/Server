@@ -53,7 +53,8 @@ std::vector<std::pair<std::string, std::string>> PluginDataRepository::top(std::
                                                                            std::string_view key, std::int32_t limit) {
     std::vector<std::pair<std::string, std::string>> found;
     wire::sql::Statement statement = database_->prepare(
-        "SELECT uuid, value FROM plugin_data WHERE plugin = ? AND key = ? ORDER BY CAST(value AS REAL) DESC LIMIT ?");
+        "SELECT uuid, value FROM plugin_data WHERE plugin = ? AND key = ? AND substr(value, 1, 1) = 'n' "
+        "ORDER BY CAST(substr(value, 2) AS REAL) DESC LIMIT ?");
     statement.bind(1, plugin);
     statement.bind(2, key);
     statement.bind(3, static_cast<std::int64_t>(limit));
