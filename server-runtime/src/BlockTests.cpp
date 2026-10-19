@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/BlockTests.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -80,6 +81,14 @@ std::optional<std::string> BlockTests::start(world::LoadedWorld& world, const wo
     }
     if (placed) {
         placed(box);
+    }
+    placed_.push_back(Placement{.worldName = world.name(), .box = box});
+    // A flag left by an earlier run on the same ground must not count for this one.
+    const Run fresh{.instance = instance, .worldName = world.name(), .box = box};
+    for (const Mode mode : {Mode::Start, Mode::Log, Mode::Fail, Mode::Accept}) {
+        for (const auto& at : blocksIn(world, fresh, mode)) {
+            world.state().setTestTriggered(at[0], at[1], at[2], false);
+        }
     }
     runs_.push_back(
         Run{.instance = instance, .worldName = world.name(), .box = box, .ticks = 0, .reporter = std::move(reporter)});
@@ -214,6 +223,37 @@ void BlockTests::tick(world::LoadedWorld& world) {
         }
     }
     std::erase_if(runs_, [](const Run& run) { return run.ticks < 0; });
+}
+
+std::int32_t BlockTests::clearAll(world::LoadedWorld& world) {
+    std::vector<player::PlayerSession*> watchers;
+    for (player::PlayerSession* player : players_->snapshot()) {
+        if (player->worldName == world.name()) {
+            watchers.push_back(player);
+        }
+    }
+    const std::int32_t air = server::registry::blocks::air().stateId;
+    std::int32_t cleared = 0;
+    std::erase_if(placed_, [&](const Placement& placement) {
+        if (placement.worldName != world.name()) {
+            return false;
+        }
+        for (std::int32_t x = placement.box.minX; x <= placement.box.maxX; x++) {
+            for (std::int32_t y = placement.box.minY; y <= placement.box.maxY; y++) {
+                for (std::int32_t z = placement.box.minZ; z <= placement.box.maxZ; z++) {
+                    const std::optional<std::int32_t> before = world.state().blockState(x, y, z);
+                    if (before.has_value() && *before != air && world.state().setBlockState(x, y, z, air)) {
+                        broadcaster_->announceBlock(watchers,
+                                                    world::BlockChange{.x = x, .y = y, .z = z, .stateId = air});
+                    }
+                }
+            }
+        }
+        cleared++;
+        return true;
+    });
+    std::erase_if(runs_, [&](const Run& run) { return run.worldName == world.name(); });
+    return cleared;
 }
 
 } // namespace basalt::server::runtime

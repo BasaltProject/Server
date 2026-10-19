@@ -52,6 +52,9 @@ public:
     /// Forgets every run without a report. parity: `/test stop`.
     void stopAll() { runs_.clear(); }
 
+    /// Empties the ground every test has been placed on in `world` and answers how many. parity: `/test clearall`.
+    [[nodiscard]] std::int32_t clearAll(world::LoadedWorld& world);
+
 private:
     struct Run {
         world::TestInstance instance;
@@ -71,7 +74,14 @@ private:
     world::StructureTemplates* templates_;
     BlockChangeBroadcaster* broadcaster_;
     player::PlayerRegistry* players_;
+
+    struct Placement {
+        std::string worldName;
+        server::world::structure::StructureBoundingBox box;
+    };
+
     std::vector<Run> runs_;
+    std::vector<Placement> placed_;
     std::vector<Report> finished_;
 };
 

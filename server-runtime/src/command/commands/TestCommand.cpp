@@ -381,8 +381,14 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
     });
 
     const CommandExecutor clear = [this](const CommandContext& context) -> Parsed<std::int32_t> {
-        const auto cleared = static_cast<std::int32_t>(failed_.size());
+        std::int32_t cleared = static_cast<std::int32_t>(failed_.size());
         failed_.clear();
+        // parity: `/test clearall` empties the space of every test, not only the memory of the failed ones.
+        if (BlockTests* blockTests = blockTests_ ? blockTests_() : nullptr; blockTests != nullptr) {
+            if (const Parsed<world::LoadedWorld*> where = context.world(); where.has_value()) {
+                cleared += blockTests->clearAll(**where);
+            }
+        }
         context.success(
             Component::translatable("commands.test.clear.success", {Component::text(std::to_string(cleared))}));
         return cleared;
@@ -449,10 +455,12 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
             });
         });
     });
-    root.literal("stop", [](const CommandNodeBuilder& form) {
-        form.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
-            context.success(Component::translatable("commands.test.no_tests"));
-            return 0;
+    root.literal("stop", [this](const CommandNodeBuilder& form) {
+        form.executes([this](const CommandContext&) -> Parsed<std::int32_t> {
+            if (BlockTests* blockTests = blockTests_ ? blockTests_() : nullptr; blockTests != nullptr) {
+                blockTests->stopAll();
+            }
+            return 1;
         });
     });
 }
