@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <cstdint>
@@ -24,6 +25,10 @@ struct TestInstance {
     std::string rotation = "none";
     std::int32_t padding = 0;
     bool skyAccess = false;
+    std::optional<wire::common::JsonValue> environment;
+    /// Tries and successes asked of a flaky test. parity: `TestData.maxAttempts` and `requiredSuccesses`.
+    std::int32_t maxAttempts = 1;
+    std::int32_t requiredSuccesses = 1;
 
     [[nodiscard]] bool isFunctionTest() const;
 };

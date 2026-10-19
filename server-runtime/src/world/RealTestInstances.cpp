@@ -119,6 +119,10 @@ constexpr std::int32_t kDefaultMaxTicks = 100;
         .rotation = textAt(*object, "rotation", "none"),
         .padding = wholeAt(*object, "padding", 0),
         .skyAccess = flagAt(*object, "sky_access"),
+        .environment =
+            object->find("environment") == nullptr ? std::nullopt : std::optional{*object->find("environment")},
+        .maxAttempts = wholeAt(*object, "max_attempts", 1),
+        .requiredSuccesses = wholeAt(*object, "required_successes", 1),
     };
 }
 

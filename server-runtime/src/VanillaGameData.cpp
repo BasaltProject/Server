@@ -104,6 +104,7 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       dialogs({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       timelines({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       testInstances({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
+      testEnvironments({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       structureTemplates({.readEntry = jar.readEntry, .dataIds = jar.dataIds}) {
     useHeightmapTags(blockTags);
     lootTables.useRegistries(&lootRegistries);

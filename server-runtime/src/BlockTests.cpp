@@ -51,8 +51,38 @@ constexpr std::string_view kTestInstanceBlock = "minecraft:test_instance_block";
 } // namespace
 
 BlockTests::BlockTests(world::StructureTemplates& templates, const world::RealTestInstances& instances,
+                       const world::RealTestEnvironments& environments, const command::CommandEnvironment& environment,
                        BlockChangeBroadcaster& broadcaster, player::PlayerRegistry& players)
-    : templates_(&templates), instances_(&instances), broadcaster_(&broadcaster), players_(&players) {}
+    : templates_(&templates), instances_(&instances), environments_(&environments), environment_(&environment),
+      broadcaster_(&broadcaster), players_(&players) {}
+
+void BlockTests::enter(world::LoadedWorld& world, Run& run) {
+    if (!run.instance.environment.has_value()) {
+        return;
+    }
+    // parity: a batch shares its environment, so tests that ask for the same one apply it once.
+    const std::string* named = run.instance.environment->get<std::string>();
+    run.environmentKey = world.name() + "/" + (named != nullptr ? *named : run.instance.id.toString());
+    Active& active = active_[run.environmentKey];
+    if (active.users++ == 0) {
+        active.undo = environments_->activate(*run.instance.environment, world, *environment_);
+    }
+}
+
+void BlockTests::leave(Run& run) {
+    if (run.environmentKey.empty()) {
+        return;
+    }
+    const auto found = active_.find(run.environmentKey);
+    run.environmentKey.clear();
+    if (found == active_.end() || --found->second.users > 0) {
+        return;
+    }
+    if (found->second.undo) {
+        found->second.undo();
+    }
+    active_.erase(found);
+}
 
 std::vector<player::PlayerSession*> BlockTests::watchersOf(const world::LoadedWorld& world) const {
     std::vector<player::PlayerSession*> watchers;
@@ -250,6 +280,7 @@ std::optional<std::string> BlockTests::start(world::LoadedWorld& world, const wo
                         .layout = layout,
                         .ticks = 0,
                         .reporter = std::move(reporter)});
+    enter(world, runs_.back());
     return std::nullopt;
 }
 
@@ -478,6 +509,7 @@ void BlockTests::tick(world::LoadedWorld& world) {
         if (report.passed) {
             encase(world, owner->layout, owner->instance.skyAccess, false);
         }
+        leave(*owner);
         owner->reporter(report);
     }
     std::erase_if(runs_, [](const Run& run) { return run.ticks < 0; });
@@ -516,8 +548,20 @@ std::int32_t BlockTests::clearAll(world::LoadedWorld& world, const std::int32_t 
             }
         }
     }
+    for (Run& run : runs_) {
+        if (run.worldName == world.name()) {
+            leave(run);
+        }
+    }
     std::erase_if(runs_, [&](const Run& run) { return run.worldName == world.name(); });
     return cleared;
+}
+
+void BlockTests::stopAll() {
+    for (Run& run : runs_) {
+        leave(run);
+    }
+    runs_.clear();
 }
 
 } // namespace basalt::server::runtime
