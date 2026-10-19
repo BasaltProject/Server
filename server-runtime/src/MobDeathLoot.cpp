@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/command/DataArguments.hpp>
+#include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
