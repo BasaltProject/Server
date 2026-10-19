@@ -39,6 +39,7 @@ private:
 
     wire::common::Logger logger_;
     std::map<wire::common::Identifier, wire::common::JsonValue> named_;
+    std::map<wire::common::Identifier, wire::common::JsonValue> timelines_;
 };
 
 } // namespace basalt::server::runtime::world

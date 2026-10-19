@@ -307,8 +307,10 @@ void RaidSystem::tickOmens(world::LoadedWorld& world, PlayerSession& player, con
 Raid* RaidSystem::createOrExtendRaid(world::LoadedWorld& world, PlayerSession& player, const RaidPos& position,
                                      std::int32_t amplifier) {
     // parity: `gameplay/can_start_raid`, which only the Nether's dimension type turns off.
+    const std::optional<double> raidsAllowed = world.attributeOverride("minecraft:gameplay/can_start_raid");
     if (player.gamemode == Gamemode::Spectator || !world.gameRules().get(world::gameRules::kRaids) ||
-        world.declaration().dimension == config::WorldDimension::Nether) {
+        (raidsAllowed.has_value() ? *raidsAllowed == 0.0
+                                  : world.declaration().dimension == config::WorldDimension::Nether)) {
         return nullptr;
     }
     std::vector<world::poi::PoiRecord> points;

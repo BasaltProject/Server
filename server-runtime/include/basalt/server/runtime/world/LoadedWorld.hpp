@@ -139,6 +139,10 @@ public:
     /// Vanilla keeps the clock per dimension type; here clock, weather and game rules are per world.
     [[nodiscard]] WorldClock& clock() noexcept { return clock_; }
 
+    void setAttributeOverride(const std::string& name, std::optional<double> value);
+
+    [[nodiscard]] std::optional<double> attributeOverride(std::string_view name) const;
+
     [[nodiscard]] const WorldClock& clock() const noexcept { return clock_; }
 
     [[nodiscard]] WorldWeather& weather() noexcept { return weather_; }
@@ -290,6 +294,8 @@ private:
     std::optional<std::array<std::int32_t, 3>> spawnOverride_;
     bool movedSpawn_ = false;
     WorldClock clock_;
+    mutable std::mutex attributeMutex_;
+    std::map<std::string, double, std::less<>> attributeOverrides_;
     WorldWeather weather_;
     GameRuleValues gameRules_;
     std::int64_t biomeZoomSeed_ = 0;

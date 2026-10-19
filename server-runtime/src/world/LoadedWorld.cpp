@@ -165,6 +165,21 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
 
 LoadedWorld::~LoadedWorld() = default;
 
+void LoadedWorld::setAttributeOverride(const std::string& name, std::optional<double> value) {
+    const std::lock_guard lock{attributeMutex_};
+    if (value.has_value()) {
+        attributeOverrides_.insert_or_assign(name, *value);
+    } else {
+        attributeOverrides_.erase(name);
+    }
+}
+
+std::optional<double> LoadedWorld::attributeOverride(std::string_view name) const {
+    const std::lock_guard lock{attributeMutex_};
+    const auto found = attributeOverrides_.find(name);
+    return found == attributeOverrides_.end() ? std::nullopt : std::optional{found->second};
+}
+
 server::world::terrain::VillageStructureGenerator*
 LoadedWorld::structureSetGenerator(const wire::common::Identifier& structure) const {
     for (server::world::terrain::VillageStructureGenerator* generator : {villageGenerator_, campGenerator_}) {
