@@ -14,6 +14,7 @@
 #include <basalt/wire/bedrock/BedrockBlocks.hpp>
 #include <basalt/wire/bedrock/BedrockEffects.hpp>
 #include <basalt/wire/bedrock/BedrockItems.hpp>
+#include <basalt/wire/bedrock/BedrockMapConversion.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/bedrock/BedrockParticles.hpp>
 #include <basalt/wire/bedrock/BedrockSounds.hpp>
@@ -408,7 +409,8 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
 
     connection.sendMapData = [this](const wire::protocol::play::MapItemDataPacket& update) {
         wire::io::ByteBuffer body;
-        wire::bedrock::writeMapItemData(body, bedrockMapOf(update, static_cast<std::uint8_t>(dimension_)), protocol_);
+        wire::bedrock::writeMapItemData(
+            body, wire::bedrock::bedrockMapOf(update, static_cast<std::uint8_t>(dimension_)), protocol_);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ClientboundMapItemData),
                        body.toVector());
     };
