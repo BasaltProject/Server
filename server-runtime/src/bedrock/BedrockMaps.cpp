@@ -58,7 +58,7 @@ constexpr std::array<Icon, 40> kIcons{{
     {4},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::int32_t>, 15> kExplorerData{{
+constexpr std::array<std::pair<std::string_view, std::int32_t>, 16> kExplorerData{{
     {"minecraft:ocean_monument_map", 3},
     {"minecraft:woodland_mansion_map", 4},
     {"minecraft:buried_trial_chambers_map", 14},
@@ -74,6 +74,7 @@ constexpr std::array<std::pair<std::string_view, std::int32_t>, 15> kExplorerDat
     {"minecraft:buried_mineshaft_map", 24},
     {"minecraft:desert_pyramid_map", 25},
     {"minecraft:warm_ocean_ruins_map", 26},
+    {"minecraft:abandoned_camp_map", 18},
 }};
 
 [[nodiscard]] std::uint32_t abgrOf(std::uint8_t packed) {
