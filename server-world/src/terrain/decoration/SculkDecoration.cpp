@@ -434,7 +434,12 @@ const std::set<std::string, std::less<>>& sculkDecoration::placedIds() {
 
 void sculkDecoration::decorateFeature(Chunk& chunk, const std::int64_t seed,
                                       const surface::SurfaceRuleEnvironment& environment,
-                                      const std::int32_t globalIndex, ExternalStateReader externalBlockState) {
+                                      const std::int32_t globalIndex, ExternalStateReader externalBlockState,
+                                      ExternalBiomeReader externalBiome) {
+    // parity: a feature no biome of the 3x3 lists never runs; each feature is reseeded, so skipping one draws nothing.
+    if (biomeInStoredRange(chunk, "deep_dark", externalBiome) == std::optional<bool>{false}) {
+        return;
+    }
     SculkRegion region{chunk, std::move(externalBlockState)};
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed =
@@ -449,7 +454,10 @@ void sculkDecoration::decorateFeature(Chunk& chunk, const std::int64_t seed,
 
 void sculkDecoration::decorate(Chunk& chunk, const std::int64_t seed,
                                const surface::SurfaceRuleEnvironment& environment,
-                               ExternalStateReader externalBlockState) {
+                               ExternalStateReader externalBlockState, ExternalBiomeReader externalBiome) {
+    if (biomeInStoredRange(chunk, "deep_dark", externalBiome) == std::optional<bool>{false}) {
+        return;
+    }
     SculkRegion region{chunk, std::move(externalBlockState)};
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed =

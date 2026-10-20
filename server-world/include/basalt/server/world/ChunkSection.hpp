@@ -39,6 +39,17 @@ public:
         return blockStateIds_.anyValue(std::forward<Predicate>(predicate));
     }
 
+    template <typename Predicate>
+    [[nodiscard]] bool mayContainBiome(Predicate&& predicate) const {
+        return biomeIds_.anyValue(std::forward<Predicate>(predicate));
+    }
+
+    /// Called when the chunk goes where other threads can reach it.
+    void share() noexcept {
+        blockStateIds_.share();
+        biomeIds_.share();
+    }
+
     [[nodiscard]] std::vector<std::int32_t> blockStateIds() const;
 
     void copyBlockStateIdsInto(std::span<std::int32_t> dest) const;

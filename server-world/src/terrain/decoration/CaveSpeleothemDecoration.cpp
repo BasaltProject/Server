@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/World.hpp>
 #include <basalt/server/world/terrain/decoration/CaveSpeleothemDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/OreBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/StoneBlockTags.hpp>
@@ -11,6 +12,8 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <expected>
+#include <functional>
 #include <map>
 #include <optional>
 #include <stdexcept>
@@ -597,7 +600,11 @@ const std::set<std::string, std::less<>>& caveSpeleothemDecoration::placedIds() 
 
 /// parity: `applyBiomeDecoration` only runs features some biome in the 3x3 lists.
 [[nodiscard]] bool biomeInRange(const surface::SurfaceRuleEnvironment& environment, const Chunk& chunk,
-                                std::string_view biome) {
+                                std::string_view biome, const ExternalBiomeReader& externalBiome) {
+    // The stored biomes of the 3x3 are what vanilla reads, and cost a palette walk, not a climate sample.
+    if (const std::optional<bool> stored = biomeInStoredRange(chunk, biome, externalBiome); stored.has_value()) {
+        return *stored;
+    }
     const ChunkHeight bounds = chunk.verticalBounds();
     for (std::int32_t dx = -1; dx <= 1; ++dx) {
         for (std::int32_t dz = -1; dz <= 1; ++dz) {
@@ -620,13 +627,14 @@ const std::set<std::string, std::less<>>& caveSpeleothemDecoration::placedIds() 
 void caveSpeleothemDecoration::decorateFeatures(Chunk& chunk, const std::int64_t seed,
                                                 const surface::SurfaceRuleEnvironment& environment,
                                                 const std::int32_t firstIndex, const std::int32_t lastIndex,
-                                                ExternalStateReader externalBlockState) {
+                                                ExternalStateReader externalBlockState,
+                                                ExternalBiomeReader externalBiome) {
     SpeleothemRegion region{chunk, std::move(externalBlockState)};
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed =
         random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
-    const bool anySulfur = biomeInRange(environment, chunk, sulfurSpike().biome);
-    const bool anyDripstone = biomeInRange(environment, chunk, pointedDripstone().biome);
+    const bool anySulfur = biomeInRange(environment, chunk, sulfurSpike().biome, externalBiome);
+    const bool anyDripstone = biomeInRange(environment, chunk, pointedDripstone().biome, externalBiome);
     for (std::int32_t globalIndex = firstIndex; globalIndex <= lastIndex; ++globalIndex) {
         const bool sulfur = globalIndex == kSulfurClusterIndex || globalIndex == kSulfurSpikeIndex;
         if (sulfur ? !anySulfur : !anyDripstone) {
@@ -647,9 +655,9 @@ void caveSpeleothemDecoration::decorateFeatures(Chunk& chunk, const std::int64_t
 
 void caveSpeleothemDecoration::decorate(Chunk& chunk, const std::int64_t seed,
                                         const surface::SurfaceRuleEnvironment& environment,
-                                        ExternalStateReader externalBlockState) {
+                                        ExternalStateReader externalBlockState, ExternalBiomeReader externalBiome) {
     decorateFeatures(chunk, seed, environment, kSulfurClusterIndex, kPointedDripstoneIndex,
-                     std::move(externalBlockState));
+                     std::move(externalBlockState), std::move(externalBiome));
 }
 
 bool caveSpeleothemDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin,

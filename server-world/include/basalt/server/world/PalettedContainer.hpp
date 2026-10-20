@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <shared_mutex>
 #include <span>
@@ -11,6 +12,9 @@ namespace basalt::server::world {
 class PalettedContainer {
 public:
     explicit PalettedContainer(std::size_t size, std::int32_t initialValue = 0);
+
+    /// From here on other threads may read it, so every access takes the lock; before this only its owner touches it.
+    void share() noexcept { shared_.store(true, std::memory_order_release); }
 
     [[nodiscard]] std::int32_t get(std::size_t index) const;
 
@@ -46,6 +50,7 @@ private:
 
     std::size_t size_;
     mutable std::shared_mutex lock_;
+    std::atomic<bool> shared_{false};
     int bits_ = 0;
     std::vector<std::int32_t> palette_;
     std::size_t paletteSize_ = 0;

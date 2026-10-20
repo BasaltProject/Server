@@ -2,6 +2,7 @@ basalt_module(server-world
     SOURCES
         src/Chunk.cpp
         src/blending/BlendingData.cpp
+        src/terrain/decoration/BiomePresence.cpp
         src/blending/Blender.cpp
         src/GeneratedBlockWrites.cpp
         src/ChunkTracker.cpp

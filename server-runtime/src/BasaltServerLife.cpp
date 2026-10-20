@@ -76,6 +76,7 @@
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
 #include <basalt/server/runtime/world/maps/Cartography.hpp>
+#include <basalt/server/world/GenerationMetrics.hpp>
 #include <basalt/wire/bedrock/BedrockEntityIdentifiers.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
@@ -311,6 +312,9 @@ void BasaltServer::shutdown() {
         world->stopGenerating(kShutdownDrainTimeoutMillis);
     }
 
+    if (server::world::generationMetrics::enabled()) {
+        logger_.info([] { return server::world::generationMetrics::report(); });
+    }
     logger_.info([this] { return "Saving " + std::to_string(worldRegistry_->worlds().size()) + " world(s)."; });
     for (const auto& [name, world] : worldRegistry_->worlds()) {
         static_cast<void>(server::plugins::emit(&plugins_->events(), &server::plugins::pluginEventTypes::worldSave(),

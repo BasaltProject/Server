@@ -30,6 +30,10 @@ public:
     [[nodiscard]] virtual std::optional<std::int32_t> oceanFloorHeightAt(std::int32_t worldX,
                                                                          std::int32_t worldZ) const = 0;
 
+    [[nodiscard]] virtual std::optional<bool> chunkHasBiome(std::int32_t, std::int32_t, std::int32_t) const {
+        return std::nullopt;
+    }
+
 protected:
     NeighbourTerrain() = default;
 };

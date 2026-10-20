@@ -59,6 +59,13 @@ public:
 
     [[nodiscard]] const ChunkSection& section(std::size_t index) const { return sections_[index]; }
 
+    /// parity: nothing; before this a chunk belongs to the one task generating it and its sections take no lock.
+    void share() noexcept {
+        for (ChunkSection& section : sections_) {
+            section.share();
+        }
+    }
+
     [[nodiscard]] std::int32_t blockStateId(std::int32_t x, std::int32_t y, std::int32_t z) const;
 
     bool setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
@@ -79,6 +86,9 @@ public:
     void setBiomeId(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ, std::int32_t biomeId);
 
     [[nodiscard]] std::int32_t biomeId(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) const;
+
+    /// parity: the union of the section palettes that `applyBiomeDecoration` reads as `getBiomesWithin`.
+    [[nodiscard]] bool hasBiome(std::int32_t biomeId) const;
 
     [[nodiscard]] std::vector<std::int32_t> heightmap(HeightmapType type = HeightmapType::MotionBlocking) const;
 

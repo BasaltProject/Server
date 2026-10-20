@@ -61,12 +61,18 @@ std::int32_t PalettedContainer::at(std::size_t index) const {
 }
 
 std::int32_t PalettedContainer::get(std::size_t index) const {
+    if (!shared_.load(std::memory_order_acquire)) {
+        return at(index);
+    }
     const std::shared_lock<std::shared_mutex> guard{lock_};
     return at(index);
 }
 
 bool PalettedContainer::set(std::size_t index, std::int32_t value) {
-    const std::unique_lock<std::shared_mutex> guard{lock_};
+    std::unique_lock<std::shared_mutex> guard{lock_, std::defer_lock};
+    if (shared_.load(std::memory_order_acquire)) {
+        guard.lock();
+    }
     if (words_.empty() && palette_[0] == value) {
         return false;
     }

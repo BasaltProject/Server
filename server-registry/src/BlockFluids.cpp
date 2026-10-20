@@ -29,8 +29,26 @@ bool hasWaterFluid(std::int32_t stateId) {
     return block != nullptr && std::ranges::find(kAlwaysInWater, block->path()) != kAlwaysInWater.end();
 }
 
-bool hasFluid(std::int32_t stateId) {
+namespace {
+
+bool computeHasFluid(std::int32_t stateId) {
     const std::int32_t lava = blocks::lava().stateId;
     return (stateId >= lava && stateId < lava + kLevels) || hasWaterFluid(stateId);
+}
+
+} // namespace
+
+bool hasFluid(std::int32_t stateId) {
+    // Asked of nearly every block a chunk generation writes, and a state's answer never changes.
+    static const std::vector<bool> answers = [] {
+        std::vector<bool> built(static_cast<std::size_t>(blocks::stateCount()));
+        for (std::size_t id = 0; id < built.size(); ++id) {
+            built[id] = computeHasFluid(static_cast<std::int32_t>(id));
+        }
+        return built;
+    }();
+    return stateId >= 0 && static_cast<std::size_t>(stateId) < answers.size()
+               ? answers[static_cast<std::size_t>(stateId)]
+               : computeHasFluid(stateId);
 }
 } // namespace basalt::server::registry::blockFluids

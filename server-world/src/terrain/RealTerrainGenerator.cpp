@@ -238,8 +238,12 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         if (generators.ancientCity != nullptr) {
             generators.ancientCity->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
         }
-        decoration::sculkDecoration::decorate(chunk, seed, environment, externalState);
-        decoration::caveSpeleothemDecoration::decorate(chunk, seed, environment, externalState);
+        const decoration::ExternalBiomeReader externalBiome = [neighbours](std::int32_t chunkX, std::int32_t chunkZ,
+                                                                           std::int32_t biomeId) {
+            return neighbours == nullptr ? std::nullopt : neighbours->chunkHasBiome(chunkX, chunkZ, biomeId);
+        };
+        decoration::sculkDecoration::decorate(chunk, seed, environment, externalState, externalBiome);
+        decoration::caveSpeleothemDecoration::decorate(chunk, seed, environment, externalState, externalBiome);
         decoration::overworldOreDecoration::decorateInfested(chunk, seed, environment, externalOceanFloor,
                                                              externalState);
         decoration::overworldSpringDecoration::decorate(chunk, seed, environment, externalState);

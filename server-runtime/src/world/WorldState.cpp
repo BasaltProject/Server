@@ -366,6 +366,7 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     if (Chunk* existing = chunkAtLocked(chunkKey); existing != nullptr) {
         return *existing;
     }
+    chunk.share();
 
     Chunk& installed = *chunksByPos_.emplace(chunkKey, std::make_unique<Chunk>(std::move(chunk))).first->second;
     const PendingChunkDecorations::ChunkAt chunkAt = [this](std::int64_t otherKey) { return chunkAtLocked(otherKey); };

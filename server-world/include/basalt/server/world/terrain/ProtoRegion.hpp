@@ -22,6 +22,9 @@ public:
     [[nodiscard]] std::optional<std::int32_t> oceanFloorHeightAt(std::int32_t worldX,
                                                                  std::int32_t worldZ) const override;
 
+    [[nodiscard]] std::optional<bool> chunkHasBiome(std::int32_t chunkX, std::int32_t chunkZ,
+                                                    std::int32_t biomeId) const override;
+
     void setBlockStateId(std::int32_t worldX, std::int32_t y, std::int32_t worldZ, std::int32_t stateId) const;
 
     void setBlockEntity(std::int32_t worldX, std::int32_t y, std::int32_t worldZ, const wire::common::Identifier& type,

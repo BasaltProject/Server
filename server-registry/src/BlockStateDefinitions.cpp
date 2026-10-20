@@ -16,6 +16,7 @@ struct Table {
     std::vector<std::int32_t> starts;
     std::vector<const Definition*> owners;
     std::vector<Identifier> ownerBlocks;
+    std::vector<std::int32_t> slotOfState;
 };
 
 [[nodiscard]] Table build() {
@@ -70,6 +71,20 @@ struct Table {
         table.owners.push_back(found == table.byBlock.end() ? nullptr : &found->second);
         table.ownerBlocks.push_back(std::move(block));
     }
+    std::int32_t last = 0;
+    for (std::size_t index = 0; index < table.starts.size(); ++index) {
+        const Definition* definition = table.owners[index];
+        last = std::max(last, table.starts[index] + (definition == nullptr ? 1 : definition->stateCount()));
+    }
+    table.slotOfState.assign(static_cast<std::size_t>(last), -1);
+    for (std::size_t index = 0; index < table.starts.size(); ++index) {
+        const Definition* definition = table.owners[index];
+        const std::int32_t count = definition == nullptr ? 1 : definition->stateCount();
+        for (std::int32_t offset = 0; offset < count; ++offset) {
+            table.slotOfState[static_cast<std::size_t>(table.starts[index] + offset)] =
+                static_cast<std::int32_t>(index);
+        }
+    }
     return table;
 }
 
@@ -80,14 +95,11 @@ struct Table {
 
 [[nodiscard]] std::optional<std::size_t> indexOf(std::int32_t stateId) {
     const Table& built = table();
-    const auto after = std::ranges::upper_bound(built.starts, stateId);
-    if (after == built.starts.begin()) {
+    if (stateId < 0 || static_cast<std::size_t>(stateId) >= built.slotOfState.size()) {
         return std::nullopt;
     }
-    const auto index = static_cast<std::size_t>(after - built.starts.begin() - 1);
-    const Definition* definition = built.owners[index];
-    const std::int32_t count = definition == nullptr ? 1 : definition->stateCount();
-    return stateId < built.starts[index] + count ? std::optional{index} : std::nullopt;
+    const std::int32_t slot = built.slotOfState[static_cast<std::size_t>(stateId)];
+    return slot < 0 ? std::nullopt : std::optional{static_cast<std::size_t>(slot)};
 }
 } // namespace
 
