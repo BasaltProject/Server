@@ -88,7 +88,7 @@ bool SculkSensorTracker::hasNear(double x, double y, double z, std::int32_t rang
     if (sculkSensors_.empty()) {
         return false;
     }
-    const WorldWriteLock lock{*mutex_};
+    const WorldReadLock lock{*mutex_};
     return std::ranges::any_of(sculkSensors_, [x, y, z, range](std::int64_t position) {
         return std::abs(unpackBlockX(position) - x) <= range && std::abs(unpackBlockY(position) - y) <= range &&
                std::abs(unpackBlockZ(position) - z) <= range;

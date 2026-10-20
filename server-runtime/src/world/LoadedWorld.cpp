@@ -485,9 +485,34 @@ void LoadedWorld::save(const std::vector<Chunk*>& chunks) {
     if (chunks.empty()) {
         return;
     }
-    std::vector<RegionStore::Snapshot> snapshots =
-        sched::onOwner<std::vector<RegionStore::Snapshot>>(owner(), [this, &chunks] { return snapshotOf(chunks); });
-    writeSnapshots(std::move(snapshots));
+    std::vector<std::pair<std::int32_t, std::int32_t>> positions;
+    positions.reserve(chunks.size());
+    for (const Chunk* chunk : chunks) {
+        positions.emplace_back(chunk->chunkX(), chunk->chunkZ());
+    }
+    writeSnapshots(snapshotInBatches(positions));
+}
+
+std::vector<RegionStore::Snapshot>
+LoadedWorld::snapshotInBatches(const std::vector<std::pair<std::int32_t, std::int32_t>>& positions) {
+    std::vector<RegionStore::Snapshot> snapshots;
+    snapshots.reserve(positions.size());
+    for (std::size_t first = 0; first < positions.size(); first += kSnapshotBatch) {
+        const std::size_t last = std::min(positions.size(), first + kSnapshotBatch);
+        std::vector<RegionStore::Snapshot> batch =
+            sched::onOwner<std::vector<RegionStore::Snapshot>>(owner(), [this, &positions, first, last] {
+                std::vector<Chunk*> chunks;
+                for (std::size_t at = first; at < last; ++at) {
+                    if (Chunk* chunk = state_.chunkIfLoaded(positions[at].first, positions[at].second);
+                        chunk != nullptr) {
+                        chunks.push_back(chunk);
+                    }
+                }
+                return snapshotOf(chunks);
+            });
+        snapshots.insert(snapshots.end(), std::make_move_iterator(batch.begin()), std::make_move_iterator(batch.end()));
+    }
+    return snapshots;
 }
 
 void LoadedWorld::writeSnapshots(std::vector<RegionStore::Snapshot> snapshots) {
@@ -510,28 +535,34 @@ void LoadedWorld::writeSnapshots(std::vector<RegionStore::Snapshot> snapshots) {
 }
 
 void LoadedWorld::saveDirty() {
-    std::vector<RegionStore::Snapshot> snapshots = sched::onOwner<std::vector<RegionStore::Snapshot>>(owner(), [this] {
-        std::vector<Chunk*> chunks = state_.dirtyChunks();
-        std::set<std::pair<std::int32_t, std::int32_t>> already;
-        for (const Chunk* chunk : chunks) {
-            already.emplace(chunk->chunkX(), chunk->chunkZ());
-        }
-        for (Chunk* chunk : state_.chunksWithStashedEntities()) {
-            if (already.emplace(chunk->chunkX(), chunk->chunkZ()).second) {
-                chunks.push_back(chunk);
+    const std::vector<std::pair<std::int32_t, std::int32_t>> positions =
+        sched::onOwner<std::vector<std::pair<std::int32_t, std::int32_t>>>(owner(), [this] {
+            std::vector<Chunk*> chunks = state_.dirtyChunks();
+            std::set<std::pair<std::int32_t, std::int32_t>> already;
+            for (const Chunk* chunk : chunks) {
+                already.emplace(chunk->chunkX(), chunk->chunkZ());
             }
-        }
-        for (const std::pair<std::int32_t, std::int32_t>& position : state_.chunksWithEntities()) {
-            if (!already.emplace(position).second) {
-                continue;
+            for (Chunk* chunk : state_.chunksWithStashedEntities()) {
+                if (already.emplace(chunk->chunkX(), chunk->chunkZ()).second) {
+                    chunks.push_back(chunk);
+                }
             }
-            if (Chunk* chunk = state_.chunkIfLoaded(position.first, position.second); chunk != nullptr) {
-                chunks.push_back(chunk);
+            for (const std::pair<std::int32_t, std::int32_t>& position : state_.chunksWithEntities()) {
+                if (!already.emplace(position).second) {
+                    continue;
+                }
+                if (Chunk* chunk = state_.chunkIfLoaded(position.first, position.second); chunk != nullptr) {
+                    chunks.push_back(chunk);
+                }
             }
-        }
-        return snapshotOf(chunks);
-    });
-    writeSnapshots(std::move(snapshots));
+            std::vector<std::pair<std::int32_t, std::int32_t>> found;
+            found.reserve(chunks.size());
+            for (const Chunk* chunk : chunks) {
+                found.emplace_back(chunk->chunkX(), chunk->chunkZ());
+            }
+            return found;
+        });
+    writeSnapshots(snapshotInBatches(positions));
     portals_.save(worldRoot_);
     randomSequences_.save(worldRoot_);
     raids_.save(worldRoot_);

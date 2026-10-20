@@ -105,6 +105,11 @@ public:
 
     void lightDone();
 
+    [[nodiscard]] bool lightsAsynchronously() const { return static_cast<bool>(onNeighbourhoodComplete_); }
+
+    /// Asks for the chunk's light to be computed off-thread, when its 3x3 stands.
+    void requestLight(std::int32_t chunkX, std::int32_t chunkZ);
+
     /// Called, with the world's lock held, for a chunk whose 3x3 has just become complete or whose light went stale,
     /// with `delayed` set.
     void setOnNeighbourhoodComplete(std::function<void(std::int32_t, std::int32_t, bool)> handler) {

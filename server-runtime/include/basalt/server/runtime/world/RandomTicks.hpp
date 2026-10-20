@@ -76,7 +76,7 @@ private:
     /// parity: `Level.randValue`.
     std::map<std::string, std::int32_t, std::less<>> walks_;
 
-    [[nodiscard]] std::int32_t nextWalk(const randomTicks::Context& context);
+    [[nodiscard]] static std::int32_t nextWalk(std::int32_t& state);
 };
 
 } // namespace basalt::server::runtime::world

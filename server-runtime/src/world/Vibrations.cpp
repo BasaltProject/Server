@@ -570,7 +570,7 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
         return;
     }
     const std::int32_t frequency = frequencyOf(event);
-    if (frequency <= 0) {
+    if (frequency <= 0 || !world.hasSculkSensorNear(x, y, z, kCalibratedRange)) {
         return;
     }
     // parity: the calibrated sensor hears twice as far, so the walk is the wider of the two and each.
