@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/ExecuteArguments.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 
@@ -68,7 +69,7 @@ void numberFormats(
     node.literal("fixed", [run](const CommandNodeBuilder& fixed) {
         fixed.argument("contents", componentArgument(), [run](const CommandNodeBuilder& contents) {
             contents.executes([run](const CommandContext& context) {
-                const auto* value = context.get<Component>("contents");
+                const auto* value = command::messageArguments::resolvedComponent(context, "contents");
                 return run(context, play::NumberFormat{
                                         play::NumberFormat::Fixed{.value = value == nullptr ? Component{} : *value}});
             });

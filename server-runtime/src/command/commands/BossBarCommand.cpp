@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
 #include <basalt/wire/text/ComponentNbt.hpp>
 
@@ -243,7 +244,7 @@ void BossBarCommand::build(const CommandNodeBuilder& root) const {
             id.argument("name", componentArgument(), [this](const CommandNodeBuilder& name) {
                 name.executes([this](const CommandContext& context) -> Parsed<std::int32_t> {
                     const auto* wanted = context.get<Identifier>("id");
-                    const auto* label = context.get<Component>("name");
+                    const auto* label = command::messageArguments::resolvedComponent(context, "name");
                     if (wanted == nullptr || label == nullptr) {
                         return 0;
                     }
@@ -348,7 +349,7 @@ void BossBarCommand::build(const CommandNodeBuilder& root) const {
                             if (!found.has_value()) {
                                 return std::unexpected{found.error()};
                             }
-                            const auto* wanted = context.get<Component>("name");
+                            const auto* wanted = command::messageArguments::resolvedComponent(context, "name");
                             if (wanted == nullptr || (*found)->name == *wanted) {
                                 return std::unexpected{unchanged("name")};
                             }

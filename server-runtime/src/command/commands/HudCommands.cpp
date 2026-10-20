@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/Coordinates.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/commands/HudCommands.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -79,7 +80,7 @@ void TitleCommand::build(const CommandNodeBuilder& root) const {
                 form.argument("title", componentArgument(), [kind](const CommandNodeBuilder& text) {
                     text.executes([kind](const CommandContext& context) -> Parsed<std::int32_t> {
                         const std::vector<player::PlayerSession*>& matched = targetsOf(context, "targets");
-                        const auto* body = context.get<Component>("title");
+                        const auto* body = command::messageArguments::resolvedComponent(context, "title");
                         const Component text = body == nullptr ? Component{} : *body;
                         const player::TitlePiece piece = kind == "title"      ? player::TitlePiece::Title
                                                          : kind == "subtitle" ? player::TitlePiece::Subtitle
