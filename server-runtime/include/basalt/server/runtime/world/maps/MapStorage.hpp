@@ -22,6 +22,9 @@ public:
     /// A folder to read from when `maps/` has no such file, such as the `data/minecraft/maps` of a vanilla world.
     void readAlsoFrom(std::string directory) { fallback_ = std::move(directory); }
 
+    /// A world from before 26.1 keeps its maps as `data/map_<id>.dat`.
+    void readAlsoFromLegacy(std::string directory) { legacy_ = std::move(directory); }
+
     [[nodiscard]] std::unique_lock<std::mutex> lock() { return std::unique_lock{mutex_}; }
 
     [[nodiscard]] MapData* get(std::int32_t id);
@@ -53,6 +56,7 @@ private:
 
     std::string directory_;
     std::string fallback_;
+    std::string legacy_;
     std::mutex mutex_;
     /// A miss is kept too, so an unknown id is not a disk read every tick.
     std::map<std::int32_t, std::optional<MapData>> maps_;

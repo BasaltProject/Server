@@ -1,3 +1,4 @@
+#include <basalt/metamorph/datafix/LevelData.hpp>
 #include <basalt/server/runtime/world/maps/MapStorage.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/wire/io/Compression.hpp>
@@ -36,8 +37,13 @@ using wire::nbt::NbtTag;
     }
     const auto read = wire::nbt::nbtIO::read(*bytes);
     const NbtCompound* root = read.has_value() ? read->tag.get<NbtCompound>() : nullptr;
-    const NbtCompound* data = root == nullptr ? nullptr : root->getCompound("data");
-    return data == nullptr ? std::nullopt : std::optional{*data};
+    const NbtCompound* held = root == nullptr ? nullptr : root->getCompound("data");
+    if (held == nullptr) {
+        return std::nullopt;
+    }
+    NbtCompound data = *held;
+    metamorph::datafix::upgradeSavedData("map", data, root->getInt("DataVersion"));
+    return data;
 }
 
 } // namespace
@@ -45,10 +51,16 @@ using wire::nbt::NbtTag;
 std::string MapStorage::pathOf(std::string_view name) const { return directory_ + "/" + std::string{name} + ".dat"; }
 
 std::optional<NbtCompound> MapStorage::read(std::string_view name) const {
-    if (std::optional<NbtCompound> found = unwrapped(pathOf(name)); found.has_value() || fallback_.empty()) {
+    if (std::optional<NbtCompound> found = unwrapped(pathOf(name)); found.has_value()) {
         return found;
     }
-    return unwrapped(fallback_ + "/" + std::string{name} + ".dat");
+    if (!fallback_.empty()) {
+        if (std::optional<NbtCompound> found = unwrapped(fallback_ + "/" + std::string{name} + ".dat");
+            found.has_value()) {
+            return found;
+        }
+    }
+    return legacy_.empty() ? std::nullopt : unwrapped(legacy_ + "/map_" + std::string{name} + ".dat");
 }
 
 MapData* MapStorage::get(std::int32_t id) {

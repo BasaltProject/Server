@@ -574,6 +574,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     fishing_ = std::make_unique<FishingSystem>(playerRegistry_, *orbs_,
                                                FishingSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     mapStorage_.readAlsoFrom(worldRegistry_->defaultWorld().worldRoot() + "/data/minecraft/maps");
+    mapStorage_.readAlsoFromLegacy(worldRegistry_->defaultWorld().worldRoot() + "/data");
     maps_ = std::make_unique<MapSystem>(
         playerRegistry_, mapStorage_,
         MapSystem::Options{.worldNamed = [this](std::string_view name) -> world::LoadedWorld* {
