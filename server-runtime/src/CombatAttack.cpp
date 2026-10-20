@@ -349,6 +349,13 @@ player::pvp::Context CombatHandler::meleeContext(const player::BreakContext& blo
                 }
             },
         .nextSeed = [] { return static_cast<std::int64_t>(std::random_device{}()); },
+        .addMobEffect =
+            [this](world::LoadedWorld& world, entity::ServerEntity& mob, const world::ActiveEffect& effect,
+                   std::int32_t sourceId) {
+                if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr) {
+                    static_cast<void>(mobs->addMobEffect(world, owner_->playersInSameWorld(), mob, effect, sourceId));
+                }
+            },
         .explode =
             [this](world::LoadedWorld& world, const world::postAttack::Explosion& blast, double x, double y, double z) {
                 if (CombatSystem* combat = owner_->options().combat; combat != nullptr) {

@@ -46,6 +46,9 @@ struct Context {
     const BreakContext* blocks = nullptr;
     std::function<void(entity::ServerEntity& mob, bool died)> sweptMob;
     std::function<std::int64_t()> nextSeed;
+    std::function<void(world::LoadedWorld& world, entity::ServerEntity& mob, const world::ActiveEffect& effect,
+                       std::int32_t sourceId)>
+        addMobEffect;
     std::function<void(world::LoadedWorld& world, const world::postAttack::Explosion& blast, double x, double y,
                        double z)>
         explode;

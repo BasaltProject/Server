@@ -250,7 +250,13 @@ void postAttack(const Context& context, world::LoadedWorld& world, PlayerSession
     }
     for (const world::postAttack::MobEffect& effect : outcome.effects) {
         PlayerSession* target = effect.target == Side::kAttacker ? &attacker : victim;
-        if (target != nullptr && target->connection().addEffect) {
+        if (target == nullptr && mob != nullptr && context.addMobEffect) {
+            context.addMobEffect(world, *mob,
+                                 world::ActiveEffect{.effect = effect.effect,
+                                                     .amplifier = effect.amplifier,
+                                                     .remainingTicks = effect.ticks},
+                                 attacker.entityId());
+        } else if (target != nullptr && target->connection().addEffect) {
             target->noteEffectSource(std::nullopt);
             target->connection().addEffect(effect.effect, effect.ticks, effect.amplifier);
         }
