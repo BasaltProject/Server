@@ -21,7 +21,6 @@ basalt_module(server-plugins
         src/PluginRegistrations.cpp
         src/PluginSurfaces.cpp
         src/PluginServiceRegistry.cpp
-        src/PluginToml.cpp
         src/PluginValues.cpp
     DEPENDS basalt::wire-common basalt::wire-io basalt::wire-lua basalt::wire-plugins
     # The event view builds a metatable and holds a registry reference, which the argument facade

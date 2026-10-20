@@ -8,6 +8,7 @@
 #include <basalt/server/plugins/PluginStore.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
+#include <basalt/wire/plugins/PluginToml.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -17,49 +18,6 @@ namespace basalt::server::plugins::pluginApi {
 namespace {
 using wire::lua::LuaArgs;
 using wire::lua::LuaRef;
-
-void pushToml(LuaArgs& lua, const wire::common::toml::TomlTable& table);
-
-void pushTomlValue(LuaArgs& lua, const wire::common::toml::TomlValue& value) {
-    if (const auto* text = value.get<std::string>(); text != nullptr) {
-        lua.pushString(*text);
-    } else if (const auto* whole = value.get<std::int64_t>(); whole != nullptr) {
-        lua.pushInteger(*whole);
-    } else if (const auto* real = value.get<double>(); real != nullptr) {
-        lua.pushNumber(*real);
-    } else if (const auto* flag = value.get<bool>(); flag != nullptr) {
-        lua.pushBoolean(*flag);
-    } else if (const auto* list = value.get<std::vector<wire::common::toml::TomlValue>>(); list != nullptr) {
-        lua.pushTable();
-        std::int64_t position = 1;
-        for (const wire::common::toml::TomlValue& element : *list) {
-            pushTomlValue(lua, element);
-            lua.setIndex(position++);
-        }
-    } else if (const auto* nested = value.get<wire::common::toml::TomlTable>(); nested != nullptr) {
-        pushToml(lua, *nested);
-    } else {
-        lua.pushNil();
-    }
-}
-
-void pushToml(LuaArgs& lua, const wire::common::toml::TomlTable& table) {
-    lua.pushTable();
-    for (const std::string& key : table.keys()) {
-        const wire::common::toml::TomlValue* value = table.find(key);
-        if (value == nullptr) {
-            continue;
-        }
-        pushTomlValue(lua, *value);
-        lua.setField(key);
-        if (key.find('-') != std::string::npos) {
-            std::string underscored = key;
-            std::ranges::replace(underscored, '-', '_');
-            pushTomlValue(lua, *value);
-            lua.setField(underscored);
-        }
-    }
-}
 
 [[nodiscard]] std::optional<std::string> stringField(LuaArgs& lua, std::int32_t index, std::string_view key) {
     lua.pushField(index, key);
@@ -115,7 +73,7 @@ void installIdentity(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugi
     lua.setField("error");
     lua.setGlobal("log");
 
-    pushToml(lua, plugin.config);
+    wire::plugins::pushToml(lua, plugin.config);
     lua.setGlobal("config");
 }
 
