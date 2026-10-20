@@ -303,8 +303,13 @@ std::optional<Parsed<LootFunction>> Reader::componentFunction(const std::string&
             return std::unexpected(operation.error());
         }
         edit.operation = *operation;
-        if (lore && object.find("entity") != nullptr && !entityTargetOf(object.find("entity")).has_value()) {
-            return std::unexpected(invalid("set_lore entity"));
+        if (lore && object.find("entity") != nullptr) {
+            const std::optional<EntityTarget> target = entityTargetOf(object.find("entity"));
+            if (!target.has_value()) {
+                return std::unexpected(invalid("set_lore entity"));
+            }
+            edit.entity = *target;
+            edit.resolvesAgainstEntity = true;
         }
         return done();
     }

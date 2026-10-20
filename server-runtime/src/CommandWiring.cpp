@@ -3,7 +3,9 @@
 #include <basalt/server/runtime/VanillaGameData.hpp>
 #include <basalt/server/runtime/command/CommandStorage.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
+#include <basalt/server/runtime/command/EntitySelector.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/VanillaCommands.hpp>
 #include <basalt/server/runtime/command/commands/AccessCommands.hpp>
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
@@ -24,6 +26,7 @@
 #include <basalt/server/runtime/world/CommandPredicates.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
+#include <basalt/wire/text/ComponentNbt.hpp>
 
 #include <cstdint>
 #include <utility>
@@ -119,6 +122,33 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     }
     WiredCommands wired;
     wired.environment = std::make_unique<command::CommandEnvironment>(*wiring.players, std::move(options));
+    if (wiring.gameData != nullptr) {
+        // parity: `ComponentUtils.updateForEntity`, run as the entity a loot function names.
+        const command::CommandEnvironment* environment = wired.environment.get();
+        wiring.gameData->lootTables.useTextResolver(
+            [environment](const wire::nbt::NbtTag& tag, std::string_view holder) -> std::optional<wire::nbt::NbtTag> {
+                const command::ConsoleCommandSource console;
+                command::StringReader reader{std::string{holder}};
+                const command::Parsed<command::EntitySelector> selector =
+                    command::EntitySelector::parse(reader, console, *environment);
+                if (!selector.has_value()) {
+                    return std::nullopt;
+                }
+                const std::vector<command::CommandTarget> found = selector->select(console, *environment, false);
+                if (found.empty()) {
+                    return std::nullopt;
+                }
+                const command::CommandTarget& self = found.front();
+                command::ExecutionSource::Changes changes{};
+                changes.entity = self;
+                changes.position = std::array<double, 3>{self.x(), self.y(), self.z()};
+                changes.player = self.player();
+                const command::ExecutionSource source{console, changes};
+                const wire::text::Component resolved = command::messageArguments::resolveContents(
+                    wire::text::componentNbt::deserialize(tag), source, *environment, &self);
+                return wire::text::componentNbt::serialize(resolved);
+            });
+    }
     if (wiring.commandStorage != nullptr) {
         wired.data = std::make_unique<command::DataAccess>(*wiring.commandStorage);
     }

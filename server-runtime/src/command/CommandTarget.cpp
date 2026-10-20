@@ -26,7 +26,7 @@ CommandTarget::CommandTarget(entity::ServerEntity& entity, std::string worldName
     : what_(&entity), worldName_(std::move(worldName)) {}
 
 CommandTarget::CommandTarget(const world::DroppedItem& item, std::string worldName)
-    : what_(&item), worldName_(std::move(worldName)) {}
+    : what_(std::make_shared<const world::DroppedItem>(item)), worldName_(std::move(worldName)) {}
 
 player::PlayerSession* CommandTarget::player() const {
     player::PlayerSession* const* session = std::get_if<player::PlayerSession*>(&what_);
@@ -39,8 +39,8 @@ entity::ServerEntity* CommandTarget::entity() const {
 }
 
 const world::DroppedItem* CommandTarget::item() const {
-    const world::DroppedItem* const* found = std::get_if<const world::DroppedItem*>(&what_);
-    return found == nullptr ? nullptr : *found;
+    const auto* found = std::get_if<std::shared_ptr<const world::DroppedItem>>(&what_);
+    return found == nullptr ? nullptr : found->get();
 }
 
 std::string CommandTarget::name() const {
@@ -50,7 +50,7 @@ std::string CommandTarget::name() const {
     if (entity::ServerEntity* found = entity(); found != nullptr) {
         return found->customName.has_value() ? *found->customName : std::string{found->type().path()};
     }
-    return std::string{std::get<const world::DroppedItem*>(what_)->item.path()};
+    return std::string{std::get<std::shared_ptr<const world::DroppedItem>>(what_)->item.path()};
 }
 
 std::int32_t CommandTarget::entityId() const {
@@ -60,7 +60,7 @@ std::int32_t CommandTarget::entityId() const {
     if (entity::ServerEntity* found = entity(); found != nullptr) {
         return found->entityId();
     }
-    return std::get<const world::DroppedItem*>(what_)->entityId;
+    return std::get<std::shared_ptr<const world::DroppedItem>>(what_)->entityId;
 }
 
 std::string CommandTarget::uuid() const {
@@ -70,7 +70,7 @@ std::string CommandTarget::uuid() const {
     if (entity::ServerEntity* found = entity(); found != nullptr) {
         return found->uuid().toString();
     }
-    return std::get<const world::DroppedItem*>(what_)->uuid.toString();
+    return std::get<std::shared_ptr<const world::DroppedItem>>(what_)->uuid.toString();
 }
 
 Identifier CommandTarget::type() const {
@@ -97,7 +97,7 @@ double CommandTarget::x() const {
     if (entity::ServerEntity* found = entity(); found != nullptr) {
         return found->x;
     }
-    return std::get<const world::DroppedItem*>(what_)->x;
+    return std::get<std::shared_ptr<const world::DroppedItem>>(what_)->x;
 }
 
 double CommandTarget::y() const {
@@ -107,7 +107,7 @@ double CommandTarget::y() const {
     if (entity::ServerEntity* found = entity(); found != nullptr) {
         return found->y;
     }
-    return std::get<const world::DroppedItem*>(what_)->y;
+    return std::get<std::shared_ptr<const world::DroppedItem>>(what_)->y;
 }
 
 double CommandTarget::z() const {
@@ -117,7 +117,7 @@ double CommandTarget::z() const {
     if (entity::ServerEntity* found = entity(); found != nullptr) {
         return found->z;
     }
-    return std::get<const world::DroppedItem*>(what_)->z;
+    return std::get<std::shared_ptr<const world::DroppedItem>>(what_)->z;
 }
 
 float CommandTarget::yaw() const {

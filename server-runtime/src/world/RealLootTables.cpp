@@ -157,6 +157,9 @@ void RealLootTables::prepare(server::world::loot::LootContext& context) {
             return scoreboard->score(holder, objective);
         };
     }
+    if (textResolver_ && !context.resolveText) {
+        context.resolveText = textResolver_;
+    }
     if (!context.registryEntries) {
         context.registryEntries = [](std::string_view registry) {
             return registry == "potion" ? potionEffects::ids() : std::vector<Identifier>{};

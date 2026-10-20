@@ -210,11 +210,14 @@ LootFunction LootFunction::setDamage(FloatProvider damage, bool add) {
     return built;
 }
 
-LootFunction LootFunction::setComponents(NbtCompound components, std::vector<std::string> removed) {
+LootFunction LootFunction::setComponents(NbtCompound components, std::vector<std::string> removed,
+                                         std::optional<EntityTarget> resolveFor, std::vector<std::string> resolveKeys) {
     LootFunction built;
     built.kind_ = Kind::SetComponents;
-    built.parts_ =
-        std::make_shared<const Parts>(Parts{.components = std::move(components), .removed = std::move(removed)});
+    built.parts_ = std::make_shared<const Parts>(Parts{.components = std::move(components),
+                                                       .removed = std::move(removed),
+                                                       .resolveFor = resolveFor,
+                                                       .resolveKeys = std::move(resolveKeys)});
     return built;
 }
 
@@ -330,6 +333,20 @@ ItemStack LootFunction::setComponent(ItemStack stack, random::RandomSource& rand
         }
         for (const std::string& name : part.removed) {
             static_cast<void>(stack.components.remove(name));
+        }
+        // parity: `SetNameFunction.apply` resolves the name against the entity, when one is named.
+        if (part.resolveFor.has_value() && context.resolveText) {
+            if (const std::optional<std::string> holder = scoreHolderOf(context, *part.resolveFor);
+                holder.has_value()) {
+                for (const std::string& key : part.resolveKeys) {
+                    if (const NbtTag* given = stack.components.find(key); given != nullptr) {
+                        if (std::optional<NbtTag> resolved = context.resolveText(*given, *holder);
+                            resolved.has_value()) {
+                            stack.components.set(key, std::move(*resolved));
+                        }
+                    }
+                }
+            }
         }
         return stack;
     case Kind::SetStewEffect: {
