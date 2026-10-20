@@ -493,6 +493,12 @@ NbtCompound encode(const ServerEntity& entity) {
         }
         tag.set("Tags", NbtTag::ofList(std::move(tags)));
     }
+    if (entity.deathLootTable.has_value()) {
+        tag.putString("DeathLootTable", *entity.deathLootTable);
+    }
+    if (entity.deathLootTableSeed != 0) {
+        tag.putLong("DeathLootTableSeed", entity.deathLootTableSeed);
+    }
     return tag;
 }
 
@@ -690,6 +696,10 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     if (const std::string_view customName = tag.getString("CustomName"); !customName.empty()) {
         entity->customName = std::string{customName};
     }
+    if (const std::string_view table = tag.getString("DeathLootTable"); !table.empty()) {
+        entity->deathLootTable = std::string{table};
+    }
+    entity->deathLootTableSeed = tag.getLong("DeathLootTableSeed");
     if (const NbtList* tags = tag.getList("Tags"); tags != nullptr) {
         for (const NbtTag& element : *tags) {
             if (const std::string* name = element.get<std::string>(); name != nullptr) {

@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/command/CommandStorage.hpp>
 #include <basalt/server/runtime/command/DataPaths.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
@@ -83,6 +84,39 @@ NbtCompound entityNbtOf(const player::PlayerSession& player) {
     return tag;
 }
 
+NbtCompound entityNbtOf(const world::DroppedItem& item) {
+    NbtCompound tag;
+    NbtCompound stack;
+    stack.putString("id", item.item.toString());
+    stack.putInt("count", item.count);
+    if (!item.components.empty()) {
+        stack.set("components", NbtTag::ofCompound(item.components));
+    }
+    tag.set("Item", NbtTag::ofCompound(std::move(stack)));
+    tag.putShort("Age", static_cast<std::int16_t>(item.age));
+    tag.putShort("PickupDelay", static_cast<std::int16_t>(item.pickupDelay));
+    tag.putShort("Health", static_cast<std::int16_t>(item.health));
+    tag.set("Pos", positionOf(item.x, item.y, item.z));
+    NbtList motion{wire::nbt::NbtType::Double};
+    motion.push(NbtTag::ofDouble(item.velocityX));
+    motion.push(NbtTag::ofDouble(item.velocityY));
+    motion.push(NbtTag::ofDouble(item.velocityZ));
+    tag.set("Motion", NbtTag::ofList(std::move(motion)));
+    tag.putBoolean("OnGround", item.onGround);
+    tag.putDouble("fall_distance", item.fallDistance);
+    const auto uuidTag = [](const wire::common::Uuid& uuid) {
+        return NbtTag::ofIntArray({static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.high() >> 32)),
+                                   static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.high())),
+                                   static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.low() >> 32)),
+                                   static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.low()))});
+    };
+    tag.set("UUID", uuidTag(item.uuid));
+    if (item.thrower.has_value()) {
+        tag.set("Thrower", uuidTag(*item.thrower));
+    }
+    return tag;
+}
+
 NbtCompound entityNbtOf(const entity::ServerEntity& entity) {
     // parity: `NbtPredicate.getEntityTagData` is `saveWithoutId`.
     NbtCompound tag = entity::entityNbt::encode(entity);
@@ -91,11 +125,11 @@ NbtCompound entityNbtOf(const entity::ServerEntity& entity) {
 }
 
 std::optional<DataHolderRef> entityHolderOf(const CommandTarget& target) {
-    if (target.player() == nullptr && target.entity() == nullptr) {
+    if (target.player() == nullptr && target.entity() == nullptr && target.item() == nullptr) {
         return std::nullopt;
     }
-    return DataHolderRef{
-        DataHolderRef::Entity{.player = target.player(), .mob = target.entity(), .name = target.name()}};
+    return DataHolderRef{DataHolderRef::Entity{
+        .player = target.player(), .mob = target.entity(), .item = target.item(), .name = target.name()}};
 }
 
 NbtCompound& CommandStorage::get(const Identifier& id) { return compounds_[id]; }
@@ -159,6 +193,9 @@ std::optional<NbtCompound> DataAccess::read(const CommandContext& context, const
     }
     if (entity->player != nullptr) {
         return entityNbtOf(*entity->player);
+    }
+    if (entity->item != nullptr) {
+        return entityNbtOf(*entity->item);
     }
     return entity->mob == nullptr ? std::nullopt : std::optional{entityNbtOf(*entity->mob)};
 }

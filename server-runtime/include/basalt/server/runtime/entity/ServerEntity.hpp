@@ -485,6 +485,10 @@ public:
 
     std::vector<std::string> tags;
 
+    /// parity: `Mob.lootTable` and `lootTableSeed`, the `DeathLootTable` a summon can name.
+    std::optional<std::string> deathLootTable;
+    std::int64_t deathLootTableSeed = 0;
+
     std::optional<std::int32_t> vehicleId;
     std::vector<std::int32_t> passengerIds;
 

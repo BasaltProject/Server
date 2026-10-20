@@ -1,5 +1,7 @@
+#include <basalt/server/runtime/command/CommandStorage.hpp>
 #include <basalt/server/runtime/command/EntitySelector.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
+#include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <algorithm>
@@ -86,7 +88,11 @@ NbtCompound of(const CommandTarget& target) {
     if (const entity::ServerEntity* entity = target.entity(); entity != nullptr) {
         return of(*entity);
     }
-    // A dropped item carries no NBT this build models, so `nbt=` never matches one.
+    if (const world::DroppedItem* item = target.item(); item != nullptr) {
+        NbtCompound tag = entityNbtOf(*item);
+        tag.putString("id", "minecraft:item");
+        return tag;
+    }
     return NbtCompound{};
 }
 
