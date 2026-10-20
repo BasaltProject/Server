@@ -492,7 +492,7 @@ void act(const randomTicks::Context& context, std::int32_t x, std::int32_t y, st
         miscGrowth::eyeblossom(context.world, context.clock, x, y, z, stateId, random, changes);
     } else if (path == "pointed_dripstone" || path == "sulfur_spike") {
         dripstoneGrowth::dripstone(context.world, x, y, z, stateId, random, changes, context.evaporates,
-                                   context.levelEvent, &context.clock);
+                                   context.levelEvent, &context.clock, context.pushPlayersUp);
     } else if (path == "vine") {
         vineGrowth::vine(context.world, context.gameRules, x, y, z, stateId, random, changes);
     } else if (path == "dried_ghast") {

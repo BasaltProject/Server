@@ -611,6 +611,21 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
             [this, &world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t type) {
                 broadcaster_->sendEffects(watchersOf(world), x, y, z, world.state().blockState(x, y, z).value_or(0),
                                           {world::blockEffect::Effect{.type = type}});
+            },
+        // parity: `Block.pushEntitiesUp` reaches players too, which teleport to the top of the block.
+        .pushPlayersUp =
+            [this, &world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t) {
+                constexpr double kMudHeight = 14.0 / 16.0;
+                constexpr double kHalfWidth = 0.3;
+                constexpr double kHeight = 1.8;
+                for (PlayerSession* player : watchersOf(world)) {
+                    const bool overlaps = player->x + kHalfWidth > x && player->x - kHalfWidth < x + 1.0 &&
+                                          player->z + kHalfWidth > z && player->z - kHalfWidth < z + 1.0 &&
+                                          player->y + kHeight > y + kMudHeight && player->y < y + 1.0;
+                    if (overlaps && player->connection().teleportTo) {
+                        player->connection().teleportTo(player->x, y + 1.0, player->z, player->yaw, player->pitch);
+                    }
+                }
             }};
     random::RandomSource random = freshRandom();
     const std::vector<world::BlockChange> changes = randomTicks_.tick(context, chunks, speed, random);
