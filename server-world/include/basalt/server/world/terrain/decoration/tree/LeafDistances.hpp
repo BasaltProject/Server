@@ -15,6 +15,8 @@ using BlockAt = std::function<std::int32_t(std::int32_t, std::int32_t, std::int3
 
 void settle(Chunk& chunk, const BlockAt& blockAt);
 
+[[nodiscard]] bool mayChangeNeighbours(const Chunk& chunk);
+
 } // namespace leafDistances
 
 } // namespace basalt::server::world::terrain::decoration::tree

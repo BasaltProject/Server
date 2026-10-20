@@ -43,6 +43,9 @@ inline constexpr std::size_t kHeightmapCount = 4;
 /// parity: `BlockTags.BLOCKS_MOTION_IN_HEIGHTMAP(_NO_LEAVES)`, one flag per block state; applies to later queries.
 void useHeightmapBlockSets(const std::vector<bool>& blocksMotion, const std::vector<bool>& blocksMotionNoLeaves);
 
+/// Whether replacing one block state with another can move the light around it.
+[[nodiscard]] bool changesLight(std::int32_t before, std::int32_t after);
+
 class Chunk {
 public:
     explicit Chunk(std::int32_t chunkX, std::int32_t chunkZ, ChunkHeight bounds = kOverworldHeight);
@@ -108,11 +111,18 @@ public:
 
     [[nodiscard]] PackedLight blockLight(const std::function<PackedLight()>& compute);
 
-    [[nodiscard]] const PackedLight* cachedSkyLight() const;
+    using SharedLight = std::shared_ptr<const PackedLight>;
 
-    [[nodiscard]] const PackedLight* cachedBlockLight() const;
+    /// The light as last computed, stale or not; null before the first computation.
+    [[nodiscard]] SharedLight cachedSkyLight() const;
+
+    [[nodiscard]] SharedLight cachedBlockLight() const;
 
     void invalidateLight();
+
+    void markLightStale();
+
+    [[nodiscard]] bool lightIsStale() const;
 
     void setBlockEntity(ChunkBlockEntity blockEntity);
 
@@ -321,9 +331,16 @@ private:
     GeneratedBlockWritePolicy generatedBlockWritePolicy_ = GeneratedBlockWritePolicy::Exact;
     terrain::ProtoRegion* region_ = nullptr;
     ChunkStage stage_ = ChunkStage::Full;
-    std::unique_ptr<std::mutex> lightLock_ = std::make_unique<std::mutex>();
-    std::optional<PackedLight> skyLight_;
-    std::optional<PackedLight> blockLight_;
+
+    struct LightCache {
+        std::mutex lock;
+        std::atomic<SharedLight> sky;
+        std::atomic<SharedLight> block;
+        std::atomic<bool> staleSky{false};
+        std::atomic<bool> staleBlock{false};
+    };
+
+    std::unique_ptr<LightCache> light_ = std::make_unique<LightCache>();
     bool dirty_ = false;
     std::int64_t inhabitedTime_ = 0;
 };

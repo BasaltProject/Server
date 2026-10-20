@@ -34,7 +34,7 @@ const Chunk* LightWindow::chunkAt(std::int32_t offsetX, std::int32_t offsetZ) co
 
 void LightWindow::fillOpacity(std::span<std::uint8_t> into, std::int32_t bottomY, std::int32_t topY,
                               std::span<const std::int32_t> opacityOf) const {
-    std::vector<std::int32_t> scratch(kBlocksPerSection);
+    std::vector<std::uint8_t> scratch(kBlocksPerSection);
     for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
         for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
             const Chunk* chunk = chunkAt(offsetX, offsetZ);
@@ -57,7 +57,7 @@ void LightWindow::fillOpacity(std::span<std::uint8_t> into, std::int32_t bottomY
                            opacityOf[static_cast<std::size_t>(stateId)] < kSolid;
                 });
                 if (!solid) {
-                    section.copyBlockStateIdsInto(scratch);
+                    section.copyMappedBlockStatesInto(scratch, opacityOf, 0);
                 }
                 for (std::int32_t localY = 0; localY < 16; ++localY) {
                     const std::int32_t y = sectionMinY + localY;
@@ -73,8 +73,7 @@ void LightWindow::fillOpacity(std::span<std::uint8_t> into, std::int32_t bottomY
                                         static_cast<std::uint8_t>(kSolid));
                         } else {
                             for (std::size_t localX = 0; localX < 16; ++localX) {
-                                into[target + localX] = static_cast<std::uint8_t>(
-                                    opacityOf[static_cast<std::size_t>(scratch[source + localX])]);
+                                into[target + localX] = scratch[source + localX];
                             }
                         }
                     }

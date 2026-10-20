@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <map>
 #include <string_view>
+#include <vector>
 
 namespace basalt::server::world::terrain::decoration::tree {
 namespace {
@@ -118,13 +119,42 @@ const PathSet& treeBlockRules::logBlockPaths() {
     return paths;
 }
 
+namespace {
+
+template <typename Answer>
+[[nodiscard]] bool tabled(std::int32_t stateId, const std::vector<bool>& table, Answer&& answer) {
+    return stateId >= 0 && static_cast<std::size_t>(stateId) < table.size() ? table[static_cast<std::size_t>(stateId)]
+                                                                            : answer(stateId);
+}
+
+} // namespace
+
 bool treeBlockRules::isLogState(std::int32_t stateId) {
-    return logBlockPaths().find(pathOf(stateId)) != logBlockPaths().end();
+    static const std::vector<bool> table = [] {
+        std::vector<bool> built(static_cast<std::size_t>(registry::blocks::stateCount()));
+        for (std::size_t id = 0; id < built.size(); ++id) {
+            built[id] = logBlockPaths().find(pathOf(static_cast<std::int32_t>(id))) != logBlockPaths().end();
+        }
+        return built;
+    }();
+    return tabled(stateId, table,
+                  [](std::int32_t id) { return logBlockPaths().find(pathOf(id)) != logBlockPaths().end(); });
 }
 
 bool treeBlockRules::isValidTreeState(std::int32_t stateId) {
-    return registry::blocks::isAir(stateId) ||
-           replaceableByTreesPaths().find(pathOf(stateId)) != replaceableByTreesPaths().end();
+    static const std::vector<bool> table = [] {
+        std::vector<bool> built(static_cast<std::size_t>(registry::blocks::stateCount()));
+        for (std::size_t id = 0; id < built.size(); ++id) {
+            const auto state = static_cast<std::int32_t>(id);
+            built[id] = registry::blocks::isAir(state) ||
+                        replaceableByTreesPaths().find(pathOf(state)) != replaceableByTreesPaths().end();
+        }
+        return built;
+    }();
+    return tabled(stateId, table, [](std::int32_t id) {
+        return registry::blocks::isAir(id) ||
+               replaceableByTreesPaths().find(pathOf(id)) != replaceableByTreesPaths().end();
+    });
 }
 
 bool treeBlockRules::canReplaceDeferred(std::int32_t actualStateId, std::int32_t generatedStateId) {

@@ -99,6 +99,18 @@ public:
     /// The global owner, since a fresh chunk belongs to no region and a region's would take every install.
     void setInstallOwner(sched::Owner* installOwner) { installOwner_ = installOwner; }
 
+    /// The chunk and its eight neighbours, held safe from unloading until `lightDone`; false when one is missing.
+    [[nodiscard]] bool lightWindowFor(std::int32_t chunkX, std::int32_t chunkZ,
+                                      std::array<server::world::Chunk*, 9>& window);
+
+    void lightDone();
+
+    /// Called, with the world's lock held, for a chunk whose 3x3 has just become complete or whose light went stale,
+    /// with `delayed` set.
+    void setOnNeighbourhoodComplete(std::function<void(std::int32_t, std::int32_t, bool)> handler) {
+        onNeighbourhoodComplete_ = std::move(handler);
+    }
+
     /// A hook rather than the bus, since this module sits below the plugin one.
     void setOnChunkInstalled(std::function<void(server::world::Chunk&)> handler) {
         const std::scoped_lock lock{chunkInstalledMutex_};
@@ -403,11 +415,15 @@ private:
 
     mutable std::mutex chunkInstalledMutex_;
     std::function<void(server::world::Chunk&)> onChunkInstalled_;
+    std::function<void(std::int32_t, std::int32_t, bool)> onNeighbourhoodComplete_;
 
     std::map<std::int64_t, std::unique_ptr<server::world::Chunk>> chunksByPos_;
     /// parity: the counter behind `ScheduledTick.subTickOrder`.
     std::int64_t nextTickOrder_ = 0;
     std::atomic<std::int64_t> chunkVersion_{0};
+    std::atomic<bool> lightBusy_{false};
+    std::mutex graveyardMutex_;
+    std::vector<std::unique_ptr<server::world::Chunk>> graveyard_;
 
     PrimedTntQueue primedTntQueue_;
     std::vector<Spilled> spilled_;

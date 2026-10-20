@@ -51,6 +51,7 @@ TEST_CASE("an entry that straddles two words reads back whole") {
 
 TEST_CASE("a reader never sees a palette index its palette does not have") {
     PalettedContainer container{4096, 0};
+    container.share();
     std::atomic<bool> stop{false};
     std::atomic<bool> sawGarbage{false};
 
