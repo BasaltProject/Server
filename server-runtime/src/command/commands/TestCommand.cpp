@@ -359,8 +359,11 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
                     Component::text("  " + instance.id.toString() + ": skipped, this build runs function tests only"));
                 continue;
             }
+            // parity: `BuiltinTestFunctions`, whose one function, `always_pass`, succeeds at once.
+            const bool builtinPass = *instance.function == Identifier::vanilla("always_pass");
             const Parsed<std::int32_t> outcome =
-                runner_->run(context.dispatcher(), context.source(), *instance.function);
+                builtinPass ? Parsed<std::int32_t>{1}
+                            : runner_->run(context.dispatcher(), context.source(), *instance.function);
             if (outcome.has_value()) {
                 passed++;
                 failed_.erase(instance.id);
