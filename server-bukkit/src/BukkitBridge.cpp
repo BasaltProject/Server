@@ -197,13 +197,13 @@ void BukkitBridge::cancelTask(std::int64_t id) {
     handle.remove();
 }
 
-bool BukkitBridge::deliver(const std::string& event, std::int32_t priority, plugins::PluginEvent& fired) {
+bool BukkitBridge::deliver(const std::string& event, std::int32_t priority, Snapshot& snapshot) {
     JNIEnv* env = shim_->env();
-    const std::vector<std::string>& names = fired.type().fields();
-    jobjectArray fields = env->NewObjectArray(static_cast<jsize>(names.size()), env->FindClass("java/lang/Object"),
-                                              nullptr);
+    const std::vector<std::string>& names = snapshot.type->fields();
+    jobjectArray fields =
+        env->NewObjectArray(static_cast<jsize>(names.size()), env->FindClass("java/lang/Object"), nullptr);
     for (std::size_t index = 0; index < names.size(); ++index) {
-        jobject value = box(env, fired.get(static_cast<std::int32_t>(index)));
+        jobject value = box(env, snapshot.values[index]);
         env->SetObjectArrayElement(fields, static_cast<jsize>(index), value);
         if (value != nullptr) {
             env->DeleteLocalRef(value);
@@ -212,19 +212,19 @@ bool BukkitBridge::deliver(const std::string& event, std::int32_t priority, plug
     jstring name = toJava(env, event);
     const jboolean cancelled =
         env->CallStaticBooleanMethod(runtime_, eventMethod_, name, static_cast<jint>(priority),
-                                     static_cast<jlong>(fired.generation()), fields,
-                                     fired.cancelled() ? JNI_TRUE : JNI_FALSE);
-    bool result = fired.cancelled();
+                                     static_cast<jlong>(snapshot.generation), fields,
+                                     snapshot.cancelled ? JNI_TRUE : JNI_FALSE);
+    bool result = snapshot.cancelled;
     if (env->ExceptionCheck() == JNI_TRUE) {
         reportJavaFailure(env, "event " + event);
     } else {
         result = cancelled == JNI_TRUE;
         for (std::size_t index = 0; index < names.size(); ++index) {
-            if (!fired.type().isMutable(names[index])) {
+            if (!snapshot.type->isMutable(names[index])) {
                 continue;
             }
             jobject value = env->GetObjectArrayElement(fields, static_cast<jsize>(index));
-            fired.set(static_cast<std::int32_t>(index), unbox(env, value));
+            snapshot.values[index] = unbox(env, value);
             if (value != nullptr) {
                 env->DeleteLocalRef(value);
             }
@@ -232,6 +232,7 @@ bool BukkitBridge::deliver(const std::string& event, std::int32_t priority, plug
     }
     env->DeleteLocalRef(name);
     env->DeleteLocalRef(fields);
+    snapshot.cancelled = result;
     return result;
 }
 
@@ -261,7 +262,31 @@ bool BukkitBridge::subscribe(const std::string& event, std::int32_t priority) {
     eventHandles_.push_back(plugins_->events().add(
         *type, std::string{kEventOwner}, 0, level, monitor, true, {},
         [this, event, priority, monitor](plugins::PluginEvent& fired) {
-            const bool cancelled = deliver(event, priority, fired);
+            Snapshot snapshot{.type = &fired.type(), .generation = fired.generation(), .cancelled = fired.cancelled()};
+            for (std::size_t index = 0; index < fired.type().fields().size(); ++index) {
+                snapshot.values.push_back(fired.get(static_cast<std::int32_t>(index)));
+            }
+            if (!plugins_->onPluginThread()) {
+                if (monitor || !fired.type().cancellable()) {
+                    static_cast<void>(services().tasks().after(
+                        0, [this, event, priority, moved = std::move(snapshot)]() mutable {
+                            deliver(event, priority, moved);
+                        }));
+                } else if (!warnedAboutThread_) {
+                    warnedAboutThread_ = true;
+                    log_.warn([&event] {
+                        return event + " was fired from a thread plugins do not run on, so no Bukkit listener "
+                                       "could change it";
+                    });
+                }
+                return;
+            }
+            const bool cancelled = deliver(event, priority, snapshot);
+            for (std::size_t index = 0; index < snapshot.values.size(); ++index) {
+                if (fired.type().isMutable(fired.type().fields()[index])) {
+                    fired.set(static_cast<std::int32_t>(index), snapshot.values[index]);
+                }
+            }
             if (cancelled && !monitor && fired.type().cancellable()) {
                 fired.cancel();
             }
@@ -295,9 +320,7 @@ void BukkitBridge::registerCommand(const std::string& plugin, const std::string&
         log_.warn([&label] { return "command '" + label + "' cannot be registered"; });
         return;
     }
-    if (!permission.empty()) {
-        spec->permission = permission;
-    }
+    spec->permission = permission;
     commands_.emplace(plugin, services().commands().registerCommand(
                                   "bukkit." + lowercase(plugin), *spec,
                                   [this, label](plugins::PluginCommandCall& call) { runCommand(label, call); }));

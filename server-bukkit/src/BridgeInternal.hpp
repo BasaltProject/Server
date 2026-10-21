@@ -37,7 +37,14 @@ public:
 
 private:
     void runTask(std::int64_t id);
-    bool deliver(const std::string& event, std::int32_t priority, plugins::PluginEvent& fired);
+    struct Snapshot {
+        const plugins::PluginEventType* type = nullptr;
+        std::vector<plugins::PluginEventValue> values;
+        std::int64_t generation = 0;
+        bool cancelled = false;
+    };
+
+    bool deliver(const std::string& event, std::int32_t priority, Snapshot& snapshot);
     bool runCommand(const std::string& name, plugins::PluginCommandCall& call);
     void reportJavaFailure(JNIEnv* env, std::string_view where);
 
@@ -55,6 +62,7 @@ private:
     std::set<std::pair<std::string, std::int32_t>> subscribed_;
     std::multimap<std::string, plugins::PluginHandle> commands_;
     std::vector<plugins::PluginHandle> eventHandles_;
+    bool warnedAboutThread_ = false;
 };
 
 void registerNatives(JNIEnv* env, jclass natives);
