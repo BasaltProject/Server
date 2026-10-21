@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
 #include <basalt/server/runtime/bedrock/BedrockCarry.hpp>
@@ -54,6 +55,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <string>
 #include <thread>
 #include <vector>
@@ -136,12 +138,8 @@ public:
         std::function<std::optional<std::string>(const std::string& name, const std::string& uuid,
                                                  const std::string& address)>
             loginRefused;
-        std::function<std::optional<std::vector<std::uint8_t>>(wire::protocol::ProtocolState state, std::int32_t id,
-                                                               std::span<const std::uint8_t> packet)>
-            outgoing;
-        std::function<std::optional<std::vector<std::uint8_t>>(wire::protocol::ProtocolState state, std::int32_t id,
-                                                               std::span<const std::uint8_t> packet)>
-            incoming;
+        /// Every packet on this connection goes through it (all states, both ways) while somebody listens.
+        server::plugins::PluginPacketBus* packets = nullptr;
         std::function<bool(const std::string& channel)> listensOn;
         std::function<void(const std::string& uuid, const std::string& channel, std::span<const std::uint8_t> payload)>
             channelMessage;
@@ -304,6 +302,16 @@ public:
 
     void sendCompressed(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody);
 
+    /// Sends a clientbound packet (id and body) past the plugin listeners unless `intercept`; any thread.
+    bool sendRaw(std::int32_t id, std::span<const std::uint8_t> body, bool intercept);
+
+    /// Handles a serverbound packet as if the client had sent it.
+    bool receiveRaw(std::int32_t id, std::span<const std::uint8_t> body, bool intercept);
+
+    [[nodiscard]] std::uint64_t connectionId() const noexcept { return connectionId_; }
+
+    [[nodiscard]] std::shared_ptr<server::plugins::PacketEndpoint> endpoint() const;
+
     void disconnect(const wire::text::Component& reason);
 
     [[nodiscard]] ContainerMenuController& menus() noexcept { return *menus_; }
@@ -459,6 +467,16 @@ private:
     /// Frames one packet for the wire: inside a data frame once the envelope is active.
     void frameOutgoing(std::span<const std::uint8_t> whole);
 
+    void dispatchOutgoing(std::int32_t id, std::span<const std::uint8_t> whole, bool intercept);
+    [[nodiscard]] bool tapListens(bool serverbound, std::int32_t id) const noexcept;
+    /// False when a listener cancelled the packet; `replacement` is set when one rewrote the body.
+    [[nodiscard]] bool tap(bool serverbound, std::int32_t id, std::span<const std::uint8_t> body,
+                           std::optional<std::vector<std::uint8_t>>& replacement);
+    class Endpoint;
+    void attachEndpoint();
+    void detachEndpoint();
+    void announceClosed();
+
     void handleFrameBody(std::int32_t packetId, wire::io::ByteBuffer& body);
 
     void handleHandshake(std::int32_t packetId, wire::io::ByteBuffer& body);
@@ -548,6 +566,8 @@ private:
     net::SessionOutbox outbox_;
     net::ProxyLogin proxy_;
     std::mutex sendMutex_;
+    std::uint64_t connectionId_ = 0;
+    std::shared_ptr<Endpoint> endpoint_;
     wire::io::ByteBuffer incoming_;
     wire::protocol::ProtocolState state_ = wire::protocol::ProtocolState::Handshake;
     std::optional<wire::protocol::handshake::HandshakePacket> handshake_;

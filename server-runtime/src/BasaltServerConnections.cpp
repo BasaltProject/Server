@@ -200,34 +200,7 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
         return login->cancelMessage().value_or("");
     };
 
-    // Nothing is copied or decoded while nobody watches that packet's name: this is on the path every packet takes.
-    server::plugins::PluginPacketBus* packets = &host->packets();
-    const auto intercept = [packets](wire::protocol::ProtocolState state, bool serverbound, std::int32_t id,
-                                     std::span<const std::uint8_t> bytes,
-                                     const player::PlayerSession* player) -> std::optional<std::vector<std::uint8_t>> {
-        const std::string name = plugins::packetNames::of(state, serverbound, id);
-        if (!packets->listening(name)) {
-            return std::vector<std::uint8_t>{bytes.begin(), bytes.end()};
-        }
-        server::plugins::PluginPacket& packet = packets->packet();
-        packet.name = name;
-        packet.serverbound = serverbound;
-        packet.playerName = player == nullptr ? "" : player->name();
-        packet.playerUuid = player == nullptr ? "" : player->uuid().toString();
-        packet.bytes.assign(bytes.begin(), bytes.end());
-        if (!packets->fire(packet)) {
-            return std::nullopt;
-        }
-        return packet.replacement.value_or(packet.bytes);
-    };
-    hooks.incoming = [intercept](wire::protocol::ProtocolState state, std::int32_t id,
-                                 std::span<const std::uint8_t> bytes) {
-        return intercept(state, true, id, bytes, nullptr);
-    };
-    hooks.outgoing = [intercept](wire::protocol::ProtocolState state, std::int32_t id,
-                                 std::span<const std::uint8_t> bytes) {
-        return intercept(state, false, id, bytes, nullptr);
-    };
+    hooks.packets = &host->packets();
 
     hooks.listensOn = [host](const std::string& channel) { return host->listeningOnChannel(channel); };
     hooks.channelMessage = [host](const std::string& uuid, const std::string& channel,

@@ -43,9 +43,11 @@ PluginHost::PluginHost(PluginServices& services, std::int32_t lanes, wire::lua::
                        std::int32_t strikeLimit)
     : services_(&services), lanes_(lanes), limits_(limits), strikeLimit_(strikeLimit),
       surfaces_([this](const std::string& message) { log_.warn([&message] { return message; }); }),
-      packets_([this](LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPacket& packet) {
-          deliverPacket(plugin, fn, packet);
-      }),
+      packets_(
+          [this](LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPacket& packet) {
+              deliverPacket(plugin, fn, packet);
+          },
+          [this](const PacketAddress& address) { return services_->packets().nameOf(address); }),
       commandDispatch_(std::make_unique<PluginCommandDispatch>(*this)),
       eventDispatch_(std::make_unique<PluginEventDispatch>(*this)) {
     for (const PluginEventType* type : pluginEventTypes::all()) {

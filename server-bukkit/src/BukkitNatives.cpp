@@ -275,5 +275,6 @@ void registerNatives(JNIEnv* env, jclass natives) {
                         reinterpret_cast<void*>(&nativeWorldTime)},
     };
     env->RegisterNatives(natives, methods.data(), static_cast<jint>(methods.size()));
+    registerPacketNatives(env, natives);
 }
 } // namespace basalt::server::bukkit

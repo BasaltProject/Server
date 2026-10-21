@@ -16,7 +16,7 @@ import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.plugin.Plugin;
 import org.basaltmc.bukkit.gen.PlayerBase;
 
-public final class BasaltPlayer extends PlayerBase {
+public class BasaltPlayer extends PlayerBase {
     private static final int kHealth = 0;
     private static final int kFood = 1;
     private static final int kLevel = 2;
@@ -30,7 +30,7 @@ public final class BasaltPlayer extends PlayerBase {
     private final String uuid;
     private final String name;
 
-    BasaltPlayer(UUID id, String name) {
+    protected BasaltPlayer(UUID id, String name) {
         this.id = id;
         this.uuid = id.toString();
         this.name = name;

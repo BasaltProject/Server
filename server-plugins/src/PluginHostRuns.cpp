@@ -106,6 +106,7 @@ bool PluginHost::inside(LoadedPlugin& plugin, std::string_view why,
     if (plugin.disabled || plugin.instances.empty()) {
         return false;
     }
+    const std::lock_guard<std::recursive_mutex> turn{luaMutex_};
     PluginInstance& instance = *plugin.instances.front();
     instance.sandbox->refill();
     instance.deciderDepth++;
@@ -150,6 +151,7 @@ void PluginHost::enter(LoadedPlugin& plugin, PluginInstance& instance, const wir
     if (plugin.disabled || !fn.valid()) {
         return;
     }
+    const std::lock_guard<std::recursive_mutex> turn{luaMutex_};
     instance.sandbox->refill();
     wire::lua::LuaArgs lua{instance.sandbox->state()};
     fn.push(lua);
@@ -189,6 +191,7 @@ void PluginHost::resuming(LoadedPlugin& plugin, const std::function<void()>& res
     if (plugin.disabled || !resume) {
         return;
     }
+    const std::lock_guard<std::recursive_mutex> turn{luaMutex_};
     resume();
     plugin.strikes = 0;
 }

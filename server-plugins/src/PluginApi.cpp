@@ -639,10 +639,11 @@ void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
                     if (!args.isFunction(at)) {
                         args.raise("packet.on(name, fn) needs a function");
                     }
-                    if (!server->services().packets().isKnown(name)) {
+                    const std::optional<PacketScope> scope = server->services().packets().scopeOf(name);
+                    if (!scope.has_value()) {
                         args.raise("this server has no packet called '" + name +
-                                   "'. Names look like clientbound.set_title_text; "
-                                   "/plugins packets lists them");
+                                   "'. Names look like clientbound.set_title_text, serverbound.play.* or "
+                                   "clientbound.configuration.0x07; /plugins packets lists them");
                     }
                     PluginEventPriority priority = PluginEventPriority::Normal;
                     if (hasOptions && args.isTable(2)) {
@@ -656,7 +657,7 @@ void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
                         }
                     }
                     PluginHandle handle =
-                        server->packets().add(*target, name, LuaRef::of(args.state(), at), priority, observer);
+                        server->packets().add(*target, *scope, LuaRef::of(args.state(), at), priority, observer);
                     static_cast<void>(
                         target->registrations.add(std::string{"packet."} + (observer ? "watch(" : "on(") + name + ")",
                                                   [moved = std::move(handle)]() mutable { moved.remove(); }));
@@ -664,27 +665,37 @@ void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
                 });
             lua.setField(observer ? "watch" : "on");
         }
-        wire::lua::pushHostFunction(lua, "packet.send", [server](LuaArgs& args) {
-            const std::shared_ptr<PluginPlayerRef> player = playerFrom(args, 1, server->services().players());
-            if (player == nullptr) {
-                args.raise("packet.send(player, name, bytes) needs a player");
-            }
-            const std::string name = args.checkString(2);
-            if (!args.isTable(3)) {
-                args.raise("packet.send needs the body as a list of bytes");
-            }
-            std::vector<std::uint8_t> bytes;
-            const std::int64_t length = args.length(3);
-            bytes.reserve(static_cast<std::size_t>(length));
-            for (std::int64_t position = 1; position <= length; position++) {
-                args.pushIndex(3, position);
-                bytes.push_back(static_cast<std::uint8_t>(args.toInteger(-1) & 0xFF));
-                args.pop(1);
-            }
-            args.pushBoolean(server->services().packets().send(*player, name, bytes));
-            return 1;
-        });
-        lua.setField("send");
+        for (const bool inbound : {false, true}) {
+            wire::lua::pushHostFunction(
+                lua, inbound ? "packet.receive" : "packet.send", [server, inbound](LuaArgs& args) {
+                    const std::shared_ptr<PluginPlayerRef> player = playerFrom(args, 1, server->services().players());
+                    if (player == nullptr) {
+                        args.raise(std::string{"packet."} + (inbound ? "receive" : "send") +
+                                   "(player, name, bytes) needs a player");
+                    }
+                    const std::string name = args.checkString(2);
+                    const std::optional<PacketAddress> address = server->services().packets().resolve(name);
+                    if (!address.has_value() || address->serverbound != inbound) {
+                        args.raise("'" + name + "' is not a " + (inbound ? "serverbound" : "clientbound") + " packet");
+                    }
+                    if (!args.isTable(3)) {
+                        args.raise("packet.send needs the body as a list of bytes");
+                    }
+                    std::vector<std::uint8_t> bytes;
+                    const std::int64_t length = args.length(3);
+                    bytes.reserve(static_cast<std::size_t>(length));
+                    for (std::int64_t position = 1; position <= length; position++) {
+                        args.pushIndex(3, position);
+                        bytes.push_back(static_cast<std::uint8_t>(args.toInteger(-1) & 0xFF));
+                        args.pop(1);
+                    }
+                    const bool intercept = args.isBoolean(4) && args.booleanOr(4, false);
+                    args.pushBoolean(inbound ? server->services().packets().receive(*player, *address, bytes, intercept)
+                                             : server->services().packets().send(*player, *address, bytes, intercept));
+                    return 1;
+                });
+            lua.setField(inbound ? "receive" : "send");
+        }
         lua.setGlobal("packet");
     }
 

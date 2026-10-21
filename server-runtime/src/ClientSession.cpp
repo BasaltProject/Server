@@ -102,9 +102,12 @@ ClientSession::ClientSession(wire::io::TcpConnection connection, Options options
                                                         : plugins::eventHooks::uiState(*this, *options_.events))),
       trades_(std::make_unique<VillagerTradeController>(
           *this, options_.events == nullptr ? VillagerTradeController::Hooks{}
-                                            : plugins::eventHooks::villagerTrade(*this, *options_.events))) {}
+                                            : plugins::eventHooks::villagerTrade(*this, *options_.events))) {
+    attachEndpoint();
+}
 
 ClientSession::~ClientSession() {
+    detachEndpoint();
     streaming_.store(false);
     if (carried_ != nullptr) {
         carried_->end();
@@ -225,6 +228,7 @@ void ClientSession::run() {
         carried_->end();
     }
     lifecycle_->leavePlayIfPresent();
+    announceClosed();
     if (closeWhenDrained_.load()) {
         // The goodbye is still queued when the read ended on purpose.
         flushOutbox();
@@ -422,15 +426,14 @@ void ClientSession::handleOriginalPacket(wire::io::ByteBuffer& body) {
 }
 
 void ClientSession::handleFrameBody(std::int32_t packetId, wire::io::ByteBuffer& body) {
-    if (options_.plugins.incoming) {
-        const std::optional<std::vector<std::uint8_t>> edited =
-            options_.plugins.incoming(state_, packetId, body.readable());
-        if (!edited.has_value()) {
+    if (tapListens(true, packetId)) {
+        std::optional<std::vector<std::uint8_t>> replacement;
+        if (!tap(true, packetId, body.readable(), replacement)) {
             return;
         }
-        if (*edited != std::vector<std::uint8_t>(body.readable().begin(), body.readable().end())) {
+        if (replacement.has_value()) {
             wire::io::ByteBuffer replaced;
-            replaced.writeBytes(*edited);
+            replaced.writeBytes(*replacement);
             body = std::move(replaced);
         }
     }
@@ -493,6 +496,19 @@ void ClientSession::sendUncompressed(std::int32_t id, const std::function<void(w
     wire::io::ByteBuffer body;
     wire::protocol::varInt::write(body, id);
     writeBody(body);
+    if (tapListens(false, id)) {
+        std::optional<std::vector<std::uint8_t>> replacement;
+        const std::size_t idLength = static_cast<std::size_t>(wire::protocol::varInt::sizeOf(id));
+        if (!tap(false, id, body.readable().subspan(idLength), replacement)) {
+            return;
+        }
+        if (replacement.has_value()) {
+            wire::io::ByteBuffer rebuilt;
+            wire::protocol::varInt::write(rebuilt, id);
+            rebuilt.writeBytes(*replacement);
+            body = std::move(rebuilt);
+        }
+    }
     wire::io::ByteBuffer frame;
     if (!wire::protocol::packetFraming::writeUncompressed(frame, body.readable())) {
         connection_.close();
@@ -505,24 +521,7 @@ void ClientSession::sendCompressed(std::int32_t id, const std::function<void(wir
     wire::io::ByteBuffer body;
     wire::protocol::varInt::write(body, id);
     writeBody(body);
-    std::vector<std::uint8_t> bytes(body.readable().begin(), body.readable().end());
-    const std::size_t idBytes = static_cast<std::size_t>(wire::protocol::varInt::sizeOf(id));
-    if (options_.plugins.outgoing) {
-        const std::optional<std::vector<std::uint8_t>> edited =
-            options_.plugins.outgoing(state_, id, std::span{bytes}.subspan(idBytes));
-        if (!edited.has_value()) {
-            return;
-        }
-        std::vector<std::uint8_t> rebuilt(bytes.begin(), bytes.begin() + static_cast<std::ptrdiff_t>(idBytes));
-        rebuilt.insert(rebuilt.end(), edited->begin(), edited->end());
-        bytes = std::move(rebuilt);
-    }
-    if (translation_ != nullptr) {
-        // After the plugins on purpose: they see the server's own version shape and translation happens on the way out.
-        sendTranslated(translation_->chain(), id, std::span{bytes}.subspan(idBytes));
-        return;
-    }
-    frameOutgoing(bytes);
+    dispatchOutgoing(id, body.readable(), true);
 }
 
 void ClientSession::sendTranslated(const wire::multiversion::ProtocolChain& chain, std::int32_t id,

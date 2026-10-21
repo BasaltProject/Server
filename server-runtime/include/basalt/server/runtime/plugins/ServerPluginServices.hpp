@@ -50,6 +50,12 @@ public:
 
     bool runAsConsole(std::string_view command) override;
 
+    bool runAsPlayer(server::plugins::PluginPlayerRef& player, std::string_view command) override;
+
+    void setPlayerRunner(std::function<bool(const std::string& uuid, const std::string& line)> runner) {
+        playerRunner_ = std::move(runner);
+    }
+
     void refresh();
 
 private:
@@ -65,6 +71,7 @@ private:
     sched::Owner* owner_;
     command::CommandDispatcher* dispatcher_;
     std::function<const command::CommandSource*()> console_;
+    std::function<bool(const std::string& uuid, const std::string& line)> playerRunner_;
     std::vector<std::unique_ptr<Entry>> entries_;
 };
 
@@ -82,16 +89,29 @@ private:
     std::string packages_;
 };
 
-class SessionPackets final : public server::plugins::PluginPacketSender {
+class NamedPackets : public server::plugins::PluginPacketSender {
+public:
+    [[nodiscard]] std::optional<server::plugins::PacketAddress> resolve(std::string_view name) const override;
+
+    [[nodiscard]] std::optional<server::plugins::PacketScope> scopeOf(std::string_view name) const override;
+
+    [[nodiscard]] std::string nameOf(const server::plugins::PacketAddress& address) const override;
+
+    [[nodiscard]] std::vector<std::string> names() const override;
+};
+
+class SessionPackets final : public NamedPackets {
 public:
     explicit SessionPackets(player::PlayerRegistry& registry) : registry_(&registry) {}
 
-    bool send(server::plugins::PluginPlayerRef& player, std::string_view name,
-              std::span<const std::uint8_t> bytes) override;
+    bool send(server::plugins::PluginPlayerRef& player, const server::plugins::PacketAddress& address,
+              std::span<const std::uint8_t> bytes, bool intercept) override;
 
-    [[nodiscard]] bool isKnown(std::string_view name) const override;
+    bool receive(server::plugins::PluginPlayerRef& player, const server::plugins::PacketAddress& address,
+                 std::span<const std::uint8_t> bytes, bool intercept) override;
 
-    [[nodiscard]] std::vector<std::string> names() const override;
+    [[nodiscard]] std::shared_ptr<server::plugins::PacketEndpoint>
+    endpointOf(server::plugins::PluginPlayerRef& player) override;
 
 private:
     player::PlayerRegistry* registry_;
@@ -142,6 +162,10 @@ public:
     bool at(std::string_view world, double x, double z, std::function<void()> task) override;
 
     void refreshCommands() { commands_.refresh(); }
+
+    void setPlayerRunner(std::function<bool(const std::string& uuid, const std::string& line)> runner) {
+        commands_.setPlayerRunner(std::move(runner));
+    }
 
 private:
     OwnerTasks tasks_;

@@ -273,6 +273,8 @@ private:
     PluginAnnouncements announcements_;
     PluginServiceRegistry services_registry_;
     PluginSurfaceRegistry surfaces_;
+    // Lua states are single threaded: a packet listener on a connection thread waits for the tick thread's call.
+    std::recursive_mutex luaMutex_;
     PluginPacketRegistry packets_;
     PluginChannelHost channels_;
     std::unique_ptr<PluginCommandDispatch> commandDispatch_;

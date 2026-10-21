@@ -54,6 +54,25 @@ std::expected<std::unique_ptr<ShimHost>, std::string> ShimHost::create(const Shi
     return std::make_unique<ShimHost>(Key{}, library, vm);
 }
 
+namespace {
+// A connection thread attaches on first use and must leave the VM before it exits.
+struct Attachment {
+    JavaVM* vm = nullptr;
+
+    Attachment() = default;
+    Attachment(const Attachment&) = delete;
+    Attachment& operator=(const Attachment&) = delete;
+
+    ~Attachment() {
+        if (vm != nullptr) {
+            vm->DetachCurrentThread();
+        }
+    }
+};
+
+thread_local Attachment tAttachment;
+} // namespace
+
 JNIEnv* ShimHost::env() const {
     JNIEnv* env = nullptr;
     if (vm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_8) == JNI_OK) {
@@ -62,6 +81,7 @@ JNIEnv* ShimHost::env() const {
     if (vm_->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
         return nullptr;
     }
+    tAttachment.vm = vm_;
     return env;
 }
 } // namespace basalt::server::bukkit

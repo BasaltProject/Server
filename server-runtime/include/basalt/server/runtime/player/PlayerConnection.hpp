@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 #include <basalt/server/runtime/chat/ChatMessage.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -18,6 +19,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -55,6 +57,9 @@ struct PlayerConnection {
     std::function<void(const chat::PlayerChatMessage& message, const chat::BoundChatType& chatType)> sendChatMessage;
 
     std::function<void(std::int32_t packetId, const std::function<void(wire::io::ByteBuffer&)>& write)> sendPlayPacket;
+
+    /// The Java connection for raw packet access; unset for Bedrock players.
+    std::function<std::shared_ptr<server::plugins::PacketEndpoint>()> packetEndpoint;
 
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                        const std::vector<world::BlockEffect>& effects)>

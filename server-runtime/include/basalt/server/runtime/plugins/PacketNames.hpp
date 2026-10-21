@@ -1,21 +1,23 @@
 #pragma once
 
-#include <basalt/wire/protocol/ProtocolState.hpp>
+#include <basalt/server/plugins/PluginPackets.hpp>
 
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace basalt::server::runtime::plugins::packetNames {
 
-[[nodiscard]] std::string of(wire::protocol::ProtocolState state, bool serverbound, std::int32_t id);
+/// The name plugins use: `clientbound.set_title_text`, or with the phase when the name repeats across phases.
+[[nodiscard]] std::string of(const server::plugins::PacketAddress& address);
 
-[[nodiscard]] std::optional<std::pair<wire::protocol::ProtocolState, std::int32_t>> idOf(std::string_view name);
+/// One packet by any of its spellings: short, with the phase, a vanilla alias, or `clientbound.play.0x1f`.
+[[nodiscard]] std::optional<server::plugins::PacketAddress> resolve(std::string_view name);
 
-[[nodiscard]] bool isKnown(std::string_view name);
+/// Like `resolve`, plus `*`, `serverbound.*` and `clientbound.play.*`.
+[[nodiscard]] std::optional<server::plugins::PacketScope> scopeOf(std::string_view name);
 
 [[nodiscard]] std::vector<std::string> all();
 

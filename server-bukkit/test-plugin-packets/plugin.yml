@@ -1,0 +1,7 @@
+name: PacketProbe
+version: 1.0.0
+main: org.basaltmc.packetprobe.PacketProbe
+api-version: "1.21"
+depend: [packetevents]
+description: Exercises PacketEvents on Basalt
+author: Basalt

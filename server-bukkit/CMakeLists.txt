@@ -14,6 +14,8 @@ basalt_module(server-bukkit
         src/BukkitBridge.cpp
         src/BukkitHost.cpp
         src/BukkitNatives.cpp
+        src/BukkitPackets.cpp
+        src/BukkitWorldNatives.cpp
         src/ShimHost.cpp
     DEPENDS basalt::server-plugins basalt::wire-common
 )

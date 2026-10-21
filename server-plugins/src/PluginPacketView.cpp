@@ -3,6 +3,9 @@
 #include <basalt/server/plugins/PluginPacketView.hpp>
 
 #include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::plugins {
@@ -23,6 +26,38 @@ using wire::lua::LuaArgs;
     }
     return out;
 }
+
+[[nodiscard]] std::string_view phaseName(PacketPhase phase) {
+    switch (phase) {
+    case PacketPhase::Handshake:
+        return "handshake";
+    case PacketPhase::Status:
+        return "status";
+    case PacketPhase::Login:
+        return "login";
+    case PacketPhase::Configuration:
+        return "configuration";
+    case PacketPhase::Play:
+        return "play";
+    }
+    return "play";
+}
+
+// Sends or injects another packet on the connection this one travels on, past the listeners unless asked.
+[[nodiscard]] bool relay(LuaArgs& args, std::int32_t base, PluginHost& host, const PluginPacket& from, bool inbound) {
+    if (from.endpoint == nullptr) {
+        return false;
+    }
+    const std::string name = args.checkString(base);
+    const std::optional<PacketAddress> address = host.services().packets().resolve(name);
+    if (!address.has_value() || address->serverbound != inbound) {
+        args.raise("'" + name + "' is not a " + (inbound ? "serverbound" : "clientbound") + " packet");
+    }
+    const std::vector<std::uint8_t> body = bytesFrom(args, base + 1);
+    const bool intercept = args.isBoolean(base + 2) && args.booleanOr(base + 2, false);
+    return inbound ? from.endpoint->receiveServerbound(address->id, body, intercept)
+                   : from.endpoint->sendClientbound(address->id, body, intercept);
+}
 } // namespace
 
 void pushPacket(LuaArgs& lua, PluginPacket& packet, PluginHost& host, LoadedPlugin& plugin) {
@@ -31,7 +66,12 @@ void pushPacket(LuaArgs& lua, PluginPacket& packet, PluginHost& host, LoadedPlug
     LoadedPlugin* owner = &plugin;
     PluginObject object{"packet"};
     object.reads("name", [target] { return PluginValue{target->name}; })
-        .reads("serverbound", [target] { return PluginValue{target->serverbound}; })
+        .reads("serverbound", [target] { return PluginValue{target->address.serverbound}; })
+        .reads("phase", [target] { return PluginValue{std::string{phaseName(target->address.phase)}}; })
+        .reads("id", [target] { return PluginValue{static_cast<std::int64_t>(target->address.id)}; })
+        .reads("connection", [target] { return PluginValue{static_cast<std::int64_t>(target->connection)}; })
+        .reads("protocol", [target] { return PluginValue{static_cast<std::int64_t>(target->clientProtocol)}; })
+        .reads("translated", [target] { return PluginValue{target->translated}; })
         .reads("size", [target] { return PluginValue{static_cast<std::int64_t>(target->bytes.size())}; })
         .reads("player_name", [target] { return PluginValue{target->playerName}; })
         .reads("player_uuid", [target] { return PluginValue{target->playerUuid}; })
@@ -58,10 +98,22 @@ void pushPacket(LuaArgs& lua, PluginPacket& packet, PluginHost& host, LoadedPlug
         .writes("cancelled",
                 [target](LuaArgs& args, std::int32_t index) { target->cancelled = args.booleanOr(index, true); })
         .writes("bytes", [target](LuaArgs& args, std::int32_t index) { target->replacement = bytesFrom(args, index); })
-        .method("cancel", [target](LuaArgs& args) {
-            static_cast<void>(args);
-            target->cancelled = true;
-            return 0;
+        .method("cancel",
+                [target](LuaArgs& args) {
+                    static_cast<void>(args);
+                    target->cancelled = true;
+                    return 0;
+                })
+        .method("send",
+                [target, server](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushBoolean(relay(args, base, *server, *target, false));
+                    return 1;
+                })
+        .method("receive", [target, server](LuaArgs& args) {
+            const std::int32_t base = firstArgument(args);
+            args.pushBoolean(relay(args, base, *server, *target, true));
+            return 1;
         });
     std::move(object).push(lua);
 }

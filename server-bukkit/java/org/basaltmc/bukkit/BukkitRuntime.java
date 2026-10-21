@@ -51,7 +51,7 @@ public final class BukkitRuntime {
             routeLogging();
             File folder = new File(pluginsFolder);
             folder.mkdirs();
-            server = new BasaltServer(new File(".").getAbsoluteFile(), folder);
+            server = new org.bukkit.craftbukkit.CraftServer(new File(".").getAbsoluteFile(), folder);
             Bukkit.setServer(server);
             Natives.log(1, "Bukkit", "Loading Bukkit plugins from " + folder.getPath());
             BasaltPluginManager manager = server.pluginManagerImpl();
