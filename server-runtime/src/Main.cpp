@@ -218,6 +218,7 @@ bool gSafeMode = false;
         }
         options.servicesKeys = instance->servicesKeys.get();
     }
+    options.bukkit = orExit(config::BukkitConfig::load(config::ConfigDirectory{}), configLogger);
     options.lang = server::assets::langAssets::loadCachedOrEmpty(dataRoot);
 
     instance->server =

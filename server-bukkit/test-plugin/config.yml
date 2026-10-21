@@ -1,0 +1,2 @@
+greeting: "Hello, %player%! Welcome to Basalt."
+tick-interval: 100

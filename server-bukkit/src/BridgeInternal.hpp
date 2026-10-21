@@ -1,0 +1,64 @@
+#pragma once
+
+#include <basalt/server/bukkit/BukkitHost.hpp>
+#include <basalt/server/bukkit/ShimHost.hpp>
+#include <basalt/server/plugins/PluginHost.hpp>
+#include <basalt/wire/common/logging/Logger.hpp>
+
+#include <cstdint>
+#include <map>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+namespace basalt::server::bukkit {
+class BukkitBridge {
+public:
+    BukkitBridge(ShimHost& shim, plugins::PluginHost& plugins, BukkitOptions options);
+
+    [[nodiscard]] static BukkitBridge& current();
+
+    [[nodiscard]] std::expected<void, std::string> boot();
+    void shutdown();
+
+    [[nodiscard]] plugins::PluginHost& plugins() noexcept { return *plugins_; }
+    [[nodiscard]] plugins::PluginServices& services() noexcept { return plugins_->services(); }
+    [[nodiscard]] const wire::common::Logger& log() const noexcept { return log_; }
+
+    [[nodiscard]] const plugins::PluginEventType* typeNamed(const std::string& name) const;
+    void scheduleAfter(std::int64_t id, std::int32_t delay);
+    void scheduleEvery(std::int64_t id, std::int32_t delay, std::int32_t period);
+    void cancelTask(std::int64_t id);
+    bool subscribe(const std::string& event, std::int32_t priority);
+    void registerCommand(const std::string& plugin, const std::string& name, const std::string& permission);
+    void unregisterCommands(const std::string& plugin);
+
+private:
+    void runTask(std::int64_t id);
+    bool deliver(const std::string& event, std::int32_t priority, plugins::PluginEvent& fired);
+    bool runCommand(const std::string& name, plugins::PluginCommandCall& call);
+    void reportJavaFailure(JNIEnv* env, std::string_view where);
+
+    ShimHost* shim_;
+    plugins::PluginHost* plugins_;
+    BukkitOptions options_;
+    wire::common::Logger log_{"Bukkit"};
+    jclass runtime_ = nullptr;
+    jmethodID bootMethod_ = nullptr;
+    jmethodID shutdownMethod_ = nullptr;
+    jmethodID taskMethod_ = nullptr;
+    jmethodID eventMethod_ = nullptr;
+    jmethodID commandMethod_ = nullptr;
+    std::map<std::int64_t, plugins::PluginHandle> tasks_;
+    std::set<std::pair<std::string, std::int32_t>> subscribed_;
+    std::multimap<std::string, plugins::PluginHandle> commands_;
+    std::vector<plugins::PluginHandle> eventHandles_;
+};
+
+void registerNatives(JNIEnv* env, jclass natives);
+
+[[nodiscard]] std::string toStd(JNIEnv* env, jstring text);
+[[nodiscard]] jstring toJava(JNIEnv* env, std::string_view text);
+} // namespace basalt::server::bukkit

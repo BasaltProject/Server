@@ -41,6 +41,7 @@
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
 #include <basalt/server/runtime/bedrock/BedrockWindows.hpp>
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
+#include <basalt/server/runtime/config/BukkitConfig.hpp>
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
 #include <basalt/server/runtime/datapack/DataPacks.hpp>
@@ -91,6 +92,7 @@ public:
         config::CompatibilityConfig compatibility{config::BackwardsSelection{},
                                                   wire::multiversion::UnknownProtocolPolicy::Refuse,
                                                   wire::multiversion::UnknownProtocolPolicy::Refuse};
+        config::BukkitConfig bukkit;
         std::string pluginsRoot = ".";
         std::string playersDatabasePath = "players.db";
         std::string worldsRoot = "worlds";
@@ -122,6 +124,8 @@ private:
     void tickWorlds(bool worldRuns);
 
     void startBedrockListener();
+
+    void startBukkit();
 
     void tickEntities(world::LoadedWorld& world, const sched::Region& region);
 
@@ -284,6 +288,7 @@ private:
     std::unique_ptr<plugins::SessionChannels> pluginChannels_;
     std::unique_ptr<plugins::ServerPluginServices> pluginServices_;
     std::unique_ptr<server::plugins::PluginHost> plugins_;
+    std::shared_ptr<void> bukkit_;
     plugins::EventSink eventSink_{[this] { return plugins_ == nullptr ? nullptr : &plugins_->events(); }};
 
     std::unique_ptr<BlockChangeBroadcaster> broadcaster_;
