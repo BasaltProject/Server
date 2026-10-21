@@ -95,6 +95,7 @@ public final class BasaltEntity extends EntityBase {
     @Override
     public void setRotation(float yaw, float pitch) {
         Location here = core.location();
+        Blocks.flushAll();
         WorldNatives.entityMove(core.world.getName(), core.id, here.getX(), here.getY(), here.getZ(), yaw, pitch);
     }
 

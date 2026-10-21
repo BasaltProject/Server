@@ -59,6 +59,15 @@ public abstract class BasaltWorldEditAdapter implements BukkitImplAdapter {
     protected abstract BlockMaterial newMaterial(String id, int defaultState);
 
     @Override
+    public void initializeRegistries() {
+        for (String id : Registries.biomeIds()) {
+            if (BiomeType.REGISTRY.get(id) == null) {
+                BiomeType.REGISTRY.register(id, new BiomeType(id));
+            }
+        }
+    }
+
+    @Override
     public DataFixer getDataFixer() {
         return new DataFixer() {
             @Override
@@ -77,7 +86,11 @@ public abstract class BasaltWorldEditAdapter implements BukkitImplAdapter {
 
     @Override
     public BaseBlock getFullBlock(Location location) {
-        return getBlock(location).toBaseBlock();
+        BlockState block = getBlock(location);
+        byte[] nbt = WorldNatives.blockEntityNbt(location.getWorld().getName(), location.getBlockX(),
+            location.getBlockY(), location.getBlockZ());
+        return nbt == null ? block.toBaseBlock()
+            : block.toBaseBlock(com.sk89q.worldedit.util.concurrency.LazyReference.computed(TileNbt.read(nbt)));
     }
 
     @Override
@@ -87,12 +100,38 @@ public abstract class BasaltWorldEditAdapter implements BukkitImplAdapter {
 
     @Override
     public BaseEntity getEntity(Entity entity) {
-        return null;
+        try {
+            return readEntity(entity);
+        } catch (RuntimeException e) {
+            org.basaltmc.bukkit.Natives.log(2, "WorldEdit", "getEntity failed: " + e);
+            return null;
+        }
+    }
+
+    private BaseEntity readEntity(Entity entity) {
+        byte[] nbt = WorldNatives.entityNbt(entity.getWorld().getName(), entity.getEntityId());
+        com.sk89q.worldedit.world.entity.EntityType type = com.sk89q.worldedit.world.entity.EntityTypes
+            .get(entity.getType().getKey().toString());
+        if (nbt == null || type == null) {
+            return null;
+        }
+        return new BaseEntity(type, com.sk89q.worldedit.util.concurrency.LazyReference.computed(TileNbt.read(nbt)));
     }
 
     @Override
     public Entity createEntity(Location location, BaseEntity state) {
-        return null;
+        org.enginehub.linbus.tree.LinCompoundTag saved = state.getNbtReference() == null ? null
+            : state.getNbtReference().getValue();
+        org.enginehub.linbus.tree.LinCompoundTag.Builder builder = saved == null
+            ? org.enginehub.linbus.tree.LinCompoundTag.builder() : saved.toBuilder();
+        builder.putString("id", state.getType().id());
+        builder.put("Pos", org.enginehub.linbus.tree.LinListTag.builder(org.enginehub.linbus.tree.LinTagType.doubleTag())
+            .add(org.enginehub.linbus.tree.LinDoubleTag.of(location.getX()))
+            .add(org.enginehub.linbus.tree.LinDoubleTag.of(location.getY()))
+            .add(org.enginehub.linbus.tree.LinDoubleTag.of(location.getZ())).build());
+        builder.remove("UUID");
+        int id = WorldNatives.spawnEntityNbt(location.getWorld().getName(), TileNbt.write(builder.build()));
+        return id < 0 ? null : org.basaltmc.bukkit.Entities.byId(location.getWorld(), id);
     }
 
     @Override

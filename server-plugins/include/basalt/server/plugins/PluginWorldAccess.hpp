@@ -446,6 +446,13 @@ public:
         return std::nullopt;
     }
 
+    /// Where the block entities of a loaded chunk are, as x, y, z triples in world coordinates.
+    [[nodiscard]] virtual std::vector<std::int32_t> blockEntityPositions(std::int32_t chunkX, std::int32_t chunkZ) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        return {};
+    }
+
     /// Replaces the block entity data at a position from a named NBT compound; false when the block owns none.
     virtual bool setBlockEntityNbt(std::int32_t x, std::int32_t y, std::int32_t z,
                                    std::span<const std::uint8_t> nbt) {
@@ -462,13 +469,13 @@ public:
         return std::nullopt;
     }
 
-    /// Brings an entity back from the NBT `entityNbt` gave (with Pos changed as wanted); it appears within a tick.
-    virtual bool spawnEntityNbt(std::span<const std::uint8_t> nbt) {
+    /// Brings an entity back from the NBT `entityNbt` gave (with Pos changed as wanted); returns its new id, or -1.
+    virtual std::int32_t spawnEntityNbt(std::span<const std::uint8_t> nbt) {
         static_cast<void>(nbt);
-        return false;
+        return -1;
     }
 
-    /// The biome ids of a chunk's 4 by 4 by 4 cells, ordered (cellY * 4 + cellZ) * 4 + cellX; false when not loaded.
+    /// The biomes (by position in the biome list) of a chunk's 4 by 4 by 4 cells, ordered (cellY * 4 + cellZ) * 4 + cellX; false when not loaded.
     virtual bool readBiomes(std::int32_t chunkX, std::int32_t chunkZ, std::span<std::int32_t> out) {
         static_cast<void>(chunkX);
         static_cast<void>(chunkZ);

@@ -47,6 +47,12 @@ public final class BasaltChunk extends ChunkBase {
     }
 
     @Override
+    public org.bukkit.ChunkSnapshot getChunkSnapshot(boolean includeMaxBlockY, boolean includeBiome,
+            boolean includeBiomeTempRain, boolean includeLightData) {
+        return new BasaltChunkSnapshot(world, x, z, true);
+    }
+
+    @Override
     public boolean isEntitiesLoaded() {
         return isLoaded();
     }
@@ -95,6 +101,7 @@ public final class BasaltChunk extends ChunkBase {
 
     @Override
     public boolean unload(boolean save) {
+        Blocks.flushAll();
         return WorldNatives.unloadChunk(world.getName(), x, z);
     }
 

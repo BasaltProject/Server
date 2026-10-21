@@ -9,6 +9,11 @@ final class BasaltFaweBlockMaterial extends BasaltBlockMaterial {
         super(id, defaultState);
     }
 
+    @Override
+    public boolean hasContainer() {
+        return isTile();
+    }
+
     public FaweCompoundTag defaultTile() {
         return null;
     }

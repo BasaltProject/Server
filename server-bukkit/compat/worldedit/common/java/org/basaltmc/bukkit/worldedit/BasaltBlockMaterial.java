@@ -119,7 +119,7 @@ public abstract class BasaltBlockMaterial implements BlockMaterial {
     }
 
     public boolean isTile() {
-        return false;
+        return flag(1 << 18);
     }
 
     public CompoundTag getDefaultTile() {

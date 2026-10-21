@@ -37,8 +37,9 @@ public final class WorldNatives {
     public static native int applyChunks(String world, int[] chunks, int[] sections, int[] states, boolean resend, int[] previous);
     public static native byte[] blockEntityNbt(String world, int x, int y, int z);
     public static native boolean setBlockEntityNbt(String world, int x, int y, int z, byte[] nbt);
+    public static native int[] blockEntityPositions(String world, int chunkX, int chunkZ);
     public static native byte[] entityNbt(String world, int id);
-    public static native boolean spawnEntityNbt(String world, byte[] nbt);
+    public static native int spawnEntityNbt(String world, byte[] nbt);
     public static native boolean readBiomes(String world, int chunkX, int chunkZ, int[] out);
     public static native boolean writeBiomes(String world, int chunkX, int chunkZ, int[] ids);
     public static native void relightChunks(String world, int[] chunks);

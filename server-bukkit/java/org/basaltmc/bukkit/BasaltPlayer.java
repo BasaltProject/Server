@@ -180,6 +180,7 @@ public class BasaltPlayer extends PlayerBase {
     @Override
     public boolean teleport(Location location) {
         World world = location.getWorld() == null ? getWorld() : location.getWorld();
+        Blocks.flushAll();
         return WorldNatives.playerMove(uuid, world.getName(), location.getX(), location.getY(), location.getZ(),
             location.getYaw(), location.getPitch());
     }
@@ -468,6 +469,7 @@ public class BasaltPlayer extends PlayerBase {
 
     @Override
     public boolean performCommand(String command) {
+        Blocks.flushAll();
         return WorldNatives.playerCommand(uuid, command);
     }
 

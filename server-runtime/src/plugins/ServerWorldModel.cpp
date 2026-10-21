@@ -585,6 +585,20 @@ public:
         return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(tag)));
     }
 
+    [[nodiscard]] std::vector<std::int32_t> blockEntityPositions(std::int32_t chunkX, std::int32_t chunkZ) override {
+        std::vector<std::int32_t> found;
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        if (chunk == nullptr) {
+            return found;
+        }
+        for (const server::world::ChunkBlockEntity& held : chunk->blockEntities()) {
+            found.push_back((chunkX << 4) + held.localX());
+            found.push_back(held.y());
+            found.push_back((chunkZ << 4) + held.localZ());
+        }
+        return found;
+    }
+
     bool setBlockEntityNbt(std::int32_t x, std::int32_t y, std::int32_t z, std::span<const std::uint8_t> nbt) override {
         server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
         const server::world::ChunkBlockEntity* held = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
@@ -621,16 +635,27 @@ public:
         return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(entity::entityNbt::encode(*found)));
     }
 
-    bool spawnEntityNbt(std::span<const std::uint8_t> nbt) override {
+    std::int32_t spawnEntityNbt(std::span<const std::uint8_t> nbt) override {
         const auto parsed = wire::nbt::nbtIO::read(nbt);
         const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
-        if (given == nullptr) {
-            return false;
+        if (given == nullptr || !hooks_.nextEntityId) {
+            return -1;
         }
-        std::vector<wire::nbt::NbtCompound> saved;
-        saved.push_back(*given);
-        world_->state().addPendingEntities(std::move(saved));
-        return true;
+        const entity::entityNbt::AllocateEntityIdFor allocate = [this](const Identifier&) {
+            return hooks_.nextEntityId();
+        };
+        const entity::entityNbt::ProtocolTypeOf protocolTypeOf =
+            [](const Identifier& type) -> std::optional<std::int32_t> {
+            const reg::EntityTypeEntry* entry = reg::entityTypes::of(type);
+            return entry == nullptr ? std::nullopt : std::optional{entry->protocolId};
+        };
+        std::int32_t first = -1;
+        for (std::unique_ptr<entity::ServerEntity>& restored :
+             entity::entityNbt::decodeTree(*given, allocate, protocolTypeOf)) {
+            const std::int32_t id = world_->state().spawnEntity(std::move(restored)).entityId();
+            first = first < 0 ? id : first;
+        }
+        return first;
     }
 
     bool readBiomes(std::int32_t chunkX, std::int32_t chunkZ, std::span<std::int32_t> out) override {
@@ -642,7 +667,7 @@ public:
         for (std::int32_t qy = 0; qy < cells; ++qy) {
             for (std::int32_t qz = 0; qz < 4; ++qz) {
                 for (std::int32_t qx = 0; qx < 4; ++qx) {
-                    out[static_cast<std::size_t>((qy * 4 + qz) * 4 + qx)] = chunk->biomeId(qx, qy, qz);
+                    out[static_cast<std::size_t>((qy * 4 + qz) * 4 + qx)] = biomeIndexOf(chunk->biomeId(qx, qy, qz));
                 }
             }
         }
@@ -659,8 +684,8 @@ public:
             for (std::int32_t qz = 0; qz < 4; ++qz) {
                 for (std::int32_t qx = 0; qx < 4; ++qx) {
                     const std::int32_t id = ids[static_cast<std::size_t>((qy * 4 + qz) * 4 + qx)];
-                    if (id >= 0) {
-                        chunk->setBiomeId(qx, qy, qz, id);
+                    if (const std::optional<std::int32_t> biome = biomeIdAt(id); biome.has_value()) {
+                        chunk->setBiomeId(qx, qy, qz, *biome);
                     }
                 }
             }
@@ -901,6 +926,27 @@ private:
         return config::dimensionFacts(world_->declaration().dimension).chunkHeight;
     }
 
+    [[nodiscard]] static std::int32_t biomeIndexOf(std::int32_t biomeId) {
+        std::int32_t index = 0;
+        for (const auto& [id, name] : reg::biomeIdsTable()) {
+            if (id == biomeId) {
+                return index;
+            }
+            ++index;
+        }
+        return -1;
+    }
+
+    [[nodiscard]] static std::optional<std::int32_t> biomeIdAt(std::int32_t index) {
+        std::int32_t at = 0;
+        for (const auto& [id, name] : reg::biomeIdsTable()) {
+            if (at++ == index) {
+                return id;
+            }
+        }
+        return std::nullopt;
+    }
+
     void ensureChunk(std::int32_t chunkX, std::int32_t chunkZ) {
         if (!world_->state().isLoaded(chunkX, chunkZ)) {
             static_cast<void>(world_->state().getOrGenerateChunk(chunkX, chunkZ));
@@ -1026,6 +1072,8 @@ std::int32_t LoadedWorlds::stateFlags(std::int32_t stateId) const {
     bits |= reg::blocks::isAir(stateId) ? 256 : 0;
     bits |= server::world::light::blockLight::emission(stateId) << 9;
     bits |= server::world::light::skyLight::opacity(stateId) << 13;
+    const Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+    bits |= block != nullptr && reg::blockEntityTypes::ofBlock(*block) != nullptr ? (1 << 18) : 0;
     return bits;
 }
 

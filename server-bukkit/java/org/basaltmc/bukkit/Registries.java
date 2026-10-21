@@ -21,7 +21,9 @@ public final class Registries {
 
     private static final Properties kNone = new Properties(new String[0], new String[0][], new int[0]);
 
-    private static String[] blockNames;
+    private static volatile String[] blockNames;
+    private static Material[] stateMaterials;
+    private static int[] defaultByMaterial;
     private static int[] blockFirst;
     private static int[] blockCount;
     private static Map<String, Integer> blockByName;
@@ -33,7 +35,13 @@ public final class Registries {
 
     private Registries() {}
 
-    private static synchronized void loadBlocks() {
+    private static void loadBlocks() {
+        if (blockNames == null) {
+            loadBlocksOnce();
+        }
+    }
+
+    private static synchronized void loadBlocksOnce() {
         if (blockNames != null) {
             return;
         }
@@ -68,6 +76,9 @@ public final class Registries {
         blockCount = sortedCount;
         blockByName = byName;
         blockNames = sortedNames;
+        stateMaterials = new Material[sortedFirst[count - 1] + sortedCount[count - 1]];
+        defaultByMaterial = new int[Material.values().length];
+        Arrays.fill(defaultByMaterial, -2);
     }
 
     public static int blockCount() {
@@ -134,13 +145,30 @@ public final class Registries {
     }
 
     public static Material materialOfState(int state) {
-        int block = blockOfState(state);
-        return block < 0 ? Material.AIR : materialOfBlock(block);
+        loadBlocks();
+        Material[] cache = stateMaterials;
+        if (state < 0 || state >= cache.length) {
+            return Material.AIR;
+        }
+        Material found = cache[state];
+        if (found == null) {
+            int block = blockOfState(state);
+            found = block < 0 ? Material.AIR : materialOfBlock(block);
+            cache[state] = found;
+        }
+        return found;
     }
 
     public static int defaultStateOf(Material material) {
+        loadBlocks();
+        int known = defaultByMaterial[material.ordinal()];
+        if (known != -2) {
+            return known;
+        }
         int block = blockIndex(material.getKey().toString());
-        return block < 0 ? -1 : defaultState(block);
+        int state = block < 0 ? -1 : defaultState(block);
+        defaultByMaterial[material.ordinal()] = state;
+        return state;
     }
 
     public static synchronized Properties propertiesOf(int block) {

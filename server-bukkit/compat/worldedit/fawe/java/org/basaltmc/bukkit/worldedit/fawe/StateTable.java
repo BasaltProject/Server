@@ -100,6 +100,9 @@ final class StateTable {
             }
         }
         backward[air] = 1;
+        for (BlockState state : all) {
+            state.getMaterial();
+        }
         stateToOrdinal = backward;
         ordinalToState = forward;
     }

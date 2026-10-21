@@ -41,6 +41,8 @@ public final class BasaltWorld extends WorldBase {
     private final UUID id;
     private World.Environment environment;
     private boolean pvp = true;
+    private int minHeight = Integer.MIN_VALUE;
+    private int maxHeight = Integer.MIN_VALUE;
 
     BasaltWorld(String name) {
         this.name = name;
@@ -58,15 +60,72 @@ public final class BasaltWorld extends WorldBase {
     }
 
     int stateAt(int x, int y, int z) {
-        return WorldNatives.state(name, x, y, z, true);
+        Blocks.Buf buf = Blocks.of(this);
+        return buf != null ? buf.state(x, y, z) : WorldNatives.state(name, x, y, z, true);
     }
 
     void putState(int x, int y, int z, int state) {
-        WorldNatives.setState(name, x, y, z, state, true);
+        Blocks.Buf buf = Blocks.of(this);
+        if (buf != null) {
+            buf.put(x, y, z, state);
+        } else {
+            WorldNatives.setState(name, x, y, z, state, true);
+        }
     }
 
+    @Override
+    public org.bukkit.Material getType(int x, int y, int z) {
+        int state = stateAt(x, y, z);
+        return Registries.materialOfState(state < 0 ? 0 : state);
+    }
+
+    @Override
+    public org.bukkit.block.data.BlockData getBlockData(int x, int y, int z) {
+        int state = stateAt(x, y, z);
+        return BasaltBlockData.of(state < 0 ? 0 : state);
+    }
+
+    @Override
+    public org.bukkit.block.BlockState getBlockState(int x, int y, int z) {
+        return getBlockAt(x, y, z).getState();
+    }
+
+    @Override
+    public void setBlockData(int x, int y, int z, org.bukkit.block.data.BlockData data) {
+        putState(x, y, z, BasaltBlockData.stateOf(data));
+    }
+
+    @Override
+    public void setType(int x, int y, int z, org.bukkit.Material type) {
+        int state = Registries.defaultStateOf(type);
+        if (state < 0) {
+            throw new IllegalArgumentException(type + " is not a block");
+        }
+        putState(x, y, z, state);
+    }
+
+    @Override
+    public org.bukkit.ChunkSnapshot getEmptyChunkSnapshot(int x, int z, boolean biome, boolean biomeTempRain) {
+        return new BasaltChunkSnapshot(this, x, z, false);
+    }
+
+    private final java.util.concurrent.ConcurrentHashMap<Integer, Entity> entityObjects =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** One object per entity id, kept while the entity lives, so plugins that hold weak references keep working. */
     Entity entity(int entityId) {
-        return EntityCore.make(this, entityId);
+        Entity known = entityObjects.get(entityId);
+        if (known != null) {
+            return known;
+        }
+        Entity made = EntityCore.make(this, entityId);
+        if (made != null) {
+            if (entityObjects.size() > 8192) {
+                entityObjects.values().removeIf(entity -> entity.isDead());
+            }
+            entityObjects.put(entityId, made);
+        }
+        return made;
     }
 
     @Override
@@ -106,12 +165,18 @@ public final class BasaltWorld extends WorldBase {
 
     @Override
     public int getMinHeight() {
-        return (int) number(kMinY);
+        if (minHeight == Integer.MIN_VALUE) {
+            minHeight = (int) number(kMinY);
+        }
+        return minHeight;
     }
 
     @Override
     public int getMaxHeight() {
-        return (int) (number(kMinY) + number(kHeight));
+        if (maxHeight == Integer.MIN_VALUE) {
+            maxHeight = (int) (number(kMinY) + number(kHeight));
+        }
+        return maxHeight;
     }
 
     @Override
@@ -189,6 +254,7 @@ public final class BasaltWorld extends WorldBase {
 
     @Override
     public int getHighestBlockYAt(int x, int z) {
+        Blocks.flushAll();
         return WorldNatives.highest(name, x, z, "motion_blocking", true);
     }
 
@@ -197,6 +263,7 @@ public final class BasaltWorld extends WorldBase {
         String kind = heightMap == HeightMap.WORLD_SURFACE || heightMap == HeightMap.WORLD_SURFACE_WG ? "surface"
             : heightMap == HeightMap.OCEAN_FLOOR || heightMap == HeightMap.OCEAN_FLOOR_WG ? "ocean_floor"
             : "motion_blocking";
+        Blocks.flushAll();
         return WorldNatives.highest(name, x, z, kind, true);
     }
 
@@ -334,11 +401,13 @@ public final class BasaltWorld extends WorldBase {
 
     @Override
     public boolean unloadChunk(int x, int z, boolean save) {
+        Blocks.flushAll();
         return WorldNatives.unloadChunk(name, x, z);
     }
 
     @Override
     public boolean unloadChunkRequest(int x, int z) {
+        Blocks.flushAll();
         return WorldNatives.unloadChunk(name, x, z);
     }
 
@@ -380,11 +449,13 @@ public final class BasaltWorld extends WorldBase {
 
     @Override
     public void save() {
+        Blocks.flushAll();
         WorldNatives.saveWorld(name);
     }
 
     @Override
     public void save(boolean flush) {
+        Blocks.flushAll();
         WorldNatives.saveWorld(name);
     }
 
@@ -516,6 +587,7 @@ public final class BasaltWorld extends WorldBase {
     @Override
     public Entity spawnEntity(Location location, EntityType type,
             org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason reason) {
+        Blocks.flushAll();
         int spawned = WorldNatives.spawn(name, type.getKey().toString(), location.getX(), location.getY(),
             location.getZ());
         return spawned < 0 ? null : entity(spawned);

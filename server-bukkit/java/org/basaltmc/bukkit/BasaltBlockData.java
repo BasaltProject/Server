@@ -33,11 +33,24 @@ public final class BasaltBlockData implements InvocationHandler {
     public static BlockData of(int state) {
         Material material = Registries.materialOfState(state);
         Class<?> specific = material.data;
-        Class<?>[] interfaces = BlockData.class.isAssignableFrom(specific)
-            ? new Class<?>[] {specific} : new Class<?>[] {BlockData.class};
-        return (BlockData) Proxy.newProxyInstance(BlockData.class.getClassLoader(), interfaces,
-            new BasaltBlockData(state));
+        Class<?> face = BlockData.class.isAssignableFrom(specific) ? specific : BlockData.class;
+        java.lang.reflect.Constructor<?> maker = kMakers.get(face);
+        try {
+            if (maker == null) {
+                Object first = Proxy.newProxyInstance(BlockData.class.getClassLoader(), new Class<?>[] {face},
+                    new BasaltBlockData(state));
+                kMakers.put(face, first.getClass().getConstructor(InvocationHandler.class));
+                return (BlockData) first;
+            }
+            return (BlockData) maker.newInstance(new BasaltBlockData(state));
+        } catch (ReflectiveOperationException e) {
+            return (BlockData) Proxy.newProxyInstance(BlockData.class.getClassLoader(), new Class<?>[] {face},
+                new BasaltBlockData(state));
+        }
     }
+
+    private static final java.util.concurrent.ConcurrentHashMap<Class<?>, java.lang.reflect.Constructor<?>> kMakers =
+        new java.util.concurrent.ConcurrentHashMap<>();
 
     public static int stateOf(BlockData data) {
         if (data != null && Proxy.isProxyClass(data.getClass())
