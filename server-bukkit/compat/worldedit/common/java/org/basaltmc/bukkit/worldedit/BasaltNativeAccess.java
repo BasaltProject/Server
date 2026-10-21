@@ -1,21 +1,22 @@
-package org.basaltmc.bukkit.fawe;
+package org.basaltmc.bukkit.worldedit;
 
 import com.sk89q.worldedit.internal.wna.WorldNativeAccess;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BlockState;
-import com.sk89q.worldedit.world.block.BlockTypesCache;
 import java.util.concurrent.ConcurrentHashMap;
 import org.basaltmc.bukkit.WorldNatives;
 import org.enginehub.linbus.tree.LinCompoundTag;
 
 /** Single-block edits: states are interned so the identity checks of the shared edit code work. */
-final class BasaltNativeAccess implements WorldNativeAccess<long[], Integer, BlockVector3> {
+public final class BasaltNativeAccess implements WorldNativeAccess<long[], Integer, BlockVector3> {
     private static final ConcurrentHashMap<Integer, Integer> kInterned = new ConcurrentHashMap<>();
 
     private final String world;
+    private final StateMapper mapper;
 
-    BasaltNativeAccess(String world) {
+    public BasaltNativeAccess(String world, StateMapper mapper) {
         this.world = world;
+        this.mapper = mapper;
     }
 
     private static Integer intern(int state) {
@@ -29,7 +30,7 @@ final class BasaltNativeAccess implements WorldNativeAccess<long[], Integer, Blo
 
     @Override
     public Integer toNative(BlockState state) {
-        return intern(StateTable.toState(state.getOrdinal()));
+        return intern(mapper.toState(state));
     }
 
     @Override
@@ -83,6 +84,5 @@ final class BasaltNativeAccess implements WorldNativeAccess<long[], Integer, Blo
     @Override
     public void onBlockStateChange(BlockVector3 pos, Integer oldState, Integer newState) {}
 
-    @Override
     public void flush() {}
 }

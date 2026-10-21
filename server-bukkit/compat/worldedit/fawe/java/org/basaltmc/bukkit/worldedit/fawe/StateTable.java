@@ -1,4 +1,4 @@
-package org.basaltmc.bukkit.fawe;
+package org.basaltmc.bukkit.worldedit.fawe;
 
 import com.sk89q.worldedit.registry.state.Property;
 import com.sk89q.worldedit.world.block.BlockState;

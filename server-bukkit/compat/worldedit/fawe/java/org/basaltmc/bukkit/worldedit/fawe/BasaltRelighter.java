@@ -1,4 +1,4 @@
-package org.basaltmc.bukkit.fawe;
+package org.basaltmc.bukkit.worldedit.fawe;
 
 import com.fastasyncworldedit.core.extent.processor.lighting.Relighter;
 import java.util.concurrent.locks.ReentrantLock;

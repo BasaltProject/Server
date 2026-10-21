@@ -1,6 +1,5 @@
-package org.basaltmc.bukkit.fawe;
+package org.basaltmc.bukkit.worldedit;
 
-import com.fastasyncworldedit.core.queue.IChunkGet;
 import com.sk89q.jnbt.Tag;
 import com.sk89q.worldedit.blocks.BaseItem;
 import com.sk89q.worldedit.blocks.BaseItemStack;
@@ -49,15 +48,15 @@ import org.bukkit.inventory.ItemStack;
 import org.enginehub.linbus.tree.LinCompoundTag;
 
 /** FastAsyncWorldEdit's view of the server, answered by Basalt's own world services instead of Minecraft internals. */
-public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
+@SuppressWarnings({"rawtypes", "unchecked"})
+public abstract class BasaltWorldEditAdapter implements BukkitImplAdapter {
     private final Map<String, Map<String, ? extends Property<?>>> properties = new ConcurrentHashMap<>();
     private final Map<String, BlockMaterial> materials = new ConcurrentHashMap<>();
     private volatile Map<String, List<Property<?>>> allProperties;
 
-    public BasaltFaweAdapter() {
-        org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("FastAsyncWorldEdit");
-        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> com.fastasyncworldedit.core.Fawe.instance().setMainThread());
-    }
+    protected abstract StateMapper mapper();
+
+    protected abstract BlockMaterial newMaterial(String id, int defaultState);
 
     @Override
     public DataFixer getDataFixer() {
@@ -73,7 +72,7 @@ public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
     public BlockState getBlock(Location location) {
         int state = WorldNatives.state(location.getWorld().getName(), location.getBlockX(), location.getBlockY(),
             location.getBlockZ(), true);
-        return com.sk89q.worldedit.world.block.BlockTypesCache.states[StateTable.toOrdinal(state)];
+        return mapper().toBlock(state);
     }
 
     @Override
@@ -83,7 +82,7 @@ public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
 
     @Override
     public WorldNativeAccess<?, ?, ?> createWorldNativeAccess(World world) {
-        return new BasaltNativeAccess(world.getName());
+        return new BasaltNativeAccess(world.getName(), mapper());
     }
 
     @Override
@@ -175,7 +174,6 @@ public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
     @Override
     public void sendFakeNBT(Player player, BlockVector3 pos, LinCompoundTag nbtData) {}
 
-    @Override
     public void sendFakeNBT(Player player, BlockVector3 pos, TileState tile, LinCompoundTag nbtData) {}
 
     @Override
@@ -212,23 +210,24 @@ public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
 
     @Override
     public OptionalInt getInternalBlockStateId(BlockState state) {
-        return OptionalInt.of(StateTable.toState(state.getOrdinal()));
+        return OptionalInt.of(mapper().toState(state));
     }
 
-    @Override
     public BlockMaterial getMaterial(BlockType blockType) {
         return materials.computeIfAbsent(blockType.id(), id -> {
             int block = Registries.blockIndex(id);
-            return new BasaltBlockMaterial(id, block < 0 ? -1 : Registries.defaultState(block));
+            return newMaterial(id, block < 0 ? -1 : Registries.defaultState(block));
         });
     }
 
-    @Override
+    public BlockMaterial getBlockMaterial(BlockType blockType) {
+        return getMaterial(blockType);
+    }
+
     public BlockMaterial getMaterial(BlockState state) {
         return getMaterial(state.getBlockType());
     }
 
-    @Override
     public Collection<String> getRegisteredDefaultBlockStates() {
         List<String> out = new ArrayList<>();
         for (int block = 0; block < Registries.blockCount(); block++) {
@@ -239,7 +238,6 @@ public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
         return out;
     }
 
-    @Override
     public Map<String, List<Property<?>>> getAllProperties() {
         Map<String, List<Property<?>>> built = allProperties;
         if (built != null) {
@@ -261,7 +259,6 @@ public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
         return out;
     }
 
-    @Override
     public Iterable<NamespacedKey> getRegisteredBiomes() {
         List<NamespacedKey> out = new ArrayList<>();
         for (String id : Registries.biomeIds()) {
@@ -270,7 +267,6 @@ public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
         return out;
     }
 
-    @Override
     public int getInternalBiomeId(BiomeType biome) {
         String[] ids = Registries.biomeIds();
         for (int i = 0; i < ids.length; i++) {
@@ -292,25 +288,5 @@ public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
     public void setBiome(Location location, BiomeType biome) {
         WorldNatives.setBiome(location.getWorld().getName(), location.getBlockX(), location.getBlockY(),
             location.getBlockZ(), biome.id());
-    }
-
-    @Override
-    public IChunkGet get(World world, int chunkX, int chunkZ) {
-        return new BasaltGetBlocks(world.getName(), chunkX, chunkZ, world.getMinHeight(), world.getMaxHeight() - 1);
-    }
-
-    @Override
-    public com.fastasyncworldedit.core.extent.processor.lighting.RelighterFactory getRelighterFactory() {
-        return (mode, world, queue) -> new BasaltRelighter();
-    }
-
-    @Override
-    public Object fromNative(Tag foreign) {
-        return foreign;
-    }
-
-    @Override
-    public Tag toNative(Object foreign) {
-        return (Tag) foreign;
     }
 }
