@@ -236,6 +236,14 @@ public:
     bool setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                        SideEffects sideEffects = SideEffects::kRun);
 
+    /// Copies a section's 4096 state ids under the read lock, so any thread may call it. False when it is not loaded.
+    [[nodiscard]] bool copySection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
+                                   std::span<std::int32_t> out) const;
+
+    /// Writes one section in one pass like `setBlockState` minus item spills; returns blocks changed, -1 if absent.
+    std::int32_t replaceSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
+                                std::span<const std::int32_t> next, std::span<std::int32_t> previous);
+
     [[nodiscard]] bool hasSculkSensorNear(double x, double y, double z, std::int32_t range) const;
 
     static constexpr std::size_t kShapeChangeMemory = 64;

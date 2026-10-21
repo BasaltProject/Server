@@ -300,6 +300,11 @@ public final class BasaltFaweAdapter implements BukkitImplAdapter<Object> {
     }
 
     @Override
+    public com.fastasyncworldedit.core.extent.processor.lighting.RelighterFactory getRelighterFactory() {
+        return (mode, world, queue) -> new BasaltRelighter();
+    }
+
+    @Override
     public Object fromNative(Tag foreign) {
         return foreign;
     }

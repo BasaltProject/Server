@@ -465,14 +465,7 @@ public:
         if (load) {
             ensureChunk(chunkX, chunkZ);
         }
-        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
-        const std::int32_t index = sectionY - chunkHeight().minSection();
-        if (chunk == nullptr || index < 0 || index >= chunkHeight().sectionCount() ||
-            out.size() < server::world::ChunkSection::kBlocks) {
-            return false;
-        }
-        chunk->section(static_cast<std::size_t>(index)).copyBlockStateIdsInto(out);
-        return true;
+        return world_->state().copySection(chunkX, sectionY, chunkZ, out);
     }
 
     bool writeSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
@@ -497,30 +490,25 @@ public:
     }
 
     std::int32_t applySections(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::int32_t> sectionYs,
-                               std::span<const std::int32_t> states, bool resend) override {
+                               std::span<const std::int32_t> states, bool resend,
+                               std::span<std::int32_t> previous) override {
         constexpr std::size_t kBlocks = server::world::ChunkSection::kBlocks;
         if (states.size() < sectionYs.size() * kBlocks) {
             return -1;
         }
         ensureChunk(chunkX, chunkZ);
-        std::array<std::int32_t, kBlocks> before{};
         std::int32_t changed = 0;
         for (std::size_t section = 0; section < sectionYs.size(); ++section) {
-            if (!readSection(chunkX, sectionYs[section], chunkZ, false, before)) {
+            std::span<std::int32_t> held;
+            if (previous.size() >= (section + 1) * kBlocks) {
+                held = previous.subspan(section * kBlocks, kBlocks);
+            }
+            const std::int32_t count = world_->state().replaceSection(
+                chunkX, sectionYs[section], chunkZ, states.subspan(section * kBlocks, kBlocks), held);
+            if (count < 0) {
                 return -1;
             }
-            const std::span<const std::int32_t> next = states.subspan(section * kBlocks, kBlocks);
-            for (std::size_t at = 0; at < kBlocks; ++at) {
-                if (next[at] < 0 || next[at] == before[at]) {
-                    continue;
-                }
-                changed += world_->state().setBlockState((chunkX << 4) + static_cast<std::int32_t>(at & 15),
-                                                          (sectionYs[section] << 4) + static_cast<std::int32_t>(at >> 8),
-                                                          (chunkZ << 4) + static_cast<std::int32_t>((at >> 4) & 15),
-                                                          next[at])
-                               ? 1
-                               : 0;
-            }
+            changed += count;
         }
         if (resend && changed > 0) {
             const std::array<std::int32_t, 2> chunk{chunkX, chunkZ};

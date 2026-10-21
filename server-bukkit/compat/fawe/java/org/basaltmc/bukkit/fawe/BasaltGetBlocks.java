@@ -167,11 +167,17 @@ final class BasaltGetBlocks extends CharGetBlocks {
                 layers[used++] = layer;
             }
         }
+        long t0 = System.nanoTime();
         BasaltGetBlocks copy = createCopy ? new BasaltGetBlocks(world, chunkX, chunkZ, minY, maxY, true) : null;
         int[] previous = copy == null ? null : new int[used * 4096];
         if (used > 0) {
+            long t1 = System.nanoTime();
             int changed = WorldNatives.applySections(world, chunkX, chunkZ, java.util.Arrays.copyOf(layers, used),
                 java.util.Arrays.copyOf(flat, used * 4096), true, previous);
+            if (Boolean.getBoolean("basalt.fawe.trace")) {
+                org.basaltmc.bukkit.Natives.log(1, "FAWE-Basalt", "chunk " + chunkX + "," + chunkZ + " sections=" + used
+                    + " convert=" + (t1 - t0) / 1000000 + "ms native=" + (System.nanoTime() - t1) / 1000000 + "ms");
+            }
             if (changed < 0) {
                 org.basaltmc.bukkit.Natives.log(2, "FAWE-Basalt", "chunk " + chunkX + "," + chunkZ + " was not written");
             }
