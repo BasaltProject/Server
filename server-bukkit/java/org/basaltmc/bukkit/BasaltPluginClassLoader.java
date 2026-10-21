@@ -80,6 +80,10 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
         }
     }
 
+    void addAddon(File addon) throws IOException {
+        addURL(addon.toURI().toURL());
+    }
+
     public PluginDescriptionFile description() {
         return description;
     }

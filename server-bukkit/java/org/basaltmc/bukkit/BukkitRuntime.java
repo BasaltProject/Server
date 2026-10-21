@@ -49,9 +49,39 @@ public final class BukkitRuntime {
         root.setLevel(Level.INFO);
     }
 
+    /** A file named dump-threads in the working directory makes the VM print every thread's stack and delete it. */
+    private static void watchForThreadDumps() {
+        Thread watcher = new Thread(() -> {
+            File trigger = new File("dump-threads");
+            while (true) {
+                try {
+                    Thread.sleep(2000);
+                    if (trigger.exists()) {
+                        trigger.delete();
+                        StringBuilder out = new StringBuilder("Thread dump:\n");
+                        for (java.util.Map.Entry<Thread, StackTraceElement[]> entry
+                                : Thread.getAllStackTraces().entrySet()) {
+                            out.append("\"").append(entry.getKey().getName()).append("\" ")
+                                .append(entry.getKey().getState()).append('\n');
+                            for (StackTraceElement frame : entry.getValue()) {
+                                out.append("    at ").append(frame).append('\n');
+                            }
+                        }
+                        Natives.log(1, "Bukkit", out.toString());
+                    }
+                } catch (Throwable t) {
+                    return;
+                }
+            }
+        }, "basalt-thread-dumper");
+        watcher.setDaemon(true);
+        watcher.start();
+    }
+
     public static boolean boot(String pluginsFolder, String dataFolder) {
         try {
             routeLogging();
+            watchForThreadDumps();
             File folder = new File(pluginsFolder);
             folder.mkdirs();
             server = new org.bukkit.craftbukkit.CraftServer(new File(".").getAbsoluteFile(), folder);

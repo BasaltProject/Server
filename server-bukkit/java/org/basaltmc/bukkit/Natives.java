@@ -5,6 +5,7 @@ public final class Natives {
 
     public static native void log(int level, String logger, String message);
     public static native long currentTick();
+    public static native boolean onPluginThread();
     public static native void scheduleAfter(long id, int delay);
     public static native void scheduleEvery(long id, int delay, int period);
     public static native void cancelTask(long id);

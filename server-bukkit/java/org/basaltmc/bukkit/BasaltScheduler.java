@@ -15,10 +15,25 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scheduler.BukkitWorker;
 import org.basaltmc.bukkit.gen.BukkitSchedulerBase;
 
-/** Bukkit's scheduler over Basalt's task service. Every task runs on the tick thread: "asynchronous" tasks are queued */
 public final class BasaltScheduler extends BukkitSchedulerBase {
+    private static final java.util.concurrent.ScheduledThreadPoolExecutor kWorkers = workers();
+
     private final Map<Long, Task> tasks = new ConcurrentHashMap<>();
     private long nextId = 1;
+
+    private static java.util.concurrent.ScheduledThreadPoolExecutor workers() {
+        java.util.concurrent.atomic.AtomicInteger counter = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.ScheduledThreadPoolExecutor pool = new java.util.concurrent.ScheduledThreadPoolExecutor(
+            4, runnable -> {
+                Thread thread = new Thread(runnable, "Craft Scheduler Thread - " + counter.incrementAndGet());
+                thread.setDaemon(true);
+                return thread;
+            });
+        pool.setRemoveOnCancelPolicy(true);
+        pool.setKeepAliveTime(30, java.util.concurrent.TimeUnit.SECONDS);
+        pool.allowCoreThreadTimeOut(true);
+        return pool;
+    }
 
     private final class Task implements BukkitTask {
         final long id;
@@ -26,8 +41,9 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
         final Consumer<? super BukkitTask> body;
         final boolean sync;
         final boolean repeating;
-        boolean cancelled;
-        boolean running;
+        volatile boolean cancelled;
+        volatile boolean running;
+        volatile java.util.concurrent.ScheduledFuture<?> worker;
 
         Task(long id, Plugin owner, Consumer<? super BukkitTask> body, boolean sync, boolean repeating) {
             this.id = id;
@@ -62,7 +78,11 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
             if (!cancelled) {
                 cancelled = true;
                 tasks.remove(id);
-                Natives.cancelTask(id);
+                if (worker != null) {
+                    worker.cancel(false);
+                } else if (sync) {
+                    Natives.cancelTask(id);
+                }
             }
         }
     }
@@ -76,6 +96,14 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
         Task task = new Task(id, plugin, body, sync, repeating);
         tasks.put(id, task);
         int start = (int) Math.max(delay, 0);
+        if (!sync) {
+            long delayMs = start * 50L;
+            task.worker = repeating
+                ? kWorkers.scheduleAtFixedRate(() -> run(id), delayMs, period * 50L,
+                    java.util.concurrent.TimeUnit.MILLISECONDS)
+                : kWorkers.schedule(() -> run(id), delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+            return task;
+        }
         // A task due now still waits a tick, as Bukkit's does when it is scheduled mid-tick.
         if (repeating) {
             Natives.scheduleEvery(id, start, (int) period);

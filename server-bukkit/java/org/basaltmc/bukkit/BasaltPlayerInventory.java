@@ -165,7 +165,8 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
 
     @Override
     public ItemStack getItemInMainHand() {
-        return getItem(getHeldItemSlot());
+        ItemStack held = getItem(getHeldItemSlot());
+        return held == null ? new BasaltItemStack(org.bukkit.Material.AIR, 0) : held;
     }
 
     @Override
@@ -175,7 +176,8 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
 
     @Override
     public ItemStack getItemInOffHand() {
-        return getItem(40);
+        ItemStack held = getItem(40);
+        return held == null ? new BasaltItemStack(org.bukkit.Material.AIR, 0) : held;
     }
 
     @Override
@@ -207,6 +209,9 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
     public HashMap<Integer, ItemStack> addItem(ItemStack... items) {
         HashMap<Integer, ItemStack> left = new HashMap<>();
         for (int i = 0; i < items.length; i++) {
+            if (items[i] == null || items[i].getType().isAir() || items[i].getAmount() <= 0) {
+                continue;
+            }
             ItemStack remaining = items[i].clone();
             int max = Math.max(1, remaining.getMaxStackSize());
             for (int slot = 0; slot < 36 && remaining.getAmount() > 0; slot++) {

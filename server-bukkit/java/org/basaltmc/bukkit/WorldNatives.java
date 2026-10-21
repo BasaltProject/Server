@@ -31,6 +31,8 @@ public final class WorldNatives {
     public static native int writeStates(String world, int[] positions, int[] states, boolean notify);
     public static native boolean readSection(String world, int chunkX, int sectionY, int chunkZ, boolean load, int[] out);
     public static native boolean writeSection(String world, int chunkX, int sectionY, int chunkZ, int[] states, boolean notify);
+    public static native int applySections(String world, int chunkX, int chunkZ, int[] sections, int[] states, boolean resend);
+    public static native void resendChunks(String world, int[] chunks);
     public static native String biome(String world, int x, int y, int z);
     public static native boolean setBiome(String world, int x, int y, int z, String biome);
     public static native int highest(String world, int x, int z, String kind, boolean load);

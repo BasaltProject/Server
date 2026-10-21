@@ -323,7 +323,7 @@ public class BasaltPlayer extends PlayerBase {
 
     @Override
     public org.bukkit.entity.Player.Spigot spigot() {
-        return new org.bukkit.entity.Player.Spigot();
+        return SpigotText.player(this::sendMessage, null);
     }
 
     @Override

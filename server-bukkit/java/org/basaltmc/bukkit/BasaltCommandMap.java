@@ -7,11 +7,10 @@ import java.util.Locale;
 import java.util.Set;
 import org.bukkit.Server;
 import org.bukkit.command.Command;
-import org.bukkit.command.PluginCommand;
+import org.bukkit.command.PluginIdentifiableCommand;
 import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.plugin.Plugin;
 
-/** Bukkit's command map; a command registered here also becomes a command of the Basalt dispatcher. */
 public final class BasaltCommandMap extends SimpleCommandMap {
     private final Set<String> announced = new HashSet<>();
 
@@ -22,10 +21,10 @@ public final class BasaltCommandMap extends SimpleCommandMap {
     @Override
     public boolean register(String label, String fallbackPrefix, Command command) {
         boolean registered = super.register(label, fallbackPrefix, command);
-        if (command instanceof PluginCommand pluginCommand) {
-            announce(pluginCommand.getPlugin().getName(), label, command);
+        if (command instanceof PluginIdentifiableCommand owned) {
+            announce(owned.getPlugin().getName(), label, command);
             for (String alias : command.getAliases()) {
-                announce(pluginCommand.getPlugin().getName(), alias, command);
+                announce(owned.getPlugin().getName(), alias, command);
             }
         }
         return registered;
@@ -55,7 +54,7 @@ public final class BasaltCommandMap extends SimpleCommandMap {
     void unregisterPlugin(Plugin plugin) {
         for (String key : new ArrayList<>(knownCommands.keySet())) {
             Command command = knownCommands.get(key);
-            if (command instanceof PluginCommand pluginCommand && pluginCommand.getPlugin() == plugin) {
+            if (command instanceof PluginIdentifiableCommand owned && owned.getPlugin() == plugin) {
                 knownCommands.remove(key);
             }
         }

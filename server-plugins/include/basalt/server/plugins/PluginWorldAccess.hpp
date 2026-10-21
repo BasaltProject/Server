@@ -412,6 +412,21 @@ public:
         return false;
     }
 
+    /// Writes whole sections of one chunk at once (4096 ids each, a negative id keeps the block); returns how many
+    virtual std::int32_t applySections(std::int32_t chunkX, std::int32_t chunkZ,
+                                       std::span<const std::int32_t> sectionYs, std::span<const std::int32_t> states,
+                                       bool resend) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        static_cast<void>(sectionYs);
+        static_cast<void>(states);
+        static_cast<void>(resend);
+        return -1;
+    }
+
+    /// Sends the chunks (x, z pairs) again to every player in this world that is near them.
+    virtual void resendChunks(std::span<const std::int32_t> chunks) { static_cast<void>(chunks); }
+
     [[nodiscard]] virtual std::optional<std::string> biomeAt(std::int32_t x, std::int32_t y, std::int32_t z) const {
         static_cast<void>(x);
         static_cast<void>(y);
