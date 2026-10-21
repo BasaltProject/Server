@@ -4,3 +4,6 @@
 [submodule "metamorph"]
 	path = metamorph
 	url = https://github.com/BasaltProject/Metamorph.git
+[submodule "shim"]
+	path = shim
+	url = https://github.com/BasaltProject/Shim.git
