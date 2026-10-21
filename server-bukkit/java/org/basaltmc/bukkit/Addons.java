@@ -15,8 +15,13 @@ final class Addons {
             return;
         }
         loader.addAddon(addon);
-        if ("FastAsyncWorldEdit".equals(plugin)) {
-            System.setProperty("worldedit.bukkit.adapter", "org.basaltmc.bukkit.fawe.BasaltFaweAdapter");
+        try (java.util.jar.JarFile jar = new java.util.jar.JarFile(addon)) {
+            java.util.zip.ZipEntry entry = jar.getEntry("basalt-addon.properties");
+            if (entry != null) {
+                java.util.Properties properties = new java.util.Properties();
+                properties.load(jar.getInputStream(entry));
+                properties.forEach((key, value) -> System.setProperty(key.toString(), value.toString()));
+            }
         }
         Natives.log(1, "Bukkit", "Attached the Basalt addon " + addon.getName() + " to " + plugin);
     }

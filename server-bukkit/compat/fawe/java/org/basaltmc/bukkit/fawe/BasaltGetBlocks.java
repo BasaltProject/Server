@@ -29,14 +29,69 @@ final class BasaltGetBlocks extends CharGetBlocks {
     private final int minY;
     private final int maxY;
     private final ReentrantLock callLock = new ReentrantLock();
+    private final long[] stamps;
+    private final boolean frozen;
+    private final java.util.concurrent.ConcurrentHashMap<Integer, IChunkGet> copies =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    private boolean createCopy;
+    private int copyKey;
 
     BasaltGetBlocks(String world, int chunkX, int chunkZ, int minY, int maxY) {
+        this(world, chunkX, chunkZ, minY, maxY, false);
+    }
+
+    /** A frozen chunk holds what was in the world when it was made and is never refreshed. */
+    private BasaltGetBlocks(String world, int chunkX, int chunkZ, int minY, int maxY, boolean frozen) {
         super(minY >> 4, maxY >> 4);
+        this.frozen = frozen;
         this.world = world;
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
         this.minY = minY;
         this.maxY = maxY;
+        this.stamps = new long[sectionCount];
+    }
+
+    /** A section read from the world is kept briefly: the world changes under it, and FAWE keeps these around. */
+    private static final long kLifetimeNanos = 200_000_000L;
+
+    private void expire(int layer) {
+        int index = layer - minSectionPosition;
+        if (frozen || index < 0 || index >= sectionCount || blocks[index] == null) {
+            return;
+        }
+        synchronized (sectionLocks[index]) {
+            if (blocks[index] != null && System.nanoTime() - stamps[index] > kLifetimeNanos) {
+                blocks[index] = null;
+            }
+        }
+    }
+
+    @Override
+    public char get(int x, int y, int z) {
+        expire(y >> 4);
+        return super.get(x, y, z);
+    }
+
+    @Override
+    public boolean hasSection(int layer) {
+        if (frozen) {
+            return layer >= minSectionPosition && layer <= maxSectionPosition && blocks[layer - minSectionPosition] != null;
+        }
+        return layer >= minSectionPosition && layer <= maxSectionPosition;
+    }
+
+    @Override
+    public char[] load(int layer) {
+        org.basaltmc.bukkit.Natives.log(1, "FAWE-Basalt", "load " + layer + " frozen=" + frozen);
+        expire(layer);
+        return super.load(layer);
+    }
+
+    @Override
+    public char[] loadIfPresent(int layer) {
+        expire(layer);
+        return super.loadIfPresent(layer);
     }
 
     @Override
@@ -52,6 +107,7 @@ final class BasaltGetBlocks extends CharGetBlocks {
         for (int i = 0; i < 4096; i++) {
             data[i] = (char) StateTable.toOrdinal(states[i]);
         }
+        stamps[layer] = System.nanoTime();
         return data;
     }
 
@@ -112,18 +168,43 @@ final class BasaltGetBlocks extends CharGetBlocks {
                 layers[used++] = layer;
             }
         }
+        org.basaltmc.bukkit.Natives.log(1, "FAWE-Basalt", "call " + chunkX + "," + chunkZ + " copy=" + createCopy + " key=" + copyKey);
+        BasaltGetBlocks copy = createCopy ? new BasaltGetBlocks(world, chunkX, chunkZ, minY, maxY, true) : null;
+        int[] previous = copy == null ? null : new int[used * 4096];
         if (used > 0) {
-            WorldNatives.applySections(world, chunkX, chunkZ, java.util.Arrays.copyOf(layers, used),
-                java.util.Arrays.copyOf(flat, used * 4096), true);
+            int changed = WorldNatives.applySections(world, chunkX, chunkZ, java.util.Arrays.copyOf(layers, used),
+                java.util.Arrays.copyOf(flat, used * 4096), true, previous);
+            if (changed < 0) {
+                org.basaltmc.bukkit.Natives.log(2, "FAWE-Basalt", "chunk " + chunkX + "," + chunkZ + " was not written");
+            }
         }
+        if (copy != null) {
+            for (int i = 0; i < used; i++) {
+                char[] ordinals = new char[4096];
+                for (int j = 0; j < 4096; j++) {
+                    ordinals[j] = (char) StateTable.toOrdinal(previous[i * 4096 + j]);
+                }
+                copy.blocks[layers[i] - minSectionPosition] = ordinals;
+            }
+            copies.put(copyKey, copy);
+        }
+        reset();
         if (finalize != null) {
-            finalize.run();
+            try {
+                finalize.run();
+            } catch (Throwable t) {
+                java.io.StringWriter trace = new java.io.StringWriter();
+                t.printStackTrace(new java.io.PrintWriter(trace));
+                org.basaltmc.bukkit.Natives.log(3, "FAWE-Basalt", "finalize threw " + trace);
+                throw t;
+            }
         }
         return null;
     }
 
     @Override
     public Map<BlockVector3, FaweCompoundTag> tiles() {
+        org.basaltmc.bukkit.Natives.log(1, "FAWE-Basalt", "tiles frozen=" + frozen);
         return Collections.emptyMap();
     }
 
@@ -149,12 +230,31 @@ final class BasaltGetBlocks extends CharGetBlocks {
 
     @Override
     public boolean isCreateCopy() {
-        return false;
+        return createCopy;
     }
 
     @Override
     public int setCreateCopy(boolean createCopy) {
-        return -1;
+        this.createCopy = createCopy;
+        return ++copyKey;
+    }
+
+    @Override
+    public IChunkGet getCopy(int key) {
+        IChunkGet real = copies.remove(key);
+        if (real == null) {
+            return null;
+        }
+        return (IChunkGet) java.lang.reflect.Proxy.newProxyInstance(IChunkGet.class.getClassLoader(),
+            new Class<?>[] {IChunkGet.class}, (proxy, method, args) -> {
+                org.basaltmc.bukkit.Natives.log(1, "FAWE-Basalt", "copy." + method.getName());
+                try {
+                    return method.invoke(real, args);
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    org.basaltmc.bukkit.Natives.log(3, "FAWE-Basalt", "copy." + method.getName() + " threw " + e.getCause());
+                    throw e.getCause();
+                }
+            });
     }
 
     @Override
