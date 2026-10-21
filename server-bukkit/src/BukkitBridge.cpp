@@ -125,6 +125,11 @@ std::expected<void, std::string> BukkitBridge::boot() {
         return std::unexpected(std::string{"org.basaltmc.bukkit runtime classes not found"});
     }
     registerNatives(env, natives);
+    if (jclass worldNatives = env->FindClass("org/basaltmc/bukkit/WorldNatives"); worldNatives != nullptr) {
+        registerWorldNatives(env, worldNatives);
+    } else {
+        env->ExceptionClear();
+    }
     bootMethod_ = env->GetStaticMethodID(runtime_, "boot", "(Ljava/lang/String;Ljava/lang/String;)Z");
     shutdownMethod_ = env->GetStaticMethodID(runtime_, "shutdown", "()V");
     taskMethod_ = env->GetStaticMethodID(runtime_, "runTask", "(J)V");
@@ -289,8 +294,12 @@ bool BukkitBridge::subscribe(const std::string& event, std::int32_t priority) {
                     fired.set(static_cast<std::int32_t>(index), snapshot.values[index]);
                 }
             }
-            if (cancelled && !monitor && fired.type().cancellable()) {
-                fired.cancel();
+            if (!monitor && fired.type().cancellable()) {
+                if (cancelled) {
+                    fired.cancel();
+                } else if (fired.cancelled()) {
+                    fired.restore();
+                }
             }
         }));
     return true;

@@ -78,13 +78,34 @@ final class EventBridge {
         BasaltWorld world() {
             return BasaltServer.instance().world(text("world"));
         }
+
+        org.bukkit.entity.Entity entity() {
+            return BasaltServer.instance().entityById(world(), (int) whole("entity_id"));
+        }
+
+        org.bukkit.block.Block block() {
+            return world().getBlockAt((int) whole("x"), (int) whole("y"), (int) whole("z"));
+        }
+
+        org.bukkit.inventory.ItemStack stack(String field) {
+            String id = text(field);
+            if (id.isEmpty()) {
+                return null;
+            }
+            org.bukkit.Material material = org.bukkit.Material.matchMaterial(id);
+            return material == null || material.isAir() ? null : new org.bukkit.inventory.ItemStack(material, 1);
+        }
+
+        Location location() {
+            return new Location(world(), real("x"), real("y"), real("z"));
+        }
     }
 
     private record Mapping(String basalt, Class<? extends Event> produced, Function<Fields, Event> build,
             BiConsumer<Event, Fields> writeBack, boolean needsPlayer) {}
 
     private static final List<Mapping> mappings = new java.util.ArrayList<>();
-    private static final Map<String, Mapping> byName = new HashMap<>();
+    private static final Map<String, List<Mapping>> byName = new HashMap<>();
     private static final Set<String> subscribed = new HashSet<>();
     private static final Map<String, Event> inFlight = new HashMap<>();
     private static final Map<String, Long> generations = new HashMap<>();
@@ -100,7 +121,7 @@ final class EventBridge {
             BiConsumer<Event, Fields> writeBack) {
         Mapping mapping = new Mapping(basalt, produced, build, writeBack, false);
         mappings.add(mapping);
-        byName.put(basalt, mapping);
+        byName.computeIfAbsent(basalt, key -> new java.util.ArrayList<>()).add(mapping);
     }
 
     static {
@@ -143,9 +164,75 @@ final class EventBridge {
         map("world.load", WorldLoadEvent.class, f -> new WorldLoadEvent(BasaltServer.instance().world(f.text("world"))));
         map("world.save", WorldSaveEvent.class, f -> new WorldSaveEvent(BasaltServer.instance().world(f.text("world"))));
         map("server.load", ServerLoadEvent.class, f -> new ServerLoadEvent(ServerLoadEvent.LoadType.STARTUP));
+        map("player.interact", org.bukkit.event.player.PlayerInteractEvent.class, f -> {
+            org.bukkit.event.block.Action action = f.text("action").startsWith("left")
+                ? org.bukkit.event.block.Action.LEFT_CLICK_BLOCK : org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK;
+            return new org.bukkit.event.player.PlayerInteractEvent(f.player(), action, f.stack("item"), f.block(),
+                org.bukkit.block.BlockFace.SELF, org.bukkit.inventory.EquipmentSlot.HAND);
+        });
+        map("block.damage", org.bukkit.event.player.PlayerInteractEvent.class,
+            f -> new org.bukkit.event.player.PlayerInteractEvent(f.player(),
+                org.bukkit.event.block.Action.LEFT_CLICK_BLOCK, f.stack("item"), f.block(),
+                org.bukkit.block.BlockFace.SELF, org.bukkit.inventory.EquipmentSlot.HAND));
+        map("block.damage", org.bukkit.event.block.BlockDamageEvent.class, f -> new org.bukkit.event.block.BlockDamageEvent(
+            f.player(), f.block(), f.player().getInventory().getItemInMainHand(), false));
+        map("block.place", org.bukkit.event.block.BlockPlaceEvent.class, f -> {
+            org.bukkit.block.Block placed = f.block();
+            return new org.bukkit.event.block.BlockPlaceEvent(placed, placed.getState(), placed.getRelative(
+                org.bukkit.block.BlockFace.DOWN), f.stack("block"), f.player(), true,
+                org.bukkit.inventory.EquipmentSlot.HAND);
+        });
+        map("player.respawn", org.bukkit.event.player.PlayerRespawnEvent.class,
+            f -> new org.bukkit.event.player.PlayerRespawnEvent(f.player(), f.location(), false));
+        map("player.world_change", org.bukkit.event.player.PlayerChangedWorldEvent.class,
+            f -> new org.bukkit.event.player.PlayerChangedWorldEvent(f.player(),
+                BasaltServer.instance().world(f.text("from_world"))));
+        map("player.item_consume", org.bukkit.event.player.PlayerItemConsumeEvent.class,
+            f -> new org.bukkit.event.player.PlayerItemConsumeEvent(f.player(), f.stack("item")));
+        map("player.swap_hands", org.bukkit.event.player.PlayerSwapHandItemsEvent.class,
+            f -> new org.bukkit.event.player.PlayerSwapHandItemsEvent(f.player(), f.stack("main_item"),
+                f.stack("off_item")));
+        map("player.food_change", org.bukkit.event.entity.FoodLevelChangeEvent.class,
+            f -> new org.bukkit.event.entity.FoodLevelChangeEvent(f.player(), (int) f.whole("food")),
+            (e, f) -> f.put("food", (long) ((org.bukkit.event.entity.FoodLevelChangeEvent) e).getFoodLevel()));
+        map("player.level_change", org.bukkit.event.player.PlayerLevelChangeEvent.class,
+            f -> new org.bukkit.event.player.PlayerLevelChangeEvent(f.player(), (int) f.whole("from_level"),
+                (int) f.whole("level")));
+        map("player.interact_entity", org.bukkit.event.player.PlayerInteractEntityEvent.class, f -> {
+            org.bukkit.entity.Entity target = f.entity();
+            return target == null || f.text("action").equals("attack") ? null
+                : new org.bukkit.event.player.PlayerInteractEntityEvent(f.player(), target);
+        });
+        map("world.chunk_load", org.bukkit.event.world.ChunkLoadEvent.class,
+            f -> new org.bukkit.event.world.ChunkLoadEvent(
+                f.world().getChunkAt((int) f.whole("chunk_x"), (int) f.whole("chunk_z"), false), f.flag("generated")));
+        map("world.chunk_unload", org.bukkit.event.world.ChunkUnloadEvent.class,
+            f -> new org.bukkit.event.world.ChunkUnloadEvent(
+                f.world().getChunkAt((int) f.whole("chunk_x"), (int) f.whole("chunk_z"), false), true));
+        map("world.weather_change", org.bukkit.event.weather.WeatherChangeEvent.class,
+            f -> new org.bukkit.event.weather.WeatherChangeEvent(f.world(), f.flag("raining")));
+        map("entity.damage", org.bukkit.event.entity.EntityDamageEvent.class, f -> {
+            org.bukkit.entity.Entity target = f.entity();
+            if (target == null) {
+                return null;
+            }
+            org.bukkit.event.entity.EntityDamageEvent.DamageCause cause = damageCause(f.text("cause"));
+            Player attacker = BasaltServer.instance().playerByName(f.text("attacker_name"));
+            return attacker == null
+                ? new org.bukkit.event.entity.EntityDamageEvent(target, cause, f.real("amount"))
+                : new org.bukkit.event.entity.EntityDamageByEntityEvent(attacker, target, cause, f.real("amount"));
+        }, (e, f) -> f.put("amount", ((org.bukkit.event.entity.EntityDamageEvent) e).getDamage()));
         map("server.command", ServerCommandEvent.class,
             f -> new ServerCommandEvent(BasaltServer.instance().consoleImpl(), f.text("command")),
             (e, f) -> f.put("command", ((ServerCommandEvent) e).getCommand()));
+    }
+
+    private static org.bukkit.event.entity.EntityDamageEvent.DamageCause damageCause(String name) {
+        try {
+            return org.bukkit.event.entity.EntityDamageEvent.DamageCause.valueOf(name.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return org.bukkit.event.entity.EntityDamageEvent.DamageCause.CUSTOM;
+        }
     }
 
     private static GameMode gameMode(String name) {
@@ -169,8 +256,8 @@ final class EventBridge {
     }
 
     static boolean fire(String name, int priority, long generation, Object[] values, boolean cancelled) {
-        Mapping mapping = byName.get(name);
-        if (mapping == null) {
+        List<Mapping> found = byName.get(name);
+        if (found == null) {
             return cancelled;
         }
         Map<String, Integer> index = indexes.computeIfAbsent(name, key -> {
@@ -182,19 +269,27 @@ final class EventBridge {
             return built;
         });
         Fields fields = new Fields(index, values);
-        Event event = inFlight.get(name);
-        if (event == null || generations.getOrDefault(name, -1L) != generation) {
-            event = mapping.build.apply(fields);
-            inFlight.put(name, event);
-            generations.put(name, generation);
+        boolean result = cancelled;
+        for (Mapping mapping : found) {
+            String key = name + "#" + mapping.produced.getName();
+            Event event = inFlight.get(key);
+            if (event == null || generations.getOrDefault(key, -1L) != generation) {
+                event = mapping.build.apply(fields);
+                inFlight.put(key, event);
+                generations.put(key, generation);
+            }
+            if (event == null) {
+                continue;
+            }
+            if (event instanceof Cancellable cancellable) {
+                cancellable.setCancelled(result);
+            }
+            BasaltServer.instance().pluginManagerImpl().callAt(event, EventPriority.values()[priority]);
+            if (mapping.writeBack != null) {
+                mapping.writeBack.accept(event, fields);
+            }
+            result = event instanceof Cancellable cancellable && cancellable.isCancelled();
         }
-        if (event instanceof Cancellable cancellable) {
-            cancellable.setCancelled(cancelled);
-        }
-        BasaltServer.instance().pluginManagerImpl().callAt(event, EventPriority.values()[priority]);
-        if (mapping.writeBack != null) {
-            mapping.writeBack.accept(event, fields);
-        }
-        return event instanceof Cancellable cancellable && cancellable.isCancelled();
+        return result;
     }
 }

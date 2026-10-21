@@ -1,6 +1,13 @@
+#include <basalt/server/registry/BlockFluids.hpp>
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/registry/VanillaTables.hpp>
+#include <basalt/server/registry/World.hpp>
+#include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
@@ -9,6 +16,8 @@
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/light/Light.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
 
@@ -91,6 +100,68 @@ public:
         found->y = y;
         found->z = z;
         return true;
+    }
+
+    [[nodiscard]] std::string uuid() const override {
+        const entity::ServerEntity* found = entity();
+        return found == nullptr ? std::string{} : found->uuid().toString();
+    }
+
+    [[nodiscard]] std::array<float, 2> rotation() const override {
+        const entity::ServerEntity* found = entity();
+        return found == nullptr ? std::array<float, 2>{0.0F, 0.0F} : std::array<float, 2>{found->yaw, found->pitch};
+    }
+
+    bool setRotation(float yaw, float pitch) override {
+        entity::ServerEntity* found = entity();
+        if (found == nullptr) {
+            return false;
+        }
+        found->yaw = yaw;
+        found->pitch = pitch;
+        return true;
+    }
+
+    [[nodiscard]] std::array<double, 3> velocity() const override {
+        const entity::ServerEntity* found = entity();
+        return found == nullptr ? std::array<double, 3>{0.0, 0.0, 0.0}
+                                : std::array<double, 3>{found->velocityX, found->velocityY, found->velocityZ};
+    }
+
+    bool setVelocity(double x, double y, double z) override {
+        entity::ServerEntity* found = entity();
+        if (found == nullptr) {
+            return false;
+        }
+        found->velocityX = x;
+        found->velocityY = y;
+        found->velocityZ = z;
+        return true;
+    }
+
+    [[nodiscard]] bool onGround() const override {
+        const entity::ServerEntity* found = entity();
+        return found != nullptr && found->onGround;
+    }
+
+    [[nodiscard]] std::int32_t age() const override {
+        const entity::ServerEntity* found = entity();
+        return found == nullptr ? 0 : found->age;
+    }
+
+    [[nodiscard]] double width() const override {
+        const entity::ServerEntity* found = entity();
+        return found == nullptr ? 0.6 : reg::entityTypeShapes::widthOf(found->type());
+    }
+
+    [[nodiscard]] double height() const override {
+        const entity::ServerEntity* found = entity();
+        return found == nullptr ? 1.8 : reg::entityTypeShapes::heightOf(found->type());
+    }
+
+    [[nodiscard]] std::optional<std::string> customName() const override {
+        const entity::ServerEntity* found = entity();
+        return found == nullptr ? std::nullopt : found->customName;
     }
 
 protected:
@@ -295,6 +366,259 @@ public:
         return true;
     }
 
+    [[nodiscard]] std::string dimension() const override {
+        return "minecraft:" + std::string{config::dimensionName(world_->declaration().dimension)};
+    }
+
+    [[nodiscard]] std::int64_t seed() const override { return world_->metadata().seed; }
+
+    [[nodiscard]] std::int32_t minHeight() const override { return chunkHeight().minY(); }
+
+    [[nodiscard]] std::int32_t height() const override { return chunkHeight().height(); }
+
+    [[nodiscard]] std::array<std::int32_t, 3> spawn() const override {
+        const std::array<double, 3>& at = world_->spawn();
+        return {static_cast<std::int32_t>(std::floor(at[0])), static_cast<std::int32_t>(std::floor(at[1])),
+                static_cast<std::int32_t>(std::floor(at[2]))};
+    }
+
+    void setSpawn(std::int32_t x, std::int32_t y, std::int32_t z) override { world_->setSpawn(x, y, z); }
+
+    [[nodiscard]] std::int64_t dayTime() const override { return world_->clock().totalTicks(); }
+
+    void setDayTime(std::int64_t ticks) override {
+        world_->clock().setTotalTicks(ticks);
+        if (hooks_.environment) {
+            hooks_.environment().syncTime(*world_);
+        }
+    }
+
+    void setWeather(bool raining, bool thundering) override {
+        world_->weather().raining = raining;
+        world_->weather().thundering = thundering;
+        if (hooks_.environment) {
+            hooks_.environment().syncWeather(*world_);
+        }
+    }
+
+    bool setDifficulty(std::string_view name) override {
+        if (name != "peaceful" && name != "easy" && name != "normal" && name != "hard") {
+            return false;
+        }
+        world_->setDifficulty(std::string{name});
+        return true;
+    }
+
+    [[nodiscard]] std::int32_t stateAt(std::int32_t x, std::int32_t y, std::int32_t z, bool load) override {
+        if (load) {
+            ensureChunk(x >> 4, z >> 4);
+        }
+        return world_->state().blockState(x, y, z).value_or(-1);
+    }
+
+    bool setStateAt(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, bool notify) override {
+        ensureChunk(x >> 4, z >> 4);
+        if (!world_->state().setBlockState(x, y, z, stateId)) {
+            return false;
+        }
+        if (notify) {
+            tell(x, y, z, stateId);
+        }
+        return true;
+    }
+
+    std::int32_t readStates(std::span<const std::int32_t> positions, std::span<std::int32_t> out,
+                            bool load) override {
+        const std::size_t count = std::min(positions.size() / 3, out.size());
+        std::int32_t found = 0;
+        for (std::size_t index = 0; index < count; ++index) {
+            const std::int32_t x = positions[index * 3];
+            const std::int32_t y = positions[index * 3 + 1];
+            const std::int32_t z = positions[index * 3 + 2];
+            if (load) {
+                ensureChunk(x >> 4, z >> 4);
+            }
+            out[index] = world_->state().blockState(x, y, z).value_or(-1);
+            found += out[index] >= 0 ? 1 : 0;
+        }
+        return found;
+    }
+
+    std::int32_t writeStates(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
+                             bool notify) override {
+        const std::size_t count = std::min(positions.size() / 3, states.size());
+        std::int32_t changed = 0;
+        for (std::size_t index = 0; index < count; ++index) {
+            changed += setStateAt(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2],
+                                  states[index], notify)
+                           ? 1
+                           : 0;
+        }
+        return changed;
+    }
+
+    bool readSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ, bool load,
+                     std::span<std::int32_t> out) override {
+        if (load) {
+            ensureChunk(chunkX, chunkZ);
+        }
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        const std::int32_t index = sectionY - chunkHeight().minSection();
+        if (chunk == nullptr || index < 0 || index >= chunkHeight().sectionCount() ||
+            out.size() < server::world::ChunkSection::kBlocks) {
+            return false;
+        }
+        chunk->section(static_cast<std::size_t>(index)).copyBlockStateIdsInto(out);
+        return true;
+    }
+
+    bool writeSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
+                      std::span<const std::int32_t> states, bool notify) override {
+        const std::int32_t index = sectionY - chunkHeight().minSection();
+        if (index < 0 || index >= chunkHeight().sectionCount() || states.size() < server::world::ChunkSection::kBlocks) {
+            return false;
+        }
+        ensureChunk(chunkX, chunkZ);
+        std::array<std::int32_t, server::world::ChunkSection::kBlocks> before{};
+        if (!readSection(chunkX, sectionY, chunkZ, false, before)) {
+            return false;
+        }
+        for (std::int32_t at = 0; at < static_cast<std::int32_t>(before.size()); ++at) {
+            if (before[static_cast<std::size_t>(at)] == states[static_cast<std::size_t>(at)]) {
+                continue;
+            }
+            setStateAt((chunkX << 4) + (at & 15), (sectionY << 4) + (at >> 8), (chunkZ << 4) + ((at >> 4) & 15),
+                       states[static_cast<std::size_t>(at)], notify);
+        }
+        return true;
+    }
+
+    [[nodiscard]] std::optional<std::string> biomeAt(std::int32_t x, std::int32_t y, std::int32_t z) const override {
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+        const std::int32_t quartY = (y - chunkHeight().minY()) >> 2;
+        if (chunk == nullptr || quartY < 0 || quartY >= chunkHeight().height() / 4) {
+            return std::nullopt;
+        }
+        const std::int32_t id = chunk->biomeId((x & 15) >> 2, quartY, (z & 15) >> 2);
+        for (const auto& [biomeId, name] : reg::biomeIdsTable()) {
+            if (biomeId == id) {
+                return "minecraft:" + std::string{name};
+            }
+        }
+        return std::nullopt;
+    }
+
+    bool setBiomeAt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view biome) override {
+        server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+        const std::int32_t quartY = (y - chunkHeight().minY()) >> 2;
+        if (chunk == nullptr || quartY < 0 || quartY >= chunkHeight().height() / 4) {
+            return false;
+        }
+        const std::string_view path = biome.starts_with("minecraft:") ? biome.substr(10) : biome;
+        for (const auto& [biomeId, name] : reg::biomeIdsTable()) {
+            if (name == path) {
+                chunk->setBiomeId((x & 15) >> 2, quartY, (z & 15) >> 2, biomeId);
+                if (hooks_.environment) {
+                    hooks_.environment().syncBiomes(*world_, x, z, x, z);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] std::int32_t highest(std::int32_t x, std::int32_t z, std::string_view kind, bool load) override {
+        if (load) {
+            ensureChunk(x >> 4, z >> 4);
+        }
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+        if (chunk == nullptr) {
+            return chunkHeight().minY() - 1;
+        }
+        server::world::HeightmapType type = server::world::HeightmapType::MotionBlocking;
+        if (kind == "surface") {
+            type = server::world::HeightmapType::WorldSurface;
+        } else if (kind == "ocean_floor") {
+            type = server::world::HeightmapType::OceanFloor;
+        }
+        return chunk->heightAt(x & 15, z & 15, type) - 1;
+    }
+
+    [[nodiscard]] bool chunkLoaded(std::int32_t chunkX, std::int32_t chunkZ) const override {
+        return world_->state().isLoaded(chunkX, chunkZ);
+    }
+
+    bool loadChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate) override {
+        if (world_->state().isLoaded(chunkX, chunkZ)) {
+            return true;
+        }
+        if (!generate) {
+            return false;
+        }
+        ensureChunk(chunkX, chunkZ);
+        return world_->state().isLoaded(chunkX, chunkZ);
+    }
+
+    bool unloadChunk(std::int32_t chunkX, std::int32_t chunkZ) override {
+        server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        if (chunk == nullptr) {
+            return false;
+        }
+        const std::int32_t reach = world_->settings().viewDistance + 1;
+        if (players_) {
+            for (const player::PlayerSession* player : players_()) {
+                if (player->worldName == world_->name() &&
+                    std::abs(static_cast<std::int32_t>(std::floor(player->x)) / 16 - chunkX) <= reach &&
+                    std::abs(static_cast<std::int32_t>(std::floor(player->z)) / 16 - chunkZ) <= reach) {
+                    return false;
+                }
+            }
+        }
+        world_->save({chunk});
+        return world_->state().evictClean({chunk}) > 0;
+    }
+
+    [[nodiscard]] std::vector<std::int32_t> loadedChunks() const override {
+        std::vector<std::int32_t> flat;
+        for (const server::world::Chunk* chunk : world_->state().chunks()) {
+            flat.push_back(chunk->chunkX());
+            flat.push_back(chunk->chunkZ());
+        }
+        return flat;
+    }
+
+    [[nodiscard]] std::shared_ptr<PluginEntityRef> entityById(std::int32_t id) const override {
+        const entity::ServerEntity* found = world_->state().entity(id);
+        if (found == nullptr || found->removed) {
+            return nullptr;
+        }
+        return std::make_shared<WorldEntityRef>(*world_, id, found->type().toString());
+    }
+
+    [[nodiscard]] std::shared_ptr<PluginEntityRef> entityByUuid(std::string_view uuid) const override {
+        for (const entity::ServerEntity* alive : world_->state().entities()) {
+            if (!alive->removed && alive->uuid().toString() == uuid) {
+                return std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString());
+            }
+        }
+        return nullptr;
+    }
+
+    [[nodiscard]] std::vector<std::shared_ptr<PluginEntityRef>> entitiesIn(std::int32_t chunkX,
+                                                                            std::int32_t chunkZ) const override {
+        std::vector<std::shared_ptr<PluginEntityRef>> refs;
+        for (const entity::ServerEntity* alive : world_->state().entitiesIn(chunkX, chunkZ)) {
+            if (!alive->removed) {
+                refs.push_back(std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString()));
+            }
+        }
+        return refs;
+    }
+
+    void save() override { world_->saveDirty(); }
+
+    [[nodiscard]] std::string folder() const override { return world_->name(); }
+
     [[nodiscard]] std::vector<std::shared_ptr<PluginEntityRef>> entities() const override {
         std::vector<std::shared_ptr<PluginEntityRef>> refs;
         for (const entity::ServerEntity* alive : world_->state().entities()) {
@@ -366,6 +690,27 @@ public:
     }
 
 private:
+    [[nodiscard]] server::world::ChunkHeight chunkHeight() const {
+        return config::dimensionFacts(world_->declaration().dimension).chunkHeight;
+    }
+
+    void ensureChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+        if (!world_->state().isLoaded(chunkX, chunkZ)) {
+            static_cast<void>(world_->state().getOrGenerateChunk(chunkX, chunkZ));
+        }
+    }
+
+    void tell(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) const {
+        if (!players_) {
+            return;
+        }
+        for (const player::PlayerSession* player : players_()) {
+            if (player->worldName == world_->name()) {
+                player::sendBlockChangeTo(*player, x, y, z, stateId);
+            }
+        }
+    }
+
     world::LoadedWorld* world_;
     ModelHooks hooks_;
     std::function<std::vector<player::PlayerSession*>()> players_;
@@ -407,6 +752,112 @@ std::shared_ptr<PluginWorldRef> LoadedWorlds::create(std::string_view name, std:
     }
     world::LoadedWorld* made = hooks_.makeWorld(std::string{name}, *theDimension, *theType, seed);
     return made == nullptr ? nullptr : std::make_shared<LoadedWorldRef>(*made, hooks_, players_);
+}
+
+std::int32_t LoadedWorlds::stateId(std::string_view text) const {
+    return LoadedWorldRef::parseState(text).value_or(-1);
+}
+
+std::string LoadedWorlds::stateText(std::int32_t stateId) const {
+    const Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return {};
+    }
+    std::string text = block->toString();
+    const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(stateId);
+    char separator = '[';
+    for (const auto& [name, value] : properties) {
+        text += separator;
+        text += name + "=" + value;
+        separator = ',';
+    }
+    return properties.empty() ? text : text + "]";
+}
+
+std::vector<std::string> LoadedWorlds::blockTable() const {
+    std::vector<std::string> table;
+    const reg::Registry<reg::BlockState>& blocks = reg::blocks::registry();
+    for (const std::int32_t defaultState : blocks.ids()) {
+        const Identifier* name = blocks.nameOf(defaultState);
+        const reg::blockStateDefinitions::Definition* definition = reg::blockStateDefinitions::of(*name);
+        table.push_back(name->toString());
+        table.push_back(std::to_string(definition == nullptr ? defaultState : definition->firstStateId()));
+        table.push_back(std::to_string(definition == nullptr ? 1 : definition->stateCount()));
+    }
+    return table;
+}
+
+std::vector<std::string> LoadedWorlds::blockProperties(std::string_view block) const {
+    std::vector<std::string> flat;
+    const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{block});
+    const reg::blockStateDefinitions::Definition* definition =
+        id.has_value() ? reg::blockStateDefinitions::of(*id) : nullptr;
+    if (definition == nullptr) {
+        return flat;
+    }
+    for (const std::string& name : definition->propertyNames()) {
+        std::string joined;
+        for (const std::string& value : definition->valuesOf(name)) {
+            joined += joined.empty() ? value : "|" + value;
+        }
+        flat.push_back(name);
+        flat.push_back(joined);
+    }
+    return flat;
+}
+
+std::int32_t LoadedWorlds::stateFlags(std::int32_t stateId) const {
+    std::int32_t bits = 0;
+    bits |= reg::blockShapes::blocksMotion(stateId) ? 1 : 0;
+    bits |= reg::blockShapes::isSolidRender(stateId) ? 2 : 0;
+    bits |= reg::blockShapes::isFullCube(stateId) ? 4 : 0;
+    bits |= reg::blockShapes::isReplaceable(stateId) ? 8 : 0;
+    bits |= reg::blockFluids::hasFluid(stateId) ? 16 : 0;
+    bits |= reg::blockShapes::isEmptyShape(stateId) ? 0 : 32;
+    bits |= reg::blockSupport::conductsRedstone(stateId) ? 64 : 0;
+    bits |= reg::blockSupport::ticksRandomly(stateId) ? 128 : 0;
+    bits |= reg::blocks::isAir(stateId) ? 256 : 0;
+    bits |= server::world::light::blockLight::emission(stateId) << 9;
+    bits |= server::world::light::skyLight::opacity(stateId) << 13;
+    return bits;
+}
+
+std::vector<double> LoadedWorlds::blockHardness(std::string_view block) const {
+    const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{block});
+    const reg::BlockHardness* found = id.has_value() ? reg::blocks::hardnessOf(*id) : nullptr;
+    if (found == nullptr) {
+        return {};
+    }
+    return {static_cast<double>(found->destroyTime), static_cast<double>(found->explosionResistance),
+            found->requiresCorrectTool ? 1.0 : 0.0};
+}
+
+std::vector<std::string> LoadedWorlds::biomeIds() const {
+    std::vector<std::string> ids;
+    for (const auto& [id, name] : reg::biomeIdsTable()) {
+        ids.push_back("minecraft:" + std::string{name});
+    }
+    return ids;
+}
+
+std::vector<std::string> LoadedWorlds::tags(std::string_view registry) const {
+    return hooks_.tags ? hooks_.tags(registry) : std::vector<std::string>{};
+}
+
+std::vector<std::string> LoadedWorlds::itemIds() const {
+    std::vector<std::string> ids;
+    for (const auto& [id, name] : reg::itemIdsTable()) {
+        ids.push_back("minecraft:" + std::string{name});
+    }
+    return ids;
+}
+
+std::vector<std::string> LoadedWorlds::entityTypeIds() const {
+    std::vector<std::string> ids;
+    for (const reg::EntityTypeEntry& entry : reg::entityTypes::all()) {
+        ids.push_back(entry.id.toString());
+    }
+    return ids;
 }
 
 server::plugins::PluginHandle RegistryPlaceholders::registerPlaceholder(std::string_view pluginId,

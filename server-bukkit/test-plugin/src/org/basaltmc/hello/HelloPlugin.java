@@ -39,6 +39,7 @@ public final class HelloPlugin extends JavaPlugin implements Listener {
             sender.sendMessage("World time: " + Bukkit.getWorlds().get(0).getFullTime());
             return true;
         });
+        getCommand("probe").setExecutor(new WorldProbe(this));
         Bukkit.getServicesManager().register(Greeter.class, name -> "Hi " + name, this,
             org.bukkit.plugin.ServicePriority.Normal);
         Greeter greeter = Bukkit.getServicesManager().load(Greeter.class);

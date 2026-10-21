@@ -1,9 +1,11 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/config/GroupsConfig.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
+#include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
@@ -454,6 +456,97 @@ public:
             names.emplace_back(name);
         }
         return names;
+    }
+
+    [[nodiscard]] float yaw() const override {
+        const player::PlayerSession* player = session();
+        return player == nullptr ? 0.0F : player->yaw;
+    }
+
+    [[nodiscard]] float pitch() const override {
+        const player::PlayerSession* player = session();
+        return player == nullptr ? 0.0F : player->pitch;
+    }
+
+    bool teleport(std::string_view world, double x, double y, double z, float yaw, float pitch) override {
+        player::PlayerSession* player = session();
+        if (player == nullptr) {
+            return false;
+        }
+        if (world != player->worldName) {
+            return teleport(world, x, y, z);
+        }
+        if (!player->connection().teleportTo) {
+            return false;
+        }
+        player->connection().teleportTo(x, y, z, yaw, pitch);
+        return true;
+    }
+
+    [[nodiscard]] std::string address() const override {
+        const player::PlayerSession* player = session();
+        return player == nullptr || !player->address().has_value() ? std::string{} : *player->address();
+    }
+
+    [[nodiscard]] std::int32_t permissionLevel() const override {
+        player::PlayerSession* player = session();
+        if (player == nullptr || !hooks_.groups) {
+            return 0;
+        }
+        return command::PlayerCommandSource{*player, hooks_.groups()}.permissionLevel();
+    }
+
+    [[nodiscard]] bool flying() const override {
+        const player::PlayerSession* player = session();
+        return player != nullptr && player->flying;
+    }
+
+    [[nodiscard]] bool onGround() const override {
+        const player::PlayerSession* player = session();
+        return player != nullptr && player->onGround;
+    }
+
+    [[nodiscard]] bool sprinting() const override {
+        const player::PlayerSession* player = session();
+        return player != nullptr && player->sprinting;
+    }
+
+    [[nodiscard]] std::int32_t entityId() const override {
+        const player::PlayerSession* player = session();
+        return player == nullptr ? 0 : player->entityId();
+    }
+
+    void showBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) override {
+        const player::PlayerSession* player = session();
+        if (player != nullptr) {
+            player::sendBlockChangeTo(*player, x, y, z, stateId);
+        }
+    }
+
+    [[nodiscard]] float experienceProgress() const override {
+        const player::PlayerSession* player = session();
+        return player == nullptr ? 0.0F : player->experience.progress();
+    }
+
+    [[nodiscard]] std::int32_t experiencePoints() const override {
+        const player::PlayerSession* player = session();
+        return player == nullptr ? 0 : player->experience.total();
+    }
+
+    void setExperience(float progress, std::int32_t level) override {
+        player::PlayerSession* player = session();
+        if (player == nullptr) {
+            return;
+        }
+        player->experience.restore(level, std::clamp(progress, 0.0F, 1.0F), player->experience.total());
+        if (player->connection().syncExperience) {
+            player->connection().syncExperience();
+        }
+    }
+
+    [[nodiscard]] float saturation() const override {
+        const player::PlayerSession* player = session();
+        return player == nullptr ? 0.0F : player->food.saturationLevel();
     }
 
 private:

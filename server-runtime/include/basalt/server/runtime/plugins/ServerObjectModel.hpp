@@ -16,6 +16,10 @@ namespace basalt::server::runtime::config {
 class GroupsConfig;
 }
 
+namespace basalt::server::runtime::command {
+class CommandEnvironment;
+}
+
 namespace basalt::server::runtime::entity {
 class ServerEntity;
 }
@@ -50,6 +54,8 @@ struct ModelHooks {
     std::function<world::LoadedWorld*(const std::string& name, config::WorldDimension dimension, config::WorldType type,
                                       std::optional<std::int64_t> seed)>
         makeWorld;
+    std::function<const command::CommandEnvironment&()> environment;
+    std::function<std::vector<std::string>(std::string_view registry)> tags;
     NpcRegistry* npcs = nullptr;
     std::function<std::int32_t()> nextEntityId;
 };
@@ -88,6 +94,17 @@ public:
                                                                           std::string_view dimension,
                                                                           std::string_view type,
                                                                           std::optional<std::int64_t> seed) override;
+
+    [[nodiscard]] std::int32_t stateId(std::string_view text) const override;
+    [[nodiscard]] std::string stateText(std::int32_t stateId) const override;
+    [[nodiscard]] std::vector<std::string> blockTable() const override;
+    [[nodiscard]] std::vector<std::string> blockProperties(std::string_view block) const override;
+    [[nodiscard]] std::int32_t stateFlags(std::int32_t stateId) const override;
+    [[nodiscard]] std::vector<double> blockHardness(std::string_view block) const override;
+    [[nodiscard]] std::vector<std::string> biomeIds() const override;
+    [[nodiscard]] std::vector<std::string> itemIds() const override;
+    [[nodiscard]] std::vector<std::string> tags(std::string_view registry) const override;
+    [[nodiscard]] std::vector<std::string> entityTypeIds() const override;
 
 private:
     ModelHooks hooks_;

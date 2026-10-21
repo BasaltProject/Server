@@ -1,0 +1,582 @@
+#include "BridgeInternal.hpp"
+
+#include <array>
+#include <exception>
+
+namespace basalt::server::bukkit {
+namespace {
+using plugins::PluginEntityRef;
+using plugins::PluginItem;
+using plugins::PluginPlayerRef;
+using plugins::PluginWorldRef;
+
+[[nodiscard]] plugins::PluginWorlds& worlds() { return BukkitBridge::current().services().worlds(); }
+
+[[nodiscard]] std::shared_ptr<PluginWorldRef> worldOf(JNIEnv* env, jstring name) {
+    return worlds().byName(toStd(env, name));
+}
+
+[[nodiscard]] std::shared_ptr<PluginPlayerRef> playerOf(JNIEnv* env, jstring uuid) {
+    return BukkitBridge::current().services().players().byUuid(toStd(env, uuid));
+}
+
+[[nodiscard]] jstring javaOrNull(JNIEnv* env, const std::optional<std::string>& text) {
+    return text.has_value() ? toJava(env, *text) : nullptr;
+}
+
+[[nodiscard]] jobjectArray stringArray(JNIEnv* env, const std::vector<std::string>& values) {
+    jclass string = env->FindClass("java/lang/String");
+    jobjectArray array = env->NewObjectArray(static_cast<jsize>(values.size()), string, nullptr);
+    for (std::size_t index = 0; index < values.size(); ++index) {
+        jstring text = toJava(env, values[index]);
+        env->SetObjectArrayElement(array, static_cast<jsize>(index), text);
+        env->DeleteLocalRef(text);
+    }
+    return array;
+}
+
+[[nodiscard]] jintArray intArray(JNIEnv* env, const std::vector<std::int32_t>& values) {
+    jintArray array = env->NewIntArray(static_cast<jsize>(values.size()));
+    env->SetIntArrayRegion(array, 0, static_cast<jsize>(values.size()), values.data());
+    return array;
+}
+
+[[nodiscard]] jdoubleArray doubleArray(JNIEnv* env, const double* values, std::size_t count) {
+    jdoubleArray array = env->NewDoubleArray(static_cast<jsize>(count));
+    env->SetDoubleArrayRegion(array, 0, static_cast<jsize>(count), values);
+    return array;
+}
+
+// A thrown C++ exception must never cross into Java, so every world call that can touch a chunk goes through this.
+template <typename Result, typename Body>
+[[nodiscard]] Result guarded(Result fallback, Body&& body) {
+    try {
+        return body();
+    } catch (const std::exception& error) {
+        BukkitBridge::current().log().warn([&error] { return std::string{"world call failed: "} + error.what(); });
+        return fallback;
+    }
+}
+
+jint JNICALL nativeStateId(JNIEnv* env, jclass, jstring text) { return worlds().stateId(toStd(env, text)); }
+
+jstring JNICALL nativeStateText(JNIEnv* env, jclass, jint id) { return toJava(env, worlds().stateText(id)); }
+
+jobjectArray JNICALL nativeBlockTable(JNIEnv* env, jclass) { return stringArray(env, worlds().blockTable()); }
+
+jobjectArray JNICALL nativeBlockProperties(JNIEnv* env, jclass, jstring block) {
+    return stringArray(env, worlds().blockProperties(toStd(env, block)));
+}
+
+jint JNICALL nativeStateFlags(JNIEnv*, jclass, jint id) { return worlds().stateFlags(id); }
+
+jdoubleArray JNICALL nativeBlockHardness(JNIEnv* env, jclass, jstring block) {
+    const std::vector<double> facts = worlds().blockHardness(toStd(env, block));
+    return facts.empty() ? nullptr : doubleArray(env, facts.data(), facts.size());
+}
+
+jobjectArray JNICALL nativeBiomeIds(JNIEnv* env, jclass) { return stringArray(env, worlds().biomeIds()); }
+
+jobjectArray JNICALL nativeItemIds(JNIEnv* env, jclass) { return stringArray(env, worlds().itemIds()); }
+
+jobjectArray JNICALL nativeTags(JNIEnv* env, jclass, jstring registry) {
+    return stringArray(env, worlds().tags(toStd(env, registry)));
+}
+
+jobjectArray JNICALL nativeEntityTypes(JNIEnv* env, jclass) { return stringArray(env, worlds().entityTypeIds()); }
+
+jobjectArray JNICALL nativeWorldStrings(JNIEnv* env, jclass, jstring name) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return nullptr;
+    }
+    return stringArray(env, {world->dimension(), world->folder(), world->difficulty()});
+}
+
+jlongArray JNICALL nativeWorldNumbers(JNIEnv* env, jclass, jstring name) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return nullptr;
+    }
+    const std::array<std::int32_t, 3> spawn = world->spawn();
+    const std::array<jlong, 11> values{world->seed(),
+                                       world->minHeight(),
+                                       world->height(),
+                                       spawn[0],
+                                       spawn[1],
+                                       spawn[2],
+                                       world->dayTime(),
+                                       world->raining() ? 1 : 0,
+                                       world->thundering() ? 1 : 0,
+                                       world->time(),
+                                       0};
+    jlongArray array = env->NewLongArray(static_cast<jsize>(values.size()));
+    env->SetLongArrayRegion(array, 0, static_cast<jsize>(values.size()), values.data());
+    return array;
+}
+
+void JNICALL nativeSetTime(JNIEnv* env, jclass, jstring name, jlong ticks) {
+    if (const auto world = worldOf(env, name); world != nullptr) {
+        world->setDayTime(ticks);
+    }
+}
+
+void JNICALL nativeSetWeather(JNIEnv* env, jclass, jstring name, jboolean raining, jboolean thundering) {
+    if (const auto world = worldOf(env, name); world != nullptr) {
+        world->setWeather(raining == JNI_TRUE, thundering == JNI_TRUE);
+    }
+}
+
+void JNICALL nativeSetSpawn(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z) {
+    if (const auto world = worldOf(env, name); world != nullptr) {
+        world->setSpawn(x, y, z);
+    }
+}
+
+jboolean JNICALL nativeSetDifficulty(JNIEnv* env, jclass, jstring name, jstring difficulty) {
+    const auto world = worldOf(env, name);
+    return world != nullptr && world->setDifficulty(toStd(env, difficulty)) ? JNI_TRUE : JNI_FALSE;
+}
+
+jstring JNICALL nativeGameRule(JNIEnv* env, jclass, jstring name, jstring rule) {
+    const auto world = worldOf(env, name);
+    return world == nullptr ? nullptr : javaOrNull(env, world->gameRule(toStd(env, rule)));
+}
+
+jboolean JNICALL nativeSetGameRule(JNIEnv* env, jclass, jstring name, jstring rule, jstring value) {
+    const auto world = worldOf(env, name);
+    return world != nullptr && world->setGameRule(toStd(env, rule), toStd(env, value)) ? JNI_TRUE : JNI_FALSE;
+}
+
+jobjectArray JNICALL nativeGameRules(JNIEnv* env, jclass, jstring name) {
+    const auto world = worldOf(env, name);
+    return stringArray(env, world == nullptr ? std::vector<std::string>{} : world->gameRules());
+}
+
+void JNICALL nativeSaveWorld(JNIEnv* env, jclass, jstring name) {
+    if (const auto world = worldOf(env, name); world != nullptr) {
+        guarded<int>(0, [&] {
+            world->save();
+            return 0;
+        });
+    }
+}
+
+jint JNICALL nativeState(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jboolean load) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return -1;
+    }
+    return guarded<jint>(-1, [&] { return world->stateAt(x, y, z, load == JNI_TRUE); });
+}
+
+jboolean JNICALL nativeSetState(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jint state,
+                                jboolean notify) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return JNI_FALSE;
+    }
+    return guarded<jboolean>(JNI_FALSE, [&] {
+        return world->setStateAt(x, y, z, state, notify == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
+    });
+}
+
+jint JNICALL nativeReadStates(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray out, jboolean load) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    const jsize count = env->GetArrayLength(out);
+    std::vector<std::int32_t> at(static_cast<std::size_t>(env->GetArrayLength(positions)));
+    env->GetIntArrayRegion(positions, 0, static_cast<jsize>(at.size()), at.data());
+    std::vector<std::int32_t> read(static_cast<std::size_t>(count), -1);
+    const jint found = guarded<jint>(0, [&] { return world->readStates(at, read, load == JNI_TRUE); });
+    env->SetIntArrayRegion(out, 0, count, read.data());
+    return found;
+}
+
+jint JNICALL nativeWriteStates(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray states,
+                               jboolean notify) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    std::vector<std::int32_t> at(static_cast<std::size_t>(env->GetArrayLength(positions)));
+    env->GetIntArrayRegion(positions, 0, static_cast<jsize>(at.size()), at.data());
+    std::vector<std::int32_t> next(static_cast<std::size_t>(env->GetArrayLength(states)));
+    env->GetIntArrayRegion(states, 0, static_cast<jsize>(next.size()), next.data());
+    return guarded<jint>(0, [&] { return world->writeStates(at, next, notify == JNI_TRUE); });
+}
+
+jboolean JNICALL nativeReadSection(JNIEnv* env, jclass, jstring name, jint chunkX, jint sectionY, jint chunkZ,
+                                   jboolean load, jintArray out) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return JNI_FALSE;
+    }
+    std::vector<std::int32_t> read(4096);
+    const bool ok = guarded<bool>(
+        false, [&] { return world->readSection(chunkX, sectionY, chunkZ, load == JNI_TRUE, read); });
+    if (ok) {
+        env->SetIntArrayRegion(out, 0, 4096, read.data());
+    }
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+jboolean JNICALL nativeWriteSection(JNIEnv* env, jclass, jstring name, jint chunkX, jint sectionY, jint chunkZ,
+                                    jintArray states, jboolean notify) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr || env->GetArrayLength(states) < 4096) {
+        return JNI_FALSE;
+    }
+    std::vector<std::int32_t> next(4096);
+    env->GetIntArrayRegion(states, 0, 4096, next.data());
+    return guarded<jboolean>(JNI_FALSE, [&] {
+        return world->writeSection(chunkX, sectionY, chunkZ, next, notify == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
+    });
+}
+
+jstring JNICALL nativeBiome(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z) {
+    const auto world = worldOf(env, name);
+    return world == nullptr ? nullptr : javaOrNull(env, guarded<std::optional<std::string>>(std::nullopt, [&] {
+                                                       return world->biomeAt(x, y, z);
+                                                   }));
+}
+
+jboolean JNICALL nativeSetBiome(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jstring biome) {
+    const auto world = worldOf(env, name);
+    return world != nullptr &&
+                   guarded<bool>(false, [&] { return world->setBiomeAt(x, y, z, toStd(env, biome)); })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jint JNICALL nativeHighest(JNIEnv* env, jclass, jstring name, jint x, jint z, jstring kind, jboolean load) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    return guarded<jint>(0, [&] { return world->highest(x, z, toStd(env, kind), load == JNI_TRUE); });
+}
+
+jboolean JNICALL nativeChunkLoaded(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
+    const auto world = worldOf(env, name);
+    return world != nullptr && world->chunkLoaded(chunkX, chunkZ) ? JNI_TRUE : JNI_FALSE;
+}
+
+jboolean JNICALL nativeLoadChunk(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jboolean generate) {
+    const auto world = worldOf(env, name);
+    return world != nullptr &&
+                   guarded<bool>(false, [&] { return world->loadChunk(chunkX, chunkZ, generate == JNI_TRUE); })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jboolean JNICALL nativeUnloadChunk(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
+    const auto world = worldOf(env, name);
+    return world != nullptr && guarded<bool>(false, [&] { return world->unloadChunk(chunkX, chunkZ); }) ? JNI_TRUE
+                                                                                                          : JNI_FALSE;
+}
+
+jintArray JNICALL nativeLoadedChunks(JNIEnv* env, jclass, jstring name) {
+    const auto world = worldOf(env, name);
+    return intArray(env, world == nullptr ? std::vector<std::int32_t>{} : world->loadedChunks());
+}
+
+jintArray JNICALL nativeEntityIds(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jboolean all) {
+    const auto world = worldOf(env, name);
+    std::vector<std::int32_t> ids;
+    if (world != nullptr) {
+        const auto found = all == JNI_TRUE ? world->entities() : world->entitiesIn(chunkX, chunkZ);
+        for (const std::shared_ptr<PluginEntityRef>& entity : found) {
+            ids.push_back(entity->id());
+        }
+    }
+    return intArray(env, ids);
+}
+
+jobjectArray JNICALL nativeEntityStrings(JNIEnv* env, jclass, jstring name, jint id) {
+    const auto world = worldOf(env, name);
+    const auto entity = world == nullptr ? nullptr : world->entityById(id);
+    if (entity == nullptr) {
+        return nullptr;
+    }
+    const std::optional<std::string> custom = entity->customName();
+    return stringArray(env, {entity->uuid(), entity->type(), custom.value_or(""), custom.has_value() ? "1" : "0"});
+}
+
+jdoubleArray JNICALL nativeEntityNumbers(JNIEnv* env, jclass, jstring name, jint id) {
+    const auto world = worldOf(env, name);
+    const auto entity = world == nullptr ? nullptr : world->entityById(id);
+    if (entity == nullptr) {
+        return nullptr;
+    }
+    const std::array<float, 2> rotation = entity->rotation();
+    const std::array<double, 3> velocity = entity->velocity();
+    const std::array<double, 13> values{entity->x(),
+                                        entity->y(),
+                                        entity->z(),
+                                        static_cast<double>(rotation[0]),
+                                        static_cast<double>(rotation[1]),
+                                        velocity[0],
+                                        velocity[1],
+                                        velocity[2],
+                                        entity->health(),
+                                        entity->onGround() ? 1.0 : 0.0,
+                                        static_cast<double>(entity->age()),
+                                        entity->width(),
+                                        entity->height()};
+    return doubleArray(env, values.data(), values.size());
+}
+
+jboolean JNICALL nativeEntityMove(JNIEnv* env, jclass, jstring name, jint id, jdouble x, jdouble y, jdouble z,
+                                  jfloat yaw, jfloat pitch) {
+    const auto world = worldOf(env, name);
+    const auto entity = world == nullptr ? nullptr : world->entityById(id);
+    if (entity == nullptr || !entity->teleport(x, y, z)) {
+        return JNI_FALSE;
+    }
+    entity->setRotation(yaw, pitch);
+    return JNI_TRUE;
+}
+
+void JNICALL nativeEntityVelocity(JNIEnv* env, jclass, jstring name, jint id, jdouble x, jdouble y, jdouble z) {
+    const auto world = worldOf(env, name);
+    if (const auto entity = world == nullptr ? nullptr : world->entityById(id); entity != nullptr) {
+        entity->setVelocity(x, y, z);
+    }
+}
+
+void JNICALL nativeEntityHealth(JNIEnv* env, jclass, jstring name, jint id, jdouble health) {
+    const auto world = worldOf(env, name);
+    if (const auto entity = world == nullptr ? nullptr : world->entityById(id); entity != nullptr) {
+        entity->setHealth(health);
+    }
+}
+
+void JNICALL nativeEntityRemove(JNIEnv* env, jclass, jstring name, jint id) {
+    const auto world = worldOf(env, name);
+    if (const auto entity = world == nullptr ? nullptr : world->entityById(id); entity != nullptr) {
+        entity->remove();
+    }
+}
+
+jint JNICALL nativeSpawn(JNIEnv* env, jclass, jstring name, jstring type, jdouble x, jdouble y, jdouble z) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return -1;
+    }
+    const auto spawned = guarded<std::shared_ptr<PluginEntityRef>>(
+        nullptr, [&] { return world->spawn(toStd(env, type), x, y, z); });
+    return spawned == nullptr ? -1 : spawned->id();
+}
+
+jboolean JNICALL nativePlayerMove(JNIEnv* env, jclass, jstring uuid, jstring world, jdouble x, jdouble y, jdouble z,
+                                  jfloat yaw, jfloat pitch) {
+    const auto player = playerOf(env, uuid);
+    return player != nullptr && player->teleport(toStd(env, world), x, y, z, yaw, pitch) ? JNI_TRUE : JNI_FALSE;
+}
+
+jdoubleArray JNICALL nativePlayerExtra(JNIEnv* env, jclass, jstring uuid) {
+    const auto player = playerOf(env, uuid);
+    if (player == nullptr) {
+        return nullptr;
+    }
+    const std::array<double, 12> values{static_cast<double>(player->yaw()),
+                                        static_cast<double>(player->pitch()),
+                                        static_cast<double>(player->permissionLevel()),
+                                        player->flying() ? 1.0 : 0.0,
+                                        player->onGround() ? 1.0 : 0.0,
+                                        player->sprinting() ? 1.0 : 0.0,
+                                        static_cast<double>(player->entityId()),
+                                        static_cast<double>(player->experienceProgress()),
+                                        static_cast<double>(player->experiencePoints()),
+                                        static_cast<double>(player->saturation()),
+                                        static_cast<double>(player->inventory().heldSlot()),
+                                        0.0};
+    return doubleArray(env, values.data(), values.size());
+}
+
+jstring JNICALL nativePlayerAddress(JNIEnv* env, jclass, jstring uuid) {
+    const auto player = playerOf(env, uuid);
+    return player == nullptr ? nullptr : toJava(env, player->address());
+}
+
+void JNICALL nativePlayerShowBlock(JNIEnv* env, jclass, jstring uuid, jint x, jint y, jint z, jint state) {
+    if (const auto player = playerOf(env, uuid); player != nullptr) {
+        player->showBlock(x, y, z, state);
+    }
+}
+
+void JNICALL nativePlayerExperience(JNIEnv* env, jclass, jstring uuid, jfloat progress, jint level) {
+    if (const auto player = playerOf(env, uuid); player != nullptr) {
+        player->setExperience(progress, level);
+    }
+}
+
+jboolean JNICALL nativePlayerCommand(JNIEnv* env, jclass, jstring uuid, jstring line) {
+    const auto player = playerOf(env, uuid);
+    return player != nullptr && BukkitBridge::current().services().commands().runAsPlayer(*player, toStd(env, line))
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+void JNICALL nativePlayerTitle(JNIEnv* env, jclass, jstring uuid, jstring title, jstring subtitle, jint fadeIn,
+                               jint stay, jint fadeOut) {
+    if (const auto player = playerOf(env, uuid); player != nullptr) {
+        player->title(toStd(env, title), toStd(env, subtitle), fadeIn, stay, fadeOut);
+    }
+}
+
+void JNICALL nativePlayerSound(JNIEnv* env, jclass, jstring uuid, jstring sound, jfloat volume, jfloat pitch) {
+    if (const auto player = playerOf(env, uuid); player != nullptr) {
+        player->sound(toStd(env, sound), volume, pitch);
+    }
+}
+
+// An item crosses as strings: id, count, damage, name (null when none), lore joined by newlines, then `id=level` pairs.
+jobjectArray itemStrings(JNIEnv* env, const std::optional<PluginItem>& item) {
+    if (!item.has_value()) {
+        return nullptr;
+    }
+    std::vector<std::string> flat{item->id, std::to_string(item->count), std::to_string(item->damage),
+                                  item->name.value_or(""), item->name.has_value() ? "1" : "0"};
+    std::string lore;
+    for (const std::string& line : item->lore) {
+        lore += lore.empty() ? line : "\n" + line;
+    }
+    flat.push_back(lore);
+    for (const auto& [id, level] : item->enchantments) {
+        flat.push_back(id + "=" + std::to_string(level));
+    }
+    return stringArray(env, flat);
+}
+
+jint JNICALL nativeInventorySize(JNIEnv* env, jclass, jstring uuid) {
+    const auto player = playerOf(env, uuid);
+    return player == nullptr ? 0 : player->inventory().size();
+}
+
+jint JNICALL nativeInventoryHeld(JNIEnv* env, jclass, jstring uuid) {
+    const auto player = playerOf(env, uuid);
+    return player == nullptr ? 0 : player->inventory().heldSlot();
+}
+
+jobjectArray JNICALL nativeInventoryGet(JNIEnv* env, jclass, jstring uuid, jint slot) {
+    const auto player = playerOf(env, uuid);
+    return player == nullptr ? nullptr : itemStrings(env, player->inventory().at(slot));
+}
+
+void JNICALL nativeInventorySet(JNIEnv* env, jclass, jstring uuid, jint slot, jobjectArray item) {
+    const auto player = playerOf(env, uuid);
+    if (player == nullptr) {
+        return;
+    }
+    if (item == nullptr) {
+        player->inventory().set(slot, std::nullopt);
+        return;
+    }
+    const auto at = [&](jsize index) {
+        return toStd(env, static_cast<jstring>(env->GetObjectArrayElement(item, index)));
+    };
+    PluginItem built;
+    built.id = at(0);
+    built.count = std::atoi(at(1).c_str());
+    built.damage = std::atoi(at(2).c_str());
+    if (at(4) == "1") {
+        built.name = at(3);
+    }
+    const std::string lore = at(5);
+    for (std::size_t from = 0; !lore.empty() && from <= lore.size();) {
+        const std::size_t end = lore.find('\n', from);
+        built.lore.push_back(lore.substr(from, end == std::string::npos ? std::string::npos : end - from));
+        if (end == std::string::npos) {
+            break;
+        }
+        from = end + 1;
+    }
+    for (jsize index = 6; index < env->GetArrayLength(item); ++index) {
+        const std::string pair = at(index);
+        if (const std::size_t equals = pair.rfind('='); equals != std::string::npos) {
+            built.enchantments[pair.substr(0, equals)] = std::atoi(pair.c_str() + equals + 1);
+        }
+    }
+    player->inventory().set(slot, built);
+}
+
+void JNICALL nativeInventoryClear(JNIEnv* env, jclass, jstring uuid) {
+    if (const auto player = playerOf(env, uuid); player != nullptr) {
+        player->inventory().clear();
+    }
+}
+} // namespace
+
+void registerWorldNatives(JNIEnv* env, jclass natives) {
+    const auto method = [](const char* name, const char* signature, void* function) {
+        return JNINativeMethod{const_cast<char*>(name), const_cast<char*>(signature), function};
+    };
+    const std::array methods{
+        method("stateId", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeStateId)),
+        method("stateText", "(I)Ljava/lang/String;", reinterpret_cast<void*>(&nativeStateText)),
+        method("blockTable", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBlockTable)),
+        method("blockProperties", "(Ljava/lang/String;)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeBlockProperties)),
+        method("stateFlags", "(I)I", reinterpret_cast<void*>(&nativeStateFlags)),
+        method("blockHardness", "(Ljava/lang/String;)[D", reinterpret_cast<void*>(&nativeBlockHardness)),
+        method("biomeIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiomeIds)),
+        method("itemIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeItemIds)),
+        method("tags", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeTags)),
+        method("entityTypes", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeEntityTypes)),
+        method("worldStrings", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeWorldStrings)),
+        method("worldNumbers", "(Ljava/lang/String;)[J", reinterpret_cast<void*>(&nativeWorldNumbers)),
+        method("setTime", "(Ljava/lang/String;J)V", reinterpret_cast<void*>(&nativeSetTime)),
+        method("setWeather", "(Ljava/lang/String;ZZ)V", reinterpret_cast<void*>(&nativeSetWeather)),
+        method("setSpawn", "(Ljava/lang/String;III)V", reinterpret_cast<void*>(&nativeSetSpawn)),
+        method("setDifficulty", "(Ljava/lang/String;Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeSetDifficulty)),
+        method("gameRule", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeGameRule)),
+        method("setGameRule", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z",
+               reinterpret_cast<void*>(&nativeSetGameRule)),
+        method("gameRules", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeGameRules)),
+        method("saveWorld", "(Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeSaveWorld)),
+        method("state", "(Ljava/lang/String;IIIZ)I", reinterpret_cast<void*>(&nativeState)),
+        method("setState", "(Ljava/lang/String;IIIIZ)Z", reinterpret_cast<void*>(&nativeSetState)),
+        method("readStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeReadStates)),
+        method("writeStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeWriteStates)),
+        method("readSection", "(Ljava/lang/String;IIIZ[I)Z", reinterpret_cast<void*>(&nativeReadSection)),
+        method("writeSection", "(Ljava/lang/String;III[IZ)Z", reinterpret_cast<void*>(&nativeWriteSection)),
+        method("biome", "(Ljava/lang/String;III)Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiome)),
+        method("setBiome", "(Ljava/lang/String;IIILjava/lang/String;)Z", reinterpret_cast<void*>(&nativeSetBiome)),
+        method("highest", "(Ljava/lang/String;IILjava/lang/String;Z)I", reinterpret_cast<void*>(&nativeHighest)),
+        method("chunkLoaded", "(Ljava/lang/String;II)Z", reinterpret_cast<void*>(&nativeChunkLoaded)),
+        method("loadChunk", "(Ljava/lang/String;IIZ)Z", reinterpret_cast<void*>(&nativeLoadChunk)),
+        method("unloadChunk", "(Ljava/lang/String;II)Z", reinterpret_cast<void*>(&nativeUnloadChunk)),
+        method("loadedChunks", "(Ljava/lang/String;)[I", reinterpret_cast<void*>(&nativeLoadedChunks)),
+        method("entityIds", "(Ljava/lang/String;IIZ)[I", reinterpret_cast<void*>(&nativeEntityIds)),
+        method("entityStrings", "(Ljava/lang/String;I)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeEntityStrings)),
+        method("entityNumbers", "(Ljava/lang/String;I)[D", reinterpret_cast<void*>(&nativeEntityNumbers)),
+        method("entityMove", "(Ljava/lang/String;IDDDFF)Z", reinterpret_cast<void*>(&nativeEntityMove)),
+        method("entityVelocity", "(Ljava/lang/String;IDDD)V", reinterpret_cast<void*>(&nativeEntityVelocity)),
+        method("entityHealth", "(Ljava/lang/String;ID)V", reinterpret_cast<void*>(&nativeEntityHealth)),
+        method("entityRemove", "(Ljava/lang/String;I)V", reinterpret_cast<void*>(&nativeEntityRemove)),
+        method("spawn", "(Ljava/lang/String;Ljava/lang/String;DDD)I", reinterpret_cast<void*>(&nativeSpawn)),
+        method("playerMove", "(Ljava/lang/String;Ljava/lang/String;DDDFF)Z", reinterpret_cast<void*>(&nativePlayerMove)),
+        method("playerExtra", "(Ljava/lang/String;)[D", reinterpret_cast<void*>(&nativePlayerExtra)),
+        method("playerAddress", "(Ljava/lang/String;)Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativePlayerAddress)),
+        method("playerShowBlock", "(Ljava/lang/String;IIII)V", reinterpret_cast<void*>(&nativePlayerShowBlock)),
+        method("playerExperience", "(Ljava/lang/String;FI)V", reinterpret_cast<void*>(&nativePlayerExperience)),
+        method("playerCommand", "(Ljava/lang/String;Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativePlayerCommand)),
+        method("playerTitle", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;III)V",
+               reinterpret_cast<void*>(&nativePlayerTitle)),
+        method("playerSound", "(Ljava/lang/String;Ljava/lang/String;FF)V", reinterpret_cast<void*>(&nativePlayerSound)),
+        method("inventorySize", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeInventorySize)),
+        method("inventoryHeld", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeInventoryHeld)),
+        method("inventoryGet", "(Ljava/lang/String;I)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeInventoryGet)),
+        method("inventorySet", "(Ljava/lang/String;I[Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeInventorySet)),
+        method("inventoryClear", "(Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeInventoryClear)),
+    };
+    env->RegisterNatives(natives, methods.data(), static_cast<jint>(methods.size()));
+}
+} // namespace basalt::server::bukkit

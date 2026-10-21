@@ -38,6 +38,9 @@ public final class BukkitRuntime {
     }
 
     private static void routeLogging() {
+        System.setProperty("log4j2.loggerContextFactory", "org.apache.logging.log4j.simple.SimpleLoggerContextFactory");
+        System.setProperty("org.apache.logging.log4j.simplelog.level", "INFO");
+        System.setProperty("org.apache.logging.log4j.simplelog.logFile", "system.out");
         java.util.logging.Logger root = java.util.logging.Logger.getLogger("");
         for (Handler existing : root.getHandlers()) {
             root.removeHandler(existing);
