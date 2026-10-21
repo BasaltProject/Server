@@ -81,6 +81,11 @@ public final class BukkitRuntime {
         return EventBridge.fire(name, priority, generation, fields, cancelled);
     }
 
+    public static void channelMessage(String channel, String uuid, byte[] payload) {
+        BasaltPlayer player = server.player(java.util.UUID.fromString(uuid), null);
+        server.messengerImpl().dispatchIncomingMessage(player, channel, payload);
+    }
+
     public static boolean command(String label, String senderName, boolean console, String args) {
         CommandSender sender = console ? server.consoleImpl() : server.playerByName(senderName);
         if (sender == null) {

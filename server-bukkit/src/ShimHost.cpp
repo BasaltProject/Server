@@ -1,8 +1,7 @@
 #include <basalt/server/bukkit/ShimHost.hpp>
 
-#include <dlfcn.h>
-
 #include <array>
+#include <dlfcn.h>
 
 namespace basalt::server::bukkit {
 namespace {

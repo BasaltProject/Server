@@ -1,8 +1,7 @@
 #pragma once
 
-#include <jni.h>
-
 #include <expected>
+#include <jni.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -19,6 +18,7 @@ class ShimHost {
 
 public:
     ShimHost(Key, void* library, JavaVM* vm) : library_(library), vm_(vm) {}
+
     ShimHost(const ShimHost&) = delete;
     ShimHost& operator=(const ShimHost&) = delete;
     ShimHost(ShimHost&&) = delete;
@@ -33,7 +33,7 @@ public:
     [[nodiscard]] JNIEnv* env() const;
 
 private:
-    void* library_;
+    [[maybe_unused]] void* library_;
     JavaVM* vm_;
 };
 } // namespace basalt::server::bukkit

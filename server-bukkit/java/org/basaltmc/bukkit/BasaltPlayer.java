@@ -236,6 +236,16 @@ public final class BasaltPlayer extends PlayerBase {
     }
 
     @Override
+    public void sendPluginMessage(Plugin source, String channel, byte[] message) {
+        Natives.playerChannelSend(uuid, channel, message);
+    }
+
+    @Override
+    public Set<String> getListeningPluginChannels() {
+        return BasaltServer.instance().getMessenger().getIncomingChannels();
+    }
+
+    @Override
     public boolean isOp() {
         return Natives.playerMay(uuid, "*");
     }

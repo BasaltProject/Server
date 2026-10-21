@@ -24,7 +24,9 @@ public:
     void shutdown();
 
     [[nodiscard]] plugins::PluginHost& plugins() noexcept { return *plugins_; }
+
     [[nodiscard]] plugins::PluginServices& services() noexcept { return plugins_->services(); }
+
     [[nodiscard]] const wire::common::Logger& log() const noexcept { return log_; }
 
     [[nodiscard]] const plugins::PluginEventType* typeNamed(const std::string& name) const;
@@ -34,9 +36,11 @@ public:
     bool subscribe(const std::string& event, std::int32_t priority);
     void registerCommand(const std::string& plugin, const std::string& name, const std::string& permission);
     void unregisterCommands(const std::string& plugin);
+    void listenChannel(const std::string& channel);
 
 private:
     void runTask(std::int64_t id);
+
     struct Snapshot {
         const plugins::PluginEventType* type = nullptr;
         std::vector<plugins::PluginEventValue> values;
@@ -58,10 +62,12 @@ private:
     jmethodID taskMethod_ = nullptr;
     jmethodID eventMethod_ = nullptr;
     jmethodID commandMethod_ = nullptr;
+    jmethodID channelMethod_ = nullptr;
     std::map<std::int64_t, plugins::PluginHandle> tasks_;
     std::set<std::pair<std::string, std::int32_t>> subscribed_;
     std::multimap<std::string, plugins::PluginHandle> commands_;
     std::vector<plugins::PluginHandle> eventHandles_;
+    std::map<std::string, plugins::PluginHandle> channels_;
     bool warnedAboutThread_ = false;
 };
 

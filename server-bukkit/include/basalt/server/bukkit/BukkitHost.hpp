@@ -33,8 +33,8 @@ public:
     ~BukkitHost();
 
     /// Creates the Shim VM, boots the Java runtime and enables every plugin it finds.
-    [[nodiscard]] static std::expected<std::unique_ptr<BukkitHost>, std::string>
-    start(const BukkitOptions& options, plugins::PluginHost& plugins);
+    [[nodiscard]] static std::expected<std::unique_ptr<BukkitHost>, std::string> start(const BukkitOptions& options,
+                                                                                       plugins::PluginHost& plugins);
 
     void stop();
 

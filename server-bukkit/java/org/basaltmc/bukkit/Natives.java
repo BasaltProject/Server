@@ -12,6 +12,8 @@ public final class Natives {
     public static native String[] eventFields(String event);
     public static native void registerCommand(String plugin, String name, String permission);
     public static native void unregisterCommands(String plugin);
+    public static native void listenChannel(String channel);
+    public static native boolean playerChannelSend(String uuid, String channel, byte[] payload);
     public static native boolean runConsoleCommand(String line);
     public static native String pluginFolder(String id);
     public static native String[] onlinePlayers();

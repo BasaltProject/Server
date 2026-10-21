@@ -25,7 +25,6 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.SimpleServicesManager;
 import org.bukkit.plugin.messaging.Messenger;
-import org.bukkit.plugin.messaging.StandardMessenger;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.basaltmc.bukkit.gen.ServerBase;
 
@@ -39,7 +38,7 @@ public final class BasaltServer extends ServerBase {
     private final BasaltPluginManager pluginManager;
     private final BasaltScheduler scheduler = new BasaltScheduler();
     private final ServicesManager services = new SimpleServicesManager();
-    private final Messenger messenger = new StandardMessenger();
+    private final BasaltMessenger messenger = new BasaltMessenger();
     private final BasaltCommandMap commandMap;
     private final BasaltConsole console = new BasaltConsole();
     private final Map<UUID, BasaltPlayer> players = new LinkedHashMap<>();
@@ -59,6 +58,10 @@ public final class BasaltServer extends ServerBase {
 
     BasaltPluginManager pluginManagerImpl() {
         return pluginManager;
+    }
+
+    BasaltMessenger messengerImpl() {
+        return messenger;
     }
 
     BasaltScheduler schedulerImpl() {
