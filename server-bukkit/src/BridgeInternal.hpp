@@ -76,7 +76,6 @@ private:
 };
 
 void registerNatives(JNIEnv* env, jclass natives);
-void registerWorldNatives(JNIEnv* env, jclass natives);
 void registerPacketNatives(JNIEnv* env, jclass natives);
 void registerWorldNatives(JNIEnv* env, jclass natives);
 
