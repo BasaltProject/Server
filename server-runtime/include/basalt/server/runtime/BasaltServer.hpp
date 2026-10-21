@@ -2,6 +2,7 @@
 
 #include <basalt/server/plugins/PluginApi.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
+#include <basalt/server/runtime/bukkit/JavaPluginScan.hpp>
 #include <basalt/server/runtime/AreaEffectCloudSystem.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
@@ -289,6 +290,7 @@ private:
     std::unique_ptr<plugins::ServerPluginServices> pluginServices_;
     std::unique_ptr<server::plugins::PluginHost> plugins_;
     std::shared_ptr<void> bukkit_;
+    std::vector<bukkit::JavaPluginJar> javaPlugins_;
     plugins::EventSink eventSink_{[this] { return plugins_ == nullptr ? nullptr : &plugins_->events(); }};
 
     std::unique_ptr<BlockChangeBroadcaster> broadcaster_;

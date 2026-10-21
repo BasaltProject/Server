@@ -34,18 +34,22 @@ std::string joined(const std::vector<std::string>& parts) {
 } // namespace
 
 PluginsCommand::PluginsCommand(server::plugins::PluginHost& host,
-                               std::function<std::optional<std::string>()> databasePath)
-    : Command("plugins", command::permissionLevel::kAdmins), host_(&host), databasePath_(std::move(databasePath)) {}
+                               std::function<std::optional<std::string>()> databasePath,
+                               std::function<std::vector<bukkit::JavaPluginJar>()> javaPlugins)
+    : Command("plugins", command::permissionLevel::kAdmins), host_(&host), databasePath_(std::move(databasePath)),
+      javaPlugins_(std::move(javaPlugins)) {}
 
 void PluginsCommand::build(const command::CommandNodeBuilder& root) const {
     server::plugins::PluginHost* host = host_;
-    root.executes([host](const command::CommandContext& context) {
+    root.executes([this, host](const command::CommandContext& context) {
         const std::vector<PluginStatus> statuses = host->statuses();
-        if (statuses.empty()) {
+        const std::vector<bukkit::JavaPluginJar> java =
+            javaPlugins_ ? javaPlugins_() : std::vector<bukkit::JavaPluginJar>{};
+        if (statuses.empty() && java.empty()) {
             context.success(grey("No plugins are loaded."));
             return 0;
         }
-        context.success(grey(std::to_string(statuses.size()) + " plugin(s):"));
+        context.success(grey(std::to_string(statuses.size() + java.size()) + " plugin(s):"));
         for (const PluginStatus& status : statuses) {
             Component state = green(" ok");
             if (status.disabled) {
@@ -54,11 +58,18 @@ void PluginsCommand::build(const command::CommandNodeBuilder& root) const {
                 state = yellow(" " + std::to_string(status.errors) + " error(s)");
             }
             context.success(white("  " + status.name + " " + status.version)
-                                .append(grey(" " + std::to_string(status.registrations) + " registration(s)" +
+                                .append(grey(" [Lua] " + std::to_string(status.registrations) + " registration(s)" +
                                              (status.editable ? ", folder" : "")))
                                 .append(state));
         }
-        return static_cast<std::int32_t>(statuses.size());
+        for (const bukkit::JavaPluginJar& jar : java) {
+            const std::size_t slash = jar.path.find_last_of('/');
+            context.success(
+                white("  " + jar.name + " " + jar.version)
+                    .append(grey(" [Bukkit] " + (slash == std::string::npos ? jar.path : jar.path.substr(slash + 1))))
+                    .append(jar.loaded ? green(" ok") : red(" not loaded, see the log")));
+        }
+        return static_cast<std::int32_t>(statuses.size() + java.size());
     });
 
     static_cast<void>(root.literal("surfaces", [host](const command::CommandNodeBuilder& node) {

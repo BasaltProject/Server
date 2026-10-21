@@ -1,19 +1,17 @@
-# Bukkit plugin compatibility. Off by default.
-#
+# Bukkit and Paper plugin compatibility. Nothing here needs editing: drop a plugin .jar into `plugins/`
+# next to your Lua packages and it loads.
 
-enabled = false
+# "auto" starts Bukkit support when a Bukkit jar is present, true insists on it (a missing runtime is an error),
+enabled = "auto"
 
-# Shim's libjvm.so (or the .dylib / .dll of your platform).
+# Fetch the libraries the runtime is missing (Maven Central, the Paper API) into `.basalt/bukkit/lib/`,
+download = true
+
+# A folder that holds the runtime: shim/libjvm.so, shim/classpath.jar, basalt-bukkit.jar, lib/ and addons/.
+runtime = ""
+
+# Individual pieces, if they live somewhere else than the runtime folder.
 libjvm = ""
-
-# Shim's classpath.jar: the Java class library Shim runs with.
 boot-classpath = ""
-
-# The Basalt Bukkit runtime jar, built together with the server (build/bukkit/basalt-bukkit.jar).
 runtime-jar = ""
-
-# A folder with the Bukkit API jar and its libraries (adventure, guava, gson, snakeyaml...), one jar each.
 libraries = ""
-
-# Where Bukkit plugin jars go.
-plugins = "plugins-bukkit"

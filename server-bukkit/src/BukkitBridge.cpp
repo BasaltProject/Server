@@ -137,8 +137,9 @@ std::expected<void, std::string> BukkitBridge::boot() {
     commandMethod_ =
         env->GetStaticMethodID(runtime_, "command", "(Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Z");
     channelMethod_ = env->GetStaticMethodID(runtime_, "channelMessage", "(Ljava/lang/String;Ljava/lang/String;[B)V");
+    listMethod_ = env->GetStaticMethodID(runtime_, "pluginList", "()[Ljava/lang/String;");
     if (channelMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr || taskMethod_ == nullptr ||
-        eventMethod_ == nullptr || commandMethod_ == nullptr) {
+        eventMethod_ == nullptr || commandMethod_ == nullptr || listMethod_ == nullptr) {
         reportJavaFailure(env, "resolving BukkitRuntime entry points");
         return std::unexpected(std::string{"BukkitRuntime entry points not found"});
     }
@@ -153,6 +154,31 @@ std::expected<void, std::string> BukkitBridge::boot() {
         return std::unexpected(std::string{"BukkitRuntime.boot refused to start"});
     }
     return {};
+}
+
+std::vector<BukkitHost::PluginState> BukkitBridge::javaPlugins() {
+    std::vector<BukkitHost::PluginState> found;
+    JNIEnv* env = shim_->env();
+    auto* rows = static_cast<jobjectArray>(env->CallStaticObjectMethod(runtime_, listMethod_));
+    if (env->ExceptionCheck() == JNI_TRUE || rows == nullptr) {
+        env->ExceptionClear();
+        return found;
+    }
+    const jsize count = env->GetArrayLength(rows);
+    for (jsize index = 0; index < count; ++index) {
+        auto* row = static_cast<jstring>(env->GetObjectArrayElement(rows, index));
+        const std::string line = toStd(env, row);
+        env->DeleteLocalRef(row);
+        const std::size_t first = line.find('\t');
+        const std::size_t second = line.find('\t', first + 1);
+        if (first == std::string::npos || second == std::string::npos) {
+            continue;
+        }
+        found.push_back({line.substr(0, first), line.substr(first + 1, second - first - 1),
+                         line.substr(second + 1) == "1"});
+    }
+    env->DeleteLocalRef(rows);
+    return found;
 }
 
 void BukkitBridge::shutdown() {

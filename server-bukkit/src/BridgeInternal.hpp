@@ -25,6 +25,8 @@ public:
     [[nodiscard]] std::expected<void, std::string> boot();
     void shutdown();
 
+    [[nodiscard]] std::vector<BukkitHost::PluginState> javaPlugins();
+
     [[nodiscard]] plugins::PluginHost& plugins() noexcept { return *plugins_; }
 
     [[nodiscard]] plugins::PluginServices& services() noexcept { return plugins_->services(); }
@@ -71,6 +73,7 @@ private:
     jmethodID eventMethod_ = nullptr;
     jmethodID commandMethod_ = nullptr;
     jmethodID channelMethod_ = nullptr;
+    jmethodID listMethod_ = nullptr;
     std::mutex tasksMutex_;
     std::map<std::int64_t, plugins::PluginHandle> tasks_;
     std::set<std::pair<std::string, std::int32_t>> subscribed_;

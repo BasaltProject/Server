@@ -533,7 +533,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                              .memoryBytes = static_cast<std::size_t>(config.pluginMemoryBytes)});
     plugins_->setApiInstaller(&server::plugins::pluginApi::install);
     static_cast<void>(wired_.dispatcher->registerCommand(std::make_shared<plugins::PluginsCommand>(
-        *plugins_, [this]() -> std::optional<std::string> { return options_.playersDatabasePath; })));
+        *plugins_, [this]() -> std::optional<std::string> { return options_.playersDatabasePath; },
+        [this] { return javaPlugins_; })));
     // A decider may only run on the owner plugins live on; unclaimed counts as ours, before the first tick.
     plugins_->setOnPluginThread([this] {
         return worldRegistry_->scheduler().global().isCurrent() || !worldRegistry_->scheduler().global().isClaimed();

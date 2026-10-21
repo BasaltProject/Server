@@ -6,16 +6,10 @@
 namespace basalt::server::bukkit {
 namespace {
 [[nodiscard]] std::vector<std::string> classpathOf(const BukkitOptions& options) {
-    std::vector<std::string> path{options.runtimeJar};
-    std::vector<std::string> jars;
-    std::error_code error;
-    for (const auto& entry : std::filesystem::directory_iterator(options.libraries, error)) {
-        if (entry.path().extension() == ".jar") {
-            jars.push_back(std::filesystem::absolute(entry.path()).string());
-        }
+    std::vector<std::string> path{std::filesystem::absolute(options.runtimeJar).string()};
+    for (const std::string& jar : options.libraries) {
+        path.push_back(std::filesystem::absolute(jar).string());
     }
-    std::ranges::sort(jars);
-    path.insert(path.end(), jars.begin(), jars.end());
     return path;
 }
 } // namespace
@@ -28,13 +22,12 @@ std::expected<std::unique_ptr<BukkitHost>, std::string> BukkitHost::start(const 
                                                                           plugins::PluginHost& plugins) {
     for (const std::string* path : {&options.libjvm, &options.bootClasspath, &options.runtimeJar}) {
         if (path->empty() || !std::filesystem::exists(*path)) {
-            return std::unexpected("bukkit.toml points at '" + *path + "', which does not exist");
+            return std::unexpected("'" + *path + "' does not exist");
         }
     }
     ShimOptions shimOptions{.libjvm = std::filesystem::absolute(options.libjvm).string(),
                             .bootClasspath = std::filesystem::absolute(options.bootClasspath).string(),
                             .classpath = classpathOf(options)};
-    shimOptions.classpath.front() = std::filesystem::absolute(options.runtimeJar).string();
     std::expected<std::unique_ptr<ShimHost>, std::string> shim = ShimHost::create(shimOptions);
     if (!shim.has_value()) {
         return std::unexpected(shim.error());
@@ -47,6 +40,8 @@ std::expected<std::unique_ptr<BukkitHost>, std::string> BukkitHost::start(const 
     }
     return host;
 }
+
+std::vector<BukkitHost::PluginState> BukkitHost::plugins() const { return bridge_->javaPlugins(); }
 
 void BukkitHost::stop() {
     if (stopped_ || bridge_ == nullptr) {
