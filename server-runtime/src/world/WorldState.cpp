@@ -208,6 +208,7 @@ std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks) {
             }
             pendingDecorations_.forgetGeneratedEntities(chunkKey);
             sculkSensors_.forgetChunk(chunkX, chunkZ);
+            blockVersion_.fetch_add(1, std::memory_order_release);
             ++removed;
         }
     }
@@ -414,6 +415,7 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     chunk.share();
 
     Chunk& installed = *chunksByPos_.emplace(chunkKey, std::make_unique<Chunk>(std::move(chunk))).first->second;
+    blockVersion_.fetch_add(1, std::memory_order_release);
     const PendingChunkDecorations::ChunkAt chunkAt = [this](std::int64_t otherKey) { return chunkAtLocked(otherKey); };
     const std::vector<server::world::ChunkGeneratedBlockWrite> spilledWrites = installed.takeGeneratedBlockWrites();
     PendingChunkDecorations::deliverGeneratedBlockWrites(spilledWrites, chunkAt);
@@ -645,6 +647,7 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
                                SideEffects sideEffects) {
     mine("A block");
     const WorldWriteLock lock{mutex_};
+    blockVersion_.fetch_add(1, std::memory_order_release);
     Chunk* chunk = chunkAtLocked(key(x >> 4, z >> 4));
     if (chunk == nullptr) {
         return false;
@@ -746,10 +749,12 @@ bool WorldState::copySection(std::int32_t chunkX, std::int32_t sectionY, std::in
 }
 
 std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
-                                        std::span<const std::int32_t> next, std::span<std::int32_t> previous) {
+                                        std::span<const std::int32_t> next, std::span<std::int32_t> previous,
+                                        std::vector<std::uint16_t>* changedOffsets) {
     mine("A section");
     constexpr std::size_t kBlocks = server::world::ChunkSection::kBlocks;
     const WorldWriteLock lock{mutex_};
+    blockVersion_.fetch_add(1, std::memory_order_release);
     Chunk* chunk = chunkAtLocked(key(chunkX, chunkZ));
     if (chunk == nullptr || next.size() < kBlocks) {
         return -1;
@@ -773,6 +778,9 @@ std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectio
     }
     if (changed.empty()) {
         return 0;
+    }
+    if (changedOffsets != nullptr) {
+        *changedOffsets = changed;
     }
     chunk->replaceSectionStates(static_cast<std::size_t>(index), merged);
     const std::int32_t baseX = chunkX << 4;
@@ -1077,6 +1085,10 @@ std::vector<std::pair<std::int32_t, std::int32_t>> WorldState::chunksWithEntitie
 
 void WorldState::forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ) {
     entityRegistry_.forgetEntitiesIn(chunkX, chunkZ);
+}
+
+void WorldState::addPendingEntities(std::vector<wire::nbt::NbtCompound> saved) {
+    entityRegistry_.addPendingEntities(std::move(saved));
 }
 
 std::vector<wire::nbt::NbtCompound> WorldState::takePendingEntities() { return entityRegistry_.takePendingEntities(); }
