@@ -66,6 +66,10 @@ public class ItemStack {
     }
 
     public InteractionResult useOn(UseOnContext context) {
-        throw Unsupported.hit("net.minecraft.world.item.ItemStack.useOn");
+        if (isEmpty()) {
+            return InteractionResult.PASS;
+        }
+        return org.basaltmc.bukkit.facade.Effects.useItem(this, context.getLevel(), context.getHitResult())
+            ? InteractionResult.SUCCESS : InteractionResult.PASS;
     }
 }

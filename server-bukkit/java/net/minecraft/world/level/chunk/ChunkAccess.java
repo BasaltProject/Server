@@ -246,7 +246,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.incrementInhabitedTime");
     }
     public void initializeLightSources() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.initializeLightSources");
+        return;
     }
     public BlockHitResult isBlockInLine(ClipBlockStateContext clipBlockStateContext) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isBlockInLine");

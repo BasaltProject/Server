@@ -869,6 +869,127 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("setState", "(Ljava/lang/String;IIIIZ)Z", reinterpret_cast<void*>(&nativeSetState)),
         method("readStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeReadStates)),
         method("writeStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeWriteStates)),
+void JNICALL nativeLightJob(JNIEnv* env, jclass, jstring name, jintArray chunks, jobject future) {
+    const auto world = worldOf(env, name);
+    const auto held = std::make_shared<JavaRef>(env, future);
+    const auto finish = [held](std::int32_t relit) {
+        JNIEnv* callEnv = BukkitBridge::current().env();
+        if (callEnv == nullptr) {
+            return;
+        }
+        jclass integerClass = callEnv->FindClass("java/lang/Integer");
+        jmethodID valueOf = callEnv->GetStaticMethodID(integerClass, "valueOf", "(I)Ljava/lang/Integer;");
+        jobject value = callEnv->CallStaticObjectMethod(integerClass, valueOf, relit);
+        jclass futureClass = callEnv->FindClass("java/util/concurrent/CompletableFuture");
+        jmethodID complete = callEnv->GetMethodID(futureClass, "complete", "(Ljava/lang/Object;)Z");
+        callEnv->CallBooleanMethod(held->ref, complete, value);
+        callEnv->ExceptionClear();
+        callEnv->DeleteLocalRef(value);
+        callEnv->DeleteLocalRef(integerClass);
+        callEnv->DeleteLocalRef(futureClass);
+    };
+    if (world == nullptr) {
+        finish(0);
+        return;
+    }
+    const std::vector<std::int32_t> pairs = ints(env, chunks);
+    world->lightJob(pairs, finish);
+}
+
+jint JNICALL nativeLightAt(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jint layer) {
+    const auto world = worldOf(env, name);
+    return world == nullptr ? -1 : world->lightAt(x, y, z, layer);
+}
+
+jbyteArray JNICALL nativeReadLight(JNIEnv* env, jclass, jstring name, jint chunkX, jint sectionY, jint chunkZ,
+                                   jint layer, jboolean load) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return nullptr;
+    }
+    std::vector<std::uint8_t> read(2048);
+    bool ok = world->readLight(chunkX, sectionY, chunkZ, layer, false, read);
+    if (!ok && load == JNI_TRUE) {
+        ok = guarded<bool>(false, [&] { return world->readLight(chunkX, sectionY, chunkZ, layer, true, read); });
+    }
+    if (!ok) {
+        return nullptr;
+    }
+    jbyteArray out = env->NewByteArray(static_cast<jsize>(read.size()));
+    env->SetByteArrayRegion(out, 0, static_cast<jsize>(read.size()), reinterpret_cast<const jbyte*>(read.data()));
+    return out;
+}
+
+jboolean JNICALL nativeWriteLight(JNIEnv* env, jclass, jstring name, jint chunkX, jint sectionY, jint chunkZ,
+                                  jint layer, jbyteArray nibbles) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return JNI_FALSE;
+    }
+    const std::vector<std::uint8_t> data = bytes(env, nibbles);
+    return world->writeLight(chunkX, sectionY, chunkZ, layer, data) ? JNI_TRUE : JNI_FALSE;
+}
+
+void JNICALL nativeCheckLight(JNIEnv* env, jclass, jstring name, jintArray positions) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return;
+    }
+    world->checkLight(ints(env, positions));
+}
+
+jint JNICALL nativeUseItemOn(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jint face, jstring item,
+                             jfloat yaw, jfloat pitch) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    const std::string held = toStd(env, item);
+    return guarded<jint>(0, [&] { return world->useItemOn(x, y, z, face, held, yaw, pitch); });
+}
+
+jboolean JNICALL nativeScheduleTick(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jint delay,
+                                    jboolean fluid) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return JNI_FALSE;
+    }
+    return guarded<bool>(false, [&] { return world->scheduleTick(x, y, z, delay, fluid != JNI_FALSE); }) ? JNI_TRUE
+                                                                                                         : JNI_FALSE;
+}
+
+jint JNICALL nativeSettleBlocks(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray previous,
+                                jint effects) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    const std::vector<std::int32_t> at = ints(env, positions);
+    const std::vector<std::int32_t> was = ints(env, previous);
+    return guarded<jint>(0, [&] { return world->settleBlocks(at, was, static_cast<std::uint32_t>(effects)); });
+}
+
+jint JNICALL nativeNeighborChanged(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray sources) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    const std::vector<std::int32_t> at = ints(env, positions);
+    const std::vector<std::int32_t> told = ints(env, sources);
+    return guarded<jint>(0, [&] { return world->neighborChanged(at, told); });
+}
+
+jint JNICALL nativeUpdateShapes(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray states,
+                                jboolean indirect) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    const std::vector<std::int32_t> at = ints(env, positions);
+    const std::vector<std::int32_t> next = ints(env, states);
+    return guarded<jint>(0, [&] { return world->updateShapes(at, next, indirect != JNI_FALSE); });
+}
+
         method("readSection", "(Ljava/lang/String;IIIZ[I)Z", reinterpret_cast<void*>(&nativeReadSection)),
         method("writeSection", "(Ljava/lang/String;III[IZ)Z", reinterpret_cast<void*>(&nativeWriteSection)),
         method("applySections", "(Ljava/lang/String;II[I[IZ[I)I", reinterpret_cast<void*>(&nativeApplySections)),
@@ -933,3 +1054,14 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
     env->RegisterNatives(natives, methods.data(), static_cast<jint>(methods.size()));
 }
 } // namespace basalt::server::bukkit
+        method("lightJob", "(Ljava/lang/String;[ILjava/util/concurrent/CompletableFuture;)V",
+               reinterpret_cast<void*>(&nativeLightJob)),
+        method("lightAt", "(Ljava/lang/String;IIII)I", reinterpret_cast<void*>(&nativeLightAt)),
+        method("readLight", "(Ljava/lang/String;IIIIZ)[B", reinterpret_cast<void*>(&nativeReadLight)),
+        method("writeLight", "(Ljava/lang/String;IIII[B)Z", reinterpret_cast<void*>(&nativeWriteLight)),
+        method("checkLight", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeCheckLight)),
+        method("useItemOn", "(Ljava/lang/String;IIIILjava/lang/String;FF)I", reinterpret_cast<void*>(&nativeUseItemOn)),
+        method("scheduleTick", "(Ljava/lang/String;IIIIZ)Z", reinterpret_cast<void*>(&nativeScheduleTick)),
+        method("settleBlocks", "(Ljava/lang/String;[I[II)I", reinterpret_cast<void*>(&nativeSettleBlocks)),
+        method("neighborChanged", "(Ljava/lang/String;[I[I)I", reinterpret_cast<void*>(&nativeNeighborChanged)),
+        method("updateShapes", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeUpdateShapes)),

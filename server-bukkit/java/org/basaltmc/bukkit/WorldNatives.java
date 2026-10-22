@@ -52,6 +52,11 @@ public final class WorldNatives {
     public static native int updateNeighbors(String world, int[] positions, int effects);
     public static native int applyChanges(String world, int[] positions, int[] states, int effects);
     public static native void resendChunks(String world, int[] chunks);
+    public static native void lightJob(String world, int[] chunks, java.util.concurrent.CompletableFuture<Integer> done);
+    public static native int lightAt(String world, int x, int y, int z, int layer);
+    public static native byte[] readLight(String world, int chunkX, int sectionY, int chunkZ, int layer, boolean load);
+    public static native boolean writeLight(String world, int chunkX, int sectionY, int chunkZ, int layer, byte[] nibbles);
+    public static native void checkLight(String world, int[] positions);
     public static native String biome(String world, int x, int y, int z);
     public static native boolean setBiome(String world, int x, int y, int z, String biome);
     public static native int highest(String world, int x, int z, String kind, boolean load);
@@ -59,6 +64,11 @@ public final class WorldNatives {
     public static native boolean chunkLoaded(String world, int chunkX, int chunkZ);
     public static native boolean loadChunk(String world, int chunkX, int chunkZ, boolean generate);
     public static native boolean unloadChunk(String world, int chunkX, int chunkZ);
+    public static native int useItemOn(String world, int x, int y, int z, int face, String item, float yaw, float pitch);
+    public static native boolean scheduleTick(String world, int x, int y, int z, int delay, boolean fluid);
+    public static native int settleBlocks(String world, int[] positions, int[] previous, int effects);
+    public static native int neighborChanged(String world, int[] positions, int[] sources);
+    public static native int updateShapes(String world, int[] positions, int[] states, boolean indirect);
     public static native int[] loadedChunks(String world);
 
     public static native int[] entityIds(String world, int chunkX, int chunkZ, boolean all);
