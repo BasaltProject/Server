@@ -193,12 +193,11 @@ public final class BasaltPluginManager extends PluginManagerBase {
         JavaPlugin plugin;
         try {
             loader = new BasaltPluginClassLoader(getClass().getClassLoader(), this, description, dataFolder, file);
-            Addons.attach(loader);
             Class<?> main = Class.forName(description.getMainClass(), true, loader);
             if (!JavaPlugin.class.isAssignableFrom(main)) {
                 throw new InvalidPluginException("main class '" + description.getMainClass() + "' does not extend JavaPlugin");
             }
-            plugin = (JavaPlugin) Addons.scoped(loader, () -> main.getDeclaredConstructor().newInstance());
+            plugin = (JavaPlugin) main.getDeclaredConstructor().newInstance();
         } catch (InvocationTargetException e) {
             throw new InvalidPluginException(e.getCause());
         } catch (ReflectiveOperationException | IOException | LinkageError e) {
@@ -215,10 +214,7 @@ public final class BasaltPluginManager extends PluginManagerBase {
         addPermissions(description.getPermissions());
         plugin.getLogger().info("Loading " + description.getFullName());
         try {
-            Addons.scoped(plugin.getClass().getClassLoader(), () -> {
-                plugin.onLoad();
-                return null;
-            });
+            plugin.onLoad();
         } catch (Throwable t) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred in onLoad: " + t.getMessage(), t);
         }
@@ -276,10 +272,7 @@ public final class BasaltPluginManager extends PluginManagerBase {
             server.commandMapImpl().registerAll(plugin.getDescription().getName(), commands);
         }
         try {
-            Addons.scoped(plugin.getClass().getClassLoader(), () -> {
-                PluginSwitch.enable((JavaPlugin) plugin);
-                return null;
-            });
+            PluginSwitch.enable((JavaPlugin) plugin);
         } catch (Throwable t) {
             plugin.getLogger().log(Level.SEVERE,
                 "Error occurred while enabling " + plugin.getDescription().getFullName() + " (Is it up to date?)", t);
