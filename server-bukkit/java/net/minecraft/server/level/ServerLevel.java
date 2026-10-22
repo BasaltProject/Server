@@ -64,6 +64,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
 
     public ServerLevel(CraftWorld world) {
         this.world = world;
+        this.entityManager = new PersistentEntitySectionManager(this);
         String[] strings = WorldNatives.worldStrings(world.getName());
         this.dimension = ResourceKey.create(Registries.DIMENSION, Identifier.parse(
             strings == null || strings[0].isEmpty() ? "minecraft:overworld" : strings[0]));
@@ -74,10 +75,11 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw new UnsupportedOperationException("A temporary server level cannot be made yet");
     }
     public boolean addFreshEntity(Entity entity, CreatureSpawnEvent.SpawnReason spawnReason) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.addFreshEntity");
+        entity.spawnReason = spawnReason;
+        return entity.spawnIn(spawnReason.name().toLowerCase(java.util.Locale.ROOT));
     }
     public void addFreshEntityWithPassengers(Entity entity, CreatureSpawnEvent.SpawnReason spawnReason) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.addFreshEntityWithPassengers");
+        addFreshEntity(entity, spawnReason);
     }
     public boolean destroyBlock(BlockPos blockPos, boolean flag, Entity entity, int value) {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.destroyBlock");
@@ -95,7 +97,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getBiomeManager");
     }
     public BlockEntity getBlockEntity(BlockPos blockPos) {
-        return null;
+        return getChunk(blockPos.getX() >> 4, blockPos.getZ() >> 4).getBlockEntity(blockPos);
     }
     public BlockState getBlockState(BlockPos blockPos) {
         return Block.stateById(WorldNatives.state(world.getName(), blockPos.getX(), blockPos.getY(), blockPos.getZ(), true));
@@ -135,7 +137,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getDataStorage");
     }
     public LevelEntityGetter getEntities() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getEntities");
+        return entityManager.getEntityGetter();
     }
     public FluidState getFluidIfLoaded(BlockPos blockPos) {
         BlockState state = getBlockStateIfLoaded(blockPos);
@@ -225,7 +227,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.removeBlock");
     }
     public void removeBlockEntity(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.removeBlockEntity");
+        getChunk(blockPos.getX() >> 4, blockPos.getZ() >> 4).removeBlockEntity(blockPos);
     }
     public void scheduleTick(BlockPos pos, Fluid fluid, int delay) {
         WorldNatives.scheduleTick(world.getName(), pos.getX(), pos.getY(), pos.getZ(), delay, true);

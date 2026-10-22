@@ -568,6 +568,25 @@ void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorld
                     args.pushBoolean(world->setBlockEntityNbt(spot.x, spot.y, spot.z, bytesOf(args, spot.next)));
                     return 1;
                 })
+        .method("create_block_entity",
+                [world](LuaArgs& args) {
+                    const Spot spot = spotAt(args, firstArgument(args));
+                    args.pushBoolean(world->createBlockEntity(spot.x, spot.y, spot.z,
+                                                              args.isNil(spot.next) ? std::vector<std::uint8_t>{}
+                                                                                    : bytesOf(args, spot.next)));
+                    return 1;
+                })
+        .method("remove_block_entity",
+                [world](LuaArgs& args) {
+                    const Spot spot = spotAt(args, firstArgument(args));
+                    args.pushBoolean(world->removeBlockEntity(spot.x, spot.y, spot.z));
+                    return 1;
+                })
+        .method("remove_entity",
+                [world](LuaArgs& args) {
+                    args.pushBoolean(world->removeEntityByUuid(args.toText(firstArgument(args))));
+                    return 1;
+                })
         .method("block_entities",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);
@@ -600,7 +619,9 @@ void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorld
                 })
         .method("spawn_nbt",
                 [world](LuaArgs& args) {
-                    const std::int32_t id = world->spawnEntityNbt(bytesOf(args, firstArgument(args)));
+                    const std::int32_t base = firstArgument(args);
+                    const std::int32_t id = world->spawnEntityNbt(
+                        bytesOf(args, base), args.isString(base + 1) ? args.toText(base + 1) : std::string{"plugin"});
                     const std::shared_ptr<PluginEntityRef> made = id < 0 ? nullptr : world->entityById(id);
                     if (made == nullptr) {
                         args.pushNil();

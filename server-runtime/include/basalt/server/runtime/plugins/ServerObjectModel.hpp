@@ -63,6 +63,9 @@ struct ModelHooks {
     std::function<BlockChangeBroadcaster*()> blocks;
     NpcRegistry* npcs = nullptr;
     std::function<std::int32_t()> nextEntityId;
+    std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
+                       double z, std::string_view cause)>
+        spawnAllowed;
 };
 
 [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef>
@@ -107,6 +110,13 @@ public:
     [[nodiscard]] std::int32_t stateFlags(std::int32_t stateId) const override;
     [[nodiscard]] std::vector<double> blockHardness(std::string_view block) const override;
     [[nodiscard]] std::vector<double> blockInfo(std::int32_t stateId) const override;
+    [[nodiscard]] std::vector<std::string> blockEntityTypes() const override;
+    [[nodiscard]] std::int32_t dataVersion() const override;
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> fixNbt(std::string_view kind,
+                                                                  std::span<const std::uint8_t> nbt,
+                                                                  std::int32_t fromVersion) const override;
+    [[nodiscard]] std::optional<std::string> fixName(std::string_view kind, std::string_view text,
+                                                     std::int32_t fromVersion) const override;
     [[nodiscard]] std::vector<std::string> biomeIds() const override;
     [[nodiscard]] std::vector<std::string> itemIds() const override;
     [[nodiscard]] std::vector<std::string> tags(std::string_view registry) const override;

@@ -32,6 +32,11 @@ public final class BasaltChunk extends ChunkBase {
     }
 
     @Override
+    public net.minecraft.world.level.chunk.ChunkAccess getHandle(net.minecraft.world.level.chunk.status.ChunkStatus status) {
+        return world.getHandle().getChunk(x, z, status, true);
+    }
+
+    @Override
     public int getZ() {
         return z;
     }

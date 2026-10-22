@@ -597,16 +597,44 @@ public:
         return false;
     }
 
+    /// Gives the block a block entity from a named NBT compound (empty: defaults); false when it owns none.
+    virtual bool createBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z, std::span<const std::uint8_t> nbt) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(nbt);
+        return false;
+    }
+
+    /// Takes the block entity at a position away without touching the block; false when there was none.
+    virtual bool removeBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return false;
+    }
+
     /// An entity as the named NBT compound the world saves it as (id, Pos, Rotation, Motion, UUID...).
     [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> entityNbt(std::int32_t entityId) {
         static_cast<void>(entityId);
         return std::nullopt;
     }
 
-    /// Brings an entity back from the NBT `entityNbt` gave (with Pos changed as wanted); returns its new id, or -1.
-    virtual std::int32_t spawnEntityNbt(std::span<const std::uint8_t> nbt) {
+    /// Brings an entity back from `entityNbt`; returns its new id, or -1 (also when entity.spawn is cancelled).
+    virtual std::int32_t spawnEntityNbt(std::span<const std::uint8_t> nbt, std::string_view cause) {
         static_cast<void>(nbt);
+        static_cast<void>(cause);
         return -1;
+    }
+
+    /// Takes the entity with this uuid out of the world; false when no live entity has it.
+    virtual bool removeEntityByUuid(std::string_view uuid) {
+        const std::shared_ptr<PluginEntityRef> found = entityByUuid(uuid);
+        if (found == nullptr) {
+            return false;
+        }
+        found->remove();
+        return true;
     }
 
     /// Biomes (biome list positions) of a chunk's 4x4x4 cells, (cellY * 4 + cellZ) * 4 + cellX; false when not loaded.
@@ -804,6 +832,30 @@ public:
     [[nodiscard]] virtual std::vector<double> blockInfo(std::int32_t stateId) const {
         static_cast<void>(stateId);
         return {};
+    }
+
+    /// Which blocks own a block entity, as pairs: the block id, then the id of its block entity type.
+    [[nodiscard]] virtual std::vector<std::string> blockEntityTypes() const { return {}; }
+
+    /// The data version this server writes, the number saved data is upgraded to.
+    [[nodiscard]] virtual std::int32_t dataVersion() const { return 0; }
+
+    /// Upgrades a named NBT document of `kind` (chunk, block_entity, entity, item) from `fromVersion`; else nothing.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>>
+    fixNbt(std::string_view kind, std::span<const std::uint8_t> nbt, std::int32_t fromVersion) const {
+        static_cast<void>(kind);
+        static_cast<void>(nbt);
+        static_cast<void>(fromVersion);
+        return std::nullopt;
+    }
+
+    /// Upgrades a `block_state` (`minecraft:oak_stairs[facing=east]`), `item` or `biome` id written at `fromVersion`.
+    [[nodiscard]] virtual std::optional<std::string> fixName(std::string_view kind, std::string_view text,
+                                                             std::int32_t fromVersion) const {
+        static_cast<void>(kind);
+        static_cast<void>(text);
+        static_cast<void>(fromVersion);
+        return std::nullopt;
     }
 
     /// The biome ids, in registry order.

@@ -18,6 +18,8 @@ public class LevelChunkSection {
     private PalettedContainerFactory lazyFactory;
     private int[] lazyBiomes;
     private int lazyBiomeOffset;
+    private PalettedContainerRO<Holder<Biome>> savedBiomes;
+    private int savedEdits;
 
     public LevelChunkSection(PalettedContainer<BlockState> states, PalettedContainerRO<Holder<Biome>> biomes) {
         this.states = states;
@@ -33,6 +35,7 @@ public class LevelChunkSection {
                              PalettedContainerRO<Holder<Biome>> readyBiomes, int[] biomeCells, int biomeOffset) {
         this.lazyFactory = factory;
         this.biomes = readyBiomes;
+        markBiomesSaved();
         this.lazyBiomes = biomeCells;
         this.lazyBiomeOffset = biomeOffset;
         if (uniform >= 0) {
@@ -73,6 +76,7 @@ public class LevelChunkSection {
         if (biomes == null) {
             biomes = org.basaltmc.bukkit.facade.Chunks.biomes(lazyFactory, lazyBiomes, lazyBiomeOffset);
             lazyBiomes = null;
+            markBiomesSaved();
         }
     }
 
@@ -141,6 +145,28 @@ public class LevelChunkSection {
             materializeBiomes();
         }
         return biomes;
+    }
+
+    private int biomeEdits() {
+        return biomes instanceof PalettedContainer<?> container ? container.edits() : 0;
+    }
+
+    public synchronized void markBiomesSaved() {
+        savedBiomes = biomes;
+        savedEdits = biomeEdits();
+    }
+
+    public synchronized void inheritBiomeState(LevelChunkSection other) {
+        savedBiomes = other.savedBiomes;
+        savedEdits = other.savedEdits;
+    }
+
+    public synchronized boolean biomesChanged(LevelChunkSection base) {
+        if (biomes == null) {
+            return false;
+        }
+        PalettedContainerRO<Holder<Biome>> reference = base == null ? null : base.savedBiomes;
+        return biomes != reference || (base != null && biomeEdits() != base.savedEdits);
     }
 
     public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ) {

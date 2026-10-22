@@ -1,14 +1,21 @@
 package org.bukkit.craftbukkit.inventory;
 
 import java.util.Locale;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
-/** Converts between the stacks of the internals and the plain Bukkit ones; only the type and count travel. */
 public class CraftItemStack extends ItemStack {
+    private DataComponentPatch components = DataComponentPatch.EMPTY;
+
     protected CraftItemStack() {
+    }
+
+    private CraftItemStack(Material type, int amount, DataComponentPatch components) {
+        super(type, amount);
+        this.components = components;
     }
 
     public static ItemStack asBukkitMirror(net.minecraft.world.item.ItemStack original) {
@@ -20,7 +27,7 @@ public class CraftItemStack extends ItemStack {
             return new ItemStack(Material.AIR, 0);
         }
         Material type = Material.getMaterial(original.getItem().itemKey().getPath().toUpperCase(Locale.ROOT));
-        return new ItemStack(type == null ? Material.AIR : type, original.getCount());
+        return new CraftItemStack(type == null ? Material.AIR : type, original.getCount(), original.getComponentsPatch());
     }
 
     public static net.minecraft.world.item.ItemStack asNMSCopy(ItemStack original) {
@@ -29,6 +36,10 @@ public class CraftItemStack extends ItemStack {
         }
         net.minecraft.world.item.Item item = BuiltInRegistries.ITEM.getValue(
             Identifier.parse("minecraft:" + original.getType().name().toLowerCase(Locale.ROOT)));
-        return new net.minecraft.world.item.ItemStack(item, original.getAmount());
+        net.minecraft.world.item.ItemStack made = new net.minecraft.world.item.ItemStack(item, original.getAmount());
+        if (original instanceof CraftItemStack craft && !craft.components.isEmpty()) {
+            made.applyComponents(craft.components);
+        }
+        return made;
     }
 }

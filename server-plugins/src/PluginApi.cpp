@@ -8,11 +8,14 @@
 #include <basalt/server/plugins/PluginStore.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
+#include <basalt/wire/nbt/NbtIO.hpp>
+#include <basalt/wire/nbt/Snbt.hpp>
 #include <basalt/wire/plugins/PluginToml.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <utility>
 
 namespace basalt::server::plugins::pluginApi {
@@ -409,6 +412,51 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("block_info");
+    wire::lua::pushHostFunction(lua, "worlds.block_entity_types", [server](LuaArgs& args) {
+        const std::vector<std::string> pairs = server->services().worlds().blockEntityTypes();
+        args.pushTable();
+        for (std::size_t at = 0; at + 1 < pairs.size(); at += 2) {
+            args.pushString(pairs[at + 1]);
+            args.setField(pairs[at]);
+        }
+        return 1;
+    });
+    lua.setField("block_entity_types");
+    wire::lua::pushHostFunction(lua, "worlds.data_version", [server](LuaArgs& args) {
+        args.pushInteger(server->services().worlds().dataVersion());
+        return 1;
+    });
+    lua.setField("data_version");
+    wire::lua::pushHostFunction(lua, "worlds.fix_nbt", [server](LuaArgs& args) {
+        const std::expected<wire::nbt::NbtTag, wire::nbt::NbtError> parsed = wire::nbt::snbt::parse(args.checkString(2));
+        if (!parsed.has_value()) {
+            args.raise("that is not valid NBT text");
+        }
+        const std::vector<std::uint8_t> bytes = wire::nbt::nbtIO::write(*parsed);
+        const std::optional<std::vector<std::uint8_t>> fixed = server->services().worlds().fixNbt(
+            args.checkString(1), bytes, static_cast<std::int32_t>(args.checkInteger(3)));
+        if (fixed.has_value()) {
+            const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::read(*fixed);
+            if (read.has_value()) {
+                args.pushString(wire::nbt::snbt::stringify(read->tag));
+                return 1;
+            }
+        }
+        args.pushNil();
+        return 1;
+    });
+    lua.setField("fix_nbt");
+    wire::lua::pushHostFunction(lua, "worlds.fix_name", [server](LuaArgs& args) {
+        const std::optional<std::string> fixed = server->services().worlds().fixName(
+            args.checkString(1), args.checkString(2), static_cast<std::int32_t>(args.checkInteger(3)));
+        if (fixed.has_value()) {
+            args.pushString(*fixed);
+        } else {
+            args.pushNil();
+        }
+        return 1;
+    });
+    lua.setField("fix_name");
     wire::lua::pushHostFunction(lua, "worlds.items", [server](LuaArgs& args) {
         args.pushTable();
         std::int64_t position = 1;

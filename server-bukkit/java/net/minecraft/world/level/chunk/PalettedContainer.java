@@ -21,6 +21,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
     });
 
     private volatile Data<T> data;
+    private volatile int edits;
     private final Strategy<T> strategy;
     private final ThreadingDetector threadingDetector = new ThreadingDetector("PalettedContainer");
 
@@ -80,7 +81,12 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
         return getAndSet(strategy.getIndex(x, y, z), value);
     }
 
+    public int edits() {
+        return edits;
+    }
+
     private T getAndSet(int index, T value) {
+        edits++;
         Data<T> held = data;
         int id = held.palette.idFor(value, this);
         int oldId = data.storage.getAndSet(index, id);
@@ -90,6 +96,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
     public void set(int x, int y, int z, T value) {
         acquire();
         try {
+            edits++;
             int id = data.palette.idFor(value, this);
             data.storage.set(strategy.getIndex(x, y, z), id);
         } finally {
@@ -242,7 +249,6 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
         }
     }
 
-    /** Every entry of the container as state ids or whatever `ids` says, in index order. */
     public int[] toIds(java.util.function.ToIntFunction<T> ids) {
         Data<T> held = data;
         int[] out = new int[strategy.entryCount()];
@@ -268,7 +274,6 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
         return out;
     }
 
-    /** Builds a container holding `ids[i]` mapped through `values` at index i, with the vanilla palette choice. */
     public static <T> PalettedContainer<T> fromIds(Strategy<T> strategy, int[] ids, java.util.function.IntFunction<T> values,
                                                    int idLimit) {
         int count = ids.length;

@@ -8,6 +8,14 @@ import java.util.Optional;
 import java.util.Set;
 
 public final class CompoundTag implements Tag {
+    public static final com.mojang.serialization.Codec<CompoundTag> CODEC =
+        com.mojang.serialization.Codec.PASSTHROUGH.comapFlatMap(dynamic -> {
+            Tag converted = dynamic.convert(NbtOps.INSTANCE).getValue();
+            return converted instanceof CompoundTag compound
+                ? com.mojang.serialization.DataResult.success(compound)
+                : com.mojang.serialization.DataResult.error(() -> "Not a compound tag: " + converted);
+        }, compound -> new com.mojang.serialization.Dynamic<>(NbtOps.INSTANCE, compound));
+
     private final Map<String, Tag> tags = new LinkedHashMap<>();
 
     public CompoundTag() {}

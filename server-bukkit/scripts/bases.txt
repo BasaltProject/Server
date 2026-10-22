@@ -1,10 +1,10 @@
 org.bukkit.Server
 org.bukkit.World
 org.bukkit.entity.Player
-org.bukkit.entity.Entity
-org.bukkit.entity.LivingEntity
+org.bukkit.entity.Entity org.bukkit.craftbukkit.entity.CraftEntity
+org.bukkit.entity.LivingEntity org.bukkit.craftbukkit.entity.CraftLivingEntity
 org.bukkit.block.Block
-org.bukkit.Chunk
+org.bukkit.Chunk org.bukkit.craftbukkit.CraftChunk
 org.bukkit.command.ConsoleCommandSender
 org.bukkit.scheduler.BukkitScheduler
 org.bukkit.plugin.PluginManager
