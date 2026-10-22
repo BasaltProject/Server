@@ -41,6 +41,10 @@ namespace basalt::server::runtime::world {
 class LoadedWorld;
 }
 
+namespace basalt::server::runtime {
+class BlockChangeBroadcaster;
+}
+
 namespace basalt::server::runtime::plugins {
 
 struct ModelHooks {
@@ -56,6 +60,7 @@ struct ModelHooks {
         makeWorld;
     std::function<const command::CommandEnvironment&()> environment;
     std::function<std::vector<std::string>(std::string_view registry)> tags;
+    std::function<BlockChangeBroadcaster*()> blocks;
     NpcRegistry* npcs = nullptr;
     std::function<std::int32_t()> nextEntityId;
 };

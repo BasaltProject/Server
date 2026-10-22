@@ -139,11 +139,11 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
     }
 
     public void onPlace(Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.onPlace");
+        return;
     }
 
     public void handleNeighborChanged(Level level, BlockPos pos, Block neighbor, Orientation orientation, boolean movedByPiston) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.handleNeighborChanged");
+        return;
     }
 
     public boolean triggerEvent(Level level, BlockPos pos, int id, int param) {
@@ -151,11 +151,13 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
     }
 
     public void updateNeighbourShapes(LevelAccessor level, BlockPos pos, int flags, int recursionLeft) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.updateNeighbourShapes");
+        if (level instanceof Level real) {
+            WorldNatives.updateNeighbors(real.getWorld().getName(), new int[] {pos.getX(), pos.getY(), pos.getZ()}, 2);
+        }
     }
 
     public void updateIndirectNeighbourShapes(LevelAccessor level, BlockPos pos, int flags, int recursionLeft) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.updateIndirectNeighbourShapes");
+        return;
     }
 
     public InteractionResult useItemOn(ItemStack stack, Level level, Player player, InteractionHand hand,

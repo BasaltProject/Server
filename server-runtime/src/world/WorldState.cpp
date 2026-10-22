@@ -748,6 +748,19 @@ bool WorldState::copySection(std::int32_t chunkX, std::int32_t sectionY, std::in
     return true;
 }
 
+bool WorldState::copySections(std::int32_t chunkX, std::int32_t chunkZ, std::span<std::int32_t> out) const {
+    constexpr std::size_t kBlocks = server::world::ChunkSection::kBlocks;
+    const WorldReadLock lock{mutex_};
+    const Chunk* chunk = chunkAtLocked(key(chunkX, chunkZ));
+    if (chunk == nullptr || out.size() < chunk->sectionCount() * kBlocks) {
+        return false;
+    }
+    for (std::size_t index = 0; index < chunk->sectionCount(); ++index) {
+        chunk->section(index).copyBlockStateIdsInto(out.subspan(index * kBlocks, kBlocks));
+    }
+    return true;
+}
+
 std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
                                         std::span<const std::int32_t> next, std::span<std::int32_t> previous,
                                         std::vector<std::uint16_t>* changedOffsets) {
@@ -800,13 +813,15 @@ std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectio
         const std::int32_t z = baseZ + ((at >> 4) & 15);
         // parity: `LevelChunk.setBlockState` gives a state that owns a block entity one whenever.
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-        if (block != nullptr && block->path() != "moving_piston" && registry::blockEntityTypes::ofBlock(*block) != nullptr &&
+        if (block != nullptr && block->path() != "moving_piston" &&
+            registry::blockEntityTypes::ofBlock(*block) != nullptr &&
             chunk->blockEntityAt(x & 15, y, z & 15) == nullptr) {
             chunk->setBlockEntity(
                 server::world::ChunkBlockEntity{x & 15, y, z & 15, *block, blockEntityDefaults::of(*block, stateId)});
         }
         poi_.noteBlockChange(poi::BlockPos{x, y, z}, was, stateId);
-        if (!std::ranges::equal(registry::blockShapes::collisionBoxes(was), registry::blockShapes::collisionBoxes(stateId)) ||
+        if (!std::ranges::equal(registry::blockShapes::collisionBoxes(was),
+                                registry::blockShapes::collisionBoxes(stateId)) ||
             moving(was) || moving(stateId)) {
             ++shapes;
         }
@@ -818,7 +833,7 @@ std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectio
         }
     }
     if (shapes > 0) {
-        // The last kShapeChangeMemory entries are kept exactly; the count moves by all of them so readers see an overflow.
+        // The last kShapeChangeMemory entries are kept exactly; the count moves by all so readers see an overflow.
         std::size_t skipped = 0;
         std::size_t kept = 0;
         for (std::size_t i = changed.size(); i-- > 0 && kept < kShapeChangeMemory;) {

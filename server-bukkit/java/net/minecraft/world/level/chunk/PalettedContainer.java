@@ -14,6 +14,12 @@ import net.minecraft.util.ZeroBitStorage;
 
 /** The names and shapes of the private members are what the world editing adapters look up by reflection. */
 public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T> {
+    private static final ThreadLocal<int[]> kLocal = ThreadLocal.withInitial(() -> {
+        int[] table = new int[1 << 16];
+        Arrays.fill(table, -1);
+        return table;
+    });
+
     private volatile Data<T> data;
     private final Strategy<T> strategy;
     private final ThreadingDetector threadingDetector = new ThreadingDetector("PalettedContainer");
@@ -266,8 +272,12 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
     public static <T> PalettedContainer<T> fromIds(Strategy<T> strategy, int[] ids, java.util.function.IntFunction<T> values,
                                                    int idLimit) {
         int count = ids.length;
-        int[] local = new int[idLimit];
-        Arrays.fill(local, -1);
+        int[] local = kLocal.get();
+        if (local.length < idLimit) {
+            local = new int[idLimit];
+            Arrays.fill(local, -1);
+            kLocal.set(local);
+        }
         int[] order = new int[Math.min(idLimit, count)];
         int distinct = 0;
         int[] indices = new int[count];
@@ -280,6 +290,9 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
                 order[distinct++] = id;
             }
             indices[i] = at;
+        }
+        for (int i = 0; i < distinct; i++) {
+            local[order[i]] = -1;
         }
         Configuration stored = strategy.getConfigurationForPaletteSize(distinct);
         if (stored.bitsInMemory() == 0) {

@@ -44,6 +44,13 @@ public final class WorldNatives {
     public static native boolean readBiomes(String world, int chunkX, int chunkZ, int[] out);
     public static native boolean writeBiomes(String world, int chunkX, int chunkZ, int[] ids);
     public static native void relightChunks(String world, int[] chunks);
+    public static native boolean readSections(String world, int chunkX, int chunkZ, boolean load, int[] out);
+    public static native int chunkStatus(String world, int chunkX, int chunkZ);
+    public static native void requestChunk(String world, int chunkX, int chunkZ, boolean generate, int priority, java.util.concurrent.CompletableFuture<Boolean> done);
+    public static native boolean holdChunks(String world, String token, int[] chunks);
+    public static native void releaseChunks(String world, String token);
+    public static native int updateNeighbors(String world, int[] positions, int effects);
+    public static native int applyChanges(String world, int[] positions, int[] states, int effects);
     public static native void resendChunks(String world, int[] chunks);
     public static native String biome(String world, int x, int y, int z);
     public static native boolean setBiome(String world, int x, int y, int z, String biome);

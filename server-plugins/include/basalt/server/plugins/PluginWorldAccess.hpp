@@ -437,9 +437,91 @@ public:
         return -1;
     }
 
+    /// Every section of a chunk, lowest first, 4096 ids each; false when the chunk is not there.
+    virtual bool readSections(std::int32_t chunkX, std::int32_t chunkZ, bool load, std::span<std::int32_t> out) {
+        constexpr std::size_t kBlocks = 4096;
+        const std::int32_t first = minHeight() >> 4;
+        const std::size_t count = static_cast<std::size_t>(std::max(height(), 0)) >> 4;
+        if (count == 0 || out.size() < count * kBlocks) {
+            return false;
+        }
+        for (std::size_t at = 0; at < count; ++at) {
+            if (!readSection(chunkX, first + static_cast<std::int32_t>(at), chunkZ, load && at == 0,
+                             out.subspan(at * kBlocks, kBlocks))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Where a chunk stands: 0 not loaded, 1 asked for and on its way, 2 loaded, 3 loaded and ticking.
+    [[nodiscard]] virtual std::int32_t chunkStatus(std::int32_t chunkX, std::int32_t chunkZ) const {
+        return chunkLoaded(chunkX, chunkZ) ? 2 : 0;
+    }
+
+    /// Asks for a chunk; `done` runs on the world's thread once loaded (false if never). Lower `priority` first.
+    virtual void requestChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate, std::int32_t priority,
+                              std::function<void(bool)> done) {
+        static_cast<void>(priority);
+        done(loadChunk(chunkX, chunkZ, generate));
+    }
+
+    /// Keeps chunks (x, z pairs) loaded for `token` until released; false when held chunks are not supported.
+    virtual bool holdChunks(std::string_view token, std::span<const std::int32_t> chunks) {
+        static_cast<void>(token);
+        static_cast<void>(chunks);
+        return false;
+    }
+
+    /// Lets go of everything `token` held.
+    virtual void releaseChunks(std::string_view token) { static_cast<void>(token); }
+
+    /// What a change of blocks sets off beyond the blocks themselves (bits of `effects`).
+    struct BlockEffects {
+        /// The neighbors are told one of their neighbors changed (`Level.updateNeighborsAt`).
+        static constexpr std::uint32_t kNeighbors = 1;
+        /// The blocks around reshape to fit the new one (a fence joining, stairs turning).
+        static constexpr std::uint32_t kShapes = 2;
+        /// The light there is worked out again.
+        static constexpr std::uint32_t kLight = 4;
+        /// Entities in the blocks are checked (reserved; nothing happens yet).
+        static constexpr std::uint32_t kEntities = 8;
+        /// Points of interest are updated (reserved; nothing happens yet).
+        static constexpr std::uint32_t kPoi = 16;
+        /// Scheduled ticks of the blocks are armed (reserved; nothing happens yet).
+        static constexpr std::uint32_t kTicks = 32;
+        /// The players who see the blocks are shown their new state.
+        static constexpr std::uint32_t kClients = 64;
+    };
+
+    /// Runs the effects in `effects` for blocks already written at (x, y, z) triples; returns how many positions were
+    virtual std::int32_t updateNeighbors(std::span<const std::int32_t> positions, std::uint32_t effects) {
+        static_cast<void>(positions);
+        static_cast<void>(effects);
+        return 0;
+    }
+
+    /// Writes states at (x, y, z) triples, then runs `effects` for the ones that changed; returns how many changed.
+    virtual std::int32_t applyChanges(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
+                                      std::uint32_t effects) {
+        const std::size_t count = std::min(positions.size() / 3, states.size());
+        std::vector<std::int32_t> changed;
+        for (std::size_t index = 0; index < count; ++index) {
+            const std::int32_t before =
+                stateAt(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2], true);
+            if (before != states[index] && setStateAt(positions[index * 3], positions[index * 3 + 1],
+                                                      positions[index * 3 + 2], states[index], false)) {
+                changed.insert(changed.end(), positions.begin() + static_cast<std::ptrdiff_t>(index * 3),
+                               positions.begin() + static_cast<std::ptrdiff_t>(index * 3 + 3));
+            }
+        }
+        static_cast<void>(updateNeighbors(changed, effects));
+        return static_cast<std::int32_t>(changed.size() / 3);
+    }
+
     /// A block entity as a named NBT compound with id, x, y and z added; nothing when the position holds none.
     [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> blockEntityNbt(std::int32_t x, std::int32_t y,
-                                                                                std::int32_t z) {
+                                                                                  std::int32_t z) {
         static_cast<void>(x);
         static_cast<void>(y);
         static_cast<void>(z);
@@ -454,8 +536,7 @@ public:
     }
 
     /// Replaces the block entity data at a position from a named NBT compound; false when the block owns none.
-    virtual bool setBlockEntityNbt(std::int32_t x, std::int32_t y, std::int32_t z,
-                                   std::span<const std::uint8_t> nbt) {
+    virtual bool setBlockEntityNbt(std::int32_t x, std::int32_t y, std::int32_t z, std::span<const std::uint8_t> nbt) {
         static_cast<void>(x);
         static_cast<void>(y);
         static_cast<void>(z);
@@ -475,7 +556,7 @@ public:
         return -1;
     }
 
-    /// The biomes (by position in the biome list) of a chunk's 4 by 4 by 4 cells, ordered (cellY * 4 + cellZ) * 4 + cellX; false when not loaded.
+    /// Biomes (biome list positions) of a chunk's 4x4x4 cells, (cellY * 4 + cellZ) * 4 + cellX; false when not loaded.
     virtual bool readBiomes(std::int32_t chunkX, std::int32_t chunkZ, std::span<std::int32_t> out) {
         static_cast<void>(chunkX);
         static_cast<void>(chunkZ);
@@ -560,7 +641,7 @@ public:
 
     /// Entities in the chunk, which are the ones it will save.
     [[nodiscard]] virtual std::vector<std::shared_ptr<PluginEntityRef>> entitiesIn(std::int32_t chunkX,
-                                                                                    std::int32_t chunkZ) const {
+                                                                                   std::int32_t chunkZ) const {
         static_cast<void>(chunkX);
         static_cast<void>(chunkZ);
         return {};
@@ -611,7 +692,7 @@ public:
         return {};
     }
 
-    /// Facts about one state as bits: 1 blocks motion, 2 solid render (occludes), 4 full cube, 8 replaceable,
+    /// Facts about one state as bits (motion, occlusion, full cube, fluid, ...) plus light emission and opacity.
     [[nodiscard]] virtual std::int32_t stateFlags(std::int32_t stateId) const {
         static_cast<void>(stateId);
         return 0;
@@ -623,7 +704,7 @@ public:
         return {};
     }
 
-    /// Physical facts about one state: friction, speed factor, jump factor, push reaction (0 normal, 1 destroy, 2 block,
+    /// Physical facts about one state: friction, speed, jump, push reaction, map colour 0xRRGGBB, fire odds.
     [[nodiscard]] virtual std::vector<double> blockInfo(std::int32_t stateId) const {
         static_cast<void>(stateId);
         return {};

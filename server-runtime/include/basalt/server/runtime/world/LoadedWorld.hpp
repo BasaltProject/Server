@@ -202,6 +202,13 @@ public:
 
     [[nodiscard]] const std::set<std::int64_t>& forcedChunks() const noexcept { return forcedChunks_; }
 
+    /// Keeps chunks (packed keys) from being unloaded for the holder `token` until `releaseChunks`.
+    void holdChunks(const std::string& token, const std::vector<std::int64_t>& keys);
+
+    void releaseChunks(const std::string& token);
+
+    [[nodiscard]] bool isHeld(std::int32_t chunkX, std::int32_t chunkZ) const;
+
     /// Not the same as the clock: `/time set` moves one, not the other.
     [[nodiscard]] std::int64_t gameTime() const noexcept { return gameTime_; }
 
@@ -323,6 +330,8 @@ private:
     server::world::terrain::BiomeZoomer biomeZoomer_;
     WorldBorder border_;
     std::set<std::int64_t> forcedChunks_;
+    mutable std::mutex holdsMutex_;
+    std::map<std::string, std::set<std::int64_t>> holds_;
     std::int64_t gameTime_ = 0;
     std::int32_t skyDarken_ = 0;
     std::string difficulty_;

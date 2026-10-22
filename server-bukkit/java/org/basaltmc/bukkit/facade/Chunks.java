@@ -16,14 +16,7 @@ public final class Chunks {
 
     public static int[] readAll(String world, int chunkX, int chunkZ, int minSection, int sections) {
         int[] all = new int[sections * kSection];
-        int[] one = new int[kSection];
-        for (int i = 0; i < sections; i++) {
-            if (!WorldNatives.readSection(world, chunkX, minSection + i, chunkZ, false, one)) {
-                return null;
-            }
-            System.arraycopy(one, 0, all, i * kSection, kSection);
-        }
-        return all;
+        return WorldNatives.readSections(world, chunkX, chunkZ, false, all) ? all : null;
     }
 
     public static int[] readBiomes(String world, int chunkX, int chunkZ, int cells) {
@@ -37,6 +30,16 @@ public final class Chunks {
             h = (h ^ ids[offset + i]) * 0x100000001b3L;
         }
         return h;
+    }
+
+    public static int uniform(int[] ids, int offset) {
+        int first = ids[offset];
+        for (int i = 1; i < kSection; i++) {
+            if (ids[offset + i] != first) {
+                return -1;
+            }
+        }
+        return first;
     }
 
     public static PalettedContainer<BlockState> states(PalettedContainerFactory factory, int[] all, int offset) {

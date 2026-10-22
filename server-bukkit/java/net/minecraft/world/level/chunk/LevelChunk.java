@@ -82,13 +82,13 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
             if (held != null && hashes[i] == hash) {
                 continue;
             }
-            if (biomeCells == null && held == null) {
+            if (held == null && biomeCells == null) {
                 biomeCells = Chunks.readBiomes(world, locX, locZ, sections.length * 64);
             }
-            PalettedContainerRO<Holder<Biome>> biomes = held != null ? held.getBiomes()
-                : Chunks.biomes(factory, biomeCells, i);
-            LevelChunkSection built = new LevelChunkSection(
-                Chunks.states(factory, all, i << 12), biomes);
+            int uniform = Chunks.uniform(all, i << 12);
+            LevelChunkSection built = new LevelChunkSection(factory,
+                uniform >= 0 ? null : java.util.Arrays.copyOfRange(all, i << 12, (i + 1) << 12), uniform,
+                held != null ? held.getBiomes() : null, biomeCells, i);
             sections[i] = built;
             baseline[i] = built;
             hashes[i] = hash;
@@ -160,7 +160,11 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     }
 
     public FullChunkStatus getFullStatus() {
-        return WorldNatives.chunkLoaded(world, locX, locZ) ? FullChunkStatus.BLOCK_TICKING : FullChunkStatus.INACCESSIBLE;
+        return switch (WorldNatives.chunkStatus(world, locX, locZ)) {
+            case 3 -> FullChunkStatus.ENTITY_TICKING;
+            case 2 -> FullChunkStatus.BLOCK_TICKING;
+            default -> FullChunkStatus.INACCESSIBLE;
+        };
     }
 
     public int getHeight() {
