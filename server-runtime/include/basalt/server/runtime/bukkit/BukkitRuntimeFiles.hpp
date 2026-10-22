@@ -1,6 +1,5 @@
 #pragma once
 
-#include <basalt/server/runtime/config/BukkitConfig.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <expected>
@@ -15,10 +14,6 @@ struct BukkitRuntimeFiles {
     std::vector<std::string> libraries;
 };
 
-/// Where to look for the runtime, best first.
-[[nodiscard]] std::vector<std::string> runtimeRoots(const config::BukkitConfig& config);
-
-/// Finds every piece of the runtime, fetching missing libraries, or says in one message what to do.
-[[nodiscard]] std::expected<BukkitRuntimeFiles, std::string> locateRuntime(const config::BukkitConfig& config,
-                                                                           const wire::common::Logger& logger);
+/// Unpacks the runtime compiled into the binary and fetches the libraries it lists, or says in one message what failed.
+[[nodiscard]] std::expected<BukkitRuntimeFiles, std::string> locateRuntime(const wire::common::Logger& logger);
 } // namespace basalt::server::runtime::bukkit

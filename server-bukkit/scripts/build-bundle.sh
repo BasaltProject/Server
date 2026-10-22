@@ -8,12 +8,14 @@ work="${1:?work dir}"
 dest="${2:?runtime dir}"
 shim="${3:-}"
 
+sha1_of() { if command -v sha1sum >/dev/null; then sha1sum "$1"; else shasum -a 1 "$1"; fi; }
+
 skip() {
     echo "Bukkit runtime: skipped, $*" >&2
     exit 0
 }
 
-for tool in javac jar curl sha1sum; do
+for tool in javac jar curl; do
     command -v "$tool" >/dev/null || skip "$tool is not installed"
 done
 mkdir -p "$work" "$dest/lib" "$dest/shim"
@@ -33,7 +35,7 @@ if [ "$stale" = 1 ]; then
         IFS=: read -r _ artifact version <"$here/api.txt"
         url="https://repo.papermc.io/repository/maven-public/io/papermc/paper/$artifact/$version/$artifact-$version.jar"
         curl -fsSL "$url" -o "$work/bukkit-api.part" || skip "could not download $url"
-        [ "$(curl -fsSL "$url.sha1" | cut -c1-40)" = "$(sha1sum "$work/bukkit-api.part" | cut -c1-40)" ] \
+        [ "$(curl -fsSL "$url.sha1" | cut -c1-40)" = "$(sha1_of "$work/bukkit-api.part" | cut -c1-40)" ] \
             || skip "the SHA-1 of $url does not match"
         mv "$work/bukkit-api.part" "$work/bukkit-api.jar"
         touch "$work/bukkit-api.fetched"
@@ -41,14 +43,14 @@ if [ "$stale" = 1 ]; then
     "$here/build-java.sh" "$work" >"$work/java.log" 2>&1 || skip "the Java half did not compile (see $work/java.log)"
 fi
 
-cp -u "$work/basalt-bukkit.jar" "$dest/"
-cp -u "$work"/lib/*.jar "$dest/lib/"
+cp "$work/basalt-bukkit.jar" "$dest/"
+cp "$work"/lib/*.jar "$dest/lib/"
 if [ -e "$work/bukkit-api.fetched" ]; then
     IFS=: read -r _ artifact version <"$here/api.txt"
-    cp -u "$work/bukkit-api.jar" "$dest/lib/$artifact-$version.jar"
+    cp "$work/bukkit-api.jar" "$dest/lib/$artifact-$version.jar"
     cat "$here/api.txt" "$here/deps.txt" >"$dest/libs.txt"
 else
-    cp -u "$work/bukkit-api.jar" "$dest/lib/"
+    cp "$work/bukkit-api.jar" "$dest/lib/"
     cp "$here/deps.txt" "$dest/libs.txt"
 fi
 
