@@ -617,7 +617,9 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
         }
         return nearAPlayer(chunkX, chunkZ);
     });
-    static_cast<void>(generationQueue_.retainWhere(nearAPlayer));
+    static_cast<void>(generationQueue_.retainWhere([&](std::int32_t chunkX, std::int32_t chunkZ) {
+        return nearAPlayer(chunkX, chunkZ) || isHeld(chunkX, chunkZ);
+    }));
     if (candidates.empty()) {
         return 0;
     }
