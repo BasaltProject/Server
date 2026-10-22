@@ -3,6 +3,7 @@
 #include <basalt/wire/nbt/Snbt.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <expected>
@@ -174,7 +175,48 @@ struct Spot {
     return out;
 }
 
-/// Effects as a number, or as a list of names: neighbors, shapes, light, entities, poi, ticks, clients.
+/// A list of state ids, one per position (shorter lists leave the rest unknown, as -1).
+[[nodiscard]] std::vector<std::int32_t> stateList(LuaArgs& lua, std::int32_t index, std::size_t count) {
+    std::vector<std::int32_t> out(count, -1);
+    const std::int64_t length = std::min<std::int64_t>(lua.length(index), static_cast<std::int64_t>(count));
+    for (std::int64_t position = 1; position <= length; position++) {
+        lua.pushIndex(index, position);
+        out[static_cast<std::size_t>(position - 1)] =
+            lua.isNumber(-1) ? static_cast<std::int32_t>(lua.toInteger(-1)) : -1;
+        lua.pop(1);
+    }
+    return out;
+}
+
+/// A block face by name: down, up, north, south, west or east.
+[[nodiscard]] std::int32_t faceFrom(LuaArgs& lua, std::int32_t index) {
+    const std::string name = lua.isString(index) ? lua.toText(index) : std::string{};
+    for (std::int32_t face = 0; face < 6; face++) {
+        if (name == std::array<std::string_view, 6>{"down", "up", "north", "south", "west",
+                                                    "east"}[static_cast<std::size_t>(face)]) {
+            return face;
+        }
+    }
+    lua.raise("a face is down, up, north, south, west or east");
+    return 1;
+}
+
+/// A light layer as "block" or "sky", or as 0 or 1.
+[[nodiscard]] std::int32_t layerFrom(LuaArgs& lua, std::int32_t index) {
+    if (lua.isNumber(index)) {
+        return lua.toInteger(index) == 1 ? 1 : 0;
+    }
+    const std::string name = lua.isString(index) ? lua.toText(index) : std::string{};
+    if (name == "sky") {
+        return 1;
+    }
+    if (name != "block") {
+        lua.raise("a light layer is 'block' or 'sky'");
+    }
+    return 0;
+}
+
+/// Effects as a number, or a list of names.
 [[nodiscard]] std::uint32_t effectsFrom(LuaArgs& lua, std::int32_t index) {
     if (lua.isNumber(index)) {
         return static_cast<std::uint32_t>(lua.toInteger(index));
@@ -204,12 +246,19 @@ struct Spot {
             mask |= Effects::kTicks;
         } else if (name == "clients") {
             mask |= Effects::kClients;
+        } else if (name == "place") {
+            mask |= Effects::kPlace;
+        } else if (name == "departure") {
+            mask |= Effects::kDeparture;
         } else {
-            lua.raise("'" + name + "' is not an effect (neighbors, shapes, light, entities, poi, ticks, clients)");
+            lua.raise("'" + name +
+                      "' is not an effect (neighbors, shapes, light, entities, poi, ticks, clients, place, departure)");
         }
     }
     return mask;
 }
+
+constexpr std::size_t kLightSectionBytes = 2048;
 
 [[nodiscard]] std::string_view statusName(std::int32_t status) {
     switch (status) {
@@ -359,7 +408,47 @@ void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorld
         .method("update_neighbors",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);
-                    args.pushInteger(world->updateNeighbors(blockTriples(args, base), effectsFrom(args, base + 1)));
+                    const std::vector<std::int32_t> at = blockTriples(args, base);
+                    const std::vector<std::int32_t> previous =
+                        args.isTable(base + 2) ? stateList(args, base + 2, at.size() / 3) : std::vector<std::int32_t>{};
+                    args.pushInteger(world->settleBlocks(at, previous, effectsFrom(args, base + 1)));
+                    return 1;
+                })
+        .method("use_item_on",
+                [world](LuaArgs& args) {
+                    const Spot spot = spotAt(args, firstArgument(args));
+                    const std::int32_t face = faceFrom(args, spot.next);
+                    args.pushInteger(world->useItemOn(
+                        spot.x, spot.y, spot.z, face, args.checkString(spot.next + 1),
+                        static_cast<float>(args.isNumber(spot.next + 2) ? args.toNumber(spot.next + 2) : 0.0),
+                        static_cast<float>(args.isNumber(spot.next + 3) ? args.toNumber(spot.next + 3) : 0.0)));
+                    return 1;
+                })
+        .method("schedule_tick",
+                [world](LuaArgs& args) {
+                    const Spot spot = spotAt(args, firstArgument(args));
+                    const bool fluid = args.isString(spot.next + 1) && args.toText(spot.next + 1) == "fluid";
+                    args.pushBoolean(world->scheduleTick(spot.x, spot.y, spot.z,
+                                                         static_cast<std::int32_t>(args.toInteger(spot.next)), fluid));
+                    return 1;
+                })
+        .method("neighbor_changed",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::vector<std::int32_t> at = blockTriples(args, base);
+                    const std::vector<std::int32_t> sources =
+                        args.isTable(base + 1) ? stateList(args, base + 1, at.size() / 3) : std::vector<std::int32_t>{};
+                    args.pushInteger(world->neighborChanged(at, sources));
+                    return 1;
+                })
+        .method("update_shapes",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::vector<std::int32_t> at = blockTriples(args, base);
+                    const bool indirect = args.isTable(base + 1);
+                    const std::vector<std::int32_t> states =
+                        indirect ? stateList(args, base + 1, at.size() / 3) : std::vector<std::int32_t>{};
+                    args.pushInteger(world->updateShapes(at, states, indirect));
                     return 1;
                 })
         .method("apply_changes",
@@ -407,6 +496,45 @@ void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorld
         .method("resend_chunks",
                 [world](LuaArgs& args) {
                     world->resendChunks(chunkPairs(args, firstArgument(args)));
+                    return 0;
+                })
+        .method("light_at",
+                [world](LuaArgs& args) {
+                    const Spot spot = spotAt(args, firstArgument(args));
+                    const std::int32_t level = world->lightAt(spot.x, spot.y, spot.z, layerFrom(args, spot.next));
+                    if (level < 0) {
+                        args.pushNil();
+                    } else {
+                        args.pushInteger(level);
+                    }
+                    return 1;
+                })
+        .method("light_section",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    std::vector<std::uint8_t> out(kLightSectionBytes);
+                    if (!world->readLight(intAt(args, base), intAt(args, base + 1), intAt(args, base + 2),
+                                          layerFrom(args, base + 3),
+                                          args.isNil(base + 4) || args.booleanOr(base + 4, true), out)) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    args.pushString(std::string_view{reinterpret_cast<const char*>(out.data()), out.size()});
+                    return 1;
+                })
+        .method(
+            "set_light_section",
+            [world](LuaArgs& args) {
+                const std::int32_t base = firstArgument(args);
+                const std::string bytes = args.checkString(base + 4);
+                args.pushBoolean(world->writeLight(
+                    intAt(args, base), intAt(args, base + 1), intAt(args, base + 2), layerFrom(args, base + 3),
+                    std::span<const std::uint8_t>{reinterpret_cast<const std::uint8_t*>(bytes.data()), bytes.size()}));
+                return 1;
+            })
+        .method("check_light",
+                [world](LuaArgs& args) {
+                    world->checkLight(blockTriples(args, firstArgument(args)));
                     return 0;
                 })
         .method("relight_chunks",

@@ -146,8 +146,26 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
             std::int64_t key = 0;
             {
                 std::unique_lock<std::mutex> lock{lightQueueMutex_};
-                if (!lightWake_.wait(lock, stop, [this] { return !lightQueue_.empty(); })) {
+                if (!lightWake_.wait(lock, stop, [this] { return !lightQueue_.empty() || !lightJobs_.empty(); })) {
                     return;
+                }
+                if (!lightJobs_.empty()) {
+                    auto job = std::move(lightJobs_.front());
+                    lightJobs_.pop_front();
+                    lock.unlock();
+                    std::int32_t relit = 0;
+                    for (const std::int64_t wanted : job.first) {
+                        std::array<Chunk*, 9> window{};
+                        if (state_.lightWindowFor(ChunkGenerationQueue::unpackX(wanted),
+                                                  ChunkGenerationQueue::unpackZ(wanted), window, false)) {
+                            window[4]->markLightStale();
+                            worldLight::precompute(window, skylight);
+                            ++relit;
+                        }
+                        state_.lightDone();
+                    }
+                    job.second(relit);
+                    continue;
                 }
                 const auto due = lightQueue_.begin()->first;
                 if (due > std::chrono::steady_clock::now()) {
@@ -208,6 +226,14 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     }
     // parity: `ServerLevel`'s constructor ends on `updateSkyBrightness()`.
     updateSkyBrightness();
+}
+
+void LoadedWorld::relightAsync(std::vector<std::int64_t> keys, std::function<void(std::int32_t)> done) {
+    {
+        const std::lock_guard<std::mutex> lock{lightQueueMutex_};
+        lightJobs_.emplace_back(std::move(keys), std::move(done));
+    }
+    lightWake_.notify_one();
 }
 
 LoadedWorld::~LoadedWorld() {

@@ -484,21 +484,72 @@ public:
         static constexpr std::uint32_t kShapes = 2;
         /// The light there is worked out again.
         static constexpr std::uint32_t kLight = 4;
-        /// Entities in the blocks are checked (reserved; nothing happens yet).
+        /// What a container that is replaced holds spills out as items.
         static constexpr std::uint32_t kEntities = 8;
-        /// Points of interest are updated (reserved; nothing happens yet).
+        /// Points of interest follow the change.
         static constexpr std::uint32_t kPoi = 16;
-        /// Scheduled ticks of the blocks are armed (reserved; nothing happens yet).
+        /// The new block books its scheduled ticks and fluid updates (`onPlace`).
         static constexpr std::uint32_t kTicks = 32;
         /// The players who see the blocks are shown their new state.
         static constexpr std::uint32_t kClients = 64;
+        /// The rest of `onPlace`: golems, dust, signals, pistons and the like arriving.
+        static constexpr std::uint32_t kPlace = 128;
+        /// What the block that left sets off on its way out (`affectNeighborsAfterRemoval`).
+        static constexpr std::uint32_t kDeparture = 256;
     };
 
-    /// Runs the effects in `effects` for blocks already written at (x, y, z) triples; returns how many positions were
-    virtual std::int32_t updateNeighbors(std::span<const std::int32_t> positions, std::uint32_t effects) {
+    /// Runs `effects` for blocks already written at (x, y, z) triples; returns how many positions were loaded.
+    virtual std::int32_t settleBlocks(std::span<const std::int32_t> positions, std::span<const std::int32_t> previous,
+                                      std::uint32_t effects) {
         static_cast<void>(positions);
+        static_cast<void>(previous);
         static_cast<void>(effects);
         return 0;
+    }
+
+    /// `settleBlocks` without knowing what was there before.
+    std::int32_t updateNeighbors(std::span<const std::int32_t> positions, std::uint32_t effects) {
+        return settleBlocks(positions, {}, effects);
+    }
+
+    /// Tells the block at each position a neighbour changed; returns how many positions were loaded.
+    virtual std::int32_t neighborChanged(std::span<const std::int32_t> positions,
+                                         std::span<const std::int32_t> sources) {
+        static_cast<void>(positions);
+        static_cast<void>(sources);
+        return 0;
+    }
+
+    /// Lets blocks around each position reshape to fit it; `states` limits it to dust lines. Returns positions reached.
+    virtual std::int32_t updateShapes(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
+                                      bool indirect) {
+        static_cast<void>(positions);
+        static_cast<void>(states);
+        static_cast<void>(indirect);
+        return 0;
+    }
+
+    /// A player's use of item `item` on face 0 to 5 of the block at (x, y, z); returns how many blocks were put down.
+    virtual std::int32_t useItemOn(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face,
+                                   std::string_view item, float yaw, float pitch) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(face);
+        static_cast<void>(item);
+        static_cast<void>(yaw);
+        static_cast<void>(pitch);
+        return 0;
+    }
+
+    /// Books a tick of the block (or its fluid) `delay` ticks away; false when nothing there ticks.
+    virtual bool scheduleTick(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t delay, bool fluid) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(delay);
+        static_cast<void>(fluid);
+        return false;
     }
 
     /// Writes states at (x, y, z) triples, then runs `effects` for the ones that changed; returns how many changed.
@@ -506,16 +557,18 @@ public:
                                       std::uint32_t effects) {
         const std::size_t count = std::min(positions.size() / 3, states.size());
         std::vector<std::int32_t> changed;
+        std::vector<std::int32_t> before;
         for (std::size_t index = 0; index < count; ++index) {
-            const std::int32_t before =
+            const std::int32_t was =
                 stateAt(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2], true);
-            if (before != states[index] && setStateAt(positions[index * 3], positions[index * 3 + 1],
-                                                      positions[index * 3 + 2], states[index], false)) {
+            if (was != states[index] && setStateAt(positions[index * 3], positions[index * 3 + 1],
+                                                   positions[index * 3 + 2], states[index], false)) {
                 changed.insert(changed.end(), positions.begin() + static_cast<std::ptrdiff_t>(index * 3),
                                positions.begin() + static_cast<std::ptrdiff_t>(index * 3 + 3));
+                before.push_back(was);
             }
         }
-        static_cast<void>(updateNeighbors(changed, effects));
+        static_cast<void>(settleBlocks(changed, before, effects));
         return static_cast<std::int32_t>(changed.size() / 3);
     }
 
@@ -572,8 +625,51 @@ public:
         return false;
     }
 
-    /// Marks the light of the chunks (x, z pairs) stale so it is recomputed, and shows them again to their watchers.
-    virtual void relightChunks(std::span<const std::int32_t> chunks) { static_cast<void>(chunks); }
+    /// Recomputes light of chunks (x, z pairs) off the tick thread and resends them; `done` gets how many were loaded.
+    virtual void lightJob(std::span<const std::int32_t> chunks, std::function<void(std::int32_t)> done) {
+        static_cast<void>(chunks);
+        done(0);
+    }
+
+    /// `lightJob` without waiting for the end of it.
+    void relightChunks(std::span<const std::int32_t> chunks) {
+        lightJob(chunks, [](std::int32_t) {});
+    }
+
+    /// Light at a position (layer 0 block, 1 sky), brought up to date; -1 when not loaded.
+    [[nodiscard]] virtual std::int32_t lightAt(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t layer) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(layer);
+        return -1;
+    }
+
+    /// A section's light as 2048 bytes, two levels each (index y * 256 + z * 16 + x, the low nibble first), brought up
+    virtual bool readLight(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ, std::int32_t layer,
+                           bool load, std::span<std::uint8_t> out) {
+        static_cast<void>(chunkX);
+        static_cast<void>(sectionY);
+        static_cast<void>(chunkZ);
+        static_cast<void>(layer);
+        static_cast<void>(load);
+        static_cast<void>(out);
+        return false;
+    }
+
+    /// Replaces a section's light with 2048 bytes in the same layout; it stands until blocks around change.
+    virtual bool writeLight(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ, std::int32_t layer,
+                            std::span<const std::uint8_t> nibbles) {
+        static_cast<void>(chunkX);
+        static_cast<void>(sectionY);
+        static_cast<void>(chunkZ);
+        static_cast<void>(layer);
+        static_cast<void>(nibbles);
+        return false;
+    }
+
+    /// Queues the light around blocks (x, y, z triples) to be worked out again, as when a block there changed.
+    virtual void checkLight(std::span<const std::int32_t> positions) { static_cast<void>(positions); }
 
     /// Changes whenever a block or chunk of this world does, so a section copy stays valid; zero when unsupported.
     [[nodiscard]] virtual std::uint64_t blockVersion() const { return 0; }

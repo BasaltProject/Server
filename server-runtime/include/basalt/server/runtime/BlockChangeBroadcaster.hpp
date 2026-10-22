@@ -6,8 +6,13 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string_view>
 #include <vector>
+
+namespace basalt::server::random {
+class RandomSource;
+} // namespace basalt::server::random
 
 namespace basalt::server::runtime::player {
 class PlayerRegistry;
@@ -22,6 +27,10 @@ class RealLootTables;
 namespace redstone {
 enum class Asked : std::uint8_t;
 } // namespace redstone
+
+namespace neighbourUpdates {
+struct Context;
+} // namespace neighbourUpdates
 } // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
@@ -48,6 +57,18 @@ public:
 
     /// parity: `FallingBlockEntity.tick`'s `spawnAtLocation(level, block)`.
     void dropFallenBlock(world::LoadedWorld& world, double x, double y, double z, std::int32_t stateId);
+
+    /// `phases` are the `neighbourUpdates::phase` bits; `removed` is the state that left, when it is known.
+    void settleBlock(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
+                     std::int32_t y, std::int32_t z, std::optional<std::int32_t> removed, std::uint32_t phases);
+
+    /// parity: `BlockState.handleNeighborChanged` on the block at (x, y, z).
+    void neighbourChanged(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                          std::int32_t x, std::int32_t y, std::int32_t z, std::optional<std::int32_t> source);
+
+    /// parity: `BlockState.updateIndirectNeighbourShapes`.
+    void reshapeIndirect(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
+                         std::int32_t y, std::int32_t z, std::int32_t stateId);
 
     void notifyAround(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
                       std::int32_t y, std::int32_t z, std::optional<std::int32_t> removed);
@@ -82,6 +103,9 @@ public:
                          std::int32_t destroyedState, bool byEntity = false);
 
 private:
+    [[nodiscard]] world::neighbourUpdates::Context updateContext(world::LoadedWorld& world,
+                                                                 random::RandomSource& random) const;
+
     void settleFrom(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
                     std::int32_t y, std::int32_t z, bool arrived, world::redstone::Asked asked) const;
 

@@ -21,6 +21,12 @@ inline constexpr std::int32_t kLampOffDelay = 4;
 
 [[nodiscard]] const wire::common::Identifier& lamp();
 
+/// parity: `neighborChanged` on the one block at (x, y, z).
+[[nodiscard]] std::vector<BlockChange> reactAt(WorldState& world, std::string_view worldName, std::int32_t x,
+                                               std::int32_t y, std::int32_t z, std::int64_t gameTime,
+                                               random::RandomSource& random, bool tntExplodes,
+                                               std::optional<std::int32_t> told = std::nullopt);
+
 /// parity: `updateNeighborsAt`.
 [[nodiscard]] std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x,
                                               std::int32_t y, std::int32_t z, std::int64_t gameTime,
