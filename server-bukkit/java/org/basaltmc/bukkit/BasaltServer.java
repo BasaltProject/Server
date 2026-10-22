@@ -57,6 +57,10 @@ public class BasaltServer extends ServerBase {
         return instance;
     }
 
+    public void tickTask(Runnable task) {
+        scheduler.runTask(null, task);
+    }
+
     BasaltPluginManager pluginManagerImpl() {
         return pluginManager;
     }

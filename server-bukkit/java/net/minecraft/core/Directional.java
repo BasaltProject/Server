@@ -1,3 +1,3 @@
 package net.minecraft.core;
-public interface Directional {
-}
+
+public interface Directional {}

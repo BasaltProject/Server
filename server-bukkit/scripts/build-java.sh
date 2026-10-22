@@ -14,6 +14,10 @@ if [ -f "$here/GenerateBases.java" ]; then
     javac --release 25 -d "$out/gen-tool" "$here/GenerateBases.java" 2>&1 || exit 1
     java -cp "$out/gen-tool:$cp" GenerateBases "$here/bases.txt" "$out/gen"
 fi
+if [ -f "$here/GenerateBlockData.java" ]; then
+    javac --release 25 -nowarn -cp "$cp" -d "$out/gen-tool" "$here/GenerateBlockData.java" 2>&1 || exit 1
+    java -cp "$out/gen-tool:$cp" GenerateBlockData "$out/gen"
+fi
 find "$root/server-bukkit/java" "$out/gen" -name '*.java' | sed 's/.*/"&"/' >"$out/runtime-sources.txt"
 javac --release 25 -nowarn -proc:none -encoding UTF-8 -cp "$cp" -d "$out/runtime-classes" @"$out/runtime-sources.txt"
 jar --create --file "$out/basalt-bukkit.jar" -C "$out/runtime-classes" . -C "$root/server-bukkit/resources" .

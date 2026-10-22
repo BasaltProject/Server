@@ -1,12 +1,20 @@
 package org.bukkit.craftbukkit.util;
 
 import net.minecraft.resources.Identifier;
-import org.basaltmc.bukkit.Unsupported;
 import org.bukkit.NamespacedKey;
-public class CraftNamespacedKey {
-    protected CraftNamespacedKey() {
-    }
+
+public final class CraftNamespacedKey {
+    private CraftNamespacedKey() {}
+
     public static NamespacedKey fromMinecraft(Identifier minecraft) {
-        throw Unsupported.hit("org.bukkit.craftbukkit.util.CraftNamespacedKey.fromMinecraft");
+        return new NamespacedKey(minecraft.getNamespace(), minecraft.getPath());
+    }
+
+    public static NamespacedKey fromString(String string) {
+        return NamespacedKey.fromString(string);
+    }
+
+    public static Identifier toMinecraft(NamespacedKey key) {
+        return Identifier.fromNamespaceAndPath(key.getNamespace(), key.getKey());
     }
 }

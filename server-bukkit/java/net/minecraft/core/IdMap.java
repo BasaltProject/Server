@@ -1,14 +1,25 @@
 package net.minecraft.core;
 
-import org.basaltmc.bukkit.Unsupported;
-public interface IdMap<T> {
-    public default Object byId(int id) {
-        throw Unsupported.hit("net.minecraft.core.IdMap.byId");
+public interface IdMap<T> extends Iterable<T> {
+    int getId(T thing);
+
+    T byId(int id);
+
+    default T byIdOrThrow(int id) {
+        T value = byId(id);
+        if (value == null) {
+            throw new IllegalArgumentException("No value with id " + id);
+        }
+        return value;
     }
-    public default Object byIdOrThrow(int id) {
-        throw Unsupported.hit("net.minecraft.core.IdMap.byIdOrThrow");
+
+    default int getIdOrThrow(T thing) {
+        int id = getId(thing);
+        if (id == -1) {
+            throw new IllegalArgumentException("Can't find id for '" + thing + "' in map " + this);
+        }
+        return id;
     }
-    public default int size() {
-        throw Unsupported.hit("net.minecraft.core.IdMap.size");
-    }
+
+    int size();
 }

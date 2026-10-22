@@ -2,30 +2,44 @@ package net.minecraft.world.level;
 
 import java.util.stream.Stream;
 import net.minecraft.core.BlockPos;
-import org.basaltmc.bukkit.Unsupported;
+
 public record ChunkPos(int x, int z) {
     public static ChunkPos containing(BlockPos pos) {
-        throw Unsupported.hit("net.minecraft.world.level.ChunkPos.containing");
+        return new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4);
     }
-    public int getMaxBlockX() {
-        throw Unsupported.hit("net.minecraft.world.level.ChunkPos.getMaxBlockX");
-    }
-    public int getMaxBlockZ() {
-        throw Unsupported.hit("net.minecraft.world.level.ChunkPos.getMaxBlockZ");
-    }
-    public int getMinBlockX() {
-        throw Unsupported.hit("net.minecraft.world.level.ChunkPos.getMinBlockX");
-    }
-    public int getMinBlockZ() {
-        throw Unsupported.hit("net.minecraft.world.level.ChunkPos.getMinBlockZ");
-    }
+
     public static long pack(int x, int z) {
-        throw Unsupported.hit("net.minecraft.world.level.ChunkPos.pack");
+        return (long) x & 0xFFFFFFFFL | ((long) z & 0xFFFFFFFFL) << 32;
     }
-    public static Stream rangeClosed(ChunkPos center, ChunkPos radius) {
-        throw Unsupported.hit("net.minecraft.world.level.ChunkPos.rangeClosed");
-    }
+
     public static ChunkPos unpack(long key) {
-        throw Unsupported.hit("net.minecraft.world.level.ChunkPos.unpack");
+        return new ChunkPos((int) key, (int) (key >> 32));
+    }
+
+    public long pack() {
+        return pack(x, z);
+    }
+
+    public static Stream<ChunkPos> rangeClosed(ChunkPos from, ChunkPos to) {
+        int width = to.x - from.x + 1;
+        int depth = to.z - from.z + 1;
+        return Stream.iterate(0, i -> i + 1).limit((long) width * depth)
+            .map(i -> new ChunkPos(from.x + i % width, from.z + i / width));
+    }
+
+    public int getMinBlockX() {
+        return x << 4;
+    }
+
+    public int getMinBlockZ() {
+        return z << 4;
+    }
+
+    public int getMaxBlockX() {
+        return (x << 4) + 15;
+    }
+
+    public int getMaxBlockZ() {
+        return (z << 4) + 15;
     }
 }

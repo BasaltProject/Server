@@ -11,102 +11,157 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.basaltmc.bukkit.Unsupported;
+import org.basaltmc.bukkit.WorldNatives;
 import org.bukkit.craftbukkit.block.data.CraftBlockData;
+
 public class BlockState extends BlockBehaviour.BlockStateBase {
-    protected BlockState() {
+    private static final int kBlocksMotion = 1;
+    private static final int kOccludes = 2;
+    private static final int kFullCube = 4;
+    private static final int kReplaceable = 8;
+    private static final int kHasCollision = 32;
+    private static final int kTicksRandomly = 128;
+    private static final int kAir = 256;
+    private static final int kHasBlockEntity = 1 << 18;
+    private int flags = -1;
+
+    public BlockState(Block block, int id) {
+        super(block, id);
     }
+
+    private int flags() {
+        int found = flags;
+        if (found < 0) {
+            found = WorldNatives.stateFlags(stateId());
+            flags = found;
+        }
+        return found;
+    }
+
     public CraftBlockData asBlockData() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.asBlockData");
+        return CraftBlockData.createData(this);
     }
-    public boolean canBeReplaced() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.canBeReplaced");
-    }
-    public boolean canBeReplaced(BlockPlaceContext blockPlaceContext) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.canBeReplaced");
-    }
-    public boolean canOcclude() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.canOcclude");
-    }
-    public boolean canSurvive(LevelReader levelReader, BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.canSurvive");
-    }
-    public Block getBlock() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.getBlock");
-    }
-    public float getDestroySpeed(BlockGetter blockGetter, BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.getDestroySpeed");
-    }
-    public FluidState getFluidState() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.getFluidState");
-    }
-    public int getLightDampening() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.getLightDampening");
-    }
-    public int getLightEmission() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.getLightEmission");
-    }
-    public PushReaction getPistonPushReaction() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.getPistonPushReaction");
-    }
-    public BlockPos getPostProcessPos(BlockGetter blockGetter, BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.getPostProcessPos");
-    }
-    public VoxelShape getShape(BlockGetter blockGetter, BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.getShape");
-    }
-    public void handleNeighborChanged(Level level, BlockPos blockPos, Block block, Orientation orientation, boolean flag) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.handleNeighborChanged");
-    }
-    public boolean hasAnalogOutputSignal() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.hasAnalogOutputSignal");
-    }
-    public boolean hasBlockEntity() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.hasBlockEntity");
-    }
-    public boolean ignitedByLava() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.ignitedByLava");
-    }
+
     public boolean isAir() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.isAir");
+        return (flags() & kAir) != 0;
     }
-    public boolean isRandomlyTicking() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.isRandomlyTicking");
+
+    public boolean canOcclude() {
+        return (flags() & kOccludes) != 0;
     }
-    public boolean isSignalSource() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.isSignalSource");
-    }
+
     public boolean isSolid() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.isSolid");
+        return (flags() & kBlocksMotion) != 0;
     }
+
+    public boolean canBeReplaced() {
+        return (flags() & kReplaceable) != 0;
+    }
+
+    public boolean canBeReplaced(BlockPlaceContext context) {
+        return canBeReplaced();
+    }
+
+    public boolean isRandomlyTicking() {
+        return (flags() & kTicksRandomly) != 0;
+    }
+
+    public boolean hasBlockEntity() {
+        return (flags() & kHasBlockEntity) != 0;
+    }
+
+    public int getLightEmission() {
+        return (flags() >> 9) & 15;
+    }
+
+    public int getLightDampening() {
+        return (flags() >> 13) & 31;
+    }
+
     public boolean liquid() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.liquid");
+        String path = getBlock().blockKey().getPath();
+        return path.equals("water") || path.equals("lava");
     }
-    public void onPlace(Level level, BlockPos blockPos, BlockState blockState, boolean flag) {
+
+    public FluidState getFluidState() {
+        if ((flags() & 16) == 0) {
+            return Fluids.EMPTY.defaultFluidState();
+        }
+        String path = getBlock().blockKey().getPath();
+        return path.equals("lava") ? Fluids.LAVA.defaultFluidState() : Fluids.WATER.defaultFluidState();
+    }
+
+    public float getDestroySpeed(BlockGetter level, BlockPos pos) {
+        return (float) getBlock().facts()[0];
+    }
+
+    public boolean requiresCorrectToolForDrops() {
+        return getBlock().facts()[2] != 0.0;
+    }
+
+    public PushReaction getPistonPushReaction() {
+        return PushReaction.PUSH_PULL;
+    }
+
+    public boolean isSignalSource() {
+        return false;
+    }
+
+    public boolean ignitedByLava() {
+        return false;
+    }
+
+    public boolean hasAnalogOutputSignal() {
+        return false;
+    }
+
+    public VoxelShape getShape(BlockGetter level, BlockPos pos) {
+        int bits = flags();
+        return VoxelShape.of((bits & kFullCube) != 0, (bits & kHasCollision) == 0);
+    }
+
+    public BlockPos getPostProcessPos(BlockGetter level, BlockPos pos) {
+        return pos;
+    }
+
+    public boolean canSurvive(LevelReader level, BlockPos pos) {
+        return true;
+    }
+
+    public void onPlace(Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
         throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.onPlace");
     }
-    public boolean requiresCorrectToolForDrops() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.requiresCorrectToolForDrops");
+
+    public void handleNeighborChanged(Level level, BlockPos pos, Block neighbor, Orientation orientation, boolean movedByPiston) {
+        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.handleNeighborChanged");
     }
-    public Object setValue(Property property, Comparable comparable) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.setValue");
-    }
-    public boolean triggerEvent(Level level, BlockPos blockPos, int value, int value2) {
+
+    public boolean triggerEvent(Level level, BlockPos pos, int id, int param) {
         throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.triggerEvent");
     }
-    public void updateIndirectNeighbourShapes(LevelAccessor levelAccessor, BlockPos blockPos, int value, int value2) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.updateIndirectNeighbourShapes");
-    }
-    public void updateNeighbourShapes(LevelAccessor levelAccessor, BlockPos blockPos, int value, int value2) {
+
+    public void updateNeighbourShapes(LevelAccessor level, BlockPos pos, int flags, int recursionLeft) {
         throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.updateNeighbourShapes");
     }
-    public InteractionResult useItemOn(ItemStack itemStack, Level level, Player player, InteractionHand interactionHand, BlockHitResult blockHitResult) {
+
+    public void updateIndirectNeighbourShapes(LevelAccessor level, BlockPos pos, int flags, int recursionLeft) {
+        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.updateIndirectNeighbourShapes");
+    }
+
+    public InteractionResult useItemOn(ItemStack stack, Level level, Player player, InteractionHand hand,
+            BlockHitResult hit) {
         throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.useItemOn");
+    }
+
+    @Override
+    public String toString() {
+        return "Block{" + getBlock().blockKey() + "}" + WorldNatives.stateText(stateId()).replaceFirst("^[^\\[]*", "");
     }
 }

@@ -1,11 +1,12 @@
 package net.minecraft.util.datafix;
 
 import com.mojang.datafixers.DataFixer;
-import org.basaltmc.bukkit.Unsupported;
+import org.basaltmc.bukkit.facade.ServerAccess;
+
 public class DataFixers {
-    protected DataFixers() {
-    }
+    private DataFixers() {}
+
     public static DataFixer getDataFixer() {
-        throw Unsupported.hit("net.minecraft.util.datafix.DataFixers.getDataFixer");
+        return ServerAccess.dataFixer();
     }
 }

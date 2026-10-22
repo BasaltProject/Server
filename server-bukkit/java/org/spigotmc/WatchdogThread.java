@@ -1,11 +1,15 @@
 package org.spigotmc;
 
 import ca.spottedleaf.moonrise.common.util.TickThread;
-import org.basaltmc.bukkit.Unsupported;
+
+/** The server's own tick loop is watched natively; plugins only poke this one to say a long task is alive. */
 public class WatchdogThread extends TickThread {
-    protected WatchdogThread() {
-    }
+    private static WatchdogThread instance = new WatchdogThread();
+    private volatile long lastTick;
+
+    protected WatchdogThread() {}
+
     public static void tick() {
-        throw Unsupported.hit("org.spigotmc.WatchdogThread.tick");
+        instance.lastTick = System.currentTimeMillis();
     }
 }

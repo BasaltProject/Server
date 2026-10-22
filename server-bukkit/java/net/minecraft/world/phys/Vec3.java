@@ -2,20 +2,39 @@ package net.minecraft.world.phys;
 
 import net.minecraft.core.Position;
 import net.minecraft.core.Vec3i;
-import org.basaltmc.bukkit.Unsupported;
+
 public class Vec3 implements Position {
-    public Vec3(double value, double value2, double value3) {
+    public static final Vec3 ZERO = new Vec3(0.0, 0.0, 0.0);
+    public final double x;
+    public final double y;
+    public final double z;
+
+    public Vec3(double x, double y, double z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
     }
+
     public static Vec3 atLowerCornerOf(Vec3i pos) {
-        throw Unsupported.hit("net.minecraft.world.phys.Vec3.atLowerCornerOf");
+        return new Vec3(pos.getX(), pos.getY(), pos.getZ());
     }
+
+    public static Vec3 atCenterOf(Vec3i pos) {
+        return new Vec3(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+    }
+
+    @Override
     public double x() {
-        throw Unsupported.hit("net.minecraft.world.phys.Vec3.x");
+        return x;
     }
+
+    @Override
     public double y() {
-        throw Unsupported.hit("net.minecraft.world.phys.Vec3.y");
+        return y;
     }
+
+    @Override
     public double z() {
-        throw Unsupported.hit("net.minecraft.world.phys.Vec3.z");
+        return z;
     }
 }
