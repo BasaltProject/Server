@@ -8,9 +8,9 @@ public class LevelLightEngine implements LightEventListener {
     protected LevelLightEngine() {
     }
     public void checkBlock(BlockPos pos) {
-        throw Unsupported.hit("net.minecraft.world.level.lighting.LevelLightEngine.checkBlock");
+        return;
     }
     public void queueSectionData(LightLayer layer, SectionPos pos, DataLayer data) {
-        throw Unsupported.hit("net.minecraft.world.level.lighting.LevelLightEngine.queueSectionData");
+        return;
     }
 }

@@ -131,6 +131,7 @@ std::expected<void, std::string> BukkitBridge::boot() {
         env->ExceptionClear();
     }
     bootMethod_ = env->GetStaticMethodID(runtime_, "boot", "(Ljava/lang/String;Ljava/lang/String;)Z");
+    enableMethod_ = env->GetStaticMethodID(runtime_, "enable", "(Ljava/lang/String;)Z");
     shutdownMethod_ = env->GetStaticMethodID(runtime_, "shutdown", "()Z");
     taskMethod_ = env->GetStaticMethodID(runtime_, "runTask", "(J)V");
     eventMethod_ = env->GetStaticMethodID(runtime_, "event", "(Ljava/lang/String;IJ[Ljava/lang/Object;Z)Z");
@@ -138,7 +139,7 @@ std::expected<void, std::string> BukkitBridge::boot() {
         env->GetStaticMethodID(runtime_, "command", "(Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Z");
     channelMethod_ = env->GetStaticMethodID(runtime_, "channelMessage", "(Ljava/lang/String;Ljava/lang/String;[B)V");
     listMethod_ = env->GetStaticMethodID(runtime_, "pluginList", "()[Ljava/lang/String;");
-    if (channelMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr || taskMethod_ == nullptr ||
+    if (channelMethod_ == nullptr || enableMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr || taskMethod_ == nullptr ||
         eventMethod_ == nullptr || commandMethod_ == nullptr || listMethod_ == nullptr) {
         reportJavaFailure(env, "resolving BukkitRuntime entry points");
         return std::unexpected(std::string{"BukkitRuntime entry points not found"});
@@ -154,6 +155,21 @@ std::expected<void, std::string> BukkitBridge::boot() {
         return std::unexpected(std::string{"BukkitRuntime.boot refused to start"});
     }
     return {};
+}
+
+bool BukkitBridge::enable() {
+    JNIEnv* env = shim_->env();
+    if (env == nullptr) {
+        return false;
+    }
+    jstring plugins = toJava(env, options_.pluginsFolder);
+    const jboolean ok = env->CallStaticBooleanMethod(runtime_, enableMethod_, plugins);
+    env->DeleteLocalRef(plugins);
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        reportJavaFailure(env, "BukkitRuntime.enable");
+        return false;
+    }
+    return ok == JNI_TRUE;
 }
 
 std::vector<BukkitHost::PluginState> BukkitBridge::javaPlugins() {

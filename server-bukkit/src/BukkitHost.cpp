@@ -41,6 +41,8 @@ std::expected<std::unique_ptr<BukkitHost>, std::string> BukkitHost::start(const 
     return host;
 }
 
+bool BukkitHost::enable() { return bridge_->enable(); }
+
 std::vector<BukkitHost::PluginState> BukkitHost::plugins() const { return bridge_->javaPlugins(); }
 
 void BukkitHost::stop() {

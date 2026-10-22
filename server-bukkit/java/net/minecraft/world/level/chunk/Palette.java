@@ -1,11 +1,20 @@
 package net.minecraft.world.level.chunk;
 
-import org.basaltmc.bukkit.Unsupported;
+import java.util.List;
+import java.util.function.Predicate;
+
 public interface Palette<T> {
-    public default int getSize() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.Palette.getSize");
-    }
-    public default Object valueFor(int index) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.Palette.valueFor");
+    int idFor(T value, PaletteResize<T> resizeHandler);
+
+    boolean maybeHas(Predicate<T> predicate);
+
+    T valueFor(int index);
+
+    int getSize();
+
+    Palette<T> copy();
+
+    interface Factory {
+        <A> Palette<A> create(int bits, List<A> paletteEntries);
     }
 }

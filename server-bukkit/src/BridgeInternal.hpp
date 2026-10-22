@@ -23,6 +23,7 @@ public:
     [[nodiscard]] static BukkitBridge& current();
 
     [[nodiscard]] std::expected<void, std::string> boot();
+    bool enable();
     bool shutdown();
 
     [[nodiscard]] std::vector<BukkitHost::PluginState> javaPlugins();
@@ -68,6 +69,7 @@ private:
     wire::common::Logger log_{"Bukkit"};
     jclass runtime_ = nullptr;
     jmethodID bootMethod_ = nullptr;
+    jmethodID enableMethod_ = nullptr;
     jmethodID shutdownMethod_ = nullptr;
     jmethodID taskMethod_ = nullptr;
     jmethodID eventMethod_ = nullptr;

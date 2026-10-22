@@ -35,6 +35,7 @@ import net.minecraft.world.level.chunk.PalettedContainerFactory;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.entity.LevelEntityGetter;
+import net.minecraft.world.level.entity.PersistentEntitySectionManager;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
 import net.minecraft.world.level.lighting.LevelLightEngine;
@@ -54,6 +55,8 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     public boolean captureTreeGeneration = false;
     public Map capturedBlockStates;
     public boolean noSave = false;
+    private ServerChunkCache chunkSource;
+    private PersistentEntitySectionManager entityManager;
     private CraftWorld world;
     private ResourceKey<Level> dimension;
     private final RandomSource random = RandomSource.create();
@@ -101,22 +104,25 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return id < 0 ? null : Block.stateById(id);
     }
     public LevelChunk getChunk(int value, int value2) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getChunk");
+        return getChunkSource().getChunk(value, value2, true);
     }
     public ChunkAccess getChunk(int value, int value2, ChunkStatus chunkStatus) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getChunk");
+        return getChunkSource().getChunk(value, value2, true);
     }
     public ChunkAccess getChunk(int value, int value2, ChunkStatus chunkStatus, boolean flag) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getChunk");
+        return getChunkSource().getChunk(value, value2, flag);
     }
     public ChunkAccess getChunk(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getChunk");
+        return getChunkSource().getChunk(blockPos.getX() >> 4, blockPos.getZ() >> 4, true);
     }
     public ChunkAccess getChunkIfLoadedImmediately(int value, int value2) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getChunkIfLoadedImmediately");
+        return getChunkSource().getChunk(value, value2, false);
     }
-    public ServerChunkCache getChunkSource() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getChunkSource");
+    public synchronized ServerChunkCache getChunkSource() {
+        if (chunkSource == null) {
+            chunkSource = new ServerChunkCache(this);
+        }
+        return chunkSource;
     }
     public CraftServer getCraftServer() {
         return (CraftServer) org.bukkit.Bukkit.getServer();
@@ -141,7 +147,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return this;
     }
     public LevelLightEngine getLightEngine() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getLightEngine");
+        return getChunkSource().getLightEngine();
     }
     public int getMaxY() {
         return world.getMaxHeight() - 1;
@@ -201,7 +207,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.moonrise$getEntityLookup");
     }
     public PalettedContainerFactory palettedContainerFactory() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.palettedContainerFactory");
+        return PalettedContainerFactory.create(registryAccess());
     }
     public WorldConfiguration paperConfig() {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.paperConfig");

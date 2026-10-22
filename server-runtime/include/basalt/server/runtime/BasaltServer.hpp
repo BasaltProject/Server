@@ -127,6 +127,7 @@ private:
     void startBedrockListener();
 
     void startBukkit();
+    void enableBukkit();
 
     void tickEntities(world::LoadedWorld& world, const sched::Region& region);
 

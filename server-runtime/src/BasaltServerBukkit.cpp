@@ -5,6 +5,7 @@
 #include <cctype>
 #include <filesystem>
 #include <format>
+#include <future>
 
 #ifdef BASALT_WITH_BUKKIT
 #include <basalt/server/bukkit/BukkitHost.hpp>
@@ -68,14 +69,6 @@ void BasaltServer::startBukkit() {
         logger_.error([&host] { return "Bukkit compatibility could not start: " + host.error(); });
         return;
     }
-    for (const server::bukkit::BukkitHost::PluginState& state : (*host)->plugins()) {
-        for (bukkit::JavaPluginJar& jar : javaPlugins_) {
-            if (lowered(jar.name) == lowered(state.name)) {
-                jar.loaded = state.enabled;
-                jar.version = state.version;
-            }
-        }
-    }
     bukkit_ = std::shared_ptr<server::bukkit::BukkitHost>(std::move(*host));
 #else
     logger_.warn([&] {
@@ -84,6 +77,30 @@ void BasaltServer::startBukkit() {
             "rebuild, or use a release that includes it.",
             count, folder);
     });
+#endif
+}
+
+void BasaltServer::enableBukkit() {
+#ifdef BASALT_WITH_BUKKIT
+    if (bukkit_ == nullptr) {
+        return;
+    }
+    auto* host = static_cast<server::bukkit::BukkitHost*>(bukkit_.get());
+    std::promise<void> done;
+    std::future<void> finished = done.get_future();
+    worldRegistry_->scheduler().global().schedule(0, [this, host, &done] {
+        host->enable();
+        for (const server::bukkit::BukkitHost::PluginState& state : host->plugins()) {
+            for (bukkit::JavaPluginJar& jar : javaPlugins_) {
+                if (lowered(jar.name) == lowered(state.name)) {
+                    jar.loaded = state.enabled;
+                    jar.version = state.version;
+                }
+            }
+        }
+        done.set_value();
+    });
+    finished.wait();
 #endif
 }
 } // namespace basalt::server::runtime
