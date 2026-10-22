@@ -141,3 +141,77 @@ TEST_CASE("a chunk is dirty only when it holds something the region file does no
     CHECK_FALSE(chunk.isDirty());
     CHECK(chunk.inhabitedTime() == 501);
 }
+
+TEST_CASE("light snapshots survive replacement and invalidation") {
+    Chunk chunk{0, 0};
+    CHECK(chunk.cachedSkyLight() == nullptr);
+    CHECK(chunk.cachedBlockLight() == nullptr);
+    const Chunk::PackedLight initial(chunk.sectionCount(), std::vector<std::uint8_t>(8, 1));
+    CHECK(chunk.skyLight([&] { return initial; }) == initial);
+    CHECK(chunk.blockLight([&] { return initial; }) == initial);
+    const auto oldSky = chunk.cachedSkyLight();
+    const auto oldBlock = chunk.cachedBlockLight();
+
+    const std::vector<std::uint8_t> replacement(8, 2);
+    CHECK(chunk.storeLightSection(true, 0, replacement));
+    CHECK(chunk.storeLightSection(false, 0, replacement));
+    CHECK(chunk.cachedSkyLight()->front() == replacement);
+    CHECK(chunk.cachedBlockLight()->front() == replacement);
+    CHECK(*oldSky == initial);
+    CHECK(*oldBlock == initial);
+
+    chunk.markLightStale();
+    CHECK(chunk.lightIsStale());
+    CHECK(chunk.skyLight([&] { return initial; }) == initial);
+    CHECK(chunk.blockLight([&] { return initial; }) == initial);
+    CHECK_FALSE(chunk.lightIsStale());
+    chunk.invalidateLight();
+    CHECK(chunk.cachedSkyLight() == nullptr);
+    CHECK(chunk.cachedBlockLight() == nullptr);
+    CHECK(*oldSky == initial);
+    CHECK(*oldBlock == initial);
+}
+
+TEST_CASE("light readers retain complete snapshots during publication") {
+    Chunk chunk{0, 0};
+    const Chunk::PackedLight initial(chunk.sectionCount(), std::vector<std::uint8_t>(8, 1));
+    static_cast<void>(chunk.skyLight([&] { return initial; }));
+    static_cast<void>(chunk.blockLight([&] { return initial; }));
+    std::atomic<bool> start{false};
+    std::atomic<bool> invalid{false};
+    std::thread reader{[&] {
+        while (!start.load()) {
+            std::this_thread::yield();
+        }
+        for (int i = 0; i < 2000; ++i) {
+            for (const auto& snapshot : {chunk.cachedSkyLight(), chunk.cachedBlockLight()}) {
+                if (snapshot == nullptr) {
+                    continue;
+                }
+                if (snapshot->size() != initial.size() || snapshot->front().size() != 8) {
+                    invalid.store(true);
+                    continue;
+                }
+                const auto& section = snapshot->front();
+                for (const auto value : section) {
+                    if ((value != 1 && value != 2) || value != section.front()) {
+                        invalid.store(true);
+                    }
+                }
+            }
+        }
+    }};
+    start.store(true);
+    for (int i = 0; i < 2000; ++i) {
+        const std::vector<std::uint8_t> section(8, static_cast<std::uint8_t>(1 + i % 2));
+        static_cast<void>(chunk.storeLightSection(true, 0, section));
+        static_cast<void>(chunk.storeLightSection(false, 0, section));
+        if (i % 10 == 0) {
+            chunk.invalidateLight();
+            static_cast<void>(chunk.skyLight([&] { return initial; }));
+            static_cast<void>(chunk.blockLight([&] { return initial; }));
+        }
+    }
+    reader.join();
+    CHECK_FALSE(invalid.load());
+}

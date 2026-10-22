@@ -5,6 +5,7 @@
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <charconv>
