@@ -30,6 +30,8 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
     private static final int kTicksRandomly = 128;
     private static final int kAir = 256;
     private static final int kHasBlockEntity = 1 << 18;
+    private static final PushReaction[] kReactions = {PushReaction.PUSH_PULL, PushReaction.POPPED,
+        PushReaction.IMMOVEABLE, PushReaction.IGNORE_ENTITY, PushReaction.PUSH};
     private int flags = -1;
 
     public BlockState(Block block, int id) {
@@ -107,7 +109,8 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
     }
 
     public PushReaction getPistonPushReaction() {
-        return PushReaction.PUSH_PULL;
+        double[] found = WorldNatives.blockInfo(stateId());
+        return found == null ? PushReaction.PUSH_PULL : kReactions[(int) found[3]];
     }
 
     public boolean isSignalSource() {

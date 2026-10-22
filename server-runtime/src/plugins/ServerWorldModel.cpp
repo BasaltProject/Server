@@ -7,6 +7,7 @@
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/MapColors.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaTables.hpp>
 #include <basalt/server/registry/World.hpp>
@@ -1085,6 +1086,21 @@ std::vector<double> LoadedWorlds::blockHardness(std::string_view block) const {
     }
     return {static_cast<double>(found->destroyTime), static_cast<double>(found->explosionResistance),
             found->requiresCorrectTool ? 1.0 : 0.0};
+}
+
+std::vector<double> LoadedWorlds::blockInfo(std::int32_t stateId) const {
+    if (reg::blockStateDefinitions::blockOf(stateId) == nullptr) {
+        return {};
+    }
+    const std::uint32_t color = reg::mapColors::argbOf(reg::mapColors::packed(
+        reg::mapColors::of(stateId), reg::mapColors::Brightness::High));
+    return {static_cast<double>(reg::blockMovement::frictionOf(stateId)),
+            static_cast<double>(reg::blockMovement::speedFactorOf(stateId)),
+            static_cast<double>(reg::blockMovement::jumpFactorOf(stateId)),
+            static_cast<double>(static_cast<std::int32_t>(reg::blockSupport::pushReaction(stateId))),
+            static_cast<double>(color & 0xFFFFFFU),
+            static_cast<double>(reg::fireOdds::igniteOdds(stateId)),
+            static_cast<double>(reg::fireOdds::burnOdds(stateId))};
 }
 
 std::vector<std::string> LoadedWorlds::biomeIds() const {

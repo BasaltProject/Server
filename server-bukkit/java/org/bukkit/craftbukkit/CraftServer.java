@@ -6,10 +6,10 @@ import net.minecraft.server.dedicated.DedicatedServer;
 import org.basaltmc.bukkit.BasaltServer;
 import org.bukkit.World;
 
-/** The class plugins find behind Bukkit.getServer(): the package name is how they recognise a CraftBukkit-shaped server. */
+/** The class plugins find behind Bukkit.getServer(); its package name is how they recognise a CraftBukkit server. */
 public final class CraftServer extends BasaltServer {
     private final DedicatedServer console = DedicatedServer.instance();
-    private Map<String, World> worlds;
+    private final Map<String, World> worlds = new java.util.concurrent.ConcurrentHashMap<>();
 
     public CraftServer(File root, File pluginsFolder) {
         super(root, pluginsFolder);

@@ -623,6 +623,12 @@ public:
         return {};
     }
 
+    /// Physical facts about one state: friction, speed factor, jump factor, push reaction (0 normal, 1 destroy, 2 block,
+    [[nodiscard]] virtual std::vector<double> blockInfo(std::int32_t stateId) const {
+        static_cast<void>(stateId);
+        return {};
+    }
+
     /// The biome ids, in registry order.
     [[nodiscard]] virtual std::vector<std::string> biomeIds() const { return {}; }
 

@@ -31,6 +31,7 @@ public class Block extends BlockBehaviour implements ItemLike {
     private volatile BlockState[] states;
     private StateDefinition<Block, BlockState> definition;
     private double[] facts;
+    private double[] info;
 
     protected Block(int index) {
         this.index = index;
@@ -149,6 +150,14 @@ public class Block extends BlockBehaviour implements ItemLike {
         return facts;
     }
 
+    public double[] info() {
+        if (info == null) {
+            double[] found = WorldNatives.blockInfo(first);
+            info = found == null || found.length < 7 ? new double[] {0.6, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0} : found;
+        }
+        return info;
+    }
+
     public BlockState defaultBlockState() {
         return stateById(Registries.defaultState(index));
     }
@@ -188,7 +197,7 @@ public class Block extends BlockBehaviour implements ItemLike {
     }
 
     public MapColor defaultMapColor() {
-        return MapColor.NONE;
+        return new MapColor((int) info()[4]);
     }
 
     public String getDescriptionId() {
@@ -200,15 +209,15 @@ public class Block extends BlockBehaviour implements ItemLike {
     }
 
     public float getFriction() {
-        return 0.6F;
+        return (float) info()[0];
     }
 
     public float getSpeedFactor() {
-        return 1.0F;
+        return (float) info()[1];
     }
 
     public float getJumpFactor() {
-        return 1.0F;
+        return (float) info()[2];
     }
 
     @Override

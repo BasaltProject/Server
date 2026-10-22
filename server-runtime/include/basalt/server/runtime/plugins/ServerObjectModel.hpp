@@ -101,6 +101,7 @@ public:
     [[nodiscard]] std::vector<std::string> blockProperties(std::string_view block) const override;
     [[nodiscard]] std::int32_t stateFlags(std::int32_t stateId) const override;
     [[nodiscard]] std::vector<double> blockHardness(std::string_view block) const override;
+    [[nodiscard]] std::vector<double> blockInfo(std::int32_t stateId) const override;
     [[nodiscard]] std::vector<std::string> biomeIds() const override;
     [[nodiscard]] std::vector<std::string> itemIds() const override;
     [[nodiscard]] std::vector<std::string> tags(std::string_view registry) const override;

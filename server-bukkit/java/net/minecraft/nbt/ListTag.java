@@ -52,7 +52,8 @@ public final class ListTag extends AbstractList<Tag> implements CollectionTag {
     }
 
     public CompoundTag getCompoundOrEmpty(int index) {
-        return index >= 0 && index < list.size() && list.get(index) instanceof CompoundTag tag ? tag : new CompoundTag();
+        return index >= 0 && index < list.size() && list.get(index) instanceof CompoundTag tag
+            ? tag : new CompoundTag();
     }
 
     public Optional<CompoundTag> getCompound(int index) {
@@ -61,15 +62,18 @@ public final class ListTag extends AbstractList<Tag> implements CollectionTag {
     }
 
     public float getFloatOr(int index, float fallback) {
-        return index >= 0 && index < list.size() && list.get(index) instanceof NumericTag tag ? tag.floatValue() : fallback;
+        return index >= 0 && index < list.size() && list.get(index) instanceof NumericTag tag
+            ? tag.floatValue() : fallback;
     }
 
     public double getDoubleOr(int index, double fallback) {
-        return index >= 0 && index < list.size() && list.get(index) instanceof NumericTag tag ? tag.doubleValue() : fallback;
+        return index >= 0 && index < list.size() && list.get(index) instanceof NumericTag tag
+            ? tag.doubleValue() : fallback;
     }
 
     public int getIntOr(int index, int fallback) {
-        return index >= 0 && index < list.size() && list.get(index) instanceof NumericTag tag ? tag.intValue() : fallback;
+        return index >= 0 && index < list.size() && list.get(index) instanceof NumericTag tag
+            ? tag.intValue() : fallback;
     }
 
     public ListTag getListOrEmpty(int index) {
