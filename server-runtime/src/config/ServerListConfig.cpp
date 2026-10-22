@@ -12,13 +12,13 @@ using wire::common::toml::TomlTable;
 
 constexpr std::string_view kModernMotdBlock =
     R"(motd = [
-    "              <bold><gradient:gray:white>BASALT SERVER</gradient></bold> <gray>[1.8-26.2]</gray>",
+    "              <bold><gradient:gray:white>BASALT SERVER</gradient></bold> <gray>[1.8-26.3]</gray>",
     "              <white>Welcome to your new server</white>",
 ])";
 
 constexpr std::string_view kLegacyMotdBlock =
     R"(motd = [
-    "              <bold><gray>BASALT SERVER</gray></bold> <dark_gray>[1.8-26.2]</dark_gray>",
+    "              <bold><gray>BASALT SERVER</gray></bold> <dark_gray>[1.8-26.3]</dark_gray>",
     "              <white>Welcome to your new server</white>",
 ])";
 

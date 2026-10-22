@@ -36,7 +36,7 @@
 [profiles.default]
 default = true
 motd = [
-    "              <bold><gradient:gray:white>BASALT SERVER</gradient></bold> <gray>[1.8-26.2]</gray>",
+    "              <bold><gradient:gray:white>BASALT SERVER</gradient></bold> <gray>[1.8-26.3]</gray>",
     "              <white>Welcome to your new server</white>",
 ]
 
@@ -45,7 +45,7 @@ motd = [
 # the profile above as flat white and loses the effect entirely. Same layout,
 # built out of the sixteen colours those clients do have.
 motd = [
-    "              <bold><gray>BASALT SERVER</gray></bold> <dark_gray>[1.8-26.2]</dark_gray>",
+    "              <bold><gray>BASALT SERVER</gray></bold> <dark_gray>[1.8-26.3]</dark_gray>",
     "              <white>Welcome to your new server</white>",
 ]
 
@@ -58,7 +58,7 @@ when = ["%basalt_player_protocol% < 735"]
 active = false
 priority = 100
 motd = [
-    "              <bold><gray>BASALT SERVER</gray></bold> <dark_gray>[1.8-26.2]</dark_gray>",
+    "              <bold><gray>BASALT SERVER</gray></bold> <dark_gray>[1.8-26.3]</dark_gray>",
     "           <red>The server is under maintenance</red>",
 ]
 # Replaces the player count with ??? rather than showing 0 of 80.
