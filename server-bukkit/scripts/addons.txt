@@ -1,0 +1,3 @@
+# name|url|sha256: compile-only inputs of the WorldEdit family add-ons. Downloaded into the build tree, never committed or bundled.
+worldedit-bukkit-7.4.6.jar|https://cdn.modrinth.com/data/1u6JkXh5/versions/YFnqiUlL/worldedit-bukkit-7.4.6.jar|e0ce67d870ad1fef8a40dd9d7926360caf3bb44722438545d6b20b55f82a0c91
+FastAsyncWorldEdit-Bukkit-2.16.1.jar|https://cdn.modrinth.com/data/z4HZZnLr/versions/b9Fl6Ct5/FastAsyncWorldEdit-Bukkit-2.16.1.jar|ef53f154d6c7ae0359f5530cbddbdc672f7a25ae0debf359426f1bae7d361312

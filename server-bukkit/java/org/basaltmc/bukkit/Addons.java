@@ -32,8 +32,39 @@ final class Addons {
             return;
         }
         loader.addAddon(best.jar());
-        best.properties().forEach(System::setProperty);
+        loader.setAddonProperties(best.properties());
         Natives.log(1, "Bukkit", "Attached the Basalt add-on " + best.id() + " to " + loader.description().getName());
+    }
+
+    /** Runs a plugin entry point with that plugin's add-on properties set, then restores what was there. */
+    static <T> T scoped(ClassLoader loader, ThrowingSupplier<T> body) throws Throwable {
+        Map<String, String> properties = loader instanceof BasaltPluginClassLoader own ? own.addonProperties() : Map.of();
+        if (properties.isEmpty()) {
+            return body.get();
+        }
+        synchronized (Addons.class) {
+            Map<String, String> previous = new HashMap<>();
+            properties.forEach((key, value) -> {
+                previous.put(key, System.getProperty(key));
+                System.setProperty(key, value);
+            });
+            try {
+                return body.get();
+            } finally {
+                previous.forEach((key, value) -> {
+                    if (value == null) {
+                        System.clearProperty(key);
+                    } else {
+                        System.setProperty(key, value);
+                    }
+                });
+            }
+        }
+    }
+
+    @FunctionalInterface
+    interface ThrowingSupplier<T> {
+        T get() throws Throwable;
     }
 
     private static boolean matches(BasaltPluginClassLoader loader, Manifest manifest) {
