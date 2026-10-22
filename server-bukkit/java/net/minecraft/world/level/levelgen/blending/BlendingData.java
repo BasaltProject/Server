@@ -1,0 +1,5 @@
+package net.minecraft.world.level.levelgen.blending;
+public class BlendingData {
+    protected BlendingData() {
+    }
+}

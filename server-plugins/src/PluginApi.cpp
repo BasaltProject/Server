@@ -226,6 +226,7 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
             server->npcClicked(*target, handler, uuid);
         };
         built.resolveText = [target](const std::string& written) { return target->text.resolve(written, nullptr, 0); };
+        built.biomeIds = [server] { return server->services().worlds().biomeIds(); };
         return built;
     };
 
@@ -282,6 +283,26 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("default");
+    wire::lua::pushHostFunction(lua, "worlds.state_id", [server](LuaArgs& args) {
+        args.pushInteger(server->services().worlds().stateId(args.checkString(1)));
+        return 1;
+    });
+    lua.setField("state_id");
+    wire::lua::pushHostFunction(lua, "worlds.state_text", [server](LuaArgs& args) {
+        args.pushString(server->services().worlds().stateText(static_cast<std::int32_t>(args.checkInteger(1))));
+        return 1;
+    });
+    lua.setField("state_text");
+    wire::lua::pushHostFunction(lua, "worlds.biomes", [server](LuaArgs& args) {
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const std::string& biome : server->services().worlds().biomeIds()) {
+            args.pushString(biome);
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("biomes");
     lua.setGlobal("worlds");
 
     wire::lua::installWaitingFunction(
