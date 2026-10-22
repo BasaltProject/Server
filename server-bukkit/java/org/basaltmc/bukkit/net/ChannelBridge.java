@@ -63,6 +63,15 @@ public final class ChannelBridge {
         volatile boolean reached;
     }
 
+    public static void shutdown() {
+        synchronized (guard) {
+            if (group != null) {
+                group.shutdownGracefully(0, 1, java.util.concurrent.TimeUnit.SECONDS).awaitUninterruptibly(3000);
+                group = null;
+            }
+        }
+    }
+
     public static void attach(List<ChannelFuture> channels, List<Connection> live) {
         serverChannels = channels;
         connections = live;

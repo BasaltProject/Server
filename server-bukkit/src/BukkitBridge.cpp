@@ -131,7 +131,7 @@ std::expected<void, std::string> BukkitBridge::boot() {
         env->ExceptionClear();
     }
     bootMethod_ = env->GetStaticMethodID(runtime_, "boot", "(Ljava/lang/String;Ljava/lang/String;)Z");
-    shutdownMethod_ = env->GetStaticMethodID(runtime_, "shutdown", "()V");
+    shutdownMethod_ = env->GetStaticMethodID(runtime_, "shutdown", "()Z");
     taskMethod_ = env->GetStaticMethodID(runtime_, "runTask", "(J)V");
     eventMethod_ = env->GetStaticMethodID(runtime_, "event", "(Ljava/lang/String;IJ[Ljava/lang/Object;Z)Z");
     commandMethod_ =
@@ -181,13 +181,15 @@ std::vector<BukkitHost::PluginState> BukkitBridge::javaPlugins() {
     return found;
 }
 
-void BukkitBridge::shutdown() {
+bool BukkitBridge::shutdown() {
     stopping_.store(true);
     JNIEnv* env = shim_->env();
+    bool clean = false;
     if (env != nullptr && runtime_ != nullptr) {
-        env->CallStaticVoidMethod(runtime_, shutdownMethod_);
+        clean = env->CallStaticBooleanMethod(runtime_, shutdownMethod_) == JNI_TRUE;
         if (env->ExceptionCheck() == JNI_TRUE) {
             reportJavaFailure(env, "BukkitRuntime.shutdown");
+            clean = false;
         }
     }
     tasks_.clear();
@@ -195,6 +197,7 @@ void BukkitBridge::shutdown() {
     commands_.clear();
     eventHandles_.clear();
     plugins_->events().removeAll(kEventOwner);
+    return clean;
 }
 
 void BukkitBridge::reportJavaFailure(JNIEnv* env, std::string_view where) {
@@ -205,6 +208,9 @@ void BukkitBridge::reportJavaFailure(JNIEnv* env, std::string_view where) {
 
 void BukkitBridge::runTask(std::int64_t id) {
     JNIEnv* env = shim_->env();
+    if (env == nullptr) {
+        return;
+    }
     env->CallStaticVoidMethod(runtime_, taskMethod_, static_cast<jlong>(id));
     if (env->ExceptionCheck() == JNI_TRUE) {
         reportJavaFailure(env, "a scheduled task");
@@ -245,6 +251,9 @@ void BukkitBridge::cancelTask(std::int64_t id) {
 
 bool BukkitBridge::deliver(const std::string& event, std::int32_t priority, Snapshot& snapshot) {
     JNIEnv* env = shim_->env();
+    if (env == nullptr) {
+        return false;
+    }
     const std::vector<std::string>& names = snapshot.type->fields();
     jobjectArray fields =
         env->NewObjectArray(static_cast<jsize>(names.size()), env->FindClass("java/lang/Object"), nullptr);
@@ -345,6 +354,9 @@ bool BukkitBridge::subscribe(const std::string& event, std::int32_t priority) {
 
 bool BukkitBridge::runCommand(const std::string& name, plugins::PluginCommandCall& call) {
     JNIEnv* env = shim_->env();
+    if (env == nullptr) {
+        return false;
+    }
     const plugins::PluginCommandCall::Argument raw = call.argument("args");
     const std::string* line = std::get_if<std::string>(&raw);
     jstring command = toJava(env, name);
@@ -391,6 +403,9 @@ void BukkitBridge::listenChannel(const std::string& channel) {
     channels_.emplace(channel, plugins_->listenNative(channel, [this](const std::string& name, const std::string& uuid,
                                                                       std::span<const std::uint8_t> bytes) {
         JNIEnv* env = shim_->env();
+        if (env == nullptr) {
+            return;
+        }
         jbyteArray payload = env->NewByteArray(static_cast<jsize>(bytes.size()));
         env->SetByteArrayRegion(payload, 0, static_cast<jsize>(bytes.size()),
                                 reinterpret_cast<const jbyte*>(bytes.data()));

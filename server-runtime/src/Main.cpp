@@ -27,8 +27,13 @@
 #include <basalt/wire/io/LogFile.hpp>
 #include <basalt/wire/io/Platform.hpp>
 
+#ifdef BASALT_WITH_BUKKIT
+#include <basalt/server/bukkit/ShimHost.hpp>
+#endif
+
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <memory>
 #include <string>
@@ -306,5 +311,11 @@ int main(int argc, char** argv) {
     // Stopped and joined here: a stdin held open by a supervisor would keep the process alive after the server.
     command::consoleReader::stop();
     wire::io::terminal::restoreMode();
+#ifdef BASALT_WITH_BUKKIT
+    if (server::bukkit::ShimHost::leftRunning()) {
+        std::fflush(nullptr);
+        std::_Exit(exitCode);
+    }
+#endif
     return exitCode;
 }

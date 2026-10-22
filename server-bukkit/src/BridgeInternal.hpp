@@ -23,7 +23,7 @@ public:
     [[nodiscard]] static BukkitBridge& current();
 
     [[nodiscard]] std::expected<void, std::string> boot();
-    void shutdown();
+    bool shutdown();
 
     [[nodiscard]] std::vector<BukkitHost::PluginState> javaPlugins();
 
