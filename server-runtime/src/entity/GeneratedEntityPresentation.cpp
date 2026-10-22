@@ -345,7 +345,7 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
     } else if (type == "wither_skull" && data.getBoolean("dangerous")) {
         entries.push_back(Entry{.index = 8, .value = SetEntityDataPacket::BoolValue{.value = true}});
     } else if (type == "axolotl") {
-        addIntIfSet(entries, data, "Variant", 18);
+        addIntIfSet(entries, data, "Variant", axolotls::kVariantDataIndex);
     } else if (type == "cat") {
         addCatMetadata(entries, data);
     } else if (type == "chicken") {
