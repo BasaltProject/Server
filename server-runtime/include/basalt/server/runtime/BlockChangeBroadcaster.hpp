@@ -66,6 +66,10 @@ public:
     void neighbourChanged(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                           std::int32_t x, std::int32_t y, std::int32_t z, std::optional<std::int32_t> source);
 
+    /// parity: `Block.updateFromNeighbourShapes`.
+    [[nodiscard]] std::int32_t validState(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                          std::int32_t stateId);
+
     /// parity: `BlockState.updateIndirectNeighbourShapes`.
     void reshapeIndirect(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
                          std::int32_t y, std::int32_t z, std::int32_t stateId);

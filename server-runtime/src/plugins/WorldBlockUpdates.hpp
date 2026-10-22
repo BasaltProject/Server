@@ -32,6 +32,9 @@ std::int32_t settle(const Target& target, std::span<const std::int32_t> position
 std::int32_t neighbourChanged(const Target& target, std::span<const std::int32_t> positions,
                               std::span<const std::int32_t> sources);
 
+/// parity: `Block.updateFromNeighbourShapes`.
+std::int32_t validState(const Target& target, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
+
 /// parity: `updateNeighbourShapes` for each position, or `updateIndirectNeighbourShapes` for the given states.
 std::int32_t shapes(const Target& target, std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
                     bool indirect);

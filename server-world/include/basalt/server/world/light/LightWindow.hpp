@@ -33,6 +33,9 @@ public:
 
     [[nodiscard]] std::pair<std::int32_t, std::int32_t> surfaceRange() const;
 
+    /// The height of the world surface above a column of the window, or the lowest height where the chunk is missing.
+    [[nodiscard]] std::int32_t surfaceAt(std::int32_t windowX, std::int32_t windowZ) const;
+
     [[nodiscard]] std::optional<std::pair<std::size_t, std::size_t>>
     emitterSections(const std::function<std::int32_t(std::int32_t)>& emission) const;
 

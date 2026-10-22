@@ -571,6 +571,12 @@ public:
         return blockUpdates::neighbourChanged(updateTarget(), positions, sources);
     }
 
+    [[nodiscard]] std::int32_t validState(std::int32_t x, std::int32_t y, std::int32_t z,
+                                          std::int32_t stateId) override {
+        return world_->state().isLoaded(x >> 4, z >> 4) ? blockUpdates::validState(updateTarget(), x, y, z, stateId)
+                                                        : stateId;
+    }
+
     std::int32_t updateShapes(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
                               bool indirect) override {
         return blockUpdates::shapes(updateTarget(), positions, states, indirect);
@@ -943,34 +949,45 @@ public:
         if (load) {
             ensureChunk(chunkX, chunkZ);
         }
-        if (out.size() < kLightBytes || (sky && !hasSkylight()) ||
-            !world::worldLight::refresh(world_->state(), chunkX, chunkZ, hasSkylight())) {
+        // parity: the engine answers with what it has worked out so far; the light thread catches up with changes.
+        if (out.size() < kLightBytes || (sky && !hasSkylight())) {
             return false;
         }
         const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
         const server::world::Chunk::SharedLight cached =
             chunk == nullptr ? nullptr : (sky ? chunk->cachedSkyLight() : chunk->cachedBlockLight());
         const std::int32_t index = sectionY - chunkHeight().minSection();
-        if (cached == nullptr || index < 0 || static_cast<std::size_t>(index) >= cached->size()) {
+        if (cached == nullptr || index < 0 || index >= chunkHeight().sectionCount()) {
             return false;
         }
-        const std::vector<std::uint8_t>& bytes = (*cached)[static_cast<std::size_t>(index)];
+        // A layer with nothing lit in it is an empty list, and a section with nothing in it an empty array.
         std::ranges::fill(out.first(kLightBytes), std::uint8_t{0});
-        std::copy_n(bytes.begin(), std::min(bytes.size(), kLightBytes), out.begin());
+        if (static_cast<std::size_t>(index) < cached->size()) {
+            const std::vector<std::uint8_t>& bytes = (*cached)[static_cast<std::size_t>(index)];
+            std::copy_n(bytes.begin(), std::min(bytes.size(), kLightBytes), out.begin());
+        }
         return true;
     }
 
     bool writeLight(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ, std::int32_t layer,
                     std::span<const std::uint8_t> nibbles) override {
         const bool sky = layer == 1;
-        if (nibbles.size() < kLightBytes || (sky && !hasSkylight()) ||
-            !world::worldLight::refresh(world_->state(), chunkX, chunkZ, hasSkylight())) {
+        if (nibbles.size() < kLightBytes || (sky && !hasSkylight())) {
             return false;
         }
         server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
         const std::int32_t index = sectionY - chunkHeight().minSection();
-        return chunk != nullptr && index >= 0 &&
-               chunk->storeLightSection(sky, static_cast<std::size_t>(index), nibbles.first(kLightBytes));
+        if (chunk == nullptr || index < 0 ||
+            !chunk->storeLightSection(sky, static_cast<std::size_t>(index), nibbles.first(kLightBytes))) {
+            return false;
+        }
+        // The engine owns the light: what a plugin wrote is read back until things settle, then worked out again.
+        constexpr std::chrono::milliseconds kQuiet{250};
+        world_->relightSoon(chunkX, chunkZ, kQuiet,
+                            [world = world_, players = players_, pair = std::array{chunkX, chunkZ}] {
+                                showChunks(*world, players, pair);
+                            });
+        return true;
     }
 
     void checkLight(std::span<const std::int32_t> positions) override {

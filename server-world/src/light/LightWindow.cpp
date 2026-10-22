@@ -153,6 +153,11 @@ std::pair<std::int32_t, std::int32_t> LightWindow::surfaceRange() const {
     return {lowest, highest};
 }
 
+std::int32_t LightWindow::surfaceAt(std::int32_t windowX, std::int32_t windowZ) const {
+    const Chunk* chunk = chunkAt(windowX / 16 - 1, windowZ / 16 - 1);
+    return chunk == nullptr ? minY_ : chunk->heightAt(windowX & 15, windowZ & 15, HeightmapType::WorldSurface);
+}
+
 std::optional<std::pair<std::size_t, std::size_t>>
 LightWindow::emitterSections(const std::function<std::int32_t(std::int32_t)>& emission) const {
     std::size_t lowest = std::numeric_limits<std::size_t>::max();

@@ -9,7 +9,7 @@ namespace basalt::server::world::light {
 
 class LightSpread {
 public:
-    /// `outside` is the level everything beyond the band is left at.
+    /// `outside` is the level above the band; below it nothing is lit.
     LightSpread(const LightWindow& window, std::int32_t bottomY, std::int32_t topY, std::int32_t outside);
 
     [[nodiscard]] std::int32_t stateAt(std::int32_t x, std::int32_t y, std::int32_t z) const {

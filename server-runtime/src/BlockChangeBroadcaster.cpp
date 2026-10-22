@@ -174,6 +174,12 @@ void BlockChangeBroadcaster::neighbourChanged(world::LoadedWorld& world,
     }
 }
 
+std::int32_t BlockChangeBroadcaster::validState(world::LoadedWorld& world, std::int32_t x, std::int32_t y,
+                                                std::int32_t z, std::int32_t stateId) {
+    random::RandomSource random = random::RandomSource::legacy(0);
+    return world::neighbourUpdates::validState(updateContext(world, random), x, y, z, stateId);
+}
+
 void BlockChangeBroadcaster::reshapeIndirect(world::LoadedWorld& world,
                                              const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
                                              std::int32_t y, std::int32_t z, std::int32_t stateId) {

@@ -138,6 +138,10 @@ void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y,
                                                   std::int32_t z, std::int32_t stateId,
                                                   std::optional<registry::BlockFace> towards = std::nullopt);
 
+/// What `stateId` would settle to at (x, y, z), writing nothing. parity: `Block.updateFromNeighbourShapes`.
+[[nodiscard]] std::int32_t validState(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
+                                      std::int32_t stateId);
+
 /// parity: `LeavesBlock.updateDistance`.
 [[nodiscard]] std::int32_t leafDistance(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 

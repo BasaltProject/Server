@@ -48,8 +48,20 @@ std::span<const std::int32_t> opacityTable() { return table(); }
 
 std::vector<SectionLight> compute(const LightWindow& window) {
     const auto [lowestSurface, highestSurface] = window.surfaceRange();
+    static_cast<void>(lowestSurface);
     const std::int32_t topY = std::clamp(highestSurface + 1, window.minY(), window.maxY());
-    const std::int32_t bottomY = std::clamp(lowestSurface - kMax - 1, window.minY(), topY);
+    // Light reaches at most kMax blocks below the lowest column floor, so nothing under that is worked out.
+    std::int32_t lowestFloor = topY + 1;
+    for (std::int32_t z = 0; z < LightWindow::kWidth; ++z) {
+        for (std::int32_t x = 0; x < LightWindow::kWidth; ++x) {
+            std::int32_t y = std::min(window.surfaceAt(x, z), topY);
+            while (y >= window.minY() && opacity(window.stateAt(x, y, z)) == 0) {
+                --y;
+            }
+            lowestFloor = std::min(lowestFloor, y + 1);
+        }
+    }
+    const std::int32_t bottomY = std::clamp(lowestFloor - kMax - 1, window.minY(), topY);
     LightSpread pass{window, bottomY, topY, kMax};
 
     // parity: `ChunkSkyLightSources`.

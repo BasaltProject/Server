@@ -63,6 +63,15 @@ public final class Effects {
         }
     }
 
+    public static BlockState valid(LevelAccessor level, BlockPos pos, BlockState state) {
+        String world = worldOf(level);
+        if (world == null) {
+            return state;
+        }
+        int settled = WorldNatives.validState(world, pos.getX(), pos.getY(), pos.getZ(), state.stateId());
+        return settled == state.stateId() ? state : net.minecraft.world.level.block.Block.stateById(settled);
+    }
+
     public static void shapes(LevelAccessor level, BlockPos pos) {
         String world = worldOf(level);
         if (world != null) {
