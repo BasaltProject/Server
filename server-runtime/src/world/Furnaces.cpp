@@ -158,7 +158,7 @@ std::int32_t cookTimeFor(const State& state, const RecipeFor& recipeFor) {
 }
 
 Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize, Cooker cooker,
-            const DropRemainder& drop) {
+            const DropRemainder& drop, const Notify& notify) {
     bool moved = false;
     bool changed = false;
     const bool wasLit = state.litTimeRemaining > 0;
@@ -187,7 +187,10 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize,
             if (recipe != nullptr) {
                 if (recipe->result.count > 0 && canBurn(state, maxStackSize, recipe->result)) {
                     if (!isLit && fuel.has_value()) {
-                        const FuelEffect effect = fuelEffect(fuel->item, cooker);
+                        FuelEffect effect = fuelEffect(fuel->item, cooker);
+                        if (notify.burn && effect.burnTicks > 0 && !notify.burn(*fuel, effect.burnTicks)) {
+                            effect.burnTicks = 0;
+                        }
                         state.litTimeRemaining = effect.burnTicks;
                         state.litTotalTime = effect.burnTicks;
                         // parity: 26.3 takes the new fuel's speed even when it does not burn, and.
@@ -213,21 +216,27 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize,
                         }
                     }
                     if (isLit) {
+                        if (state.cookingTimer == 0 && notify.started) {
+                            notify.started(*ingredient, state.cookingTotalTime, recipe->id);
+                        }
                         ++state.cookingTimer;
                         moved = true;
                         if (state.cookingTimer >= state.cookingTotalTime) {
                             state.cookingTimer = 0;
                             state.cookingTotalTime = atSpeed(recipe->cookingTime, state.speedMultiplier);
-                            burn(state, *ingredient, recipe->result);
-                            // parity: `setRecipeUsed`, one more of this recipe to pay out later.
-                            const auto used = std::ranges::find(state.recipesUsed, recipe->id,
-                                                                &std::pair<std::string, std::int32_t>::first);
-                            if (used == state.recipesUsed.end()) {
-                                state.recipesUsed.emplace_back(recipe->id, 1);
-                            } else {
-                                ++used->second;
+                            ItemStack made = recipe->result;
+                            if (!notify.smelt || notify.smelt(*ingredient, made, recipe->id)) {
+                                burn(state, *ingredient, made);
+                                // parity: `setRecipeUsed`, one more of this recipe to pay out later.
+                                const auto used = std::ranges::find(state.recipesUsed, recipe->id,
+                                                                    &std::pair<std::string, std::int32_t>::first);
+                                if (used == state.recipesUsed.end()) {
+                                    state.recipesUsed.emplace_back(recipe->id, 1);
+                                } else {
+                                    ++used->second;
+                                }
+                                changed = true;
                             }
-                            changed = true;
                         }
                     } else {
                         moved = moved || state.cookingTimer != 0;

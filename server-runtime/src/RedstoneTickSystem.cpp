@@ -663,6 +663,8 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             },
         .allowHopperMove = hooks_.allowHopperMove,
         .allowSmelt = hooks_.allowSmelt,
+        .furnaceBurn = hooks_.furnaceBurn,
+        .furnaceStarted = hooks_.furnaceStarted,
         .isBookshelfBook =
             [this](const wire::common::Identifier& item) {
                 return options_.itemTags != nullptr &&

@@ -115,6 +115,9 @@ void ContainerMenuController::openEnderChest(PlayerSession& session, const Block
     if (!above.has_value() || server::registry::blockSupport::conductsRedstone(*above)) {
         return;
     }
+    if (!mayOpen("ender_chest", pos)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::chest(allocateContainerId());
     openBlock.reset();
@@ -136,6 +139,9 @@ void ContainerMenuController::openEnderChest(PlayerSession& session, const Block
 }
 
 void ContainerMenuController::openChest(PlayerSession& session, const BlockPos& pos, const std::string& block) {
+    if (!mayOpen(block.ends_with("shulker_box") ? "shulker_box" : block, pos)) {
+        return;
+    }
     returnCraftingGrid(session);
     const std::int32_t containerId = allocateContainerId();
     // parity: `ChestBlock.getMenuProvider`, which hands both halves over as one container.
@@ -228,7 +234,7 @@ void ContainerMenuController::fillPluginMenu(const std::map<std::int32_t, Plugin
         if (slot < 0 || static_cast<std::size_t>(slot) >= pluginMenu_->size()) {
             continue;
         }
-        wire::nbt::NbtCompound components;
+        wire::nbt::NbtCompound components = item.components;
         // The name is MiniMessage on the plugin's side and a component on the wire, so it is parsed here.
         if (item.name.has_value()) {
             components.set("minecraft:custom_name",
@@ -260,6 +266,7 @@ void ContainerMenuController::closeOpenMenu() {
     if (session == nullptr || openMenu.containerId() == 0) {
         return;
     }
+    closeReason_ = "plugin";
     owner_->sendPlayPacket(
         wire::protocol::play::ContainerClosePacket::kClientboundId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::ContainerClosePacket{.containerId = openMenu.containerId()}.write(buffer);
@@ -268,6 +275,9 @@ void ContainerMenuController::closeOpenMenu() {
 }
 
 void ContainerMenuController::openMerchantMenu(PlayerSession& session) {
+    if (!mayOpen("merchant", std::nullopt)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::merchant(allocateContainerId());
     openBlock.reset();
@@ -288,6 +298,9 @@ void ContainerMenuController::openMerchantMenu(PlayerSession& session) {
 }
 
 void ContainerMenuController::openSmithingMenu(PlayerSession& session) {
+    if (!mayOpen("smithing", std::nullopt)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::smithing(allocateContainerId());
     openBlock.reset();
@@ -309,6 +322,9 @@ void ContainerMenuController::openSmithingMenu(PlayerSession& session) {
 }
 
 void ContainerMenuController::openStonecutterMenu(PlayerSession& session) {
+    if (!mayOpen("stonecutter", std::nullopt)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::stonecutter(allocateContainerId());
     openBlock.reset();
@@ -331,6 +347,9 @@ void ContainerMenuController::openStonecutterMenu(PlayerSession& session) {
 }
 
 void ContainerMenuController::openCrafter(PlayerSession& session, const BlockPos& pos) {
+    if (!mayOpen("crafter", pos)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::crafter(allocateContainerId());
     openBlock = pos;
@@ -373,7 +392,11 @@ void ContainerMenuController::setSlotState(const std::int32_t slot, const bool e
     });
 }
 
-void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
+void ContainerMenuController::closeOpenMenu(PlayerSession& session, std::string_view reason) {
+    if (hooks_.closed && (openMenu.containerId() != 0 || reason == "player")) {
+        hooks_.closed(windowKind(), closeReason_.empty() ? reason : std::string_view{closeReason_});
+    }
+    closeReason_.clear();
     if (openMenu.containerId() == 0) {
         returnCraftingGrid(session);
         sendInventory();
@@ -404,6 +427,8 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
     openEntity_.reset();
     pluginMenu_.reset();
     pluginMenuClick_ = nullptr;
+    pluginEditable_ = false;
+    pluginKind_.clear();
     // parity: `SmithingMenu.removed`, which hands the three inputs back.
     if (openSmithing_) {
         for (const std::int32_t slot : {Menu::kSmithingTemplate, Menu::kSmithingBase, Menu::kSmithingAddition}) {

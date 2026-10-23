@@ -157,7 +157,15 @@ const loot::ItemStack* CraftingInput::item(std::int32_t x, std::int32_t y) const
 }
 
 bool Ingredient::test(const loot::ItemStack* stack) const {
-    return stack != nullptr && items.contains(stack->item.toString());
+    if (stack == nullptr) {
+        return false;
+    }
+    for (const loot::ItemStack& wanted : exact) {
+        if (wanted.item == stack->item && wanted.components == stack->components) {
+            return true;
+        }
+    }
+    return items.contains(stack->item.toString());
 }
 
 bool Ingredient::testOptional(const std::optional<Ingredient>& ingredient, const loot::ItemStack* stack) {

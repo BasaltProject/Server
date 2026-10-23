@@ -226,6 +226,8 @@ struct PlayerConnection {
 
     std::function<void()> closeOpenMenu;
 
+    std::function<server::plugins::PluginWindow*()> window;
+
     std::function<void(world::LoadedWorld& world)> syncOpenWindow;
 
     /// Moves this session onto the owner of the world it is standing in, between ticks.

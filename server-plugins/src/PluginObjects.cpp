@@ -1,5 +1,6 @@
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
+#include <basalt/wire/nbt/Snbt.hpp>
 #include <basalt/wire/plugins/PluginValue.hpp>
 
 #include <charconv>
@@ -70,6 +71,24 @@ constexpr std::int32_t kFadeOut = 20;
     }
     return encoded;
 }
+
+[[nodiscard]] wire::nbt::NbtCompound componentsOf(LuaArgs& lua, std::int32_t index) {
+    wire::nbt::NbtCompound out;
+    if (!lua.isTable(index)) {
+        return out;
+    }
+    lua.pushNil();
+    while (lua.nextEntry(index)) {
+        const std::string name = lua.toText(-2);
+        const std::expected<wire::nbt::NbtTag, wire::nbt::NbtError> parsed = wire::nbt::snbt::parse(lua.toText(-1));
+        if (!parsed.has_value()) {
+            lua.raise("the component '" + name + "' is not valid NBT text");
+        }
+        out.set(name, *parsed);
+        lua.pop(1);
+    }
+    return out;
+}
 } // namespace
 
 std::optional<PluginPoint> pointFrom(LuaArgs& lua, std::int32_t index) {
@@ -133,6 +152,9 @@ std::optional<PluginItem> itemFrom(LuaArgs& lua, std::int32_t index) {
     lua.pushField(index, "enchantments");
     item.enchantments = levelsOf(lua, lua.top());
     lua.pop(1);
+    lua.pushField(index, "components");
+    item.components = componentsOf(lua, lua.top());
+    lua.pop(1);
     return item;
 }
 
@@ -192,11 +214,19 @@ void pushItem(LuaArgs& lua, const PluginItem& item) {
         .reads("name", [item] { return item.name.has_value() ? PluginValue{*item.name} : PluginValue{}; })
         .reads("lore", [item] { return PluginValue{item.lore}; })
         .reads("damage", [item] { return PluginValue{static_cast<std::int64_t>(item.damage)}; })
-        .pushes("enchantments", [item](LuaArgs& args) {
+        .pushes("enchantments",
+                [item](LuaArgs& args) {
+                    args.pushTable();
+                    for (const auto& [id, level] : item.enchantments) {
+                        args.pushInteger(level);
+                        args.setField(id);
+                    }
+                })
+        .pushes("components", [item](LuaArgs& args) {
             args.pushTable();
-            for (const auto& [id, level] : item.enchantments) {
-                args.pushInteger(level);
-                args.setField(id);
+            for (std::size_t at = 0; at < item.components.names().size(); ++at) {
+                args.pushString(wire::nbt::snbt::stringify(item.components.values()[at]));
+                args.setField(item.components.names()[at]);
             }
         });
     std::move(object).push(lua);

@@ -335,7 +335,61 @@ const PluginEventType& inventoryOpen() {
 }
 
 const PluginEventType& inventoryClose() {
-    static const PluginEventType type{"inventory.close", false, {"player_name", "player_uuid", "world", "kind"}};
+    static const PluginEventType type{
+        "inventory.close", false, {"player_name", "player_uuid", "world", "kind", "reason"}};
+    return type;
+}
+
+const PluginEventType& inventoryDrag() {
+    static const PluginEventType type{"inventory.drag", true, {"player_name", "player_uuid", "world", "type", "slots"}};
+    return type;
+}
+
+const PluginEventType& inventoryPrepare() {
+    static const PluginEventType type{
+        "inventory.prepare",
+        false,
+        {"player_name", "player_uuid", "world", "kind", "recipe", "result", "name", "cost"},
+        {"result", "cost"}};
+    return type;
+}
+
+const PluginEventType& inventoryTake() {
+    static const PluginEventType type{
+        "inventory.take", true, {"player_name", "player_uuid", "world", "kind", "recipe", "result", "shift"}};
+    return type;
+}
+
+const PluginEventType& inventoryEnchantPrepare() {
+    static const PluginEventType type{"inventory.enchant_prepare",
+                                      true,
+                                      {"player_name", "player_uuid", "world", "item", "bookshelves", "offers"},
+                                      {"offers"}};
+    return type;
+}
+
+const PluginEventType& inventoryEnchant() {
+    static const PluginEventType type{"inventory.enchant",
+                                      true,
+                                      {"player_name", "player_uuid", "world", "item", "button", "cost", "enchants"},
+                                      {"cost", "enchants"}};
+    return type;
+}
+
+const PluginEventType& furnaceBurn() {
+    static const PluginEventType type{
+        "furnace.burn", true, {"world", "x", "y", "z", "cooker", "fuel", "burn_time"}, {"burn_time"}};
+    return type;
+}
+
+const PluginEventType& furnaceStart() {
+    static const PluginEventType type{
+        "furnace.start", false, {"world", "x", "y", "z", "cooker", "source", "total", "recipe"}};
+    return type;
+}
+
+const PluginEventType& inventoryChanged() {
+    static const PluginEventType type{"inventory.changed", false, {"player_name", "player_uuid", "world"}};
     return type;
 }
 
@@ -346,7 +400,11 @@ const PluginEventType& inventoryClick() {
 }
 
 const PluginEventType& inventorySmelt() {
-    static const PluginEventType type{"inventory.smelt", true, {"world", "x", "y", "z", "cooker", "item", "result"}};
+    static const PluginEventType type{
+        "inventory.smelt",
+        true,
+        {"world", "x", "y", "z", "cooker", "item", "result", "source", "output", "recipe"},
+        {"output"}};
     return type;
 }
 
@@ -476,7 +534,15 @@ const std::vector<const PluginEventType*>& all() {
                                                            &raidFinish(),
                                                            &entityCombust(),
                                                            &blockFade(),
-                                                           &playerCustomClick()};
+                                                           &playerCustomClick(),
+                                                           &inventoryDrag(),
+                                                           &inventoryChanged(),
+                                                           &inventoryPrepare(),
+                                                           &inventoryTake(),
+                                                           &inventoryEnchantPrepare(),
+                                                           &inventoryEnchant(),
+                                                           &furnaceBurn(),
+                                                           &furnaceStart()};
     return every;
 }
 } // namespace basalt::server::plugins::pluginEventTypes

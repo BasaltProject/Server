@@ -87,10 +87,6 @@ namespace crafting = server::world::crafting;
     return *turned;
 }
 
-[[nodiscard]] const server::world::loot::ItemStack* slotOf(const furnaces::State& state, std::size_t slot) {
-    return slot < state.items.size() && state.items[slot].has_value() ? &*state.items[slot] : nullptr;
-}
-
 } // namespace
 
 std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,
@@ -354,9 +350,25 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 continue;
             }
             furnaces::State state = furnaces::read(entity->data());
-            if (hooks.allowSmelt &&
-                !hooks.allowSmelt(worldName, x, y, z, nameOf(*cooker), slotOf(state, 0), slotOf(state, 2))) {
-                continue;
+            furnaces::Notify notify;
+            if (hooks.furnaceBurn) {
+                notify.burn = [&hooks, &worldName, &cooker, x, y, z](const server::world::loot::ItemStack& fuel,
+                                                                     std::int32_t& burnTicks) {
+                    return hooks.furnaceBurn(worldName, x, y, z, nameOf(*cooker), fuel, burnTicks);
+                };
+            }
+            if (hooks.furnaceStarted) {
+                notify.started = [&hooks, &worldName, &cooker, x, y, z](const server::world::loot::ItemStack& source,
+                                                                        std::int32_t total, std::string_view recipe) {
+                    hooks.furnaceStarted(worldName, x, y, z, nameOf(*cooker), source, total, recipe);
+                };
+            }
+            if (hooks.allowSmelt) {
+                notify.smelt = [&hooks, &worldName, &cooker, x, y, z](const server::world::loot::ItemStack& source,
+                                                                      server::world::loot::ItemStack& result,
+                                                                      std::string_view recipe) {
+                    return hooks.allowSmelt(worldName, x, y, z, nameOf(*cooker), source, result, recipe);
+                };
             }
             const furnaces::Ticked turn = furnaces::tick(
                 state,
@@ -368,7 +380,8 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     if (hooks.onDropped) {
                         hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = remainder});
                     }
-                });
+                },
+                notify);
             if (!turn.moved) {
                 continue;
             }

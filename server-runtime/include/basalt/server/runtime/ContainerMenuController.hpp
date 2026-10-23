@@ -1,8 +1,10 @@
 #pragma once
 
+#include <basalt/server/plugins/PluginWindow.hpp>
 #include <basalt/server/runtime/player/Menu.hpp>
 #include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
+#include <basalt/server/runtime/world/Enchanting.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Uuid.hpp>
@@ -40,9 +42,10 @@ struct PluginMenuItem {
     std::int32_t count = 1;
     std::optional<std::string> name;
     std::vector<std::string> lore;
+    wire::nbt::NbtCompound components;
 };
 
-class ContainerMenuController {
+class ContainerMenuController final : public server::plugins::PluginWindow {
 public:
     /// parity: the four grid cells of a player's own inventory, and the nine of a table.
     static constexpr std::int32_t kMaxGridSize = 9;
@@ -56,6 +59,23 @@ public:
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
                            const std::string& item)>
             pickAllowed;
+        std::function<void(std::string_view kind, std::string_view reason)> closed;
+        std::function<bool(std::string_view type, std::string_view slots)> dragAllowed;
+        std::function<void()> changed;
+        std::function<void(std::string_view kind, std::string_view recipe, std::string_view name,
+                           std::optional<storage::StoredItemStack>& result, std::int32_t& cost)>
+            prepared;
+        std::function<bool(std::string_view kind, std::string_view recipe, const storage::StoredItemStack& result,
+                           bool shift)>
+            takeAllowed;
+        /// The three rows an enchanting table is about to show for an item; false hides them all.
+        std::function<bool(const storage::StoredItemStack& item, std::int32_t bookshelves,
+                           std::array<world::enchanting::Row, 3>& rows)>
+            enchantPrepared;
+        /// The button pressed, the levels it costs and the enchantments it adds; false stops it.
+        std::function<bool(const storage::StoredItemStack& item, std::int32_t button, std::int32_t& cost,
+                           std::vector<world::enchanting::Offer>& offers)>
+            enchantAllowed;
     };
 
     struct Options {
@@ -123,6 +143,22 @@ public:
 
     void openCrafter(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
+    std::int32_t openWindow(const server::plugins::PluginWindowSpec& spec) override;
+
+    void closeWindow() override;
+
+    [[nodiscard]] server::plugins::PluginWindowInfo windowInfo() const override;
+
+    [[nodiscard]] std::optional<server::plugins::PluginItem> windowItem(std::int32_t slot) const override;
+
+    void setWindowItem(std::int32_t slot, const std::optional<server::plugins::PluginItem>& item) override;
+
+    [[nodiscard]] std::optional<server::plugins::PluginItem> cursorItem() const override;
+
+    void setCursorItem(const std::optional<server::plugins::PluginItem>& item) override;
+
+    void resyncWindow() override { sendInventory(); }
+
     void openPluginMenu(const std::string& title, std::int32_t rows,
                         const std::map<std::int32_t, PluginMenuItem>& items, std::function<void(std::int32_t)> onClick);
 
@@ -130,7 +166,9 @@ public:
 
     void closeOpenMenu();
 
-    void closeOpenMenu(player::PlayerSession& session);
+    void closeOpenMenu(player::PlayerSession& session) { closeOpenMenu(session, "unknown"); }
+
+    void closeOpenMenu(player::PlayerSession& session, std::string_view reason);
 
     /// parity: `ContainerButtonClick`.
     void clickContainerButton(std::int32_t button);
@@ -151,6 +189,8 @@ public:
 
     void handleContainerClick(const wire::protocol::play::ServerboundContainerClickPacket& packet);
 
+    void handleContainerClickChecked(const wire::protocol::play::ServerboundContainerClickPacket& packet);
+
     void placeRecipe(const wire::protocol::play::PlaceRecipePacket& packet);
 
     void handleSetCreativeModeSlot(const wire::protocol::play::ServerboundSetCreativeModeSlotPacket& packet);
@@ -167,6 +207,16 @@ public:
 
 private:
     [[nodiscard]] std::int32_t allocateContainerId();
+
+    [[nodiscard]] std::string windowKind() const;
+
+    void announceResult(std::string_view kind, std::optional<storage::StoredItemStack>& result, std::int32_t& cost);
+
+    [[nodiscard]] bool resultMayBeTaken(const player::MenuSlot& slot, bool shift) const;
+
+    [[nodiscard]] bool mayOpen(std::string_view kind, const std::optional<wire::protocol::play::BlockPos>& pos) const {
+        return !hooks_.openAllowed || hooks_.openAllowed(kind, pos);
+    }
 
     [[nodiscard]] std::optional<storage::StoredItemStack> readBlockSlot(std::int32_t index) const;
 
@@ -323,6 +373,9 @@ private:
     bool openMount_ = false;
     std::optional<std::vector<std::optional<storage::StoredItemStack>>> pluginMenu_;
     std::function<void(std::int32_t)> pluginMenuClick_;
+    std::string pluginKind_;
+    std::string closeReason_;
+    bool pluginEditable_ = false;
     std::optional<wire::protocol::play::BlockPos> openedAt_;
 
     bool openStonecutter_ = false;
@@ -338,6 +391,7 @@ private:
     std::array<std::optional<storage::StoredItemStack>, 2> enchantmentSlots_;
     std::array<std::int32_t, 3> enchantmentCosts_{0, 0, 0};
     std::array<std::int32_t, 3> enchantmentClues_{-1, -1, -1};
+    std::array<world::enchanting::Row, 3> enchantmentRows_;
     std::array<std::int32_t, 3> enchantmentLevels_{-1, -1, -1};
     std::int32_t shelvesAround_ = 0;
 

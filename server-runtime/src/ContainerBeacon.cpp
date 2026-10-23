@@ -54,6 +54,9 @@ world::beacons::Stored ContainerMenuController::beaconState() const {
 }
 
 void ContainerMenuController::openBeaconMenu(PlayerSession& session, const BlockPos& pos) {
+    if (!mayOpen("beacon", pos)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::beacon(allocateContainerId());
     openBlock = pos;

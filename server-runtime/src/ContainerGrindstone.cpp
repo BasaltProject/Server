@@ -23,6 +23,9 @@ using wire::text::Component;
 } // namespace
 
 void ContainerMenuController::openGrindstoneMenu(PlayerSession& session, const BlockPos& pos) {
+    if (!mayOpen("grindstone", pos)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::grindstone(allocateContainerId());
     openBlock = pos;

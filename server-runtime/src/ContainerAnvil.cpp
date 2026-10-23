@@ -26,6 +26,9 @@ using wire::text::Component;
 } // namespace
 
 void ContainerMenuController::openAnvilMenu(PlayerSession& session, const BlockPos& pos) {
+    if (!mayOpen("anvil", pos)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::anvil(allocateContainerId());
     openBlock = pos;
@@ -74,6 +77,7 @@ void ContainerMenuController::recomputeAnvilResult() {
     anvilCost_ = made.cost;
     anvilMaterials_ = made.materialCount;
     anvilOnlyRenaming_ = made.onlyRenaming;
+    announceResult("anvil", anvilSlots_[Menu::kAnvilResult], anvilCost_);
     sendAnvilCost();
 }
 

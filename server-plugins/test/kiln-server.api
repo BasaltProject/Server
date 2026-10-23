@@ -105,6 +105,13 @@ rawequal function
 rawget function
 rawlen function
 rawset function
+recipes table
+recipes.add function
+recipes.clear function
+recipes.has function
+recipes.ids function
+recipes.remove function
+recipes.reset function
 request_chunk function
 require function
 run function

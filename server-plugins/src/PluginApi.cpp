@@ -4,6 +4,7 @@
 #include <basalt/server/plugins/PluginMenuObject.hpp>
 #include <basalt/server/plugins/PluginObject.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
+#include <basalt/server/plugins/PluginRecipeApi.hpp>
 #include <basalt/server/plugins/PluginServiceRegistry.hpp>
 #include <basalt/server/plugins/PluginStore.hpp>
 #include <basalt/wire/io/FileIO.hpp>
@@ -428,7 +429,8 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
     });
     lua.setField("data_version");
     wire::lua::pushHostFunction(lua, "worlds.fix_nbt", [server](LuaArgs& args) {
-        const std::expected<wire::nbt::NbtTag, wire::nbt::NbtError> parsed = wire::nbt::snbt::parse(args.checkString(2));
+        const std::expected<wire::nbt::NbtTag, wire::nbt::NbtError> parsed =
+            wire::nbt::snbt::parse(args.checkString(2));
         if (!parsed.has_value()) {
             args.raise("that is not valid NBT text");
         }
@@ -506,6 +508,7 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
     });
     lua.setField("tags");
     lua.setGlobal("worlds");
+    installRecipes(lua, host);
 
     wire::lua::installWaitingFunction(
         *instance.sandbox, "request_chunk", [server, target, lane](LuaArgs& args, wire::lua::LuaCall::Resume resume) {

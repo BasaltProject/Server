@@ -101,6 +101,8 @@ public:
 
     [[nodiscard]] static Menu rows(std::int32_t containerId, std::int32_t rows);
 
+    [[nodiscard]] static Menu blocks(std::int32_t containerId, std::int32_t count);
+
     [[nodiscard]] static Menu mount(std::int32_t containerId, std::int32_t columns);
 
     [[nodiscard]] static Menu stonecutter(std::int32_t containerId);

@@ -493,6 +493,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     pluginPlaceholders_ = std::make_unique<plugins::RegistryPlaceholders>(placeholders_, *pluginPlayers_, sessions);
     pluginStorage_ = std::make_unique<plugins::DatabasePluginStorage>([this] { return playerStore_.get(); });
     pluginMenus_ = std::make_unique<plugins::SessionMenus>(playerRegistry_);
+    pluginInventories_ =
+        std::make_unique<plugins::ServerInventories>([this]() -> VanillaGameData& { return vanillaData_; });
     pluginPackets_ = std::make_unique<plugins::SessionPackets>(playerRegistry_);
     pluginChannels_ = std::make_unique<plugins::SessionChannels>(playerRegistry_);
 
@@ -502,6 +504,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     parts.placeholders = pluginPlaceholders_.get();
     parts.storage = pluginStorage_.get();
     parts.menus = pluginMenus_.get();
+    parts.inventories = pluginInventories_.get();
     parts.packets = pluginPackets_.get();
     parts.channels = pluginChannels_.get();
     parts.ownerAt = [this](const std::string& name, double x, double z) -> sched::Owner* {

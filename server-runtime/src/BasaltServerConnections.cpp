@@ -344,13 +344,6 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
                                                     filled.set(4, static_cast<std::int64_t>(fromSlot));
                                                 }));
     };
-    hooks.menuClosed = [bus](const player::PlayerSession& player, std::string_view kind) {
-        static_cast<void>(server::plugins::emit(bus, &server::plugins::pluginEventTypes::inventoryClose(),
-                                                [&player, kind](server::plugins::PluginEvent& filled) {
-                                                    fillPlayer(filled, player);
-                                                    filled.set(3, std::string{kind});
-                                                }));
-    };
     return hooks;
 }
 

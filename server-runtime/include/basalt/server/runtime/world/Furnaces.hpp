@@ -62,9 +62,20 @@ struct Ticked {
 /// parity: `Containers.dropItemStack` at the furnace, which only the caller can do.
 using DropRemainder = std::function<void(const server::world::loot::ItemStack&)>;
 
+/// What a plugin may say about a furnace as it works: fuel about to burn, a smelt about to start and one about to
+/// finish.
+struct Notify {
+    std::function<bool(const server::world::loot::ItemStack& fuel, std::int32_t& burnTicks)> burn;
+    std::function<void(const server::world::loot::ItemStack& source, std::int32_t totalTicks, std::string_view recipe)>
+        started;
+    std::function<bool(const server::world::loot::ItemStack& source, server::world::loot::ItemStack& result,
+                       std::string_view recipe)>
+        smelt;
+};
+
 [[nodiscard]] Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize = kDefaultStackSize,
                           server::world::crafting::Cooker cooker = server::world::crafting::Cooker::Smelting,
-                          const DropRemainder& drop = {});
+                          const DropRemainder& drop = {}, const Notify& notify = {});
 
 /// parity: the `minecraft:cooking_fuel` component's two providers.
 struct FuelEffect {

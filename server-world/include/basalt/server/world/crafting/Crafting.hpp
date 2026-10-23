@@ -43,6 +43,9 @@ struct Ingredient {
 
     std::string tag;
 
+    /// Stacks that match only with their components as well, for an ingredient a plugin made. Count is ignored.
+    std::vector<loot::ItemStack> exact;
+
     [[nodiscard]] bool test(const loot::ItemStack* stack) const;
 
     /// parity: `Ingredient.testOptionalIngredient`.

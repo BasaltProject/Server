@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/plugins/PluginEvents.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <array>
 #include <cstdint>
@@ -14,6 +15,8 @@
 #include <vector>
 
 namespace basalt::server::plugins {
+class PluginWindow;
+
 struct PluginItem {
     std::string id;
     std::int32_t count = 1;
@@ -21,6 +24,7 @@ struct PluginItem {
     std::vector<std::string> lore;
     std::int32_t damage = 0;
     std::map<std::string, std::int32_t> enchantments;
+    wire::nbt::NbtCompound components;
 
     friend bool operator==(const PluginItem&, const PluginItem&) = default;
 };
@@ -49,6 +53,8 @@ public:
     [[nodiscard]] virtual std::int32_t count(std::string_view id) const = 0;
 
     virtual void clear() = 0;
+
+    virtual void setHeldSlot(std::int32_t slot) { static_cast<void>(slot); }
 };
 
 class PluginPlayerRef : public std::enable_shared_from_this<PluginPlayerRef> {
@@ -95,6 +101,9 @@ public:
     [[nodiscard]] virtual std::optional<std::string> heldItem() const = 0;
 
     [[nodiscard]] virtual PluginInventory& inventory() = 0;
+
+    /// The container window this player has open, or null when the connection has no windows (Bedrock).
+    [[nodiscard]] virtual PluginWindow* window() { return nullptr; }
 
     virtual void title(std::string_view title, std::string_view subtitle, std::int32_t fadeIn, std::int32_t stay,
                        std::int32_t fadeOut) = 0;
@@ -879,7 +888,8 @@ public:
     /// The item ids, in registry order.
     [[nodiscard]] virtual std::vector<std::string> itemIds() const { return {}; }
 
-    /// The ids of a registry by name (`damage_type`, `particle_type`, `worldgen/biome`...), empty when the server has none.
+    /// The ids of a registry by name (`damage_type`, `particle_type`, `worldgen/biome`...), empty when the server has
+    /// none.
     [[nodiscard]] virtual std::vector<std::string> registryIds(std::string_view registry) const {
         static_cast<void>(registry);
         return {};

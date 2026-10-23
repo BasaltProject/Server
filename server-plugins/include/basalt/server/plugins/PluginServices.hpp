@@ -2,6 +2,7 @@
 
 #include <basalt/server/plugins/PluginCommandSpec.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
+#include <basalt/server/plugins/PluginInventories.hpp>
 #include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 
@@ -236,5 +237,10 @@ public:
     [[nodiscard]] virtual PluginChannelSender& channels() = 0;
 
     virtual bool at(std::string_view world, double x, double z, std::function<void()> task) = 0;
+
+    [[nodiscard]] virtual PluginInventories& inventories() {
+        static PluginInventories kNone;
+        return kNone;
+    }
 };
 } // namespace basalt::server::plugins

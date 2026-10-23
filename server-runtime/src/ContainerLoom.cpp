@@ -27,6 +27,9 @@ constexpr std::string_view kFreePatterns = "minecraft:no_item_required";
 } // namespace
 
 void ContainerMenuController::openLoomMenu(PlayerSession& session, const BlockPos& pos) {
+    if (!mayOpen("loom", pos)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::loom(allocateContainerId());
     openBlock = pos;
