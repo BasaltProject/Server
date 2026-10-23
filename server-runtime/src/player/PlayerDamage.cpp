@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
@@ -16,6 +17,7 @@
 #include <basalt/server/runtime/player/PlayerTotem.hpp>
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
@@ -55,6 +57,34 @@ constexpr std::int32_t kHurtCooldownTicks = 20;
 constexpr std::int32_t kCooldownHalfTicks = 10;
 
 constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
+
+[[nodiscard]] bool velocityAllowed(const PlayerSession& session, std::array<double, 3>& velocity) {
+    if (session.events == nullptr) {
+        return true;
+    }
+    const server::plugins::PluginEvent* answered = session.events->ask(
+        &server::plugins::pluginEventTypes::playerVelocity, [&](server::plugins::PluginEvent& event) {
+            plugins::EventSink::player(event, session);
+            event.set("vx", velocity[0]);
+            event.set("vy", velocity[1]);
+            event.set("vz", velocity[2]);
+        });
+    if (answered == nullptr) {
+        return true;
+    }
+    if (answered->cancelled()) {
+        return false;
+    }
+    const auto edited = [&](const char* field, double& axis) {
+        if (const auto* value = std::get_if<double>(&answered->get(field)); value != nullptr) {
+            axis = *value;
+        }
+    };
+    edited("vx", velocity[0]);
+    edited("vy", velocity[1]);
+    edited("vz", velocity[2]);
+    return true;
+}
 
 /// parity: `blocks_attacks`.
 constexpr std::int32_t kShieldDelayTicks = 5;
@@ -260,9 +290,11 @@ void pushAway(PlayerSession& session, const entity::DamageSource& source, bool b
         start = player::combat::knockback(kBlockedPush, -towardsX, -towardsZ, start[0], start[1], start[2],
                                           session.onGround, resistance);
     }
-    const std::array<double, 3> moved =
-        player::combat::knockback(entity::entityCombat::kDefaultKnockback, towardsX, towardsZ, start[0], start[1],
-                                  start[2], session.onGround, resistance);
+    std::array<double, 3> moved = player::combat::knockback(entity::entityCombat::kDefaultKnockback, towardsX, towardsZ,
+                                                            start[0], start[1], start[2], session.onGround, resistance);
+    if (!velocityAllowed(session, moved)) {
+        return;
+    }
     session.deltaMovement = moved;
     const auto angle = static_cast<float>(std::atan2(towardsZ, towardsX) * kRadiansToDegrees) - session.yaw;
     if (session.connection().pushBack) {
@@ -288,9 +320,13 @@ void pushAway(PlayerSession& session, const entity::DamageSource& source, bool b
 }
 
 void shove(PlayerSession& session, const entity::shieldBlows::Push& push) {
-    session.deltaMovement = {push.x, push.y, push.z};
+    std::array<double, 3> pushed{push.x, push.y, push.z};
+    if (!velocityAllowed(session, pushed)) {
+        return;
+    }
+    session.deltaMovement = pushed;
     if (session.connection().pushBack) {
-        session.connection().pushBack(push.x, push.y, push.z, session.yaw);
+        session.connection().pushBack(pushed[0], pushed[1], pushed[2], session.yaw);
         return;
     }
     if (!session.connection().sendPlayPacket) {
@@ -299,7 +335,7 @@ void shove(PlayerSession& session, const entity::shieldBlows::Push& push) {
     session.connection().sendPlayPacket(
         wire::protocol::play::SetEntityMotionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::SetEntityMotionPacket{
-                .entityId = session.entityId(), .velocityX = push.x, .velocityY = push.y, .velocityZ = push.z}
+                .entityId = session.entityId(), .velocityX = pushed[0], .velocityY = pushed[1], .velocityZ = pushed[2]}
                 .write(buffer);
         });
 }

@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
@@ -29,6 +30,16 @@ constexpr std::int32_t kCheckInterval = 10;
            item::itemWear::damage(*stack) < item::itemWear::maxDamage(*stack) - 1;
 }
 
+[[nodiscard]] bool toggleAllowed(const PlayerSession& player, bool gliding) {
+    return player.events == nullptr ||
+           player.events->allowed(&server::plugins::pluginEventTypes::entityToggleGlide,
+                                  [&](server::plugins::PluginEvent& event) {
+                                      plugins::hookEvents::entity(event, player.worldName, player.entityId(),
+                                                                  "minecraft:player", player.x, player.y, player.z);
+                                      event.set("gliding", gliding);
+                                  });
+}
+
 [[nodiscard]] const wire::common::Identifier& levitation() {
     static const wire::common::Identifier kLevitation = wire::common::Identifier::vanilla("levitation");
     return kLevitation;
@@ -45,7 +56,9 @@ bool canGlide(const PlayerSession& player) {
 
 void startFallFlying(PlayerSession& player) {
     // parity: `isInLiquid`.
-    player.fallFlying = !player.fallFlying && canGlide(player);
+    if (!player.fallFlying && canGlide(player) && toggleAllowed(player, true)) {
+        player.fallFlying = true;
+    }
 }
 
 void tick(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world) {
@@ -54,7 +67,9 @@ void tick(const BreakContext& context, PlayerSession& player, world::LoadedWorld
         return;
     }
     if (!canGlide(player)) {
-        player.fallFlying = false;
+        if (toggleAllowed(player, false)) {
+            player.fallFlying = false;
+        }
         return;
     }
     const std::int32_t next = player.fallFlyTicks + 1;

@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
@@ -10,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPick.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/BlockPickData.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
@@ -600,6 +602,30 @@ void ContainerMenuController::handleSetCreativeModeSlot(
     if (stack.has_value() &&
         stack->count > server::registry::itemStacking::maxStackSize(stack->id, stack->components)) {
         return;
+    }
+    if (world::LoadedWorld* where = owner_->currentWorld(); where != nullptr) {
+        const server::plugins::PluginEvent* asked = where->events().ask(
+            &server::plugins::pluginEventTypes::inventoryCreative, [&](server::plugins::PluginEvent& event) {
+                plugins::EventSink::player(event, *session);
+                event.set("slot", static_cast<std::int64_t>(packet.slot));
+                event.set("item", stack.has_value() ? stack->id : std::string{});
+                event.set("count", static_cast<std::int64_t>(stack.has_value() ? stack->count : 0));
+            });
+        if (asked != nullptr && asked->cancelled()) {
+            sendInventorySlot(*slot);
+            return;
+        }
+        if (asked != nullptr) {
+            const auto* item = std::get_if<std::string>(&asked->get("item"));
+            const auto* count = std::get_if<std::int64_t>(&asked->get("count"));
+            if (item != nullptr && count != nullptr &&
+                (!stack.has_value() || *item != stack->id || *count != stack->count)) {
+                stack = item->empty() || *count <= 0
+                            ? std::nullopt
+                            : std::optional{storage::StoredItemStack{
+                                  .id = *item, .count = static_cast<std::int32_t>(*count), .components = {}}};
+            }
+        }
     }
     session->inventory.set(*slot, stack);
     sendInventorySlot(*slot);

@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -304,6 +305,34 @@ void MobActionSystem::piglinStopHoldingOffhand(world::LoadedWorld& world, Server
                 random::RandomSource& roll =
                     table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : random;
                 result = table->generate(roll, context.luck, std::nullopt, context);
+            }
+            std::string lines;
+            for (const ItemStack& stack : result) {
+                lines += (lines.empty() ? "" : "\n") + stack.item.toString() + "|" + std::to_string(stack.count);
+            }
+            const server::plugins::PluginEvent* asked = world.events().ask(
+                &server::plugins::pluginEventTypes::entityPiglinBarter, [&](server::plugins::PluginEvent& event) {
+                    plugins::hookEvents::entity(event, world.name(), piglin);
+                    event.set("outcome", lines);
+                });
+            if (asked != nullptr && asked->cancelled()) {
+                result.clear();
+            } else if (const auto* edited =
+                           asked == nullptr ? nullptr : std::get_if<std::string>(&asked->get("outcome"));
+                       edited != nullptr && *edited != lines) {
+                result.clear();
+                for (std::size_t from = 0; from < edited->size();) {
+                    const std::size_t end = std::min(edited->find('\n', from), edited->size());
+                    const std::string line = edited->substr(from, end - from);
+                    from = end + 1;
+                    const std::size_t bar = line.find('|');
+                    const auto id = wire::common::Identifier::parse(line.substr(0, bar));
+                    if (bar != std::string::npos && id.has_value()) {
+                        result.push_back(ItemStack{
+                            .item = *id,
+                            .count = static_cast<std::int32_t>(std::strtol(line.c_str() + bar + 1, nullptr, 10))});
+                    }
+                }
             }
             throwAll(result);
         } else if (!currency && !piglinEquip(world, piglin, *held)) {

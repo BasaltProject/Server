@@ -30,6 +30,10 @@
 #include <string>
 #include <vector>
 
+namespace basalt::server::runtime::plugins {
+class EventSink;
+}
+
 namespace basalt::server::runtime::player {
 
 class PlayerSession {
@@ -172,6 +176,9 @@ public:
     std::vector<std::string> postEffects;
 
     PlayerStats stats;
+
+    /// Where this player's own state tells the plugins what happens; null until the session is wired.
+    const plugins::EventSink* events = nullptr;
 
     PlayerInventory inventory;
 

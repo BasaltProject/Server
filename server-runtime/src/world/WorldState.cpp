@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -1096,7 +1097,47 @@ std::optional<DroppedItem> WorldState::removeItem(std::int32_t entityId) {
     return itemPhysics_.removeItem(entityId);
 }
 
-std::vector<std::int32_t> WorldState::tickItems(const sched::Region* region) { return itemPhysics_.tickItems(region); }
+void WorldState::setEvents(const plugins::EventSink* events, std::string worldName) {
+    events_ = events;
+    eventWorld_ = std::move(worldName);
+    const auto describe = [this](server::plugins::PluginEvent& event, const DroppedItem& item) {
+        plugins::hookEvents::position(event, eventWorld_, static_cast<std::int32_t>(std::floor(item.x)),
+                                      static_cast<std::int32_t>(std::floor(item.y)),
+                                      static_cast<std::int32_t>(std::floor(item.z)));
+        event.set("entity_id", static_cast<std::int64_t>(item.entityId));
+        event.set("item", item.item.toString());
+        event.set("count", static_cast<std::int64_t>(item.count));
+    };
+    itemPhysics_.setMergeGate(
+        [this, describe](const DroppedItem& into, const DroppedItem& from) {
+            return this->events().allowed(&server::plugins::pluginEventTypes::itemMerge,
+                                          [&](server::plugins::PluginEvent& event) {
+                                              describe(event, into);
+                                              event.set("source_id", static_cast<std::int64_t>(from.entityId));
+                                              event.set("source_count", static_cast<std::int64_t>(from.count));
+                                          });
+        },
+        [this] { return this->events().listening(&server::plugins::pluginEventTypes::itemMerge); });
+}
+
+std::vector<std::int32_t> WorldState::tickItems(const sched::Region* region) {
+    if (events().listening(&server::plugins::pluginEventTypes::itemDespawn)) {
+        for (const DroppedItem& item : itemPhysics_.expiring(region)) {
+            if (!events().allowed(
+                    &server::plugins::pluginEventTypes::itemDespawn, [&](server::plugins::PluginEvent& event) {
+                        plugins::hookEvents::position(event, eventWorld_, static_cast<std::int32_t>(std::floor(item.x)),
+                                                      static_cast<std::int32_t>(std::floor(item.y)),
+                                                      static_cast<std::int32_t>(std::floor(item.z)));
+                        event.set("entity_id", static_cast<std::int64_t>(item.entityId));
+                        event.set("item", item.item.toString());
+                        event.set("count", static_cast<std::int64_t>(item.count));
+                    })) {
+                itemPhysics_.restartAge(item.entityId);
+            }
+        }
+    }
+    return itemPhysics_.tickItems(region);
+}
 
 std::vector<entity::ServerEntity*> WorldState::entities() const { return entityRegistry_.entities(); }
 
@@ -1142,6 +1183,16 @@ entity::ServerEntity& WorldState::spawnEntity(std::unique_ptr<entity::ServerEnti
 }
 
 std::vector<std::int32_t> WorldState::collectRemovedEntities() { return entityRegistry_.collectRemovedEntities(); }
+
+bool WorldState::tntMayPrime(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view reason,
+                             std::string_view who) const {
+    return events().allowed(&server::plugins::pluginEventTypes::blockTntPrime,
+                            [&](server::plugins::PluginEvent& event) {
+                                plugins::hookEvents::position(event, eventWorld_, x, y, z);
+                                event.set("reason", std::string{reason});
+                                event.set("player_name", std::string{who});
+                            });
+}
 
 void WorldState::primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event) {
     primedTntQueue_.primeTnt(x, y, z, event);

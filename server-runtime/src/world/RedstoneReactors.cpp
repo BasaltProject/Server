@@ -251,7 +251,7 @@ void tnt(WorldState& world, std::string_view worldName, std::int32_t x, std::int
         return;
     }
     // parity: `neighborChanged` does not look at `unstable`.
-    if (redstone::bestNeighbourSignal(world, worldName, x, y, z) <= 0) {
+    if (redstone::bestNeighbourSignal(world, worldName, x, y, z) <= 0 || !world.tntMayPrime(x, y, z, "redstone")) {
         return;
     }
     if (!world.setBlockState(x, y, z, registry::blocks::air().stateId)) {

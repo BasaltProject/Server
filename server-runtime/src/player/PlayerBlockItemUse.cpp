@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -10,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/BlockTransformers.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
@@ -215,7 +217,8 @@ void primeTntFor(const BreakContext& context, PlayerSession& player, world::Load
                  const std::int32_t y, const std::int32_t z, const std::int32_t heldSlot,
                  const storage::StoredItemStack& held, const bool wears) {
     // parity: `TntBlock.prime` answers false with `tnt_explodes` off.
-    if (!world.gameRules().get(world::gameRules::kTntExplodes)) {
+    if (!world.gameRules().get(world::gameRules::kTntExplodes) ||
+        !world.state().tntMayPrime(x, y, z, "item", player.name())) {
         return;
     }
     if (!world.state().setBlockState(x, y, z, reg::blocks::air().stateId)) {
@@ -375,6 +378,18 @@ bool useComposterFor(const BreakContext& context, PlayerSession& player, world::
     const std::optional<wire::common::Identifier> item =
         held.has_value() ? parsedOrNothing(held->id) : std::optional<wire::common::Identifier>{};
     if (!item.has_value() || !world::composters::chanceOf(*item).has_value() || *level >= world::composters::kFull) {
+        return false;
+    }
+    const std::int32_t chance = world::composters::chanceOf(*item).value_or(0);
+    if (!world.events().allowed(&server::plugins::pluginEventTypes::blockCompost,
+                                [&](server::plugins::PluginEvent& event) {
+                                    plugins::EventSink::player(event, player);
+                                    event.set("x", static_cast<std::int64_t>(x));
+                                    event.set("y", static_cast<std::int64_t>(y));
+                                    event.set("z", static_cast<std::int64_t>(z));
+                                    event.set("item", item->toString());
+                                    event.set("raises", *level == 0 || chance >= 100);
+                                })) {
         return false;
     }
     random::RandomSource random = random::RandomSource::legacy(seedOf(context));

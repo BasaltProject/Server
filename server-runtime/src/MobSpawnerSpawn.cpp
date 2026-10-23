@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
@@ -8,6 +9,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/EquipmentTables.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -305,6 +307,17 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
                 return Attempt::Abort;
             }
         }
+    }
+    if (!world.events().allowed(&server::plugins::pluginEventTypes::entitySpawn,
+                                [&](server::plugins::PluginEvent& event) {
+                                    event.set("entity_type", loaded.main->type().toString());
+                                    event.set("world", world.name());
+                                    event.set("x", loaded.main->x);
+                                    event.set("y", loaded.main->y);
+                                    event.set("z", loaded.main->z);
+                                    event.set("reason", std::string{"spawner"});
+                                })) {
+        return Attempt::Abort;
     }
     const wire::common::Uuid mainUuid = loaded.main->uuid();
     const std::int32_t mainId = loaded.main->entityId();

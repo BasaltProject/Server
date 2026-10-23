@@ -152,6 +152,8 @@ basalt_module(server-runtime-core
         src/BlockUseOn.cpp
         src/plugins/EventHooks.cpp
         src/plugins/EventSink.cpp
+        src/plugins/HookEvents.cpp
+        src/plugins/PlayerHookEvents.cpp
         src/plugins/WorldEventHooks.cpp
         src/plugins/PacketNames.cpp
         src/plugins/PacketNameTable.cpp

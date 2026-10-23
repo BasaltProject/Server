@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
@@ -216,6 +217,13 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
                                  const std::function<void(wire::nbt::NbtCompound& converted)>& finish) {
     const server::registry::EntityTypeEntry* entry = server::registry::entityTypes::of(conversion.into);
     if (entry == nullptr || mob.removed) {
+        return false;
+    }
+    if (!world.events().allowed(&server::plugins::pluginEventTypes::entityTransform,
+                                [&](server::plugins::PluginEvent& event) {
+                                    plugins::hookEvents::entity(event, world.name(), mob);
+                                    event.set("to_type", conversion.into.toString());
+                                })) {
         return false;
     }
     wire::nbt::NbtCompound tag = conversions::convertedTag(entity::entityNbt::encode(mob), mob.type(), conversion);

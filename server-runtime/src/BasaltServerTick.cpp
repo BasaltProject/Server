@@ -22,6 +22,7 @@
 #include <basalt/server/runtime/entity/SwimPath.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/AttachedEntities.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -308,6 +309,23 @@ world::TriggerDamage BasaltServer::killingBlowOf(const world::LoadedWorld& world
     return blow;
 }
 
+namespace {
+
+void announceVehicleMove(const world::LoadedWorld& world, const entity::ServerEntity& vehicle,
+                         const std::array<double, 3>& from) {
+    if (vehicle.removed || (vehicle.x == from[0] && vehicle.y == from[1] && vehicle.z == from[2])) {
+        return;
+    }
+    world.events().notify(&server::plugins::pluginEventTypes::vehicleMove, [&](server::plugins::PluginEvent& event) {
+        plugins::hookEvents::entity(event, world.name(), vehicle);
+        event.set("from_x", from[0]);
+        event.set("from_y", from[1]);
+        event.set("from_z", from[2]);
+    });
+}
+
+} // namespace
+
 void BasaltServer::tickBoat(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                             const std::vector<entity::ServerEntity*>& /*living*/, entity::ServerEntity& boat) {
     player::PlayerSession* driver = nullptr;
@@ -578,8 +596,25 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         // parity: `AbstractCubeMob.remove`.
         random::RandomSource splitRandom = random::RandomSource::legacy(scratchSeed());
-        for (const entity::cubeMobs::Split& split : entity::cubeMobs::splitsOf(*dying, splitRandom)) {
-            if (spawning_ == nullptr) {
+        const std::vector<entity::cubeMobs::Split> splits = entity::cubeMobs::splitsOf(*dying, splitRandom);
+        std::size_t splitCount = splits.size();
+        if (!splits.empty()) {
+            const server::plugins::PluginEvent* asked = world.events().ask(
+                &server::plugins::pluginEventTypes::entitySplit, [&](server::plugins::PluginEvent& event) {
+                    plugins::hookEvents::entity(event, world.name(), *dying);
+                    event.set("count", static_cast<std::int64_t>(splits.size()));
+                });
+            if (asked != nullptr && asked->cancelled()) {
+                splitCount = 0;
+            } else if (const auto* edited =
+                           asked == nullptr ? nullptr : std::get_if<std::int64_t>(&asked->get("count"));
+                       edited != nullptr) {
+                splitCount = std::min(splitCount, static_cast<std::size_t>(std::max<std::int64_t>(0, *edited)));
+            }
+        }
+        std::size_t splitIndex = 0;
+        for (const entity::cubeMobs::Split& split : splits) {
+            if (spawning_ == nullptr || splitIndex++ >= splitCount) {
                 break;
             }
             static_cast<void>(spawning_->spawnMob(
@@ -821,7 +856,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         // parity: `AbstractMinecart.tick`: on a rail it follows the track, and off one it falls.
         if (world::detectorRails::isMinecart(entity->type())) {
+            const std::array<double, 3> cartFrom{entity->x, entity->y, entity->z};
             vehicles_->tickMinecart(world, *entity);
+            announceVehicleMove(world, *entity, cartFrom);
             if (entity->removed) {
                 continue;
             }
@@ -878,7 +915,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         // parity: `AbstractBoat.tick`.
         if (entity::boats::isBoat(entity->type())) {
+            const std::array<double, 3> boatFrom{entity->x, entity->y, entity->z};
             tickBoat(world, watchers, living, *entity);
+            announceVehicleMove(world, *entity, boatFrom);
             if (mobActions_ != nullptr) {
                 mobActions_->tickLeash(world, *entity);
             }

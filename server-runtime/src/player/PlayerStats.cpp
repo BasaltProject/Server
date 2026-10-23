@@ -15,7 +15,7 @@ namespace {
 } // namespace
 
 void PlayerStats::increment(std::string_view key, std::int64_t amount) {
-    if (amount == 0) {
+    if (amount == 0 || (gate_ && !gate_(key, amount))) {
         return;
     }
     const std::lock_guard<std::mutex> guard{lock_};

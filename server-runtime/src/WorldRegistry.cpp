@@ -1,7 +1,9 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/ShriekerSystem.hpp>
 #include <basalt/server/runtime/WorldRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/ContainerLoot.hpp>
@@ -192,6 +194,11 @@ bool WorldRegistry::unloadWorld(const std::string& name, const bool save) {
             if (player->worldName == name) {
                 return false;
             }
+        }
+        if (options_.events != nullptr &&
+            !options_.events->allowed(&server::plugins::pluginEventTypes::worldUnload,
+                                      [&](server::plugins::PluginEvent& event) { event.set("world", name); })) {
+            return false;
         }
         if (save) {
             world->saveDirty();

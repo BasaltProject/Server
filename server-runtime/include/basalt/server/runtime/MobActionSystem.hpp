@@ -183,6 +183,8 @@ public:
 
     void teleported(entity::ServerEntity& mob) override;
 
+    bool mayTeleport(entity::ServerEntity& mob, double x, double y, double z, std::string_view cause) override;
+
     [[nodiscard]] std::optional<bool> blockTagged(std::string_view tag,
                                                   const wire::common::Identifier& block) const override;
 
@@ -277,7 +279,8 @@ public:
     bool dropAllLeashes(world::LoadedWorld& world, player::PlayerSession& player);
 
     /// parity: `Leashable.dropLeash` and `removeLeash`, the lead dropped as an item or not.
-    void dropLeash(world::LoadedWorld& world, entity::ServerEntity& leashed, bool dropLead);
+    void dropLeash(world::LoadedWorld& world, entity::ServerEntity& leashed, bool dropLead,
+                   std::string_view reason = "unknown");
 
     void propagateFall(world::LoadedWorld& world, entity::ServerEntity& vehicle, double fallen,
                        const world::fallLanding::Landing& landing);
@@ -701,6 +704,9 @@ private:
     [[nodiscard]] player::PlayerSession* playerIn(world::LoadedWorld& world, std::int32_t entityId);
     void leashSound(world::LoadedWorld& world, std::string_view sound, double x, double y, double z);
     void setLeashedTo(world::LoadedWorld& world, entity::ServerEntity& leashed, std::int32_t holderId);
+
+    [[nodiscard]] bool playerMayUnleash(world::LoadedWorld& world, const player::PlayerSession& player,
+                                        const entity::ServerEntity& leashed);
     [[nodiscard]] std::vector<entity::ServerEntity*>
     leashedTo(world::LoadedWorld& world, const entity::ServerEntity& holder, double x, double y, double z);
     [[nodiscard]] std::vector<entity::ServerEntity*> leashedToId(world::LoadedWorld& world, std::int32_t holderId,

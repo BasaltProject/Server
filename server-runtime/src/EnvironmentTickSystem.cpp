@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerVelocity.hpp>
 #include <basalt/server/runtime/player/PlayerVitals.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/EndGateways.hpp>
@@ -291,6 +292,14 @@ void EnvironmentTickSystem::tickPortals(world::LoadedWorld& world) {
             player->portalTicks = 0;
             continue;
         }
+        if (player->portalTicks == 0) {
+            world.events().notify(&server::plugins::pluginEventTypes::entityPortalEnter,
+                                  [&](server::plugins::PluginEvent& event) {
+                                      plugins::hookEvents::entity(event, world.name(), player->entityId(),
+                                                                  "minecraft:player", player->x, player->y, player->z);
+                                      event.set("kind", std::string{"nether"});
+                                  });
+        }
         player->portalTicks++;
         const std::int32_t delay = player->gamemode == Gamemode::Creative ? creativeDelay : defaultDelay;
         if (player->portalTicks >= delay) {
@@ -320,6 +329,21 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
         const bool drowns =
             !player->invulnerable() && eyes.has_value() && world::fluids::of(*eyes) == world::Submersion::Water;
         player->airSupply = world::fluids::airAfterTick(player->airSupply, drowns);
+        if (player->airSupply != air) {
+            const server::plugins::PluginEvent* answered = world.events().ask(
+                &server::plugins::pluginEventTypes::entityAirChange, [&](server::plugins::PluginEvent& event) {
+                    plugins::hookEvents::entity(event, world.name(), player->entityId(), "minecraft:player", player->x,
+                                                player->y, player->z);
+                    event.set("amount", static_cast<std::int64_t>(player->airSupply));
+                });
+            if (answered != nullptr && answered->cancelled()) {
+                player->airSupply = air;
+            } else if (const auto* edited =
+                           answered == nullptr ? nullptr : std::get_if<std::int64_t>(&answered->get("amount"));
+                       edited != nullptr) {
+                player->airSupply = static_cast<std::int32_t>(*edited);
+            }
+        }
         if (drowns && player->airSupply <= world::fluids::kDrowningAir) {
             player->airSupply = 0;
             if (player->connection().hurt) {

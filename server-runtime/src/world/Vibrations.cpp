@@ -1,5 +1,7 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/BlockRay.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
@@ -534,6 +536,17 @@ bool ignoredWhenSneaking(std::string_view event) {
 
 void emit(WorldState& world, std::string_view event, double x, double y, double z, std::int64_t gameTime,
           const Source& source) {
+    if (!world.events().allowed(
+            &server::plugins::pluginEventTypes::worldGameEvent, [&](server::plugins::PluginEvent& filled) {
+                filled.set("world", world.eventWorld());
+                filled.set("x", x);
+                filled.set("y", y);
+                filled.set("z", z);
+                filled.set("event", std::string{event});
+                filled.set("entity_uuid", source.entity.has_value() ? source.entity->toString() : std::string{});
+            })) {
+        return;
+    }
     world.recordGameEvent(GameEventRecord{.event = std::string{event},
                                           .x = x,
                                           .y = y,

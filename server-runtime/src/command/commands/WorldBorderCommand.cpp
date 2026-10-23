@@ -1,6 +1,8 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/Coordinates.hpp>
 #include <basalt/server/runtime/command/commands/WorldBorderCommand.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/protocol/play/BorderPackets.hpp>
 
@@ -38,6 +40,8 @@ void broadcast(const CommandContext& context, const world::LoadedWorld& world, c
     }
 }
 
+constexpr std::int64_t kMillisPerTick = 50;
+
 [[nodiscard]] Parsed<std::int32_t> applySize(const CommandContext& context, double newSize, std::int32_t timeTicks) {
     const Parsed<world::LoadedWorld*> world = context.world();
     if (!world.has_value()) {
@@ -58,6 +62,15 @@ void broadcast(const CommandContext& context, const world::LoadedWorld& world, c
                                                  {Component::text(std::to_string(WorldBorder::kMaxSize))})}};
     }
     const double old = border.targetSize();
+    if (!(*world)->events().allowed(&server::plugins::pluginEventTypes::worldBorderBounds,
+                                    [&](server::plugins::PluginEvent& event) {
+                                        event.set("world", (*world)->name());
+                                        event.set("old_size", old);
+                                        event.set("new_size", newSize);
+                                        event.set("duration_ms", static_cast<std::int64_t>(timeTicks) * kMillisPerTick);
+                                    })) {
+        return 0;
+    }
     if (timeTicks > 0) {
         border.moveSize(newSize, timeTicks);
         broadcast(context, **world,
@@ -144,6 +157,16 @@ void WorldBorderCommand::build(const CommandNodeBuilder& root) const {
                 if (border.centerX() == at[0] && border.centerZ() == at[2]) {
                     return std::unexpected{
                         CommandSyntaxError{.component = Component::translatable("commands.worldborder.center.failed")}};
+                }
+                if (!(*world)->events().allowed(&server::plugins::pluginEventTypes::worldBorderCenter,
+                                                [&](server::plugins::PluginEvent& event) {
+                                                    event.set("world", (*world)->name());
+                                                    event.set("old_x", border.centerX());
+                                                    event.set("old_z", border.centerZ());
+                                                    event.set("new_x", at[0]);
+                                                    event.set("new_z", at[2]);
+                                                })) {
+                    return 0;
                 }
                 border.center(at[0], at[2]);
                 broadcast(context, **world, play::SetBorderCenterPacket{.centerX = at[0], .centerZ = at[2]});

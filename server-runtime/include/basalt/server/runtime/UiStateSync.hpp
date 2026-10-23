@@ -9,6 +9,10 @@
 #include <map>
 #include <vector>
 
+namespace basalt::wire::protocol::play {
+struct CommandsPacket;
+}
+
 namespace basalt::server::runtime::player {
 class PlayerSession;
 }
@@ -67,6 +71,8 @@ public:
                              const std::function<float()>& nextFloat);
 
 private:
+    void filterCommandTree(wire::protocol::play::CommandsPacket& tree, const player::PlayerSession& session);
+
     /// parity: `PlayerList.sendPlayerPermissionLevel`.
     void sendPermissionLevel();
 

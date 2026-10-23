@@ -1,8 +1,11 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/RecipeBook.hpp>
@@ -137,6 +140,15 @@ void ContainerMenuController::placeRecipe(const wire::protocol::play::PlaceRecip
     }
     const Placement placement = placementOf(*recipe, openMenu.gridWidth(), openMenu.gridHeight());
     if (placement.impossible()) {
+        return;
+    }
+    if (world::LoadedWorld* where = owner_->currentWorld();
+        where != nullptr && !where->events().allowed(&server::plugins::pluginEventTypes::playerRecipeBookClick,
+                                                     [&](server::plugins::PluginEvent& event) {
+                                                         plugins::EventSink::player(event, *session);
+                                                         event.set("recipe", id.toString());
+                                                         event.set("make_all", packet.useMaxItems);
+                                                     })) {
         return;
     }
 

@@ -16,6 +16,7 @@
 #include <basalt/server/runtime/player/PlayerImpulse.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
@@ -310,7 +311,19 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                 player->connection().sendLevelEvent(kSplashPotionEvent, bx, by, bz, kWaterBottleColour);
             }
         }
-        const std::int32_t amount = 3 + (options_.nextInt ? options_.nextInt(5) + options_.nextInt(5) : 0);
+        std::int32_t amount = 3 + (options_.nextInt ? options_.nextInt(5) + options_.nextInt(5) : 0);
+        if (const server::plugins::PluginEvent* answered =
+                world.events().ask(&server::plugins::pluginEventTypes::entityExpBottle,
+                                   [&](server::plugins::PluginEvent& event) {
+                                       plugins::hookEvents::entity(event, world.name(), entity);
+                                       event.set("experience", static_cast<std::int64_t>(amount));
+                                       event.set("show_effect", true);
+                                   });
+            answered != nullptr) {
+            if (const auto* edited = std::get_if<std::int64_t>(&answered->get("experience")); edited != nullptr) {
+                amount = static_cast<std::int32_t>(std::max<std::int64_t>(0, *edited));
+            }
+        }
         if (options_.awardExperience) {
             options_.awardExperience(world, entity.x, entity.y, entity.z, amount);
         }
@@ -413,6 +426,14 @@ void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<Pla
     if (!bottle.potionEffect.has_value()) {
         return;
     }
+
+    struct Splashed {
+        ServerEntity* mob = nullptr;
+        PlayerSession* player = nullptr;
+        double share = 0.0;
+    };
+
+    std::vector<Splashed> splashed;
     // parity: `applySplash` reaches every living thing in range, mobs as much as players.
     for (ServerEntity* mob : living) {
         if (mob->removed || mob->dying || !server::registry::entityAttributes::isLiving(mob->type())) {
@@ -425,14 +446,7 @@ void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<Pla
         if (distanceSquared > kSplashRange * kSplashRange) {
             continue;
         }
-        const double share = 1.0 - (std::sqrt(distanceSquared) / kSplashRange);
-        const auto ticks = static_cast<std::int32_t>(kSplashDuration * share);
-        if (ticks > 0) {
-            static_cast<void>(giveMobEffect(
-                world, watchers, *mob,
-                world::ActiveEffect{.effect = Identifier::vanilla(*bottle.potionEffect), .remainingTicks = ticks},
-                bottle.entityId()));
-        }
+        splashed.push_back({mob, nullptr, 1.0 - (std::sqrt(distanceSquared) / kSplashRange)});
     }
     for (PlayerSession* player : watchers) {
         const double dx = player->x - bottle.x;
@@ -442,15 +456,59 @@ void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<Pla
         if (distanceSquared > kSplashRange * kSplashRange) {
             continue;
         }
-        // parity: `ThrownSplashPotion.applySplash`.
-        const double share = 1.0 - (std::sqrt(distanceSquared) / kSplashRange);
-        const auto ticks = static_cast<std::int32_t>(kSplashDuration * share);
-        if (ticks <= 0 || !player->connection().addEffect) {
+        splashed.push_back({nullptr, player, 1.0 - (std::sqrt(distanceSquared) / kSplashRange)});
+    }
+    const auto idOf = [](const Splashed& hit) {
+        return hit.mob != nullptr ? hit.mob->entityId() : hit.player->entityId();
+    };
+    const server::plugins::PluginEvent* answered = world.events().ask(
+        &server::plugins::pluginEventTypes::entityPotionSplash, [&](server::plugins::PluginEvent& event) {
+            std::string lines;
+            for (const Splashed& hit : splashed) {
+                lines += (lines.empty() ? "" : "\n") + std::to_string(idOf(hit)) + "|" + std::to_string(hit.share);
+            }
+            plugins::hookEvents::entity(event, world.name(), bottle);
+            event.set("effect", *bottle.potionEffect);
+            event.set("affected", std::move(lines));
+        });
+    if (answered != nullptr && answered->cancelled()) {
+        splashed.clear();
+    } else if (const auto* edited =
+                   answered == nullptr ? nullptr : std::get_if<std::string>(&answered->get("affected"));
+               edited != nullptr) {
+        std::vector<Splashed> kept;
+        std::size_t from = 0;
+        while (from < edited->size()) {
+            const std::size_t end = std::min(edited->find('\n', from), edited->size());
+            const std::string line = edited->substr(from, end - from);
+            from = end + 1;
+            const std::size_t bar = line.find('|');
+            if (bar == std::string::npos) {
+                continue;
+            }
+            const auto id = static_cast<std::int32_t>(std::strtol(line.c_str(), nullptr, 10));
+            const auto found = std::ranges::find_if(splashed, [&](const Splashed& hit) { return idOf(hit) == id; });
+            if (found != splashed.end()) {
+                kept.push_back({found->mob, found->player, std::strtod(line.c_str() + bar + 1, nullptr)});
+            }
+        }
+        splashed = std::move(kept);
+    }
+    for (const Splashed& hit : splashed) {
+        const auto ticks = static_cast<std::int32_t>(kSplashDuration * hit.share);
+        if (ticks <= 0) {
             continue;
         }
-        // parity: `getEffectSource`, the thrower or else the bottle.
-        player->noteEffectSource(bottle.ownerId.value_or(bottle.entityId()));
-        player->connection().addEffect(Identifier::vanilla(*bottle.potionEffect), ticks, 0);
+        if (hit.mob != nullptr) {
+            static_cast<void>(giveMobEffect(
+                world, watchers, *hit.mob,
+                world::ActiveEffect{.effect = Identifier::vanilla(*bottle.potionEffect), .remainingTicks = ticks},
+                bottle.entityId()));
+        } else if (hit.player->connection().addEffect) {
+            // parity: `getEffectSource`, the thrower or else the bottle.
+            hit.player->noteEffectSource(bottle.ownerId.value_or(bottle.entityId()));
+            hit.player->connection().addEffect(Identifier::vanilla(*bottle.potionEffect), ticks, 0);
+        }
     }
     broadcaster_.sendEffects(watchers, static_cast<std::int32_t>(std::floor(bottle.x)),
                              static_cast<std::int32_t>(std::floor(bottle.y)),

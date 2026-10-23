@@ -58,7 +58,7 @@ constexpr double kMaxSignal = 15.0;
 /// parity: `TntBlock.onProjectileHit` into `TntBlock.prime`.
 [[nodiscard]] std::optional<BlockChange> primeTnt(WorldState& world, const entity::BlockHit& hit, bool tntExplodes) {
     // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off.
-    if (!tntExplodes) {
+    if (!tntExplodes || !world.tntMayPrime(hit.blockX, hit.blockY, hit.blockZ, "projectile")) {
         return std::nullopt;
     }
     const std::int32_t air = registry::blocks::air().stateId;
