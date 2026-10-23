@@ -988,6 +988,28 @@ jobjectArray JNICALL nativePlayerProfile(JNIEnv* env, jclass, jstring uuid) {
     }
     return jni::stringArrayOf(env, flat);
 }
+
+jobjectArray JNICALL nativeSelect(JNIEnv* env, jclass, jstring selector, jstring asUuid) {
+    const std::string text = toStd(env, selector);
+    const std::string who = asUuid == nullptr ? std::string{} : toStd(env, asUuid);
+    std::vector<plugins::PluginSelected> chosen;
+    std::string error;
+    const bool ok = jni::onServer<bool>(
+        false, [&] { return BukkitBridge::current().services().selectors().select(text, who, chosen, error); });
+    std::vector<std::string> flat;
+    if (!ok) {
+        flat.push_back("error");
+        flat.push_back(error);
+        return jni::stringArrayOf(env, flat);
+    }
+    flat.push_back("ok");
+    for (const plugins::PluginSelected& one : chosen) {
+        flat.push_back(one.uuid);
+        flat.push_back(one.world);
+        flat.push_back(one.player ? "1" : "0");
+    }
+    return jni::stringArrayOf(env, flat);
+}
 } // namespace
 
 void registerMiscNatives(JNIEnv* env, jclass natives) {
@@ -1113,6 +1135,8 @@ void registerMiscNatives(JNIEnv* env, jclass natives) {
                reinterpret_cast<void*>(&nativeSetDragonPreviouslyKilled)),
         method("playerProfile", "(Ljava/lang/String;)[Ljava/lang/String;",
                reinterpret_cast<void*>(&nativePlayerProfile)),
+        method("select", "(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeSelect)),
         method("playerPermissions", "(Ljava/lang/String;[Ljava/lang/String;[Z)V",
                reinterpret_cast<void*>(&nativePlayerPermissions)),
     };

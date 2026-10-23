@@ -167,6 +167,7 @@ basalt_module(server-runtime-core
         src/plugins/ServerDatapacks.cpp
         src/plugins/ServerMaps.cpp
         src/plugins/ServerLoot.cpp
+        src/plugins/ServerSelectors.cpp
         src/plugins/DataFix.cpp
         src/plugins/ServerWorldModel.cpp
         src/plugins/WorldBlockUpdates.cpp

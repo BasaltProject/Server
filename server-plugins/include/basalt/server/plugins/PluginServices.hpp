@@ -10,6 +10,7 @@
 #include <basalt/server/plugins/PluginMaps.hpp>
 #include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/plugins/PluginScoreboards.hpp>
+#include <basalt/server/plugins/PluginSelectors.hpp>
 #include <basalt/server/plugins/PluginServerControl.hpp>
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 
@@ -275,5 +276,7 @@ public:
     [[nodiscard]] virtual PluginMaps& maps() { return PluginMaps::unavailable(); }
 
     [[nodiscard]] virtual PluginLoot& loot() { return PluginLoot::unavailable(); }
+
+    [[nodiscard]] virtual PluginSelectors& selectors() { return PluginSelectors::unavailable(); }
 };
 } // namespace basalt::server::plugins

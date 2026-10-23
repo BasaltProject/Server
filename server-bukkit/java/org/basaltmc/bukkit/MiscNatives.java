@@ -110,4 +110,5 @@ public final class MiscNatives {
     public static native String[] dragonFight(String world);
     public static native void setDragonPreviouslyKilled(String world, boolean value);
     public static native String[] playerProfile(String uuid);
+    public static native String[] select(String selector, String asUuid);
 }

@@ -146,6 +146,7 @@ public:
         server::plugins::PluginDatapacks* datapacks = nullptr;
         server::plugins::PluginMaps* maps = nullptr;
         server::plugins::PluginLoot* loot = nullptr;
+        server::plugins::PluginSelectors* selectors = nullptr;
         std::function<sched::Owner*(const std::string& world, double x, double z)> ownerAt;
     };
 
@@ -174,6 +175,7 @@ public:
     [[nodiscard]] server::plugins::PluginDatapacks& datapacks() override;
     [[nodiscard]] server::plugins::PluginMaps& maps() override;
     [[nodiscard]] server::plugins::PluginLoot& loot() override;
+    [[nodiscard]] server::plugins::PluginSelectors& selectors() override;
 
     bool at(std::string_view world, double x, double z, std::function<void()> task) override;
 
