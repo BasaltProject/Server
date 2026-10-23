@@ -20,10 +20,13 @@ inline constexpr std::int32_t kGrowthOdds = 7;
 
 using Flowering = std::function<bool(const wire::common::Identifier& block)>;
 
+/// Asked once a tree is about to be tried; false keeps the sapling as it is.
+using MayGrow = std::function<bool()>;
+
 /// parity: `advanceTree`.
 [[nodiscard]] std::vector<BlockChange> advance(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                std::int32_t stateId, random::RandomSource& random,
-                                               const Flowering& flowering = {});
+                                               const Flowering& flowering = {}, const MayGrow& mayGrow = {});
 
 } // namespace saplingGrowth
 

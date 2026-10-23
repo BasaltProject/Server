@@ -64,6 +64,17 @@ public:
             bucketAllowed;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>
             bedAllowed;
+        std::function<void(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>
+            bedLeft;
+        std::function<bool(const player::PlayerSession& player, std::string_view state, std::int32_t hookId,
+                           std::int32_t& exp)>
+            fishing;
+        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t stateId)>
+            fertilizeAllowed;
+        std::function<bool(const player::PlayerSession& player, std::string_view type, std::int32_t x, std::int32_t y,
+                           std::int32_t z, std::string_view face)>
+            hangingAllowed;
         std::function<bool(std::string_view worldName, double x, double y, double z, const std::string& item,
                            std::int32_t count, std::string_view cause)>
             itemSpawnAllowed;

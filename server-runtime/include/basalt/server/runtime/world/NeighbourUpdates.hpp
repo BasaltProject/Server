@@ -95,6 +95,9 @@ struct Context {
     /// parity: `LevelChunk.setBlockState`.
     bool railArrivalTells = true;
     std::uint32_t phases = phase::kAll;
+    /// Asked before the block at (x, y, z) is told a neighbour changed.
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::optional<std::int32_t> source)>
+        physicsAllowed;
 };
 
 /// parity: the block's `updateShape` is `BlockInput.place`'s pre-shape.

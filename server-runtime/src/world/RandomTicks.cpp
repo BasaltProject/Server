@@ -280,7 +280,8 @@ void growSapling(const randomTicks::Context& context, std::int32_t x, std::int32
         return;
     }
     const std::vector<BlockChange> grown =
-        saplingGrowth::advance(context.world, x, y, z, stateId, random, context.flowering);
+        saplingGrowth::advance(context.world, x, y, z, stateId, random, context.flowering,
+                               [&] { return !context.structureAllowed || context.structureAllowed(x, y, z, stateId); });
     changes.insert(changes.end(), grown.begin(), grown.end());
 }
 

@@ -652,6 +652,9 @@ void neighbourChanged(const Context& context, const std::int32_t x, const std::i
     if (!standing.has_value()) {
         return;
     }
+    if (context.physicsAllowed && !context.physicsAllowed(x, y, z, source)) {
+        return;
+    }
     // parity: `Level.removeBlock` writes with flag three.
     if (dropUnsupportedComponent(context, x, y, z, broken).has_value()) {
         Context gone = context;

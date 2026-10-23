@@ -33,6 +33,9 @@ void tickVitals(PlayerSession& player, const VitalsContext& context) {
     }
     // parity: `Player.tick`, which counts this up for as long as the player is not swinging.
     player.ticksSinceSwing++;
+    if (context.armorWatch) {
+        context.armorWatch(player);
+    }
     if (player.dead || player.gamemode == Gamemode::Creative || player.gamemode == Gamemode::Spectator) {
         return;
     }

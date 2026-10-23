@@ -41,6 +41,10 @@ public:
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            bool extending, std::string_view direction)>
             pistonAllowed;
+        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::optional<std::int32_t> source)>
+            physicsAllowed;
+        std::function<bool()> physicsWatched;
 
         /// parity: `CarvedPumpkinBlock.trySpawnGolem`'s `addFreshEntity`.
         std::function<void(world::LoadedWorld& world, std::string_view type, double x, double y, double z)> summonGolem;

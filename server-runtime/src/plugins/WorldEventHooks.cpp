@@ -1,9 +1,12 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
 #include <basalt/server/runtime/plugins/WorldEventHooks.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+
+#include <array>
 
 namespace basalt::server::runtime::plugins::worldEventHooks {
 namespace {
@@ -42,6 +45,43 @@ void redstone(RedstoneTickSystem::Hooks& hooks, const EventSink& sink) {
         return sink.allowed(&blockIgnite, [&](PluginEvent& event) {
             here(event, world, x, y, z);
             event.set("cause", std::string{cause});
+            event.set("player_name", std::string{});
+        });
+    };
+    hooks.burnAllowed = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                std::int32_t stateId, std::int32_t fromX, std::int32_t fromY, std::int32_t fromZ) {
+        return sink.allowed(&blockBurn, [&](PluginEvent& event) {
+            here(event, world, x, y, z);
+            const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
+            event.set("block", block == nullptr ? std::string{"minecraft:air"} : block->toString());
+            event.set("igniter_x", static_cast<std::int64_t>(fromX));
+            event.set("igniter_y", static_cast<std::int64_t>(fromY));
+            event.set("igniter_z", static_cast<std::int64_t>(fromZ));
+        });
+    };
+    hooks.flowAllowed = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                std::int32_t toX, std::int32_t toY, std::int32_t toZ) {
+        return sink.allowed(&blockFromTo, [&](PluginEvent& event) {
+            here(event, world, x, y, z);
+            const wire::common::Identifier* block =
+                server::registry::blockStateDefinitions::blockOf(world.state().blockState(x, y, z).value_or(0));
+            event.set("block", block == nullptr ? std::string{"minecraft:air"} : block->toString());
+            event.set("to_x", static_cast<std::int64_t>(toX));
+            event.set("to_y", static_cast<std::int64_t>(toY));
+            event.set("to_z", static_cast<std::int64_t>(toZ));
+            event.set("face", std::string{toY < y   ? "down"
+                                          : toX > x ? "east"
+                                          : toX < x ? "west"
+                                          : toZ > z ? "south"
+                                                    : "north"});
+        });
+    };
+    hooks.structureAllowed = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                     std::int32_t stateId) {
+        return sink.allowed(&worldStructureGrow, [&](PluginEvent& event) {
+            here(event, world, x, y, z);
+            const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
+            event.set("species", block == nullptr ? std::string{"minecraft:oak_sapling"} : block->toString());
             event.set("player_name", std::string{});
         });
     };
@@ -184,6 +224,26 @@ void environment(EnvironmentTickSystem::Hooks& hooks, const EventSink& sink) {
     hooks.lightningAllowed = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
         return sink.allowed(&worldLightning, [&](PluginEvent& event) { here(event, world, x, y, z); });
     };
+    hooks.armorWatch = [&sink](player::PlayerSession& who) {
+        if (!sink.listening(&playerArmorChange)) {
+            return;
+        }
+        constexpr std::array<std::string_view, 4> kSlots{"feet", "legs", "chest", "head"};
+        for (std::int32_t index = 0; index < 4; ++index) {
+            const auto& stack = who.inventory.at(36 + index);
+            const std::string now = stack.has_value() ? stack->id : std::string{};
+            if (who.armorKnown && now != who.armorSeen[static_cast<std::size_t>(index)]) {
+                sink.notify(&playerArmorChange, [&](PluginEvent& event) {
+                    EventSink::player(event, who);
+                    event.set("slot", std::string{kSlots[static_cast<std::size_t>(index)]});
+                    event.set("old_item", who.armorSeen[static_cast<std::size_t>(index)]);
+                    event.set("new_item", now);
+                });
+            }
+            who.armorSeen[static_cast<std::size_t>(index)] = now;
+        }
+        who.armorKnown = true;
+    };
     hooks.foodChanged = [&sink](const player::PlayerSession& who, std::int32_t now,
                                 std::int32_t before) -> std::optional<std::int32_t> {
         const server::plugins::PluginEvent* event = sink.ask(&playerFoodChange, [&](PluginEvent& filled) {
@@ -229,6 +289,19 @@ void spawning(NaturalSpawningSystem::Hooks& hooks, const EventSink& sink) {
 }
 
 void pistons(BlockChangeBroadcaster::Hooks& hooks, const EventSink& sink) {
+    hooks.physicsAllowed = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                   std::optional<std::int32_t> source) {
+        const auto nameOf = [](std::int32_t stateId) {
+            const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
+            return block == nullptr ? std::string{"minecraft:air"} : block->toString();
+        };
+        return sink.allowed(&blockPhysics, [&](PluginEvent& event) {
+            here(event, world, x, y, z);
+            event.set("block", nameOf(world.state().blockState(x, y, z).value_or(0)));
+            event.set("source_block", source.has_value() ? nameOf(*source) : std::string{});
+        });
+    };
+    hooks.physicsWatched = [&sink] { return sink.listening(&blockPhysics); };
     hooks.pistonAllowed = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                   bool extending, std::string_view direction) {
         return sink.allowed(&blockPiston, [&](PluginEvent& event) {

@@ -80,6 +80,9 @@ void CombatHandler::dismount(PlayerSession& session) {
         return;
     }
     entity::ServerEntity* vehicle = session.vehicleId.has_value() ? world->state().entity(*session.vehicleId) : nullptr;
+    if (vehicle != nullptr && hooks_.dismountAllowed && !hooks_.dismountAllowed(session, *vehicle)) {
+        return;
+    }
     session.vehicleId.reset();
     if (vehicle == nullptr) {
         return;

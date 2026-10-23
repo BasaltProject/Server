@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
@@ -11,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/EventHooks.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -21,6 +23,7 @@
 #include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
+#include <basalt/wire/text/Serializers.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -478,7 +481,29 @@ void ClientSession::sendKeepAliveIfDue() {
     });
 }
 
-void ClientSession::disconnect(const wire::text::Component& reason) {
+void ClientSession::disconnect(const wire::text::Component& requested) {
+    wire::text::Component reason = requested;
+    static thread_local bool askingAboutKick = false;
+    if (options_.events != nullptr && playerSession_ != nullptr && !closeWhenDrained_.load() && !askingAboutKick) {
+        askingAboutKick = true;
+        const std::string shown = wire::text::toPlainText(requested);
+        const server::plugins::PluginEvent* kick = options_.events->ask(
+            &server::plugins::pluginEventTypes::playerKick, [&](server::plugins::PluginEvent& event) {
+                plugins::EventSink::player(event, *playerSession_);
+                event.set("reason", shown);
+                event.set("cause", std::string{"kicked"});
+            });
+        askingAboutKick = false;
+        if (kick != nullptr && kick->cancelled()) {
+            return;
+        }
+        if (kick != nullptr) {
+            const auto* edited = std::get_if<std::string>(&kick->get("reason"));
+            if (edited != nullptr && *edited != shown) {
+                reason = wire::text::Component::text(*edited);
+            }
+        }
+    }
     sendCompressed(play::PlayDisconnectPacket::kId, [&reason](wire::io::ByteBuffer& buffer) {
         play::PlayDisconnectPacket{.reason = reason}.write(buffer);
     });

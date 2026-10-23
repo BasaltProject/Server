@@ -157,16 +157,23 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         }
         const std::int32_t here = world.state().blockState(x, y, z).value_or(0);
         if (world::fires::isFire(here)) {
-            if (hooks_.igniteAllowed && !hooks_.igniteAllowed(world, x, y, z, "spread")) {
-                continue;
-            }
             random::RandomSource random = freshRandom();
             const world::fires::Surroundings surroundings{
                 .rainingAt = [&world](std::int32_t rx, std::int32_t ry,
                                       std::int32_t rz) { return world::precipitation::rainingAt(world, rx, ry, rz); },
                 .increasedBurnout = world::precipitation::increasedFireBurnout(world, x, y, z),
                 .canSpread = canSpreadFireAround(world, watchers, x, y, z),
-                .bedrockBurnsForever = world.declaration().dimension == config::WorldDimension::End};
+                .bedrockBurnsForever = world.declaration().dimension == config::WorldDimension::End,
+                .igniteAllowed =
+                    [this, &world](std::int32_t tx, std::int32_t ty, std::int32_t tz, std::int32_t, std::int32_t,
+                                   std::int32_t) {
+                        return !hooks_.igniteAllowed || hooks_.igniteAllowed(world, tx, ty, tz, "spread");
+                    },
+                .burnAllowed =
+                    [this, &world](std::int32_t bx, std::int32_t by, std::int32_t bz, std::int32_t stateId,
+                                   std::int32_t fx, std::int32_t fy, std::int32_t fz) {
+                        return !hooks_.burnAllowed || hooks_.burnAllowed(world, bx, by, bz, stateId, fx, fy, fz);
+                    }};
             sendBlockUpdates(watchers, world::fires::tick(world.state(), world.weather(), world.difficulty(), x, y, z,
                                                           random, {}, hasSkylight, surroundings));
             continue;

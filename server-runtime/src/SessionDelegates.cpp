@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
@@ -17,6 +18,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -421,6 +423,19 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
                                                                      session->sprinting, onGround, inWater));
     // parity: the server reads a jump off the packets, exactly here: it left the ground moving up.
     if (session->onGround && !onGround && y > session->y) {
+        if (options_.events != nullptr && !options_.events->allowed(&server::plugins::pluginEventTypes::playerJump,
+                                                                    [&](server::plugins::PluginEvent& event) {
+                                                                        plugins::EventSink::player(event, *session);
+                                                                        event.set("from_x", session->x);
+                                                                        event.set("from_y", session->y);
+                                                                        event.set("from_z", session->z);
+                                                                        event.set("x", x);
+                                                                        event.set("y", y);
+                                                                        event.set("z", z);
+                                                                    })) {
+            sendPlayerPosition(session->x, session->y, session->z, yaw, pitch);
+            return;
+        }
         session->food.addExhaustion(player::FoodData::jumpExhaustion(session->sprinting));
         session->stats.increment(storage::stats::jump());
     }

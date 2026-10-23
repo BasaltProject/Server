@@ -158,6 +158,12 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
     if (!target.has_value()) {
         return ArrowHit::Missed;
     }
+    if (options_.projectileHit) {
+        const std::int32_t struck = target->mob != nullptr ? target->mob->entityId() : target->player->entityId();
+        options_.projectileHit(world, arrow, struck, static_cast<std::int32_t>(std::floor(arrow.x)),
+                               static_cast<std::int32_t>(std::floor(arrow.y)),
+                               static_cast<std::int32_t>(std::floor(arrow.z)));
+    }
     // parity: `AbstractArrow.onHitEntity`.
     // rounded up.
     const double speed = std::sqrt((arrow.velocityX * arrow.velocityX) + (arrow.velocityY * arrow.velocityY) +

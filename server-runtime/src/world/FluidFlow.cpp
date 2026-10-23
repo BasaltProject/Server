@@ -316,7 +316,7 @@ private:
         if (canMaybePassThrough(kind, state, below, registry::BlockFace::Down)) {
             const std::int32_t newBelow = newLiquid(x, y - 1, z, kind);
             if (newBelow != kEmpty && canBeReplacedWith(below, kind, true)) {
-                spreadTo(x, y - 1, z, kind, true, newBelow);
+                spreadTo(x, y, z, x, y - 1, z, kind, true, newBelow);
                 if (sourceNeighbourCount(x, y, z, kind) >= 3) {
                     spreadToSides(x, y, z, state, kind);
                 }
@@ -365,7 +365,7 @@ private:
                 continue;
             }
             const std::array<std::int32_t, 3>& offset = kOffsets[index];
-            spreadTo(x + offset[0], y, z + offset[2], kind, false, targets[index]);
+            spreadTo(x, y, z, x + offset[0], y, z + offset[2], kind, false, targets[index]);
         }
     }
 
@@ -444,7 +444,11 @@ private:
     }
 
     /// parity: `FlowingFluid.spreadTo`.
-    void spreadTo(std::int32_t x, std::int32_t y, std::int32_t z, FluidKind kind, bool downward, std::int32_t target) {
+    void spreadTo(std::int32_t fromX, std::int32_t fromY, std::int32_t fromZ, std::int32_t x, std::int32_t y,
+                  std::int32_t z, FluidKind kind, bool downward, std::int32_t target) {
+        if (context_.flowAllowed && !context_.flowAllowed(fromX, fromY, fromZ, x, y, z)) {
+            return;
+        }
         const std::int32_t existing = at(x, y, z);
         if (downward && kind == FluidKind::Lava && fluidFlow::kindOf(existing) == FluidKind::Water) {
             set(x, y, z, solidStates().stone);

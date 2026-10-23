@@ -52,6 +52,7 @@ struct Context {
     /// Unset, every change goes through, as on a server with no plugins.
     MayChange mayChange;
     saplingGrowth::Flowering flowering;
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> structureAllowed;
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t type)> levelEvent;
     /// Lifts the players standing in the block, which only the session layer can move; the last argument is unused.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t unused)> pushPlayersUp;

@@ -172,9 +172,12 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
 /// parity: `FireBlock.checkBurnOut`.
 void burnOut(WorldState& world, const WorldWeather& weather, const Surroundings& surroundings, std::int32_t x,
              std::int32_t y, std::int32_t z, std::int32_t chance, random::RandomSource& random, std::int32_t age,
-             std::vector<BlockChange>& changes) {
+             std::vector<BlockChange>& changes, std::int32_t fromX, std::int32_t fromY, std::int32_t fromZ) {
     const std::int32_t stateId = stateAt(world, x, y, z);
     if (random.nextInt(chance) >= registry::fireOdds::burnOdds(stateId)) {
+        return;
+    }
+    if (surroundings.burnAllowed && !surroundings.burnAllowed(x, y, z, stateId, fromX, fromY, fromZ)) {
         return;
     }
     if (random.nextInt(age + kBurnAgeBias) < kBurnAgeLimit && !rainingOn(world, weather, surroundings, x, y, z)) {
@@ -220,6 +223,9 @@ void spread(WorldState& world, const WorldWeather& weather, const Surroundings& 
                     continue;
                 }
                 if (weather.raining && nearRain(world, weather, surroundings, tx, ty, tz)) {
+                    continue;
+                }
+                if (surroundings.igniteAllowed && !surroundings.igniteAllowed(tx, ty, tz, x, y, z)) {
                     continue;
                 }
                 const std::optional<std::int32_t> fire =
@@ -345,12 +351,12 @@ std::vector<BlockChange> tick(WorldState& world, const WorldWeather& weather, st
     }
 
     const std::int32_t extra = surroundings.increasedBurnout ? kIncreasedBurnout : 0;
-    burnOut(world, weather, surroundings, x + 1, y, z, kSideChance + extra, random, age, changes);
-    burnOut(world, weather, surroundings, x - 1, y, z, kSideChance + extra, random, age, changes);
-    burnOut(world, weather, surroundings, x, y - 1, z, kVerticalChance + extra, random, age, changes);
-    burnOut(world, weather, surroundings, x, y + 1, z, kVerticalChance + extra, random, age, changes);
-    burnOut(world, weather, surroundings, x, y, z - 1, kSideChance + extra, random, age, changes);
-    burnOut(world, weather, surroundings, x, y, z + 1, kSideChance + extra, random, age, changes);
+    burnOut(world, weather, surroundings, x + 1, y, z, kSideChance + extra, random, age, changes, x, y, z);
+    burnOut(world, weather, surroundings, x - 1, y, z, kSideChance + extra, random, age, changes, x, y, z);
+    burnOut(world, weather, surroundings, x, y - 1, z, kVerticalChance + extra, random, age, changes, x, y, z);
+    burnOut(world, weather, surroundings, x, y + 1, z, kVerticalChance + extra, random, age, changes, x, y, z);
+    burnOut(world, weather, surroundings, x, y, z - 1, kSideChance + extra, random, age, changes, x, y, z);
+    burnOut(world, weather, surroundings, x, y, z + 1, kSideChance + extra, random, age, changes, x, y, z);
     spread(world, weather, surroundings, difficulty, x, y, z, random, age, changes);
     return changes;
 }

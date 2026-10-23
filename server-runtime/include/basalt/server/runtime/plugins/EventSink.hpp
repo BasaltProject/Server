@@ -18,6 +18,11 @@ public:
 
     explicit EventSink(std::function<server::plugins::PluginEventBus*()> bus) : bus_(std::move(bus)) {}
 
+    [[nodiscard]] bool listening(TypeOf type) const {
+        const server::plugins::PluginEventBus* bus = bus_ ? bus_() : nullptr;
+        return bus != nullptr && bus->listening(type());
+    }
+
     /// Fires `type` and answers false only when a listener cancelled it. `fill` sets the fields by name.
     template <typename Fill>
     [[nodiscard]] bool allowed(TypeOf type, Fill&& fill) const {

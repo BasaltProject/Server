@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -44,6 +45,10 @@ struct Context {
     bool ultrawarm = false;
     /// Since 26.3 block tags decide what a flow washes away; without them the older shape rule applies.
     const realBlockTags::TagMembers* blockTags = nullptr;
+    /// Asked before the fluid at (x, y, z) spreads into (toX, toY, toZ).
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t toX, std::int32_t toY,
+                       std::int32_t toZ)>
+        flowAllowed;
 };
 
 [[nodiscard]] std::optional<FluidKind> kindOf(std::int32_t stateId);

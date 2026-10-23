@@ -53,6 +53,20 @@ constexpr std::array<std::string_view, 4> kDifficulties{"peaceful", "easy", "nor
     const std::int32_t ticks = duration != nullptr ? *duration
                                : random != nullptr ? WorldWeather::randomDuration(range, *random)
                                                    : range.first;
+    namespace events = server::plugins::pluginEventTypes;
+    const bool wasRaining = weather.raining;
+    const bool wasThundering = weather.thundering;
+    const server::plugins::PluginEvent* change = server::plugins::emit(
+        context.environment().pluginEvents(), &events::worldWeatherChange(), [&](server::plugins::PluginEvent& event) {
+            event.set("world", (*world)->name());
+            event.set("raining", kind != "clear");
+            event.set("thundering", kind == "thunder");
+            event.set("from_raining", wasRaining);
+            event.set("from_thundering", wasThundering);
+        });
+    if (change != nullptr && change->cancelled()) {
+        return 0;
+    }
     if (kind == "clear") {
         weather.set(ticks, 0, false, false);
     } else {

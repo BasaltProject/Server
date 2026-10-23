@@ -154,6 +154,9 @@ void wakeUpFor(const BreakContext& context, PlayerSession& player, world::Loaded
         return;
     }
     const std::array<std::int32_t, 3> bed = *player.sleepingBed;
+    if (context.bedLeft) {
+        context.bedLeft(player, bed[0], bed[1], bed[2]);
+    }
     player.sleepingBed.reset();
     // parity: `stopSleepInBed(false, ...)`.
     player.sleepTicks = 100;

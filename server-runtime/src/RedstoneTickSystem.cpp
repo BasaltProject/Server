@@ -148,12 +148,20 @@ void RedstoneTickSystem::tickFluids(world::LoadedWorld& world, const sched::Regi
             continue;
         }
         random::RandomSource random = freshRandom();
+        std::function<bool(std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t)>
+            flowGate;
+        if (hooks_.flowAllowed) {
+            flowGate = [this, &world](std::int32_t fx, std::int32_t fy, std::int32_t fz, std::int32_t tx,
+                                      std::int32_t ty,
+                                      std::int32_t tz) { return hooks_.flowAllowed(world, fx, fy, fz, tx, ty, tz); };
+        }
         const world::fluidFlow::Context context{.world = world.state(),
                                                 .gameRules = world.gameRules(),
                                                 .random = random,
                                                 .ultrawarm =
                                                     world.declaration().dimension == config::WorldDimension::Nether,
-                                                .blockTags = options_.blockTags};
+                                                .blockTags = options_.blockTags,
+                                                .flowAllowed = flowGate};
         for (const world::FluidChange& change :
              world::fluidFlow::tick(context, position[0], position[1], position[2])) {
             const BlockPos pos{change.x, change.y, change.z};
@@ -606,6 +614,10 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
         .flowering =
             [tags = options_.blockTags](const wire::common::Identifier& block) {
                 return tags != nullptr && world::realBlockTags::contains(*tags, "minecraft:flowers", block);
+            },
+        .structureAllowed =
+            [this, &world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+                return !hooks_.structureAllowed || hooks_.structureAllowed(world, x, y, z, stateId);
             },
         .levelEvent =
             [this, &world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t type) {

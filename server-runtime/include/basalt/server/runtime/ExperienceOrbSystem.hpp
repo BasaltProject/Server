@@ -30,6 +30,9 @@ public:
 
     struct Options {
         std::function<std::int64_t()> nextSeed;
+        /// Answers the points a player is really given for an orb; a listener may change them.
+        std::function<std::int32_t(const player::PlayerSession& player, std::int32_t amount, std::int32_t orbId)>
+            gained;
     };
 
     ExperienceOrbSystem(player::PlayerRegistry& players, Options options);

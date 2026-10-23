@@ -194,6 +194,10 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.breakAllowed = hooks_.breakAllowed;
     context.itemSpawnAllowed = hooks_.itemSpawnAllowed;
     context.itemDamageAllowed = hooks_.itemDamageAllowed;
+    context.bedLeft = hooks_.bedLeft;
+    context.fishing = hooks_.fishing;
+    context.fertilizeAllowed = hooks_.fertilizeAllowed;
+    context.hangingAllowed = hooks_.hangingAllowed;
     context.putBack = [this](const PlayerSession&, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                              const std::int32_t stateId) {
         owner_->sendPlayPacket(play::ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
