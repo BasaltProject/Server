@@ -83,6 +83,16 @@ std::vector<PluginKnownPlayer> ServerAccess::knownPlayers() {
     return all;
 }
 
+std::optional<PluginKnownPlayer> ServerAccess::spawnPoint(std::string_view uuid) {
+    storage::PlayerStore* store = open();
+    const std::optional<storage::StoredSpawnPoint> point =
+        store == nullptr ? std::nullopt : store->access().spawnPointOf(uuid);
+    if (!point.has_value()) {
+        return std::nullopt;
+    }
+    return PluginKnownPlayer{.uuid = point->uuid, .world = point->world, .x = point->x, .y = point->y, .z = point->z};
+}
+
 bool ServerAccess::isOperator(std::string_view uuid) {
     storage::PlayerStore* store = open();
     if (store == nullptr || !hooks_.groups) {

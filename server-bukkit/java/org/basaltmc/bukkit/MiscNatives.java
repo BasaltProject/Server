@@ -19,6 +19,7 @@ public final class MiscNatives {
     public static native String[] knownPlayer(String key, boolean byName);
     public static native double[] knownPlayerNumbers(String uuid);
     public static native String[] knownPlayers();
+    public static native String[] spawnPoint(String uuid);
     public static native boolean isOperator(String uuid);
     public static native boolean setOperator(String uuid, boolean value);
     public static native String[] operators();

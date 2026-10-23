@@ -132,6 +132,11 @@ public final class BasaltOfflinePlayer extends OfflinePlayerBase implements Conf
     }
 
     @Override
+    public Location getRespawnLocation(boolean loadLocationAndValidate) {
+        return OfflineSupport.respawnLocation(id);
+    }
+
+    @Override
     public Location getLocation() {
         return OfflineSupport.lastLocation(id);
     }

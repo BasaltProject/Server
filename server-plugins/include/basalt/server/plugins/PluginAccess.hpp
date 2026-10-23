@@ -52,6 +52,12 @@ public:
 
     [[nodiscard]] virtual std::vector<PluginKnownPlayer> knownPlayers() { return {}; }
 
+    /// Where the player respawns when a bed or anchor holds their spawn point (a known player with one set).
+    [[nodiscard]] virtual std::optional<PluginKnownPlayer> spawnPoint(std::string_view uuid) {
+        static_cast<void>(uuid);
+        return std::nullopt;
+    }
+
     [[nodiscard]] virtual bool isOperator(std::string_view uuid) {
         static_cast<void>(uuid);
         return false;
