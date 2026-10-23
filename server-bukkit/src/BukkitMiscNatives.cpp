@@ -949,6 +949,45 @@ jintArray JNICALL nativeShapeBoxes(JNIEnv* env, jclass, jint state) {
     env->SetIntArrayRegion(array, 0, static_cast<jsize>(boxes.size()), boxes.data());
     return array;
 }
+
+jobjectArray JNICALL nativeDragonFight(JNIEnv* env, jclass, jstring world) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const auto facts = jni::onServer<std::optional<plugins::PluginWorldRef::DragonFightFacts>>(
+        std::nullopt, [&] { return found->dragonFight(); });
+    if (!facts.has_value()) {
+        return nullptr;
+    }
+    const std::string portal = facts->portal.has_value()
+                                   ? std::to_string((*facts->portal)[0]) + "," + std::to_string((*facts->portal)[1]) +
+                                         "," + std::to_string((*facts->portal)[2])
+                                   : std::string{};
+    return jni::stringArrayOf(env, {facts->previouslyKilled ? "1" : "0", portal, facts->respawnStage,
+                                    std::to_string(facts->gatewaysLeft), facts->dragonUuid});
+}
+
+void JNICALL nativeSetDragonPreviouslyKilled(JNIEnv* env, jclass, jstring world, jboolean value) {
+    const auto found = worldOf(env, world);
+    if (found != nullptr) {
+        static_cast<void>(
+            jni::onServer<bool>(false, [&] { return found->setDragonPreviouslyKilled(value == JNI_TRUE); }));
+    }
+}
+
+jobjectArray JNICALL nativePlayerProfile(JNIEnv* env, jclass, jstring uuid) {
+    const auto player = BukkitBridge::current().services().players().byUuid(toStd(env, uuid));
+    if (player == nullptr) {
+        return nullptr;
+    }
+    std::vector<std::string> flat;
+    for (const std::array<std::string, 3>& property :
+         jni::onServer<std::vector<std::array<std::string, 3>>>({}, [&] { return player->profileProperties(); })) {
+        flat.insert(flat.end(), property.begin(), property.end());
+    }
+    return jni::stringArrayOf(env, flat);
+}
 } // namespace
 
 void registerMiscNatives(JNIEnv* env, jclass natives) {
@@ -1069,6 +1108,11 @@ void registerMiscNatives(JNIEnv* env, jclass natives) {
         method("locateBiome", "(Ljava/lang/String;[Ljava/lang/String;IIIII)[I",
                reinterpret_cast<void*>(&nativeLocateBiome)),
         method("shapeBoxes", "(I)[I", reinterpret_cast<void*>(&nativeShapeBoxes)),
+        method("dragonFight", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeDragonFight)),
+        method("setDragonPreviouslyKilled", "(Ljava/lang/String;Z)V",
+               reinterpret_cast<void*>(&nativeSetDragonPreviouslyKilled)),
+        method("playerProfile", "(Ljava/lang/String;)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativePlayerProfile)),
         method("playerPermissions", "(Ljava/lang/String;[Ljava/lang/String;[Z)V",
                reinterpret_cast<void*>(&nativePlayerPermissions)),
     };

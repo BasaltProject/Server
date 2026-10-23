@@ -26,6 +26,7 @@
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/maps/MapDecorationTypes.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/server/world/Chunk.hpp>
@@ -886,6 +887,33 @@ public:
         return first;
     }
 
+    [[nodiscard]] std::optional<DragonFightFacts> dragonFight() override {
+        const world::DragonFight* fight = world_->dragonFight();
+        if (fight == nullptr) {
+            return std::nullopt;
+        }
+        DragonFightFacts facts;
+        facts.previouslyKilled = fight->previouslyKilled;
+        facts.portal = fight->exitPortalLocation;
+        if (fight->respawnStage.has_value()) {
+            facts.respawnStage = std::string{world::respawnStageName(*fight->respawnStage)};
+        }
+        facts.gatewaysLeft = static_cast<std::int32_t>(fight->gateways.size());
+        if (fight->dragonUuid.has_value()) {
+            facts.dragonUuid = fight->dragonUuid->toString();
+        }
+        return facts;
+    }
+
+    bool setDragonPreviouslyKilled(bool value) override {
+        world::DragonFight* fight = world_->dragonFight();
+        if (fight == nullptr) {
+            return false;
+        }
+        fight->previouslyKilled = value;
+        return true;
+    }
+
     [[nodiscard]] std::optional<std::array<std::int32_t, 2>> locateStructure(std::string_view structure, std::int32_t x,
                                                                              std::int32_t z, std::int32_t cells,
                                                                              bool skipExisting) override {
@@ -1682,6 +1710,13 @@ std::vector<std::string> LoadedWorlds::registryIds(std::string_view registry) co
     }
     if (registry == "data_component_type") {
         return tableIds(reg::dataComponentIdsTable());
+    }
+    if (registry == "map_decoration_type") {
+        std::vector<std::string> ids;
+        for (std::int32_t id = 0; world::maps::decorationTypes::byId(id) != nullptr; ++id) {
+            ids.push_back("minecraft:" + std::string{world::maps::decorationTypes::byId(id)->name});
+        }
+        return ids;
     }
     if (registry == "block_entity_type") {
         std::vector<std::string> ids;

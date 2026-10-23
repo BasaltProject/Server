@@ -365,6 +365,16 @@ public:
         return left == 0;
     }
 
+    [[nodiscard]] std::vector<std::array<std::string, 3>> profileProperties() const override {
+        std::vector<std::array<std::string, 3>> out;
+        if (const player::PlayerSession* player = session(); player != nullptr) {
+            for (const wire::protocol::login::GameProfileProperty& property : player->profileProperties) {
+                out.push_back({property.name, property.value, property.signature.value_or(std::string{})});
+            }
+        }
+        return out;
+    }
+
     [[nodiscard]] std::optional<std::string> heldItem() const override {
         const player::PlayerSession* player = session();
         if (player == nullptr) {

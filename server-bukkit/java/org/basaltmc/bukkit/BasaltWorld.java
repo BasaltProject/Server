@@ -1018,4 +1018,9 @@ public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
         builder.accept(configured);
         return configured.run();
     }
+
+    @Override
+    public org.bukkit.boss.DragonBattle getEnderDragonBattle() {
+        return org.basaltmc.bukkit.misc.BasaltDragonBattle.of(this);
+    }
 }

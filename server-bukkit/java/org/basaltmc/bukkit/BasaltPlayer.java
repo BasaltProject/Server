@@ -425,7 +425,13 @@ public class BasaltPlayer extends PlayerBase {
 
     @Override
     public com.destroystokyo.paper.profile.PlayerProfile getPlayerProfile() {
-        return new org.basaltmc.bukkit.misc.BasaltPlayerProfile(id, name);
+        org.basaltmc.bukkit.misc.BasaltPlayerProfile profile = new org.basaltmc.bukkit.misc.BasaltPlayerProfile(id, name);
+        String[] flat = MiscNatives.playerProfile(uuid);
+        for (int i = 0; flat != null && i + 2 < flat.length; i += 3) {
+            profile.setProperty(new com.destroystokyo.paper.profile.ProfileProperty(flat[i], flat[i + 1],
+                flat[i + 2].isEmpty() ? null : flat[i + 2]));
+        }
+        return profile;
     }
 
     @Override
