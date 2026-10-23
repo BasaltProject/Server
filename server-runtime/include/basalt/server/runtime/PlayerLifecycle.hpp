@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/Announcement.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 
@@ -27,8 +28,8 @@ class ClientSession;
 class PlayerLifecycle {
 public:
     struct Hooks {
-        std::function<void(const player::PlayerSession& player, const world::LoadedWorld& world, double x, double y,
-                           double z)>
+        std::function<void(const player::PlayerSession& player, const world::LoadedWorld& world, double& x, double& y,
+                           double& z)>
             respawned;
         std::function<bool(const player::PlayerSession& player, wire::protocol::play::Gamemode mode,
                            wire::protocol::play::Gamemode previous)>
@@ -39,7 +40,7 @@ public:
         std::function<bool(const player::PlayerSession* player, double toX, double toY, double toZ,
                            std::string_view cause)>
             teleportAllowed;
-        std::function<void(const player::PlayerSession& player, const std::optional<std::string>& world)> quit;
+        std::function<Announcement(const player::PlayerSession& player, const std::optional<std::string>& world)> quit;
     };
 
     explicit PlayerLifecycle(ClientSession& owner, Hooks hooks = {});

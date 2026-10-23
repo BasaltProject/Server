@@ -68,11 +68,18 @@
 #include <basalt/server/runtime/world/Waxing.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
+#include <array>
 #include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {
 namespace {
+
+[[nodiscard]] std::string_view faceName(const wire::protocol::play::Direction direction) {
+    constexpr std::array<std::string_view, 6> kNames{"down", "up", "north", "south", "west", "east"};
+    const auto index = static_cast<std::size_t>(direction);
+    return index < kNames.size() ? kNames[index] : "up";
+}
 
 namespace play = wire::protocol::play;
 namespace reg = server::registry;
@@ -230,7 +237,8 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     };
     // The interact hook runs before the click does anything: chests, doors and placement are this one question.
     if (hooks_.interactAllowed &&
-        !hooks_.interactAllowed(*session, hit.pos.x, hit.pos.y, hit.pos.z, held.has_value() ? held->id : "")) {
+        !hooks_.interactAllowed(*session, hit.pos.x, hit.pos.y, hit.pos.z, held.has_value() ? held->id : "",
+                                faceName(hit.direction), mainHand)) {
         owner_->sendPlayPacket(play::ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
             play::ClientboundBlockUpdatePacket{.pos = hit.pos, .blockStateId = clickedState.value_or(0)}.write(buffer);
         });
@@ -702,6 +710,16 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     world::LoadedWorld* world = owner_->currentWorld();
     if (session == nullptr || world == nullptr || session->gamemode == Gamemode::Spectator) {
         return;
+    }
+    if (hooks_.airUseAllowed) {
+        const std::optional<storage::StoredItemStack> inHand =
+            useItem.hand == play::Hand::MainHand ? session->inventory.heldItem()
+                                                 : session->inventory.at(PlayerInventory::kOffhandSlot);
+        if (!hooks_.airUseAllowed(*session, inHand.has_value() ? inHand->id : "",
+                                  useItem.hand == play::Hand::MainHand)) {
+            owner_->sendInventory();
+            return;
+        }
     }
     if (useItem.hand != play::Hand::MainHand) {
         const std::optional<storage::StoredItemStack> offhand = session->inventory.at(PlayerInventory::kOffhandSlot);

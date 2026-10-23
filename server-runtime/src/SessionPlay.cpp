@@ -42,6 +42,7 @@
 #include <basalt/wire/protocol/play/UiPackets.hpp>
 #include <basalt/wire/protocol/play/VehiclePackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
+#include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
@@ -754,14 +755,17 @@ void ClientSession::enterPlay() {
                oneDecimal(player.x) + ", " + oneDecimal(player.y) + ", " + oneDecimal(player.z) + ")";
     });
     logger_.info([&player] { return player.name() + " joined the game"; });
+    auto welcome = std::make_shared<Announcement>();
     if (options_.plugins.joined) {
         // Handed to the owner: a decider only runs on the plugin thread, and from here the host drops it.
-        onOwner([this] {
-            const PlayerSession* joined = playerSession_.get();
-            if (joined != nullptr) {
-                options_.plugins.joined(*joined);
-            }
-        });
+        static_cast<void>(onOwnerWait(
+            [this, welcome] {
+                const PlayerSession* joined = playerSession_.get();
+                if (joined != nullptr) {
+                    *welcome = options_.plugins.joined(*joined);
+                }
+            },
+            std::chrono::seconds(5)));
     }
 
     std::vector<play::PlayerInfoEntry> entries;
@@ -795,9 +799,13 @@ void ClientSession::enterPlay() {
     // Drawn here: the outbound loop sends chunks first and would leave the scoreboard behind the terrain.
     uiState_->tickUi();
 
-    broadcastToEveryone(
-        wire::text::Component::translatable("multiplayer.player.joined", {wire::text::Component::text(player.name())})
-            .color(wire::text::kYellow));
+    if (!welcome->silent) {
+        broadcastToEveryone(welcome->text.empty()
+                                ? wire::text::Component::translatable("multiplayer.player.joined",
+                                                                      {wire::text::Component::text(player.name())})
+                                      .color(wire::text::kYellow)
+                                : wire::text::miniMessage::parse(welcome->text));
+    }
 
     // Last: started earlier, this thread interleaves chunk batches with join packets, which the client reads as desync.
     startOutboundLoop();

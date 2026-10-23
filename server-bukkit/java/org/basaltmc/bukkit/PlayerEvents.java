@@ -83,6 +83,10 @@ final class PlayerEvents {
         };
     }
 
+    static EquipmentSlot hand(String name) {
+        return name.equals("off_hand") ? EquipmentSlot.OFF_HAND : EquipmentSlot.HAND;
+    }
+
     static BlockFace face(String name) {
         try {
             return BlockFace.valueOf(name.toUpperCase(Locale.ROOT));

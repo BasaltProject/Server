@@ -2,12 +2,14 @@
 
 namespace basalt::server::plugins::pluginEventTypes {
 const PluginEventType& playerJoin() {
-    static const PluginEventType type{"player.join", false, {"player_name", "player_uuid", "world"}};
+    static const PluginEventType type{
+        "player.join", false, {"player_name", "player_uuid", "world", "message", "silent"}, {"message", "silent"}};
     return type;
 }
 
 const PluginEventType& playerQuit() {
-    static const PluginEventType type{"player.quit", false, {"player_name", "player_uuid", "world"}};
+    static const PluginEventType type{
+        "player.quit", false, {"player_name", "player_uuid", "world", "message", "silent"}, {"message", "silent"}};
     return type;
 }
 
@@ -50,7 +52,8 @@ const PluginEventType& playerWorldChange() {
 }
 
 const PluginEventType& playerRespawn() {
-    static const PluginEventType type{"player.respawn", false, {"player_name", "player_uuid", "world", "x", "y", "z"}};
+    static const PluginEventType type{
+        "player.respawn", false, {"player_name", "player_uuid", "world", "x", "y", "z"}, {"x", "y", "z"}};
     return type;
 }
 
@@ -58,7 +61,7 @@ const PluginEventType& playerInteract() {
     static const PluginEventType type{
         "player.interact",
         true,
-        {"player_name", "player_uuid", "world", "action", "x", "y", "z", "block", "item", "hand"}};
+        {"player_name", "player_uuid", "world", "action", "x", "y", "z", "block", "item", "hand", "face"}};
     return type;
 }
 
@@ -650,6 +653,12 @@ const PluginEventType& projectileHit() {
     return type;
 }
 
+const PluginEventType& playerInteractAir() {
+    static const PluginEventType type{
+        "player.interact_air", true, {"player_name", "player_uuid", "world", "item", "hand"}};
+    return type;
+}
+
 const std::vector<const PluginEventType*>& all() {
     static const std::vector<const PluginEventType*> every{&playerJoin(),
                                                            &playerQuit(),
@@ -759,7 +768,8 @@ const std::vector<const PluginEventType*>& all() {
                                                            &hangingPlace(),
                                                            &hangingBreak(),
                                                            &serverTickEnd(),
-                                                           &projectileHit()};
+                                                           &projectileHit(),
+                                                           &playerInteractAir()};
     return every;
 }
 } // namespace basalt::server::plugins::pluginEventTypes

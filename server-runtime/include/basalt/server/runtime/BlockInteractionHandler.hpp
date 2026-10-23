@@ -47,8 +47,9 @@ public:
                            const std::string& item)>
             placeAllowed;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
-                           const std::string& item)>
+                           const std::string& item, std::string_view face, bool mainHand)>
             interactAllowed;
+        std::function<bool(const player::PlayerSession& player, const std::string& item, bool mainHand)> airUseAllowed;
         std::function<bool(const player::PlayerSession& player, const std::string& item, std::int32_t count)>
             dropAllowed;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>

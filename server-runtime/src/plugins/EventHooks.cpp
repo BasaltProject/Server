@@ -43,6 +43,7 @@ using server::plugins::pluginEventTypes::playerEffect;
 using server::plugins::pluginEventTypes::playerFish;
 using server::plugins::pluginEventTypes::playerGamemodeChange;
 using server::plugins::pluginEventTypes::playerInteract;
+using server::plugins::pluginEventTypes::playerInteractAir;
 using server::plugins::pluginEventTypes::playerInteractEntity;
 using server::plugins::pluginEventTypes::playerItemConsume;
 using server::plugins::pluginEventTypes::playerItemDamage;
@@ -109,14 +110,23 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
         });
     };
     hooks.interactAllowed = [&owner, &sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y,
-                                            std::int32_t z, const std::string& item) {
+                                            std::int32_t z, const std::string& item, std::string_view face,
+                                            bool mainHand) {
         return sink.allowed(&playerInteract, [&](PluginEvent& event) {
             EventSink::player(event, who);
             event.set("action", std::string{"right_click_block"});
             position(event, x, y, z);
             event.set("block", blockNameAt(owner, x, y, z));
             event.set("item", item);
-            event.set("hand", std::string{"main_hand"});
+            event.set("hand", std::string{mainHand ? "main_hand" : "off_hand"});
+            event.set("face", std::string{face});
+        });
+    };
+    hooks.airUseAllowed = [&sink](const player::PlayerSession& who, const std::string& item, bool mainHand) {
+        return sink.allowed(&playerInteractAir, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            event.set("item", item);
+            event.set("hand", std::string{mainHand ? "main_hand" : "off_hand"});
         });
     };
     hooks.dropAllowed = [&sink](const player::PlayerSession& who, const std::string& item, std::int32_t count) {
@@ -239,19 +249,49 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
 }
 
 PlayerLifecycle::Hooks lifecycle(ClientSession& owner, const EventSink& sink) {
-    static_cast<void>(owner);
     PlayerLifecycle::Hooks hooks;
-    hooks.respawned = [&sink](const player::PlayerSession& who, const world::LoadedWorld&, double x, double y,
-                              double z) {
-        sink.notify(&playerRespawn, [&](PluginEvent& event) {
-            EventSink::player(event, who);
-            event.set("x", x);
-            event.set("y", y);
-            event.set("z", z);
+    hooks.respawned = [&sink](const player::PlayerSession& who, const world::LoadedWorld&, double& x, double& y,
+                              double& z) {
+        const server::plugins::PluginEvent* event = sink.ask(&playerRespawn, [&](PluginEvent& filled) {
+            EventSink::player(filled, who);
+            filled.set("x", x);
+            filled.set("y", y);
+            filled.set("z", z);
         });
+        if (event == nullptr) {
+            return;
+        }
+        if (const auto* moved = std::get_if<double>(&event->get("x")); moved != nullptr) {
+            x = *moved;
+        }
+        if (const auto* moved = std::get_if<double>(&event->get("y")); moved != nullptr) {
+            y = *moved;
+        }
+        if (const auto* moved = std::get_if<double>(&event->get("z")); moved != nullptr) {
+            z = *moved;
+        }
     };
-    hooks.quit = [&sink](const player::PlayerSession& who, const std::optional<std::string>&) {
-        sink.notify(&playerQuit, [&](PluginEvent& event) { EventSink::player(event, who); });
+    hooks.quit = [&owner, &sink](const player::PlayerSession& who, const std::optional<std::string>&) {
+        if (!sink.listening(&playerQuit)) {
+            return Announcement{};
+        }
+        auto farewell = std::make_shared<Announcement>();
+        static_cast<void>(owner.onOwnerWait(
+            [&sink, &who, farewell] {
+                const server::plugins::PluginEvent* quit =
+                    sink.ask(&playerQuit, [&](PluginEvent& event) { EventSink::player(event, who); });
+                if (quit == nullptr) {
+                    return;
+                }
+                if (const auto* text = std::get_if<std::string>(&quit->get("message")); text != nullptr) {
+                    farewell->text = *text;
+                }
+                if (const auto* silent = std::get_if<bool>(&quit->get("silent")); silent != nullptr) {
+                    farewell->silent = *silent;
+                }
+            },
+            std::chrono::milliseconds(500)));
+        return *farewell;
     };
     hooks.gamemodeAllowed = [&sink](const player::PlayerSession& who, wire::protocol::play::Gamemode mode,
                                     wire::protocol::play::Gamemode previous) {
