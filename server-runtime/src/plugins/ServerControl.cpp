@@ -1,5 +1,7 @@
 #include <basalt/server/runtime/plugins/ServerControl.hpp>
 
+#include <chrono>
+
 namespace basalt::server::runtime::plugins {
 
 ServerControl::ServerControl(Hooks hooks) : hooks_(std::move(hooks)) {
@@ -11,6 +13,18 @@ ServerControl::ServerControl(Hooks hooks) : hooks_(std::move(hooks)) {
 float ServerControl::tickRate() {
     TickLoop* loop = hooks_.tickLoop ? hooks_.tickLoop() : nullptr;
     return loop == nullptr ? 20.0F : loop->tickRate();
+}
+
+std::array<double, 4> ServerControl::pace() {
+    TickLoop* loop = hooks_.tickLoop ? hooks_.tickLoop() : nullptr;
+    if (loop == nullptr) {
+        return {20.0, 20.0, 20.0, 0.0};
+    }
+    const TickRates rates = loop->tickRates();
+    const std::int64_t now =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+    return {rates.oneMinute, rates.fiveMinutes, rates.fifteenMinutes, loop->durations().summary(now, 60).meanMillis};
 }
 
 void ServerControl::setTickRate(float rate) {
@@ -72,6 +86,10 @@ std::vector<server::plugins::PluginServerLink> ServerControl::links() {
 void ServerControl::setLinks(std::vector<server::plugins::PluginServerLink> links) {
     const std::lock_guard<std::mutex> lock{linksMutex_};
     links_ = std::move(links);
+}
+
+std::optional<server::plugins::PluginResourcePack> ServerControl::resourcePack() {
+    return hooks_.resourcePack ? hooks_.resourcePack() : std::nullopt;
 }
 
 } // namespace basalt::server::runtime::plugins

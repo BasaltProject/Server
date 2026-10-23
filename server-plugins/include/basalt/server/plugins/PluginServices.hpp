@@ -6,6 +6,7 @@
 #include <basalt/server/plugins/PluginCommandSpec.hpp>
 #include <basalt/server/plugins/PluginDatapacks.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
+#include <basalt/server/plugins/PluginLoot.hpp>
 #include <basalt/server/plugins/PluginMaps.hpp>
 #include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/plugins/PluginScoreboards.hpp>
@@ -272,5 +273,7 @@ public:
     [[nodiscard]] virtual PluginDatapacks& datapacks() { return PluginDatapacks::unavailable(); }
 
     [[nodiscard]] virtual PluginMaps& maps() { return PluginMaps::unavailable(); }
+
+    [[nodiscard]] virtual PluginLoot& loot() { return PluginLoot::unavailable(); }
 };
 } // namespace basalt::server::plugins

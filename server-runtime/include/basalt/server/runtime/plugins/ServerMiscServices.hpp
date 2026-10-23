@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/plugins/ServerBossBars.hpp>
 #include <basalt/server/runtime/plugins/ServerControl.hpp>
 #include <basalt/server/runtime/plugins/ServerDatapacks.hpp>
+#include <basalt/server/runtime/plugins/ServerLoot.hpp>
 #include <basalt/server/runtime/plugins/ServerMaps.hpp>
 #include <basalt/server/runtime/plugins/ServerScoreboards.hpp>
 
@@ -21,6 +22,7 @@ struct MiscServices {
     std::unique_ptr<ServerControl> control;
     std::unique_ptr<ServerDatapacks> datapacks;
     std::unique_ptr<ServerMaps> maps;
+    std::unique_ptr<ServerLoot> loot;
 };
 
 } // namespace basalt::server::runtime::plugins

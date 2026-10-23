@@ -108,6 +108,135 @@ public abstract class MiscServer extends ServerBase {
         return null;
     }
 
+    private record Pack(UUID id, String url, String hash, String prompt, boolean required)
+            implements org.bukkit.packs.ResourcePack {
+        @Override
+        public UUID getId() {
+            return id;
+        }
+
+        @Override
+        public String getUrl() {
+            return url;
+        }
+
+        @Override
+        public String getHash() {
+            return hash.isEmpty() ? null : hash;
+        }
+
+        @Override
+        public String getPrompt() {
+            return prompt;
+        }
+
+        @Override
+        public boolean isRequired() {
+            return required;
+        }
+    }
+
+    private static Pack pack() {
+        String[] fields = MiscNatives.resourcePack();
+        if (fields == null) {
+            return null;
+        }
+        String prompt = fields[4].isEmpty() ? null
+            : org.basaltmc.bukkit.misc.Json.legacyOf(org.basaltmc.bukkit.misc.Json.component(fields[4]));
+        return new Pack(UUID.fromString(fields[0]), fields[1], fields[2], prompt, "1".equals(fields[3]));
+    }
+
+    @Override
+    public org.bukkit.packs.ResourcePack getServerResourcePack() {
+        return pack();
+    }
+
+    @Override
+    public String getResourcePack() {
+        Pack pack = pack();
+        return pack == null ? "" : pack.url();
+    }
+
+    @Override
+    public String getResourcePackHash() {
+        Pack pack = pack();
+        return pack == null ? "" : pack.hash();
+    }
+
+    @Override
+    public String getResourcePackPrompt() {
+        Pack pack = pack();
+        return pack == null ? "" : pack.prompt() == null ? "" : pack.prompt();
+    }
+
+    @Override
+    public boolean isResourcePackRequired() {
+        Pack pack = pack();
+        return pack != null && pack.required();
+    }
+
+    @Override
+    public double[] getTPS() {
+        double[] pace = MiscNatives.tmPace();
+        return new double[] {pace[0], pace[1], pace[2]};
+    }
+
+    @Override
+    public double getAverageTickTime() {
+        return MiscNatives.tmPace()[3];
+    }
+
+    @Override
+    public void sendPluginMessage(org.bukkit.plugin.Plugin source, String channel, byte[] message) {
+        org.bukkit.plugin.messaging.StandardMessenger.validatePluginMessage(getMessenger(), source, channel, message);
+        for (Player player : getOnlinePlayers()) {
+            player.sendPluginMessage(source, channel, message);
+        }
+    }
+
+    @Override
+    public UUID getPlayerUniqueId(String playerName) {
+        Player online = getPlayerExact(playerName);
+        if (online != null) {
+            return online.getUniqueId();
+        }
+        Access.Known known = Access.byName(playerName);
+        return known == null ? null : known.id();
+    }
+
+    @Override
+    public void reloadPermissions() {
+        for (Player player : getOnlinePlayers()) {
+            player.recalculatePermissions();
+        }
+    }
+
+    @Override
+    public void savePlayers() {
+        Natives.runConsoleCommand("save-all flush");
+    }
+
+    @Override
+    public net.kyori.adventure.text.Component motd() {
+        return org.basaltmc.bukkit.misc.Json.fromLegacy(getMotd());
+    }
+
+    @Override
+    public net.kyori.adventure.text.Component permissionMessage() {
+        return org.basaltmc.bukkit.misc.Json.fromLegacy(getPermissionMessage());
+    }
+
+    @Override
+    public String getPermissionMessage() {
+        return "\u00a7cI'm sorry, but you do not have permission to perform this command. Please contact the server "
+            + "administrators if you believe that this is a mistake.";
+    }
+
+    @Override
+    public org.bukkit.loot.LootTable getLootTable(org.bukkit.NamespacedKey key) {
+        return org.basaltmc.bukkit.misc.BasaltLootTable.get(key);
+    }
+
     @Override
     public OfflinePlayer getOfflinePlayer(UUID id) {
         Player online = getPlayer(id);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -16,7 +17,16 @@ struct PluginServerLink {
     std::string url;
 };
 
-/// The pace of the server and the links its clients list in their pause menu.
+struct PluginResourcePack {
+    std::string id;
+    std::string url;
+    std::string hash;
+    bool required = false;
+    /// A JSON text component, or empty.
+    std::string prompt;
+};
+
+/// The pace of the server, the links its clients list in their pause menu, and the pack it asks them to use.
 class PluginServerControl {
 public:
     PluginServerControl() = default;
@@ -29,6 +39,9 @@ public:
     [[nodiscard]] static PluginServerControl& unavailable();
 
     [[nodiscard]] virtual float tickRate() { return 20.0F; }
+
+    /// Ticks per second over the last minute, five minutes and fifteen minutes, then the mean tick in milliseconds.
+    [[nodiscard]] virtual std::array<double, 4> pace() { return {20.0, 20.0, 20.0, 0.0}; }
 
     virtual void setTickRate(float rate) { static_cast<void>(rate); }
 
@@ -58,6 +71,8 @@ public:
     [[nodiscard]] virtual std::vector<PluginServerLink> links() { return {}; }
 
     virtual void setLinks(std::vector<PluginServerLink> links) { static_cast<void>(links); }
+
+    [[nodiscard]] virtual std::optional<PluginResourcePack> resourcePack() { return std::nullopt; }
 };
 
 inline PluginServerControl& PluginServerControl::unavailable() {
