@@ -41,8 +41,12 @@ class BlockInteractionHandler {
 public:
     struct Hooks {
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
-                           std::int32_t stateId)>
+                           std::int32_t stateId, bool& dropItems)>
             breakAllowed;
+        std::function<void(const player::PlayerSession* player, const std::string& world, std::int32_t x,
+                           std::int32_t y, std::int32_t z, std::int32_t stateId,
+                           std::vector<server::world::loot::ItemStack>& drops)>
+            blockDrops;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
                            const std::string& item)>
             placeAllowed;

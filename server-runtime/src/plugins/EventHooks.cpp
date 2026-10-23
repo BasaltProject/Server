@@ -15,6 +15,7 @@ namespace {
 using server::plugins::PluginEvent;
 using server::plugins::pluginEventTypes::blockBreak;
 using server::plugins::pluginEventTypes::blockDamage;
+using server::plugins::pluginEventTypes::blockDrops;
 using server::plugins::pluginEventTypes::blockFertilize;
 using server::plugins::pluginEventTypes::blockPlace;
 using server::plugins::pluginEventTypes::entityDamage;
@@ -94,12 +95,66 @@ void playerAsEntity(PluginEvent& event, const player::PlayerSession& who) {
 BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const EventSink& sink) {
     BlockInteractionHandler::Hooks hooks;
     hooks.breakAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
-                                 std::int32_t stateId) {
-        return sink.allowed(&blockBreak, [&](PluginEvent& event) {
-            EventSink::player(event, who);
-            position(event, x, y, z);
-            event.set("block", blockNameOf(stateId));
+                                 std::int32_t stateId, bool& dropItems) {
+        const server::plugins::PluginEvent* event = sink.ask(&blockBreak, [&](PluginEvent& filled) {
+            EventSink::player(filled, who);
+            position(filled, x, y, z);
+            filled.set("block", blockNameOf(stateId));
+            filled.set("drop_items", true);
         });
+        if (event == nullptr) {
+            return true;
+        }
+        if (const auto* drops = std::get_if<bool>(&event->get("drop_items")); drops != nullptr) {
+            dropItems = *drops;
+        }
+        return !event->cancelled();
+    };
+    hooks.blockDrops = [&sink](const player::PlayerSession* who, const std::string& world, std::int32_t x,
+                               std::int32_t y, std::int32_t z, std::int32_t stateId,
+                               std::vector<server::world::loot::ItemStack>& drops) {
+        if (who == nullptr || !sink.listening(&blockDrops)) {
+            return;
+        }
+        std::string lines;
+        for (const server::world::loot::ItemStack& stack : drops) {
+            lines += (lines.empty() ? "" : "\n") + stack.item.toString() + "|" + std::to_string(stack.count);
+        }
+        const server::plugins::PluginEvent* event = sink.ask(&blockDrops, [&](PluginEvent& filled) {
+            EventSink::player(filled, *who);
+            position(filled, x, y, z);
+            filled.set("world", world);
+            filled.set("block", blockNameOf(stateId));
+            filled.set("drops", lines);
+        });
+        if (event == nullptr) {
+            return;
+        }
+        if (event->cancelled()) {
+            drops.clear();
+            return;
+        }
+        const auto* edited = std::get_if<std::string>(&event->get("drops"));
+        if (edited == nullptr || *edited == lines) {
+            return;
+        }
+        std::vector<server::world::loot::ItemStack> next;
+        for (std::size_t from = 0; from < edited->size();) {
+            const std::size_t end = std::min(edited->find('\n', from), edited->size());
+            const std::string line = edited->substr(from, end - from);
+            from = end + 1;
+            const std::size_t bar = line.find('|');
+            if (bar == std::string::npos) {
+                continue;
+            }
+            const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+                wire::common::Identifier::parse(line.substr(0, bar));
+            const std::int32_t count = std::atoi(line.c_str() + bar + 1);
+            if (id.has_value() && count > 0) {
+                next.push_back(server::world::loot::ItemStack{.item = *id, .count = count});
+            }
+        }
+        drops = std::move(next);
     };
     hooks.placeAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
                                  const std::string& item) {
