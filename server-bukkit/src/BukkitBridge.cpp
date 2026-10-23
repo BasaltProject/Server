@@ -10,6 +10,7 @@
 namespace basalt::server::bukkit {
 namespace {
 std::atomic<BukkitBridge*> gCurrent{nullptr};
+thread_local plugins::PluginCommandCall* gCurrentCall = nullptr;
 
 constexpr std::string_view kEventOwner = "bukkit";
 
@@ -100,6 +101,12 @@ BukkitBridge::BukkitBridge(ShimHost& shim, plugins::PluginHost& plugins, BukkitO
 
 BukkitBridge::~BukkitBridge() { seal(); }
 
+void BukkitBridge::replyToCommand(const std::string& message) {
+    if (gCurrentCall != nullptr) {
+        gCurrentCall->reply(message);
+    }
+}
+
 BukkitBridge* BukkitBridge::live() { return gCurrent.load(); }
 
 JNIEnv* BukkitBridge::liveEnv() {
@@ -177,8 +184,9 @@ std::expected<void, std::string> BukkitBridge::boot() {
     shutdownMethod_ = env->GetStaticMethodID(runtime_, "shutdown", "()Z");
     taskMethod_ = env->GetStaticMethodID(runtime_, "runTask", "(J)V");
     eventMethod_ = env->GetStaticMethodID(runtime_, "event", "(Ljava/lang/String;IJ[Ljava/lang/Object;Z)Z");
-    commandMethod_ =
-        env->GetStaticMethodID(runtime_, "command", "(Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Z");
+    commandMethod_ = env->GetStaticMethodID(runtime_, "command",
+                                            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/"
+                                            "String;DDDLjava/lang/String;Ljava/lang/String;)Z");
     channelMethod_ = env->GetStaticMethodID(runtime_, "channelMessage", "(Ljava/lang/String;Ljava/lang/String;[B)V");
     listMethod_ = env->GetStaticMethodID(runtime_, "pluginList", "()[Ljava/lang/String;");
     if (channelMethod_ == nullptr || enableMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr ||
@@ -420,14 +428,23 @@ bool BukkitBridge::runCommand(const std::string& name, plugins::PluginCommandCal
     jstring command = toJava(env, name);
     jstring sender = toJava(env, call.source());
     jstring args = toJava(env, line == nullptr ? std::string_view{} : std::string_view{*line});
-    const jboolean handled = env->CallStaticBooleanMethod(runtime_, commandMethod_, command, sender,
-                                                          call.isConsole() ? JNI_TRUE : JNI_FALSE, args);
+    jstring kind = toJava(env, call.kind());
+    jstring world = toJava(env, call.world());
+    jstring caller = toJava(env, call.caller());
+    const std::array<double, 3> at = call.position();
+    gCurrentCall = &call;
+    const jboolean handled = env->CallStaticBooleanMethod(runtime_, commandMethod_, command, sender, kind, world, at[0],
+                                                          at[1], at[2], caller, args);
+    gCurrentCall = nullptr;
     if (env->ExceptionCheck() == JNI_TRUE) {
         reportJavaFailure(env, "command " + name);
     }
     env->DeleteLocalRef(command);
     env->DeleteLocalRef(sender);
     env->DeleteLocalRef(args);
+    env->DeleteLocalRef(kind);
+    env->DeleteLocalRef(world);
+    env->DeleteLocalRef(caller);
     return handled == JNI_TRUE;
 }
 

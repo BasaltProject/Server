@@ -1,10 +1,12 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
+#include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/PacketNames.hpp>
 #include <basalt/server/runtime/plugins/ServerPluginServices.hpp>
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 
@@ -156,13 +158,31 @@ NoChannels& noChannels() {
 
 class DispatchedCall final : public PluginCommandCall {
 public:
+    struct Origin {
+        std::string kind;
+        std::string world;
+        std::array<double, 3> position{};
+        std::string caller;
+    };
+
     DispatchedCall(std::string source, bool console, std::map<std::string, Argument, std::less<>> values,
-                   std::function<void(const wire::text::Component&)> reply)
-        : source_(std::move(source)), console_(console), values_(std::move(values)), reply_(std::move(reply)) {}
+                   std::function<void(const wire::text::Component&)> reply, Origin origin)
+        : source_(std::move(source)), console_(console), values_(std::move(values)), reply_(std::move(reply)),
+          origin_(std::move(origin)) {}
 
     [[nodiscard]] std::string source() const override { return source_; }
 
     [[nodiscard]] bool isConsole() const override { return console_; }
+
+    [[nodiscard]] std::string kind() const override {
+        return origin_.kind.empty() ? (console_ ? "console" : "player") : origin_.kind;
+    }
+
+    [[nodiscard]] std::string world() const override { return origin_.world; }
+
+    [[nodiscard]] std::array<double, 3> position() const override { return origin_.position; }
+
+    [[nodiscard]] std::string caller() const override { return origin_.caller; }
 
     void reply(std::string_view message) override {
         if (reply_) {
@@ -180,6 +200,7 @@ private:
     bool console_;
     std::map<std::string, Argument, std::less<>> values_;
     std::function<void(const wire::text::Component&)> reply_;
+    Origin origin_;
 };
 
 [[nodiscard]] std::shared_ptr<const command::ArgumentType> typeOf(const PluginCommandArgument& argument) {
@@ -269,9 +290,17 @@ command::CommandNode* DispatcherCommands::add(Entry& entry) {
                     }
                     // Handed to the owner: plugin code only ever runs on one, and the command arrives on the source's.
                     const command::CommandSource& source = context.source();
+                    DispatchedCall::Origin origin{.kind = std::string{source.kind()}, .position = source.position()};
+                    if (const world::LoadedWorld* at = command::worldIn(source, context.environment()); at != nullptr) {
+                        origin.world = at->name();
+                    }
+                    if (const command::ExecutionSource* execution = source.asExecution(); execution != nullptr) {
+                        origin.caller = std::string{execution->root().kind()} + ":" + execution->root().name();
+                    }
                     auto call = std::make_shared<DispatchedCall>(
                         source.name(), source.player() == nullptr, std::move(values),
-                        [&source](const wire::text::Component& message) { source.sendSystemMessage(message); });
+                        [&source](const wire::text::Component& message) { source.sendSystemMessage(message); },
+                        std::move(origin));
                     const std::function<void(PluginCommandCall&)> run = target->run;
                     if (owner->isCurrent()) {
                         run(*call);

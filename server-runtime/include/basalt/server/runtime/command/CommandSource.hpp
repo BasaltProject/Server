@@ -59,6 +59,9 @@ public:
 
     [[nodiscard]] virtual const ExecutionSource* asExecution() const { return nullptr; }
 
+    /// `console`, `player`, `command_block` or `other`, for the plugin API to hand the right kind of sender.
+    [[nodiscard]] virtual std::string_view kind() const { return "other"; }
+
     [[nodiscard]] virtual bool defersSelectors() const { return false; }
 
     /// parity: `CommandSourceStack.isSilent`.
@@ -77,6 +80,8 @@ public:
                                   wire::text::LangTable lang = wire::text::LangTable{}, SpawnAt spawn = {});
 
     [[nodiscard]] std::string name() const override { return "Server"; }
+
+    [[nodiscard]] std::string_view kind() const override { return "console"; }
 
     [[nodiscard]] wire::text::Component displayName() const override;
 
@@ -102,6 +107,8 @@ public:
                         const chat::SignedArguments* signedArguments = nullptr);
 
     [[nodiscard]] std::string name() const override;
+
+    [[nodiscard]] std::string_view kind() const override { return "player"; }
 
     [[nodiscard]] wire::text::Component displayName() const override;
 
@@ -132,6 +139,8 @@ public:
                        wire::text::LangTable lang = wire::text::LangTable{});
 
     [[nodiscard]] std::string name() const override { return name_; }
+
+    [[nodiscard]] std::string_view kind() const override { return "command_block"; }
 
     [[nodiscard]] wire::text::Component displayName() const override;
 

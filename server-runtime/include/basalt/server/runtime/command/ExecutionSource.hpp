@@ -54,6 +54,8 @@ public:
 
     [[nodiscard]] const ExecutionSource* asExecution() const override { return this; }
 
+    [[nodiscard]] std::string_view kind() const override;
+
     [[nodiscard]] bool silent() const override { return silent_; }
 
     /// parity: a modified `CommandSourceStack` keeps the signing context it came from.

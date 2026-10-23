@@ -27,6 +27,7 @@ public:
     [[nodiscard]] static BukkitBridge& current();
     [[nodiscard]] static BukkitBridge* live();
     static void seal();
+    static void replyToCommand(const std::string& message);
     [[nodiscard]] static JNIEnv* liveEnv();
 
     [[nodiscard]] std::expected<void, std::string> boot();

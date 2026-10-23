@@ -48,6 +48,11 @@ bool ExecutionSource::hasPermission(std::optional<std::string_view> node) const 
     return trusted_ || base_->hasPermission(node);
 }
 
+std::string_view ExecutionSource::kind() const {
+    const CommandSource& origin = root();
+    return player_ != nullptr && origin.player() != player_ ? "proxied" : origin.kind();
+}
+
 const CommandSource& ExecutionSource::root() const {
     const ExecutionSource* inner = base_->asExecution();
     return inner == nullptr ? *base_ : inner->root();
