@@ -84,12 +84,6 @@ public final class BasaltRegistryAccess implements RegistryAccess {
                     }
                 }
                 break;
-            case "mob_effect":
-                String[] effects = WorldNatives.registryIds(name);
-                for (int i = 0; i < effects.length; i++) {
-                    out.add(new org.basaltmc.bukkit.entity.BasaltPotionEffectType(NamespacedKey.fromString(effects[i]), i));
-                }
-                break;
             default:
                 if (type != null && type.isInterface()) {
                     String[] entryIds = WorldNatives.registryIds(name);
