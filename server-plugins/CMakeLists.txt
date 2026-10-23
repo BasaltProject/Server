@@ -2,6 +2,7 @@ basalt_module(server-plugins
     SOURCES
         src/PluginEvents.cpp
         src/PluginEventTypes.cpp
+        src/PluginHookEventTypes.cpp
         src/PluginDispatch.cpp
         src/PluginApi.cpp
         src/PluginMiscApi.cpp
