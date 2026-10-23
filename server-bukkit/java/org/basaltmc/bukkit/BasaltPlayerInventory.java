@@ -24,6 +24,14 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
         this.uuid = uuid;
     }
 
+    /** Bukkit counts the hotbar first (0 to 8) and the storage rows after it; Basalt keeps the rows first. */
+    private static int basaltSlot(int slot) {
+        if (slot >= 0 && slot < 9) {
+            return slot + 27;
+        }
+        return slot >= 9 && slot < 36 ? slot - 9 : slot;
+    }
+
     @Override
     public int getSize() {
         return kSize;
@@ -39,12 +47,12 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
 
     @Override
     public ItemStack getItem(int slot) {
-        return Items.fromStrings(WorldNatives.inventoryGet(uuid, slot));
+        return Items.fromStrings(WorldNatives.inventoryGet(uuid, basaltSlot(slot)));
     }
 
     @Override
     public void setItem(int slot, ItemStack item) {
-        WorldNatives.inventorySet(uuid, slot, Items.toStrings(item));
+        WorldNatives.inventorySet(uuid, basaltSlot(slot), Items.toStrings(item));
     }
 
     @Override
