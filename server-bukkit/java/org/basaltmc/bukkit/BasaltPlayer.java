@@ -142,20 +142,8 @@ public class BasaltPlayer extends PlayerBase {
         return isOnline();
     }
 
-    @Override
-    public double getHealth() {
-        return number(kHealth);
-    }
 
-    @Override
-    public void setHealth(double health) {
-        Natives.playerSetHealth(uuid, health);
-    }
 
-    @Override
-    public double getMaxHealth() {
-        return 20.0;
-    }
 
     @Override
     public int getFoodLevel() {
@@ -469,6 +457,23 @@ public class BasaltPlayer extends PlayerBase {
         return values == null ? 0.0 : values[index];
     }
 
+    private org.basaltmc.bukkit.entity.EntityCore entityCore;
+
+    @Override
+    public synchronized org.basaltmc.bukkit.entity.EntityCore core() {
+        BasaltWorld world = (BasaltWorld) getWorld();
+        int entityId = getEntityId();
+        if (entityCore == null || entityCore.world != world || entityCore.id != entityId) {
+            entityCore = new org.basaltmc.bukkit.entity.EntityCore(world, entityId, id, EntityType.PLAYER);
+        }
+        return entityCore;
+    }
+
+    @Override
+    public org.bukkit.inventory.EntityEquipment getEquipment() {
+        return new org.basaltmc.bukkit.entity.BasaltPlayerEquipment(getInventory(), this);
+    }
+
     private BasaltPlayerInventory inventory;
     private final MetadataHolder metadata = new MetadataHolder();
     private final java.util.Set<String> tags = new java.util.HashSet<>();
@@ -596,7 +601,9 @@ public class BasaltPlayer extends PlayerBase {
     }
 
     @Override
-    public void updateInventory() {}
+    public void updateInventory() {
+        InventoryNatives.windowResync(uuid);
+    }
 
     @Override
     public void setViewDistance(int distance) {}
@@ -726,30 +733,10 @@ public class BasaltPlayer extends PlayerBase {
         return tags.remove(tag);
     }
 
-    @Override
-    public org.bukkit.entity.Entity getVehicle() {
-        return null;
-    }
 
-    @Override
-    public boolean isInsideVehicle() {
-        return false;
-    }
 
-    @Override
-    public java.util.List<org.bukkit.entity.Entity> getPassengers() {
-        return new java.util.ArrayList<>();
-    }
 
-    @Override
-    public boolean isPersistent() {
-        return true;
-    }
 
-    @Override
-    public int getTicksLived() {
-        return 0;
-    }
 
     @Override
     public org.bukkit.block.BlockFace getFacing() {
@@ -774,6 +761,37 @@ public class BasaltPlayer extends PlayerBase {
     @Override
     public String toString() {
         return "BasaltPlayer{name=" + name + "}";
+    }
+
+    @Override
+    public org.bukkit.inventory.InventoryView getOpenInventory() {
+        return org.basaltmc.bukkit.inv.Windows.current(this);
+    }
+
+    @Override
+    public org.bukkit.inventory.InventoryView openInventory(org.bukkit.inventory.Inventory inventory) {
+        return org.basaltmc.bukkit.inv.Windows.open(this, inventory);
+    }
+
+    @Override
+    public void openInventory(org.bukkit.inventory.InventoryView view) {
+        org.basaltmc.bukkit.inv.Windows.open(this, (org.basaltmc.bukkit.inv.BasaltInventoryView) view);
+    }
+
+    @Override
+    public void closeInventory(org.bukkit.event.inventory.InventoryCloseEvent.Reason reason) {
+        org.basaltmc.bukkit.inv.Windows.closeCurrent(this);
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemStack getItemOnCursor() {
+        org.bukkit.inventory.ItemStack cursor = Items.fromBytes(InventoryNatives.cursorItem(uuid));
+        return cursor == null ? new BasaltItemStack(org.bukkit.Material.AIR, 0) : cursor;
+    }
+
+    @Override
+    public void setItemOnCursor(org.bukkit.inventory.ItemStack item) {
+        InventoryNatives.setCursorItem(uuid, Items.toBytes(item));
     }
 
     @Override
