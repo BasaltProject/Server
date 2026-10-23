@@ -48,6 +48,7 @@ public class BasaltServer extends ServerBase {
 
     protected BasaltServer(File root, File pluginsFolder) {
         instance = this;
+        org.basaltmc.bukkit.item.ItemMetas.register();
         this.root = root;
         this.pluginManager = new BasaltPluginManager(this, pluginsFolder);
         this.commandMap = new BasaltCommandMap(this);
@@ -546,5 +547,161 @@ public class BasaltServer extends ServerBase {
             return online;
         }
         throw Unsupported.hit("Server#getOfflinePlayer(String) for a player who is not online");
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemFactory getItemFactory() {
+        return BasaltItemFactory.INSTANCE;
+    }
+
+    @Override
+    public org.bukkit.inventory.Inventory createInventory(org.bukkit.inventory.InventoryHolder holder,
+            org.bukkit.event.inventory.InventoryType type) {
+        return org.basaltmc.bukkit.inv.Creation.of(holder, type, (Component) null);
+    }
+
+    @Override
+    public org.bukkit.inventory.Inventory createInventory(org.bukkit.inventory.InventoryHolder holder,
+            org.bukkit.event.inventory.InventoryType type, Component title) {
+        return org.basaltmc.bukkit.inv.Creation.of(holder, type, title);
+    }
+
+    @Override
+    public org.bukkit.inventory.Inventory createInventory(org.bukkit.inventory.InventoryHolder holder,
+            org.bukkit.event.inventory.InventoryType type, String title) {
+        return org.basaltmc.bukkit.inv.Creation.of(holder, type, title);
+    }
+
+    @Override
+    public org.bukkit.inventory.Inventory createInventory(org.bukkit.inventory.InventoryHolder holder, int size) {
+        return org.basaltmc.bukkit.inv.Creation.of(holder, size, (Component) null);
+    }
+
+    @Override
+    public org.bukkit.inventory.Inventory createInventory(org.bukkit.inventory.InventoryHolder holder, int size,
+            Component title) {
+        return org.basaltmc.bukkit.inv.Creation.of(holder, size, title);
+    }
+
+    @Override
+    public org.bukkit.inventory.Inventory createInventory(org.bukkit.inventory.InventoryHolder holder, int size,
+            String title) {
+        return org.basaltmc.bukkit.inv.Creation.of(holder, size, title);
+    }
+
+    @Override
+    public boolean addRecipe(org.bukkit.inventory.Recipe recipe) {
+        return org.basaltmc.bukkit.recipe.Recipes.add(recipe);
+    }
+
+    @Override
+    public boolean addRecipe(org.bukkit.inventory.Recipe recipe, boolean resendRecipes) {
+        return org.basaltmc.bukkit.recipe.Recipes.add(recipe);
+    }
+
+    @Override
+    public boolean addRecipes(Iterable<org.bukkit.inventory.Recipe> recipes) {
+        return org.basaltmc.bukkit.recipe.Recipes.addAll(recipes);
+    }
+
+    @Override
+    public org.bukkit.inventory.Recipe getRecipe(org.bukkit.NamespacedKey key) {
+        return org.basaltmc.bukkit.recipe.Recipes.get(key);
+    }
+
+    @Override
+    public boolean hasRecipe(org.bukkit.NamespacedKey key) {
+        return org.basaltmc.bukkit.recipe.Recipes.has(key);
+    }
+
+    @Override
+    public boolean removeRecipe(org.bukkit.NamespacedKey key) {
+        return org.basaltmc.bukkit.recipe.Recipes.remove(key);
+    }
+
+    @Override
+    public boolean removeRecipe(org.bukkit.NamespacedKey key, boolean resendRecipes) {
+        return org.basaltmc.bukkit.recipe.Recipes.remove(key);
+    }
+
+    @Override
+    public boolean removeRecipes(Iterable<org.bukkit.NamespacedKey> keys) {
+        return org.basaltmc.bukkit.recipe.Recipes.removeAll(keys);
+    }
+
+    @Override
+    public java.util.Iterator<org.bukkit.inventory.Recipe> recipeIterator() {
+        return org.basaltmc.bukkit.recipe.Recipes.iterator();
+    }
+
+    @Override
+    public java.util.List<org.bukkit.inventory.Recipe> getRecipesFor(org.bukkit.inventory.ItemStack result) {
+        return org.basaltmc.bukkit.recipe.Recipes.producing(result);
+    }
+
+    @Override
+    public void clearRecipes() {
+        org.basaltmc.bukkit.recipe.Recipes.clear();
+    }
+
+    @Override
+    public void resetRecipes() {
+        org.basaltmc.bukkit.recipe.Recipes.reset();
+    }
+
+    @Override
+    public org.bukkit.inventory.Merchant createMerchant() {
+        return new org.basaltmc.bukkit.inv.BasaltMerchant(null);
+    }
+
+    @Override
+    public org.bukkit.inventory.Merchant createMerchant(Component title) {
+        return new org.basaltmc.bukkit.inv.BasaltMerchant(title);
+    }
+
+    @Override
+    public org.bukkit.inventory.Merchant createMerchant(String title) {
+        return new org.basaltmc.bukkit.inv.BasaltMerchant(title == null ? null
+            : org.basaltmc.bukkit.item.Texts.fromLegacy(title));
+    }
+
+    @Override
+    public org.bukkit.inventory.Recipe getCraftingRecipe(org.bukkit.inventory.ItemStack[] matrix, World world) {
+        org.basaltmc.bukkit.recipe.Recipes.Crafted crafted = org.basaltmc.bukkit.recipe.Recipes.craft(matrix);
+        return crafted == null ? null : org.basaltmc.bukkit.recipe.Recipes.get(crafted.recipe());
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemStack craftItem(org.bukkit.inventory.ItemStack[] matrix, World world, Player player) {
+        return craftItemResult(matrix, world, player).getResult();
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemStack craftItem(org.bukkit.inventory.ItemStack[] matrix, World world) {
+        return craftItemResult(matrix, world, null).getResult();
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemCraftResult craftItemResult(org.bukkit.inventory.ItemStack[] matrix, World world) {
+        return craftItemResult(matrix, world, null);
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemCraftResult craftItemResult(org.bukkit.inventory.ItemStack[] matrix, World world,
+            Player player) {
+        org.basaltmc.bukkit.recipe.Recipes.Crafted crafted = org.basaltmc.bukkit.recipe.Recipes.craft(matrix);
+        if (crafted == null) {
+            return new org.basaltmc.bukkit.recipe.CraftResult(new BasaltItemStack(org.bukkit.Material.AIR, 0), matrix);
+        }
+        org.bukkit.inventory.ItemStack[] left = new org.bukkit.inventory.ItemStack[matrix.length];
+        for (int at = 0; at < left.length; at++) {
+            org.bukkit.inventory.ItemStack used = matrix[at];
+            if (used != null && used.getAmount() > 1) {
+                left[at] = used.asQuantity(used.getAmount() - 1);
+            } else {
+                left[at] = crafted.remaining()[at];
+            }
+        }
+        return new org.basaltmc.bukkit.recipe.CraftResult(crafted.result(), left);
     }
 }

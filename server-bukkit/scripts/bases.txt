@@ -21,3 +21,6 @@ org.bukkit.block.BlockState
 org.bukkit.block.BlockType$Typed
 org.bukkit.inventory.ItemType$Typed
 org.bukkit.OfflinePlayer
+
+# inventory
+org.bukkit.inventory.meta.ItemMeta

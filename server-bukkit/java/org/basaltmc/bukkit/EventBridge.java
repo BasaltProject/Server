@@ -93,7 +93,19 @@ final class EventBridge {
                 return null;
             }
             org.bukkit.Material material = org.bukkit.Material.matchMaterial(id);
-            return material == null || material.isAir() ? null : new org.bukkit.inventory.ItemStack(material, 1);
+            if (material == null || material.isAir()) {
+                return null;
+            }
+            Player who = player();
+            if (who != null) {
+                for (org.bukkit.inventory.ItemStack held : new org.bukkit.inventory.ItemStack[] {
+                    who.getInventory().getItemInMainHand(), who.getInventory().getItemInOffHand()}) {
+                    if (held != null && held.getType() == material && held.getAmount() > 0) {
+                        return held.clone();
+                    }
+                }
+            }
+            return new org.bukkit.inventory.ItemStack(material, 1);
         }
 
         Location location() {
@@ -113,18 +125,27 @@ final class EventBridge {
 
     private EventBridge() {}
 
-    private static void map(String basalt, Class<? extends Event> produced, Function<Fields, Event> build) {
+    static void map(String basalt, Class<? extends Event> produced, Function<Fields, Event> build) {
         map(basalt, produced, build, null);
     }
 
-    private static void map(String basalt, Class<? extends Event> produced, Function<Fields, Event> build,
+    static void map(String basalt, Class<? extends Event> produced, Function<Fields, Event> build,
             BiConsumer<Event, Fields> writeBack) {
         Mapping mapping = new Mapping(basalt, produced, build, writeBack, false);
         mappings.add(mapping);
         byName.computeIfAbsent(basalt, key -> new java.util.ArrayList<>()).add(mapping);
     }
 
+    static void mapAlways(String basalt, java.util.function.Consumer<Fields> effect) {
+        map(basalt, org.bukkit.event.server.ServerEvent.class, f -> {
+            effect.accept(f);
+            return null;
+        });
+        Natives.subscribe(basalt, EventPriority.MONITOR.ordinal());
+    }
+
     static {
+        InventoryEvents.register();
         map("player.join", PlayerJoinEvent.class, f -> new PlayerJoinEvent(f.player(),
             Component.translatable("multiplayer.player.joined", Component.text(f.text("player_name")))));
         map("player.quit", PlayerQuitEvent.class, f -> new PlayerQuitEvent(f.player(),

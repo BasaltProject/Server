@@ -474,7 +474,9 @@ public class BasaltPlayer extends PlayerBase {
     }
 
     @Override
-    public void updateInventory() {}
+    public void updateInventory() {
+        InventoryNatives.windowResync(uuid);
+    }
 
     @Override
     public void setViewDistance(int distance) {}
@@ -652,5 +654,36 @@ public class BasaltPlayer extends PlayerBase {
     @Override
     public String toString() {
         return "BasaltPlayer{name=" + name + "}";
+    }
+
+    @Override
+    public org.bukkit.inventory.InventoryView getOpenInventory() {
+        return org.basaltmc.bukkit.inv.Windows.current(this);
+    }
+
+    @Override
+    public org.bukkit.inventory.InventoryView openInventory(org.bukkit.inventory.Inventory inventory) {
+        return org.basaltmc.bukkit.inv.Windows.open(this, inventory);
+    }
+
+    @Override
+    public void openInventory(org.bukkit.inventory.InventoryView view) {
+        org.basaltmc.bukkit.inv.Windows.open(this, (org.basaltmc.bukkit.inv.BasaltInventoryView) view);
+    }
+
+    @Override
+    public void closeInventory(org.bukkit.event.inventory.InventoryCloseEvent.Reason reason) {
+        org.basaltmc.bukkit.inv.Windows.closeCurrent(this);
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemStack getItemOnCursor() {
+        org.bukkit.inventory.ItemStack cursor = Items.fromBytes(InventoryNatives.cursorItem(uuid));
+        return cursor == null ? new BasaltItemStack(org.bukkit.Material.AIR, 0) : cursor;
+    }
+
+    @Override
+    public void setItemOnCursor(org.bukkit.inventory.ItemStack item) {
+        InventoryNatives.setCursorItem(uuid, Items.toBytes(item));
     }
 }

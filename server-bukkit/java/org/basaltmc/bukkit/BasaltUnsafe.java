@@ -21,4 +21,24 @@ public final class BasaltUnsafe extends UnsafeValuesBase {
     public String getMainLevelName() {
         return "world";
     }
+
+    @Override
+    public org.bukkit.potion.PotionType.InternalPotionData getInternalPotionData(org.bukkit.NamespacedKey key) {
+        return org.basaltmc.bukkit.item.PotionData.of(key);
+    }
+
+    @Override
+    public org.bukkit.Material getMaterial(String material, int version) {
+        return org.bukkit.Material.matchMaterial(material);
+    }
+
+    @Override
+    public org.bukkit.Material fromLegacy(org.bukkit.Material material) {
+        return material;
+    }
+
+    @Override
+    public org.bukkit.Material toLegacy(org.bukkit.Material material) {
+        return material;
+    }
 }

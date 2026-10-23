@@ -124,7 +124,8 @@ public final class BasaltBlock extends BlockBase {
 
     @Override
     public BlockState getState() {
-        return new BasaltBlockState(world, x, y, z, getBlockData());
+        return org.basaltmc.bukkit.inv.ContainerStates.of(world.getName(), x, y, z,
+            new BasaltBlockState(world, x, y, z, getBlockData()));
     }
 
     @Override
