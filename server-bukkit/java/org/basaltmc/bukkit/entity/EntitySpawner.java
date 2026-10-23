@@ -1,5 +1,6 @@
 package org.basaltmc.bukkit.entity;
 
+import java.util.UUID;
 import java.util.function.Consumer;
 import org.basaltmc.bukkit.BasaltWorld;
 import org.basaltmc.bukkit.Blocks;
@@ -58,5 +59,34 @@ public final class EntitySpawner {
             return item;
         }
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T extends Entity> T create(BasaltWorld world, Location at, Class<T> type) {
+        EntityType kind = typeOf(type);
+        if (kind == EntityType.PLAYER) {
+            throw new IllegalArgumentException("Cannot create a player");
+        }
+        return (T) EntityCore.template(world, kind, at.getX(), at.getY(), at.getZ(), at.getYaw(), at.getPitch());
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T extends Entity> T add(BasaltWorld world, T entity, SpawnReason reason) {
+        if (!(entity instanceof Cored cored) || !cored.core().isTemplate()) {
+            throw new IllegalArgumentException("Entity has already been added to a world");
+        }
+        EntityCore core = cored.core();
+        double[] at = core.stagedNumbers();
+        Blocks.flushAll();
+        int id = EntityNatives.spawnAs(world.getName(), core.type.getKey().toString(), at[EntityCore.kX],
+            at[EntityCore.kY], at[EntityCore.kZ], (float) at[EntityCore.kYaw],
+            reason == null ? "custom" : reason.name().toLowerCase(java.util.Locale.ROOT));
+        if (id < 0) {
+            return null;
+        }
+        String[] strings = org.basaltmc.bukkit.WorldNatives.entityStrings(world.getName(), id);
+        core.bind(id, UUID.fromString(strings[0]));
+        world.adopt(id, entity);
+        return entity;
     }
 }
