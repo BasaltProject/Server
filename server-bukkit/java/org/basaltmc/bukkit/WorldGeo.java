@@ -431,6 +431,21 @@ public abstract class WorldGeo extends WorldExtras {
     }
 
     @Override
+    public org.bukkit.generator.ChunkGenerator getGenerator() {
+        return org.basaltmc.bukkit.worldgen.CustomGenerators.generatorOf(getName());
+    }
+
+    @Override
+    public BiomeProvider getBiomeProvider() {
+        return org.basaltmc.bukkit.worldgen.CustomGenerators.biomesOf(getName());
+    }
+
+    @Override
+    public List<org.bukkit.generator.BlockPopulator> getPopulators() {
+        return org.basaltmc.bukkit.worldgen.CustomGenerators.populatorsOf((BasaltWorld) this);
+    }
+
+    @Override
     public BiomeProvider vanillaBiomeProvider() {
         BasaltWorld self = (BasaltWorld) this;
         return new BiomeProvider() {

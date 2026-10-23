@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/entity/Raids.hpp>
@@ -253,6 +254,41 @@ void ServerWorldEnv::setInhabitedTime(const std::int32_t chunkX, const std::int3
     if (server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ); chunk != nullptr) {
         chunk->increaseInhabitedTime(ticks - chunk->inhabitedTime());
     }
+}
+
+bool ServerWorldEnv::useChunkFill(ChunkFill fill) {
+    if (world_->declaration().type != config::WorldType::Void) {
+        return false;
+    }
+    std::vector<std::int32_t> biomeIds;
+    for (const auto& [id, name] : reg::biomeIdsTable()) {
+        biomeIds.push_back(id);
+    }
+    world_->setChunkFiller([fill = std::move(fill), biomeIds = std::move(biomeIds)](
+                               const std::int32_t chunkX, const std::int32_t chunkZ, server::world::Chunk& chunk) {
+        std::vector<std::int32_t> blocks;
+        std::vector<std::int32_t> biomes;
+        fill(chunkX, chunkZ, blocks, biomes);
+        for (std::int32_t& biome : biomes) {
+            biome = biome >= 0 && static_cast<std::size_t>(biome) < biomeIds.size()
+                        ? biomeIds[static_cast<std::size_t>(biome)]
+                        : biomeIds.front();
+        }
+        constexpr std::size_t kBlocks = server::world::ChunkSection::kBlocks;
+        constexpr std::size_t kBiomes = server::world::ChunkSection::kBiomes;
+        for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
+            if (blocks.size() >= (index + 1) * kBlocks) {
+                chunk.section(index).setBlockStateIds(
+                    std::span<const std::int32_t>{blocks}.subspan(index * kBlocks, kBlocks));
+            }
+            if (biomes.size() >= (index + 1) * kBiomes) {
+                chunk.section(index).setBiomeIds(
+                    std::span<const std::int32_t>{biomes}.subspan(index * kBiomes, kBiomes));
+            }
+        }
+        chunk.invalidateHeightmaps();
+    });
+    return true;
 }
 
 } // namespace basalt::server::runtime::plugins

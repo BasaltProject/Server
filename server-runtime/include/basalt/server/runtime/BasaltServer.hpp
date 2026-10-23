@@ -170,6 +170,9 @@ private:
 
     void shutdownIfSignalled();
 
+    /// Connects what the server tells plugins about a world to that world; a world made later needs it too.
+    void wireWorld(const std::string& name, world::LoadedWorld& world);
+
     void startPluginWatchdog();
 
     void reportOrphanedPluginData();

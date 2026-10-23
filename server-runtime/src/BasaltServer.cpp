@@ -485,7 +485,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                             double z) { return spawning_->spawnMob(world, type, x, y, z, 0.0F, "plugin"); };
     model.makeWorld = [this](const std::string& name, config::WorldDimension dimension, config::WorldType type,
                              std::optional<std::int64_t> seed) {
-        return worldRegistry_->createWorld(name, dimension, type, seed);
+        world::LoadedWorld* made = worldRegistry_->createWorld(name, dimension, type, seed);
+        if (made != nullptr) {
+            wireWorld(made->name(), *made);
+        }
+        return made;
     };
     model.unloadWorld = [this](const std::string& name, bool save) { return worldRegistry_->unloadWorld(name, save); };
     model.environment = [this]() -> const command::CommandEnvironment& { return *wired_.environment; };

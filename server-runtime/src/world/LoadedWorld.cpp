@@ -388,6 +388,11 @@ void LoadedWorld::saveMetadata() {
 
 Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     const auto started = std::chrono::steady_clock::now();
+    ChunkFiller filler;
+    {
+        const std::lock_guard<std::mutex> lock{fillerMutex_};
+        filler = chunkFiller_;
+    }
     const config::DimensionFacts& facts = config::dimensionFacts(declaration_.dimension);
     Chunk chunk = [&] {
         switch (declaration_.type) {
@@ -396,7 +401,7 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
         case config::WorldType::Void:
             return server::world::voidWorldGenerator::generate(
                 chunkX, chunkZ, metadata_.spawnX, metadata_.spawnY, metadata_.spawnZ,
-                server::world::voidWorldGenerator::kDefaultPlatformRadius, facts.chunkHeight);
+                filler ? 0 : server::world::voidWorldGenerator::kDefaultPlatformRadius, facts.chunkHeight);
         case config::WorldType::Debug:
             return server::world::debugWorldGenerator::generate(chunkX, chunkZ, facts.chunkHeight);
         case config::WorldType::Normal:
@@ -407,6 +412,9 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
         }
         return server::world::noiseWorldGenerator::generate(chunkX, chunkZ);
     }();
+    if (filler && declaration_.type == config::WorldType::Void) {
+        filler(chunkX, chunkZ, chunk);
+    }
     timings_.of("world.generate")
         .record(
             std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - started).count());
@@ -451,10 +459,16 @@ std::optional<Chunk> LoadedWorld::loadOrGenerateChunk(std::int32_t chunkX, std::
         timings_.of("world.generate")
             .record(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - started)
                         .count());
+        if (made.has_value() && !stored.has_value()) {
+            made->markFresh();
+        }
         return made;
     }
     Chunk chunk = stored.has_value() ? std::move(*stored) : generateChunk(chunkX, chunkZ);
     chunk.setStage(server::world::ChunkStage::Full);
+    if (!stored.has_value()) {
+        chunk.markFresh();
+    }
     portals_.scan(chunk);
     // Off the tick thread, and once: from here on a leaf knows its own distance. parity: not in a debug
     if (!stored.has_value() && declaration_.type != config::WorldType::Debug) {

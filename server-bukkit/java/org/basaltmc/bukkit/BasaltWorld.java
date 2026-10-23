@@ -232,16 +232,6 @@ public final class BasaltWorld extends WorldGeo {
     }
 
     @Override
-    public org.bukkit.generator.ChunkGenerator getGenerator() {
-        return null;
-    }
-
-    @Override
-    public org.bukkit.generator.BiomeProvider getBiomeProvider() {
-        return null;
-    }
-
-    @Override
     public Block getBlockAt(int x, int y, int z) {
         return new BasaltBlock(this, x, y, z);
     }

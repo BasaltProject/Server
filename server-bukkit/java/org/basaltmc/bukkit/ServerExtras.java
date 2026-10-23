@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
 import org.bukkit.WorldCreator;
@@ -355,8 +356,22 @@ public abstract class ServerExtras extends MiscServer {
             return null;
         }
         BasaltWorld made = world(name);
+        if (creator.generator() != null) {
+            org.basaltmc.bukkit.worldgen.CustomGenerators.install(made, creator.generator(), creator.biomeProvider());
+            Location spawn = creator.generator().getFixedSpawnLocation(made, new java.util.Random(creator.seed()));
+            if (spawn != null) {
+                made.setSpawnLocation(spawn);
+            } else {
+                made.setSpawnLocation(0, made.getHighestBlockYAt(0, 0) + 1, 0);
+            }
+        }
         getPluginManager().callEvent(new org.bukkit.event.world.WorldInitEvent(made));
         return made;
+    }
+
+    @Override
+    public org.bukkit.generator.ChunkGenerator.ChunkData createChunkData(World world) {
+        return org.basaltmc.bukkit.worldgen.CustomGenerators.newChunkData(world);
     }
 
     @Override

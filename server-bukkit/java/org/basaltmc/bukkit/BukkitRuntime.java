@@ -170,6 +170,9 @@ public final class BukkitRuntime {
     public static boolean event(String name, int priority, long generation, Object[] fields, boolean cancelled) {
         Blocks.begin();
         try {
+            if (name.equals("world.chunk_load") && priority == 0) {
+                org.basaltmc.bukkit.worldgen.CustomGenerators.chunkLoaded(fields);
+            }
             return EventBridge.fire(name, priority, generation, fields, cancelled);
         } finally {
             Blocks.end();

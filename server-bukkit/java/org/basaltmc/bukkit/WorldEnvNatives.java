@@ -89,6 +89,9 @@ public final class WorldEnvNatives {
     /** Tells the sender of the plugin command running now, which is not the console or a player. */
     public static native void commandReply(String miniMessage);
 
+    /** Has the chunks of a void world made by `CustomGenerators.fill`; false when the world is not a void world. */
+    public static native boolean useGenerator(String world);
+
     /** One server setting as text, null when there is none of that name. */
     public static native String setting(String key);
 

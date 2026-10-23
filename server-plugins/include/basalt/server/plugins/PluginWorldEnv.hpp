@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -320,6 +321,16 @@ public:
         static_cast<void>(chunkX);
         static_cast<void>(chunkZ);
         static_cast<void>(ticks);
+    }
+
+    /// Hands the chunks of a void world to `fill`, which gives one block state id per block of each section from the
+    /// lowest (x fastest, then z, then y) and one biome id per 4x4x4 cell; empty answers leave a chunk empty.
+    using ChunkFill = std::function<void(std::int32_t chunkX, std::int32_t chunkZ, std::vector<std::int32_t>& blocks,
+                                         std::vector<std::int32_t>& biomes)>;
+
+    virtual bool useChunkFill(ChunkFill fill) {
+        static_cast<void>(fill);
+        return false;
     }
 
     /// Whether the state would survive standing at the position (`BlockState.canSurvive`).
