@@ -105,6 +105,7 @@ public final class BukkitRuntime {
             try {
                 manager.loadPlugins(folder);
                 manager.enableAll(PluginLoadOrder.STARTUP);
+                server.announceWorlds();
                 manager.enableAll(PluginLoadOrder.POSTWORLD);
             } finally {
                 Blocks.end();
