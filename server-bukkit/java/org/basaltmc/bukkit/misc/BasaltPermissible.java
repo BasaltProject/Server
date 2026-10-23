@@ -24,8 +24,18 @@ public final class BasaltPermissible extends PermissibleBase {
     }
 
     @Override
+    public boolean isPermissionSet(String name) {
+        return super.isPermissionSet(name) || id != null && Natives.playerMay(id.toString(), name);
+    }
+
+    @Override
+    public boolean isPermissionSet(org.bukkit.permissions.Permission permission) {
+        return isPermissionSet(permission.getName());
+    }
+
+    @Override
     public boolean hasPermission(String name) {
-        if (isPermissionSet(name)) {
+        if (super.isPermissionSet(name)) {
             return super.hasPermission(name);
         }
         if (id != null && Natives.playerMay(id.toString(), name)) {
