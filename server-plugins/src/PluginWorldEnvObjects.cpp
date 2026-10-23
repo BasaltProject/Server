@@ -76,6 +76,27 @@ void pushDrops(LuaArgs& args, const std::vector<PluginDrop>& drops) {
     }
 }
 
+constexpr std::array<std::string_view, 8> kCategories{
+    "monster",        "creature",      "ambient", "axolotls", "underground_water_creature",
+    "water_creature", "water_ambient", "misc"};
+
+void pushBox(LuaArgs& args, const std::array<std::int32_t, 6>& box) {
+    args.pushTable();
+    for (std::size_t at = 0; at < box.size(); ++at) {
+        args.pushInteger(box[at]);
+        args.setIndex(static_cast<std::int64_t>(at) + 1);
+    }
+}
+
+void pushStrings(LuaArgs& args, const std::vector<std::string>& values) {
+    args.pushTable();
+    std::int64_t position = 1;
+    for (const std::string& value : values) {
+        args.pushString(value);
+        args.setIndex(position++);
+    }
+}
+
 void pushBorder(LuaArgs& args, const PluginBorder& border) {
     args.pushTable();
     args.pushNumber(border.centerX);
@@ -115,6 +136,342 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                 [world](LuaArgs& args) {
                     PluginWorldEnv* env = world->env();
                     pushBorder(args, env == nullptr ? PluginBorder{} : env->border());
+                })
+        .reads("view_distance",
+               [world] {
+                   PluginWorldEnv* env = world->env();
+                   return PluginValue{static_cast<std::int64_t>(env == nullptr ? 10 : env->viewDistance())};
+               })
+        .writes("view_distance",
+                [world](LuaArgs& args, std::int32_t index) {
+                    if (PluginWorldEnv* env = world->env(); env != nullptr) {
+                        env->setViewDistance(static_cast<std::int32_t>(args.checkInteger(index)));
+                    }
+                })
+        .reads("sea_level",
+               [world] {
+                   PluginWorldEnv* env = world->env();
+                   return PluginValue{static_cast<std::int64_t>(env == nullptr ? 63 : env->seaLevel())};
+               })
+        .pushes("forced_chunks",
+                [world](LuaArgs& args) {
+                    PluginWorldEnv* env = world->env();
+                    const std::vector<std::int32_t> flat =
+                        env == nullptr ? std::vector<std::int32_t>{} : env->forcedChunks();
+                    args.pushTable();
+                    for (std::size_t at = 0; at + 1 < flat.size(); at += 2) {
+                        args.pushTable();
+                        args.pushInteger(flat[at]);
+                        args.setField("x");
+                        args.pushInteger(flat[at + 1]);
+                        args.setField("z");
+                        args.setIndex(static_cast<std::int64_t>(at / 2) + 1);
+                    }
+                })
+        .method("force_chunk",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    if (PluginWorldEnv* env = world->env(); env != nullptr) {
+                        env->setChunkForced(static_cast<std::int32_t>(args.checkInteger(base)),
+                                            static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                            args.booleanOr(base + 2, true));
+                    }
+                    return 0;
+                })
+        .pushes("weather_times",
+                [world](LuaArgs& args) {
+                    PluginWorldEnv* env = world->env();
+                    const std::array<std::int32_t, 3> times =
+                        env == nullptr ? std::array<std::int32_t, 3>{} : env->weatherTimes();
+                    args.pushTable();
+                    args.pushInteger(times[0]);
+                    args.setField("rain");
+                    args.pushInteger(times[1]);
+                    args.setField("thunder");
+                    args.pushInteger(times[2]);
+                    args.setField("clear");
+                })
+        .method("set_weather_times",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    if (env == nullptr || !args.isTable(base)) {
+                        args.raise("set_weather_times takes a table: rain, thunder, clear");
+                    }
+                    std::array<std::int32_t, 3> times = env->weatherTimes();
+                    times[0] = static_cast<std::int32_t>(numberField(args, base, "rain").value_or(times[0]));
+                    times[1] = static_cast<std::int32_t>(numberField(args, base, "thunder").value_or(times[1]));
+                    times[2] = static_cast<std::int32_t>(numberField(args, base, "clear").value_or(times[2]));
+                    env->setWeatherTimes(times[0], times[1], times[2]);
+                    return 0;
+                })
+        .method("inhabited_time",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const auto chunkX = static_cast<std::int32_t>(args.checkInteger(base));
+                    const auto chunkZ = static_cast<std::int32_t>(args.checkInteger(base + 1));
+                    if (env != nullptr && args.isNumber(base + 2)) {
+                        env->setInhabitedTime(chunkX, chunkZ, args.toInteger(base + 2));
+                    }
+                    args.pushInteger(env == nullptr ? 0 : env->inhabitedTime(chunkX, chunkZ));
+                    return 1;
+                })
+        .method("structures",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const std::vector<PluginStructureStart> starts =
+                        env == nullptr ? std::vector<PluginStructureStart>{}
+                                       : env->structureStarts(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                              static_cast<std::int32_t>(args.checkInteger(base + 1)));
+                    args.pushTable();
+                    std::int64_t position = 1;
+                    for (const PluginStructureStart& start : starts) {
+                        args.pushTable();
+                        args.pushString(start.structure);
+                        args.setField("structure");
+                        args.pushInteger(start.chunkX);
+                        args.setField("chunk_x");
+                        args.pushInteger(start.chunkZ);
+                        args.setField("chunk_z");
+                        pushBox(args, start.bounds);
+                        args.setField("bounds");
+                        args.pushTable();
+                        std::int64_t piece = 1;
+                        for (const std::array<std::int32_t, 6>& box : start.pieces) {
+                            pushBox(args, box);
+                            args.setIndex(piece++);
+                        }
+                        args.setField("pieces");
+                        args.setIndex(position++);
+                    }
+                    return 1;
+                })
+        .method("raids",
+                [world](LuaArgs& args) {
+                    PluginWorldEnv* env = world->env();
+                    const std::vector<PluginRaid> raids = env == nullptr ? std::vector<PluginRaid>{} : env->raids();
+                    args.pushTable();
+                    std::int64_t position = 1;
+                    for (const PluginRaid& raid : raids) {
+                        args.pushTable();
+                        args.pushInteger(raid.id);
+                        args.setField("id");
+                        args.pushBoolean(raid.started);
+                        args.setField("started");
+                        args.pushInteger(raid.ticksActive);
+                        args.setField("ticks_active");
+                        args.pushInteger(raid.omenLevel);
+                        args.setField("omen_level");
+                        args.pushString(raid.status);
+                        args.setField("status");
+                        args.pushInteger(raid.groupsSpawned);
+                        args.setField("groups_spawned");
+                        args.pushInteger(raid.totalGroups);
+                        args.setField("total_groups");
+                        args.pushNumber(raid.totalHealth);
+                        args.setField("total_health");
+                        args.pushTable();
+                        for (std::size_t at = 0; at < raid.center.size(); ++at) {
+                            args.pushInteger(raid.center[at]);
+                            args.setIndex(static_cast<std::int64_t>(at) + 1);
+                        }
+                        args.setField("center");
+                        pushStrings(args, raid.heroes);
+                        args.setField("heroes");
+                        args.pushTable();
+                        std::int64_t raider = 1;
+                        for (const std::int32_t id : raid.raiders) {
+                            args.pushInteger(id);
+                            args.setIndex(raider++);
+                        }
+                        args.setField("raiders");
+                        args.setIndex(position++);
+                    }
+                    return 1;
+                })
+        .method("set_raid",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    bool changed = false;
+                    if (env != nullptr && args.isTable(base + 1)) {
+                        const auto id = static_cast<std::int32_t>(args.checkInteger(base));
+                        for (const PluginRaid& raid : env->raids()) {
+                            if (raid.id == id) {
+                                changed = env->setRaid(
+                                    id,
+                                    static_cast<std::int32_t>(
+                                        numberField(args, base + 1, "omen_level").value_or(raid.omenLevel)),
+                                    static_cast<std::int32_t>(
+                                        numberField(args, base + 1, "total_groups").value_or(raid.totalGroups)));
+                            }
+                        }
+                    }
+                    args.pushBoolean(changed);
+                    return 1;
+                })
+        .method("fluid",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const PluginFluid fluid =
+                        env == nullptr ? PluginFluid{}
+                                       : env->fluidAt(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                      static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                      static_cast<std::int32_t>(args.checkInteger(base + 2)));
+                    args.pushTable();
+                    args.pushString(fluid.fluid);
+                    args.setField("fluid");
+                    args.pushBoolean(fluid.source);
+                    args.setField("source");
+                    args.pushInteger(fluid.level);
+                    args.setField("level");
+                    args.pushBoolean(fluid.falling);
+                    args.setField("falling");
+                    return 1;
+                })
+        .method("lightning_target",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const std::optional<std::array<std::int32_t, 3>> at =
+                        env == nullptr ? std::nullopt
+                                       : env->lightningTarget(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                              static_cast<std::int32_t>(args.checkInteger(base + 1)));
+                    if (!at.has_value()) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    args.pushTable();
+                    for (std::size_t index = 0; index < at->size(); ++index) {
+                        args.pushInteger((*at)[index]);
+                        args.setIndex(static_cast<std::int64_t>(index) + 1);
+                    }
+                    return 1;
+                })
+        .method("game_event",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    if (PluginWorldEnv* env = world->env(); env != nullptr) {
+                        env->gameEvent(args.checkString(base), args.checkNumber(base + 1), args.checkNumber(base + 2),
+                                       args.checkNumber(base + 3),
+                                       args.isString(base + 4) ? args.checkString(base + 4) : std::string{});
+                    }
+                    return 0;
+                })
+        .method("grow_tree",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    args.pushBoolean(env != nullptr &&
+                                     env->growTree(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                   static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                   static_cast<std::int32_t>(args.checkInteger(base + 2)),
+                                                   args.checkString(base + 3)));
+                    return 1;
+                })
+        .method("pois",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    std::vector<std::string> types;
+                    if (args.isTable(base + 4)) {
+                        const std::int64_t length = args.length(base + 4);
+                        for (std::int64_t position = 1; position <= length; ++position) {
+                            args.pushIndex(base + 4, position);
+                            types.push_back(args.toText(-1));
+                            args.pop(1);
+                        }
+                    }
+                    const std::string kind = args.isString(base + 5) ? args.checkString(base + 5) : std::string{"any"};
+                    const std::vector<PluginPoi> found =
+                        env == nullptr
+                            ? std::vector<PluginPoi>{}
+                            : env->pointsOfInterest(types, static_cast<std::int32_t>(args.checkInteger(base)),
+                                                    static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                    static_cast<std::int32_t>(args.checkInteger(base + 2)),
+                                                    static_cast<std::int32_t>(args.checkInteger(base + 3)),
+                                                    kind == "free"    ? 0
+                                                    : kind == "taken" ? 1
+                                                                      : 2);
+                    args.pushTable();
+                    std::int64_t position = 1;
+                    for (const PluginPoi& poi : found) {
+                        args.pushTable();
+                        args.pushString(poi.type);
+                        args.setField("type");
+                        args.pushInteger(poi.x);
+                        args.setField("x");
+                        args.pushInteger(poi.y);
+                        args.setField("y");
+                        args.pushInteger(poi.z);
+                        args.setField("z");
+                        args.pushInteger(poi.freeTickets);
+                        args.setField("free_tickets");
+                        args.setIndex(position++);
+                    }
+                    return 1;
+                })
+        .pushes("spawn_rules",
+                [world](LuaArgs& args) {
+                    PluginWorldEnv* env = world->env();
+                    const PluginSpawnTunables rules = env == nullptr ? PluginSpawnTunables{} : env->spawnTunables();
+                    args.pushTable();
+                    args.pushTable();
+                    for (std::size_t at = 0; at < kCategories.size(); ++at) {
+                        if (rules.limits[at] >= 0) {
+                            args.pushInteger(rules.limits[at]);
+                            args.setField(kCategories[at]);
+                        }
+                    }
+                    args.setField("limits");
+                    args.pushTable();
+                    for (std::size_t at = 0; at < kCategories.size(); ++at) {
+                        if (rules.ticksPer[at] >= 0) {
+                            args.pushInteger(rules.ticksPer[at]);
+                            args.setField(kCategories[at]);
+                        }
+                    }
+                    args.setField("ticks_per");
+                    args.pushBoolean(rules.allowMonsters);
+                    args.setField("allow_monsters");
+                    args.pushBoolean(rules.allowAnimals);
+                    args.setField("allow_animals");
+                })
+        .method("set_spawn_rules",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    if (env == nullptr || !args.isTable(base)) {
+                        args.raise("set_spawn_rules takes a table: limits, ticks_per, allow_monsters, allow_animals");
+                    }
+                    PluginSpawnTunables rules = env->spawnTunables();
+                    for (const char* group : {"limits", "ticks_per"}) {
+                        args.pushField(base, group);
+                        if (args.isTable(-1)) {
+                            for (std::size_t at = 0; at < kCategories.size(); ++at) {
+                                args.pushField(-1, kCategories[at]);
+                                if (args.isNumber(-1)) {
+                                    (std::string_view{group} == "limits" ? rules.limits : rules.ticksPer)[at] =
+                                        static_cast<std::int32_t>(args.toInteger(-1));
+                                }
+                                args.pop(1);
+                            }
+                        }
+                        args.pop(1);
+                    }
+                    for (const char* flag : {"allow_monsters", "allow_animals"}) {
+                        args.pushField(base, flag);
+                        if (args.isBoolean(-1)) {
+                            (std::string_view{flag} == "allow_monsters" ? rules.allowMonsters : rules.allowAnimals) =
+                                args.toBoolean(-1);
+                        }
+                        args.pop(1);
+                    }
+                    env->setSpawnTunables(rules);
+                    return 0;
                 })
         .method("set_border",
                 [world](LuaArgs& args) {

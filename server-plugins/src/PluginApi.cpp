@@ -461,6 +461,20 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("tool_facts");
+    wire::lua::pushHostFunction(lua, "worlds.game_rules", [server](LuaArgs& args) {
+        const std::vector<std::string> specs = server->services().worlds().gameRuleSpecs();
+        args.pushTable();
+        for (std::size_t at = 0; at + 2 < specs.size(); at += 3) {
+            args.pushTable();
+            args.pushString(specs[at + 1]);
+            args.setField("type");
+            args.pushString(specs[at + 2]);
+            args.setField("default");
+            args.setField(specs[at]);
+        }
+        return 1;
+    });
+    lua.setField("game_rules");
     wire::lua::pushHostFunction(lua, "worlds.transform_state", [server](LuaArgs& args) {
         args.pushInteger(server->services().worlds().transformState(static_cast<std::int32_t>(args.checkInteger(1)),
                                                                     static_cast<std::int32_t>(args.integerOr(2, 0)),
