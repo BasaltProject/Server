@@ -42,22 +42,32 @@ storage::PlayerStore* ServerAccess::open() const {
     return store != nullptr && store->isOpen() ? store : nullptr;
 }
 
+std::optional<PluginKnownPlayer> ServerAccess::online(std::string_view uuid, std::string_view name) const {
+    for (const player::PlayerSession* session :
+         hooks_.sessions ? hooks_.sessions() : std::vector<player::PlayerSession*>{}) {
+        if (uuid.empty() ? session->name() == name : session->uuid().toString() == uuid) {
+            return PluginKnownPlayer{.uuid = session->uuid().toString(),
+                                     .name = session->name(),
+                                     .world = session->worldName,
+                                     .x = session->x,
+                                     .y = session->y,
+                                     .z = session->z};
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<PluginKnownPlayer> ServerAccess::playerByUuid(std::string_view uuid) {
     storage::PlayerStore* store = open();
-    if (store == nullptr) {
-        return std::nullopt;
-    }
-    const std::optional<storage::StoredPlayer> stored = store->players().load(uuid);
-    return stored.has_value() ? std::optional{known(*stored)} : std::nullopt;
+    const std::optional<storage::StoredPlayer> stored = store == nullptr ? std::nullopt : store->players().load(uuid);
+    return stored.has_value() ? std::optional{known(*stored)} : online(uuid, {});
 }
 
 std::optional<PluginKnownPlayer> ServerAccess::playerByName(std::string_view name) {
     storage::PlayerStore* store = open();
-    if (store == nullptr) {
-        return std::nullopt;
-    }
-    const std::optional<storage::StoredPlayer> stored = store->players().loadByName(name);
-    return stored.has_value() ? std::optional{known(*stored)} : std::nullopt;
+    const std::optional<storage::StoredPlayer> stored =
+        store == nullptr ? std::nullopt : store->players().loadByName(name);
+    return stored.has_value() ? std::optional{known(*stored)} : online({}, name);
 }
 
 std::vector<PluginKnownPlayer> ServerAccess::knownPlayers() {

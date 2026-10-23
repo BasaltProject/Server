@@ -41,6 +41,8 @@ public:
 
 private:
     [[nodiscard]] storage::PlayerStore* open() const;
+    [[nodiscard]] std::optional<server::plugins::PluginKnownPlayer> online(std::string_view uuid,
+                                                                           std::string_view name) const;
 
     Hooks hooks_;
 };
