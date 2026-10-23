@@ -1176,6 +1176,9 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         const Position at = current.at;
         const std::optional<std::int32_t> told = current.told;
         reacting.pop_back();
+        if (context.physicsAllowed && !context.physicsAllowed(at[0], at[1], at[2], told)) {
+            continue;
+        }
         for (const BlockChange& change :
              redstoneReactors::update(world, context.worldName, at[0], at[1], at[2], context.gameTime, context.random,
                                       context.tntExplodes, false, told)) {
