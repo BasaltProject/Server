@@ -128,6 +128,12 @@ struct RuntimeEntityMetadata {
     std::optional<bool> goatLeftHorn;
     std::optional<bool> goatRightHorn;
     std::optional<VehicleData> vehicle;
+    /// parity: `Entity`'s shared flags, custom name, name visibility, silence and gravity.
+    std::int8_t sharedFlags = 0;
+    std::optional<std::string> customName;
+    bool nameVisible = false;
+    bool silent = false;
+    bool noGravity = false;
 
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>
     changesFrom(const RuntimeEntityMetadata* previous) const;
@@ -136,5 +142,8 @@ struct RuntimeEntityMetadata {
 };
 
 [[nodiscard]] RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity);
+
+/// parity: `Entity.DATA_SHARED_FLAGS_ID` as far as a non-player entity sets it: on fire, invisible and glowing.
+[[nodiscard]] std::int8_t sharedFlagsOf(const ServerEntity& entity);
 
 } // namespace basalt::server::runtime::entity

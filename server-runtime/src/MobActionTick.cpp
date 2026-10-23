@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
 #include <basalt/server/runtime/entity/Frogs.hpp>
+#include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
@@ -93,7 +94,7 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
     if (burning == wasBurning) {
         return;
     }
-    const auto flags = static_cast<std::int8_t>(burning ? SetEntityDataPacket::kFlagOnFire : 0);
+    const std::int8_t flags = entity::sharedFlagsOf(mob);
     for (PlayerSession* player : watchers) {
         if (!player->connection().sendPlayPacket) {
             continue;

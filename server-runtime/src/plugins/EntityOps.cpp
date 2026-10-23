@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
@@ -808,6 +809,9 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
         }
         putAt(source(entity), path, typedTag(asText(at(arguments, 1)).value_or("string"), at(arguments, 2)));
         return true;
+    }
+    if (operation == "is_breed_item") {
+        return entity::breeding::isFood(entity.type(), idOf(asText(at(arguments, 0)).value_or("")));
     }
     if (operation == "look_at") {
         entity::ai::lookControl::lookAt(entity, asReal(at(arguments, 0)), asReal(at(arguments, 1)),

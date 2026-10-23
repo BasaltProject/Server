@@ -51,6 +51,15 @@ void bindEntityOperations(PluginObject& object, const std::shared_ptr<PluginEnti
         pushValue(args, entity->property(args.checkString(firstArgument(args))).value_or(PluginValue{}));
         return 1;
     });
+    object.method("call", [entity](wire::lua::LuaArgs& args) {
+        const std::int32_t base = firstArgument(args);
+        std::vector<PluginEntityValue> arguments;
+        for (std::int32_t index = base + 1; index <= args.count(); ++index) {
+            arguments.push_back(valueAt(args, index));
+        }
+        pushValue(args, entity->invoke(args.checkString(base), arguments).value_or(PluginEntityValue{}));
+        return 1;
+    });
     object.method("set", [entity](wire::lua::LuaArgs& args) {
         const std::int32_t base = firstArgument(args);
         args.pushBoolean(entity->setProperty(args.checkString(base), valueAt(args, base + 1)));

@@ -745,6 +745,30 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
             Entry{.index = shulkers::kColorDataIndex,
                   .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*shulkerColor)}});
     }
+    constexpr std::uint8_t kNameIndex = 2;
+    constexpr std::uint8_t kNameVisibleIndex = 3;
+    constexpr std::uint8_t kSilentIndex = 4;
+    constexpr std::uint8_t kNoGravityIndex = 5;
+    if ((previous == nullptr && sharedFlags != 0) || (previous != nullptr && previous->sharedFlags != sharedFlags)) {
+        entries.push_back(Entry{.index = SetEntityDataPacket::kSharedFlagsIndex,
+                                .value = SetEntityDataPacket::ByteValue{.value = sharedFlags}});
+    }
+    if ((previous == nullptr && customName.has_value()) ||
+        (previous != nullptr && previous->customName != customName)) {
+        entries.push_back(
+            Entry{.index = kNameIndex,
+                  .value = SetEntityDataPacket::OptionalTextValue{
+                      .value = customName.has_value() ? std::optional{wire::text::Component::text(*customName)}
+                                                      : std::nullopt}});
+    }
+    const auto flagEntry = [&](bool now, bool RuntimeEntityMetadata::* field, std::uint8_t index) {
+        if ((previous == nullptr && now) || (previous != nullptr && previous->*field != now)) {
+            entries.push_back(Entry{.index = index, .value = SetEntityDataPacket::BoolValue{.value = now}});
+        }
+    };
+    flagEntry(nameVisible, &RuntimeEntityMetadata::nameVisible, kNameVisibleIndex);
+    flagEntry(silent, &RuntimeEntityMetadata::silent, kSilentIndex);
+    flagEntry(noGravity, &RuntimeEntityMetadata::noGravity, kNoGravityIndex);
     // parity: a fresh dragon is defined hovering, so only a different phase is news.
     if (dragonPhase.has_value() && (previous == nullptr || previous->dragonPhase != dragonPhase) &&
         (previous != nullptr || *dragonPhase != static_cast<std::int32_t>(enderDragon::Phase::Hover))) {
@@ -754,8 +778,32 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
     return entries;
 }
 
+std::int8_t sharedFlagsOf(const ServerEntity& entity) {
+    const bool hasData = entity.sourceNbt.has_value();
+    const bool invisible = (hasData && entity.sourceNbt->getBoolean("Invisible")) ||
+                           entity.effects.contains(wire::common::Identifier::vanilla("invisibility"));
+    const bool glowing = (hasData && entity.sourceNbt->getBoolean("Glowing")) ||
+                         entity.effects.contains(wire::common::Identifier::vanilla("glowing"));
+    std::int8_t flags = 0;
+    if (entity.fireTicks > 0) {
+        flags |= SetEntityDataPacket::kFlagOnFire;
+    }
+    if (invisible) {
+        flags |= 0x20;
+    }
+    if (glowing) {
+        flags |= 0x40;
+    }
+    return flags;
+}
+
 RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     RuntimeEntityMetadata live{.airSupply = entity.airSupply};
+    live.sharedFlags = sharedFlagsOf(entity);
+    live.customName = entity.customName;
+    live.nameVisible = entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("CustomNameVisible");
+    live.silent = entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("Silent");
+    live.noGravity = entity.noGravity;
     live.vehicle = vehicleDataOf(entity);
     if (ageableMobs::hasBabyMetadata(entity.type().path())) {
         live.baby = entity.age < 0;
