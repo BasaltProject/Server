@@ -327,6 +327,9 @@ bool MobActionSystem::addMobEffect(world::LoadedWorld& world, const std::vector<
         return true;
     }
     const bool fresh = !mob.effects.contains(effect.effect);
+    if (hooks_.effectAllowed && !hooks_.effectAllowed(world, mob, effect, fresh ? "added" : "changed")) {
+        return false;
+    }
     const bool changed = entity::mobStatusEffects::add(mob, effect);
     // parity: `MobEffect.onEffectAdded`, the three omens' sound when one is newly given.
     const std::string_view path = effect.effect.path();

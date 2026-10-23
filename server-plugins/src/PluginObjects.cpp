@@ -350,6 +350,7 @@ void pushEntity(LuaArgs& lua, std::shared_ptr<PluginEntityRef> entity) {
                 entity->teleport(args.checkNumber(base), args.checkNumber(base + 1), args.checkNumber(base + 2)));
             return 1;
         });
+    bindEntityOperations(object, entity);
     std::move(object).push(lua);
 }
 

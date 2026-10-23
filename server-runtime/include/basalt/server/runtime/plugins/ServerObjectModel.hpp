@@ -3,7 +3,9 @@
 #include <basalt/server/plugins/PluginServices.hpp>
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/plugins/ServerNpcs.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
@@ -66,6 +68,16 @@ struct ModelHooks {
     std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                        double z, std::string_view cause)>
         spawnAllowed;
+    std::function<entity::entityCombat::Hooks()> combatHooks;
+    std::function<void(world::LoadedWorld& world, entity::ServerEntity& entity, const wire::common::Identifier& type,
+                       std::int32_t causeId, bool died)>
+        announceHit;
+    std::function<bool(world::LoadedWorld& world, entity::ServerEntity& entity, const world::ActiveEffect& effect,
+                       std::int32_t sourceId)>
+        giveEffect;
+    std::function<entity::ServerEntity*(world::LoadedWorld& world, const wire::common::Identifier& type, double x,
+                                        double y, double z, float yaw, std::string_view reason)>
+        spawnAs;
 };
 
 [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef>
@@ -90,7 +102,7 @@ private:
 class LoadedWorlds final : public server::plugins::PluginWorlds {
 public:
     LoadedWorlds(ModelHooks hooks, std::function<std::vector<player::PlayerSession*>()> players)
-        : hooks_(std::move(hooks)), players_(std::move(players)) {}
+        : hooks_(std::make_shared<const ModelHooks>(std::move(hooks))), players_(std::move(players)) {}
 
     [[nodiscard]] std::vector<std::shared_ptr<server::plugins::PluginWorldRef>> all() const override;
 
@@ -112,9 +124,8 @@ public:
     [[nodiscard]] std::vector<double> blockInfo(std::int32_t stateId) const override;
     [[nodiscard]] std::vector<std::string> blockEntityTypes() const override;
     [[nodiscard]] std::int32_t dataVersion() const override;
-    [[nodiscard]] std::optional<std::vector<std::uint8_t>> fixNbt(std::string_view kind,
-                                                                  std::span<const std::uint8_t> nbt,
-                                                                  std::int32_t fromVersion) const override;
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>>
+    fixNbt(std::string_view kind, std::span<const std::uint8_t> nbt, std::int32_t fromVersion) const override;
     [[nodiscard]] std::optional<std::string> fixName(std::string_view kind, std::string_view text,
                                                      std::int32_t fromVersion) const override;
     [[nodiscard]] std::vector<std::string> biomeIds() const override;
@@ -124,7 +135,7 @@ public:
     [[nodiscard]] std::vector<std::string> registryIds(std::string_view registry) const override;
 
 private:
-    ModelHooks hooks_;
+    std::shared_ptr<const ModelHooks> hooks_;
     std::function<std::vector<player::PlayerSession*>()> players_;
 };
 

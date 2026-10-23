@@ -16,16 +16,21 @@
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
-#include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
+#include <basalt/server/runtime/plugins/DroppedItemOps.hpp>
+#include <basalt/server/runtime/plugins/EntityOps.hpp>
+#include <basalt/server/runtime/plugins/PlayerEntityOps.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
+#include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/server/world/Chunk.hpp>
@@ -59,8 +64,9 @@ const Identifier& textDisplay() {
 
 class WorldEntityRef : public PluginEntityRef {
 public:
-    WorldEntityRef(world::LoadedWorld& world, std::int32_t entityId, std::string type)
-        : world_(&world), entityId_(entityId), type_(std::move(type)) {}
+    WorldEntityRef(world::LoadedWorld& world, std::int32_t entityId, std::string type,
+                   std::shared_ptr<const ModelHooks> hooks = nullptr)
+        : world_(&world), hooks_(std::move(hooks)), entityId_(entityId), type_(std::move(type)) {}
 
     [[nodiscard]] std::int32_t id() const override { return entityId_; }
 
@@ -180,6 +186,22 @@ public:
         return found == nullptr ? std::nullopt : found->customName;
     }
 
+    [[nodiscard]] std::optional<server::plugins::PluginEntityValue> property(std::string_view name) const override {
+        const entity::ServerEntity* found = entity();
+        return found == nullptr ? std::nullopt : entityOps::get(environment(), *found, name);
+    }
+
+    bool setProperty(std::string_view name, const server::plugins::PluginEntityValue& value) override {
+        entity::ServerEntity* found = entity();
+        return found != nullptr && entityOps::set(environment(), *found, name, value);
+    }
+
+    std::optional<server::plugins::PluginEntityValue>
+    invoke(std::string_view operation, const std::vector<server::plugins::PluginEntityValue>& arguments) override {
+        entity::ServerEntity* found = entity();
+        return found == nullptr ? std::nullopt : entityOps::invoke(environment(), *found, operation, arguments);
+    }
+
 protected:
     [[nodiscard]] entity::ServerEntity* entity() const {
         entity::ServerEntity* found = world_->state().entity(entityId_);
@@ -189,6 +211,11 @@ protected:
     world::LoadedWorld* world_;
 
 private:
+    [[nodiscard]] entityOps::Environment environment() const {
+        return entityOps::Environment{.hooks = hooks_.get(), .world = world_};
+    }
+
+    std::shared_ptr<const ModelHooks> hooks_;
     std::int32_t entityId_;
     std::string type_;
 };
@@ -265,9 +292,9 @@ private:
 
 class LoadedWorldRef final : public PluginWorldRef {
 public:
-    LoadedWorldRef(world::LoadedWorld& world, ModelHooks hooks,
+    LoadedWorldRef(world::LoadedWorld& world, std::shared_ptr<const ModelHooks> hooks,
                    std::function<std::vector<player::PlayerSession*>()> players)
-        : world_(&world), hooks_(std::move(hooks)), players_(std::move(players)) {}
+        : world_(&world), shared_(std::move(hooks)), hooks_(*shared_), players_(std::move(players)) {}
 
     [[nodiscard]] std::string name() const override { return world_->name(); }
 
@@ -520,10 +547,11 @@ public:
         const std::string token = "request:" + std::to_string(chunkX) + "," + std::to_string(chunkZ);
         world_->holdChunks(token, {world::ChunkGenerationQueue::pack(chunkX, chunkZ)});
         world_->generationQueue().request(chunkX, chunkZ, priority);
-        awaitChunk(chunkX, chunkZ, 0,
-                   std::make_shared<std::function<void(bool)>>([this, token, done = std::move(done)](bool loaded) {
+        world::LoadedWorld* held = world_;
+        awaitChunk(held, chunkX, chunkZ, 0,
+                   std::make_shared<std::function<void(bool)>>([held, token, done = std::move(done)](bool loaded) {
                        done(loaded);
-                       world_->releaseChunks(token);
+                       held->releaseChunks(token);
                    }));
     }
 
@@ -1119,15 +1147,25 @@ public:
     [[nodiscard]] std::shared_ptr<PluginEntityRef> entityById(std::int32_t id) const override {
         const entity::ServerEntity* found = world_->state().entity(id);
         if (found == nullptr || found->removed) {
+            if (std::shared_ptr<PluginEntityRef> item = droppedItemRef(*world_, id); item != nullptr) {
+                return item;
+            }
+            if (players_) {
+                for (const player::PlayerSession* session : players_()) {
+                    if (session->entityId() == id && session->worldName == world_->name()) {
+                        return playerEntityRef(*world_, id, players_);
+                    }
+                }
+            }
             return nullptr;
         }
-        return std::make_shared<WorldEntityRef>(*world_, id, found->type().toString());
+        return std::make_shared<WorldEntityRef>(*world_, id, found->type().toString(), shared_);
     }
 
     [[nodiscard]] std::shared_ptr<PluginEntityRef> entityByUuid(std::string_view uuid) const override {
         for (const entity::ServerEntity* alive : world_->state().entities()) {
             if (!alive->removed && alive->uuid().toString() == uuid) {
-                return std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString());
+                return std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(), shared_);
             }
         }
         return nullptr;
@@ -1138,7 +1176,8 @@ public:
         std::vector<std::shared_ptr<PluginEntityRef>> refs;
         for (const entity::ServerEntity* alive : world_->state().entitiesIn(chunkX, chunkZ)) {
             if (!alive->removed) {
-                refs.push_back(std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString()));
+                refs.push_back(
+                    std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(), shared_));
             }
         }
         return refs;
@@ -1152,8 +1191,12 @@ public:
         std::vector<std::shared_ptr<PluginEntityRef>> refs;
         for (const entity::ServerEntity* alive : world_->state().entities()) {
             if (!alive->removed) {
-                refs.push_back(std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString()));
+                refs.push_back(
+                    std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(), shared_));
             }
+        }
+        for (std::shared_ptr<PluginEntityRef>& item : droppedItemRefs(*world_)) {
+            refs.push_back(std::move(item));
         }
         return refs;
     }
@@ -1167,7 +1210,27 @@ public:
         if (spawned == nullptr) {
             return nullptr;
         }
-        return std::make_shared<WorldEntityRef>(*world_, spawned->entityId(), spawned->type().toString());
+        return std::make_shared<WorldEntityRef>(*world_, spawned->entityId(), spawned->type().toString(), shared_);
+    }
+
+    std::int32_t dropItem(std::span<const std::uint8_t> stack, double x, double y, double z, double velocityX,
+                          double velocityY, double velocityZ) override {
+        return hooks_.nextEntityId
+                   ? plugins::dropItem(*world_, hooks_.nextEntityId(), stack, x, y, z, velocityX, velocityY, velocityZ)
+                   : -1;
+    }
+
+    std::shared_ptr<PluginEntityRef> spawnAs(std::string_view type, double x, double y, double z, float yaw,
+                                             std::string_view reason) override {
+        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{type});
+        if (!id.has_value() || reg::entityTypes::of(*id) == nullptr || !hooks_.spawnAs) {
+            return nullptr;
+        }
+        entity::ServerEntity* spawned = hooks_.spawnAs(*world_, *id, x, y, z, yaw, reason);
+        if (spawned == nullptr) {
+            return nullptr;
+        }
+        return std::make_shared<WorldEntityRef>(*world_, spawned->entityId(), spawned->type().toString(), shared_);
     }
 
     std::shared_ptr<PluginHologramRef> hologram(std::string_view text, double x, double y, double z) override {
@@ -1244,10 +1307,10 @@ private:
         return std::nullopt;
     }
 
-    void awaitChunk(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t waited,
-                    std::shared_ptr<std::function<void(bool)>> done) {
+    static void awaitChunk(world::LoadedWorld* world, std::int32_t chunkX, std::int32_t chunkZ, std::int32_t waited,
+                           std::shared_ptr<std::function<void(bool)>> done) {
         constexpr std::int32_t kGiveUpTicks = 1200;
-        if (world_->state().isLoaded(chunkX, chunkZ)) {
+        if (world->state().isLoaded(chunkX, chunkZ)) {
             (*done)(true);
             return;
         }
@@ -1255,8 +1318,8 @@ private:
             (*done)(false);
             return;
         }
-        world_->owner().schedule(
-            1, [this, chunkX, chunkZ, waited, done] { awaitChunk(chunkX, chunkZ, waited + 1, done); });
+        world->owner().schedule(
+            1, [world, chunkX, chunkZ, waited, done] { awaitChunk(world, chunkX, chunkZ, waited + 1, done); });
     }
 
     void ensureChunk(std::int32_t chunkX, std::int32_t chunkZ) {
@@ -1317,7 +1380,8 @@ private:
     }
 
     world::LoadedWorld* world_;
-    ModelHooks hooks_;
+    std::shared_ptr<const ModelHooks> shared_;
+    const ModelHooks& hooks_;
     std::function<std::vector<player::PlayerSession*>()> players_;
 };
 
@@ -1325,22 +1389,22 @@ private:
 
 std::vector<std::shared_ptr<PluginWorldRef>> LoadedWorlds::all() const {
     std::vector<std::shared_ptr<PluginWorldRef>> refs;
-    if (!hooks_.allWorlds) {
+    if (!hooks_->allWorlds) {
         return refs;
     }
-    for (world::LoadedWorld* world : hooks_.allWorlds()) {
+    for (world::LoadedWorld* world : hooks_->allWorlds()) {
         refs.push_back(std::make_shared<LoadedWorldRef>(*world, hooks_, players_));
     }
     return refs;
 }
 
 std::shared_ptr<PluginWorldRef> LoadedWorlds::byName(std::string_view name) const {
-    world::LoadedWorld* world = hooks_.worldFor ? hooks_.worldFor(std::string{name}) : nullptr;
+    world::LoadedWorld* world = hooks_->worldFor ? hooks_->worldFor(std::string{name}) : nullptr;
     return world == nullptr ? nullptr : std::make_shared<LoadedWorldRef>(*world, hooks_, players_);
 }
 
 std::shared_ptr<PluginWorldRef> LoadedWorlds::defaultWorld() const {
-    return hooks_.defaultWorldName ? byName(hooks_.defaultWorldName()) : nullptr;
+    return hooks_->defaultWorldName ? byName(hooks_->defaultWorldName()) : nullptr;
 }
 
 std::shared_ptr<PluginWorldRef> LoadedWorlds::create(std::string_view name, std::string_view dimension,
@@ -1352,10 +1416,10 @@ std::shared_ptr<PluginWorldRef> LoadedWorlds::create(std::string_view name, std:
     }
     const std::optional<config::WorldDimension> theDimension = config::dimensionByName(dimensionName);
     const std::optional<config::WorldType> theType = config::worldTypeByName(type);
-    if (!theDimension.has_value() || !theType.has_value() || !hooks_.makeWorld) {
+    if (!theDimension.has_value() || !theType.has_value() || !hooks_->makeWorld) {
         return nullptr;
     }
-    world::LoadedWorld* made = hooks_.makeWorld(std::string{name}, *theDimension, *theType, seed);
+    world::LoadedWorld* made = hooks_->makeWorld(std::string{name}, *theDimension, *theType, seed);
     return made == nullptr ? nullptr : std::make_shared<LoadedWorldRef>(*made, hooks_, players_);
 }
 
@@ -1497,7 +1561,7 @@ std::vector<std::string> LoadedWorlds::biomeIds() const {
 }
 
 std::vector<std::string> LoadedWorlds::tags(std::string_view registry) const {
-    return hooks_.tags ? hooks_.tags(registry) : std::vector<std::string>{};
+    return hooks_->tags ? hooks_->tags(registry) : std::vector<std::string>{};
 }
 
 std::vector<std::string> LoadedWorlds::itemIds() const {
@@ -1537,6 +1601,31 @@ std::vector<std::string> LoadedWorlds::registryIds(std::string_view registry) co
             ids.push_back("minecraft:" + std::string{name});
         }
         return ids;
+    }
+    if (registry == "mob_effect") {
+        std::vector<std::string> ids;
+        for (std::int32_t protocolId = 0; world::mobEffects::byProtocolId(protocolId).has_value(); ++protocolId) {
+            ids.push_back(world::mobEffects::byProtocolId(protocolId)->toString());
+        }
+        return ids;
+    }
+    if (registry == "attribute") {
+        std::vector<std::string> ids;
+        for (const std::string_view name : reg::attributeIds::all()) {
+            ids.push_back("minecraft:" + std::string{name});
+        }
+        return ids;
+    }
+    if (registry == "villager_profession") {
+        std::vector<std::string> ids;
+        for (const std::string_view name : entity::villagers::professions()) {
+            ids.push_back("minecraft:" + std::string{name});
+        }
+        return ids;
+    }
+    if (registry == "villager_type") {
+        return {"minecraft:desert", "minecraft:jungle", "minecraft:plains", "minecraft:savanna",
+                "minecraft:snow",   "minecraft:swamp",  "minecraft:taiga"};
     }
     static const std::vector<wire::protocol::configuration::RegistryDataPacket> synced =
         registry::vanillaConfigurationRegistries::packets();

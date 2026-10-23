@@ -39,6 +39,8 @@ void pushItem(wire::lua::LuaArgs& lua, const PluginItem& item);
 
 void pushInventory(wire::lua::LuaArgs& lua, const std::shared_ptr<PluginPlayerRef>& owner);
 
+void bindEntityOperations(PluginObject& object, const std::shared_ptr<PluginEntityRef>& entity);
+
 void pushEntity(wire::lua::LuaArgs& lua, std::shared_ptr<PluginEntityRef> entity);
 
 void pushPlayer(wire::lua::LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginStorage* storage = nullptr,

@@ -486,6 +486,21 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                 double y, double z, std::string_view cause) {
         return spawning_ == nullptr || spawning_->askSpawn(world, type, x, y, z, cause);
     };
+    model.combatHooks = [this] { return mobCombatHooks_; };
+    model.announceHit = [this](world::LoadedWorld& world, entity::ServerEntity& hit,
+                               const wire::common::Identifier& type, std::int32_t causeId, bool died) {
+        if (combat_ != nullptr) {
+            combat_->announceEntityHit(watchersIn(world), hit, type, causeId, died);
+        }
+    };
+    model.giveEffect = [this](world::LoadedWorld& world, entity::ServerEntity& affected,
+                              const world::ActiveEffect& effect, std::int32_t sourceId) {
+        return combat_ != nullptr && combat_->giveMobEffect(world, watchersIn(world), affected, effect, sourceId);
+    };
+    model.spawnAs = [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
+                           double z, float yaw, std::string_view reason) {
+        return spawning_ == nullptr ? nullptr : spawning_->spawnMob(world, type, x, y, z, yaw, reason);
+    };
 
     const auto sessions = [this] { return playerRegistry_.snapshot(); };
     pluginPlayers_ = std::make_unique<plugins::RegistryPlayers>(playerRegistry_, model);
@@ -929,6 +944,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                       return mobActions_ != nullptr &&
                                              mobActions_->addMobEffect(world, watchers, mob, effect);
                                   }});
+    mobCombatHooks_ = mobHooks.combat;
     // parity: `ContainerOpenersCounter` over a chest a copper golem works.
     mobHooks.openersChanged = [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                      std::int32_t openers) {
@@ -1144,6 +1160,16 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
 }
 
 BasaltServer::~BasaltServer() { shutdown(); }
+
+std::vector<player::PlayerSession*> BasaltServer::watchersIn(const world::LoadedWorld& world) {
+    std::vector<player::PlayerSession*> watchers;
+    for (player::PlayerSession* session : playerRegistry_.snapshot()) {
+        if (session->worldName == world.name()) {
+            watchers.push_back(session);
+        }
+    }
+    return watchers;
+}
 
 std::map<std::string, world::LoadedWorld*, std::less<>> BasaltServer::namedWorlds() const {
     std::map<std::string, world::LoadedWorld*, std::less<>> named;

@@ -84,6 +84,9 @@ namespace pluginEventTypes {
 [[nodiscard]] const PluginEventType& playerPortal();
 [[nodiscard]] const PluginEventType& raidFinish();
 [[nodiscard]] const PluginEventType& entityCombust();
+[[nodiscard]] const PluginEventType& entityTarget();
+[[nodiscard]] const PluginEventType& entityDrops();
+[[nodiscard]] const PluginEventType& entityPotionEffect();
 [[nodiscard]] const PluginEventType& blockFade();
 
 [[nodiscard]] const std::vector<const PluginEventType*>& all();
