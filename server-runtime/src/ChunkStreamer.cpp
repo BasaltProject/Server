@@ -249,7 +249,31 @@ void ChunkStreamer::sendChunk(Chunk& chunk) {
 }
 
 std::int32_t ChunkStreamer::trackedRadius() const {
-    return std::clamp(requestedViewDistance_, kMinViewDistance, std::max(viewRadius_, kMinViewDistance));
+    const std::int32_t cap = viewOverride_.value_or(viewRadius_);
+    return std::clamp(requestedViewDistance_, kMinViewDistance, std::max(cap, kMinViewDistance));
+}
+
+std::vector<std::pair<std::int32_t, std::int32_t>> ChunkStreamer::sentChunks() const {
+    const std::lock_guard<std::mutex> guard{chunkStreamMutex_};
+    std::vector<std::pair<std::int32_t, std::int32_t>> sent;
+    for (const ChunkPos& pos : chunkTracker_.loaded()) {
+        if (std::ranges::find(pendingChunks_, pos) == pendingChunks_.end()) {
+            sent.emplace_back(pos.x, pos.z);
+        }
+    }
+    return sent;
+}
+
+void ChunkStreamer::overrideViewDistance(const std::optional<std::int32_t> distance) {
+    viewOverride_ = distance;
+    const std::int32_t radius = distance.value_or(viewRadius_);
+    owner_->sendCompressed(wire::protocol::play::SetChunkCacheRadiusPacket::kId,
+                           [radius](wire::io::ByteBuffer& buffer) {
+                               wire::protocol::play::SetChunkCacheRadiusPacket{.radius = radius}.write(buffer);
+                           });
+    if (viewRadius_ > 0) {
+        applyDelta(chunkTracker_.update(centerChunkX_, centerChunkZ_, trackedRadius()));
+    }
 }
 
 void ChunkStreamer::setRequestedViewDistance(std::int32_t distance) {

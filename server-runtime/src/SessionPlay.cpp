@@ -29,6 +29,7 @@
 #include <basalt/server/runtime/world/RecipeBook.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/nbt/Snbt.hpp>
+#include <basalt/wire/protocol/ProtocolBuffer.hpp>
 #include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -45,6 +46,7 @@
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <expected>
@@ -67,6 +69,8 @@ using wire::common::Identifier;
 constexpr std::int32_t kMovePlayerRotId = 0x20;
 constexpr std::int32_t kMovePlayerStatusOnlyId = 0x21;
 constexpr std::int32_t kServerboundClientInformationId = 0x0e;
+constexpr std::int32_t kServerboundCookieResponseId = 0x15;
+
 constexpr std::int32_t kServerboundPlayerInputId = 0x2b;
 
 // parity: `Input`'s own bit order.
@@ -75,6 +79,15 @@ constexpr std::int32_t kBackInputFlag = 0x02;
 constexpr std::int32_t kLeftInputFlag = 0x04;
 constexpr std::int32_t kRightInputFlag = 0x08;
 constexpr std::int32_t kSneakInputFlag = 0x20;
+
+// Packets a client sends without anyone having done anything.
+const std::set<std::int32_t> kPassivePackets{0x00, 0x06, 0x0b, 0x0d, 0x0e, 0x15, 0x1c, 0x1e,
+                                             0x1f, 0x20, 0x21, 0x26, 0x2c, 0x2d, 0x32};
+
+[[nodiscard]] std::int64_t steadyMillis() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
 
 constexpr float kMinChunksPerTick = 0.01F;
 constexpr float kMaxChunksPerTick = 64.0F;
@@ -294,6 +307,9 @@ player::PlayerConnection ClientSession::playerConnection() {
     player::PlayerConnection connection;
     connection.protocolVersion = handshake_.has_value() ? handshake_->protocolVersion : 0;
     connection.connectedHost = handshake_.has_value() ? handshake_->hostName : "";
+    connection.connectedPort = handshake_.has_value() ? handshake_->port : 0;
+    connection.transferred =
+        handshake_.has_value() && handshake_->intent == wire::protocol::handshake::ClientIntent::Transfer;
     connection.address = remoteAddress();
     world::RealEnchantments* enchantments = options_.enchantments;
     connection.enchantmentIds = [enchantments](const Identifier& name) {
@@ -496,6 +512,24 @@ player::PlayerConnection ClientSession::playerConnection() {
     };
     connection.sendCommandTree = [this] { sendCommandTree(); };
     connection.syncExperience = [this] { syncExperience(); };
+    connection.respawn = [this] { lifecycle_->respawn(); };
+    connection.syncHealth = [this] { uiState_->syncHealth(); };
+    connection.tracksEntity = [this](std::int32_t entityId) { return entityTracker_->isTracking(entityId); };
+    connection.sentChunks = [this] { return chunkStreamer_->sentChunks(); };
+    connection.overrideViewDistance = [this](std::optional<std::int32_t> distance) {
+        chunkStreamer_->overrideViewDistance(distance);
+    };
+    connection.chat = [this](const std::string& message) {
+        if (secureChat_ == nullptr || !tryHandleChat(message, false)) {
+            return;
+        }
+        const std::int64_t now = chat::nowMillis();
+        std::expected<chat::PlayerChatMessage, std::string> built = secureChat_->unpack(
+            std::nullopt, chat::SignedBody{.content = message, .timestamp = now, .salt = 0, .lastSeen = {}}, now);
+        if (built.has_value()) {
+            broadcastChat(*built);
+        }
+    };
     connection.killPlayer = [this](std::string_view deathMessageId) { killPlayer(deathMessageId); };
     connection.sendBlockChange = [this](const std::int32_t x, const std::int32_t y, const std::int32_t z,
                                         const std::int32_t stateId) {
@@ -593,6 +627,9 @@ void ClientSession::enterPlay() {
             .name = property.name, .value = property.value, .signature = property.signature});
     }
     session->skinParts = pendingSkinParts_;
+    session->extras.client = pendingOptions_;
+    session->extras.lastActionMillis = steadyMillis();
+    session->extras.brand = pendingBrand_;
     session->mainArm = pendingMainHand_;
     session->chatVisibility.store(static_cast<PlayerSession::ChatVisibility>(std::clamp(pendingChatVisibility_, 0, 2)));
     playerSession_ = std::move(session);
@@ -740,6 +777,9 @@ void ClientSession::enterPlay() {
 
 void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body) {
     PlayerSession* session = playerSession_.get();
+    if (session != nullptr && !kPassivePackets.contains(packetId)) {
+        session->extras.lastActionMillis = steadyMillis();
+    }
     if (packetId == play::ServerboundPositionPacket::kId) {
         const std::optional<play::ServerboundPositionPacket> move = play::ServerboundPositionPacket::read(body);
         if (move.has_value() && !updateAwaitingTeleport()) {
@@ -1090,6 +1130,30 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
+    if (packetId == play::PlayKeepAlivePacket::kServerboundId) {
+        const std::optional<play::PlayKeepAlivePacket> answer = play::PlayKeepAlivePacket::read(body);
+        if (answer.has_value() && session != nullptr && answer->keepAliveId == keepAliveToken_) {
+            // parity: `ServerCommonPacketListenerImpl.handleKeepAlive`.
+            const auto elapsed =
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - lastKeepAlive_)
+                    .count();
+            session->extras.pingMillis = (session->extras.pingMillis * 3 + static_cast<std::int32_t>(elapsed)) / 4;
+        }
+        return;
+    }
+    if (packetId == kServerboundCookieResponseId) {
+        const std::string key = wire::protocol::readString(body, 256);
+        const bool present = wire::protocol::readBoolean(body);
+        std::vector<std::uint8_t> payload;
+        if (present) {
+            payload = wire::protocol::readByteArray(body, 5120);
+        }
+        if (session != nullptr && !body.failed()) {
+            session->extras.state["cookie:" + key] =
+                present ? "P" + std::string{payload.begin(), payload.end()} : std::string{"A"};
+        }
+        return;
+    }
     if (packetId == kServerboundClientInformationId) {
         // parity: `ServerPlayer.updateOptions`.
         const std::optional<wire::protocol::configuration::ClientInformationPacket> information =
@@ -1102,6 +1166,14 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         pendingMainHand_ = information->mainHand;
         pendingChatVisibility_ = information->chatFlags;
         pendingViewDistance_ = information->viewDistance;
+        if (session != nullptr) {
+            session->extras.client = player::ClientOptions{.locale = information->locale,
+                                                           .viewDistance = information->viewDistance,
+                                                           .particleStatus = information->particleStatus,
+                                                           .chatColors = information->chatColors,
+                                                           .textFiltering = information->enableTextFiltering,
+                                                           .serverListings = information->enableServerListing};
+        }
         if (chunkStreamer_ != nullptr) {
             chunkStreamer_->setRequestedViewDistance(information->viewDistance);
         }
@@ -1131,6 +1203,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         if (session == nullptr || body.failed()) {
             return;
         }
+        session->extras.inputFlags = inputs;
         if (options_.plugins.sneakChanged && ((inputs & kSneakInputFlag) != 0) != session->sneaking) {
             options_.plugins.sneakChanged(*session, (inputs & kSneakInputFlag) != 0);
         }

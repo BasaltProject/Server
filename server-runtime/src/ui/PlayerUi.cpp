@@ -1,3 +1,5 @@
+#include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/ui/PlayerUi.hpp>
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
@@ -108,6 +110,11 @@ void PlayerUi::worldChanged() {
 }
 
 void PlayerUi::updateTabList(const PlaceholderContext& context) {
+    if (const player::PlayerSession* held = context.get(placeholder::playerSlot());
+        held != nullptr && (held->extras.tabHeader.has_value() || held->extras.tabFooter.has_value())) {
+        lastTabList_.reset();
+        return;
+    }
     const config::UiConfigs configs = configs_();
     const config::TabListProfile profile =
         config::selectProfile(configs.tabList.profiles, configs.tabList.defaultProfile(), *placeholders_, context,

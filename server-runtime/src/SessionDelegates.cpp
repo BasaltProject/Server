@@ -30,6 +30,7 @@
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -395,6 +396,11 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
         return;
     }
     // parity: `handleMovePlayer`.
+    if (x != session->x || y != session->y || z != session->z || yaw != session->yaw || pitch != session->pitch) {
+        session->extras.lastActionMillis =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                .count();
+    }
     if (session->vehicleId.has_value()) {
         session->yaw = yaw;
         session->pitch = pitch;

@@ -48,6 +48,8 @@ enum class TitlePiece : std::uint8_t {
 struct PlayerConnection {
     std::int32_t protocolVersion = 0;
     std::string connectedHost;
+    std::uint16_t connectedPort = 0;
+    bool transferred = false;
     std::optional<std::string> address;
 
     item::itemComponentCodecs::EnchantmentId enchantmentIds;
@@ -210,6 +212,16 @@ struct PlayerConnection {
     std::function<void()> sendCommandTree;
 
     std::function<void()> syncExperience;
+
+    std::function<void()> respawn;
+
+    std::function<bool(std::int32_t entityId)> tracksEntity;
+
+    std::function<std::vector<std::pair<std::int32_t, std::int32_t>>()> sentChunks;
+
+    std::function<void(std::optional<std::int32_t> distance)> overrideViewDistance;
+
+    std::function<void(const std::string& message)> chat;
 
     std::function<void()> syncHealth;
 

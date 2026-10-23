@@ -318,7 +318,9 @@ void PlayerLifecycle::setGamemode(Gamemode mode) {
     if (hooks_.gamemodeAllowed && !hooks_.gamemodeAllowed(*session, mode, session->gamemode)) {
         return;
     }
+    session->extras.previousGamemode = static_cast<std::int32_t>(session->gamemode);
     session->gamemode = mode;
+    session->extras.allowFlight.reset();
     // parity: `ServerPlayerGameMode.changeGameModeForPlayer` lets go of any impulse.
     player::impulse::reset(*session);
     if (!session->mayFly()) {

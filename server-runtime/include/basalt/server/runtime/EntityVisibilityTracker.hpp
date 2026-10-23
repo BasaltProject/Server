@@ -60,6 +60,10 @@ public:
 
     void forgetEverythingDrawn();
 
+    [[nodiscard]] bool isTracking(std::int32_t entityId) const {
+        return trackedEntities_.contains(entityId) || trackedPlayers_.contains(entityId);
+    }
+
 private:
     void syncPassengers(const std::vector<entity::ServerEntity*>& entities, const std::string& viewer,
                         std::int32_t viewerEntityId);
