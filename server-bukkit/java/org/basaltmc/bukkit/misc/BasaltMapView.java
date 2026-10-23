@@ -223,6 +223,14 @@ public final class BasaltMapView implements MapView {
         }
     }
 
+    public void sendTo(Player player) {
+        byte[] colors = MiscNatives.mapColors(id);
+        if (colors != null) {
+            sent.remove(player.getUniqueId());
+            render(player, colors);
+        }
+    }
+
     private void renderForCarriers() {
         byte[] colors = MiscNatives.mapColors(id);
         if (colors == null) {
