@@ -50,4 +50,21 @@ public interface MobOps extends Mob, org.basaltmc.bukkit.entity.Cored {
         lookAt(entity.getLocation().getX(), entity.getLocation().getY() + entity.getHeight() * 0.85,
             entity.getLocation().getZ(), headRotationSpeed, maxHeadPitch);
     }
+
+    default boolean shouldDespawnInPeaceful() {
+        return "monster".equals(core().text("category"));
+    }
+
+    default boolean isInDaylight() {
+        org.bukkit.Location here = getLocation();
+        return core().world.isDayTime() && core().world.getHighestBlockYAt(here) <= here.getBlockY();
+    }
+
+    default int getHeadRotationSpeed() {
+        return 10;
+    }
+
+    default int getMaxHeadPitch() {
+        return 40;
+    }
 }
