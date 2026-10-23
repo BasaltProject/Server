@@ -1,10 +1,5 @@
 <p align="center">
-  <a href="https://raw.githubusercontent.com/BasaltProject/.github/main/assets/basalt-logo-white.svg#gh-dark-mode-only">
-    <img src="https://raw.githubusercontent.com/BasaltProject/.github/main/assets/basalt-logo-white.svg" alt="Basalt" width="360">
-  </a>
-  <a href="https://raw.githubusercontent.com/BasaltProject/.github/main/assets/basalt-logo-black.svg#gh-light-mode-only">
-    <img src="https://raw.githubusercontent.com/BasaltProject/.github/main/assets/basalt-logo-black.svg" alt="Basalt" width="360">
-  </a>
+  <img src="docs/assets/basalt-logo.png" alt="Basalt" width="360">
 </p>
 
 <h2 align="center">Basalt Server</h2>

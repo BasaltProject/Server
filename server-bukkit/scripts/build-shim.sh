@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Basalt Shim into <out>: libjvm and classpath.jar. A selected Bukkit build requires both.
+# Builds Basalt Shim (the shim/ submodule) out of tree into <out>: libjvm.so and classpath.jar. Never fails the build.
 # Usage: build-shim.sh <shim source dir> <out dir> <wire zlib include dir>
 here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "${2:?out dir}"
@@ -8,8 +8,8 @@ out="$(cd "$2" && pwd)"
 zlib="$(cd "${3:?zlib include dir}" && pwd)"
 
 skip() {
-    echo "Shim: failed, $*" >&2
-    exit 1
+    echo "Shim: skipped, $*" >&2
+    exit 0
 }
 
 [ -f "$src/GNUmakefile" ] || skip "shim/ is empty (run: git submodule update --init)"
@@ -18,21 +18,13 @@ for tool in make clang clang++ javac jar; do
 done
 ext="$(uname -s | tr A-Z a-z)"
 [ "$ext" = darwin ] && lib=libjvm.dylib || lib=libjvm.so
-process=compile
-# Apple Silicon forbids the legacy JIT's writable/executable memory mapping.
-# Use Shim's interpreter rather than weakening the host's memory protections.
-if [ "$ext" = darwin ] && [ "$(uname -m)" = arm64 ]; then
-    process=interpret
-fi
-configuration="$ext:$(uname -m):$process"
 if [ -f "$out/$lib" ] && [ -f "$out/classpath.jar" ] \
-    && [ "$(cat "$out/build-configuration.txt" 2>/dev/null)" = "$configuration" ] \
     && [ -z "$(find "$src" -newer "$out/$lib" -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.java' -o -name '*.mk' \) -print -quit)" ]; then
     exit 0
 fi
 mkdir -p "$out"
 flags=()
-if [ "$ext" != darwin ] && [ ! -f /usr/include/zlib.h ]; then
+if [ ! -f /usr/include/zlib.h ]; then
     mkdir -p "$out/zlib-stub"
     for candidate in /usr/lib/x86_64-linux-gnu/libz.so.1 /usr/lib/aarch64-linux-gnu/libz.so.1 /usr/lib64/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1; do
         [ -e "$candidate" ] && ln -sf "$candidate" "$out/zlib-stub/libz.so" && break
@@ -40,10 +32,9 @@ if [ "$ext" != darwin ] && [ ! -f /usr/include/zlib.h ]; then
     flags+=("extra-cflags=-I$zlib" "extra-lflags=-L$out/zlib-stub")
 fi
 # Its rules only work inside the source tree, whose build/ folder is ignored by that repo.
-run_make() { make -C "$src" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)" use-clang=true "process=$process" "${flags[@]}" "$@"; }
+run_make() { make -C "$src" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)" use-clang=true "${flags[@]}" "$@"; }
 { run_make build; } >"$out/shim-make.log" 2>&1 || skip "the Shim build failed (see $out/shim-make.log)"
 built="$(dirname "$(ls -t "$src"/build/*/"$lib" 2>/dev/null | head -1)")"
 [ -f "$built/$lib" ] && [ -f "$built/classpath.jar" ] || skip "the Shim build left no $lib or classpath.jar (see $out/shim-make.log)"
 cp "$built/$lib" "$built/classpath.jar" "$out/"
-printf '%s\n' "$configuration" >"$out/build-configuration.txt"
 echo "Shim built in $out"

@@ -159,7 +159,7 @@ const PluginEventType& entityDamage() {
     static const PluginEventType type{
         "entity.damage",
         true,
-        {"entity_id", "entity_type", "world", "cause", "amount", "attacker_name", "attacker_id"},
+        {"entity_id", "entity_type", "world", "cause", "amount", "attacker_name", "attacker_id", "direct_id"},
         {"amount"}};
     return type;
 }
@@ -464,6 +464,23 @@ const PluginEventType& entityDrops() {
     return type;
 }
 
+const PluginEventType& entityLaunch() {
+    static const PluginEventType type{
+        "entity.launch", true, {"entity_id", "entity_type", "world", "x", "y", "z", "shooter_id"}};
+    return type;
+}
+
+const PluginEventType& vehicleDamage() {
+    static const PluginEventType type{
+        "vehicle.damage", true, {"entity_id", "entity_type", "world", "amount", "attacker_id"}, {"amount"}};
+    return type;
+}
+
+const PluginEventType& vehicleDestroy() {
+    static const PluginEventType type{"vehicle.destroy", true, {"entity_id", "entity_type", "world", "attacker_id"}};
+    return type;
+}
+
 const PluginEventType& entityResurrect() {
     static const PluginEventType type{"entity.resurrect", true, {"entity_id", "entity_type", "world", "hand"}};
     return type;
@@ -574,6 +591,9 @@ const std::vector<const PluginEventType*>& all() {
                                                            &entityTarget(),
                                                            &entityAdd(),
                                                            &entityResurrect(),
+                                                           &entityLaunch(),
+                                                           &vehicleDamage(),
+                                                           &vehicleDestroy(),
                                                            &entityDrops(),
                                                            &entityPotionEffect(),
                                                            &blockFade(),

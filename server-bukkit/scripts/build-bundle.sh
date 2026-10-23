@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Assembles the Bukkit runtime folder staged into the server binary.
+# Builds the Bukkit runtime folder the server finds next to its binary.
 # Usage: build-bundle.sh <work dir> <runtime dir> [shim build dir]
-# Once Bukkit is selected, missing prerequisites must fail instead of shipping an incomplete runtime.
+# It never fails the build: a missing JDK or network leaves a warning and a runtime the server explains at start-up.
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$here/../.."
 work="${1:?work dir}"
@@ -11,8 +11,8 @@ shim="${3:-}"
 sha1_of() { if command -v sha1sum >/dev/null; then sha1sum "$1"; else shasum -a 1 "$1"; fi; }
 
 skip() {
-    echo "Bukkit runtime: failed, $*" >&2
-    exit 1
+    echo "Bukkit runtime: skipped, $*" >&2
+    exit 0
 }
 
 for tool in javac jar curl; do

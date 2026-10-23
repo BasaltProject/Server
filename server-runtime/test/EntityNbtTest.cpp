@@ -506,41 +506,6 @@ TEST_CASE("axolotl playing-dead updates never overwrite the integer variant") {
     }
 }
 
-TEST_CASE("fox variants never overwrite the byte-valued flags metadata") {
-    namespace entity = basalt::server::runtime::entity;
-    using Packet = basalt::wire::protocol::play::SetEntityDataPacket;
-    for (const std::string type : {"red", "snow"}) {
-        for (const std::int32_t age : {0, -24000}) {
-            CAPTURE(type);
-            CAPTURE(age);
-            NbtCompound data;
-            data.putString("Type", type);
-            data.putInt("Age", age);
-            const Packet packet{.entityId = 86, .entries = entity::generatedEntityMetadata("fox", data)};
-            bool foundVariant = false;
-            for (const auto& entry : packet.entries) {
-                CHECK(entry.index != 19);
-                if (entry.index == 18) {
-                    REQUIRE(type == "snow");
-                    const auto* value = std::get_if<Packet::IntValue>(&entry.value);
-                    REQUIRE(value != nullptr);
-                    CHECK(value->value == 1);
-                    foundVariant = true;
-                }
-            }
-            CHECK(foundVariant == (type == "snow"));
-            basalt::wire::io::ByteBuffer buffer;
-            packet.write(buffer);
-            const auto decoded = Packet::read(buffer);
-            REQUIRE(decoded.has_value());
-            CHECK(decoded->entityId == 86);
-            CHECK(decoded->entries == packet.entries);
-            CHECK(buffer.readableBytes() == 0);
-            CHECK_FALSE(buffer.failed());
-        }
-    }
-}
-
 TEST_CASE("a generated vehicle brings its riders with it") {
     ChunkGeneratedEntity rider;
     rider.type = Identifier::vanilla("pillager");

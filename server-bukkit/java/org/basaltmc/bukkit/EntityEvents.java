@@ -127,6 +127,27 @@ final class EntityEvents {
                 f.text("hand").equals("off_hand") ? org.bukkit.inventory.EquipmentSlot.OFF_HAND
                     : org.bukkit.inventory.EquipmentSlot.HAND) : null;
         });
+        EventBridge.map("entity.launch", org.bukkit.event.entity.ProjectileLaunchEvent.class, f -> {
+            Entity made = f.entity();
+            return made instanceof org.bukkit.entity.Projectile projectile
+                ? new org.bukkit.event.entity.ProjectileLaunchEvent(projectile) : null;
+        });
+        EventBridge.map("vehicle.damage", org.bukkit.event.vehicle.VehicleDamageEvent.class, f -> {
+            Entity vehicle = f.entity();
+            Entity attacker = f.whole("attacker_id") >= 0 ? BasaltServer.instance().entityById(f.world(),
+                (int) f.whole("attacker_id")) : null;
+            return vehicle instanceof org.bukkit.entity.Vehicle made
+                ? new org.bukkit.event.vehicle.VehicleDamageEvent(made, DamageSource.builder(DamageType.GENERIC).build(),
+                    attacker, f.real("amount")) : null;
+        }, (e, f) -> f.put("amount", ((org.bukkit.event.vehicle.VehicleDamageEvent) e).getDamage()));
+        EventBridge.map("vehicle.destroy", org.bukkit.event.vehicle.VehicleDestroyEvent.class, f -> {
+            Entity vehicle = f.entity();
+            Entity attacker = f.whole("attacker_id") >= 0 ? BasaltServer.instance().entityById(f.world(),
+                (int) f.whole("attacker_id")) : null;
+            return vehicle instanceof org.bukkit.entity.Vehicle made
+                ? new org.bukkit.event.vehicle.VehicleDestroyEvent(made, DamageSource.builder(DamageType.GENERIC).build(),
+                    attacker) : null;
+        });
         EventBridge.map("entity.heal", EntityRegainHealthEvent.class, f -> {
             Entity healed = f.entity();
             return healed == null ? null : new EntityRegainHealthEvent(healed, f.real("amount"),
@@ -247,14 +268,19 @@ final class EntityEvents {
         String cause = f.text("cause");
         EntityDamageEvent.DamageCause mapped = damageCause(cause);
         DamageType type = Registry.DAMAGE_TYPE.get(NamespacedKey.minecraft(cause.toLowerCase(Locale.ROOT)));
-        Entity attacker = f.whole("attacker_id") >= 0 ? BasaltServer.instance().entityById(f.world(),
+        Entity culprit = f.whole("attacker_id") >= 0 ? BasaltServer.instance().entityById(f.world(),
             (int) f.whole("attacker_id")) : null;
+        Entity attacker = f.whole("direct_id") >= 0 ? BasaltServer.instance().entityById(f.world(),
+            (int) f.whole("direct_id")) : null;
+        if (attacker == null) {
+            attacker = culprit;
+        }
         if (attacker == null && !f.text("attacker_name").isEmpty()) {
             attacker = BasaltServer.instance().playerByName(f.text("attacker_name"));
         }
         DamageSource.Builder builder = DamageSource.builder(type == null ? DamageType.GENERIC : type);
         if (attacker != null) {
-            builder.withCausingEntity(attacker).withDirectEntity(attacker);
+            builder.withCausingEntity(culprit != null ? culprit : attacker).withDirectEntity(attacker);
         }
         DamageSource source = builder.build();
         Event event = attacker == null ? new EntityDamageEvent(target, mapped, source, f.real("amount"))

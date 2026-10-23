@@ -168,13 +168,21 @@ bool VehicleSystem::board(world::LoadedWorld& world, ServerEntity& vehicle, Serv
     return true;
 }
 
-bool VehicleSystem::hurt(world::LoadedWorld& world, ServerEntity& vehicle, const Hit& hit) {
+bool VehicleSystem::hurt(world::LoadedWorld& world, ServerEntity& vehicle, const Hit& incoming) {
     if (vehicle.removed) {
         return true;
     }
+    Hit hit = incoming;
     const bool invulnerable = vehicle.sourceNbt.has_value() && vehicle.sourceNbt->getBoolean("Invulnerable");
     if (invulnerable && !hit.creativePlayer && !typeIn(hit.type, "minecraft:bypasses_invulnerability")) {
         return false;
+    }
+    if (hooks_.damageAllowed) {
+        const std::optional<float> allowed = hooks_.damageAllowed(world, vehicle, hit);
+        if (!allowed.has_value()) {
+            return false;
+        }
+        hit.amount = *allowed;
     }
     const bool tnt = vehicle.type().path() == "tnt_minecart";
     // parity: `MinecartTNT.hurtServer`, a burning arrow sets it off before anything else.
@@ -214,6 +222,9 @@ bool VehicleSystem::hurt(world::LoadedWorld& world, ServerEntity& vehicle, const
 }
 
 void VehicleSystem::destroy(world::LoadedWorld& world, ServerEntity& vehicle, const Hit& hit) {
+    if (hooks_.destroyAllowed && !hooks_.destroyAllowed(world, vehicle, hit)) {
+        return;
+    }
     // parity: `MinecartTNT.destroy`.
     if (vehicle.type().path() == "tnt_minecart" && !hit.creativePlayer) {
         const double speedSqr = (vehicle.velocityX * vehicle.velocityX) + (vehicle.velocityZ * vehicle.velocityZ);

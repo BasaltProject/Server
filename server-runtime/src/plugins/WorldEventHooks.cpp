@@ -240,6 +240,36 @@ void pistons(BlockChangeBroadcaster::Hooks& hooks, const EventSink& sink) {
     };
 }
 
+void vehicles(VehicleSystem::Hooks& hooks, const EventSink& sink) {
+    hooks.damageAllowed = [&sink](const world::LoadedWorld& world, const entity::ServerEntity& vehicle,
+                                  const VehicleSystem::Hit& hit) -> std::optional<float> {
+        const server::plugins::PluginEvent* event = sink.ask(&vehicleDamage, [&](PluginEvent& filled) {
+            filled.set("entity_id", static_cast<std::int64_t>(vehicle.entityId()));
+            filled.set("entity_type", vehicle.type().toString());
+            filled.set("world", world.name());
+            filled.set("amount", static_cast<double>(hit.amount));
+            filled.set("attacker_id", static_cast<std::int64_t>(hit.causeId.value_or(-1)));
+        });
+        if (event == nullptr) {
+            return hit.amount;
+        }
+        if (event->cancelled()) {
+            return std::nullopt;
+        }
+        const auto* edited = std::get_if<double>(&event->get("amount"));
+        return edited == nullptr ? hit.amount : static_cast<float>(*edited);
+    };
+    hooks.destroyAllowed = [&sink](const world::LoadedWorld& world, const entity::ServerEntity& vehicle,
+                                   const VehicleSystem::Hit& hit) {
+        return sink.allowed(&vehicleDestroy, [&](PluginEvent& filled) {
+            filled.set("entity_id", static_cast<std::int64_t>(vehicle.entityId()));
+            filled.set("entity_type", vehicle.type().toString());
+            filled.set("world", world.name());
+            filled.set("attacker_id", static_cast<std::int64_t>(hit.causeId.value_or(-1)));
+        });
+    };
+}
+
 void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf) {
     hooks.targetChanged = [&sink](const world::LoadedWorld& world, const entity::ServerEntity& mob,
                                   const std::optional<std::int32_t>& previous, std::optional<std::int32_t>& next) {
@@ -360,7 +390,8 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
     };
     hooks.combat.damaged = [&sink, worldOf](const entity::ServerEntity& mob, float amount, std::string_view cause,
                                             const std::optional<std::string>& attackerName,
-                                            const std::optional<std::int32_t>& attackerId) -> std::optional<float> {
+                                            const std::optional<std::int32_t>& attackerId,
+                                            const std::optional<std::int32_t>& directId) -> std::optional<float> {
         const server::plugins::PluginEvent* event = sink.ask(&entityDamage, [&](PluginEvent& filled) {
             filled.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
             filled.set("entity_type", mob.type().toString());
@@ -369,6 +400,7 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
             filled.set("amount", static_cast<double>(amount));
             filled.set("attacker_name", attackerName.value_or(std::string{}));
             filled.set("attacker_id", static_cast<std::int64_t>(attackerId.value_or(-1)));
+            filled.set("direct_id", static_cast<std::int64_t>(directId.value_or(attackerId.value_or(-1))));
         });
         if (event == nullptr) {
             return amount;

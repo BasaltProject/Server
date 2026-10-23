@@ -251,13 +251,16 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
             filled.set("cause", std::string{cause});
             filled.set("amount", static_cast<double>(amount));
             std::string attacker;
+            std::int64_t causing = sourceEntityId.value_or(-1);
             if (sourceEntityId.has_value() && owner.currentWorld() != nullptr) {
                 if (const entity::ServerEntity* source = owner.world().entity(*sourceEntityId); source != nullptr) {
                     attacker = source->type().toString();
+                    causing = source->ownerId.value_or(*sourceEntityId);
                 }
             }
             filled.set("attacker_name", attacker);
-            filled.set("attacker_id", static_cast<std::int64_t>(sourceEntityId.value_or(-1)));
+            filled.set("attacker_id", causing);
+            filled.set("direct_id", static_cast<std::int64_t>(sourceEntityId.value_or(-1)));
         });
         if (event == nullptr) {
             return amount;

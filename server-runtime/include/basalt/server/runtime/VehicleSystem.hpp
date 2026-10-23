@@ -51,6 +51,14 @@ public:
         bool burningProjectile = false;
     };
 
+    struct Hooks {
+        std::function<std::optional<float>(const world::LoadedWorld& world, const entity::ServerEntity& vehicle,
+                                           const Hit& hit)>
+            damageAllowed;
+        std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& vehicle, const Hit& hit)>
+            destroyAllowed;
+    };
+
     struct Options {
         std::function<std::int64_t()> nextSeed;
         std::function<bool()> minecartImprovements;
@@ -68,6 +76,8 @@ public:
 
     VehicleSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster, ExplosionSystem& explosions,
                   EntityPushSystem& pushes, MobActionSystem& mobs, Options options);
+
+    void setHooks(Hooks hooks) { hooks_ = std::move(hooks); }
 
     /// parity: `AbstractMinecart.tick` and the subclass that owns the cart.
     void tickMinecart(world::LoadedWorld& world, entity::ServerEntity& cart);
@@ -111,6 +121,7 @@ private:
     EntityPushSystem* pushes_;
     MobActionSystem* mobs_;
     Options options_;
+    Hooks hooks_;
 };
 
 } // namespace basalt::server::runtime
