@@ -197,4 +197,9 @@ public final class BasaltChunk extends ChunkBase {
     public String toString() {
         return "BasaltChunk{world=" + world.getName() + ",x=" + x + ",z=" + z + "}";
     }
+
+    @Override
+    public org.bukkit.persistence.PersistentDataContainer getPersistentDataContainer() {
+        return org.basaltmc.bukkit.persistence.PdcStores.chunk(world.getName(), x, z);
+    }
 }

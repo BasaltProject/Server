@@ -882,4 +882,31 @@ public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
     public String toString() {
         return "BasaltWorld{name=" + name + "}";
     }
+
+    @Override
+    public org.bukkit.persistence.PersistentDataContainer getPersistentDataContainer() {
+        return org.basaltmc.bukkit.persistence.PdcStores.world(name);
+    }
+
+    private final MetadataHolder metadata = new MetadataHolder();
+
+    @Override
+    public void setMetadata(String name, org.bukkit.metadata.MetadataValue value) {
+        metadata.set(name, value);
+    }
+
+    @Override
+    public java.util.List<org.bukkit.metadata.MetadataValue> getMetadata(String name) {
+        return metadata.get(name);
+    }
+
+    @Override
+    public boolean hasMetadata(String name) {
+        return metadata.has(name);
+    }
+
+    @Override
+    public void removeMetadata(String name, org.bukkit.plugin.Plugin plugin) {
+        metadata.remove(name, plugin);
+    }
 }

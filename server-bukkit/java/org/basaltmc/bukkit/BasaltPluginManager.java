@@ -72,18 +72,7 @@ public final class BasaltPluginManager extends PluginManagerBase {
     private record Candidate(File file, PluginDescriptionFile description) {}
 
     static PluginDescriptionFile describe(File jar) throws InvalidDescriptionException, IOException {
-        try (JarFile file = new JarFile(jar)) {
-            JarEntry entry = file.getJarEntry("plugin.yml");
-            if (entry == null) {
-                entry = file.getJarEntry("paper-plugin.yml");
-            }
-            if (entry == null) {
-                throw new InvalidDescriptionException("Jar does not contain plugin.yml");
-            }
-            try (InputStream stream = file.getInputStream(entry)) {
-                return new PluginDescriptionFile(stream);
-            }
-        }
+        return org.basaltmc.bukkit.plugin.PluginDescriptors.describe(jar);
     }
 
     @Override
@@ -193,6 +182,12 @@ public final class BasaltPluginManager extends PluginManagerBase {
         JavaPlugin plugin;
         try {
             loader = new BasaltPluginClassLoader(getClass().getClassLoader(), this, description, dataFolder, file);
+            loader.addLibraries(org.basaltmc.bukkit.plugin.PluginLibraries.forDescription(description));
+            String paperLoader = org.basaltmc.bukkit.plugin.PluginLibraries.loaderClass(file);
+            if (paperLoader != null) {
+                loader.addLibraries(org.basaltmc.bukkit.plugin.PluginLibraries.runLoader(paperLoader, loader,
+                    description, dataFolder.toPath(), file.toPath()));
+            }
             Class<?> main = Class.forName(description.getMainClass(), true, loader);
             if (!JavaPlugin.class.isAssignableFrom(main)) {
                 throw new InvalidPluginException("main class '" + description.getMainClass() + "' does not extend JavaPlugin");

@@ -15,6 +15,8 @@ import org.bukkit.permissions.PermissionAttachment;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.plugin.Plugin;
 import org.basaltmc.bukkit.gen.PlayerBase;
+import org.basaltmc.bukkit.misc.BasaltPermissible;
+import org.basaltmc.bukkit.misc.OfflineSupport;
 
 public class BasaltPlayer extends PlayerBase {
     private static final int kHealth = 0;
@@ -30,10 +32,54 @@ public class BasaltPlayer extends PlayerBase {
     private final String uuid;
     private final String name;
 
+    private final BasaltPermissible permissible;
+
     protected BasaltPlayer(UUID id, String name) {
         this.id = id;
         this.uuid = id.toString();
         this.name = name;
+        this.permissible = new BasaltPermissible(this, id);
+    }
+
+    private volatile org.bukkit.scoreboard.Scoreboard scoreboard;
+
+    @Override
+    public org.bukkit.advancement.AdvancementProgress getAdvancementProgress(
+            org.bukkit.advancement.Advancement advancement) {
+        return new org.basaltmc.bukkit.misc.BasaltAdvancementProgress(uuid,
+            (org.basaltmc.bukkit.misc.BasaltAdvancement) advancement);
+    }
+
+    @Override
+    public void showBossBar(net.kyori.adventure.bossbar.BossBar bar) {
+        org.basaltmc.bukkit.misc.AdventureBars.show(id, bar);
+    }
+
+    @Override
+    public void hideBossBar(net.kyori.adventure.bossbar.BossBar bar) {
+        org.basaltmc.bukkit.misc.AdventureBars.hide(id, bar);
+    }
+
+    public void publishPermissions() {
+        permissible.publish();
+    }
+
+    @Override
+    public org.bukkit.scoreboard.Scoreboard getScoreboard() {
+        org.bukkit.scoreboard.Scoreboard held = scoreboard;
+        return held != null ? held : BasaltServer.instance().getScoreboardManager().getMainScoreboard();
+    }
+
+    @Override
+    public void setScoreboard(org.bukkit.scoreboard.Scoreboard board) {
+        if (board == null) {
+            throw new IllegalArgumentException("Scoreboard cannot be null");
+        }
+        if (!(board instanceof org.basaltmc.bukkit.misc.BasaltScoreboard own)) {
+            throw new IllegalArgumentException("Scoreboard must be a Basalt scoreboard");
+        }
+        MiscNatives.sbShow(uuid, own.handle());
+        scoreboard = own.handle() == 0 ? null : own;
     }
 
     private double number(int index) {
@@ -96,8 +142,20 @@ public class BasaltPlayer extends PlayerBase {
         return isOnline();
     }
 
+    @Override
+    public double getHealth() {
+        return number(kHealth);
+    }
 
+    @Override
+    public void setHealth(double health) {
+        Natives.playerSetHealth(uuid, health);
+    }
 
+    @Override
+    public double getMaxHealth() {
+        return 20.0;
+    }
 
     @Override
     public int getFoodLevel() {
@@ -248,61 +306,126 @@ public class BasaltPlayer extends PlayerBase {
 
     @Override
     public void setOp(boolean value) {
-        throw Unsupported.hit("Player#setOp");
+        OfflineSupport.setOp(id, value);
+        permissible.recalculatePermissions();
     }
 
     @Override
     public boolean isPermissionSet(String permission) {
-        return hasPermission(permission);
+        return permissible.isPermissionSet(permission);
     }
 
     @Override
     public boolean isPermissionSet(Permission permission) {
-        return hasPermission(permission.getName());
+        return permissible.isPermissionSet(permission);
     }
 
     @Override
     public boolean hasPermission(String permission) {
-        if (Natives.playerMay(uuid, permission)) {
-            return true;
-        }
-        return BasaltServer.instance().pluginManagerImpl().grantedByDefault(permission, isOp());
+        return permissible.hasPermission(permission);
     }
 
     @Override
     public boolean hasPermission(Permission permission) {
-        return hasPermission(permission.getName());
+        return permissible.hasPermission(permission);
     }
 
     @Override
     public PermissionAttachment addAttachment(Plugin plugin) {
-        return new PermissionAttachment(plugin, this);
+        return permissible.addAttachment(plugin);
     }
 
     @Override
     public PermissionAttachment addAttachment(Plugin plugin, int ticks) {
-        return new PermissionAttachment(plugin, this);
+        return permissible.addAttachment(plugin, ticks);
     }
 
     @Override
     public PermissionAttachment addAttachment(Plugin plugin, String name, boolean value) {
-        return new PermissionAttachment(plugin, this);
+        return permissible.addAttachment(plugin, name, value);
     }
 
     @Override
     public PermissionAttachment addAttachment(Plugin plugin, String name, boolean value, int ticks) {
-        return new PermissionAttachment(plugin, this);
+        return permissible.addAttachment(plugin, name, value, ticks);
     }
 
     @Override
-    public void removeAttachment(PermissionAttachment attachment) {}
+    public void removeAttachment(PermissionAttachment attachment) {
+        permissible.removeAttachment(attachment);
+    }
 
     @Override
-    public void recalculatePermissions() {}
+    public void recalculatePermissions() {
+        permissible.recalculatePermissions();
+    }
 
     @Override
     public Set<PermissionAttachmentInfo> getEffectivePermissions() {
-        return Set.of();
+        return permissible.getEffectivePermissions();
+    }
+
+    @Override
+    public boolean isBanned() {
+        return OfflineSupport.isBanned(id);
+    }
+
+    @Override
+    public <E extends org.bukkit.BanEntry<? super com.destroystokyo.paper.profile.PlayerProfile>> E ban(String reason,
+            java.util.Date expires, String source) {
+        return OfflineSupport.ban(id, name, reason, expires, source);
+    }
+
+    @Override
+    public <E extends org.bukkit.BanEntry<? super com.destroystokyo.paper.profile.PlayerProfile>> E ban(String reason,
+            java.time.Instant expires, String source) {
+        return OfflineSupport.ban(id, name, reason, expires, source);
+    }
+
+    @Override
+    public <E extends org.bukkit.BanEntry<? super com.destroystokyo.paper.profile.PlayerProfile>> E ban(String reason,
+            java.time.Duration duration, String source) {
+        return OfflineSupport.ban(id, name, reason, duration, source);
+    }
+
+    @Override
+    public boolean isWhitelisted() {
+        return OfflineSupport.isWhitelisted(id);
+    }
+
+    @Override
+    public void setWhitelisted(boolean value) {
+        OfflineSupport.setWhitelisted(id, name, value);
+    }
+
+    @Override
+    public long getFirstPlayed() {
+        return OfflineSupport.firstPlayed(id);
+    }
+
+    @Override
+    public long getLastPlayed() {
+        return System.currentTimeMillis();
+    }
+
+    @Override
+    public long getLastLogin() {
+        return OfflineSupport.lastSeen(id);
+    }
+
+    @Override
+    public long getLastSeen() {
+        return System.currentTimeMillis();
+    }
+
+    @Override
+    public boolean hasPlayedBefore() {
+        return OfflineSupport.hasPlayedBefore(id);
+    }
+
+    @Override
+    public com.destroystokyo.paper.profile.PlayerProfile getPlayerProfile() {
+        return new org.basaltmc.bukkit.misc.BasaltPlayerProfile(id, name);
     }
 
     @Override
@@ -333,23 +456,6 @@ public class BasaltPlayer extends PlayerBase {
     private double extra(int index) {
         double[] values = WorldNatives.playerExtra(uuid);
         return values == null ? 0.0 : values[index];
-    }
-
-    private org.basaltmc.bukkit.entity.EntityCore entityCore;
-
-    @Override
-    public synchronized org.basaltmc.bukkit.entity.EntityCore core() {
-        BasaltWorld world = (BasaltWorld) getWorld();
-        int entityId = getEntityId();
-        if (entityCore == null || entityCore.world != world || entityCore.id != entityId) {
-            entityCore = new org.basaltmc.bukkit.entity.EntityCore(world, entityId, id, EntityType.PLAYER);
-        }
-        return entityCore;
-    }
-
-    @Override
-    public org.bukkit.inventory.EntityEquipment getEquipment() {
-        return new org.basaltmc.bukkit.entity.BasaltPlayerEquipment(getInventory(), this);
     }
 
     private BasaltPlayerInventory inventory;
@@ -479,9 +585,7 @@ public class BasaltPlayer extends PlayerBase {
     }
 
     @Override
-    public void updateInventory() {
-        InventoryNatives.windowResync(uuid);
-    }
+    public void updateInventory() {}
 
     @Override
     public void setViewDistance(int distance) {}
@@ -611,10 +715,30 @@ public class BasaltPlayer extends PlayerBase {
         return tags.remove(tag);
     }
 
+    @Override
+    public org.bukkit.entity.Entity getVehicle() {
+        return null;
+    }
 
+    @Override
+    public boolean isInsideVehicle() {
+        return false;
+    }
 
+    @Override
+    public java.util.List<org.bukkit.entity.Entity> getPassengers() {
+        return new java.util.ArrayList<>();
+    }
 
+    @Override
+    public boolean isPersistent() {
+        return true;
+    }
 
+    @Override
+    public int getTicksLived() {
+        return 0;
+    }
 
     @Override
     public org.bukkit.block.BlockFace getFacing() {
@@ -642,33 +766,7 @@ public class BasaltPlayer extends PlayerBase {
     }
 
     @Override
-    public org.bukkit.inventory.InventoryView getOpenInventory() {
-        return org.basaltmc.bukkit.inv.Windows.current(this);
-    }
-
-    @Override
-    public org.bukkit.inventory.InventoryView openInventory(org.bukkit.inventory.Inventory inventory) {
-        return org.basaltmc.bukkit.inv.Windows.open(this, inventory);
-    }
-
-    @Override
-    public void openInventory(org.bukkit.inventory.InventoryView view) {
-        org.basaltmc.bukkit.inv.Windows.open(this, (org.basaltmc.bukkit.inv.BasaltInventoryView) view);
-    }
-
-    @Override
-    public void closeInventory(org.bukkit.event.inventory.InventoryCloseEvent.Reason reason) {
-        org.basaltmc.bukkit.inv.Windows.closeCurrent(this);
-    }
-
-    @Override
-    public org.bukkit.inventory.ItemStack getItemOnCursor() {
-        org.bukkit.inventory.ItemStack cursor = Items.fromBytes(InventoryNatives.cursorItem(uuid));
-        return cursor == null ? new BasaltItemStack(org.bukkit.Material.AIR, 0) : cursor;
-    }
-
-    @Override
-    public void setItemOnCursor(org.bukkit.inventory.ItemStack item) {
-        InventoryNatives.setCursorItem(uuid, Items.toBytes(item));
+    public org.bukkit.persistence.PersistentDataContainer getPersistentDataContainer() {
+        return org.basaltmc.bukkit.persistence.PdcStores.player(uuid);
     }
 }
