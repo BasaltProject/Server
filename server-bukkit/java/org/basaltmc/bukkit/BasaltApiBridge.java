@@ -10,18 +10,10 @@ import org.basaltmc.bukkit.gen.LifecycleEventManagerBase;
 
 /** The hooks Paper's API reaches the server through; what is not here reports itself once when used. */
 public final class BasaltApiBridge extends InternalAPIBridgeBase {
-    private static final class Lifecycle extends LifecycleEventManagerBase {
-        @Override
-        public void registerEventHandler(
-                io.papermc.paper.plugin.lifecycle.event.handler.configuration.LifecycleEventHandlerConfiguration config) {
-            Unsupported.hit("LifecycleEventManager#registerEventHandler");
-        }
-    }
-
     @Override
     public LifecycleEventManager<Plugin> createPluginLifecycleEventManager(JavaPlugin plugin,
             BooleanSupplier registrationCheck) {
-        return new Lifecycle();
+        return new org.basaltmc.bukkit.brigadier.BasaltLifecycleManager(plugin);
     }
 
     @Override
@@ -42,6 +34,13 @@ public final class BasaltApiBridge extends InternalAPIBridgeBase {
     @Override
     public org.bukkit.damage.DamageSource.Builder createDamageSourceBuilder(org.bukkit.damage.DamageType type) {
         return new BasaltDamageSource.Builder(type);
+    }
+
+    @Override
+    public java.util.function.Predicate<io.papermc.paper.command.brigadier.CommandSourceStack> restricted(
+            java.util.function.Predicate<io.papermc.paper.command.brigadier.CommandSourceStack> predicate,
+            boolean restricted) {
+        return predicate;
     }
 
     @Override
