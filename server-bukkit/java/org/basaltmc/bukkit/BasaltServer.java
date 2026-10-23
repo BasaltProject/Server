@@ -175,7 +175,15 @@ public class BasaltServer extends MiscServer {
 
     @Override
     public boolean dispatchCommand(CommandSender sender, String commandLine) {
-        return commandMap.dispatch(sender, commandLine);
+        String bare = commandLine.startsWith("/") ? commandLine.substring(1) : commandLine;
+        String label = bare.split(" ", 2)[0].toLowerCase(Locale.ROOT);
+        if (commandMap.getCommand(label) != null) {
+            return commandMap.dispatch(sender, bare);
+        }
+        if (sender instanceof Player player) {
+            return WorldNatives.playerCommand(player.getUniqueId().toString(), bare);
+        }
+        return sender instanceof ConsoleCommandSender && Natives.runConsoleCommand(bare);
     }
 
     @Override
