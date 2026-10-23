@@ -1,0 +1,175 @@
+#pragma once
+
+#include <basalt/server/plugins/PluginEntityOps.hpp>
+
+#include <array>
+#include <string_view>
+
+namespace basalt::server::plugins {
+
+inline constexpr std::array kPlayerProperties{
+    EntityPropertySpec{"allow_flight", EntityValueKind::Bool, true},
+    EntityPropertySpec{"flying", EntityValueKind::Bool, true},
+    EntityPropertySpec{"fly_speed", EntityValueKind::Real, true},
+    EntityPropertySpec{"walk_speed", EntityValueKind::Real, true},
+    EntityPropertySpec{"sprinting", EntityValueKind::Bool, true},
+    EntityPropertySpec{"sneaking", EntityValueKind::Bool, true},
+    EntityPropertySpec{"swimming", EntityValueKind::Bool, true},
+    EntityPropertySpec{"gliding", EntityValueKind::Bool, true},
+    EntityPropertySpec{"exhaustion", EntityValueKind::Real, true},
+    EntityPropertySpec{"saturation", EntityValueKind::Real, true},
+    EntityPropertySpec{"exp", EntityValueKind::Real, true},
+    EntityPropertySpec{"total_experience", EntityValueKind::Int, true},
+    EntityPropertySpec{"exp_to_next_level", EntityValueKind::Int, false},
+    EntityPropertySpec{"health_scale", EntityValueKind::Real, true},
+    EntityPropertySpec{"sleeping_ignored", EntityValueKind::Bool, true},
+    EntityPropertySpec{"collidable", EntityValueKind::Bool, true},
+    EntityPropertySpec{"affects_spawning", EntityValueKind::Bool, true},
+    EntityPropertySpec{"flying_fall_damage", EntityValueKind::Bool, true},
+    EntityPropertySpec{"exp_cooldown", EntityValueKind::Int, true},
+    EntityPropertySpec{"attack_cooldown", EntityValueKind::Real, false},
+    EntityPropertySpec{"view_distance", EntityValueKind::Int, true},
+    EntityPropertySpec{"simulation_distance", EntityValueKind::Int, true},
+    EntityPropertySpec{"portal_cooldown", EntityValueKind::Int, true},
+    EntityPropertySpec{"warden_warning_level", EntityValueKind::Int, true},
+    EntityPropertySpec{"warden_warning_cooldown", EntityValueKind::Int, true},
+    EntityPropertySpec{"warden_time_since_warning", EntityValueKind::Int, true},
+    EntityPropertySpec{"input_flags", EntityValueKind::Int, false},
+    EntityPropertySpec{"idle_ms", EntityValueKind::Int, false},
+    EntityPropertySpec{"using_item", EntityValueKind::Bool, false},
+    EntityPropertySpec{"using_offhand", EntityValueKind::Bool, false},
+    EntityPropertySpec{"blocking", EntityValueKind::Bool, false},
+    EntityPropertySpec{"sleep_ticks", EntityValueKind::Int, false},
+    EntityPropertySpec{"seen_win_screen", EntityValueKind::Bool, true},
+    EntityPropertySpec{"fishing_hook", EntityValueKind::Int, false},
+    EntityPropertySpec{"enchantment_seed", EntityValueKind::Int, true},
+    EntityPropertySpec{"score", EntityValueKind::Int, true},
+    EntityPropertySpec{"previous_gamemode", EntityValueKind::Text, false},
+    EntityPropertySpec{"tab_header", EntityValueKind::Text, true},
+    EntityPropertySpec{"tab_footer", EntityValueKind::Text, true},
+    EntityPropertySpec{"list_name", EntityValueKind::Text, true},
+    EntityPropertySpec{"listed", EntityValueKind::Bool, true},
+    EntityPropertySpec{"list_order", EntityValueKind::Int, true},
+    EntityPropertySpec{"player_time", EntityValueKind::Int, false},
+    EntityPropertySpec{"player_time_relative", EntityValueKind::Bool, false},
+    EntityPropertySpec{"player_weather", EntityValueKind::Text, false},
+    EntityPropertySpec{"spectator_target", EntityValueKind::Int, true},
+    EntityPropertySpec{"compass_target", EntityValueKind::List, false},
+    EntityPropertySpec{"locale", EntityValueKind::Text, false},
+    EntityPropertySpec{"client_view_distance", EntityValueKind::Int, false},
+    EntityPropertySpec{"client_particles", EntityValueKind::Int, false},
+    EntityPropertySpec{"chat_colors", EntityValueKind::Bool, false},
+    EntityPropertySpec{"text_filtering", EntityValueKind::Bool, false},
+    EntityPropertySpec{"server_listings", EntityValueKind::Bool, false},
+    EntityPropertySpec{"main_hand", EntityValueKind::Int, false},
+    EntityPropertySpec{"skin_parts", EntityValueKind::Int, false},
+    EntityPropertySpec{"chat_visibility", EntityValueKind::Int, false},
+    EntityPropertySpec{"client_brand", EntityValueKind::Text, false},
+    EntityPropertySpec{"protocol_version", EntityValueKind::Int, false},
+    EntityPropertySpec{"virtual_host", EntityValueKind::Text, false},
+    EntityPropertySpec{"transferred", EntityValueKind::Bool, false},
+    EntityPropertySpec{"bee_stingers", EntityValueKind::Int, true},
+    EntityPropertySpec{"bee_stinger_cooldown", EntityValueKind::Int, true},
+    EntityPropertySpec{"arrow_cooldown", EntityValueKind::Int, true},
+    EntityPropertySpec{"riptiding", EntityValueKind::Bool, false},
+    EntityPropertySpec{"pack_status", EntityValueKind::Int, false},
+};
+
+inline constexpr std::array kPlayerOperations{
+    EntityOperationSpec{"give_exp", ""},
+    EntityOperationSpec{"give_levels", ""},
+    EntityOperationSpec{"send_health", ""},
+    EntityOperationSpec{"send_experience", ""},
+    EntityOperationSpec{"reset_attack_cooldown", ""},
+    EntityOperationSpec{"fake_experience", ""},
+    EntityOperationSpec{"fake_health", ""},
+    EntityOperationSpec{"entity_event", ""},
+    EntityOperationSpec{"list_player", ""},
+    EntityOperationSpec{"list_unlisted", ""},
+    EntityOperationSpec{"tracked_by", ""},
+    EntityOperationSpec{"sent_chunks", ""},
+    EntityOperationSpec{"pickup_animation", ""},
+    EntityOperationSpec{"send_effect", ""},
+    EntityOperationSpec{"send_effect_removed", ""},
+    EntityOperationSpec{"open_book", ""},
+    EntityOperationSpec{"server_links", ""},
+    EntityOperationSpec{"store_cookie", ""},
+    EntityOperationSpec{"cookie_request", ""},
+    EntityOperationSpec{"cookie_answer", ""},
+    EntityOperationSpec{"reset_idle", ""},
+    EntityOperationSpec{"title_part", ""},
+    EntityOperationSpec{"title_times", ""},
+    EntityOperationSpec{"clear_title", ""},
+    EntityOperationSpec{"tab_list", ""},
+    EntityOperationSpec{"sound_at", ""},
+    EntityOperationSpec{"sound_entity", ""},
+    EntityOperationSpec{"stop_sound", ""},
+    EntityOperationSpec{"particle_at", ""},
+    EntityOperationSpec{"world_event", ""},
+    EntityOperationSpec{"update_commands", ""},
+    EntityOperationSpec{"set_player_time", ""},
+    EntityOperationSpec{"reset_player_time", ""},
+    EntityOperationSpec{"set_player_weather", ""},
+    EntityOperationSpec{"hide_entity", ""},
+    EntityOperationSpec{"show_entity", ""},
+    EntityOperationSpec{"can_see", ""},
+    EntityOperationSpec{"visible_by_default", ""},
+    EntityOperationSpec{"set_compass_target", ""},
+    EntityOperationSpec{"block_change", ""},
+    EntityOperationSpec{"block_damage", ""},
+    EntityOperationSpec{"sign_text", ""},
+    EntityOperationSpec{"open_sign", ""},
+    EntityOperationSpec{"cooldown", ""},
+    EntityOperationSpec{"set_cooldown", ""},
+    EntityOperationSpec{"statistic", ""},
+    EntityOperationSpec{"set_statistic", ""},
+    EntityOperationSpec{"inc_statistic", ""},
+    EntityOperationSpec{"transfer", ""},
+    EntityOperationSpec{"resource_pack", ""},
+    EntityOperationSpec{"remove_resource_pack", ""},
+    EntityOperationSpec{"game_event", ""},
+    EntityOperationSpec{"border_set", ""},
+    EntityOperationSpec{"border_reset", ""},
+    EntityOperationSpec{"known_recipes", ""},
+    EntityOperationSpec{"discover_recipes", ""},
+    EntityOperationSpec{"undiscover_recipes", ""},
+    EntityOperationSpec{"has_recipe", ""},
+    EntityOperationSpec{"spawn_point", ""},
+    EntityOperationSpec{"set_spawn_point", ""},
+    EntityOperationSpec{"clear_spawn_point", ""},
+    EntityOperationSpec{"last_death", ""},
+    EntityOperationSpec{"set_last_death", ""},
+    EntityOperationSpec{"post_effects", ""},
+    EntityOperationSpec{"set_post_effects", ""},
+    EntityOperationSpec{"ender_slot", ""},
+    EntityOperationSpec{"set_ender_slot", ""},
+    EntityOperationSpec{"save_data", ""},
+    EntityOperationSpec{"respawn", ""},
+    EntityOperationSpec{"chat", ""},
+    EntityOperationSpec{"wake_up", ""},
+    EntityOperationSpec{"swing", ""},
+    EntityOperationSpec{"hurt_animation", ""},
+    EntityOperationSpec{"send_equipment", ""},
+    EntityOperationSpec{"look_at", ""},
+    EntityOperationSpec{"chat_completions", ""},
+};
+
+[[nodiscard]] constexpr const EntityPropertySpec* playerPropertyNamed(std::string_view name) {
+    for (const EntityPropertySpec& spec : kPlayerProperties) {
+        if (spec.name == name) {
+            return &spec;
+        }
+    }
+    return nullptr;
+}
+
+[[nodiscard]] constexpr bool isPlayerOperation(std::string_view name) {
+    for (const EntityOperationSpec& spec : kPlayerOperations) {
+        if (spec.name == name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace basalt::server::plugins

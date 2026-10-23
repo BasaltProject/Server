@@ -183,6 +183,25 @@ public:
     virtual void setHeldSlot(std::int32_t slot) { static_cast<void>(slot); }
 
     [[nodiscard]] virtual bool sprinting() const { return false; }
+
+    /// Player state and operations by name (see `PluginPlayerOps.hpp`); nothing means the name is unknown.
+    [[nodiscard]] virtual std::optional<PluginEntityValue> property(std::string_view name) const {
+        static_cast<void>(name);
+        return std::nullopt;
+    }
+
+    virtual bool setProperty(std::string_view name, const PluginEntityValue& value) {
+        static_cast<void>(name);
+        static_cast<void>(value);
+        return false;
+    }
+
+    virtual std::optional<PluginEntityValue> invoke(std::string_view operation,
+                                                    const std::vector<PluginEntityValue>& arguments) {
+        static_cast<void>(operation);
+        static_cast<void>(arguments);
+        return std::nullopt;
+    }
 };
 
 class PluginEntityRef {

@@ -512,6 +512,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                            double z, float yaw, std::string_view reason) {
         return spawning_ == nullptr ? nullptr : spawning_->spawnMob(world, type, x, y, z, yaw, reason);
     };
+    model.progress = [this] { return playerProgress_.get(); };
+    model.recipes = [this] { return &vanillaData_.recipes; };
+    model.store = [this] { return playerStore_.get(); };
 
     const auto sessions = [this] { return playerRegistry_.snapshot(); };
     pluginPlayers_ = std::make_unique<plugins::RegistryPlayers>(playerRegistry_, model);
