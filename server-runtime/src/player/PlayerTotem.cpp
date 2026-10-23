@@ -106,6 +106,9 @@ bool checkTotemDeathProtection(PlayerSession& player, const TotemContext& contex
         if (!effects.has_value()) {
             continue;
         }
+        if (context.resurrectAllowed && !context.resurrectAllowed(player, slot == PlayerInventory::kOffhandSlot)) {
+            return false;
+        }
         storage::StoredItemStack left = *held;
         left.count -= 1;
         player.inventory.set(slot, left.count <= 0 ? std::nullopt : std::optional{left});

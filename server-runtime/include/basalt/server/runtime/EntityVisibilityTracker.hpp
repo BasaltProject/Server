@@ -92,6 +92,7 @@ private:
     std::map<std::int32_t, std::vector<std::int32_t>> lastPassengers_;
     std::map<std::int32_t, std::int32_t> lastLeashHolders_;
     std::map<std::int32_t, std::vector<entity::GeneratedEquipment>> lastMobEquipment_;
+    std::map<std::int32_t, std::string> lastDisplayText_;
     std::set<std::int32_t> trackedPlayers_;
     std::map<std::int32_t, player::PlayerEntityData> lastPlayerData_;
     std::map<std::int32_t, std::vector<std::optional<storage::StoredItemStack>>> trackedEquipment_;

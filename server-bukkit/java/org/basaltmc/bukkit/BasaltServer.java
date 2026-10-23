@@ -115,6 +115,16 @@ public class BasaltServer extends ServerBase {
     }
 
     @Override
+    public boolean isOwnedByCurrentRegion(org.bukkit.entity.Entity entity) {
+        return isPrimaryThread();
+    }
+
+    @Override
+    public org.bukkit.entity.EntityFactory getEntityFactory() {
+        return org.basaltmc.bukkit.entity.BasaltEntityFactory.instance;
+    }
+
+    @Override
     public String getName() {
         return "Basalt";
     }

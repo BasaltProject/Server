@@ -23,6 +23,16 @@ public final class BasaltEntitySnapshot implements EntitySnapshot {
         this.nbt = nbt;
     }
 
+    public static EntitySnapshot parse(String snbt) {
+        byte[] parsed = org.basaltmc.bukkit.EntityNatives.snbtToNbt(snbt);
+        CompoundTag tag = parsed == null ? null : NbtCodec.fromBytes(parsed);
+        EntityType kind = tag == null ? EntityType.UNKNOWN : EntityCore.typeOf(tag.getStringOr("id", ""));
+        if (kind == EntityType.UNKNOWN) {
+            throw new IllegalArgumentException("Unable to read an entity from: " + snbt);
+        }
+        return new BasaltEntitySnapshot(kind, parsed);
+    }
+
     public static EntitySnapshot of(EntityCore core) {
         byte[] saved = core.nbt("");
         return saved == null ? null : new BasaltEntitySnapshot(core.type, saved);
@@ -64,6 +74,6 @@ public final class BasaltEntitySnapshot implements EntitySnapshot {
 
     @Override
     public String getAsString() {
-        return NbtCodec.fromBytes(nbt).toString();
+        return org.basaltmc.bukkit.EntityNatives.nbtToSnbt(nbt);
     }
 }

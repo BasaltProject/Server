@@ -246,6 +246,7 @@ player::DamageContext CombatHandler::damageContext() const {
     context.world = [this] { return owner_->currentWorld(); };
     context.damaged = hooks_.damaged;
     context.healed = hooks_.healed;
+    context.resurrectAllowed = hooks_.resurrectAllowed;
     context.slotChanged = [this](const PlayerSession&, std::int32_t slot) { owner_->sendInventorySlot(slot); };
     context.disableBlocking = [this](PlayerSession& player, std::int32_t ticks) {
         owner_->itemUseTimers().stopBlocking();

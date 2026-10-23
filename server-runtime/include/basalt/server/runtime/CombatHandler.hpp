@@ -37,6 +37,7 @@ public:
                                            const std::optional<std::int32_t>& sourceEntityId)>
             damaged;
         std::function<std::optional<float>(const player::PlayerSession& player, float amount)> healed;
+        std::function<bool(const player::PlayerSession& player, bool offhand)> resurrectAllowed;
         std::function<void(const player::PlayerSession& player, const std::string& deathMessage)> died;
         std::function<bool(const player::PlayerSession& player, std::int32_t targetEntityId)> attackAllowed;
         std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& vehicle)> mountAllowed;

@@ -37,6 +37,7 @@ struct DamageContext {
                                        const std::optional<std::int32_t>& sourceEntityId)>
         damaged;
     std::function<std::optional<float>(const PlayerSession& player, float amount)> healed;
+    std::function<bool(const PlayerSession& player, bool offhand)> resurrectAllowed;
     std::function<void(const PlayerSession& player, std::int32_t slot)> slotChanged;
     std::function<void(PlayerSession& player, std::int32_t cooldownTicks)> disableBlocking;
     DeathContext death;

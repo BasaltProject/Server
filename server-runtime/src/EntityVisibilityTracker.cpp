@@ -161,6 +161,7 @@ void EntityVisibilityTracker::forgetEverythingDrawn() {
     lastRuntimeEntityMetadata_.clear();
     lastPassengers_.clear();
     lastMobEquipment_.clear();
+    lastDisplayText_.clear();
 }
 
 void EntityVisibilityTracker::syncSummonedEntities() {
@@ -182,6 +183,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                 lastPassengers_.erase(entity->entityId());
                 lastLeashHolders_.erase(entity->entityId());
                 lastMobEquipment_.erase(entity->entityId());
+                lastDisplayText_.erase(entity->entityId());
                 owner_->sendPlayPacket(RemoveEntitiesPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                     RemoveEntitiesPacket{.entityIds = {entity->entityId()}}.write(buffer);
                 });
@@ -254,6 +256,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             }
             if (entity->displayText.has_value()) {
                 sendDisplayText(entity->entityId(), *entity->displayText);
+                lastDisplayText_.insert_or_assign(entity->entityId(), *entity->displayText);
             }
             syncLeash(*entity);
             continue;
@@ -269,6 +272,13 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             });
         }
         syncMobEquipment(*entity);
+        if (entity->displayText.has_value()) {
+            std::string& shown = lastDisplayText_[entity->entityId()];
+            if (shown != *entity->displayText) {
+                shown = *entity->displayText;
+                sendDisplayText(entity->entityId(), shown);
+            }
+        }
         syncLeash(*entity);
         const auto last = lastEntityPositions_.find(entity->entityId());
         const bool first = last == lastEntityPositions_.end();
@@ -428,25 +438,27 @@ void EntityVisibilityTracker::syncMobEquipment(const entity::ServerEntity& entit
     world::RealEnchantments* enchantments = owner_->options().enchantments;
     std::vector<SetEquipmentPacket::Slot> slots;
     for (const entity::GeneratedEquipment& before : known) {
-        if (std::ranges::none_of(worn, [&](const entity::GeneratedEquipment& now) { return now.slot == before.slot; })) {
+        if (std::ranges::none_of(worn,
+                                 [&](const entity::GeneratedEquipment& now) { return now.slot == before.slot; })) {
             slots.push_back(SetEquipmentPacket::Slot{.type = before.slot, .stack = std::nullopt});
         }
     }
     for (const entity::GeneratedEquipment& slot : worn) {
         const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(slot.item);
-        const server::registry::Item* item =
-            id.has_value() ? server::registry::items::registry().byName(*id) : nullptr;
+        const server::registry::Item* item = id.has_value() ? server::registry::items::registry().byName(*id) : nullptr;
         if (item == nullptr) {
             continue;
         }
         slots.push_back(SetEquipmentPacket::Slot{
             .type = slot.slot,
-            .stack = wire::protocol::play::WireItemStack{
-                .itemId = item->protocolId,
-                .count = slot.count,
-                .components = item::itemComponentCodecs::toWire(slot.components, [enchantments](const Identifier& name) {
-                    return enchantments == nullptr ? std::nullopt : enchantments->protocolIdOf(name);
-                })}});
+            .stack = wire::protocol::play::WireItemStack{.itemId = item->protocolId,
+                                                         .count = slot.count,
+                                                         .components = item::itemComponentCodecs::toWire(
+                                                             slot.components, [enchantments](const Identifier& name) {
+                                                                 return enchantments == nullptr
+                                                                            ? std::nullopt
+                                                                            : enchantments->protocolIdOf(name);
+                                                             })}});
     }
     known = std::move(worn);
     if (!slots.empty()) {

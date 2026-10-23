@@ -19,6 +19,7 @@ using server::plugins::pluginEventTypes::blockPlace;
 using server::plugins::pluginEventTypes::entityDamage;
 using server::plugins::pluginEventTypes::entityHeal;
 using server::plugins::pluginEventTypes::entityMount;
+using server::plugins::pluginEventTypes::entityResurrect;
 using server::plugins::pluginEventTypes::entityShoot;
 using server::plugins::pluginEventTypes::entityTame;
 using server::plugins::pluginEventTypes::inventoryChanged;
@@ -266,6 +267,12 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
         }
         const auto* edited = std::get_if<double>(&event->get("amount"));
         return edited == nullptr ? amount : static_cast<float>(*edited);
+    };
+    hooks.resurrectAllowed = [&sink](const player::PlayerSession& who, bool offhand) {
+        return sink.allowed(&entityResurrect, [&](PluginEvent& event) {
+            playerAsEntity(event, who);
+            event.set("hand", std::string{offhand ? "off_hand" : "hand"});
+        });
     };
     hooks.healed = [&sink](const player::PlayerSession& who, float amount) -> std::optional<float> {
         const server::plugins::PluginEvent* event = sink.ask(&entityHeal, [&](PluginEvent& filled) {

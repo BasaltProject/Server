@@ -21,6 +21,7 @@ struct TotemContext {
     std::function<float()> nextFloat;
     std::function<void(const PlayerSession& player, std::int32_t slot)> slotChanged;
     std::function<void(PlayerSession& player, const storage::StoredItemStack& spent)> usedTotem;
+    std::function<bool(const PlayerSession& player, bool offhand)> resurrectAllowed;
     std::function<void(const PlayerSession& player)> interactFinished;
 };
 

@@ -101,6 +101,11 @@ final class EntityEvents {
                 new org.bukkit.inventory.ItemStack(material, (int) Math.max(1, f.whole("count")))));
             return new org.bukkit.event.entity.ItemSpawnEvent((org.bukkit.entity.Item) item);
         });
+        EventBridge.map("player.item_pickup", org.bukkit.event.entity.EntityPickupItemEvent.class, f -> {
+            Entity item = f.world() == null ? null : f.world().entity((int) f.whole("entity_id"));
+            return item instanceof org.bukkit.entity.Item picked && f.player() != null
+                ? new org.bukkit.event.entity.EntityPickupItemEvent(f.player(), picked, 0) : null;
+        });
         EventBridge.map("block.explode", org.bukkit.event.entity.ExplosionPrimeEvent.class, f -> {
             Entity source = f.whole("entity_id") > 0 ? f.entity() : null;
             return source == null ? null : new org.bukkit.event.entity.ExplosionPrimeEvent(source,
@@ -115,6 +120,12 @@ final class EntityEvents {
             Entity mount = f.entity();
             return mount instanceof org.bukkit.entity.Vehicle vehicle && f.player() != null && f.flag("mounting")
                 ? new org.bukkit.event.vehicle.VehicleEnterEvent(vehicle, f.player()) : null;
+        });
+        EventBridge.map("entity.resurrect", org.bukkit.event.entity.EntityResurrectEvent.class, f -> {
+            Entity who = f.entity();
+            return who instanceof LivingEntity living ? new org.bukkit.event.entity.EntityResurrectEvent(living,
+                f.text("hand").equals("off_hand") ? org.bukkit.inventory.EquipmentSlot.OFF_HAND
+                    : org.bukkit.inventory.EquipmentSlot.HAND) : null;
         });
         EventBridge.map("entity.heal", EntityRegainHealthEvent.class, f -> {
             Entity healed = f.entity();
