@@ -180,6 +180,7 @@ basalt_module(server-runtime-core
         src/plugins/DataFix.cpp
         src/plugins/ServerWorldModel.cpp
         src/plugins/ServerWorldEnv.cpp
+        src/plugins/ServerSettings.cpp
         src/plugins/EntityOps.cpp
         src/plugins/PlayerEntityOps.cpp
         src/plugins/DroppedItemOps.cpp

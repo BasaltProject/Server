@@ -169,6 +169,10 @@ server_links.list function
 server_links.set function
 service function
 setmetatable function
+settings table
+settings.get function
+settings.keys function
+settings.set function
 sidebar function
 store table
 string table
@@ -245,4 +249,5 @@ worlds.state_text function
 worlds.tags function
 worlds.tool_facts function
 worlds.transform_state function
+worlds.unload function
 xpcall function

@@ -14,6 +14,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -76,6 +77,9 @@ public:
     world::LoadedWorld* createWorld(const std::string& name, config::WorldDimension dimension, config::WorldType type,
                                     std::optional<std::int64_t> seed);
 
+    /// Takes a world nobody stands in out of play; it stays in memory and `createWorld` brings it back.
+    bool unloadWorld(const std::string& name, bool save);
+
     [[nodiscard]] std::map<std::string, std::int64_t>& lastChunkSetVersion() noexcept { return lastChunkSetVersion_; }
 
     /// The tab list, scoreboard, boss bar and server list read their file on every use; the command tree does not.
@@ -94,6 +98,7 @@ private:
 
     std::map<std::string, world::WorldMetadata> metadata_;
     std::vector<std::unique_ptr<world::LoadedWorld>> owned_;
+    std::set<std::string> unloaded_;
     std::map<std::string, world::VanillaWorldGeneratorFactory::Generators> built_;
     std::map<std::string, std::int64_t> lastChunkSetVersion_;
     std::string defaultName_;

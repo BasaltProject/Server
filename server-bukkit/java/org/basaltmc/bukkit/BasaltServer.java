@@ -27,7 +27,7 @@ import org.bukkit.plugin.SimpleServicesManager;
 import org.bukkit.plugin.messaging.Messenger;
 import org.bukkit.scheduler.BukkitScheduler;
 
-public class BasaltServer extends MiscServer {
+public class BasaltServer extends ServerExtras {
     public static final String kMinecraftVersion = "26.3";
 
     private static BasaltServer instance;
@@ -111,11 +111,6 @@ public class BasaltServer extends MiscServer {
 
     synchronized BasaltWorld world(String name) {
         return worlds.computeIfAbsent(name, BasaltWorld::new);
-    }
-
-    @Override
-    public boolean isOwnedByCurrentRegion(org.bukkit.entity.Entity entity) {
-        return isPrimaryThread();
     }
 
     @Override
@@ -420,67 +415,12 @@ public class BasaltServer extends MiscServer {
     }
 
     @Override
-    public GameMode getDefaultGameMode() {
-        return GameMode.SURVIVAL;
-    }
-
-    @Override
-    public boolean getOnlineMode() {
-        return true;
-    }
-
-    @Override
-    public int getMaxPlayers() {
-        return 20;
-    }
-
-    @Override
-    public int getPort() {
-        return 25565;
-    }
-
-    @Override
-    public String getIp() {
-        return "";
-    }
-
-    @Override
-    public String getMotd() {
-        return "A Basalt Server";
-    }
-
-    @Override
-    public int getViewDistance() {
-        return 10;
-    }
-
-    @Override
-    public int getSimulationDistance() {
-        return 10;
-    }
-
-    @Override
-    public boolean getAllowNether() {
-        return true;
-    }
-
-    @Override
-    public boolean getAllowEnd() {
-        return true;
-    }
-
-    @Override
     public boolean getAllowFlight() {
         return false;
     }
 
     @Override
     public boolean isHardcore() {
-        return false;
-    }
-
-    @Override
-    public boolean isStopping() {
         return false;
     }
 

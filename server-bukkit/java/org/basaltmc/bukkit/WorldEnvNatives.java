@@ -41,6 +41,18 @@ public final class WorldEnvNatives {
 
     public static native double breakSpeed(String world, String player, int x, int y, int z);
 
+    /** One server setting as text, null when there is none of that name. */
+    public static native String setting(String key);
+
+    public static native boolean setSetting(String key, String value);
+
+    /** Makes a world of the dimension (overworld, nether, end) and type; true when it exists afterwards. */
+    public static native boolean createWorld(String name, String dimension, String type, long seed, boolean seeded);
+
+    public static native boolean unloadWorld(String name, boolean save);
+
+    public static native boolean stopping();
+
     public static native int transformState(int state, int rotation, int mirror);
 
     /** Whether the tool is right for the block's drops, then how fast it mines it. */

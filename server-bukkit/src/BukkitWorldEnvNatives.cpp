@@ -264,6 +264,51 @@ jdouble JNICALL nativeBreakSpeed(JNIEnv* env, jclass, jstring world, jstring pla
     });
 }
 
+jstring JNICALL nativeSetting(JNIEnv* env, jclass, jstring key) {
+    const std::string name = toStd(env, key);
+    const std::optional<std::string> value = jni::onServer<std::optional<std::string>>(
+        std::nullopt, [&] { return BukkitBridge::current().services().serverControl().setting(name); });
+    return value.has_value() ? toJava(env, *value) : nullptr;
+}
+
+jboolean JNICALL nativeSetSetting(JNIEnv* env, jclass, jstring key, jstring value) {
+    const std::string name = toStd(env, key);
+    const std::string text = toStd(env, value);
+    return jni::onServer<bool>(
+               false, [&] { return BukkitBridge::current().services().serverControl().setSetting(name, text); })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jboolean JNICALL nativeCreateWorld(JNIEnv* env, jclass, jstring name, jstring dimension, jstring type, jlong seed,
+                                   jboolean seeded) {
+    const std::string world = toStd(env, name);
+    const std::string kind = toStd(env, dimension);
+    const std::string shape = toStd(env, type);
+    return jni::onServer<bool>(false,
+                               [&] {
+                                   return BukkitBridge::current().services().worlds().create(
+                                              world, kind, shape,
+                                              seeded == JNI_TRUE ? std::optional<std::int64_t>{seed} : std::nullopt) !=
+                                          nullptr;
+                               })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jboolean JNICALL nativeUnloadWorld(JNIEnv* env, jclass, jstring name, jboolean save) {
+    const std::string world = toStd(env, name);
+    return jni::onServer<bool>(
+               false, [&] { return BukkitBridge::current().services().worlds().unload(world, save == JNI_TRUE); })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jboolean JNICALL nativeStopping(JNIEnv*, jclass) {
+    BukkitBridge* bridge = BukkitBridge::live();
+    return bridge != nullptr && bridge->stopping() ? JNI_TRUE : JNI_FALSE;
+}
+
 jint JNICALL nativeTransformState(JNIEnv*, jclass, jint state, jint rotation, jint mirror) {
     return BukkitBridge::current().services().worlds().transformState(state, rotation, mirror);
 }
@@ -304,6 +349,12 @@ void registerWorldEnvNatives(JNIEnv* env, jclass natives) {
         method("survives", "(Ljava/lang/String;IIII)Z", reinterpret_cast<void*>(&nativeSurvives)),
         method("temperature", "(Ljava/lang/String;III)D", reinterpret_cast<void*>(&nativeTemperature)),
         method("breakSpeed", "(Ljava/lang/String;Ljava/lang/String;III)D", reinterpret_cast<void*>(&nativeBreakSpeed)),
+        method("setting", "(Ljava/lang/String;)Ljava/lang/String;", reinterpret_cast<void*>(&nativeSetting)),
+        method("setSetting", "(Ljava/lang/String;Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeSetSetting)),
+        method("createWorld", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JZ)Z",
+               reinterpret_cast<void*>(&nativeCreateWorld)),
+        method("unloadWorld", "(Ljava/lang/String;Z)Z", reinterpret_cast<void*>(&nativeUnloadWorld)),
+        method("stopping", "()Z", reinterpret_cast<void*>(&nativeStopping)),
         method("transformState", "(III)I", reinterpret_cast<void*>(&nativeTransformState)),
         method("toolFacts", "(Ljava/lang/String;I)[D", reinterpret_cast<void*>(&nativeToolFacts)),
     };

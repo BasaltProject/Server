@@ -92,4 +92,16 @@ std::optional<server::plugins::PluginResourcePack> ServerControl::resourcePack()
     return hooks_.resourcePack ? hooks_.resourcePack() : std::nullopt;
 }
 
+std::vector<std::string> ServerControl::settingKeys() {
+    return hooks_.settings == nullptr ? std::vector<std::string>{} : hooks_.settings->keys();
+}
+
+std::optional<std::string> ServerControl::setting(const std::string_view key) {
+    return hooks_.settings == nullptr ? std::nullopt : hooks_.settings->get(key);
+}
+
+bool ServerControl::setSetting(const std::string_view key, const std::string_view value) {
+    return hooks_.settings != nullptr && hooks_.settings->set(key, value);
+}
+
 } // namespace basalt::server::runtime::plugins
