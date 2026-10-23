@@ -36,17 +36,24 @@ public final class PluginLibraries {
         if (coordinates.isEmpty()) {
             return urls;
         }
-        MavenLibraryResolver resolver = new MavenLibraryResolver();
-        resolver.addRepository(new RemoteRepository.Builder("central", "default",
-            MavenLibraryResolver.MAVEN_CENTRAL_DEFAULT_MIRROR).build());
-        for (String coordinate : coordinates) {
-            resolver.addDependency(new Dependency(new DefaultArtifact(coordinate), null));
+        try {
+            MavenLibraryResolver resolver = new MavenLibraryResolver();
+            resolver.addRepository(new RemoteRepository.Builder("central", "default",
+                MavenLibraryResolver.MAVEN_CENTRAL_DEFAULT_MIRROR).build());
+            for (String coordinate : coordinates) {
+                resolver.addDependency(new Dependency(new DefaultArtifact(coordinate), null));
+            }
+            register(resolver, urls, meta.getName());
+        } catch (RuntimeException | LinkageError e) {
+            java.io.StringWriter trace = new java.io.StringWriter();
+            e.printStackTrace(new java.io.PrintWriter(trace));
+            Natives.log(3, "Bukkit", "Could not resolve the libraries of " + meta.getName() + ": " + trace);
         }
-        register(resolver, urls, meta.getName());
         return urls;
     }
 
     private static void register(ClassPathLibrary library, List<URL> into, String plugin) {
+        library = MavenLibraries.lockFree(library);
         LibraryStore store = path -> {
             try {
                 into.add(path.toUri().toURL());
@@ -57,7 +64,9 @@ public final class PluginLibraries {
         try {
             library.register(store);
         } catch (LibraryLoadingException e) {
-            Natives.log(3, "Bukkit", "Could not load the libraries of " + plugin + ": " + e.getMessage());
+            java.io.StringWriter trace = new java.io.StringWriter();
+            e.printStackTrace(new java.io.PrintWriter(trace));
+            Natives.log(3, "Bukkit", "Could not load the libraries of " + plugin + ": " + trace);
         }
     }
 
