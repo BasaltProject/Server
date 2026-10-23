@@ -1279,7 +1279,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     difficulty_ = worldRegistry_->defaultWorld().settings().difficulty;
 }
 
-BasaltServer::~BasaltServer() { shutdown(); }
+BasaltServer::~BasaltServer() {
+    shutdown();
+    // Joined before any member dies: a stop requested from the tick leaves that thread finishing its turn.
+    if (tickLoop_ != nullptr) {
+        tickLoop_->stop();
+    }
+}
 
 std::vector<player::PlayerSession*> BasaltServer::watchersIn(const world::LoadedWorld& world) {
     std::vector<player::PlayerSession*> watchers;

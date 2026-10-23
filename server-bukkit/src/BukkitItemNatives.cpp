@@ -1,4 +1,5 @@
 #include "BridgeInternal.hpp"
+#include "ServerThreadCall.hpp"
 
 #include <basalt/server/plugins/PluginWindow.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
@@ -27,19 +28,7 @@ template <typename Result, typename Body>
             return fallback;
         }
     };
-    BukkitBridge& bridge = BukkitBridge::current();
-    if (bridge.plugins().onPluginThread()) {
-        return run();
-    }
-    std::promise<Result> done;
-    std::future<Result> result = done.get_future();
-    static_cast<void>(bridge.services().tasks().after(0, [&done, &run] { done.set_value(run()); }));
-    while (result.wait_for(std::chrono::milliseconds{50}) != std::future_status::ready) {
-        if (bridge.stopping()) {
-            return fallback;
-        }
-    }
-    return result.get();
+    return callOnPluginThread(BukkitBridge::current(), fallback, run);
 }
 
 [[nodiscard]] std::vector<std::uint8_t> bytesOf(JNIEnv* env, jbyteArray array) {

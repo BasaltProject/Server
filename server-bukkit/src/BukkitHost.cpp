@@ -51,7 +51,9 @@ void BukkitHost::stop() {
     }
     stopped_ = true;
     shim_->beginShutdown();
-    if (bridge_->shutdown()) {
+    const bool clean = bridge_->shutdown();
+    BukkitBridge::seal();
+    if (clean) {
         shim_->destroy();
     } else {
         ShimHost::markLeftRunning();
