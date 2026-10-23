@@ -433,13 +433,23 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
         return edited == nullptr ? amount : static_cast<float>(*edited);
     };
     hooks.died = [&sink](const player::PlayerSession& who, const std::string& deathMessage) {
-        sink.notify(&playerDeath, [&](PluginEvent& event) {
-            EventSink::player(event, who);
-            event.set("x", who.x);
-            event.set("y", who.y);
-            event.set("z", who.z);
-            event.set("cause", deathMessage);
+        Announcement said;
+        const server::plugins::PluginEvent* event = sink.ask(&playerDeath, [&](PluginEvent& filled) {
+            EventSink::player(filled, who);
+            filled.set("x", who.x);
+            filled.set("y", who.y);
+            filled.set("z", who.z);
+            filled.set("cause", deathMessage);
         });
+        if (event != nullptr) {
+            if (const auto* text = std::get_if<std::string>(&event->get("message")); text != nullptr) {
+                said.text = *text;
+            }
+            if (const auto* silent = std::get_if<bool>(&event->get("silent")); silent != nullptr) {
+                said.silent = *silent;
+            }
+        }
+        return said;
     };
     hooks.attackAllowed = [&owner, &sink](const player::PlayerSession& who, std::int32_t targetEntityId) {
         return sink.allowed(&playerInteractEntity, [&](PluginEvent& event) {

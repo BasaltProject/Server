@@ -83,6 +83,11 @@ final class PlayerEvents {
         };
     }
 
+    static void forget(java.util.UUID player) {
+        mainHands.remove(player);
+        locales.remove(player);
+    }
+
     static EquipmentSlot hand(String name) {
         return name.equals("off_hand") ? EquipmentSlot.OFF_HAND : EquipmentSlot.HAND;
     }
@@ -104,6 +109,13 @@ final class PlayerEvents {
             Player who = f.player();
             return who == null ? null : new org.bukkit.event.entity.PlayerDeathEvent(who, generic(), new ArrayList<>(),
                 0, Component.text(f.text("cause")), false);
+        }, (e, f) -> {
+            Component chosen = ((org.bukkit.event.entity.PlayerDeathEvent) e).deathMessage();
+            if (chosen == null) {
+                f.put("silent", true);
+            } else if (!chosen.equals(Component.text(f.text("cause")))) {
+                f.put("message", net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().serialize(chosen));
+            }
         });
         EventBridge.map("player.item_drop", org.bukkit.event.player.PlayerDropItemEvent.class, f -> {
             Entity item = droppedItem(f, stackOf(f.text("item"), f.whole("count")));

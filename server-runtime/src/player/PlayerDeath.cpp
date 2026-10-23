@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <vector>
@@ -42,20 +43,25 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
         arguments.push_back(*killer);
     }
     const Component message = Component::translatable("death.attack." + std::string{deathMessageId}, arguments);
+    Announcement said;
     if (context.died) {
-        context.died(session, wire::text::resolvePlainText(message, context.lang));
+        said = context.died(session, wire::text::resolvePlainText(message, context.lang));
     }
     if (session.connection().sendCombatDeath) {
         session.connection().sendCombatDeath(message);
     }
-    context.logger.info([&] { return wire::text::resolvePlainText(message, context.lang); });
+    const Component announced = said.text.empty() ? message : wire::text::miniMessage::parse(said.text);
+    if (said.silent) {
+        return;
+    }
+    context.logger.info([&] { return wire::text::resolvePlainText(announced, context.lang); });
 
     if (context.registry == nullptr) {
         return;
     }
     for (const PlayerSession* player : context.registry->snapshot()) {
         if (player->connection().sendSystemMessage) {
-            player->connection().sendSystemMessage(message);
+            player->connection().sendSystemMessage(announced);
         }
     }
 }
