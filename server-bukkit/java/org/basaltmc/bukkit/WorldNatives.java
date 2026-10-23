@@ -12,6 +12,7 @@ public final class WorldNatives {
     public static native double[] blockInfo(int state);
     public static native String[] biomeIds();
     public static native String[] itemIds();
+    public static native String[] registryIds(String registry);
     public static native String[] tags(String registry);
     public static native String[] blockEntityTypes();
     public static native int dataVersion();

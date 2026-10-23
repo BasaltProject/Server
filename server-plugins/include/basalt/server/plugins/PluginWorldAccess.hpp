@@ -879,6 +879,12 @@ public:
     /// The item ids, in registry order.
     [[nodiscard]] virtual std::vector<std::string> itemIds() const { return {}; }
 
+    /// The ids of a registry by name (`damage_type`, `particle_type`, `worldgen/biome`...), empty when the server has none.
+    [[nodiscard]] virtual std::vector<std::string> registryIds(std::string_view registry) const {
+        static_cast<void>(registry);
+        return {};
+    }
+
     /// The entity type ids.
     [[nodiscard]] virtual std::vector<std::string> entityTypeIds() const { return {}; }
 };

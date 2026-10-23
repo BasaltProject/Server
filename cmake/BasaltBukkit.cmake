@@ -61,6 +61,8 @@ function(basalt_bukkit_runtime)
         VERBATIM
     )
     add_custom_target(basalt-bukkit-embed ALL
+        BYPRODUCTS ${BASALT_BUKKIT_EMBED_DIR}/libjvm ${BASALT_BUKKIT_EMBED_DIR}/boot.jar
+                   ${BASALT_BUKKIT_EMBED_DIR}/runtime.jar ${BASALT_BUKKIT_EMBED_DIR}/libs.txt
         COMMAND ${CMAKE_COMMAND} -DSHIM=${_shim} -DRUNTIME=${CMAKE_BINARY_DIR}/bukkit-runtime -DOUT=${BASALT_BUKKIT_EMBED_DIR}
                 -P ${CMAKE_SOURCE_DIR}/cmake/StageBukkitRuntime.cmake
         COMMENT "Staging the Bukkit runtime to embed"
