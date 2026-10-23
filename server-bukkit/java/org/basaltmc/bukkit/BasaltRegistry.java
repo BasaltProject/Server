@@ -46,7 +46,13 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
         T found = entries().get(key);
         if (found == null && open != null) {
             synchronized (this) {
-                found = entries().computeIfAbsent(key, open);
+                found = entries().get(key);
+                if (found == null) {
+                    found = open.apply(key);
+                    if (found != null) {
+                        entries().put(key, found);
+                    }
+                }
             }
         }
         return found;

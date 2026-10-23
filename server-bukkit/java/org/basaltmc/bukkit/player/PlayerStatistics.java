@@ -6,7 +6,7 @@ import org.bukkit.Material;
 import org.bukkit.Statistic;
 import org.bukkit.entity.EntityType;
 
-final class PlayerStatistics {
+public final class PlayerStatistics {
     private static final Map<Statistic, String> kRenamed = Map.ofEntries(
         Map.entry(Statistic.PLAY_ONE_MINUTE, "play_time"),
         Map.entry(Statistic.CAKE_SLICES_EATEN, "eat_cake_slice"),
@@ -76,5 +76,43 @@ final class PlayerStatistics {
             throw new IllegalArgumentException("Invalid entity type for this statistic");
         }
         return typed(statistic) + entity.getKey();
+    }
+
+    /** The statistic a stored key stands for plus its material or entity, or null for a key Bukkit has no name for. */
+    public static Object[] parse(String key) {
+        int slash = key.indexOf('/');
+        if (slash < 0) {
+            return null;
+        }
+        String group = key.substring(0, slash);
+        String name = key.substring(slash + 1);
+        if (group.equals("minecraft:custom")) {
+            for (Statistic statistic : Statistic.values()) {
+                if (statistic.getType() == Statistic.Type.UNTYPED && untyped(statistic).equals(key)) {
+                    return new Object[] {statistic};
+                }
+            }
+            return null;
+        }
+        Statistic statistic = switch (group) {
+            case "minecraft:mined" -> Statistic.MINE_BLOCK;
+            case "minecraft:used" -> Statistic.USE_ITEM;
+            case "minecraft:broken" -> Statistic.BREAK_ITEM;
+            case "minecraft:crafted" -> Statistic.CRAFT_ITEM;
+            case "minecraft:picked_up" -> Statistic.PICKUP;
+            case "minecraft:dropped" -> Statistic.DROP;
+            case "minecraft:killed" -> Statistic.KILL_ENTITY;
+            case "minecraft:killed_by" -> Statistic.ENTITY_KILLED_BY;
+            default -> null;
+        };
+        if (statistic == null) {
+            return null;
+        }
+        if (statistic.getType() == Statistic.Type.ENTITY) {
+            EntityType type = org.bukkit.Registry.ENTITY_TYPE.get(org.bukkit.NamespacedKey.fromString(name));
+            return type == null ? null : new Object[] {statistic, type};
+        }
+        Material material = Material.matchMaterial(name);
+        return material == null ? null : new Object[] {statistic, material};
     }
 }
