@@ -79,6 +79,53 @@ public final class BasaltItemType extends ItemTypeTypedBase {
     }
 
     @Override
+    public boolean hasDefaultData(io.papermc.paper.datacomponent.DataComponentType type) {
+        return org.basaltmc.bukkit.item.ItemDefaults.of(key.toString()).containsKey(type.getKey().toString());
+    }
+
+    @Override
+    public Object getDefaultData(io.papermc.paper.datacomponent.DataComponentType.Valued type) {
+        Object stored = org.basaltmc.bukkit.item.ItemDefaults.of(key.toString()).get(type.getKey().toString());
+        return stored == null ? null : org.basaltmc.bukkit.datacomponent.ComponentOps.decodeDefault(type, stored);
+    }
+
+    @Override
+    public java.util.Set getDefaultDataTypes() {
+        java.util.Set<io.papermc.paper.datacomponent.DataComponentType> out = new java.util.LinkedHashSet<>();
+        for (String name : org.basaltmc.bukkit.item.ItemDefaults.of(key.toString()).keySet()) {
+            io.papermc.paper.datacomponent.DataComponentType found =
+                org.basaltmc.bukkit.datacomponent.ComponentType.of(name);
+            if (found != null) {
+                out.add(found);
+            }
+        }
+        return out;
+    }
+
+    @Override
+    public com.google.common.collect.Multimap getDefaultAttributeModifiers() {
+        return org.basaltmc.bukkit.item.MetaAttributes.all(org.basaltmc.bukkit.item.ItemDefaults.of(key.toString()),
+            entry -> true);
+    }
+
+    @Override
+    public com.google.common.collect.Multimap getDefaultAttributeModifiers(org.bukkit.inventory.EquipmentSlot slot) {
+        return org.basaltmc.bukkit.item.MetaAttributes.forSlot(org.basaltmc.bukkit.item.ItemDefaults.of(key.toString()),
+            slot);
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemRarity getItemRarity() {
+        return org.bukkit.inventory.ItemRarity.valueOf(org.basaltmc.bukkit.item.ItemDefaults.rarity(key.toString())
+            .toUpperCase(java.util.Locale.ROOT));
+    }
+
+    @Override
+    public float getCompostChance() {
+        return ItemData.of(key.toString()).composterChance() / 100.0F;
+    }
+
+    @Override
     public int getMaxStackSize() {
         return ItemData.of(key.toString()).maxStackSize();
     }

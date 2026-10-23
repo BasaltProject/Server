@@ -77,6 +77,9 @@ final class Codecs {
             case "dye", "base_color":
                 return Convert.dye(String.valueOf(nbt));
             default:
+                if (Specs.has(name)) {
+                    return Specs.decode(name, nbt);
+                }
                 throw org.basaltmc.bukkit.Unsupported.hit("data component " + name);
         }
     }
@@ -84,6 +87,9 @@ final class Codecs {
     static Object encode(String name, Object value) {
         if (value instanceof PaperValues.Stored stored) {
             return stored.nbt();
+        }
+        if (value instanceof Dyn.Value dyn) {
+            return dyn.nbt();
         }
         if (value instanceof Integer || value instanceof Long) {
             return ((Number) value).intValue();
@@ -102,6 +108,10 @@ final class Codecs {
         }
         if (value instanceof DyeColor color) {
             return Convert.dye(color);
+        }
+        Object other = Specs.encode(name, value);
+        if (other != null) {
+            return other;
         }
         if (value instanceof List<?> || value instanceof Map<?, ?>) {
             return value;

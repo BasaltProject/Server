@@ -2,14 +2,12 @@ package org.basaltmc.bukkit.datacomponent;
 
 import io.papermc.paper.datacomponent.DataComponentBuilder;
 import io.papermc.paper.datacomponent.DataComponentType;
-import io.papermc.paper.inventory.ItemRarity;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
-import net.kyori.adventure.text.Component;
 import org.basaltmc.bukkit.Items;
-import org.basaltmc.bukkit.item.ItemData;
+import org.basaltmc.bukkit.item.ItemDefaults;
 import org.basaltmc.bukkit.item.Nbt;
 import org.bukkit.inventory.ItemStack;
 
@@ -26,42 +24,12 @@ public final class ComponentOps {
     }
 
     private static boolean hasDefault(ItemStack stack, String name) {
-        ItemData data = ItemData.of(stack.getType().getKey().toString());
-        switch (name) {
-            case "max_stack_size", "repair_cost", "lore", "enchantments", "rarity", "item_name", "item_model",
-                "tooltip_display":
-                return true;
-            case "max_damage", "damage":
-                return data.maxDamage() > 0;
-            default:
-                return false;
-        }
+        return ItemDefaults.of(stack.getType().getKey().toString()).containsKey("minecraft:" + name);
     }
 
     private static Object defaultOf(ItemStack stack, String name) {
-        String id = stack.getType().getKey().toString();
-        switch (name) {
-            case "max_stack_size":
-                return ItemData.of(id).maxStackSize();
-            case "max_damage":
-                return ItemData.of(id).maxDamage();
-            case "damage", "repair_cost":
-                return 0;
-            case "lore":
-                return new PaperValues.Lore(java.util.List.of());
-            case "enchantments":
-                return new PaperValues.Enchants(Map.of());
-            case "rarity":
-                return ItemRarity.COMMON;
-            case "item_name":
-                return Component.translatable(stack.getType().translationKey());
-            case "item_model":
-                return net.kyori.adventure.key.Key.key(id);
-            case "tooltip_display":
-                return new PaperValues.Tooltip(false, Set.of());
-            default:
-                return null;
-        }
+        Object stored = ItemDefaults.of(stack.getType().getKey().toString()).get("minecraft:" + name);
+        return stored == null ? null : Codecs.decode(name, Nbt.copy(stored));
     }
 
     private static boolean removed(Map<String, Object> components, String full) {
@@ -79,6 +47,11 @@ public final class ComponentOps {
             return (T) defaultOf(stack, name(type));
         }
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T decodeDefault(DataComponentType.Valued<T> type, Object stored) {
+        return (T) Codecs.decode(name(type), Nbt.copy(stored));
     }
 
     public static boolean has(ItemStack stack, DataComponentType type) {

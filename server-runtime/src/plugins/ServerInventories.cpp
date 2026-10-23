@@ -1,8 +1,10 @@
 #include <basalt/server/registry/ItemFood.hpp>
+#include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
 #include <basalt/server/runtime/plugins/PluginRecipeNbt.hpp>
 #include <basalt/server/runtime/plugins/ServerInventories.hpp>
+#include <basalt/server/runtime/world/Composters.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/PotionEffects.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
@@ -67,6 +69,29 @@ std::optional<std::vector<std::uint8_t>> ServerInventories::itemData(std::string
         stats.putDouble("attack_damage", weapon->attackDamage);
         stats.putDouble("attack_speed", weapon->attackSpeed);
         data.set("weapon", NbtTag::ofCompound(std::move(stats)));
+    }
+    if (const std::span<const reg::itemTools::Rule> rules = reg::itemTools::rulesFor(*item); !rules.empty()) {
+        NbtCompound tool;
+        std::vector<NbtTag> entries;
+        bool sword = false;
+        for (const reg::itemTools::Rule& rule : rules) {
+            NbtCompound entry;
+            entry.putString("blocks", "#" + std::string{rule.blockTag});
+            if (rule.speed.has_value()) {
+                entry.putFloat("speed", *rule.speed);
+            }
+            entry.putBoolean("correct_for_drops", rule.correctForDrops);
+            sword = sword || rule.blockTag == "minecraft:sword_instantly_mines";
+            entries.push_back(NbtTag::ofCompound(std::move(entry)));
+        }
+        tool.set("rules", NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, std::move(entries)}));
+        // parity: `Items.swordTool` and the mace cost two durability a block and cannot dig in creative.
+        tool.putInt("damage_per_block", sword ? 2 : 1);
+        tool.putBoolean("can_destroy_blocks_in_creative", !sword);
+        data.set("tool", NbtTag::ofCompound(std::move(tool)));
+    }
+    if (const std::optional<std::int32_t> chance = world::composters::chanceOf(*item); chance.has_value()) {
+        data.putInt("composter_chance", *chance);
     }
     return encoded(std::move(data));
 }

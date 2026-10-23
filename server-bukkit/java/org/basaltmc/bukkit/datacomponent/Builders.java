@@ -57,6 +57,14 @@ public final class Builders {
         return new PaperValues.DamageResistantValue(types);
     }
 
+    public static Object damageResistantNbt(RegistryKeySet<DamageType> types) {
+        return new PaperValues.DamageResistantValue(types).nbt();
+    }
+
+    public static DamageResistant damageResistantOf(Object stored) {
+        return PaperValues.DamageResistantValue.of(stored);
+    }
+
     public static Enchantable enchantable(int level) {
         return new PaperValues.EnchantableValue(level);
     }

@@ -602,6 +602,10 @@ final class PaperValues {
         @Override
         public Object nbt() {
             Map<String, Object> out = Nbt.compound();
+            if (types instanceof io.papermc.paper.registry.tag.Tag<DamageType> tag) {
+                out.put("types", "#" + tag.tagKey().key().asString());
+                return out;
+            }
             List<Object> ids = new ArrayList<>();
             for (var key : types.values()) {
                 ids.add(key.key().asString());
@@ -614,6 +618,11 @@ final class PaperValues {
             Map<String, Object> map = Nbt.map(nbt);
             List<String> ids = new ArrayList<>();
             Object types = map == null ? null : map.get("types");
+            if (types instanceof String single && single.startsWith("#")) {
+                var tagKey = RegistryKey.DAMAGE_TYPE.tagKey(Key.key(single.substring(1)));
+                return new DamageResistantValue(new org.basaltmc.bukkit.BasaltRegistryTag<>(RegistryKey.DAMAGE_TYPE,
+                    tagKey, List.of()));
+            }
             if (types instanceof List<?> list) {
                 for (Object id : list) {
                     ids.add(String.valueOf(id));
