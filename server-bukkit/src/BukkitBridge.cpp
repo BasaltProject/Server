@@ -130,13 +130,8 @@ std::expected<void, std::string> BukkitBridge::boot() {
     } else {
         env->ExceptionClear();
     }
-    if (jclass inventoryNatives = env->FindClass("org/basaltmc/bukkit/InventoryNatives"); inventoryNatives != nullptr) {
-        registerInventoryNatives(env, inventoryNatives);
-    } else {
-        env->ExceptionClear();
-    }
-    if (jclass entityNatives = env->FindClass("org/basaltmc/bukkit/EntityNatives"); entityNatives != nullptr) {
-        registerEntityNatives(env, entityNatives);
+    if (jclass miscNatives = env->FindClass("org/basaltmc/bukkit/MiscNatives"); miscNatives != nullptr) {
+        registerMiscNatives(env, miscNatives);
     } else {
         env->ExceptionClear();
     }
@@ -149,8 +144,8 @@ std::expected<void, std::string> BukkitBridge::boot() {
         env->GetStaticMethodID(runtime_, "command", "(Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Z");
     channelMethod_ = env->GetStaticMethodID(runtime_, "channelMessage", "(Ljava/lang/String;Ljava/lang/String;[B)V");
     listMethod_ = env->GetStaticMethodID(runtime_, "pluginList", "()[Ljava/lang/String;");
-    if (channelMethod_ == nullptr || enableMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr ||
-        taskMethod_ == nullptr || eventMethod_ == nullptr || commandMethod_ == nullptr || listMethod_ == nullptr) {
+    if (channelMethod_ == nullptr || enableMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr || taskMethod_ == nullptr ||
+        eventMethod_ == nullptr || commandMethod_ == nullptr || listMethod_ == nullptr) {
         reportJavaFailure(env, "resolving BukkitRuntime entry points");
         return std::unexpected(std::string{"BukkitRuntime entry points not found"});
     }
@@ -200,8 +195,8 @@ std::vector<BukkitHost::PluginState> BukkitBridge::javaPlugins() {
         if (first == std::string::npos || second == std::string::npos) {
             continue;
         }
-        found.push_back(
-            {line.substr(0, first), line.substr(first + 1, second - first - 1), line.substr(second + 1) == "1"});
+        found.push_back({line.substr(0, first), line.substr(first + 1, second - first - 1),
+                         line.substr(second + 1) == "1"});
     }
     env->DeleteLocalRef(rows);
     return found;

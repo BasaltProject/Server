@@ -79,4 +79,31 @@ void PluginDataRepository::purge(std::string_view plugin) {
     statement.bind(1, plugin);
     statement.execute();
 }
+
+std::optional<std::vector<std::uint8_t>> PluginDataRepository::holder(std::string_view kind, std::string_view id) {
+    wire::sql::Statement statement = database_->prepare("SELECT data FROM holder_data WHERE kind = ? AND id = ?");
+    statement.bind(1, kind);
+    statement.bind(2, id);
+    if (!statement.step()) {
+        return std::nullopt;
+    }
+    return statement.blob(0);
+}
+
+void PluginDataRepository::setHolder(std::string_view kind, std::string_view id, std::span<const std::uint8_t> data) {
+    if (data.empty()) {
+        wire::sql::Statement statement = database_->prepare("DELETE FROM holder_data WHERE kind = ? AND id = ?");
+        statement.bind(1, kind);
+        statement.bind(2, id);
+        statement.execute();
+        return;
+    }
+    wire::sql::Statement statement =
+        database_->prepare("INSERT OR REPLACE INTO holder_data(kind, id, data) VALUES (?, ?, ?)");
+    statement.bind(1, kind);
+    statement.bind(2, id);
+    statement.bind(3, data);
+    statement.execute();
+}
+
 } // namespace basalt::server::storage

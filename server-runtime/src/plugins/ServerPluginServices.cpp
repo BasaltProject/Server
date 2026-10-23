@@ -106,8 +106,7 @@ public:
         return false;
     }
 
-    [[nodiscard]] std::shared_ptr<server::plugins::PacketEndpoint>
-    endpointOf(server::plugins::PluginPlayerRef&) override {
+    [[nodiscard]] std::shared_ptr<server::plugins::PacketEndpoint> endpointOf(server::plugins::PluginPlayerRef&) override {
         return nullptr;
     }
 };
@@ -363,9 +362,7 @@ std::optional<server::plugins::PacketScope> NamedPackets::scopeOf(std::string_vi
     return packetNames::scopeOf(name);
 }
 
-std::string NamedPackets::nameOf(const server::plugins::PacketAddress& address) const {
-    return packetNames::of(address);
-}
+std::string NamedPackets::nameOf(const server::plugins::PacketAddress& address) const { return packetNames::of(address); }
 
 std::vector<std::string> NamedPackets::names() const { return packetNames::all(); }
 
@@ -442,8 +439,32 @@ server::plugins::PluginChannelSender& ServerPluginServices::channels() {
     return parts_.channels == nullptr ? noChannels() : *parts_.channels;
 }
 
-server::plugins::PluginInventories& ServerPluginServices::inventories() {
-    return parts_.inventories == nullptr ? PluginServices::inventories() : *parts_.inventories;
+server::plugins::PluginAccess& ServerPluginServices::access() {
+    return parts_.access == nullptr ? server::plugins::PluginAccess::unavailable() : *parts_.access;
+}
+
+server::plugins::PluginScoreboards& ServerPluginServices::scoreboards() {
+    return parts_.scoreboards == nullptr ? server::plugins::PluginScoreboards::unavailable() : *parts_.scoreboards;
+}
+
+server::plugins::PluginBossBars& ServerPluginServices::bossBars() {
+    return parts_.bossBars == nullptr ? server::plugins::PluginBossBars::unavailable() : *parts_.bossBars;
+}
+
+server::plugins::PluginAdvancements& ServerPluginServices::advancements() {
+    return parts_.advancements == nullptr ? server::plugins::PluginAdvancements::unavailable() : *parts_.advancements;
+}
+
+server::plugins::PluginServerControl& ServerPluginServices::serverControl() {
+    return parts_.control == nullptr ? server::plugins::PluginServerControl::unavailable() : *parts_.control;
+}
+
+server::plugins::PluginDatapacks& ServerPluginServices::datapacks() {
+    return parts_.datapacks == nullptr ? server::plugins::PluginDatapacks::unavailable() : *parts_.datapacks;
+}
+
+server::plugins::PluginMaps& ServerPluginServices::maps() {
+    return parts_.maps == nullptr ? server::plugins::PluginMaps::unavailable() : *parts_.maps;
 }
 
 bool ServerPluginServices::at(std::string_view world, double x, double z, std::function<void()> task) {

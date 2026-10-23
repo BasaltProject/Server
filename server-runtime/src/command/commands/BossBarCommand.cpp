@@ -62,6 +62,9 @@ wire::nbt::NbtCompound BossBarRegistry::encode() const {
         entry.putInt("Max", bar.max);
         entry.putString("Color", std::string{bossBarColorName(bar.color)});
         entry.putString("Overlay", std::string{play::bossBarOverlayName(bar.overlay)});
+        entry.putBoolean("DarkenScreen", bar.darkenScreen);
+        entry.putBoolean("PlayBossMusic", bar.playMusic);
+        entry.putBoolean("CreateWorldFog", bar.createFog);
         std::vector<wire::nbt::NbtTag> names;
         for (const std::string& name : bar.players) {
             names.push_back(wire::nbt::NbtTag::ofString(name));
@@ -88,6 +91,9 @@ void BossBarRegistry::restore(const wire::nbt::NbtCompound& packed) {
         bar.visible = entry->getBoolean("Visible", false);
         bar.value = entry->getInt("Value", 0);
         bar.max = entry->getInt("Max", 100);
+        bar.darkenScreen = entry->getBoolean("DarkenScreen", false);
+        bar.playMusic = entry->getBoolean("PlayBossMusic", false);
+        bar.createFog = entry->getBoolean("CreateWorldFog", false);
         for (const play::BossBarColor color :
              {play::BossBarColor::Pink, play::BossBarColor::Blue, play::BossBarColor::Red, play::BossBarColor::Green,
               play::BossBarColor::Yellow, play::BossBarColor::Purple, play::BossBarColor::White}) {
@@ -118,7 +124,13 @@ float CustomBossBar::progress() const {
 }
 
 play::BossEventPacket::Add CustomBossBar::addOperation() const {
-    return play::BossEventPacket::Add{.name = name, .progress = progress(), .color = color, .overlay = overlay};
+    return play::BossEventPacket::Add{.name = name,
+                                      .progress = progress(),
+                                      .color = color,
+                                      .overlay = overlay,
+                                      .darkenScreen = darkenScreen,
+                                      .playMusic = playMusic,
+                                      .createWorldFog = createFog};
 }
 
 std::vector<CustomBossBar*> BossBarRegistry::all() {

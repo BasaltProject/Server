@@ -12,13 +12,18 @@
 #include <basalt/server/storage/AccessRepository.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
+#include <basalt/wire/protocol/ProtocolBuffer.hpp>
+#include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/protocol/handshake/HandshakePacket.hpp>
 #include <basalt/wire/protocol/login/LoginPackets.hpp>
 #include <basalt/wire/protocol/login/LoginPluginPackets.hpp>
 #include <basalt/wire/protocol/status/StatusPackets.hpp>
+#include <basalt/wire/text/ComponentJson.hpp>
+#include <basalt/wire/text/ComponentNbt.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 
 #include <algorithm>
@@ -383,6 +388,39 @@ void ClientSession::finishLogin(Uuid id, const std::string& name,
     }
 }
 
+void ClientSession::sendServerLinks(const std::vector<server::plugins::PluginServerLink>& links) {
+    static constexpr std::array<std::string_view, 10> kKinds{
+        "bug_report", "community_guidelines", "support", "status", "feedback", "community", "website", "forums",
+        "news",       "announcements"};
+    std::vector<const server::plugins::PluginServerLink*> shown;
+    for (const server::plugins::PluginServerLink& link : links) {
+        if (link.url.starts_with("http://") || link.url.starts_with("https://")) {
+            shown.push_back(&link);
+        }
+    }
+    if (shown.empty()) {
+        return;
+    }
+    sendCompressed(wire::protocol::configuration::ServerLinksPacket::kId, [&shown](wire::io::ByteBuffer& buffer) {
+        wire::protocol::varInt::write(buffer, static_cast<std::int32_t>(shown.size()));
+        for (const server::plugins::PluginServerLink* link : shown) {
+            const auto kind = std::ranges::find(kKinds, link->kind);
+            if (kind != kKinds.end()) {
+                wire::protocol::writeBoolean(buffer, true);
+                wire::protocol::varInt::write(buffer, static_cast<std::int32_t>(kind - kKinds.begin()));
+            } else {
+                wire::protocol::writeBoolean(buffer, false);
+                const auto parsed = wire::common::parseJson(link->label);
+                wire::protocol::writeAnonymousNbt(
+                    buffer, wire::text::componentNbt::serialize(parsed.has_value()
+                                                                    ? wire::text::componentJson::deserialize(*parsed)
+                                                                    : wire::text::Component::text(link->label)));
+            }
+            wire::protocol::writeString(buffer, link->url);
+        }
+    });
+}
+
 void ClientSession::enterConfiguration() {
     state_ = wire::protocol::ProtocolState::Configuration;
     // parity: `ServerConfigurationPacketListenerImpl`.
@@ -390,10 +428,12 @@ void ClientSession::enterConfiguration() {
         wire::protocol::configuration::BrandPacket{.brand = "Basalt " + std::string{buildInfo::kMinecraftVersion}}
             .write(buffer);
     });
-    // parity: `ServerLinks`, which holds the bug report link alone; `Util.parseAndValidateUntrustedUri`.
+    // parity: `ServerLinks`; `Util.parseAndValidateUntrustedUri`.
     const bool serverLinksKnown = handshake_.has_value() && handshake_->protocolVersion == buildInfo::kProtocolVersion;
-    if (serverLinksKnown &&
-        (options_.bugReportLink.starts_with("http://") || options_.bugReportLink.starts_with("https://"))) {
+    if (serverLinksKnown && options_.serverLinks) {
+        sendServerLinks(options_.serverLinks());
+    } else if (serverLinksKnown &&
+               (options_.bugReportLink.starts_with("http://") || options_.bugReportLink.starts_with("https://"))) {
         sendCompressed(wire::protocol::configuration::ServerLinksPacket::kId, [this](wire::io::ByteBuffer& buffer) {
             wire::protocol::configuration::ServerLinksPacket{
                 .links = {{wire::protocol::configuration::kBugReportLinkType, options_.bugReportLink}}}

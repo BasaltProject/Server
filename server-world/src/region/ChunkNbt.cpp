@@ -376,6 +376,9 @@ NbtCompound write(const Chunk& chunk) {
     if (!chunk.structures().empty()) {
         tag.set("structures", NbtTag::ofCompound(encodeStructures(chunk.structures())));
     }
+    if (!chunk.pluginData().empty()) {
+        tag.set(kPluginDataKey, NbtTag::ofCompound(chunk.pluginData()));
+    }
     return tag;
 }
 
@@ -757,6 +760,9 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
     }
     chunk.setSavedEntities(std::move(entities));
     decodeStructures(tag.getCompound("structures"), chunk.structures());
+    if (const NbtCompound* pluginData = tag.getCompound(kPluginDataKey); pluginData != nullptr) {
+        chunk.setPluginData(*pluginData);
+    }
     // parity: `PostProcessing`.
     if (const NbtList* post = tag.getList("PostProcessing"); post != nullptr) {
         for (std::size_t index = 0; index < post->size(); ++index) {

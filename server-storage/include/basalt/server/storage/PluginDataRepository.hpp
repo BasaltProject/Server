@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -28,6 +29,10 @@ public:
     [[nodiscard]] std::map<std::string, std::int64_t, std::less<>> namespaces();
 
     void purge(std::string_view plugin);
+
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> holder(std::string_view kind, std::string_view id);
+
+    void setHolder(std::string_view kind, std::string_view id, std::span<const std::uint8_t> data);
 
 private:
     wire::sql::Database* database_;

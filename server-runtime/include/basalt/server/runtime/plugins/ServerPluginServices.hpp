@@ -138,7 +138,13 @@ public:
         server::plugins::PluginMenus* menus = nullptr;
         server::plugins::PluginPacketSender* packets = nullptr;
         server::plugins::PluginChannelSender* channels = nullptr;
-        server::plugins::PluginInventories* inventories = nullptr;
+        server::plugins::PluginAccess* access = nullptr;
+        server::plugins::PluginScoreboards* scoreboards = nullptr;
+        server::plugins::PluginBossBars* bossBars = nullptr;
+        server::plugins::PluginAdvancements* advancements = nullptr;
+        server::plugins::PluginServerControl* control = nullptr;
+        server::plugins::PluginDatapacks* datapacks = nullptr;
+        server::plugins::PluginMaps* maps = nullptr;
         std::function<sched::Owner*(const std::string& world, double x, double z)> ownerAt;
     };
 
@@ -159,7 +165,13 @@ public:
     [[nodiscard]] server::plugins::PluginMenus& menus() override;
     [[nodiscard]] server::plugins::PluginPacketSender& packets() override;
     [[nodiscard]] server::plugins::PluginChannelSender& channels() override;
-    [[nodiscard]] server::plugins::PluginInventories& inventories() override;
+    [[nodiscard]] server::plugins::PluginAccess& access() override;
+    [[nodiscard]] server::plugins::PluginScoreboards& scoreboards() override;
+    [[nodiscard]] server::plugins::PluginBossBars& bossBars() override;
+    [[nodiscard]] server::plugins::PluginAdvancements& advancements() override;
+    [[nodiscard]] server::plugins::PluginServerControl& serverControl() override;
+    [[nodiscard]] server::plugins::PluginDatapacks& datapacks() override;
+    [[nodiscard]] server::plugins::PluginMaps& maps() override;
 
     bool at(std::string_view world, double x, double z, std::function<void()> task) override;
 

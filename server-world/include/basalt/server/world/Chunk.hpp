@@ -161,6 +161,13 @@ public:
 
     [[nodiscard]] std::span<const wire::nbt::NbtCompound> savedEntities() const noexcept { return savedEntities_; }
 
+    [[nodiscard]] const wire::nbt::NbtCompound& pluginData() const noexcept { return pluginData_; }
+
+    void setPluginData(wire::nbt::NbtCompound data) {
+        pluginData_ = std::move(data);
+        dirty_ = true;
+    }
+
     /// Read back from storage already finished, so its blocks are final and nothing is settled over them.
     [[nodiscard]] bool loadedComplete() const noexcept { return loadedComplete_; }
 
@@ -322,6 +329,7 @@ private:
     std::vector<std::int32_t> blockEntityOrder_;
     std::vector<ChunkGeneratedEntity> generatedEntities_;
     std::vector<wire::nbt::NbtCompound> savedEntities_;
+    wire::nbt::NbtCompound pluginData_;
     bool loadedComplete_ = false;
     bool needsRetrogen_ = false;
     std::shared_ptr<blending::BlendingData> blending_;

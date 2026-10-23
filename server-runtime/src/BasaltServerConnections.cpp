@@ -107,6 +107,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.enforceSecureProfile = config_->enforceSecureProfile && options_.sessionService != nullptr &&
                                    options_.servicesKeys != nullptr && options_.servicesKeys->canValidateProfileKeys();
     options.bugReportLink = config_->bugReportLink;
+    options.serverLinks = [this] { return miscServices_.control->links(); };
     options.resourcePack = resourcePackOf(*config_);
     options.forwarding = config_->forwarding;
     options.playerRegistry = &playerRegistry_;
@@ -317,7 +318,10 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
         return !event->cancelled();
     };
 
-    hooks.joined = [bus](const player::PlayerSession& player) {
+    hooks.joined = [this, bus](const player::PlayerSession& player) {
+        if (miscServices_.scoreboards != nullptr) {
+            miscServices_.scoreboards->joined(player);
+        }
         static_cast<void>(
             server::plugins::emit(bus, &server::plugins::pluginEventTypes::playerJoin(),
                                   [&player](server::plugins::PluginEvent& filled) { fillPlayer(filled, player); }));

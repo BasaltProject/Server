@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/plugins/PluginPackets.hpp>
+#include <basalt/server/plugins/PluginServerControl.hpp>
 #include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
 #include <basalt/server/runtime/bedrock/BedrockCarry.hpp>
@@ -194,6 +195,8 @@ public:
         std::function<std::vector<std::string>()> enabledFeatures;
         /// parity: `DedicatedServer.createServerLinks`; empty when unset or not http(s).
         std::string bugReportLink;
+        /// The links clients list in their pause menu, when something other than `bugReportLink` decides them.
+        std::function<std::vector<server::plugins::PluginServerLink>()> serverLinks;
 
         struct ResourcePack {
             wire::common::Uuid id;
@@ -528,6 +531,8 @@ private:
     void sendStonecutterRecipes();
 
     void seenAdvancements(wire::io::ByteBuffer& body);
+
+    void sendServerLinks(const std::vector<server::plugins::PluginServerLink>& links);
 
     [[nodiscard]] player::PlayerConnection playerConnection();
 

@@ -312,7 +312,44 @@ public:
         if (player == nullptr || !hooks_.groups) {
             return false;
         }
-        return hooks_.groups().resolve(player->group, permission);
+        return player->permissionGrant(permission).value_or(hooks_.groups().resolve(player->group, permission));
+    }
+
+    void setPermission(std::string_view source, std::string_view node, std::optional<bool> granted) override {
+        player::PlayerSession* player = session();
+        if (player == nullptr) {
+            return;
+        }
+        auto& held = player->permissionGrants[std::string{source}];
+        if (granted.has_value()) {
+            held.insert_or_assign(std::string{node}, *granted);
+        } else {
+            held.erase(std::string{node});
+        }
+        resendCommands(*player);
+    }
+
+    void setPermissions(std::string_view source, const std::vector<std::pair<std::string, bool>>& nodes) override {
+        player::PlayerSession* player = session();
+        if (player == nullptr) {
+            return;
+        }
+        std::map<std::string, bool, std::less<>> next;
+        for (const auto& [node, granted] : nodes) {
+            next.insert_or_assign(node, granted);
+        }
+        auto& held = player->permissionGrants[std::string{source}];
+        if (held == next) {
+            return;
+        }
+        held = std::move(next);
+        resendCommands(*player);
+    }
+
+    static void resendCommands(player::PlayerSession& player) {
+        if (player.connection().sendCommandTree) {
+            player.connection().sendCommandTree();
+        }
     }
 
     bool give(std::string_view item, std::int32_t count) override {

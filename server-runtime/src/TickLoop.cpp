@@ -103,6 +103,8 @@ bool TickLoop::step(std::int32_t ticks) {
     return true;
 }
 
+bool TickLoop::stopStepping() { return stepsOwed_.exchange(0, std::memory_order_relaxed) > 0; }
+
 void TickLoop::sprint(std::int32_t ticks) { sprintTicksLeft_.store(ticks, std::memory_order_relaxed); }
 
 bool TickLoop::stopSprinting() {

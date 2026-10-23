@@ -19,6 +19,9 @@ struct CustomBossBar {
     std::int32_t value = 0;
     std::int32_t max = 100;
     bool visible = true;
+    bool darkenScreen = false;
+    bool playMusic = false;
+    bool createFog = false;
     std::set<std::string> players;
 
     [[nodiscard]] float progress() const;

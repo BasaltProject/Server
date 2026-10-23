@@ -523,6 +523,26 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         std::make_unique<plugins::ServerInventories>([this]() -> VanillaGameData& { return vanillaData_; });
     pluginPackets_ = std::make_unique<plugins::SessionPackets>(playerRegistry_);
     pluginChannels_ = std::make_unique<plugins::SessionChannels>(playerRegistry_);
+    miscServices_.access = std::make_unique<plugins::ServerAccess>(plugins::ServerAccess::Hooks{
+        .store = [this] { return playerStore_.get(); },
+        .groups = [this]() -> const config::GroupsConfig& { return live_->current()->groups; },
+        .sessions = sessions,
+        .whitelistEnforced = [this] { return whitelistEnforced_; },
+        .setWhitelistEnforced = [this](bool value) { whitelistEnforced_ = value; }});
+    miscServices_.scoreboards = std::make_unique<plugins::ServerScoreboards>(
+        plugins::ServerScoreboards::Hooks{.sessions = sessions, .main = &scoreboard_, .mainTeams = &teams_});
+    miscServices_.bossBars = std::make_unique<plugins::ServerBossBars>(
+        plugins::ServerBossBars::Hooks{.sessions = sessions, .registry = &bossBars_});
+    miscServices_.advancements = std::make_unique<plugins::ServerAdvancements>(
+        plugins::ServerAdvancements::Hooks{.advancements = [this] { return &vanillaData_.advancements; },
+                                           .progress = [this] { return playerProgress_.get(); },
+                                           .triggers = [this] { return advancementTriggers_.get(); },
+                                           .sessions = sessions});
+    miscServices_.datapacks = std::make_unique<plugins::ServerDatapacks>([this] { return options_.datapacks; });
+    miscServices_.maps = std::make_unique<plugins::ServerMaps>(
+        plugins::ServerMaps::Hooks{.storage = &mapStorage_, .sessions = sessions, .worldFor = model.worldFor});
+    miscServices_.control = std::make_unique<plugins::ServerControl>(plugins::ServerControl::Hooks{
+        .tickLoop = [this] { return tickLoop_.get(); }, .bugReportLink = config.bugReportLink});
 
     plugins::ServerPluginServices::Parts parts;
     parts.players = pluginPlayers_.get();
@@ -533,6 +553,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     parts.inventories = pluginInventories_.get();
     parts.packets = pluginPackets_.get();
     parts.channels = pluginChannels_.get();
+    parts.access = miscServices_.access.get();
+    parts.scoreboards = miscServices_.scoreboards.get();
+    parts.bossBars = miscServices_.bossBars.get();
+    parts.advancements = miscServices_.advancements.get();
+    parts.control = miscServices_.control.get();
+    parts.datapacks = miscServices_.datapacks.get();
+    parts.maps = miscServices_.maps.get();
     parts.ownerAt = [this](const std::string& name, double x, double z) -> sched::Owner* {
         const std::map<std::string, world::LoadedWorld*> loaded = worldRegistry_->worlds();
         const auto found = loaded.find(name);

@@ -74,6 +74,11 @@ public:
 
     void sprint(std::int32_t ticks);
 
+    [[nodiscard]] std::int32_t stepsOwed() const noexcept { return stepsOwed_.load(std::memory_order_relaxed); }
+
+    /// Answers false when no step was owed.
+    bool stopStepping();
+
     bool stopSprinting();
 
     void start();

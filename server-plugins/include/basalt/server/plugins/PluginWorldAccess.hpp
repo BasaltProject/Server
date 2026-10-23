@@ -97,6 +97,19 @@ public:
 
     [[nodiscard]] virtual bool may(std::string_view permission) const = 0;
 
+    /// What `source` (a plugin) grants or denies this player over their group; nothing withdraws it.
+    virtual void setPermission(std::string_view source, std::string_view node, std::optional<bool> granted) {
+        static_cast<void>(source);
+        static_cast<void>(node);
+        static_cast<void>(granted);
+    }
+
+    /// Replaces everything `source` grants or denies this player with these nodes.
+    virtual void setPermissions(std::string_view source, const std::vector<std::pair<std::string, bool>>& nodes) {
+        static_cast<void>(source);
+        static_cast<void>(nodes);
+    }
+
     virtual bool give(std::string_view item, std::int32_t count) = 0;
 
     [[nodiscard]] virtual std::optional<std::string> heldItem() const = 0;
@@ -696,6 +709,59 @@ public:
         static_cast<void>(nbt);
         static_cast<void>(cause);
         return -1;
+    }
+
+    /// What plugins keep on the world, as a named NBT compound (empty compound when nothing is kept).
+    [[nodiscard]] virtual std::vector<std::uint8_t> pluginData() { return {}; }
+
+    virtual bool setPluginData(std::span<const std::uint8_t> nbt) {
+        static_cast<void>(nbt);
+        return false;
+    }
+
+    /// What plugins keep on a loaded chunk, saved with it; nothing when the chunk is not loaded.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> chunkPluginData(std::int32_t chunkX,
+                                                                                   std::int32_t chunkZ) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        return std::nullopt;
+    }
+
+    virtual bool setChunkPluginData(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::uint8_t> nbt) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        static_cast<void>(nbt);
+        return false;
+    }
+
+    /// What plugins keep on a block entity, saved with it; nothing when the position holds none.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> blockEntityPluginData(std::int32_t x, std::int32_t y,
+                                                                                         std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return std::nullopt;
+    }
+
+    virtual bool setBlockEntityPluginData(std::int32_t x, std::int32_t y, std::int32_t z,
+                                          std::span<const std::uint8_t> nbt) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(nbt);
+        return false;
+    }
+
+    /// What plugins keep on an entity, saved with it; nothing when the entity is gone.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> entityPluginData(std::int32_t entityId) {
+        static_cast<void>(entityId);
+        return std::nullopt;
+    }
+
+    virtual bool setEntityPluginData(std::int32_t entityId, std::span<const std::uint8_t> nbt) {
+        static_cast<void>(entityId);
+        static_cast<void>(nbt);
+        return false;
     }
 
     /// Takes the entity with this uuid out of the world; false when no live entity has it.

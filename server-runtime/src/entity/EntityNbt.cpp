@@ -499,6 +499,9 @@ NbtCompound encode(const ServerEntity& entity) {
     if (entity.deathLootTableSeed != 0) {
         tag.putLong("DeathLootTableSeed", entity.deathLootTableSeed);
     }
+    if (!entity.pluginData.empty()) {
+        tag.set("PublicBukkitValues", NbtTag::ofCompound(entity.pluginData));
+    }
     return tag;
 }
 
@@ -700,6 +703,9 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
         entity->deathLootTable = std::string{table};
     }
     entity->deathLootTableSeed = tag.getLong("DeathLootTableSeed");
+    if (const NbtCompound* pluginData = tag.getCompound("PublicBukkitValues"); pluginData != nullptr) {
+        entity->pluginData = *pluginData;
+    }
     if (const NbtList* tags = tag.getList("Tags"); tags != nullptr) {
         for (const NbtTag& element : *tags) {
             if (const std::string* name = element.get<std::string>(); name != nullptr) {

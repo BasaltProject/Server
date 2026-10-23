@@ -137,6 +137,16 @@ void pushText(LuaArgs& lua, const std::optional<std::string>& text) {
     }
 }
 
+[[nodiscard]] std::int32_t entityIdAt(LuaArgs& lua, std::int32_t index) {
+    if (!lua.isTable(index)) {
+        return static_cast<std::int32_t>(lua.toInteger(index));
+    }
+    lua.pushField(index, "id");
+    const auto id = static_cast<std::int32_t>(lua.toInteger(-1));
+    lua.pop(1);
+    return id;
+}
+
 struct Spot {
     std::int32_t x = 0;
     std::int32_t y = 0;
@@ -626,6 +636,52 @@ void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorld
                         id = intAt(args, base);
                     }
                     pushText(args, snbtOf(world->entityNbt(id)));
+                    return 1;
+                })
+        .method("plugin_data",
+                [world](LuaArgs& args) {
+                    pushText(args, snbtOf(world->pluginData()));
+                    return 1;
+                })
+        .method("set_plugin_data",
+                [world](LuaArgs& args) {
+                    args.pushBoolean(world->setPluginData(bytesOf(args, firstArgument(args))));
+                    return 1;
+                })
+        .method("chunk_data",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    pushText(args, snbtOf(world->chunkPluginData(intAt(args, base), intAt(args, base + 1))));
+                    return 1;
+                })
+        .method("set_chunk_data",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushBoolean(
+                        world->setChunkPluginData(intAt(args, base), intAt(args, base + 1), bytesOf(args, base + 2)));
+                    return 1;
+                })
+        .method("block_entity_data",
+                [world](LuaArgs& args) {
+                    const Spot spot = spotAt(args, firstArgument(args));
+                    pushText(args, snbtOf(world->blockEntityPluginData(spot.x, spot.y, spot.z)));
+                    return 1;
+                })
+        .method("set_block_entity_data",
+                [world](LuaArgs& args) {
+                    const Spot spot = spotAt(args, firstArgument(args));
+                    args.pushBoolean(world->setBlockEntityPluginData(spot.x, spot.y, spot.z, bytesOf(args, spot.next)));
+                    return 1;
+                })
+        .method("entity_data",
+                [world](LuaArgs& args) {
+                    pushText(args, snbtOf(world->entityPluginData(entityIdAt(args, firstArgument(args)))));
+                    return 1;
+                })
+        .method("set_entity_data",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushBoolean(world->setEntityPluginData(entityIdAt(args, base), bytesOf(args, base + 1)));
                     return 1;
                 })
         .method("spawn_nbt",
