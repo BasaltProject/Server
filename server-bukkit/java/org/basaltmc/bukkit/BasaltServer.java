@@ -13,7 +13,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
-import org.bukkit.GameMode;
 import org.bukkit.Warning;
 import org.bukkit.World;
 import org.bukkit.command.CommandMap;
@@ -27,7 +26,7 @@ import org.bukkit.plugin.SimpleServicesManager;
 import org.bukkit.plugin.messaging.Messenger;
 import org.bukkit.scheduler.BukkitScheduler;
 
-public class BasaltServer extends ServerExtras {
+public class BasaltServer extends ServerLeftovers {
     public static final String kMinecraftVersion = "26.3";
 
     private static BasaltServer instance;

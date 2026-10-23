@@ -68,6 +68,7 @@ loot.roll function
 loot.tables function
 maps table
 maps.create function
+maps.explorer function
 maps.info function
 math table
 math.abs function
@@ -193,6 +194,14 @@ string.reverse function
 string.sub function
 string.unpack function
 string.upper function
+structures table
+structures.capture function
+structures.file function
+structures.ids function
+structures.place function
+structures.read function
+structures.remove function
+structures.write function
 t function
 tab_list function
 table table

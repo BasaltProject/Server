@@ -7,7 +7,6 @@ import io.papermc.paper.world.chunk.ChunkGenerationState;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -566,6 +565,21 @@ public abstract class WorldGeo extends WorldExtras {
     @Override
     public org.bukkit.util.StructureSearchResult locateNearestStructure(Location origin,
         org.bukkit.generator.structure.StructureType type, int radius, boolean findUnexplored) {
-        throw Unsupported.hit("World#locateNearestStructure by structure type");
+        org.bukkit.util.StructureSearchResult nearest = null;
+        double best = Double.MAX_VALUE;
+        for (org.bukkit.generator.structure.Structure structure : StructureKinds.structuresOf(type)) {
+            org.bukkit.util.StructureSearchResult found = locateNearestStructure(origin, structure, radius,
+                findUnexplored);
+            if (found != null) {
+                double dx = found.getLocation().getX() - origin.getX();
+                double dz = found.getLocation().getZ() - origin.getZ();
+                double distance = dx * dx + dz * dz;
+                if (distance < best) {
+                    best = distance;
+                    nearest = found;
+                }
+            }
+        }
+        return nearest;
     }
 }

@@ -2,6 +2,8 @@
 #include <basalt/server/plugins/PluginMiscApi.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
+#include <basalt/wire/nbt/NbtIO.hpp>
+#include <basalt/wire/nbt/Snbt.hpp>
 
 #include <array>
 #include <cstdint>
@@ -82,6 +84,45 @@ void pushNames(LuaArgs& args, const std::vector<std::string>& names) {
         args.pushString(name);
         args.setIndex(position++);
     }
+}
+
+[[nodiscard]] std::vector<std::string> namesField(LuaArgs& lua, std::int32_t index, std::string_view key) {
+    std::vector<std::string> out;
+    lua.pushField(index, key);
+    const std::int32_t at = lua.top();
+    if (lua.isString(at)) {
+        out.push_back(lua.toText(at));
+    } else if (lua.isTable(at)) {
+        const std::int64_t count = lua.length(at);
+        for (std::int64_t position = 1; position <= count; ++position) {
+            lua.pushIndex(at, position);
+            out.push_back(lua.toText(-1));
+            lua.pop(1);
+        }
+    }
+    lua.pop(1);
+    return out;
+}
+
+void pushSnbt(LuaArgs& args, const std::optional<std::vector<std::uint8_t>>& bytes) {
+    if (bytes.has_value()) {
+        const std::expected<wire::nbt::AnonymousTag, wire::nbt::NbtError> read =
+            wire::nbt::nbtIO::readAnonymous(*bytes);
+        if (read.has_value()) {
+            args.pushString(wire::nbt::snbt::stringify(read->tag));
+            return;
+        }
+    }
+    args.pushNil();
+}
+
+[[nodiscard]] std::optional<std::vector<std::uint8_t>> snbtBytes(LuaArgs& args, std::int32_t index) {
+    const std::expected<wire::nbt::NbtTag, wire::nbt::NbtError> parsed =
+        wire::nbt::snbt::parse(args.checkString(index));
+    if (!parsed.has_value()) {
+        return std::nullopt;
+    }
+    return wire::nbt::nbtIO::writeAnonymous(*parsed);
 }
 
 void installScoreboards(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
@@ -664,7 +705,90 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
         return 1;
     });
     lua.setField("info");
+    wire::lua::pushHostFunction(lua, "maps.explorer", [server](LuaArgs& args) {
+        if (!args.isTable(1)) {
+            args.raise(
+                "maps.explorer({ world = ..., x = ..., y = ..., z = ..., destination = { ... } }) takes a table");
+        }
+        PluginExploration request;
+        request.destination = namesField(args, 1, "destination");
+        request.decoration = stringField(args, 1, "decoration").value_or(request.decoration);
+        request.zoom = static_cast<std::int32_t>(numberField(args, 1, "zoom").value_or(request.zoom));
+        request.radius = static_cast<std::int32_t>(numberField(args, 1, "radius").value_or(request.radius));
+        request.skipExisting = flagField(args, 1, "skip_existing").value_or(request.skipExisting);
+        const std::optional<std::vector<std::uint8_t>> made = server->services().maps().explorerMap(
+            stringField(args, 1, "world").value_or(std::string{}), numberField(args, 1, "x").value_or(0.0),
+            numberField(args, 1, "y").value_or(0.0), numberField(args, 1, "z").value_or(0.0), request);
+        pushSnbt(args, made);
+        return 1;
+    });
+    lua.setField("explorer");
     lua.setGlobal("maps");
+
+    lua.pushTable();
+    wire::lua::pushHostFunction(lua, "structures.ids", [server](LuaArgs& args) {
+        pushNames(args, server->services().structures().ids());
+        return 1;
+    });
+    lua.setField("ids");
+    wire::lua::pushHostFunction(lua, "structures.read", [server](LuaArgs& args) {
+        pushSnbt(args, server->services().structures().read(args.checkString(1)));
+        return 1;
+    });
+    lua.setField("read");
+    wire::lua::pushHostFunction(lua, "structures.write", [server](LuaArgs& args) {
+        const std::optional<std::vector<std::uint8_t>> bytes = snbtBytes(args, 2);
+        args.pushBoolean(bytes.has_value() &&
+                         server->services().structures().store(args.checkString(1), *bytes, args.toBoolean(3)));
+        return 1;
+    });
+    lua.setField("write");
+    wire::lua::pushHostFunction(lua, "structures.remove", [server](LuaArgs& args) {
+        args.pushBoolean(server->services().structures().remove(args.checkString(1), args.toBoolean(2)));
+        return 1;
+    });
+    lua.setField("remove");
+    wire::lua::pushHostFunction(lua, "structures.file", [server](LuaArgs& args) {
+        args.pushString(server->services().structures().file(args.checkString(1)));
+        return 1;
+    });
+    lua.setField("file");
+    wire::lua::pushHostFunction(lua, "structures.capture", [server](LuaArgs& args) {
+        if (!args.isTable(1)) {
+            args.raise("structures.capture({ world = ..., x = ..., y = ..., z = ..., size_x = ... }) takes a table");
+        }
+        const auto number = [&args](std::string_view key) {
+            return static_cast<std::int32_t>(numberField(args, 1, key).value_or(0.0));
+        };
+        pushSnbt(args, server->services().structures().capture(stringField(args, 1, "world").value_or(std::string{}),
+                                                               number("x"), number("y"), number("z"), number("size_x"),
+                                                               number("size_y"), number("size_z"),
+                                                               flagField(args, 1, "entities").value_or(false)));
+        return 1;
+    });
+    lua.setField("capture");
+    wire::lua::pushHostFunction(lua, "structures.place", [server](LuaArgs& args) {
+        const std::optional<std::vector<std::uint8_t>> bytes = snbtBytes(args, 1);
+        if (!bytes.has_value() || !args.isTable(2)) {
+            args.pushBoolean(false);
+            return 1;
+        }
+        PluginStructurePlacement placement;
+        placement.world = stringField(args, 2, "world").value_or(std::string{});
+        placement.x = static_cast<std::int32_t>(numberField(args, 2, "x").value_or(0.0));
+        placement.y = static_cast<std::int32_t>(numberField(args, 2, "y").value_or(0.0));
+        placement.z = static_cast<std::int32_t>(numberField(args, 2, "z").value_or(0.0));
+        placement.rotation = static_cast<std::int32_t>(numberField(args, 2, "rotation").value_or(0.0));
+        placement.mirror = static_cast<std::int32_t>(numberField(args, 2, "mirror").value_or(0.0));
+        placement.integrity = static_cast<float>(numberField(args, 2, "integrity").value_or(1.0));
+        placement.seed = static_cast<std::int64_t>(numberField(args, 2, "seed").value_or(0.0));
+        placement.entities = flagField(args, 2, "entities").value_or(true);
+        placement.palette = static_cast<std::int32_t>(numberField(args, 2, "palette").value_or(-1.0));
+        args.pushBoolean(server->services().structures().place(*bytes, placement));
+        return 1;
+    });
+    lua.setField("place");
+    lua.setGlobal("structures");
 }
 } // namespace
 

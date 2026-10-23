@@ -32,6 +32,16 @@ struct PluginMapCursor {
     std::optional<std::string> caption;
 };
 
+struct PluginExploration {
+    /// Structure ids, or tag ids with a leading #.
+    std::vector<std::string> destination;
+    /// A map decoration type id.
+    std::string decoration = "minecraft:mansion";
+    std::int32_t zoom = 2;
+    std::int32_t radius = 50;
+    bool skipExisting = true;
+};
+
 /// Maps as the world keeps them (128 by 128 colour ids and their decorations) and a way to show a player another view.
 class PluginMaps {
 public:
@@ -76,6 +86,18 @@ public:
     [[nodiscard]] virtual std::vector<std::string> carriers(std::int32_t id) {
         static_cast<void>(id);
         return {};
+    }
+
+    /// The components of a filled map that shows the nearest of these structures from the point, as an unnamed NBT
+    /// compound; nothing when none is found.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>>
+    explorerMap(std::string_view world, double x, double y, double z, const PluginExploration& request) {
+        static_cast<void>(world);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(request);
+        return std::nullopt;
     }
 
     /// Shows the player this picture of the map, and these cursors, in place of what the world keeps.

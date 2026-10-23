@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/plugins/ServerMaps.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/common/json/Json.hpp>
+#include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
 
 namespace basalt::server::runtime::plugins {
@@ -126,6 +127,24 @@ void ServerMaps::show(std::string_view uuid, std::int32_t id, std::span<const st
             .colors = std::vector<std::uint8_t>(colors.begin(), colors.begin() + server::plugins::PluginMaps::kPixels)};
         sendMapUpdate(*session, packet);
     }
+}
+
+std::optional<std::vector<std::uint8_t>> ServerMaps::explorerMap(std::string_view world, double x, double y, double z,
+                                                                 const server::plugins::PluginExploration& request) {
+    world::LoadedWorld* found = hooks_.worldFor ? hooks_.worldFor(std::string{world}) : nullptr;
+    if (found == nullptr || !hooks_.explore) {
+        return std::nullopt;
+    }
+    wire::nbt::NbtCompound components;
+    const server::world::loot::ExplorationMapRequest asked{.destination = request.destination,
+                                                           .decoration = request.decoration,
+                                                           .zoom = static_cast<std::int8_t>(request.zoom),
+                                                           .searchRadius = request.radius,
+                                                           .skipExistingChunks = request.skipExisting};
+    if (!hooks_.explore(*found, components, asked, {x, y, z})) {
+        return std::nullopt;
+    }
+    return wire::nbt::nbtIO::writeAnonymous(wire::nbt::NbtTag::ofCompound(std::move(components)));
 }
 
 } // namespace basalt::server::runtime::plugins

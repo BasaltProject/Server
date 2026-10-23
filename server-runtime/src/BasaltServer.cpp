@@ -579,7 +579,18 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                            .sessions = sessions});
     miscServices_.datapacks = std::make_unique<plugins::ServerDatapacks>([this] { return options_.datapacks; });
     miscServices_.maps = std::make_unique<plugins::ServerMaps>(
-        plugins::ServerMaps::Hooks{.storage = &mapStorage_, .sessions = sessions, .worldFor = model.worldFor});
+        plugins::ServerMaps::Hooks{.storage = &mapStorage_,
+                                   .sessions = sessions,
+                                   .worldFor = model.worldFor,
+                                   .explore = [this](world::LoadedWorld& world, wire::nbt::NbtCompound& components,
+                                                     const server::world::loot::ExplorationMapRequest& request,
+                                                     const std::array<double, 3>& origin) {
+                                       return maps_ != nullptr && maps_->explore(world, components, request, origin);
+                                   }});
+    miscServices_.structures = std::make_unique<plugins::ServerStructures>(
+        plugins::ServerStructures::Hooks{.templates = &vanillaData_.structureTemplates,
+                                         .blocks = [this] { return structureBlocks_.get(); },
+                                         .worldFor = model.worldFor});
     miscServices_.loot = std::make_unique<plugins::ServerLoot>(plugins::ServerLoot::Hooks{
         .tables = &vanillaData_.lootTables, .worldFor = model.worldFor, .sessions = sessions});
     miscServices_.selectors = std::make_unique<plugins::ServerSelectors>(plugins::ServerSelectors::Hooks{
@@ -627,6 +638,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     parts.maps = miscServices_.maps.get();
     parts.loot = miscServices_.loot.get();
     parts.selectors = miscServices_.selectors.get();
+    parts.structures = miscServices_.structures.get();
     parts.ownerAt = [this](const std::string& name, double x, double z) -> sched::Owner* {
         const std::map<std::string, world::LoadedWorld*> loaded = worldRegistry_->worlds();
         const auto found = loaded.find(name);
