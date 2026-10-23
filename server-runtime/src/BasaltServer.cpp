@@ -509,6 +509,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         return flat;
     };
     model.npcs = &npcs_;
+    model.lootTables = &vanillaData_.lootTables;
+    model.blockTags = &vanillaData_.blockTags;
+    model.itemTags = &vanillaData_.itemTags;
     model.nextEntityId = [this] { return playerRegistry_.allocateEntityId(); };
     model.spawnAllowed = [this](const world::LoadedWorld& world, const wire::common::Identifier& type, double x,
                                 double y, double z, std::string_view cause) {

@@ -191,6 +191,13 @@ public final class ContainerStates {
                     throw e.getCause();
                 }
             }
+            try {
+                return base.getClass().getMethod(name, method.getParameterTypes()).invoke(base, args);
+            } catch (NoSuchMethodException e) {
+                // the base does not know the method either
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            }
             if (method.isDefault()) {
                 return InvocationHandler.invokeDefault(proxy, method, args);
             }

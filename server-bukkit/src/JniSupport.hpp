@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BridgeInternal.hpp"
+#include "ServerThreadCall.hpp"
 
 #include <chrono>
 #include <exception>
@@ -60,18 +61,6 @@ template <typename Result, typename Body>
             return fallback;
         }
     };
-    BukkitBridge& bridge = BukkitBridge::current();
-    if (bridge.plugins().onPluginThread()) {
-        return run();
-    }
-    std::promise<Result> done;
-    std::future<Result> result = done.get_future();
-    static_cast<void>(bridge.services().tasks().after(0, [&done, &run] { done.set_value(run()); }));
-    while (result.wait_for(std::chrono::milliseconds{50}) != std::future_status::ready) {
-        if (bridge.stopping()) {
-            return fallback;
-        }
-    }
-    return result.get();
+    return callOnPluginThread(BukkitBridge::current(), fallback, run);
 }
 } // namespace basalt::server::bukkit::jni

@@ -89,6 +89,11 @@ jdoubleArray JNICALL nativeBlockInfo(JNIEnv* env, jclass, jint id) {
     return facts.empty() ? nullptr : doubleArray(env, facts.data(), facts.size());
 }
 
+jobjectArray JNICALL nativeBlockSounds(JNIEnv* env, jclass, jint id) {
+    const std::vector<std::string> sounds = worlds().blockSounds(id);
+    return sounds.empty() ? nullptr : stringArray(env, sounds);
+}
+
 jobjectArray JNICALL nativeBiomeIds(JNIEnv* env, jclass) { return stringArray(env, worlds().biomeIds()); }
 
 jobjectArray JNICALL nativeItemIds(JNIEnv* env, jclass) { return stringArray(env, worlds().itemIds()); }
@@ -1016,6 +1021,7 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("stateFlags", "(I)I", reinterpret_cast<void*>(&nativeStateFlags)),
         method("blockHardness", "(Ljava/lang/String;)[D", reinterpret_cast<void*>(&nativeBlockHardness)),
         method("blockInfo", "(I)[D", reinterpret_cast<void*>(&nativeBlockInfo)),
+        method("blockSounds", "(I)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBlockSounds)),
         method("biomeIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiomeIds)),
         method("itemIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeItemIds)),
         method("registryIds", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeRegistryIds)),

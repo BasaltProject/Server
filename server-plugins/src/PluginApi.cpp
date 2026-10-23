@@ -414,6 +414,47 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("block_info");
+    wire::lua::pushHostFunction(lua, "worlds.block_sounds", [server](LuaArgs& args) {
+        const std::vector<std::string> facts =
+            server->services().worlds().blockSounds(static_cast<std::int32_t>(args.checkInteger(1)));
+        if (facts.size() < 7) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        args.pushNumber(std::stod(facts[0]));
+        args.setField("volume");
+        args.pushNumber(std::stod(facts[1]));
+        args.setField("pitch");
+        for (std::size_t at = 2; at < 7; ++at) {
+            args.pushString(facts[at]);
+            args.setField(std::array<const char*, 5>{"break", "step", "place", "hit", "fall"}[at - 2]);
+        }
+        return 1;
+    });
+    lua.setField("block_sounds");
+    wire::lua::pushHostFunction(lua, "worlds.tool_facts", [server](LuaArgs& args) {
+        const std::vector<double> facts = server->services().worlds().toolFacts(
+            args.isString(1) ? args.checkString(1) : std::string{}, static_cast<std::int32_t>(args.checkInteger(2)));
+        if (facts.size() < 2) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        args.pushBoolean(facts[0] != 0.0);
+        args.setField("correct_for_drops");
+        args.pushNumber(facts[1]);
+        args.setField("mining_speed");
+        return 1;
+    });
+    lua.setField("tool_facts");
+    wire::lua::pushHostFunction(lua, "worlds.transform_state", [server](LuaArgs& args) {
+        args.pushInteger(server->services().worlds().transformState(static_cast<std::int32_t>(args.checkInteger(1)),
+                                                                    static_cast<std::int32_t>(args.integerOr(2, 0)),
+                                                                    static_cast<std::int32_t>(args.integerOr(3, 0))));
+        return 1;
+    });
+    lua.setField("transform_state");
     wire::lua::pushHostFunction(lua, "worlds.block_entity_types", [server](LuaArgs& args) {
         const std::vector<std::string> pairs = server->services().worlds().blockEntityTypes();
         args.pushTable();

@@ -162,7 +162,7 @@ public final class BasaltBlockState extends BlockStateBase {
 
     @Override
     public Collection<ItemStack> getDrops(ItemStack tool, Entity entity) {
-        return List.of();
+        return world == null ? List.of() : getBlock().getDrops(tool, entity);
     }
 
     @Override

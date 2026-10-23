@@ -179,6 +179,7 @@ basalt_module(server-runtime-core
         src/plugins/ServerSelectors.cpp
         src/plugins/DataFix.cpp
         src/plugins/ServerWorldModel.cpp
+        src/plugins/ServerWorldEnv.cpp
         src/plugins/EntityOps.cpp
         src/plugins/PlayerEntityOps.cpp
         src/plugins/DroppedItemOps.cpp
