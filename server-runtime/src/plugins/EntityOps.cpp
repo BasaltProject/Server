@@ -6,6 +6,8 @@
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
+#include <basalt/server/runtime/player/PlayerConnection.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/EntityOps.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
@@ -250,6 +252,9 @@ const Accessors& accessors() {
         all["sitting"] = field(&ServerEntity::sitting);
         all["tamed_horse"] = field(&ServerEntity::tamedHorse);
         all["fuse"] = field(&ServerEntity::fuse);
+        all["category"] = Accessor{
+            [](const ServerEntity& entity) -> Value { return std::string{entity::mobs::categoryOf(entity.type())}; },
+            nullptr};
         all["loot_table"] =
             Accessor{[](const ServerEntity& entity) -> Value {
                          return entity.deathLootTable.has_value() ? Value{*entity.deathLootTable} : Value{};
@@ -765,6 +770,13 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
                 rider->vehicleId.reset();
                 rider->boardingCooldown = 60;
                 any = true;
+            } else if (environment.players) {
+                for (player::PlayerSession* session : environment.players()) {
+                    if (session->entityId() == id && session->connection().dismount) {
+                        session->connection().dismount();
+                        any = true;
+                    }
+                }
             }
         }
         entity.passengerIds.clear();

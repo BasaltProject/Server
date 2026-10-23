@@ -49,7 +49,7 @@ namespace {
 
 TEST_CASE("the table of events is the frozen kotlin's table") {
     const std::vector<const PluginEventType*>& all = pluginEventTypes::all();
-    CHECK(all.size() == 74);
+    CHECK(all.size() == 75);
 
     std::set<std::string> names;
     std::string joined;
@@ -60,8 +60,8 @@ TEST_CASE("the table of events is the frozen kotlin's table") {
         }
         joined += describe(*type);
     }
-    CHECK(names.size() == 74);
-    CHECK(checksumOf(joined) == -2485247439438187185LL);
+    CHECK(names.size() == 75);
+    CHECK(checksumOf(joined) == 6173712629169645523LL);
 
     CHECK(describe(*all[0]) == "player.join|false|player_name,player_uuid,world|");
     CHECK(describe(*all[1]) == "player.quit|false|player_name,player_uuid,world|");
@@ -70,7 +70,7 @@ TEST_CASE("the table of events is the frozen kotlin's table") {
     CHECK(describe(*all[34]) == "world.chunk_load|false|world,chunk_x,chunk_z,generated|");
     CHECK(describe(*all[51]) == "entity.shoot|true|entity_id,entity_type,world,projectile,power|");
     CHECK(describe(*all[68]) == "entity.combust|true|entity_id,entity_type,world,ticks,cause|");
-    CHECK(describe(*all[72]) == "block.fade|true|world,x,y,z,block,to_block,cause|");
+    CHECK(describe(*all[73]) == "block.fade|true|world,x,y,z,block,to_block,cause|");
 
     CHECK(std::count_if(all.begin(), all.end(), [](const PluginEventType* type) { return type->cancellable(); }) == 52);
 }

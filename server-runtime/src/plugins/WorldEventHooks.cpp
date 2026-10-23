@@ -214,6 +214,18 @@ void spawning(NaturalSpawningSystem::Hooks& hooks, const EventSink& sink) {
             event.set("reason", std::string{reason});
         });
     };
+    hooks.spawned = [&sink](const world::LoadedWorld& world, const entity::ServerEntity& added,
+                            std::string_view reason) {
+        sink.notify(&entityAdd, [&](PluginEvent& event) {
+            event.set("entity_id", static_cast<std::int64_t>(added.entityId()));
+            event.set("entity_type", added.type().toString());
+            event.set("world", world.name());
+            event.set("x", added.x);
+            event.set("y", added.y);
+            event.set("z", added.z);
+            event.set("reason", std::string{reason});
+        });
+    };
 }
 
 void pistons(BlockChangeBroadcaster::Hooks& hooks, const EventSink& sink) {
@@ -252,8 +264,7 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
         return true;
     };
     hooks.deathDrops = [&sink, worldOf](const world::LoadedWorld& world, const entity::ServerEntity& mob,
-                                        std::vector<server::world::loot::ItemStack>& drops,
-                                        std::int32_t& experience) {
+                                        std::vector<server::world::loot::ItemStack>& drops, std::int32_t& experience) {
         std::string lines;
         for (const server::world::loot::ItemStack& stack : drops) {
             lines += (lines.empty() ? "" : "\n") + stack.item.toString() + "|" + std::to_string(stack.count);

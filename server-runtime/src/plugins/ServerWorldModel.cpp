@@ -65,8 +65,10 @@ const Identifier& textDisplay() {
 class WorldEntityRef : public PluginEntityRef {
 public:
     WorldEntityRef(world::LoadedWorld& world, std::int32_t entityId, std::string type,
-                   std::shared_ptr<const ModelHooks> hooks = nullptr)
-        : world_(&world), hooks_(std::move(hooks)), entityId_(entityId), type_(std::move(type)) {}
+                   std::shared_ptr<const ModelHooks> hooks = nullptr,
+                   std::function<std::vector<player::PlayerSession*>()> players = nullptr)
+        : world_(&world), hooks_(std::move(hooks)), players_(std::move(players)), entityId_(entityId),
+          type_(std::move(type)) {}
 
     [[nodiscard]] std::int32_t id() const override { return entityId_; }
 
@@ -212,10 +214,11 @@ protected:
 
 private:
     [[nodiscard]] entityOps::Environment environment() const {
-        return entityOps::Environment{.hooks = hooks_.get(), .world = world_};
+        return entityOps::Environment{.hooks = hooks_.get(), .world = world_, .players = players_};
     }
 
     std::shared_ptr<const ModelHooks> hooks_;
+    std::function<std::vector<player::PlayerSession*>()> players_;
     std::int32_t entityId_;
     std::string type_;
 };
@@ -1159,13 +1162,14 @@ public:
             }
             return nullptr;
         }
-        return std::make_shared<WorldEntityRef>(*world_, id, found->type().toString(), shared_);
+        return std::make_shared<WorldEntityRef>(*world_, id, found->type().toString(), shared_, players_);
     }
 
     [[nodiscard]] std::shared_ptr<PluginEntityRef> entityByUuid(std::string_view uuid) const override {
         for (const entity::ServerEntity* alive : world_->state().entities()) {
             if (!alive->removed && alive->uuid().toString() == uuid) {
-                return std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(), shared_);
+                return std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(), shared_,
+                                                        players_);
             }
         }
         return nullptr;
@@ -1176,8 +1180,8 @@ public:
         std::vector<std::shared_ptr<PluginEntityRef>> refs;
         for (const entity::ServerEntity* alive : world_->state().entitiesIn(chunkX, chunkZ)) {
             if (!alive->removed) {
-                refs.push_back(
-                    std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(), shared_));
+                refs.push_back(std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(),
+                                                                shared_, players_));
             }
         }
         return refs;
@@ -1191,8 +1195,8 @@ public:
         std::vector<std::shared_ptr<PluginEntityRef>> refs;
         for (const entity::ServerEntity* alive : world_->state().entities()) {
             if (!alive->removed) {
-                refs.push_back(
-                    std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(), shared_));
+                refs.push_back(std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(),
+                                                                shared_, players_));
             }
         }
         for (std::shared_ptr<PluginEntityRef>& item : droppedItemRefs(*world_)) {
@@ -1210,7 +1214,8 @@ public:
         if (spawned == nullptr) {
             return nullptr;
         }
-        return std::make_shared<WorldEntityRef>(*world_, spawned->entityId(), spawned->type().toString(), shared_);
+        return std::make_shared<WorldEntityRef>(*world_, spawned->entityId(), spawned->type().toString(), shared_,
+                                                players_);
     }
 
     std::int32_t dropItem(std::span<const std::uint8_t> stack, double x, double y, double z, double velocityX,
@@ -1230,7 +1235,8 @@ public:
         if (spawned == nullptr) {
             return nullptr;
         }
-        return std::make_shared<WorldEntityRef>(*world_, spawned->entityId(), spawned->type().toString(), shared_);
+        return std::make_shared<WorldEntityRef>(*world_, spawned->entityId(), spawned->type().toString(), shared_,
+                                                players_);
     }
 
     std::shared_ptr<PluginHologramRef> hologram(std::string_view text, double x, double y, double z) override {

@@ -37,6 +37,9 @@ public:
         std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                            double z, std::string_view reason)>
             spawnAllowed;
+        std::function<void(const world::LoadedWorld& world, const entity::ServerEntity& entity,
+                           std::string_view reason)>
+            spawned;
     };
 
     struct Options {

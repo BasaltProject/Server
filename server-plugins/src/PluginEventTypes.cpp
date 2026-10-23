@@ -464,6 +464,12 @@ const PluginEventType& entityDrops() {
     return type;
 }
 
+const PluginEventType& entityAdd() {
+    static const PluginEventType type{
+        "entity.add", false, {"entity_id", "entity_type", "world", "x", "y", "z", "reason"}};
+    return type;
+}
+
 const PluginEventType& entityTarget() {
     static const PluginEventType type{"entity.target",
                                       true,
@@ -561,6 +567,7 @@ const std::vector<const PluginEventType*>& all() {
                                                            &raidFinish(),
                                                            &entityCombust(),
                                                            &entityTarget(),
+                                                           &entityAdd(),
                                                            &entityDrops(),
                                                            &entityPotionEffect(),
                                                            &blockFade(),
