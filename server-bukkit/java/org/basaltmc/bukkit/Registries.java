@@ -35,6 +35,32 @@ public final class Registries {
 
     private Registries() {}
 
+    private static volatile java.util.List<String> sounds;
+
+    /** Every sound event id, in the order the game registers them. */
+    public static java.util.List<String> soundIds() {
+        if (sounds == null) {
+            synchronized (Registries.class) {
+                if (sounds == null) {
+                    java.util.List<String> read = new java.util.ArrayList<>();
+                    try (java.io.InputStream in = Registries.class.getResourceAsStream("/sound_events.txt")) {
+                        if (in != null) {
+                            for (String line : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                                if (!line.isBlank()) {
+                                    read.add(line.strip());
+                                }
+                            }
+                        }
+                    } catch (java.io.IOException failure) {
+                        Natives.log(2, "Bukkit", "Could not read the sound list: " + failure);
+                    }
+                    sounds = java.util.List.copyOf(read);
+                }
+            }
+        }
+        return sounds;
+    }
+
     private static void loadBlocks() {
         if (blockNames == null) {
             loadBlocksOnce();
