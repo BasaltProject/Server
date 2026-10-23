@@ -34,6 +34,10 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
         this.jar = jar;
     }
 
+    public String pluginName() {
+        return description.getName();
+    }
+
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         return loadClass(name, resolve, true, true);
