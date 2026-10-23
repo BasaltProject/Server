@@ -13,6 +13,8 @@ public final class WorldEnvNatives {
 
     public static native void levelEvent(String world, int type, int x, int y, int z, int data, boolean global);
 
+    public static native void blockEvent(String world, int x, int y, int z, int first, int second);
+
     /** Centre x and z, size, target size, lerp ticks, damage, buffer, warning blocks, warning seconds. */
     public static native double[] border(String world);
 

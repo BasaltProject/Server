@@ -94,6 +94,19 @@ void JNICALL nativeLevelEvent(JNIEnv* env, jclass, jstring world, jint type, jin
     }));
 }
 
+void JNICALL nativeBlockEvent(JNIEnv* env, jclass, jstring world, jint x, jint y, jint z, jint first, jint second) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return;
+    }
+    static_cast<void>(jni::onServer<bool>(false, [&] {
+        if (PluginWorldEnv* target = found->env(); target != nullptr) {
+            target->blockEvent(x, y, z, first, second);
+        }
+        return true;
+    }));
+}
+
 jdoubleArray JNICALL nativeBorder(JNIEnv* env, jclass, jstring world) {
     const auto found = worldOf(env, world);
     if (found == nullptr) {
@@ -277,6 +290,7 @@ void registerWorldEnvNatives(JNIEnv* env, jclass natives) {
         method("particle", "(Ljava/lang/String;Ljava/lang/String;DDDIDDDDDDIZ[DLjava/lang/String;Ljava/lang/String;)V",
                reinterpret_cast<void*>(&nativeParticle)),
         method("levelEvent", "(Ljava/lang/String;IIIIIZ)V", reinterpret_cast<void*>(&nativeLevelEvent)),
+        method("blockEvent", "(Ljava/lang/String;IIIII)V", reinterpret_cast<void*>(&nativeBlockEvent)),
         method("border", "(Ljava/lang/String;)[D", reinterpret_cast<void*>(&nativeBorder)),
         method("setBorder", "(Ljava/lang/String;[DD)V", reinterpret_cast<void*>(&nativeSetBorder)),
         method("playerCount", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativePlayerCount)),

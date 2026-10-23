@@ -85,6 +85,16 @@ public:
         static_cast<void>(global);
     }
 
+    /// A block event (a chest lid, a bell, a note) to the players watching the block; the numbers mean what the block
+    /// says.
+    virtual void blockEvent(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t first, std::int32_t second) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(first);
+        static_cast<void>(second);
+    }
+
     [[nodiscard]] virtual PluginBorder border() { return {}; }
 
     /// Applies the border settings that differ from the current ones; the size moves over `seconds` when positive.

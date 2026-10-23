@@ -211,6 +211,20 @@ void ServerWorldEnv::levelEvent(const std::int32_t type, const std::int32_t x, c
     }
 }
 
+void ServerWorldEnv::blockEvent(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                const std::int32_t first, const std::int32_t second) {
+    const std::optional<std::int32_t> state = world_->state().blockState(x, y, z);
+    if (!state.has_value()) {
+        return;
+    }
+    for (const player::PlayerSession* player : watchers()) {
+        if (player->connection().sendBlockEvent &&
+            distanceSquared(*player, x + 0.5, y + 0.5, z + 0.5) <= kLevelEventRange * kLevelEventRange) {
+            player->connection().sendBlockEvent(x, y, z, *state, first, second);
+        }
+    }
+}
+
 PluginBorder ServerWorldEnv::border() {
     const world::WorldBorder& border = world_->border();
     return PluginBorder{.centerX = border.centerX(),
