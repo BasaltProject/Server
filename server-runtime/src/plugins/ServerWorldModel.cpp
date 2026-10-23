@@ -886,6 +886,61 @@ public:
         return first;
     }
 
+    [[nodiscard]] std::optional<std::array<std::int32_t, 2>> locateStructure(std::string_view structure, std::int32_t x,
+                                                                             std::int32_t z, std::int32_t cells,
+                                                                             bool skipExisting) override {
+        static_cast<void>(skipExisting);
+        const auto wanted = Identifier::parse(std::string{structure});
+        if (!wanted.has_value()) {
+            return std::nullopt;
+        }
+        const std::int64_t seed = world_->metadata().seed;
+        if (*wanted == Identifier::vanilla("stronghold")) {
+            server::world::terrain::StrongholdStructureGenerator* strongholds = world_->strongholdGenerator();
+            const auto found = strongholds == nullptr ? std::nullopt : strongholds->locate(x, z);
+            return found.has_value() ? std::optional{std::array{found->first * 16, found->second * 16}} : std::nullopt;
+        }
+        for (const world::StructureLocator& locator : world_->structureLocators()) {
+            if (locator.id == *wanted) {
+                const auto found = locator.locate(seed, x >> 4, z >> 4, cells, {});
+                return found.has_value() ? std::optional{std::array{found->first * 16, found->second * 16}}
+                                         : std::nullopt;
+            }
+        }
+        if (server::world::terrain::VillageStructureGenerator* generator = world_->structureSetGenerator(*wanted);
+            generator != nullptr) {
+            const auto found = generator->locate(seed, x >> 4, z >> 4, &*wanted);
+            return found.has_value() ? std::optional{std::array{found->chunkX * 16, found->chunkZ * 16}} : std::nullopt;
+        }
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<std::array<std::int32_t, 3>> locateBiome(const std::vector<std::string>& biomes,
+                                                                         std::int32_t x, std::int32_t y, std::int32_t z,
+                                                                         std::int32_t radius,
+                                                                         std::int32_t step) override {
+        const server::world::terrain::OverworldBiomeSource* source = world_->biomeSource();
+        if (source == nullptr || step <= 0) {
+            return std::nullopt;
+        }
+        for (std::int32_t ring = 0; ring <= radius; ring += step) {
+            for (std::int32_t dx = -ring; dx <= ring; dx += step) {
+                for (std::int32_t dz = -ring; dz <= ring; dz += step) {
+                    if (ring > 0 && dx * dx != ring * ring && dz * dz != ring * ring) {
+                        continue;
+                    }
+                    const std::string_view name = source->biomeAt(x + dx, y, z + dz);
+                    if (std::ranges::any_of(biomes, [name](const std::string& wanted) {
+                            return wanted == name || (wanted.starts_with("minecraft:") && wanted.substr(10) == name);
+                        })) {
+                        return std::array{x + dx, y, z + dz};
+                    }
+                }
+            }
+        }
+        return std::nullopt;
+    }
+
     [[nodiscard]] static std::vector<std::uint8_t> packedData(const wire::nbt::NbtCompound& data) {
         return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(data));
     }

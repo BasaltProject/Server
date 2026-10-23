@@ -908,6 +908,40 @@ jobjectArray JNICALL nativeLootRoll(JNIEnv* env, jclass, jstring table, jstring 
     }
     return jni::stringArrayOf(env, flat);
 }
+
+jintArray JNICALL nativeLocateStructure(JNIEnv* env, jclass, jstring world, jstring structure, jint x, jint z,
+                                        jint cells) {
+    const auto found = worldOf(env, world);
+    const std::string kind = toStd(env, structure);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const auto at = jni::onServer<std::optional<std::array<std::int32_t, 2>>>(
+        std::nullopt, [&] { return found->locateStructure(kind, x, z, cells, false); });
+    if (!at.has_value()) {
+        return nullptr;
+    }
+    jintArray array = env->NewIntArray(2);
+    env->SetIntArrayRegion(array, 0, 2, at->data());
+    return array;
+}
+
+jintArray JNICALL nativeLocateBiome(JNIEnv* env, jclass, jstring world, jobjectArray biomes, jint x, jint y, jint z,
+                                    jint radius, jint step) {
+    const auto found = worldOf(env, world);
+    const std::vector<std::string> wanted = jni::stringsOf(env, biomes);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const auto at = jni::onServer<std::optional<std::array<std::int32_t, 3>>>(
+        std::nullopt, [&] { return found->locateBiome(wanted, x, y, z, radius, step); });
+    if (!at.has_value()) {
+        return nullptr;
+    }
+    jintArray array = env->NewIntArray(3);
+    env->SetIntArrayRegion(array, 0, 3, at->data());
+    return array;
+}
 } // namespace
 
 void registerMiscNatives(JNIEnv* env, jclass natives) {
@@ -1023,6 +1057,10 @@ void registerMiscNatives(JNIEnv* env, jclass natives) {
         method("lootTables", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeLootTables)),
         method("lootRoll", "(Ljava/lang/String;Ljava/lang/String;DDDFJLjava/lang/String;)[Ljava/lang/String;",
                reinterpret_cast<void*>(&nativeLootRoll)),
+        method("locateStructure", "(Ljava/lang/String;Ljava/lang/String;III)[I",
+               reinterpret_cast<void*>(&nativeLocateStructure)),
+        method("locateBiome", "(Ljava/lang/String;[Ljava/lang/String;IIIII)[I",
+               reinterpret_cast<void*>(&nativeLocateBiome)),
         method("playerPermissions", "(Ljava/lang/String;[Ljava/lang/String;[Z)V",
                reinterpret_cast<void*>(&nativePlayerPermissions)),
     };

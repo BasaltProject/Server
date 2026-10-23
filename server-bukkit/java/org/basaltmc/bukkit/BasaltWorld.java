@@ -909,4 +909,61 @@ public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
     public void removeMetadata(String name, org.bukkit.plugin.Plugin plugin) {
         metadata.remove(name, plugin);
     }
+
+    @Override
+    public org.bukkit.util.StructureSearchResult locateNearestStructure(Location origin,
+            org.bukkit.generator.structure.Structure structure, int radius, boolean findUnexplored) {
+        int[] at = MiscNatives.locateStructure(name, structure.getKey().toString(), origin.getBlockX(),
+            origin.getBlockZ(), Math.max(radius, 1));
+        if (at == null) {
+            return null;
+        }
+        Location found = new Location(this, at[0], 0, at[1]);
+        return new org.bukkit.util.StructureSearchResult() {
+            @Override
+            public org.bukkit.generator.structure.Structure getStructure() {
+                return structure;
+            }
+
+            @Override
+            public Location getLocation() {
+                return found;
+            }
+        };
+    }
+
+    @Override
+    public Location locateNearestStructure(Location origin, org.bukkit.StructureType structureType, int radius,
+            boolean findUnexplored) {
+        int[] at = MiscNatives.locateStructure(name, "minecraft:" + structureType.getName(), origin.getBlockX(),
+            origin.getBlockZ(), Math.max(radius, 1));
+        return at == null ? null : new Location(this, at[0], 0, at[1]);
+    }
+
+    @Override
+    public org.bukkit.util.BiomeSearchResult locateNearestBiome(Location origin, int radius, int horizontalInterval,
+            int verticalInterval, org.bukkit.block.Biome... biomes) {
+        String[] wanted = new String[biomes.length];
+        for (int i = 0; i < biomes.length; i++) {
+            wanted[i] = biomes[i].getKey().toString();
+        }
+        int[] at = MiscNatives.locateBiome(name, wanted, origin.getBlockX(), origin.getBlockY(), origin.getBlockZ(),
+            radius, horizontalInterval);
+        if (at == null) {
+            return null;
+        }
+        Location found = new Location(this, at[0], at[1], at[2]);
+        org.bukkit.block.Biome biome = getBiome(at[0], at[1], at[2]);
+        return new org.bukkit.util.BiomeSearchResult() {
+            @Override
+            public org.bukkit.block.Biome getBiome() {
+                return biome;
+            }
+
+            @Override
+            public Location getLocation() {
+                return found;
+            }
+        };
+    }
 }

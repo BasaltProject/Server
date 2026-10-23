@@ -104,4 +104,6 @@ public final class MiscNatives {
     public static native String[] lootTables();
     public static native String[] lootRoll(String table, String world, double x, double y, double z, float luck,
         long seed, String looter);
+    public static native int[] locateStructure(String world, String structure, int x, int z, int cells);
+    public static native int[] locateBiome(String world, String[] biomes, int x, int y, int z, int radius, int step);
 }
