@@ -101,7 +101,7 @@ public class BasaltServer extends ServerBase {
         return null;
     }
 
-    org.bukkit.entity.Entity entityById(BasaltWorld world, int id) {
+    public org.bukkit.entity.Entity entityById(BasaltWorld world, int id) {
         for (org.bukkit.entity.Player player : getOnlinePlayers()) {
             if (player.getEntityId() == id) {
                 return player;

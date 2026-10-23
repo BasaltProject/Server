@@ -18,6 +18,6 @@ public final class EntityBridge {
     }
 
     public static boolean isAlive(String typeKey) {
-        return EntityCore.typeOf(typeKey).isAlive();
+        return org.basaltmc.bukkit.entity.EntityCore.typeOf(typeKey).isAlive();
     }
 }

@@ -1,8 +1,6 @@
 org.bukkit.Server
 org.bukkit.World
-org.bukkit.entity.Player
-org.bukkit.entity.Entity org.bukkit.craftbukkit.entity.CraftEntity
-org.bukkit.entity.LivingEntity org.bukkit.craftbukkit.entity.CraftLivingEntity
+org.bukkit.entity.Player - EntityOps,LivingEntityOps
 org.bukkit.block.Block
 org.bukkit.Chunk org.bukkit.craftbukkit.CraftChunk
 org.bukkit.command.ConsoleCommandSender

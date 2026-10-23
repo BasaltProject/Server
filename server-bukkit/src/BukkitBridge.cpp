@@ -130,8 +130,8 @@ std::expected<void, std::string> BukkitBridge::boot() {
     } else {
         env->ExceptionClear();
     }
-    if (jclass inventoryNatives = env->FindClass("org/basaltmc/bukkit/InventoryNatives"); inventoryNatives != nullptr) {
-        registerInventoryNatives(env, inventoryNatives);
+    if (jclass entityNatives = env->FindClass("org/basaltmc/bukkit/EntityNatives"); entityNatives != nullptr) {
+        registerEntityNatives(env, entityNatives);
     } else {
         env->ExceptionClear();
     }

@@ -25,7 +25,11 @@ public final class GenerateBases {
             }
             String[] words = line.split("\\s+");
             Class<?> type = Class.forName(words[0], false, GenerateBases.class.getClassLoader());
-            Files.writeString(out.resolve(baseName(type) + ".java"), generate(type, words.length > 1 ? words[1] : null));
+            java.util.Set<String> covered = words.length > 2 && args.length > 2
+                ? GenerateEntities.coverOf(Path.of(args[2]), words[2]) : java.util.Set.of();
+            String top = words.length > 2 && args.length > 2 ? words[2].substring(words[2].lastIndexOf(',') + 1) : null;
+            Files.writeString(out.resolve(baseName(type) + ".java"),
+                generate(type, words.length > 1 && !words[1].equals("-") ? words[1] : null, covered, top));
         }
     }
 
@@ -37,7 +41,7 @@ public final class GenerateBases {
         return than.isAssignableFrom(candidate) && candidate != than;
     }
 
-    private static String generate(Class<?> type, String parent) {
+    static Map<String, Method> chosen(Class<?> type) {
         Map<String, Method> chosen = new LinkedHashMap<>();
         List<Method> methods = new ArrayList<>(List.of(type.getMethods()));
         methods.sort((a, b) -> a.toGenericString().compareTo(b.toGenericString()));
@@ -69,6 +73,11 @@ public final class GenerateBases {
                 chosen.remove(key.toString());
             }
         }
+        return chosen;
+    }
+
+    private static String generate(Class<?> type, String parent, java.util.Set<String> covered, String top) {
+        Map<String, Method> chosen = chosen(type);
         StringBuilder source = new StringBuilder();
         source.append("package org.basaltmc.bukkit.gen;\n\n");
         source.append("import org.basaltmc.bukkit.Unsupported;\n\n");
@@ -76,8 +85,28 @@ public final class GenerateBases {
         source.append("@SuppressWarnings({\"rawtypes\", \"unchecked\", \"deprecation\", \"removal\"})\n");
         source.append("public abstract class ").append(baseName(type)).append(parent == null ? "" : " extends " + parent)
             .append(" implements ")
-            .append(type.getCanonicalName()).append(" {\n");
+            .append(type.getCanonicalName()).append(top == null ? "" : ", org.basaltmc.bukkit.entity.ops." + top)
+            .append(" {\n");
         for (Method method : chosen.values()) {
+            String key = GenerateEntities.simpleKey(method);
+            if (covered.contains(key)) {
+                java.util.Set<Class<?>> closure = new java.util.LinkedHashSet<>();
+                GenerateEntities.collect(closure, type);
+                if (top != null && GenerateEntities.redeclared(closure,
+                    GenerateEntities.apiOf(top), key)) {
+                    source.append(GenerateEntities.bridge(method, top));
+                }
+                continue;
+            }
+            source.append(stub(method, type));
+        }
+        source.append("}\n");
+        return source.toString();
+    }
+
+    static String stub(Method method, Class<?> type) {
+        StringBuilder source = new StringBuilder();
+        {
             boolean erased = method.getDeclaringClass().getTypeParameters().length > 0;
             source.append("    @Override\n    public ");
             if (!erased && method.getTypeParameters().length > 0) {
@@ -118,15 +147,14 @@ public final class GenerateBases {
             source.append(" {\n        throw Unsupported.hit(\"").append(type.getSimpleName()).append('#')
                 .append(method.getName()).append("\");\n    }\n\n");
         }
-        source.append("}\n");
         return source.toString();
     }
 
-    private static String name(Class<?> type) {
+    static String name(Class<?> type) {
         return type.getCanonicalName();
     }
 
-    private static String typeName(Type type) {
+    static String typeName(Type type) {
         if (type instanceof Class<?> raw) {
             return raw.getCanonicalName();
         }

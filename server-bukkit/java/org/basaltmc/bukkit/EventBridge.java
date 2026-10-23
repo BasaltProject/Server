@@ -232,28 +232,10 @@ final class EventBridge {
                 f.world().getChunkAt((int) f.whole("chunk_x"), (int) f.whole("chunk_z"), false), true));
         map("world.weather_change", org.bukkit.event.weather.WeatherChangeEvent.class,
             f -> new org.bukkit.event.weather.WeatherChangeEvent(f.world(), f.flag("raining")));
-        map("entity.damage", org.bukkit.event.entity.EntityDamageEvent.class, f -> {
-            org.bukkit.entity.Entity target = f.entity();
-            if (target == null) {
-                return null;
-            }
-            org.bukkit.event.entity.EntityDamageEvent.DamageCause cause = damageCause(f.text("cause"));
-            Player attacker = BasaltServer.instance().playerByName(f.text("attacker_name"));
-            return attacker == null
-                ? new org.bukkit.event.entity.EntityDamageEvent(target, cause, f.real("amount"))
-                : new org.bukkit.event.entity.EntityDamageByEntityEvent(attacker, target, cause, f.real("amount"));
-        }, (e, f) -> f.put("amount", ((org.bukkit.event.entity.EntityDamageEvent) e).getDamage()));
+        EntityEvents.install();
         map("server.command", ServerCommandEvent.class,
             f -> new ServerCommandEvent(BasaltServer.instance().consoleImpl(), f.text("command")),
             (e, f) -> f.put("command", ((ServerCommandEvent) e).getCommand()));
-    }
-
-    private static org.bukkit.event.entity.EntityDamageEvent.DamageCause damageCause(String name) {
-        try {
-            return org.bukkit.event.entity.EntityDamageEvent.DamageCause.valueOf(name.toUpperCase(java.util.Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            return org.bukkit.event.entity.EntityDamageEvent.DamageCause.CUSTOM;
-        }
     }
 
     private static GameMode gameMode(String name) {

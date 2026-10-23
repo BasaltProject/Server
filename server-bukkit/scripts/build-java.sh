@@ -11,8 +11,9 @@ fi
 rm -rf "$out/runtime-classes" "$out/gen" && mkdir -p "$out/runtime-classes" "$out/gen"
 cp="$out/bukkit-api.jar:$(ls "$out"/lib/*.jar | tr '\n' ':')"
 if [ -f "$here/GenerateBases.java" ]; then
-    javac --release 25 -d "$out/gen-tool" "$here/GenerateBases.java" 2>&1 || exit 1
-    java -cp "$out/gen-tool:$cp" GenerateBases "$here/bases.txt" "$out/gen"
+    javac --release 25 -nowarn -cp "$cp" -d "$out/gen-tool" "$here/GenerateBases.java" "$here/GenerateEntities.java" 2>&1 || exit 1
+    java -cp "$out/gen-tool:$cp" GenerateBases "$here/bases.txt" "$out/gen" "$root/server-bukkit/java/org/basaltmc/bukkit/entity/ops"
+    java -cp "$out/gen-tool:$cp" GenerateEntities "$root/server-bukkit/java/org/basaltmc/bukkit/entity/ops" "$out/gen"
 fi
 if [ -f "$here/GenerateBlockData.java" ]; then
     javac --release 25 -nowarn -cp "$cp" -d "$out/gen-tool" "$here/GenerateBlockData.java" 2>&1 || exit 1

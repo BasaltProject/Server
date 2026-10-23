@@ -113,12 +113,12 @@ public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
         new java.util.concurrent.ConcurrentHashMap<>();
 
     /** One object per entity id, kept while the entity lives, so plugins that hold weak references keep working. */
-    Entity entity(int entityId) {
+    public Entity entity(int entityId) {
         Entity known = entityObjects.get(entityId);
         if (known != null) {
             return known;
         }
-        Entity made = EntityCore.make(this, entityId);
+        Entity made = org.basaltmc.bukkit.entity.EntityCore.make(this, entityId);
         if (made != null) {
             if (entityObjects.size() > 8192) {
                 entityObjects.values().removeIf(entity -> entity.isDead());
@@ -587,10 +587,47 @@ public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
     @Override
     public Entity spawnEntity(Location location, EntityType type,
             org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason reason) {
-        Blocks.flushAll();
-        int spawned = WorldNatives.spawn(name, type.getKey().toString(), location.getX(), location.getY(),
-            location.getZ());
-        return spawned < 0 ? null : entity(spawned);
+        return org.basaltmc.bukkit.entity.EntitySpawner.spawn(this, location, type, reason, null);
+    }
+
+    @Override
+    public Entity spawnEntity(Location location, EntityType type, boolean randomizeData) {
+        return spawnEntity(location, type, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM);
+    }
+
+    @Override
+    public <T extends Entity> T spawn(Location location, Class<T> type, Consumer<? super T> function,
+            org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason reason) throws IllegalArgumentException {
+        return org.basaltmc.bukkit.entity.EntitySpawner.spawn(this, location, type, reason, function);
+    }
+
+    @Override
+    public <T extends Entity> T spawn(Location location, Class<T> type, boolean randomizeData,
+            Consumer<? super T> function) throws IllegalArgumentException {
+        return spawn(location, type, function, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM);
+    }
+
+    @Override
+    public <T extends LivingEntity> T spawn(Location location, Class<T> type,
+            org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason reason, boolean randomizeData,
+            Consumer<? super T> function) throws IllegalArgumentException {
+        return spawn(location, type, function, reason);
+    }
+
+    @Override
+    public org.bukkit.entity.Item dropItem(Location location, org.bukkit.inventory.ItemStack item,
+            Consumer<? super org.bukkit.entity.Item> function) {
+        return org.basaltmc.bukkit.entity.EntitySpawner.drop(this, location, item, 0.0, 0.0, 0.0, function);
+    }
+
+    @Override
+    public org.bukkit.entity.Item dropItemNaturally(Location location, org.bukkit.inventory.ItemStack item,
+            Consumer<? super org.bukkit.entity.Item> function) {
+        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+        Location at = location.clone().add(random.nextDouble() * 0.5 + 0.25, random.nextDouble() * 0.5 + 0.25,
+            random.nextDouble() * 0.5 + 0.25);
+        return org.basaltmc.bukkit.entity.EntitySpawner.drop(this, at, item, random.nextDouble() * 0.2 - 0.1, 0.2,
+            random.nextDouble() * 0.2 - 0.1, function);
     }
 
     @Override
