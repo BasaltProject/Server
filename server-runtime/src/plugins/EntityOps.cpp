@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/player/PlayerConnection.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -253,6 +254,10 @@ const Accessors& accessors() {
         all["sitting"] = field(&ServerEntity::sitting);
         all["tamed_horse"] = field(&ServerEntity::tamedHorse);
         all["fuse"] = field(&ServerEntity::fuse);
+        all["object_data"] = field(&ServerEntity::objectData);
+        all["bolt_visual_only"] = field(&ServerEntity::boltVisualOnly);
+        all["bolt_life"] = field(&ServerEntity::boltLife);
+        all["bolt_flashes"] = field(&ServerEntity::boltFlashes);
         all["category"] = Accessor{
             [](const ServerEntity& entity) -> Value { return std::string{entity::mobs::categoryOf(entity.type())}; },
             nullptr};
@@ -525,6 +530,10 @@ bool mergeNbt(ServerEntity& entity, const NbtCompound& patch) {
     }
     for (const char* skipped : {"id", "UUID", "Pos", "Motion", "Rotation", "Health", "Passengers"}) {
         remainder.remove(skipped);
+    }
+    if (patch.contains("Offers") && entity.type().path() == "villager") {
+        entity::villagers::readOffers(patch, entity);
+        remainder.remove("Offers");
     }
     merge(source(entity), remainder);
     if (const NbtTag* health = patch.find("Health"); health != nullptr) {

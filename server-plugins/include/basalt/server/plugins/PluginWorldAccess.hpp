@@ -359,6 +359,17 @@ public:
         return -1;
     }
 
+    /// An explosion of the given power; the source is an entity id or -1. Blocks are spared when `breakBlocks` is off.
+    virtual bool explode(double x, double y, double z, float power, bool breakBlocks, std::int32_t sourceEntityId) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(power);
+        static_cast<void>(breakBlocks);
+        static_cast<void>(sourceEntityId);
+        return false;
+    }
+
     /// Like `spawn`, with a facing and the reason the spawn event reports.
     virtual std::shared_ptr<PluginEntityRef> spawnAs(std::string_view type, double x, double y, double z, float yaw,
                                                      std::string_view reason) {

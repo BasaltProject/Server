@@ -78,6 +78,9 @@ struct ModelHooks {
     std::function<entity::ServerEntity*(world::LoadedWorld& world, const wire::common::Identifier& type, double x,
                                         double y, double z, float yaw, std::string_view reason)>
         spawnAs;
+    std::function<void(world::LoadedWorld& world, double x, double y, double z, float power, bool breakBlocks,
+                       std::int32_t sourceEntityId)>
+        explode;
 };
 
 [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef>

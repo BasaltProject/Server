@@ -1225,6 +1225,14 @@ public:
                    : -1;
     }
 
+    bool explode(double x, double y, double z, float power, bool breakBlocks, std::int32_t sourceEntityId) override {
+        if (!hooks_.explode) {
+            return false;
+        }
+        hooks_.explode(*world_, x, y, z, power, breakBlocks, sourceEntityId);
+        return true;
+    }
+
     std::shared_ptr<PluginEntityRef> spawnAs(std::string_view type, double x, double y, double z, float yaw,
                                              std::string_view reason) override {
         const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{type});

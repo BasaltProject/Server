@@ -228,13 +228,22 @@ jint JNICALL nativeDropItem(JNIEnv* env, jclass, jstring world, jbyteArray stack
     return guarded<jint>(-1, [&] { return found->dropItem(bytes, x, y, z, vx, vy, vz); });
 }
 
+jboolean JNICALL nativeExplode(JNIEnv* env, jclass, jstring world, jdouble x, jdouble y, jdouble z, jfloat power,
+                               jboolean breakBlocks, jint source) {
+    const auto found = BukkitBridge::current().services().worlds().byName(toStd(env, world));
+    return found != nullptr &&
+                   guarded<bool>(false, [&] { return found->explode(x, y, z, power, breakBlocks == JNI_TRUE, source); })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
 } // namespace
 
 void registerEntityNatives(JNIEnv* env, jclass natives) {
     const auto method = [](const char* name, const char* signature, void* function) {
         return JNINativeMethod{const_cast<char*>(name), const_cast<char*>(signature), function};
     };
-    const std::array<JNINativeMethod, 5> methods{
+    const std::array<JNINativeMethod, 6> methods{
         method("get", "(Ljava/lang/String;ILjava/lang/String;)Ljava/lang/Object;", reinterpret_cast<void*>(&nativeGet)),
         method("set", "(Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;)Z",
                reinterpret_cast<void*>(&nativeSet)),
@@ -243,6 +252,7 @@ void registerEntityNatives(JNIEnv* env, jclass natives) {
         method("spawnAs", "(Ljava/lang/String;Ljava/lang/String;DDDFLjava/lang/String;)I",
                reinterpret_cast<void*>(&nativeSpawnAs)),
         method("dropItem", "(Ljava/lang/String;[BDDDDDD)I", reinterpret_cast<void*>(&nativeDropItem)),
+        method("explode", "(Ljava/lang/String;DDDFZI)Z", reinterpret_cast<void*>(&nativeExplode)),
     };
     env->RegisterNatives(natives, methods.data(), static_cast<jint>(methods.size()));
 }
