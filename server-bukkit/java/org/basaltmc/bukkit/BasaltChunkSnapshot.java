@@ -78,12 +78,12 @@ public final class BasaltChunkSnapshot implements org.bukkit.ChunkSnapshot {
 
     @Override
     public int getBlockSkyLight(int x, int y, int z) {
-        return 15;
+        return Math.max(0, WorldNatives.lightAt(world.getName(), (chunkX << 4) + (x & 15), y, (chunkZ << 4) + (z & 15), 1));
     }
 
     @Override
     public int getBlockEmittedLight(int x, int y, int z) {
-        return 0;
+        return (WorldNatives.stateFlags(state(x, y, z)) >> 9) & 15;
     }
 
     @Override
@@ -108,12 +108,12 @@ public final class BasaltChunkSnapshot implements org.bukkit.ChunkSnapshot {
 
     @Override
     public double getRawBiomeTemperature(int x, int z) {
-        return 0.8;
+        return getRawBiomeTemperature(x, minY, z);
     }
 
     @Override
     public double getRawBiomeTemperature(int x, int y, int z) {
-        return 0.8;
+        return WorldEnvNatives.temperature(world.getName(), (chunkX << 4) + (x & 15), y, (chunkZ << 4) + (z & 15));
     }
 
     @Override
@@ -152,6 +152,14 @@ public final class BasaltChunkSnapshot implements org.bukkit.ChunkSnapshot {
 
     @Override
     public boolean contains(Biome biome) {
+        int wanted = java.util.Arrays.asList(Registries.biomeIds()).indexOf(biome.getKey().toString());
+        int[] cells = org.basaltmc.bukkit.facade.Chunks.readBiomes(world.getName(), chunkX, chunkZ,
+            ((maxY - minY) >> 4) * 64);
+        for (int cell : cells == null ? new int[0] : cells) {
+            if (cell == wanted) {
+                return true;
+            }
+        }
         return false;
     }
 }

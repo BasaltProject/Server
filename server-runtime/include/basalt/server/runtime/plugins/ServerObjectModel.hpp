@@ -134,6 +134,8 @@ public:
     [[nodiscard]] std::vector<double> blockHardness(std::string_view block) const override;
     [[nodiscard]] std::vector<double> blockInfo(std::int32_t stateId) const override;
     [[nodiscard]] std::vector<std::int32_t> collisionBoxes(std::int32_t stateId) const override;
+    [[nodiscard]] std::vector<std::string> gameRuleSpecs() const override;
+    [[nodiscard]] std::int32_t gameEventFrequency(std::string_view event) const override;
     [[nodiscard]] std::vector<std::string> blockSounds(std::int32_t stateId) const override;
     [[nodiscard]] std::int32_t transformState(std::int32_t stateId, std::int32_t rotation,
                                               std::int32_t mirror) const override;

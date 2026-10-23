@@ -201,6 +201,20 @@ public:
         return strongholdGenerator_;
     }
 
+    /// What a plugin changed about natural spawning here; a value under zero is vanilla's.
+    struct SpawnTunables {
+        std::array<std::int32_t, 8> limits{-1, -1, -1, -1, -1, -1, -1, -1};
+        std::array<std::int32_t, 8> ticksPer{-1, -1, -1, -1, -1, -1, -1, -1};
+        bool allowMonsters = true;
+        bool allowAnimals = true;
+    };
+
+    [[nodiscard]] SpawnTunables& spawnTunables() noexcept { return spawnTunables_; }
+
+    [[nodiscard]] const SpawnTunables& spawnTunables() const noexcept { return spawnTunables_; }
+
+    void setViewDistance(std::int32_t chunks) noexcept { settings_.viewDistance = chunks; }
+
     /// This world's border. Not persisted yet, so it starts at vanilla's default size each run.
     [[nodiscard]] WorldBorder& border() noexcept { return border_; }
 
@@ -344,6 +358,7 @@ private:
     std::unique_ptr<server::world::terrain::OverworldBiomeSource> biomeSource_;
     server::world::terrain::BiomeZoomer biomeZoomer_;
     WorldBorder border_;
+    SpawnTunables spawnTunables_;
     std::set<std::int64_t> forcedChunks_;
     std::mutex pluginDataMutex_;
     std::optional<wire::nbt::NbtCompound> pluginData_;

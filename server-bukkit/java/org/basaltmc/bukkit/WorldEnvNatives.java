@@ -41,6 +41,51 @@ public final class WorldEnvNatives {
 
     public static native double breakSpeed(String world, String player, int x, int y, int z);
 
+    /** Per structure start: name, chunk x and z, box, then the boxes of its pieces, joined by bars. */
+    public static native String[] structureStarts(String world, int chunkX, int chunkZ);
+
+    public static native String[] raids(String world);
+
+    public static native boolean setRaid(String world, int id, int omenLevel, int totalGroups);
+
+    /** Fluid name, source flag, level and falling flag joined by bars. */
+    public static native String fluidAt(String world, int x, int y, int z);
+
+    public static native int[] lightningTarget(String world, int x, int z);
+
+    public static native void gameEvent(String world, String event, double x, double y, double z, String source);
+
+    public static native boolean growTree(String world, int x, int y, int z, String sapling);
+
+    public static native String[] pointsOfInterest(String world, String[] types, int x, int y, int z, int radius,
+        int occupancy);
+
+    /** Eight limits, eight ticks per spawn, then the monster and animal flags. */
+    public static native int[] spawnTunables(String world);
+
+    public static native void setSpawnTunables(String world, int[] values);
+
+    /** The view distance after setting it to a positive value; a zero only reads it. */
+    public static native int viewDistance(String world, int set);
+
+    /** Sea level, then the ticks left of rain, thunder and commanded clear weather. */
+    public static native int[] worldFacts(String world);
+
+    public static native void setWeatherTimes(String world, int rain, int thunder, int clear);
+
+    /** The force-loaded chunks as x and z pairs. */
+    public static native int[] forcedChunks(String world);
+
+    public static native void setChunkForced(String world, int chunkX, int chunkZ, boolean forced);
+
+    /** The inhabited ticks of a loaded chunk, after setting them when `set` is not negative. */
+    public static native long inhabitedTime(String world, int chunkX, int chunkZ, long set);
+
+    /** Id, `boolean` or `int`, and starting value of every game rule. */
+    public static native String[] gameRuleSpecs();
+
+    public static native int gameEventFrequency(String event);
+
     /** One server setting as text, null when there is none of that name. */
     public static native String setting(String key);
 

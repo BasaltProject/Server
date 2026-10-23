@@ -25,7 +25,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.util.BoundingBox;
 
-public final class BasaltWorld extends WorldExtras {
+public final class BasaltWorld extends WorldGeo {
     private static final int kSeed = 0;
     private static final int kMinY = 1;
     private static final int kHeight = 2;
@@ -189,11 +189,6 @@ public final class BasaltWorld extends WorldExtras {
     }
 
     @Override
-    public int getSeaLevel() {
-        return 63;
-    }
-
-    @Override
     public File getWorldFolder() {
         return new File(BasaltServer.instance().getWorldContainer(), text(1));
     }
@@ -330,16 +325,6 @@ public final class BasaltWorld extends WorldExtras {
     }
 
     @Override
-    public double getTemperature(int x, int y, int z) {
-        return 0.8;
-    }
-
-    @Override
-    public double getHumidity(int x, int y, int z) {
-        return 0.4;
-    }
-
-    @Override
     public org.bukkit.Chunk getChunkAt(int x, int z) {
         return getChunkAt(x, z, true);
     }
@@ -418,29 +403,6 @@ public final class BasaltWorld extends WorldExtras {
     @Override
     public boolean refreshChunk(int x, int z) {
         return isChunkLoaded(x, z);
-    }
-
-    @Override
-    public boolean isChunkForceLoaded(int x, int z) {
-        return false;
-    }
-
-    @Override
-    public void setChunkForceLoaded(int x, int z, boolean forced) {}
-
-    @Override
-    public Collection<org.bukkit.Chunk> getForceLoadedChunks() {
-        return List.of();
-    }
-
-    @Override
-    public Collection<Player> getPlayersSeeingChunk(int x, int z) {
-        return List.of();
-    }
-
-    @Override
-    public Collection<Player> getPlayersSeeingChunk(org.bukkit.Chunk chunk) {
-        return List.of();
     }
 
     @Override
@@ -773,30 +735,6 @@ public final class BasaltWorld extends WorldExtras {
     }
 
     @Override
-    public int getWeatherDuration() {
-        return 6000;
-    }
-
-    @Override
-    public void setWeatherDuration(int ticks) {}
-
-    @Override
-    public int getThunderDuration() {
-        return 6000;
-    }
-
-    @Override
-    public void setThunderDuration(int ticks) {}
-
-    @Override
-    public int getClearWeatherDuration() {
-        return 0;
-    }
-
-    @Override
-    public void setClearWeatherDuration(int ticks) {}
-
-    @Override
     public boolean getPVP() {
         return pvp;
     }
@@ -821,51 +759,62 @@ public final class BasaltWorld extends WorldExtras {
     }
 
     @Override
-    public int getViewDistance() {
-        return BasaltServer.instance().getViewDistance();
-    }
-
-    @Override
     public int getSimulationDistance() {
         return BasaltServer.instance().getSimulationDistance();
     }
 
     @Override
     public String[] getGameRules() {
-        return WorldNatives.gameRules(name);
+        String[] ids = WorldNatives.gameRules(name);
+        String[] names = new String[ids == null ? 0 : ids.length];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = BasaltGameRule.legacyName(ids[i]);
+        }
+        return names;
     }
 
     @Override
     public String getGameRuleValue(String rule) {
-        return WorldNatives.gameRule(name, rule);
+        return WorldNatives.gameRule(name, BasaltGameRule.modernName(rule));
     }
 
     @Override
     public boolean setGameRuleValue(String rule, String value) {
-        return WorldNatives.setGameRule(name, rule, value);
+        return WorldNatives.setGameRule(name, BasaltGameRule.modernName(rule), value);
     }
 
     @Override
     public boolean isGameRule(String rule) {
-        return WorldNatives.gameRule(name, rule) != null;
+        return WorldNatives.gameRule(name, BasaltGameRule.modernName(rule)) != null;
     }
 
     @Override
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> T getGameRuleValue(GameRule<T> rule) {
-        String value = WorldNatives.gameRule(name, rule.getName());
+        if (rule instanceof BasaltGameRule.Legacy legacy) {
+            Object modern = getGameRuleValue(legacy.modern);
+            return modern == null ? null : (T) legacy.fromModern.apply(modern);
+        }
+        String value = WorldNatives.gameRule(name, rule.getKey().getKey());
         if (value == null) {
             return null;
         }
-        if (rule.getType() == Boolean.class) {
-            return (T) Boolean.valueOf(value);
-        }
-        return (T) Integer.valueOf(value);
+        return (T) (rule.getType() == Boolean.class ? (Object) Boolean.valueOf(value) : (Object) Integer.valueOf(value));
     }
 
     @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <T> T getGameRuleDefault(GameRule<T> rule) {
+        return rule.getDefaultValue();
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> boolean setGameRule(GameRule<T> rule, T value) {
-        return WorldNatives.setGameRule(name, rule.getName(), String.valueOf(value));
+        if (rule instanceof BasaltGameRule.Legacy legacy) {
+            return setGameRule(legacy.modern, legacy.toModern.apply(value));
+        }
+        return WorldNatives.setGameRule(name, rule.getKey().getKey(), String.valueOf(value));
     }
 
     @Override

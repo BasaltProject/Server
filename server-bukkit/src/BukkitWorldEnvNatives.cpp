@@ -2,6 +2,8 @@
 
 #include <basalt/server/plugins/PluginWorldEnv.hpp>
 
+#include <algorithm>
+
 namespace basalt::server::bukkit {
 namespace {
 using plugins::PluginBorder;
@@ -309,6 +311,281 @@ jboolean JNICALL nativeStopping(JNIEnv*, jclass) {
     return bridge != nullptr && bridge->stopping() ? JNI_TRUE : JNI_FALSE;
 }
 
+template <typename Each>
+std::string joinWith(const char separator, const Each& each, const std::size_t count) {
+    std::string out;
+    for (std::size_t at = 0; at < count; ++at) {
+        out += (at == 0 ? "" : std::string(1, separator)) + each(at);
+    }
+    return out;
+}
+
+jobjectArray JNICALL nativeStructureStarts(JNIEnv* env, jclass, jstring world, jint chunkX, jint chunkZ) {
+    const auto found = worldOf(env, world);
+    std::vector<std::string> rows;
+    if (found != nullptr) {
+        const auto starts = jni::onServer<std::vector<plugins::PluginStructureStart>>({}, [&] {
+            PluginWorldEnv* target = found->env();
+            return target == nullptr ? std::vector<plugins::PluginStructureStart>{}
+                                     : target->structureStarts(chunkX, chunkZ);
+        });
+        const auto box = [](const std::array<std::int32_t, 6>& bounds) {
+            return joinWith(',', [&bounds](std::size_t at) { return std::to_string(bounds[at]); }, bounds.size());
+        };
+        for (const plugins::PluginStructureStart& start : starts) {
+            rows.push_back(start.structure + "|" + std::to_string(start.chunkX) + "|" + std::to_string(start.chunkZ) +
+                           "|" + box(start.bounds) + "|" +
+                           joinWith(';', [&](std::size_t at) { return box(start.pieces[at]); }, start.pieces.size()));
+        }
+    }
+    return jni::stringArrayOf(env, rows);
+}
+
+jobjectArray JNICALL nativeRaids(JNIEnv* env, jclass, jstring world) {
+    const auto found = worldOf(env, world);
+    std::vector<std::string> rows;
+    if (found != nullptr) {
+        const auto raids = jni::onServer<std::vector<plugins::PluginRaid>>({}, [&] {
+            PluginWorldEnv* target = found->env();
+            return target == nullptr ? std::vector<plugins::PluginRaid>{} : target->raids();
+        });
+        for (const plugins::PluginRaid& raid : raids) {
+            rows.push_back(
+                std::to_string(raid.id) + "|" + (raid.started ? "1" : "0") + "|" + std::to_string(raid.ticksActive) +
+                "|" + std::to_string(raid.omenLevel) + "|" + std::to_string(raid.center[0]) + "," +
+                std::to_string(raid.center[1]) + "," + std::to_string(raid.center[2]) + "|" + raid.status + "|" +
+                std::to_string(raid.groupsSpawned) + "|" + std::to_string(raid.totalGroups) + "|" +
+                std::to_string(raid.totalHealth) + "|" +
+                joinWith(
+                    ',', [&](std::size_t at) { return raid.heroes[at]; }, raid.heroes.size()) +
+                "|" +
+                joinWith(',', [&](std::size_t at) { return std::to_string(raid.raiders[at]); }, raid.raiders.size()));
+        }
+    }
+    return jni::stringArrayOf(env, rows);
+}
+
+jboolean JNICALL nativeSetRaid(JNIEnv* env, jclass, jstring world, jint id, jint omen, jint groups) {
+    const auto found = worldOf(env, world);
+    return found != nullptr && jni::onServer<bool>(false,
+                                                   [&] {
+                                                       PluginWorldEnv* target = found->env();
+                                                       return target != nullptr && target->setRaid(id, omen, groups);
+                                                   })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jstring JNICALL nativeFluidAt(JNIEnv* env, jclass, jstring world, jint x, jint y, jint z) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const plugins::PluginFluid fluid = jni::onServer<plugins::PluginFluid>({}, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? plugins::PluginFluid{} : target->fluidAt(x, y, z);
+    });
+    return toJava(env, fluid.fluid + "|" + (fluid.source ? "1" : "0") + "|" + std::to_string(fluid.level) + "|" +
+                           (fluid.falling ? "1" : "0"));
+}
+
+jintArray JNICALL nativeLightningTarget(JNIEnv* env, jclass, jstring world, jint x, jint z) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const auto at = jni::onServer<std::optional<std::array<std::int32_t, 3>>>(std::nullopt, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? std::optional<std::array<std::int32_t, 3>>{} : target->lightningTarget(x, z);
+    });
+    if (!at.has_value()) {
+        return nullptr;
+    }
+    jintArray array = env->NewIntArray(3);
+    env->SetIntArrayRegion(array, 0, 3, at->data());
+    return array;
+}
+
+void JNICALL nativeGameEvent(JNIEnv* env, jclass, jstring world, jstring event, jdouble x, jdouble y, jdouble z,
+                             jstring source) {
+    const auto found = worldOf(env, world);
+    const std::string name = toStd(env, event);
+    const std::string who = source == nullptr ? std::string{} : toStd(env, source);
+    if (found == nullptr) {
+        return;
+    }
+    static_cast<void>(jni::onServer<bool>(false, [&] {
+        if (PluginWorldEnv* target = found->env(); target != nullptr) {
+            target->gameEvent(name, x, y, z, who);
+        }
+        return true;
+    }));
+}
+
+jboolean JNICALL nativeGrowTree(JNIEnv* env, jclass, jstring world, jint x, jint y, jint z, jstring sapling) {
+    const auto found = worldOf(env, world);
+    const std::string name = toStd(env, sapling);
+    return found != nullptr && jni::onServer<bool>(false,
+                                                   [&] {
+                                                       PluginWorldEnv* target = found->env();
+                                                       return target != nullptr && target->growTree(x, y, z, name);
+                                                   })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jobjectArray JNICALL nativePointsOfInterest(JNIEnv* env, jclass, jstring world, jobjectArray types, jint x, jint y,
+                                            jint z, jint radius, jint occupancy) {
+    const auto found = worldOf(env, world);
+    std::vector<std::string> rows;
+    if (found != nullptr) {
+        const std::vector<std::string> wanted = jni::stringsOf(env, types);
+        const auto records = jni::onServer<std::vector<plugins::PluginPoi>>({}, [&] {
+            PluginWorldEnv* target = found->env();
+            return target == nullptr ? std::vector<plugins::PluginPoi>{}
+                                     : target->pointsOfInterest(wanted, x, y, z, radius, occupancy);
+        });
+        for (const plugins::PluginPoi& poi : records) {
+            rows.push_back(poi.type + "|" + std::to_string(poi.x) + "|" + std::to_string(poi.y) + "|" +
+                           std::to_string(poi.z) + "|" + std::to_string(poi.freeTickets));
+        }
+    }
+    return jni::stringArrayOf(env, rows);
+}
+
+jintArray JNICALL nativeSpawnTunables(JNIEnv* env, jclass, jstring world) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const plugins::PluginSpawnTunables held = jni::onServer<plugins::PluginSpawnTunables>({}, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? plugins::PluginSpawnTunables{} : target->spawnTunables();
+    });
+    std::array<jint, 18> values{};
+    std::ranges::copy(held.limits, values.begin());
+    std::ranges::copy(held.ticksPer, values.begin() + 8);
+    values[16] = held.allowMonsters ? 1 : 0;
+    values[17] = held.allowAnimals ? 1 : 0;
+    jintArray array = env->NewIntArray(18);
+    env->SetIntArrayRegion(array, 0, 18, values.data());
+    return array;
+}
+
+void JNICALL nativeSetSpawnTunables(JNIEnv* env, jclass, jstring world, jintArray values) {
+    const auto found = worldOf(env, world);
+    std::array<jint, 18> raw{};
+    if (found == nullptr || values == nullptr || env->GetArrayLength(values) < 18) {
+        return;
+    }
+    env->GetIntArrayRegion(values, 0, 18, raw.data());
+    plugins::PluginSpawnTunables held;
+    std::copy_n(raw.begin(), 8, held.limits.begin());
+    std::copy_n(raw.begin() + 8, 8, held.ticksPer.begin());
+    held.allowMonsters = raw[16] != 0;
+    held.allowAnimals = raw[17] != 0;
+    static_cast<void>(jni::onServer<bool>(false, [&] {
+        if (PluginWorldEnv* target = found->env(); target != nullptr) {
+            target->setSpawnTunables(held);
+        }
+        return true;
+    }));
+}
+
+jint JNICALL nativeViewDistance(JNIEnv* env, jclass, jstring world, jint set) {
+    const auto found = worldOf(env, world);
+    return found == nullptr ? 10 : jni::onServer<jint>(10, [&] {
+        PluginWorldEnv* target = found->env();
+        if (target == nullptr) {
+            return 10;
+        }
+        if (set > 0) {
+            target->setViewDistance(set);
+        }
+        return target->viewDistance();
+    });
+}
+
+jintArray JNICALL nativeWorldFacts(JNIEnv* env, jclass, jstring world) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const std::array<jint, 4> values = jni::onServer<std::array<jint, 4>>({}, [&] {
+        PluginWorldEnv* target = found->env();
+        if (target == nullptr) {
+            return std::array<jint, 4>{63, 0, 0, 0};
+        }
+        const std::array<std::int32_t, 3> times = target->weatherTimes();
+        return std::array<jint, 4>{target->seaLevel(), times[0], times[1], times[2]};
+    });
+    jintArray array = env->NewIntArray(4);
+    env->SetIntArrayRegion(array, 0, 4, values.data());
+    return array;
+}
+
+void JNICALL nativeSetWeatherTimes(JNIEnv* env, jclass, jstring world, jint rain, jint thunder, jint clear) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return;
+    }
+    static_cast<void>(jni::onServer<bool>(false, [&] {
+        if (PluginWorldEnv* target = found->env(); target != nullptr) {
+            target->setWeatherTimes(rain, thunder, clear);
+        }
+        return true;
+    }));
+}
+
+jintArray JNICALL nativeForcedChunks(JNIEnv* env, jclass, jstring world) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const std::vector<std::int32_t> flat = jni::onServer<std::vector<std::int32_t>>({}, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? std::vector<std::int32_t>{} : target->forcedChunks();
+    });
+    jintArray array = env->NewIntArray(static_cast<jsize>(flat.size()));
+    env->SetIntArrayRegion(array, 0, static_cast<jsize>(flat.size()), flat.data());
+    return array;
+}
+
+void JNICALL nativeSetChunkForced(JNIEnv* env, jclass, jstring world, jint chunkX, jint chunkZ, jboolean forced) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return;
+    }
+    static_cast<void>(jni::onServer<bool>(false, [&] {
+        if (PluginWorldEnv* target = found->env(); target != nullptr) {
+            target->setChunkForced(chunkX, chunkZ, forced == JNI_TRUE);
+        }
+        return true;
+    }));
+}
+
+jlong JNICALL nativeInhabitedTime(JNIEnv* env, jclass, jstring world, jint chunkX, jint chunkZ, jlong set) {
+    const auto found = worldOf(env, world);
+    return found == nullptr ? 0 : jni::onServer<jlong>(0, [&] {
+        PluginWorldEnv* target = found->env();
+        if (target == nullptr) {
+            return jlong{0};
+        }
+        if (set >= 0) {
+            target->setInhabitedTime(chunkX, chunkZ, set);
+        }
+        return static_cast<jlong>(target->inhabitedTime(chunkX, chunkZ));
+    });
+}
+
+jobjectArray JNICALL nativeGameRuleSpecs(JNIEnv* env, jclass) {
+    return jni::stringArrayOf(env, BukkitBridge::current().services().worlds().gameRuleSpecs());
+}
+
+jint JNICALL nativeGameEventFrequency(JNIEnv* env, jclass, jstring event) {
+    return BukkitBridge::current().services().worlds().gameEventFrequency(toStd(env, event));
+}
+
 jint JNICALL nativeTransformState(JNIEnv*, jclass, jint state, jint rotation, jint mirror) {
     return BukkitBridge::current().services().worlds().transformState(state, rotation, mirror);
 }
@@ -355,6 +632,27 @@ void registerWorldEnvNatives(JNIEnv* env, jclass natives) {
                reinterpret_cast<void*>(&nativeCreateWorld)),
         method("unloadWorld", "(Ljava/lang/String;Z)Z", reinterpret_cast<void*>(&nativeUnloadWorld)),
         method("stopping", "()Z", reinterpret_cast<void*>(&nativeStopping)),
+        method("structureStarts", "(Ljava/lang/String;II)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeStructureStarts)),
+        method("raids", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeRaids)),
+        method("setRaid", "(Ljava/lang/String;III)Z", reinterpret_cast<void*>(&nativeSetRaid)),
+        method("fluidAt", "(Ljava/lang/String;III)Ljava/lang/String;", reinterpret_cast<void*>(&nativeFluidAt)),
+        method("lightningTarget", "(Ljava/lang/String;II)[I", reinterpret_cast<void*>(&nativeLightningTarget)),
+        method("gameEvent", "(Ljava/lang/String;Ljava/lang/String;DDDLjava/lang/String;)V",
+               reinterpret_cast<void*>(&nativeGameEvent)),
+        method("growTree", "(Ljava/lang/String;IIILjava/lang/String;)Z", reinterpret_cast<void*>(&nativeGrowTree)),
+        method("pointsOfInterest", "(Ljava/lang/String;[Ljava/lang/String;IIIII)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativePointsOfInterest)),
+        method("spawnTunables", "(Ljava/lang/String;)[I", reinterpret_cast<void*>(&nativeSpawnTunables)),
+        method("setSpawnTunables", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeSetSpawnTunables)),
+        method("viewDistance", "(Ljava/lang/String;I)I", reinterpret_cast<void*>(&nativeViewDistance)),
+        method("worldFacts", "(Ljava/lang/String;)[I", reinterpret_cast<void*>(&nativeWorldFacts)),
+        method("setWeatherTimes", "(Ljava/lang/String;III)V", reinterpret_cast<void*>(&nativeSetWeatherTimes)),
+        method("forcedChunks", "(Ljava/lang/String;)[I", reinterpret_cast<void*>(&nativeForcedChunks)),
+        method("setChunkForced", "(Ljava/lang/String;IIZ)V", reinterpret_cast<void*>(&nativeSetChunkForced)),
+        method("inhabitedTime", "(Ljava/lang/String;IIJ)J", reinterpret_cast<void*>(&nativeInhabitedTime)),
+        method("gameRuleSpecs", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeGameRuleSpecs)),
+        method("gameEventFrequency", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeGameEventFrequency)),
         method("transformState", "(III)I", reinterpret_cast<void*>(&nativeTransformState)),
         method("toolFacts", "(Ljava/lang/String;I)[D", reinterpret_cast<void*>(&nativeToolFacts)),
     };

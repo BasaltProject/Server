@@ -159,7 +159,7 @@ std::vector<player::PlayerSession*> ServerWorldEnv::watchers() const {
 void ServerWorldEnv::sound(const std::string_view sound, const std::string_view category, const double x,
                            const double y, const double z, const float volume, const float pitch,
                            const std::int64_t seed) {
-    const double range = kSoundBaseRange * std::max(1.0F, volume);
+    const double range = kSoundBaseRange * static_cast<double>(std::max(1.0F, volume));
     for (const player::PlayerSession* player : watchers()) {
         if (distanceSquared(*player, x, y, z) <= range * range) {
             player::playSoundFor(*player, sound, sourceOf(category), x, y, z, volume, pitch, seed);

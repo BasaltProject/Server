@@ -1076,6 +1076,15 @@ public:
         return stateId;
     }
 
+    /// Every game rule as triples: its id, `boolean` or `int`, and the value a world starts with.
+    [[nodiscard]] virtual std::vector<std::string> gameRuleSpecs() const { return {}; }
+
+    /// The strength (1 to 15) a sculk sensor gives a game event; zero for one it does not listen to.
+    [[nodiscard]] virtual std::int32_t gameEventFrequency(std::string_view event) const {
+        static_cast<void>(event);
+        return 0;
+    }
+
     /// Which blocks own a block entity, as pairs: the block id, then the id of its block entity type.
     [[nodiscard]] virtual std::vector<std::string> blockEntityTypes() const { return {}; }
 

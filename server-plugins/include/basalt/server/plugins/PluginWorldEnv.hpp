@@ -49,6 +49,55 @@ struct PluginDrop {
     std::string components;
 };
 
+struct PluginStructureStart {
+    std::string structure;
+    std::int32_t chunkX = 0;
+    std::int32_t chunkZ = 0;
+    /// min x y z, then max x y z, in blocks and inclusive.
+    std::array<std::int32_t, 6> bounds{};
+    std::vector<std::array<std::int32_t, 6>> pieces;
+};
+
+struct PluginRaid {
+    std::int32_t id = 0;
+    bool started = false;
+    std::int64_t ticksActive = 0;
+    std::int32_t omenLevel = 0;
+    std::array<std::int32_t, 3> center{};
+    /// ongoing, victory, loss or stopped.
+    std::string status;
+    std::int32_t groupsSpawned = 0;
+    std::int32_t totalGroups = 0;
+    float totalHealth = 0.0F;
+    std::vector<std::string> heroes;
+    std::vector<std::int32_t> raiders;
+};
+
+struct PluginFluid {
+    /// empty, water or lava.
+    std::string fluid = "empty";
+    bool source = false;
+    std::int32_t level = 0;
+    bool falling = false;
+};
+
+struct PluginPoi {
+    std::string type;
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+    std::int32_t freeTickets = 0;
+};
+
+/// What a plugin changed about natural spawning; a value under zero is vanilla's. Categories in `MobCategory` order:
+/// monster, creature, ambient, axolotls, underground water creature, water creature, water ambient, misc.
+struct PluginSpawnTunables {
+    std::array<std::int32_t, 8> limits{-1, -1, -1, -1, -1, -1, -1, -1};
+    std::array<std::int32_t, 8> ticksPer{-1, -1, -1, -1, -1, -1, -1, -1};
+    bool allowMonsters = true;
+    bool allowAnimals = true;
+};
+
 /// What a plugin can do to the physical world around it that the block and entity services do not cover.
 class PluginWorldEnv {
 public:
@@ -167,6 +216,110 @@ public:
         static_cast<void>(y);
         static_cast<void>(z);
         return 0.0;
+    }
+
+    /// The structure starts that begin in a loaded chunk, with the box of each piece.
+    [[nodiscard]] virtual std::vector<PluginStructureStart> structureStarts(std::int32_t chunkX, std::int32_t chunkZ) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        return {};
+    }
+
+    [[nodiscard]] virtual std::vector<PluginRaid> raids() { return {}; }
+
+    /// Changes the omen level and the number of waves of a raid; false when there is no such raid.
+    virtual bool setRaid(std::int32_t id, std::int32_t omenLevel, std::int32_t totalGroups) {
+        static_cast<void>(id);
+        static_cast<void>(omenLevel);
+        static_cast<void>(totalGroups);
+        return false;
+    }
+
+    [[nodiscard]] virtual PluginFluid fluidAt(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return {};
+    }
+
+    /// Where lightning striking near the column would land: a lightning rod in range, else the highest point.
+    [[nodiscard]] virtual std::optional<std::array<std::int32_t, 3>> lightningTarget(std::int32_t x, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(z);
+        return std::nullopt;
+    }
+
+    /// Raises a game event that sculk sensors in range hear; `source` is an entity uuid or empty.
+    virtual void gameEvent(std::string_view event, double x, double y, double z, std::string_view source) {
+        static_cast<void>(event);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(source);
+    }
+
+    /// Grows the tree of a sapling block (`oak_sapling`...) at the position; false when no tree fits.
+    virtual bool growTree(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view sapling) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(sapling);
+        return false;
+    }
+
+    /// Points of interest of the named types (empty: all) within `radius` of the point; `occupancy` 0 free, 1 taken, 2
+    /// any.
+    [[nodiscard]] virtual std::vector<PluginPoi> pointsOfInterest(const std::vector<std::string>& types, std::int32_t x,
+                                                                  std::int32_t y, std::int32_t z, std::int32_t radius,
+                                                                  std::int32_t occupancy) {
+        static_cast<void>(types);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(radius);
+        static_cast<void>(occupancy);
+        return {};
+    }
+
+    [[nodiscard]] virtual PluginSpawnTunables spawnTunables() { return {}; }
+
+    virtual void setSpawnTunables(const PluginSpawnTunables& tunables) { static_cast<void>(tunables); }
+
+    [[nodiscard]] virtual std::int32_t viewDistance() { return 10; }
+
+    virtual void setViewDistance(std::int32_t chunks) { static_cast<void>(chunks); }
+
+    [[nodiscard]] virtual std::int32_t seaLevel() { return 63; }
+
+    /// The chunks kept loaded by `/forceload`, as x and z pairs.
+    [[nodiscard]] virtual std::vector<std::int32_t> forcedChunks() { return {}; }
+
+    virtual void setChunkForced(std::int32_t chunkX, std::int32_t chunkZ, bool forced) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        static_cast<void>(forced);
+    }
+
+    /// Ticks left of the rain, of the thunder and of the clear weather a command asked for.
+    [[nodiscard]] virtual std::array<std::int32_t, 3> weatherTimes() { return {0, 0, 0}; }
+
+    virtual void setWeatherTimes(std::int32_t rain, std::int32_t thunder, std::int32_t clear) {
+        static_cast<void>(rain);
+        static_cast<void>(thunder);
+        static_cast<void>(clear);
+    }
+
+    /// How long players have stood in the chunk, in ticks; zero for a chunk that is not loaded.
+    [[nodiscard]] virtual std::int64_t inhabitedTime(std::int32_t chunkX, std::int32_t chunkZ) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        return 0;
+    }
+
+    virtual void setInhabitedTime(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t ticks) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        static_cast<void>(ticks);
     }
 
     /// Whether the state would survive standing at the position (`BlockState.canSurvive`).

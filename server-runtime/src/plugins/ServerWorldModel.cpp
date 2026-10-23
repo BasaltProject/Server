@@ -33,6 +33,7 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/runtime/world/maps/MapDecorationTypes.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
@@ -1713,6 +1714,21 @@ std::vector<double> LoadedWorlds::blockInfo(std::int32_t stateId) const {
             static_cast<double>(color & 0xFFFFFFU),
             static_cast<double>(reg::fireOdds::igniteOdds(stateId)),
             static_cast<double>(reg::fireOdds::burnOdds(stateId))};
+}
+
+std::vector<std::string> LoadedWorlds::gameRuleSpecs() const {
+    std::vector<std::string> specs;
+    for (const world::GameRule& rule : world::gameRules::all()) {
+        specs.emplace_back(rule.id);
+        specs.emplace_back(rule.kind == world::GameRule::Kind::Boolean ? "boolean" : "int");
+        specs.push_back(rule.kind == world::GameRule::Kind::Boolean ? (rule.defaultFlag ? "true" : "false")
+                                                                    : std::to_string(rule.defaultNumber));
+    }
+    return specs;
+}
+
+std::int32_t LoadedWorlds::gameEventFrequency(std::string_view event) const {
+    return world::vibrations::frequencyOf(event);
 }
 
 std::vector<std::string> LoadedWorlds::blockSounds(std::int32_t stateId) const {
