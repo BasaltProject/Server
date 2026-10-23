@@ -398,6 +398,18 @@ public final class BasaltPluginManager extends PluginManagerBase {
 
     @Override
     public void callEvent(Event event) {
+        if (event.isAsynchronous()) {
+            if (Thread.holdsLock(this)) {
+                throw new IllegalStateException(event.getEventName()
+                    + " cannot be triggered asynchronously from inside synchronized code.");
+            }
+            if (server.isPrimaryThread()) {
+                throw new IllegalStateException(event.getEventName()
+                    + " cannot be triggered asynchronously from primary server thread.");
+            }
+        } else if (!server.isPrimaryThread()) {
+            throw new IllegalStateException(event.getEventName() + " may only be triggered synchronously.");
+        }
         for (RegisteredListener registration : event.getHandlers().getRegisteredListeners()) {
             if (!registration.getPlugin().isEnabled()) {
                 continue;

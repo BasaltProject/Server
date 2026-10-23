@@ -251,6 +251,10 @@ public class BasaltServer extends MiscServer {
         return matches;
     }
 
+    boolean announced() {
+        return worldsReady;
+    }
+
     /** Plugins that load at STARTUP see no worlds, as on any Bukkit server, until the worlds are announced. */
     void announceWorlds() {
         worldsReady = true;

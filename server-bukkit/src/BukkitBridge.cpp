@@ -4,6 +4,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <future>
+#include <memory>
 
 namespace basalt::server::bukkit {
 namespace {
@@ -357,6 +360,29 @@ bool BukkitBridge::subscribe(const std::string& event, std::int32_t priority) {
                 snapshot.values.push_back(fired.get(static_cast<std::int32_t>(index)));
             }
             if (!plugins_->onPluginThread()) {
+                if (event == "player.login" && !monitor) {
+                    auto shared = std::make_shared<Snapshot>(std::move(snapshot));
+                    auto done = std::make_shared<std::promise<void>>();
+                    std::future<void> finished = done->get_future();
+                    static_cast<void>(services().tasks().after(0, [this, event, priority, shared, done] {
+                        shared->cancelled = deliver(event, priority, *shared);
+                        done->set_value();
+                    }));
+                    if (finished.wait_for(std::chrono::seconds(10)) != std::future_status::ready) {
+                        return;
+                    }
+                    for (std::size_t index = 0; index < shared->values.size(); ++index) {
+                        if (fired.type().isMutable(fired.type().fields()[index])) {
+                            fired.set(static_cast<std::int32_t>(index), shared->values[index]);
+                        }
+                    }
+                    if (shared->cancelled) {
+                        fired.cancel();
+                    } else if (fired.cancelled()) {
+                        fired.restore();
+                    }
+                    return;
+                }
                 if (monitor || !fired.type().cancellable()) {
                     static_cast<void>(
                         services().tasks().after(0, [this, event, priority, moved = std::move(snapshot)]() mutable {

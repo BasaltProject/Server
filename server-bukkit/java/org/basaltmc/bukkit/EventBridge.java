@@ -114,12 +114,13 @@ final class EventBridge {
     }
 
     private record Mapping(String basalt, Class<? extends Event> produced, Function<Fields, Event> build,
-            BiConsumer<Event, Fields> writeBack, boolean needsPlayer) {}
+            BiConsumer<Event, Fields> writeBack, BiConsumer<Event, Fields> refresh) {}
 
     private static final List<Mapping> mappings = new java.util.ArrayList<>();
     private static final Map<String, List<Mapping>> byName = new HashMap<>();
     private static final Set<String> subscribed = new HashSet<>();
     private static final Map<String, Event> inFlight = new HashMap<>();
+    private static final Set<String> failed = new HashSet<>();
     private static final Map<String, Long> generations = new HashMap<>();
     private static final Map<String, Map<String, Integer>> indexes = new HashMap<>();
 
@@ -131,7 +132,12 @@ final class EventBridge {
 
     static void map(String basalt, Class<? extends Event> produced, Function<Fields, Event> build,
             BiConsumer<Event, Fields> writeBack) {
-        Mapping mapping = new Mapping(basalt, produced, build, writeBack, false);
+        map(basalt, produced, build, writeBack, null);
+    }
+
+    static void map(String basalt, Class<? extends Event> produced, Function<Fields, Event> build,
+            BiConsumer<Event, Fields> writeBack, BiConsumer<Event, Fields> refresh) {
+        Mapping mapping = new Mapping(basalt, produced, build, writeBack, refresh);
         mappings.add(mapping);
         byName.computeIfAbsent(basalt, key -> new java.util.ArrayList<>()).add(mapping);
     }
@@ -146,15 +152,20 @@ final class EventBridge {
 
     static {
         InventoryEvents.register();
+        PlayerEvents.install();
+        BlockEvents.install();
+        WorldEvents.install();
+        ServerEvents.install();
         map("player.join", PlayerJoinEvent.class, f -> new PlayerJoinEvent(f.player(),
             Component.translatable("multiplayer.player.joined", Component.text(f.text("player_name")))));
         map("player.quit", PlayerQuitEvent.class, f -> new PlayerQuitEvent(f.player(),
             Component.translatable("multiplayer.player.left", Component.text(f.text("player_name"))),
             PlayerQuitEvent.QuitReason.DISCONNECTED));
         map("player.chat", AsyncPlayerChatEvent.class,
-            f -> new AsyncPlayerChatEvent(false, f.player(), f.text("message"), new HashSet<>(
+            f -> new AsyncPlayerChatEvent(true, f.player(), f.text("message"), new HashSet<>(
                 BasaltServer.instance().getOnlinePlayers())),
-            (e, f) -> f.put("message", ((AsyncPlayerChatEvent) e).getMessage()));
+            (e, f) -> f.put("message", ((AsyncPlayerChatEvent) e).getMessage()),
+            (e, f) -> ((AsyncPlayerChatEvent) e).setMessage(f.text("message")));
         map("player.command", PlayerCommandPreprocessEvent.class,
             f -> new PlayerCommandPreprocessEvent(f.player(), "/" + f.text("command")),
             (e, f) -> {
@@ -170,7 +181,7 @@ final class EventBridge {
             BasaltWorld world = f.world();
             return new PlayerTeleportEvent(f.player(),
                 new Location(world, f.real("from_x"), f.real("from_y"), f.real("from_z")),
-                new Location(world, f.real("x"), f.real("y"), f.real("z")), PlayerTeleportEvent.TeleportCause.UNKNOWN);
+                new Location(world, f.real("x"), f.real("y"), f.real("z")), PlayerEvents.teleportCause(f.text("cause")));
         });
         map("player.gamemode_change", PlayerGameModeChangeEvent.class, f -> new PlayerGameModeChangeEvent(
             f.player(), gameMode(f.text("gamemode")), PlayerGameModeChangeEvent.Cause.UNKNOWN, null));
@@ -231,7 +242,11 @@ final class EventBridge {
             f -> new org.bukkit.event.world.ChunkUnloadEvent(
                 f.world().getChunkAt((int) f.whole("chunk_x"), (int) f.whole("chunk_z"), false), true));
         map("world.weather_change", org.bukkit.event.weather.WeatherChangeEvent.class,
-            f -> new org.bukkit.event.weather.WeatherChangeEvent(f.world(), f.flag("raining")));
+            f -> f.flag("raining") == f.flag("from_raining") ? null
+                : new org.bukkit.event.weather.WeatherChangeEvent(f.world(), f.flag("raining")));
+        map("world.weather_change", org.bukkit.event.weather.ThunderChangeEvent.class,
+            f -> f.flag("thundering") == f.flag("from_thundering") ? null
+                : new org.bukkit.event.weather.ThunderChangeEvent(f.world(), f.flag("thundering")));
         EntityEvents.install();
         map("server.command", ServerCommandEvent.class,
             f -> new ServerCommandEvent(BasaltServer.instance().consoleImpl(), f.text("command")),
@@ -275,23 +290,34 @@ final class EventBridge {
         boolean result = cancelled;
         for (Mapping mapping : found) {
             String key = name + "#" + mapping.produced.getName();
-            Event event = inFlight.get(key);
-            if (event == null || generations.getOrDefault(key, -1L) != generation) {
-                event = mapping.build.apply(fields);
-                inFlight.put(key, event);
-                generations.put(key, generation);
+            try {
+                Event event = inFlight.get(key);
+                if (event == null || generations.getOrDefault(key, -1L) != generation) {
+                    event = mapping.build.apply(fields);
+                    inFlight.put(key, event);
+                    generations.put(key, generation);
+                }
+                if (event == null) {
+                    continue;
+                }
+                if (mapping.refresh != null) {
+                    mapping.refresh.accept(event, fields);
+                }
+                if (event instanceof Cancellable cancellable) {
+                    cancellable.setCancelled(result);
+                }
+                BasaltServer.instance().pluginManagerImpl().callAt(event, EventPriority.values()[priority]);
+                if (mapping.writeBack != null) {
+                    mapping.writeBack.accept(event, fields);
+                }
+                result = event instanceof Cancellable cancellable && cancellable.isCancelled();
+            } catch (Throwable failure) {
+                inFlight.remove(key);
+                if (failed.add(key)) {
+                    BasaltServer.instance().getLogger().log(java.util.logging.Level.SEVERE,
+                        "Could not build " + mapping.produced.getSimpleName() + " from " + name, failure);
+                }
             }
-            if (event == null) {
-                continue;
-            }
-            if (event instanceof Cancellable cancellable) {
-                cancellable.setCancelled(result);
-            }
-            BasaltServer.instance().pluginManagerImpl().callAt(event, EventPriority.values()[priority]);
-            if (mapping.writeBack != null) {
-                mapping.writeBack.accept(event, fields);
-            }
-            result = event instanceof Cancellable cancellable && cancellable.isCancelled();
         }
         return result;
     }
