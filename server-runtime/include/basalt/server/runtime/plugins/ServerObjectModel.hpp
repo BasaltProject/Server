@@ -125,6 +125,7 @@ public:
     [[nodiscard]] std::int32_t stateFlags(std::int32_t stateId) const override;
     [[nodiscard]] std::vector<double> blockHardness(std::string_view block) const override;
     [[nodiscard]] std::vector<double> blockInfo(std::int32_t stateId) const override;
+    [[nodiscard]] std::vector<std::int32_t> collisionBoxes(std::int32_t stateId) const override;
     [[nodiscard]] std::vector<std::string> blockEntityTypes() const override;
     [[nodiscard]] std::int32_t dataVersion() const override;
     [[nodiscard]] std::optional<std::vector<std::uint8_t>>

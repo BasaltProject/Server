@@ -106,4 +106,5 @@ public final class MiscNatives {
         long seed, String looter);
     public static native int[] locateStructure(String world, String structure, int x, int z, int cells);
     public static native int[] locateBiome(String world, String[] biomes, int x, int y, int z, int radius, int step);
+    public static native int[] shapeBoxes(int stateId);
 }

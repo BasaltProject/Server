@@ -966,4 +966,56 @@ public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
             }
         };
     }
+
+    @Override
+    public org.bukkit.util.RayTraceResult rayTraceBlocks(io.papermc.paper.math.Position start,
+            org.bukkit.util.Vector direction, double maxDistance, org.bukkit.FluidCollisionMode fluidCollisionMode,
+            boolean ignorePassableBlocks, java.util.function.Predicate<? super org.bukkit.block.Block> canCollide) {
+        return org.basaltmc.bukkit.misc.RayTracing.blocks(this, new org.bukkit.util.Vector(start.x(), start.y(), start.z()),
+            direction, maxDistance, fluidCollisionMode, ignorePassableBlocks, canCollide);
+    }
+
+    @Override
+    public org.bukkit.util.RayTraceResult rayTraceEntities(io.papermc.paper.math.Position start,
+            org.bukkit.util.Vector direction, double maxDistance, double raySize,
+            java.util.function.Predicate<? super org.bukkit.entity.Entity> filter) {
+        return org.basaltmc.bukkit.misc.RayTracing.entities(this, new org.bukkit.util.Vector(start.x(), start.y(), start.z()),
+            direction, maxDistance, raySize, filter);
+    }
+
+    @Override
+    public org.bukkit.util.RayTraceResult rayTrace(io.papermc.paper.math.Position start,
+            org.bukkit.util.Vector direction, double maxDistance, org.bukkit.FluidCollisionMode fluidCollisionMode,
+            boolean ignorePassableBlocks, double raySize,
+            java.util.function.Predicate<? super org.bukkit.entity.Entity> filter,
+            java.util.function.Predicate<? super org.bukkit.block.Block> canCollide) {
+        return org.basaltmc.bukkit.misc.RayTracing.both(this, new org.bukkit.util.Vector(start.x(), start.y(), start.z()),
+            direction, maxDistance, fluidCollisionMode, ignorePassableBlocks, raySize, filter, canCollide);
+    }
+
+    @Override
+    public boolean hasCollisionsIn(org.bukkit.util.BoundingBox box) {
+        for (int x = (int) Math.floor(box.getMinX()); x <= (int) Math.floor(box.getMaxX()); x++) {
+            for (int y = (int) Math.floor(box.getMinY()); y <= (int) Math.floor(box.getMaxY()); y++) {
+                for (int z = (int) Math.floor(box.getMinZ()); z <= (int) Math.floor(box.getMaxZ()); z++) {
+                    double[] boxes = org.basaltmc.bukkit.misc.Shapes.boxes(WorldNatives.state(name, x, y, z, false));
+                    for (int i = 0; i + 5 < boxes.length; i += 6) {
+                        if (box.overlaps(new org.bukkit.util.BoundingBox(x + boxes[i], y + boxes[i + 1], z + boxes[i + 2],
+                                x + boxes[i + 3], y + boxes[i + 4], z + boxes[i + 5]))) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public org.bukkit.util.RayTraceResult rayTrace(
+            java.util.function.Consumer<io.papermc.paper.raytracing.PositionedRayTraceConfigurationBuilder> builder) {
+        org.basaltmc.bukkit.misc.RayTraceBuilder configured = new org.basaltmc.bukkit.misc.RayTraceBuilder();
+        builder.accept(configured);
+        return configured.run();
+    }
 }

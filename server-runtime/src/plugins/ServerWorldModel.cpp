@@ -1598,6 +1598,14 @@ std::vector<double> LoadedWorlds::blockInfo(std::int32_t stateId) const {
             static_cast<double>(reg::fireOdds::burnOdds(stateId))};
 }
 
+std::vector<std::int32_t> LoadedWorlds::collisionBoxes(std::int32_t stateId) const {
+    if (reg::blockStateDefinitions::blockOf(stateId) == nullptr) {
+        return {};
+    }
+    const std::span<const std::int32_t> boxes = reg::blockShapes::collisionBoxes(stateId);
+    return {boxes.begin(), boxes.end()};
+}
+
 std::vector<std::string> LoadedWorlds::blockEntityTypes() const {
     std::vector<std::string> pairs;
     const reg::Registry<reg::BlockState>& blocks = reg::blocks::registry();
