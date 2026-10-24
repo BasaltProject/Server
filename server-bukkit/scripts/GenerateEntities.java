@@ -385,7 +385,11 @@ public final class GenerateEntities {
         }
         String head = stub.substring(0, bodyAt);
         boolean returns = method.getReturnType() != void.class;
-        return head + " {\n        " + (returns ? "return " : "") + "org.basaltmc.bukkit.entity.ops." + ops
+        Class<?> type = method.getReturnType();
+        String cast = returns && !type.isPrimitive() && type != Object.class && Modifier.isPublic(type.getModifiers())
+            && method.getTypeParameters().length == 0 && method.getGenericReturnType() instanceof Class<?>
+            ? "(" + type.getCanonicalName() + ") " : "";
+        return head + " {\n        " + (returns ? "return " + cast : "") + "org.basaltmc.bukkit.entity.ops." + ops
             + ".super." + method.getName() + "(" + call + ");\n    }\n\n";
     }
 }

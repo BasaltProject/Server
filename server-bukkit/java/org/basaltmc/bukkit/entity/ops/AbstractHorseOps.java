@@ -47,4 +47,8 @@ public interface AbstractHorseOps extends AbstractHorse, Cored {
     default void setEatingHaystack(boolean eating) {
         core().nbtSet("EatingHaystack", "bool", eating);
     }
+
+    default org.bukkit.inventory.AbstractHorseInventory getInventory() {
+        return new org.basaltmc.bukkit.inv.MountInventory(core(), this);
+    }
 }

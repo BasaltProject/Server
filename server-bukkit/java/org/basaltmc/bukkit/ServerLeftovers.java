@@ -103,4 +103,14 @@ public abstract class ServerLeftovers extends ServerExtras {
     public org.bukkit.World getRespawnWorld() {
         return getWorlds().isEmpty() ? null : getWorlds().get(0);
     }
+
+    @Override
+    public void reloadData() {
+        MiscNatives.dpRefresh();
+    }
+
+    @Override
+    public void updateResources() {
+        MiscNatives.dpRefresh();
+    }
 }
