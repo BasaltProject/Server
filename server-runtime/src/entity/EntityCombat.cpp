@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Shulkers.hpp>
+#include <basalt/server/runtime/entity/SulfurCubes.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
@@ -25,6 +26,9 @@ namespace basalt::server::runtime::entity::entityCombat {
 namespace {
 
 namespace reg = server::registry;
+
+/// parity: `SulfurCubeArchetype.DEFAULT_KNOCKBACK_MODIFIERS`, the push a hit gives a cube it cannot hurt.
+constexpr double kSulfurKnockback = 0.33;
 
 [[nodiscard]] float attributeOf(const wire::common::Identifier& type, std::string_view name) {
     const std::optional<double> base = reg::entityAttributes::baseValue(type, name);
@@ -77,6 +81,16 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     }
     if (entity.removed || entity.health <= 0.0) {
         return {};
+    }
+    // parity: `SulfurCube.hurtServer`, lit by fire or a blast and unhurt by a plain hit while it holds something.
+    if (sulfurCubes::isSulfurCube(entity)) {
+        sulfurCubes::primeOnHit(entity, cause);
+        if (sulfurCubes::immuneTo(entity, cause)) {
+            if (sourceX.has_value() && sourceZ.has_value()) {
+                knockback(entity, kSulfurKnockback, *sourceX, *sourceZ);
+            }
+            return {};
+        }
     }
     // parity: `Entity.isInvulnerableTo`, which only the void and `/kill` get past.
     if (entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("Invulnerable") && cause != "out_of_world" &&

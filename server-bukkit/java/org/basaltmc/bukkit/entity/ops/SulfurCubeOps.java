@@ -9,4 +9,24 @@ public interface SulfurCubeOps extends SulfurCube, Cored {
             && core().test("sulfur_swallow", org.basaltmc.bukkit.item.Nbt.writeNamed(
                 org.basaltmc.bukkit.item.Convert.stack(item)));
     }
+
+    default int getFuseTicks() {
+        return core().integer("fuse");
+    }
+
+    default void setFuseTicks(int ticks) {
+        core().set("fuse", ticks);
+    }
+
+    default boolean canExplode() {
+        return core().test("sulfur_can_explode");
+    }
+
+    default boolean ignite(boolean imminent) {
+        return core().test("sulfur_prime", imminent);
+    }
+
+    default boolean ignite() {
+        return ignite(false);
+    }
 }
