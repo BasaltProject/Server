@@ -18,11 +18,20 @@ basalt_module(server-bukkit
         src/BukkitItemNatives.cpp
         src/BukkitLeftoverNatives.cpp
         src/BukkitMiscNatives.cpp
+        src/BukkitMiscDataNatives.cpp
+        src/BukkitMiscBoardNatives.cpp
+        src/BukkitMiscExtrasNatives.cpp
+        src/BukkitMiscMapsNatives.cpp
         src/BukkitNatives.cpp
         src/BukkitPackets.cpp
         src/BukkitPlayerNatives.cpp
         src/BukkitRestNatives.cpp
         src/BukkitWorldNatives.cpp
+        src/BukkitWorldRegistryNatives.cpp
+        src/BukkitWorldBlocksNatives.cpp
+        src/BukkitWorldEntitiesNatives.cpp
+        src/BukkitWorldChunksNatives.cpp
+        src/BukkitWorldJobsNatives.cpp
         src/BukkitWorldEnvNatives.cpp
         src/ShimHost.cpp
     DEPENDS basalt::server-plugins basalt::wire-common
