@@ -53,4 +53,8 @@ public interface CreeperOps extends Creeper, Cored {
     default void setMaxFuseTicks(int ticks) {
         core().nbtSet("Fuse", "short", ticks);
     }
+
+    default void ignite(org.bukkit.entity.Entity igniter) {
+        ignite();
+    }
 }

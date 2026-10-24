@@ -44,4 +44,68 @@ public interface MinecartOps extends Minecart, Cored {
             default -> org.bukkit.Material.MINECART;
         };
     }
+
+    default double getDamage() {
+        return core().real("vehicle_damage");
+    }
+
+    default void setDamage(double damage) {
+        core().set("vehicle_damage", damage);
+    }
+
+    default double getMaxSpeed() {
+        return core().real("cart_max_speed");
+    }
+
+    default void setMaxSpeed(double speed) {
+        if (speed >= 0.0) {
+            core().set("cart_max_speed", speed);
+        }
+    }
+
+    default boolean isSlowWhenEmpty() {
+        return core().flag("cart_slow_when_empty");
+    }
+
+    default void setSlowWhenEmpty(boolean slow) {
+        core().set("cart_slow_when_empty", slow);
+    }
+
+    default org.bukkit.util.Vector getFlyingVelocityMod() {
+        return new org.bukkit.util.Vector(core().real("cart_flying_x"), core().real("cart_flying_y"),
+            core().real("cart_flying_z"));
+    }
+
+    default void setFlyingVelocityMod(org.bukkit.util.Vector flying) {
+        core().set("cart_flying_x", flying.getX());
+        core().set("cart_flying_y", flying.getY());
+        core().set("cart_flying_z", flying.getZ());
+    }
+
+    default org.bukkit.util.Vector getDerailedVelocityMod() {
+        return new org.bukkit.util.Vector(core().real("cart_derailed_x"), core().real("cart_derailed_y"),
+            core().real("cart_derailed_z"));
+    }
+
+    default void setDerailedVelocityMod(org.bukkit.util.Vector derailed) {
+        core().set("cart_derailed_x", derailed.getX());
+        core().set("cart_derailed_y", derailed.getY());
+        core().set("cart_derailed_z", derailed.getZ());
+    }
+
+    default net.kyori.adventure.util.TriState getFrictionState() {
+        return switch (core().integer("cart_friction")) {
+            case 0 -> net.kyori.adventure.util.TriState.FALSE;
+            case 1 -> net.kyori.adventure.util.TriState.TRUE;
+            default -> net.kyori.adventure.util.TriState.NOT_SET;
+        };
+    }
+
+    default void setFrictionState(net.kyori.adventure.util.TriState state) {
+        if (state == null) {
+            throw new IllegalArgumentException("state may not be null");
+        }
+        core().set("cart_friction", state == net.kyori.adventure.util.TriState.TRUE ? 1
+            : state == net.kyori.adventure.util.TriState.FALSE ? 0 : -1);
+    }
 }

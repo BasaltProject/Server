@@ -40,6 +40,7 @@ public interface AbstractVillagerOps extends AbstractVillager, Cored {
     }
 
     default List<MerchantRecipe> getRecipes() {
+        core().call("villager_add_trades", 0L);
         List<MerchantRecipe> out = new ArrayList<>();
         byte[] stored = core().nbt("Offers");
         CompoundTag offers = stored == null ? null : NbtCodec.fromBytes(stored);

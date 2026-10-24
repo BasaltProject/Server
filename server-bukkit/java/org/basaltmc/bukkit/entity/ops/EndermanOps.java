@@ -57,4 +57,36 @@ public interface EndermanOps extends Enderman, Cored {
     default void setCarriedMaterial(org.bukkit.material.MaterialData data) {
         setCarriedBlock(data == null ? null : org.bukkit.Bukkit.createBlockData(data.getItemType()));
     }
+
+    default boolean teleportRandomly() {
+        return core().test("enderman_teleport", 0L, 0.0, 0.0, 0.0);
+    }
+
+    default boolean teleport() {
+        return teleportRandomly();
+    }
+
+    default boolean teleportTowards(org.bukkit.entity.Entity entity) {
+        org.bukkit.Location at = entity.getLocation();
+        double eye = entity instanceof org.bukkit.entity.LivingEntity living ? living.getEyeHeight() : 0.0;
+        return core().test("enderman_teleport", 1L, at.getX(), at.getY() + eye, at.getZ());
+    }
+
+    default boolean isScreaming() {
+        return core().integer("target") >= 0;
+    }
+
+    default void setScreaming(boolean screaming) {
+        if (screaming != isScreaming()) {
+            throw org.basaltmc.bukkit.Unsupported.hit("Enderman#setScreaming without a target");
+        }
+    }
+
+    default boolean hasBeenStaredAt() {
+        return core().flag("enderman_stared_at");
+    }
+
+    default void setHasBeenStaredAt(boolean stared) {
+        core().set("enderman_stared_at", stared);
+    }
 }

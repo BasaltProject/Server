@@ -34,4 +34,15 @@ public interface ProjectileOps extends Projectile, Cored {
     default void setHasLeftShooter(boolean left) {
         core().nbtSet("LeftOwner", "bool", left);
     }
+
+    default boolean canHitEntity(Entity entity) {
+        if (entity == null || !entity.isValid()) {
+            return false;
+        }
+        if (entity instanceof org.bukkit.entity.Player player
+            && player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
+            return false;
+        }
+        return !(entity.equals(getShooter()) && !hasLeftShooter());
+    }
 }

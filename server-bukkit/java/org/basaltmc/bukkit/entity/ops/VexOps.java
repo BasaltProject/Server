@@ -43,4 +43,20 @@ public interface VexOps extends Vex, Cored {
     default void setLifeTicks(int ticks) {
         setLimitedLifetimeTicks(ticks);
     }
+
+    default boolean isCharging() {
+        return core().flag("charging");
+    }
+
+    default void setCharging(boolean charging) {
+        core().call("set_charging", charging);
+    }
+
+    default org.bukkit.entity.LivingEntity getOwner() {
+        return core().entity(core().integer("owner_id")) instanceof org.bukkit.entity.LivingEntity owner ? owner : null;
+    }
+
+    default void setOwner(org.bukkit.entity.LivingEntity owner) {
+        core().set("owner_id", owner == null ? -1 : owner.getEntityId());
+    }
 }

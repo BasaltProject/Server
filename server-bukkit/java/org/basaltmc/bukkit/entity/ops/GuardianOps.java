@@ -7,4 +7,24 @@ public interface GuardianOps extends Guardian, Cored {
     default boolean isElder() {
         return getType() == org.bukkit.entity.EntityType.ELDER_GUARDIAN;
     }
+
+    default boolean setLaser(boolean activated) {
+        return core().test("guardian_laser", activated);
+    }
+
+    default boolean hasLaser() {
+        return core().integer("guardian_laser_target") >= 0;
+    }
+
+    default int getLaserDuration() {
+        return 80;
+    }
+
+    default int getLaserTicks() {
+        return core().integer("guardian_laser_ticks");
+    }
+
+    default void setLaserTicks(int ticks) {
+        core().set("guardian_laser_ticks", ticks);
+    }
 }

@@ -84,4 +84,32 @@ public interface BeeOps extends Bee, Cored {
     default void setTicksSincePollination(int ticks) {
         core().nbtSet("TicksSincePollination", "int", ticks);
     }
+
+    default int getTimeSinceSting() {
+        return core().integer("bee_sting_age");
+    }
+
+    default void setTimeSinceSting(int time) {
+        if (time < 0) {
+            throw new IllegalArgumentException("time must not be negative");
+        }
+        core().set("bee_sting_age", time);
+    }
+
+    default boolean isRolling() {
+        return core().flag("bee_rolling");
+    }
+
+    default net.kyori.adventure.util.TriState getRollingOverride() {
+        return switch (core().integer("bee_rolling_override")) {
+            case 0 -> net.kyori.adventure.util.TriState.FALSE;
+            case 1 -> net.kyori.adventure.util.TriState.TRUE;
+            default -> net.kyori.adventure.util.TriState.NOT_SET;
+        };
+    }
+
+    default void setRollingOverride(net.kyori.adventure.util.TriState rolling) {
+        core().set("bee_rolling_override", rolling == net.kyori.adventure.util.TriState.TRUE ? 1
+            : rolling == net.kyori.adventure.util.TriState.FALSE ? 0 : -1);
+    }
 }

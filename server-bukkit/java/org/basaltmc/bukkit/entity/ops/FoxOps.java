@@ -64,6 +64,55 @@ public interface FoxOps extends Fox, Cored {
     }
 
     default void setSleeping(boolean sleeping) {
-        core().nbtSet("Sleeping", "bool", sleeping);
+        core().call("set_sleeping", sleeping);
+    }
+
+    private boolean flag(int bit) {
+        return (core().integer("fox_flags") & bit) != 0;
+    }
+
+    private void flag(int bit, boolean on) {
+        int flags = core().integer("fox_flags");
+        core().set("fox_flags", on ? flags | bit : flags & ~bit);
+    }
+
+    default boolean isCrouching() {
+        return flag(4);
+    }
+
+    default void setCrouching(boolean crouching) {
+        flag(4, crouching);
+    }
+
+    default boolean isInterested() {
+        return flag(8);
+    }
+
+    default void setInterested(boolean interested) {
+        flag(8, interested);
+    }
+
+    default boolean isLeaping() {
+        return flag(16);
+    }
+
+    default void setLeaping(boolean leaping) {
+        flag(16, leaping);
+    }
+
+    default boolean isFaceplanted() {
+        return flag(64);
+    }
+
+    default void setFaceplanted(boolean faceplanted) {
+        flag(64, faceplanted);
+    }
+
+    default boolean isDefending() {
+        return flag(128);
+    }
+
+    default void setDefending(boolean defending) {
+        flag(128, defending);
     }
 }

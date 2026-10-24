@@ -5,7 +5,7 @@ import org.bukkit.entity.ZombieVillager;
 
 public interface ZombieVillagerOps extends ZombieVillager, Cored {
     default void setConversionTime(int time) {
-        core().nbtSet("ConversionTime", "int", time);
+        core().set("conversion_countdown", time);
     }
 
     default void setConversionTime(int time, boolean broadcast) {
@@ -24,5 +24,16 @@ public interface ZombieVillagerOps extends ZombieVillager, Cored {
         } else {
             core().nbtSet("ConversionPlayer", "uuid", player.getUniqueId().toString());
         }
+    }
+
+    default org.bukkit.entity.Villager.Type getVillagerType() {
+        String name = core().nbtText("VillagerData.type");
+        org.bukkit.entity.Villager.Type found = name == null ? null
+            : org.bukkit.Registry.VILLAGER_TYPE.get(org.bukkit.NamespacedKey.fromString(name));
+        return found == null ? org.bukkit.entity.Villager.Type.PLAINS : found;
+    }
+
+    default void setVillagerType(org.bukkit.entity.Villager.Type type) {
+        core().nbtSet("VillagerData.type", "string", type.getKey().toString());
     }
 }

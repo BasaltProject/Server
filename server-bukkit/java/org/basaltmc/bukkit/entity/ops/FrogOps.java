@@ -15,4 +15,12 @@ public interface FrogOps extends Frog, Cored {
     default void setVariant(Frog.Variant variant) {
         core().nbtSet("variant", "string", variant.getKey().toString());
     }
+
+    default org.bukkit.entity.Entity getTongueTarget() {
+        return core().entity(core().integer("frog_tongue_target"));
+    }
+
+    default void setTongueTarget(org.bukkit.entity.Entity target) {
+        core().set("frog_tongue_target", target == null ? -1 : target.getEntityId());
+    }
 }

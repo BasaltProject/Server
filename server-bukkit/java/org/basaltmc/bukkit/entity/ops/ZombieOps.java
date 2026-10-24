@@ -13,7 +13,35 @@ public interface ZombieOps extends Zombie, Cored {
     }
 
     default int getConversionTime() {
-        return core().nbtInt("DrownedConversionTime", -1);
+        return core().integer("conversion_countdown");
+    }
+
+    default boolean shouldBurnInDay() {
+        return core().flag("burns_in_day");
+    }
+
+    default void setShouldBurnInDay(boolean burn) {
+        core().set("burns_in_day", burn);
+    }
+
+    default boolean isArmsRaised() {
+        return core().flag("aggressive");
+    }
+
+    default void setArmsRaised(boolean raised) {
+        core().set("aggressive", raised);
+    }
+
+    default boolean isDrowning() {
+        return core().integer("conversion_countdown") >= 0;
+    }
+
+    default void startDrowning(int conversionTime) {
+        core().set("conversion_countdown", conversionTime);
+    }
+
+    default void stopDrowning() {
+        core().set("conversion_countdown", -1);
     }
 
     default boolean canBreakDoors() {
@@ -42,10 +70,10 @@ public interface ZombieOps extends Zombie, Cored {
     }
 
     default boolean isConverting() {
-        return core().nbtValue("ConversionTime") instanceof Number time && time.intValue() > -1;
+        return core().integer("conversion_countdown") > -1;
     }
 
     default void setConversionTime(int time) {
-        core().nbtSet("DrownedConversionTime", "int", time);
+        core().set("conversion_countdown", time);
     }
 }

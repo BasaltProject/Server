@@ -1,44 +1,67 @@
 package org.basaltmc.bukkit.entity.ops;
 
-import org.bukkit.Location;
 import org.basaltmc.bukkit.entity.Cored;
+import org.bukkit.Location;
 import org.bukkit.entity.Raider;
 
 public interface RaiderOps extends Raider, Cored {
     default int getWave() {
-        return core().nbtInt("Wave");
+        return core().integer("raid_wave");
     }
 
     default void setWave(int wave) {
-        core().nbtSet("Wave", "int", wave);
+        core().set("raid_wave", wave);
     }
 
     default boolean isCanJoinRaid() {
-        return core().nbtFlag("CanJoinRaid");
+        return core().flag("raid_can_join");
     }
 
     default void setCanJoinRaid(boolean join) {
-        core().nbtSet("CanJoinRaid", "bool", join);
+        core().set("raid_can_join", join);
     }
 
     default boolean isPatrolLeader() {
-        return core().nbtFlag("PatrolLeader");
+        return core().flag("patrol_leader");
     }
 
     default void setPatrolLeader(boolean leader) {
-        core().nbtSet("PatrolLeader", "bool", leader);
+        core().set("patrol_leader", leader);
     }
 
     default org.bukkit.block.Block getPatrolTarget() {
-        Location at = EntityNbt.position(core().worldRef(), EntityNbt.compound(core(), "").get("PatrolTarget"));
+        Location at = MobPositions.parse(core(), core().text("patrol_target"));
         return at == null ? null : at.getBlock();
     }
 
     default void setPatrolTarget(org.bukkit.block.Block block) {
-        if (block == null) {
-            core().nbtRemove("PatrolTarget");
-        } else {
-            core().nbtSet("PatrolTarget", "pos", block.getX() + "," + block.getY() + "," + block.getZ());
-        }
+        core().set("patrol_target", block == null ? "" : block.getX() + "," + block.getY() + "," + block.getZ());
+    }
+
+    default int getTicksOutsideRaid() {
+        return core().integer("raid_ticks_outside");
+    }
+
+    default void setTicksOutsideRaid(int ticks) {
+        core().set("raid_ticks_outside", ticks);
+    }
+
+    default boolean isCelebrating() {
+        return core().flag("raid_celebrating");
+    }
+
+    default void setCelebrating(boolean celebrating) {
+        core().call("raider_celebrate", celebrating);
+    }
+
+    default org.bukkit.Raid getRaid() {
+        int id = core().integer("raid_id");
+        return id < 0 ? null : core().worldRef().getRaids().stream().filter(raid -> raid.getId() == id).findFirst()
+            .orElse(null);
+    }
+
+    default org.bukkit.Sound getCelebrationSound() {
+        return org.bukkit.Registry.SOUNDS.get(org.bukkit.NamespacedKey.minecraft("entity." + core().keyName()
+            + ".celebrate"));
     }
 }

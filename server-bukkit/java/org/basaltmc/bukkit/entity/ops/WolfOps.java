@@ -29,11 +29,19 @@ public interface WolfOps extends Wolf, Cored {
     }
 
     default boolean isAngry() {
-        long end = core().nbtValue("anger_end_time") instanceof Number number ? number.longValue() : 0L;
+        long end = core().property("neutral_anger_end") instanceof Number number ? number.longValue() : 0L;
         return end - getWorld().getGameTime() > 0L;
     }
 
     default void setAngry(boolean angry) {
-        core().nbtSet("anger_end_time", "long", angry ? getWorld().getGameTime() + 600L : 0L);
+        core().set("neutral_anger_end", angry ? getWorld().getGameTime() + 600L : -1L);
+    }
+
+    default boolean isInterested() {
+        return core().flag("wolf_interested");
+    }
+
+    default void setInterested(boolean interested) {
+        core().set("wolf_interested", interested);
     }
 }
