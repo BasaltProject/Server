@@ -31,18 +31,13 @@ public interface ExplosiveMinecartOps extends ExplosiveMinecart, Cored {
     }
 
     default void explode() {
-        org.bukkit.util.Vector velocity = getVelocity();
-        double speed = Math.min(5.0, velocity.getX() * velocity.getX() + velocity.getZ() * velocity.getZ());
-        explode(speed);
+        explode(0.0);
     }
 
-    default void explode(double speedSquared) {
-        if (speedSquared < 0.0) {
-            throw new IllegalArgumentException("Speed cannot be negative");
+    default void explode(double power) {
+        if (power < 0.0 || power > 5.0) {
+            throw new IllegalArgumentException("Power must be in range [0, 5] (got " + power + ")");
         }
-        double power = 4.0 + java.util.concurrent.ThreadLocalRandom.current().nextDouble() * 1.5 * Math.min(5.0, speedSquared);
-        org.bukkit.Location at = getLocation();
-        remove();
-        at.getWorld().createExplosion(at, (float) power, false, true, this);
+        core().set("cart_detonate", power);
     }
 }

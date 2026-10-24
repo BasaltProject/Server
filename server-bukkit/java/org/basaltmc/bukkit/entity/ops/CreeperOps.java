@@ -27,15 +27,22 @@ public interface CreeperOps extends Creeper, Cored {
     }
 
     default boolean isIgnited() {
-        return getFuseTicks() > 0;
+        return core().flag("creeper_ignited");
     }
 
     default void ignite() {
-        setFuseTicks(1);
+        core().set("creeper_ignited", true);
     }
 
     default void setIgnited(boolean ignited) {
-        setFuseTicks(ignited ? 1 : 0);
+        core().set("creeper_ignited", ignited);
+        if (!ignited) {
+            core().set("creeper_igniter", -1L);
+        }
+    }
+
+    default org.bukkit.entity.Entity getIgniter() {
+        return core().integer("creeper_igniter") >= 0 ? core().entity(core().integer("creeper_igniter")) : null;
     }
 
     default void explode() {
@@ -55,6 +62,7 @@ public interface CreeperOps extends Creeper, Cored {
     }
 
     default void ignite(org.bukkit.entity.Entity igniter) {
+        core().set("creeper_igniter", igniter == null ? -1L : (long) igniter.getEntityId());
         ignite();
     }
 }

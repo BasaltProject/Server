@@ -152,4 +152,8 @@ public interface VillagerOps extends Villager, Cored {
     default void clearReputations() {
         core().call("villager_clear_gossips");
     }
+
+    default org.bukkit.inventory.Inventory getInventory() {
+        return new org.basaltmc.bukkit.inv.HeldInventory(core(), this, "villager", 8);
+    }
 }

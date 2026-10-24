@@ -37,4 +37,9 @@ public interface TropicalFishOps extends TropicalFish, Cored {
         int at = Math.min(5, Math.max(0, index)) + (base == 0 ? 0 : 6);
         return kPatterns[at];
     }
+
+    default void setPattern(TropicalFish.Pattern pattern) {
+        int at = java.util.Arrays.asList(kPatterns).indexOf(pattern);
+        core().nbtSet("Variant", "int", (variant() & 0xFFFF0000) | ((at % 6) << 8) | (at >= 6 ? 1 : 0));
+    }
 }

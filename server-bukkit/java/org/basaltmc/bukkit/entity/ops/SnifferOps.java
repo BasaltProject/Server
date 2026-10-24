@@ -34,4 +34,16 @@ public interface SnifferOps extends Sniffer, Cored {
         return Sniffer.State.values()[Math.max(0, Math.min(Sniffer.State.values().length - 1,
             core().integer("sniffer_state")))];
     }
+
+    default void setState(Sniffer.State state) {
+        core().call("sniffer_set_state", (long) state.ordinal());
+    }
+
+    default boolean canDig() {
+        return core().test("sniffer_can_dig");
+    }
+
+    default Location findPossibleDigLocation() {
+        return MobPositions.parse(core(), core().call("sniffer_dig_spot") instanceof String spot ? spot : null);
+    }
 }

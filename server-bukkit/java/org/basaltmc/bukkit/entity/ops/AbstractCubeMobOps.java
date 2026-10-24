@@ -14,4 +14,12 @@ public interface AbstractCubeMobOps extends AbstractCubeMob, Cored {
         }
         core().set("cube_size", size);
     }
+
+    default boolean canWander() {
+        return core().flag("cube_wander");
+    }
+
+    default void setWander(boolean canWander) {
+        core().set("cube_wander", canWander);
+    }
 }

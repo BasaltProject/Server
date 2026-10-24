@@ -44,4 +44,19 @@ public interface WolfOps extends Wolf, Cored {
     default void setInterested(boolean interested) {
         core().set("wolf_interested", interested);
     }
+
+    default boolean isWet() {
+        return core().test("wolf_wet");
+    }
+
+    default float getTailAngle() {
+        if (isAngry()) {
+            return 1.5393804f;
+        }
+        if (isTamed()) {
+            double max = getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
+            return (0.55f - (float) ((max - getHealth()) * 0.02)) * (float) Math.PI;
+        }
+        return 0.62831855f;
+    }
 }

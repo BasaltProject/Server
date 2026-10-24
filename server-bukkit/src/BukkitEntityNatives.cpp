@@ -65,7 +65,7 @@ jobject JNICALL nativeCall(JNIEnv* env, jclass, jstring world, jint id, jstring 
     }
     const auto result =
         guarded<std::optional<PluginEntityValue>>(std::nullopt, [&] { return entity->invoke(name, converted); });
-    return jni::boxed(env, result, name == "nbt" || name == "equipment");
+    return jni::boxed(env, result, name == "nbt" || name == "equipment" || name == "held_get");
 }
 
 jint JNICALL nativeSpawnAs(JNIEnv* env, jclass, jstring world, jstring type, jdouble x, jdouble y, jdouble z,

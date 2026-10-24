@@ -11,4 +11,24 @@ public interface AbstractSkeletonOps extends AbstractSkeleton, Cored {
     default void setShouldBurnInDay(boolean burn) {
         core().set("burns_in_day", burn);
     }
+
+    default org.bukkit.entity.Skeleton.SkeletonType getSkeletonType() {
+        return switch (core().type.getKey().getKey()) {
+            case "wither_skeleton" -> org.bukkit.entity.Skeleton.SkeletonType.WITHER;
+            case "stray" -> org.bukkit.entity.Skeleton.SkeletonType.STRAY;
+            case "bogged" -> org.bukkit.entity.Skeleton.SkeletonType.BOGGED;
+            case "parched" -> org.bukkit.entity.Skeleton.SkeletonType.PARCHED;
+            default -> org.bukkit.entity.Skeleton.SkeletonType.NORMAL;
+        };
+    }
+
+    default void setSkeletonType(org.bukkit.entity.Skeleton.SkeletonType type) {
+        core().retype(switch (type) {
+            case WITHER -> "wither_skeleton";
+            case STRAY -> "stray";
+            case BOGGED -> "bogged";
+            case PARCHED -> "parched";
+            default -> "skeleton";
+        });
+    }
 }

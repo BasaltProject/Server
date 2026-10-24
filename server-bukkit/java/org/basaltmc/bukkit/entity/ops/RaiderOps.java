@@ -64,4 +64,8 @@ public interface RaiderOps extends Raider, Cored {
         return org.bukkit.Registry.SOUNDS.get(org.bukkit.NamespacedKey.minecraft("entity." + core().keyName()
             + ".celebrate"));
     }
+
+    default void setRaid(org.bukkit.Raid raid) {
+        core().set("raid_id", raid == null ? -1L : (long) raid.getId());
+    }
 }

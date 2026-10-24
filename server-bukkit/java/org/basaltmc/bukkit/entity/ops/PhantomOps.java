@@ -33,4 +33,9 @@ public interface PhantomOps extends Phantom, Cored {
     default void setShouldBurnInDay(boolean burn) {
         core().set("burns_in_day", burn);
     }
+
+    default java.util.UUID getSpawningEntity() {
+        Object stored = EntityNbt.compound(core(), "").get("Paper.SpawningEntity");
+        return stored instanceof int[] ? org.basaltmc.bukkit.item.Convert.uuidOf(stored) : null;
+    }
 }

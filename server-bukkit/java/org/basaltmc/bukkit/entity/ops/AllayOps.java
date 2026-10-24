@@ -48,4 +48,8 @@ public interface AllayOps extends Allay, Cored {
     default void startDancing(org.bukkit.Location location) {
         startDancing();
     }
+
+    default org.bukkit.inventory.Inventory getInventory() {
+        return new org.basaltmc.bukkit.inv.HeldInventory(core(), this, "allay", 1);
+    }
 }

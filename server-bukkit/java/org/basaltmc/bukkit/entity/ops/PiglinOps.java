@@ -25,6 +25,55 @@ public interface PiglinOps extends Piglin, Cored {
     }
 
     default void setDancing(boolean dancing) {
-        core().set("piglin_dancing", dancing);
+        core().call("piglin_dance", dancing, -1L);
+    }
+
+    default void setDancing(long duration) {
+        core().call("piglin_dance", true, duration);
+    }
+
+    private java.util.Set<org.bukkit.Material> items(String kind) {
+        java.util.Set<org.bukkit.Material> out = new java.util.HashSet<>();
+        if (core().call("piglin_items", kind) instanceof String[] names) {
+            for (String name : names) {
+                org.bukkit.Material material = org.bukkit.Material.matchMaterial(name);
+                if (material != null) {
+                    out.add(material);
+                }
+            }
+        }
+        return java.util.Collections.unmodifiableSet(out);
+    }
+
+    private boolean edit(String kind, org.bukkit.Material material, boolean add) {
+        return material.isItem() && core().test("piglin_item_edit", kind, material.getKey().toString(), add);
+    }
+
+    default boolean addBarterMaterial(org.bukkit.Material material) {
+        return edit("barter", material, true);
+    }
+
+    default boolean removeBarterMaterial(org.bukkit.Material material) {
+        return edit("barter", material, false);
+    }
+
+    default boolean addMaterialOfInterest(org.bukkit.Material material) {
+        return edit("interest", material, true);
+    }
+
+    default boolean removeMaterialOfInterest(org.bukkit.Material material) {
+        return edit("interest", material, false);
+    }
+
+    default java.util.Set<org.bukkit.Material> getBarterList() {
+        return items("barter");
+    }
+
+    default java.util.Set<org.bukkit.Material> getInterestList() {
+        return items("interest");
+    }
+
+    default org.bukkit.inventory.Inventory getInventory() {
+        return new org.basaltmc.bukkit.inv.HeldInventory(core(), this, "piglin", 8);
     }
 }

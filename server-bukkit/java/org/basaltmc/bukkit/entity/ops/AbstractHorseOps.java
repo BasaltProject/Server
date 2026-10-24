@@ -82,4 +82,16 @@ public interface AbstractHorseOps extends AbstractHorse, Cored {
         }
         core().set("horse_max_temper", level);
     }
+
+    default void setVariant(Horse.Variant variant) {
+        core().retype(switch (variant) {
+            case DONKEY -> "donkey";
+            case MULE -> "mule";
+            case UNDEAD_HORSE -> "zombie_horse";
+            case SKELETON_HORSE -> "skeleton_horse";
+            case LLAMA -> "llama";
+            case CAMEL -> "camel";
+            default -> "horse";
+        });
+    }
 }

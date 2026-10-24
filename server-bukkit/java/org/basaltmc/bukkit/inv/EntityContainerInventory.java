@@ -20,11 +20,17 @@ public class EntityContainerInventory extends AbstractInventory {
     protected final EntityCore core;
     protected final Entity holder;
     private final int size;
+    private final String key;
 
     public EntityContainerInventory(EntityCore core, Entity holder, int size) {
+        this(core, holder, size, "Items");
+    }
+
+    public EntityContainerInventory(EntityCore core, Entity holder, int size, String key) {
         this.core = core;
         this.holder = holder;
         this.size = size;
+        this.key = key;
     }
 
     @Override
@@ -47,7 +53,7 @@ public class EntityContainerInventory extends AbstractInventory {
     @Override
     public ItemStack getItem(int slot) {
         check(slot);
-        List<Object> items = Nbt.list(saved().get("Items"));
+        List<Object> items = Nbt.list(saved().get(key));
         for (Object entry : items == null ? List.of() : items) {
             Map<String, Object> item = Nbt.map(entry);
             if (item != null && Nbt.integer(item, "Slot", -1) == slot) {
@@ -62,7 +68,7 @@ public class EntityContainerInventory extends AbstractInventory {
     public void setItem(int slot, ItemStack item) {
         check(slot);
         boolean empty = item == null || item.getType().isAir() || item.getAmount() <= 0;
-        List<Object> items = Nbt.list(saved().get("Items"));
+        List<Object> items = Nbt.list(saved().get(key));
         List<Object> kept = new ArrayList<>();
         for (Object entry : items == null ? List.of() : items) {
             Map<String, Object> existing = Nbt.map(entry);
@@ -76,7 +82,7 @@ public class EntityContainerInventory extends AbstractInventory {
             kept.add(stored);
         }
         Map<String, Object> patch = Nbt.compound();
-        patch.put("Items", kept);
+        patch.put(key, kept);
         core.mergeNbt(Nbt.writeNamed(patch));
     }
 

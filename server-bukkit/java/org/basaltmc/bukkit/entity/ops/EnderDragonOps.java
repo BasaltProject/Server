@@ -31,4 +31,19 @@ public interface EnderDragonOps extends EnderDragon, Cored {
             core().set("dragon_podium", MobPositions.format(location));
         }
     }
+
+    default java.util.Set<org.bukkit.entity.ComplexEntityPart> getParts() {
+        java.util.Set<org.bukkit.entity.ComplexEntityPart> parts = new java.util.LinkedHashSet<>();
+        if (core().call("dragon_parts") instanceof String[] rows) {
+            for (int index = 0; index < rows.length; index++) {
+                parts.add(new org.basaltmc.bukkit.entity.BasaltDragonPart(this, core(), index));
+            }
+        }
+        return java.util.Collections.unmodifiableSet(parts);
+    }
+
+    default org.bukkit.boss.BossBar getBossBar() {
+        org.bukkit.boss.DragonBattle battle = getDragonBattle();
+        return battle == null ? null : battle.getBossBar();
+    }
 }
