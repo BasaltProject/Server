@@ -10,6 +10,8 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <set>
+#include <string>
 
 namespace basalt::server::runtime::entity {
 
@@ -50,6 +52,8 @@ using Pos = std::array<std::int32_t, 3>;
 struct PiglinState {
     bool brute = false;
     bool cannotHunt = false;
+    std::set<std::string> barterItems;
+    std::set<std::string> interestItems;
     std::array<std::optional<server::world::loot::ItemStack>, kInventorySize> inventory;
     ai::brainKit::Memory<wire::common::Uuid> angryAt;
     ai::brainKit::Memory<bool> universalAnger;

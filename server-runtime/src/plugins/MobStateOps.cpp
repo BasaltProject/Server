@@ -20,7 +20,7 @@ const Tables& tables() {
         addVillager(all.properties, all.operations);
         addBeasts(all.properties, all.operations);
         addFlagOps(all.properties, all.operations);
-        addEntityState(all.properties, all.operations);
+        addMobMore(all.properties, all.operations);
         return all;
     }();
     return kAll;

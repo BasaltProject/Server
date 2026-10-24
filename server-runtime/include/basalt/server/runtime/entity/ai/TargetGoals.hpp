@@ -53,6 +53,20 @@ private:
     std::int32_t randomInterval_;
 };
 
+/// parity: `Vindicator.VindicatorJohnnyAttackGoal`, which goes for anything alive once the vindicator is Johnny.
+class JohnnyAttackGoal final : public Goal {
+public:
+    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
+
+    [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
+
+    void start(MobContext& mob) override;
+
+    void stop(MobContext& mob) override;
+};
+
 /// parity: `HurtByTargetGoal`.
 class HurtByTargetGoal final : public Goal {
 public:

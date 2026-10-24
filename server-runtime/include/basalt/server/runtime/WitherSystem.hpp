@@ -73,6 +73,9 @@ public:
 
     void keepBar(world::LoadedWorld& world, entity::ServerEntity& wither);
 
+    /// Runs `use` on the bar of this wither, if it has one yet.
+    bool withBar(std::int32_t entityId, const std::function<void(BossBarView&, player::PlayerRegistry&)>& use);
+
     void sweepBars();
 
 private:

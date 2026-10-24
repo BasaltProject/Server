@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/Sniffers.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
+#include <basalt/server/runtime/entity/ai/RandomPos.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
@@ -470,6 +471,100 @@ void MobActionSystem::snifferDropsSeed(world::LoadedWorld& world, const ServerEn
     if (!sniffer.sourceNbt.has_value() || !sniffer.sourceNbt->getBoolean("Silent")) {
         playSound(world, sniffer, "entity.sniffer.drop_seed", 1.0F, 1.0F, SoundSource::Neutral);
     }
+}
+
+bool MobActionSystem::pluginSnifferState(ServerEntity& sniffer, std::int32_t pose) {
+    world::LoadedWorld* world = worldOf(sniffer);
+    if (world == nullptr || sniffer.type().path() != "sniffer" || pose < 0 || pose > static_cast<std::int32_t>(Pose::Rising)) {
+        return false;
+    }
+    SnifferState& state = sniffers::stateOf(sniffer);
+    const bool silent = sniffer.sourceNbt.has_value() && sniffer.sourceNbt->getBoolean("Silent");
+    const auto sound = [&](std::string_view name, float pitch) {
+        if (!silent) {
+            playSound(*world, sniffer, name, 1.0F, pitch, SoundSource::Neutral);
+        }
+    };
+    const auto target = static_cast<Pose>(pose);
+    // parity: `Sniffer.transitionTo`.
+    switch (target) {
+    case Pose::FeelingHappy:
+        sound("entity.sniffer.happy", 1.0F);
+        break;
+    case Pose::Scenting:
+        sound("entity.sniffer.scenting", sniffer.age < 0 ? 1.3F : 1.0F);
+        break;
+    case Pose::Sniffing:
+        sound("entity.sniffer.sniffing", 1.0F);
+        break;
+    case Pose::Digging:
+        state.dropSeedAt = sniffer.tickCount + sniffers::kDropSeedOffset;
+        entityEvent(sniffer, sniffers::kDiggingEvent);
+        break;
+    case Pose::Rising:
+        sound("entity.sniffer.digging_stop", 1.0F);
+        break;
+    case Pose::Idling:
+    case Pose::Searching:
+        break;
+    }
+    state.pose = target;
+    return true;
+}
+
+namespace {
+
+/// parity: `Sniffer.canDig(BlockPos)`.
+[[nodiscard]] bool snifferCanDigAt(MobActionSystem& system, world::LoadedWorld& world, ServerEntity& sniffer,
+                                   const kit::Block& at) {
+    const std::optional<std::int32_t> stateId = world.state().blockState(at[0], at[1], at[2]);
+    const wire::common::Identifier* block =
+        stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+    if (block == nullptr || !system.blockTagged("minecraft:sniffer_diggable_block", *block).value_or(false)) {
+        return false;
+    }
+    const std::string dimension = config::dimensionRegistryKey(world.declaration().dimension);
+    const SnifferState& state = sniffers::stateOf(sniffer);
+    if (std::ranges::any_of(state.explored,
+                            [&](const auto& seen) { return seen.first == dimension && seen.second == at; })) {
+        return false;
+    }
+    return entity::ai::navigation::canReach(world.state(), sniffer, at[0] + 0.5, at[1] + 1.0, at[2] + 0.5);
+}
+
+} // namespace
+
+bool MobActionSystem::pluginSnifferCanDig(ServerEntity& sniffer) {
+    world::LoadedWorld* world = worldOf(sniffer);
+    if (world == nullptr || sniffer.type().path() != "sniffer") {
+        return false;
+    }
+    const SnifferState& state = sniffers::stateOf(sniffer);
+    const kit::Block head = headBlock(sniffer);
+    return state.panicTicks <= 0 && !state.temptation.following && sniffer.age >= 0 &&
+           !entity::ai::inWater(world->state(), sniffer) && sniffer.onGround && !sniffer.vehicleId.has_value() &&
+           snifferCanDigAt(*this, *world, sniffer, {head[0], head[1] - 1, head[2]});
+}
+
+std::optional<std::array<std::int32_t, 3>> MobActionSystem::pluginSnifferDigSpot(ServerEntity& sniffer) {
+    world::LoadedWorld* world = worldOf(sniffer);
+    if (world == nullptr || sniffer.type().path() != "sniffer") {
+        return std::nullopt;
+    }
+    random::RandomSource random = freshRandom();
+    // parity: `Sniffer.calculateDigPosition`, five strolls further out each time.
+    for (std::int32_t index = 0; index < 5; ++index) {
+        const std::optional<kit::Vec> spot =
+            entity::ai::randomPos::landPos(world->state(), sniffer, random, 10 + (2 * index), 3);
+        if (!spot.has_value()) {
+            continue;
+        }
+        const kit::Block below{mth::floor((*spot)[0]), mth::floor((*spot)[1]) - 1, mth::floor((*spot)[2])};
+        if (snifferCanDigAt(*this, *world, sniffer, below)) {
+            return below;
+        }
+    }
+    return std::nullopt;
 }
 
 } // namespace basalt::server::runtime

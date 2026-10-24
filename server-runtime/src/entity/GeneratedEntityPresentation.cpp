@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/entity/FishingHooks.hpp>
 #include <basalt/server/runtime/entity/Frogs.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/Goats.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -29,6 +30,8 @@
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
+#include <basalt/wire/protocol/ProtocolBuffer.hpp>
+#include <basalt/wire/text/ComponentNbt.hpp>
 
 #include <array>
 #include <cstdint>
@@ -156,6 +159,141 @@ void addItemFrameMetadata(Entries& into, const NbtCompound& data) {
     if (const std::int32_t rotation = data.getByte("ItemRotation", 0); rotation != 0) {
         into.push_back(Entry{.index = SetEntityDataPacket::kItemFrameStackIndex + 1,
                              .value = SetEntityDataPacket::IntValue{.value = rotation}});
+    }
+}
+
+/// parity: `ResolvableProfile.STREAM_CODEC`, from the profile a mannequin saves.
+[[nodiscard]] std::vector<std::uint8_t> profileBytes(const wire::nbt::NbtTag& saved) {
+    wire::io::ByteBuffer out;
+    std::string name;
+    std::optional<wire::common::Uuid> id;
+    std::vector<std::tuple<std::string, std::string, std::optional<std::string>>> properties;
+    std::optional<std::string> texture;
+    std::optional<std::string> cape;
+    std::optional<std::string> elytra;
+    std::optional<bool> slim;
+    if (const std::string* only = saved.get<std::string>(); only != nullptr) {
+        name = *only;
+    } else if (const NbtCompound* profile = saved.get<NbtCompound>(); profile != nullptr) {
+        name = std::string{profile->getString("name")};
+        if (const std::span<const std::int32_t> parts = profile->getIntArray("id"); parts.size() == 4) {
+            const auto word = [parts](std::size_t at) {
+                return static_cast<std::uint64_t>(static_cast<std::uint32_t>(parts[at]));
+            };
+            id = wire::common::Uuid{(word(0) << 32) | word(1), (word(2) << 32) | word(3)};
+        }
+        if (const wire::nbt::NbtList* held = profile->getList("properties"); held != nullptr) {
+            for (const wire::nbt::NbtTag& tag : held->elements()) {
+                if (const NbtCompound* property = tag.get<NbtCompound>(); property != nullptr) {
+                    properties.emplace_back(std::string{property->getString("name")},
+                                            std::string{property->getString("value")},
+                                            property->contains("signature")
+                                                ? std::optional{std::string{property->getString("signature")}}
+                                                : std::nullopt);
+                }
+            }
+        }
+        const auto identifier = [profile](std::string_view key) -> std::optional<std::string> {
+            const std::string_view value = profile->getString(key);
+            return value.empty() ? std::nullopt : std::optional{std::string{value}};
+        };
+        texture = identifier("texture");
+        cape = identifier("cape");
+        elytra = identifier("elytra");
+        if (const std::string_view model = profile->getString("model"); !model.empty()) {
+            slim = model == "slim";
+        }
+    }
+    const bool full = !name.empty() && id.has_value();
+    wire::protocol::writeBoolean(out, full);
+    if (full) {
+        wire::protocol::writeUuid(out, *id);
+        wire::protocol::writeString(out, name);
+    } else {
+        wire::protocol::writeBoolean(out, !name.empty());
+        if (!name.empty()) {
+            wire::protocol::writeString(out, name);
+        }
+        wire::protocol::writeBoolean(out, id.has_value());
+        if (id.has_value()) {
+            wire::protocol::writeUuid(out, *id);
+        }
+    }
+    wire::protocol::varInt::write(out, static_cast<std::int32_t>(properties.size()));
+    for (const auto& [key, value, signature] : properties) {
+        wire::protocol::writeString(out, key);
+        wire::protocol::writeString(out, value);
+        wire::protocol::writeBoolean(out, signature.has_value());
+        if (signature.has_value()) {
+            wire::protocol::writeString(out, *signature);
+        }
+    }
+    for (const std::optional<std::string>& asset : {texture, cape, elytra}) {
+        wire::protocol::writeBoolean(out, asset.has_value());
+        if (asset.has_value()) {
+            wire::protocol::writeString(out, *asset);
+        }
+    }
+    wire::protocol::writeBoolean(out, slim.has_value());
+    if (slim.has_value()) {
+        wire::protocol::writeBoolean(out, *slim);
+    }
+    const auto bytes = out.readSpan(out.readableBytes());
+    return {bytes.begin(), bytes.end()};
+}
+
+/// parity: `Mannequin`'s saved data, which the client draws the figure from.
+void addMannequinMetadata(Entries& into, const NbtCompound& data) {
+    constexpr std::uint8_t kMainHandIndex = 15;
+    constexpr std::uint8_t kLayersIndex = 16;
+    constexpr std::uint8_t kProfileIndex = 17;
+    constexpr std::uint8_t kImmovableIndex = 18;
+    constexpr std::uint8_t kDescriptionIndex = 19;
+    constexpr std::int32_t kProfileSerializer = 41;
+    static constexpr std::array<std::string_view, 7> kLayers{"cape",           "jacket",         "left_sleeve", "right_sleeve",
+                                                             "left_pants_leg", "right_pants_leg", "hat"};
+    using wire::protocol::play::Pose;
+    const std::string_view pose = data.getString("pose");
+    const std::optional<Pose> saved = pose == "crouching"      ? std::optional{Pose::Crouching}
+                                      : pose == "swimming"     ? std::optional{Pose::Swimming}
+                                      : pose == "fall_flying"  ? std::optional{Pose::FallFlying}
+                                      : pose == "sleeping"     ? std::optional{Pose::Sleeping}
+                                                               : std::nullopt;
+    if (saved.has_value()) {
+        into.push_back(Entry{.index = SetEntityDataPacket::kPoseIndex, .value = SetEntityDataPacket::PoseValue{*saved}});
+    }
+    if (data.getString("main_hand") == "left") {
+        into.push_back(Entry{.index = kMainHandIndex,
+                             .value = SetEntityDataPacket::RegistryIdValue{.value = 0,
+                                                                           .registry = RegistryHolder::HumanoidArm}});
+    }
+    std::int32_t mask = 0x7F;
+    if (const wire::nbt::NbtList* hidden = data.getList("hidden_layers"); hidden != nullptr) {
+        for (const wire::nbt::NbtTag& tag : hidden->elements()) {
+            const std::string* layer = tag.get<std::string>();
+            for (std::size_t bit = 0; layer != nullptr && bit < kLayers.size(); ++bit) {
+                if (*layer == kLayers[bit]) {
+                    mask &= ~(1 << bit);
+                }
+            }
+        }
+    }
+    into.push_back(Entry{.index = kLayersIndex, .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(mask)}});
+    if (const wire::nbt::NbtTag* profile = data.find("profile"); profile != nullptr) {
+        into.push_back(Entry{.index = kProfileIndex,
+                             .value = SetEntityDataPacket::RawValue{.serializer = kProfileSerializer,
+                                                                   .bytes = profileBytes(*profile)}});
+    }
+    if (data.getBoolean("immovable")) {
+        into.push_back(Entry{.index = kImmovableIndex, .value = SetEntityDataPacket::BoolValue{.value = true}});
+    }
+    if (data.getBoolean("hide_description")) {
+        into.push_back(
+            Entry{.index = kDescriptionIndex, .value = SetEntityDataPacket::OptionalTextValue{.value = std::nullopt}});
+    } else if (const wire::nbt::NbtTag* description = data.find("description"); description != nullptr) {
+        into.push_back(Entry{.index = kDescriptionIndex,
+                             .value = SetEntityDataPacket::OptionalTextValue{
+                                 .value = wire::text::componentNbt::deserialize(*description)}});
     }
 }
 
@@ -323,6 +461,9 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
             break;
         }
     }
+    if (type == "mannequin") {
+        addMannequinMetadata(entries, data);
+    }
     if (type == "armor_stand") {
         addArmorStandMetadata(entries, data);
     } else if ((type == "zombie" || type == "husk") && data.contains("DrownedConversionTime") &&
@@ -424,6 +565,20 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
             static_cast<std::int8_t>((data.getByte("Color") & 0x0F) | (data.getBoolean("Sheared") ? 0x10 : 0));
         if (wool != 0) {
             entries.push_back(Entry{.index = 18, .value = SetEntityDataPacket::ByteValue{.value = wool}});
+        }
+    } else if (type == "snow_golem") {
+        // parity: `SnowGolem.DATA_PUMPKIN_ID`, which a fresh one starts with the pumpkin on.
+        entries.push_back(Entry{.index = 16,
+                                .value = SetEntityDataPacket::ByteValue{
+                                    .value = static_cast<std::int8_t>(data.getBoolean("Pumpkin", true) ? 16 : 0)}});
+    } else if (type == "bogged") {
+        if (data.getBoolean("sheared")) {
+            entries.push_back(Entry{.index = 16, .value = SetEntityDataPacket::BoolValue{.value = true}});
+        }
+    } else if (type == "turtle") {
+        // parity: `Turtle.HAS_EGG`, the first index after `Animal`'s.
+        if (data.getBoolean("HasEgg")) {
+            entries.push_back(Entry{.index = 18, .value = SetEntityDataPacket::BoolValue{.value = true}});
         }
     } else if (type == "tropical_fish") {
         addIntIfSet(entries, data, "Variant", 17);
@@ -591,6 +746,21 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
     counter(pandaUnhappy, previous == nullptr ? std::nullopt : previous->pandaUnhappy, kPandaUnhappyDataIndex);
     counter(pandaSneeze, previous == nullptr ? std::nullopt : previous->pandaSneeze, kPandaSneezeDataIndex);
     counter(pandaEat, previous == nullptr ? std::nullopt : previous->pandaEat, kPandaEatDataIndex);
+    const auto plain = [&](const std::optional<bool>& now, const std::optional<bool> RuntimeEntityMetadata::* field,
+                           std::uint8_t index) {
+        if (now.has_value() && (previous == nullptr || previous->*field != now) && (previous != nullptr || *now)) {
+            entries.push_back(Entry{.index = index, .value = SetEntityDataPacket::BoolValue{.value = *now}});
+        }
+    };
+    // parity: the first index each of these mobs defines after `Animal`'s, or `Raider`'s for the witch.
+    plain(polarStanding, &RuntimeEntityMetadata::polarStanding, 18);
+    plain(striderCold, &RuntimeEntityMetadata::striderCold, 19);
+    plain(turtleLaying, &RuntimeEntityMetadata::turtleLaying, 19);
+    plain(witchUsing, &RuntimeEntityMetadata::witchUsing, 17);
+    if (boostTotal.has_value() && (previous == nullptr || previous->boostTotal != boostTotal) &&
+        (previous != nullptr || *boostTotal != 0)) {
+        entries.push_back(Entry{.index = 18, .value = SetEntityDataPacket::IntValue{.value = *boostTotal}});
+    }
     if (allayDancing.has_value() && (previous == nullptr || previous->allayDancing != allayDancing) &&
         (previous != nullptr || *allayDancing)) {
         entries.push_back(
@@ -976,6 +1146,21 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         if (entity.piglin != nullptr) {
             live.piglinCharging = entity.piglin->chargingCrossbow;
             live.piglinDancing = entity.piglin->dancing;
+        }
+    }
+    if (const mobMisc::State* held = mobMisc::peek(entity); held != nullptr) {
+        const std::string_view kind = entity.type().path();
+        if (kind == "polar_bear") {
+            live.polarStanding = held->polarStanding;
+        } else if (kind == "strider") {
+            live.striderCold = held->striderCold;
+            live.boostTotal = held->boostTotal;
+        } else if (kind == "pig") {
+            live.boostTotal = held->boostTotal;
+        } else if (kind == "turtle") {
+            live.turtleLaying = held->turtleLaying;
+        } else if (kind == "witch") {
+            live.witchUsing = held->witchDrinking;
         }
     }
     if (entity.allay != nullptr) {

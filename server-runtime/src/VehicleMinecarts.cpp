@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include <map>
 #include <string>
 
@@ -138,7 +139,9 @@ void VehicleSystem::tickMinecart(world::LoadedWorld& world, ServerEntity& cart) 
     // sets it off.
     if (path == "tnt_minecart") {
         const double speedSqr = (cart.velocityX * cart.velocityX) + (cart.velocityZ * cart.velocityZ);
-        if (cart.fuse > 0) {
+        if (state.detonateSpeedSqr.has_value()) {
+            explodeTnt(world, cart, *std::exchange(state.detonateSpeedSqr, std::nullopt));
+        } else if (cart.fuse > 0) {
             --cart.fuse;
         } else if (cart.fuse == 0) {
             explodeTnt(world, cart, speedSqr);

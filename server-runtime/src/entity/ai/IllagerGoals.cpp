@@ -1,9 +1,11 @@
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
 
 #include <cmath>
 #include <cstdint>
+#include <vector>
 
 namespace basalt::server::runtime::entity::ai {
 namespace {
@@ -160,6 +162,62 @@ void CastSpellGoal::tick(MobContext& mob) {
             mob.actions.applyEffect(*target->playerId, "blindness", kBlindnessTicks, 0, mob.mob.entityId());
         }
         break;
+    }
+}
+
+bool WololoSpellGoal::canUse(MobContext& mob) {
+    constexpr double kRange = 16.0;
+    constexpr double kHeight = 4.0;
+    constexpr std::int8_t kBlue = 11;
+    if (mob.mob.targetId.has_value() || mob.mob.spellType != 0 || mob.mob.tickCount < nextCast_ ||
+        !mob.actions.mobGriefing(mob.mob)) {
+        return false;
+    }
+    std::vector<const ServerEntity*> sheep;
+    for (const ServerEntity* candidate : mob.entities) {
+        if (candidate == nullptr || candidate->removed || candidate->health <= 0.0 ||
+            candidate->type().path() != "sheep" || !candidate->sourceNbt.has_value() ||
+            candidate->sourceNbt->getByte("Color") != kBlue) {
+            continue;
+        }
+        if (std::abs(candidate->x - mob.mob.x) <= kRange && std::abs(candidate->z - mob.mob.z) <= kRange &&
+            std::abs(candidate->y - mob.mob.y) <= kHeight &&
+            mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z) <= kRange * kRange) {
+            sheep.push_back(candidate);
+        }
+    }
+    if (sheep.empty()) {
+        return false;
+    }
+    mobMisc::of(mob.mob).wololoTarget = sheep[static_cast<std::size_t>(mob.random.nextInt(static_cast<std::int32_t>(sheep.size())))]->entityId();
+    return true;
+}
+
+bool WololoSpellGoal::canContinueToUse(MobContext& mob) {
+    const mobMisc::State* misc = mobMisc::peek(mob.mob);
+    return misc != nullptr && misc->wololoTarget.has_value() && warmup_ > 0;
+}
+
+void WololoSpellGoal::start(MobContext& mob) {
+    constexpr std::int32_t kWarmup = 40;
+    constexpr std::int32_t kInterval = 140;
+    warmup_ = adjustedTickDelay(kWarmup);
+    nextCast_ = mob.mob.tickCount + kInterval;
+    mob.actions.setCasting(mob.mob, true);
+    navigation::stop(mob.mob);
+}
+
+void WololoSpellGoal::stop(MobContext& mob) {
+    mob.actions.setCasting(mob.mob, false);
+    mobMisc::of(mob.mob).wololoTarget.reset();
+}
+
+void WololoSpellGoal::tick(MobContext& mob) {
+    if (--warmup_ != 0) {
+        return;
+    }
+    if (const mobMisc::State* misc = mobMisc::peek(mob.mob); misc != nullptr && misc->wololoTarget.has_value()) {
+        static_cast<void>(mob.actions.wololo(mob.mob, *misc->wololoTarget));
     }
 }
 

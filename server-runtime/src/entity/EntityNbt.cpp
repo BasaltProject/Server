@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Armadillos.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/Camels.hpp>
@@ -370,6 +371,14 @@ NbtCompound encode(const ServerEntity& entity) {
     // parity: `Creeper.addAdditionalSaveData` writes `powered` whether it is or not.
     if (path == "creeper") {
         tag.putBoolean("powered", entity.powered);
+        if (entity.misc != nullptr && entity.misc->creeperIgnited) {
+            tag.putBoolean("ignited", true);
+        } else {
+            tag.remove("ignited");
+        }
+    }
+    if (entity.misc != nullptr && !entity.misc->cubeWanders) {
+        tag.putBoolean("Paper.canWander", false);
     }
     if (path == "dolphin") {
         tag.putBoolean("GotFish", entity.gotFish);
@@ -620,6 +629,12 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
         entity->conversionClock = numericInt(tag, "Age");
     }
     entity->powered = path == "creeper" && numericBoolean(tag, "powered");
+    if (tag.contains("Paper.canWander") && !numericBoolean(tag, "Paper.canWander")) {
+        mobMisc::of(*entity).cubeWanders = false;
+    }
+    if (path == "creeper" && numericBoolean(tag, "ignited")) {
+        mobMisc::of(*entity).creeperIgnited = true;
+    }
     mobStatusEffects::decode(*entity, tag);
     if (path == "dolphin") {
         entity->gotFish = numericBoolean(tag, "GotFish");

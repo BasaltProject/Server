@@ -80,4 +80,26 @@ private:
     std::int32_t nextCast_ = 0;
 };
 
+/// parity: `Evoker.EvokerWololoSpellGoal`.
+class WololoSpellGoal final : public Goal {
+public:
+    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
+
+    [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
+
+    [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
+
+    void start(MobContext& mob) override;
+
+    void stop(MobContext& mob) override;
+
+    void tick(MobContext& mob) override;
+
+private:
+    std::int32_t warmup_ = 0;
+    std::int32_t nextCast_ = 0;
+};
+
 } // namespace basalt::server::runtime::entity::ai

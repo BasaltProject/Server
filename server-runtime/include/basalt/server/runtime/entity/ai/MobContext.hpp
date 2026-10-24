@@ -213,6 +213,12 @@ public:
     /// parity: `Raider.setCelebrating`.
     virtual void setCelebrating(ServerEntity& /*raider*/, bool /*celebrating*/) {}
 
+    /// parity: `EvokerWololoSpellGoal.performSpellCasting`.
+    [[nodiscard]] virtual bool wololo(ServerEntity& /*evoker*/, std::int32_t /*sheepId*/) { return false; }
+
+    /// parity: `GameRules.MOB_GRIEFING`.
+    [[nodiscard]] virtual bool mobGriefing(const ServerEntity& /*mob*/) { return true; }
+
     /// parity: `getBeehiveBlockEntity`, `isFull` and `isFireNearby`.
     struct HiveView {
         bool loaded = false;

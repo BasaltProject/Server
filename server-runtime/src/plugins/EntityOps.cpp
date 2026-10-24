@@ -214,6 +214,10 @@ const Accessors& accessors() {
                                           const std::optional<std::string> text = asText(value);
                                           if (text.has_value() && !text->empty()) {
                                               entity.customName = *text;
+                                              // parity: `Vindicator.setCustomName` turns a Johnny on for good.
+                                              if (*text == "Johnny" && entity.type().path() == "vindicator") {
+                                                  source(entity).putBoolean("Johnny", true);
+                                              }
                                           } else {
                                               entity.customName.reset();
                                           }

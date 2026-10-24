@@ -661,6 +661,11 @@ basalt_module(server-runtime-core
         src/entity/MobEquipment.cpp
         src/entity/NeutralAnger.cpp
         src/entity/Piglins.cpp
+        src/entity/MobMisc.cpp
+        src/entity/ai/FishGoals.cpp
+        src/MobActionPluginMore.cpp
+        src/MobActionShearing.cpp
+        src/plugins/MobMoreOps.cpp
         src/entity/CopperGolem.cpp
         src/entity/EntityCombat.cpp
         src/entity/MobBrain.cpp

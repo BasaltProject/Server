@@ -21,6 +21,7 @@
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
@@ -301,6 +302,15 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     const bool raider = RaidSystem::isRaider(mob);
     if (raider) {
         raids_->tickRaider(world, mob);
+    }
+    if (mob.type().path() == "witch") {
+        tickWitchDrinking(world, mob, random);
+    }
+    if (mob.type().path() == "strider") {
+        tickStriderWarmth(world, mob);
+    }
+    if (mob.misc != nullptr && mob.misc->boosting && mob.misc->boostTime++ > mob.misc->boostTotal) {
+        mob.misc->boosting = false;
     }
     const BrainTick brain = brainOf(mob.type());
     if (mob.goals == nullptr && brain == nullptr) {

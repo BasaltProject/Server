@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
 #include <basalt/server/runtime/entity/ai/HorseGoals.hpp>
+#include <basalt/server/runtime/entity/ai/FishGoals.hpp>
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/LlamaGoals.hpp>
 #include <basalt/server/runtime/entity/ai/LongDistancePatrolGoal.hpp>
@@ -397,6 +398,9 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
         add<HurtByTargetGoal>(selector, 1);
         add<NearestAttackablePlayerGoal>(selector, 2);
         add<NearestAttackableEntityGoal>(selector, 3, Names{"iron_golem", "villager"});
+        if (path == "vindicator") {
+            add<JohnnyAttackGoal>(selector, 4);
+        }
         return true;
     }
     return false;
@@ -513,9 +517,10 @@ bool buildIllager(GoalSelector& selector, std::string_view path) {
     if (path == "evoker") {
         addRaiderGoals(selector);
         add<FloatGoal>(selector, 0);
-        // parity: `Evoker.registerGoals`, the fangs before the vexes and the wololo left out.
+        // parity: `Evoker.registerGoals`, the fangs before the vexes.
         add<CastSpellGoal>(selector, 4, CastSpellGoal::Spell::SummonVexes, kSummonCast, kSummonCooldown);
         add<CastSpellGoal>(selector, 5, CastSpellGoal::Spell::Fangs, kFangCast, kFangCooldown);
+        add<WololoSpellGoal>(selector, 6);
         add<RandomStrollGoal>(selector, 8, 0.6);
         add<LookAtPlayerGoal>(selector, 9, kLookMeet, 1.0F);
         add<RandomLookAroundGoal>(selector, 10);
@@ -629,6 +634,9 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path) {
     static const Names kFish{"cod", "salmon", "tropical_fish", "pufferfish", "tadpole"};
     if (kFish.contains(path)) {
         add<SwimAboutGoal>(selector, 4, kFishPush);
+        if (path == "cod" || path == "salmon" || path == "tropical_fish") {
+            add<FollowFlockLeaderGoal>(selector, 5);
+        }
         return true;
     }
     // parity: `Dolphin.registerGoals`.

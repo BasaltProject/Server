@@ -3,12 +3,14 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -117,6 +119,59 @@ void NearestAttackableEntityGoal::start(MobContext& mob) {
 }
 
 void NearestAttackableEntityGoal::stop(MobContext& mob) { mob.mob.targetId.reset(); }
+
+namespace {
+
+[[nodiscard]] bool isJohnny(const ServerEntity& vindicator) {
+    return vindicator.sourceNbt.has_value() && vindicator.sourceNbt->getBoolean("Johnny");
+}
+
+/// parity: `LivingEntity.attackable`, which an armor stand refuses.
+[[nodiscard]] std::optional<std::int32_t> johnnyTarget(MobContext& mob) {
+    const double range = followRange(mob);
+    double best = range * range;
+    std::optional<std::int32_t> found;
+    for (const ServerEntity* candidate : mob.entities) {
+        if (candidate == nullptr || candidate == &mob.mob || candidate->removed || candidate->health <= 0.0 ||
+            !reg::entityAttributes::isLiving(candidate->type()) || candidate->type().path() == "armor_stand") {
+            continue;
+        }
+        const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);
+        if (distance <= best) {
+            best = distance;
+            found = candidate->entityId();
+        }
+    }
+    if (const PlayerView* player = mob.nearestPlayer(range); player != nullptr) {
+        if (mob.distanceSquaredTo(player->x, player->y, player->z) <= best) {
+            found = player->entityId;
+        }
+    }
+    return found;
+}
+
+} // namespace
+
+bool JohnnyAttackGoal::canUse(MobContext& mob) {
+    return isJohnny(mob.mob) && !mob.mob.targetId.has_value() && johnnyTarget(mob).has_value();
+}
+
+bool JohnnyAttackGoal::canContinueToUse(MobContext& mob) {
+    if (!mob.mob.targetId.has_value()) {
+        return false;
+    }
+    const double range = followRange(mob);
+    if (const PlayerView* player = mob.playerById(*mob.mob.targetId); player != nullptr) {
+        return player->targetable && mob.distanceSquaredTo(player->x, player->y, player->z) <= range * range;
+    }
+    const ServerEntity* target = mob.entityById(*mob.mob.targetId);
+    return target != nullptr && !target->removed && target->health > 0.0 &&
+           mob.distanceSquaredTo(target->x, target->y, target->z) <= range * range;
+}
+
+void JohnnyAttackGoal::start(MobContext& mob) { mob.mob.targetId = johnnyTarget(mob); }
+
+void JohnnyAttackGoal::stop(MobContext& mob) { mob.mob.targetId.reset(); }
 
 HurtByTargetGoal::HurtByTargetGoal(Types ignoreDamageFrom, bool alertOthers, Types ignoreAlert)
     : ignoreDamageFrom_(std::move(ignoreDamageFrom)), alertOthers_(alertOthers), ignoreAlert_(std::move(ignoreAlert)) {}
@@ -228,6 +283,9 @@ void MeleeAttackGoal::start(MobContext& mob) {
 }
 
 void MeleeAttackGoal::stop(MobContext& mob) {
+    if (mob.mob.misc != nullptr) {
+        mob.mob.misc->polarStanding = false;
+    }
     mob.mob.aggressive = false;
     navigation::stop(mob.mob);
 }
@@ -258,6 +316,33 @@ void MeleeAttackGoal::tick(MobContext& mob) {
         }
         if (!navigation::moveTo(mob.world, mob.mob, target->x, target->y, target->z, speedModifier_)) {
             repathCooldown_ += kNoPathPenalty;
+        }
+    }
+    if (mob.mob.type().path() == "polar_bear") {
+        // parity: `PolarBear.PolarBearMeleeAttackGoal`, up on its hind legs just before the swipe.
+        constexpr std::int32_t kWarningInterval = 40;
+        constexpr std::int32_t kStandTicks = 10;
+        constexpr double kStandReach = 3.0;
+        mobMisc::State& bear = mobMisc::of(mob.mob);
+        bear.polarWarning = std::max(bear.polarWarning - 1, 0);
+        const double reach = target->width + kStandReach;
+        if (mob.mob.attackCooldown <= 0 && withinReach(mob, *target)) {
+            bear.polarStanding = false;
+        } else if (mob.distanceSquaredTo(target->x, target->y, target->z) < reach * reach) {
+            if (mob.mob.attackCooldown <= 0) {
+                bear.polarStanding = false;
+                mob.mob.attackCooldown = mobCombat::kAttackInterval;
+            }
+            if (mob.mob.attackCooldown <= kStandTicks) {
+                bear.polarStanding = true;
+                if (bear.polarWarning <= 0) {
+                    mob.actions.mobSound(mob.mob, "entity.polar_bear.warning");
+                    bear.polarWarning = kWarningInterval;
+                }
+            }
+        } else {
+            mob.mob.attackCooldown = mobCombat::kAttackInterval;
+            bear.polarStanding = false;
         }
     }
     if (mob.mob.attackCooldown > 0 || !withinReach(mob, *target)) {

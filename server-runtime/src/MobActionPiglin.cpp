@@ -365,7 +365,7 @@ void MobActionSystem::piglinCore(world::LoadedWorld& world, entity::ai::MobConte
         if (sense.wantedItem.has_value() && !state.admiring.has(now) && !state.admiringDisabled.has(now) &&
             !state.walkToItemDisabled.has(now)) {
             for (const world::DroppedItem& item : world.state().nearbyItems(piglin.x, piglin.y, piglin.z, 33.0)) {
-                if (item.entityId == *sense.wantedItem && itemTagged("minecraft:piglin_loved", item.item)) {
+                if (item.entityId == *sense.wantedItem && piglinLoves(state, item.item)) {
                     state.admiring.setFor(true, now, piglins::kAdmireDuration);
                 }
             }
@@ -514,7 +514,7 @@ void MobActionSystem::piglinActivity(world::LoadedWorld& world, entity::ai::MobC
         }
         const std::optional<server::world::loot::ItemStack> offhand =
             entity::mobEquipment::get(piglin, entity::mobEquipment::Slot::OffHand);
-        const bool lovesOffhand = offhand.has_value() && itemTagged("minecraft:piglin_loved", offhand->item);
+        const bool lovesOffhand = offhand.has_value() && piglinLoves(state, offhand->item);
         if (wanted.has_value() && !lovesOffhand &&
             context.distanceSquaredTo(wanted->x, wanted->y, wanted->z) <
                 piglins::kMaxDistanceToWalkToItem * piglins::kMaxDistanceToWalkToItem) {

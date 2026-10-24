@@ -81,6 +81,10 @@ namespace piglins {
 struct PiglinState;
 }
 
+namespace mobMisc {
+struct State;
+}
+
 namespace neutralAnger {
 struct Anger;
 }
@@ -502,6 +506,7 @@ public:
     /// parity: `Allay`'s own fields and brain. Absent for everything that is not one.
     std::shared_ptr<allays::AllayState> allay;
     std::shared_ptr<piglins::PiglinState> piglin;
+    std::shared_ptr<mobMisc::State> misc;
     std::shared_ptr<neutralAnger::Anger> neutral;
     std::shared_ptr<hoglins::HoglinState> hoglin;
     std::shared_ptr<axolotls::AxolotlState> axolotl;
