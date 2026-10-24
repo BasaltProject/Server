@@ -43,8 +43,6 @@ public final class EntityCore {
     public final EntityType type;
     public final MetadataHolder metadata = new MetadataHolder();
     public final java.util.Set<String> tags = new java.util.HashSet<>();
-    public final java.util.Map<net.kyori.adventure.key.Key, java.util.function.Predicate<Entity>> alliedRules =
-        new java.util.concurrent.ConcurrentHashMap<>();
     public final java.util.Map<org.bukkit.entity.memory.MemoryKey<?>, Object> memories =
         new java.util.concurrent.ConcurrentHashMap<>();
     public volatile org.bukkit.permissions.PermissibleBase permissions;
