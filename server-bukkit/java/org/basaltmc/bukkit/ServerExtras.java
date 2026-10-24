@@ -349,7 +349,7 @@ public abstract class ServerExtras extends MiscServer {
         String kind = type == WorldType.FLAT ? "flat" : type == WorldType.AMPLIFIED ? "amplified"
             : type == WorldType.LARGE_BIOMES ? "large_biomes" : type == WorldType.DEBUG_ALL_BLOCK_STATES ? "debug"
             : "normal";
-        if (creator.generator() != null) {
+        if (creator.generator() != null && !org.basaltmc.bukkit.worldgen.CustomGenerators.needsVanilla(creator.generator())) {
             kind = "void";
         }
         if (!WorldEnvNatives.createWorld(name, dimension, kind, creator.seed(), true)) {
@@ -390,8 +390,4 @@ public abstract class ServerExtras extends MiscServer {
         return !event.isCancelled() && WorldEnvNatives.unloadWorld(world.getName(), save);
     }
 
-    @Override
-    public long[] getTickTimes() {
-        throw Unsupported.hit("Server#getTickTimes");
-    }
 }

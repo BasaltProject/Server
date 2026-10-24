@@ -31,6 +31,34 @@ public final class TileStates {
         return proxy(tile, kind);
     }
 
+    /** A tile state for a block that is in no world, over data that came from an item. */
+    public static BlockState detached(BlockState base, Map<String, Object> data, java.util.List<Object> items) {
+        BlockState held = org.basaltmc.bukkit.inv.ContainerStates.detached(base, data, items);
+        TileKind kind = held != base ? Kinds.container(held) : Kinds.of(base.getType().getKey().getKey());
+        if (kind == null) {
+            return held;
+        }
+        return proxy(new Tile(held, data), kind);
+    }
+
+    /** The state a tile state wraps, which holds the stacks of a container. */
+    public static BlockState innerOf(BlockState state) {
+        if (state != null && Proxy.isProxyClass(state.getClass())
+            && Proxy.getInvocationHandler(state) instanceof Handler handler) {
+            return handler.tile.base;
+        }
+        return state;
+    }
+
+    /** The block entity data a tile state of the server holds, or null for any other state. */
+    public static java.util.Map<String, Object> dataOf(BlockState state) {
+        if (state != null && Proxy.isProxyClass(state.getClass())
+            && Proxy.getInvocationHandler(state) instanceof Handler handler) {
+            return handler.tile.data;
+        }
+        return null;
+    }
+
     private static BlockState proxy(Tile tile, TileKind kind) {
         tile.self = (BlockState) Proxy.newProxyInstance(kind.face().getClassLoader(), new Class<?>[] {kind.face()},
             new Handler(tile, kind));

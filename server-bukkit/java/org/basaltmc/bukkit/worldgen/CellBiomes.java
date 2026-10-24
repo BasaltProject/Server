@@ -19,6 +19,10 @@ public final class CellBiomes implements ChunkGenerator.BiomeGrid {
         java.util.Arrays.fill(cells, fallback);
     }
 
+    void load(int[] fromServer) {
+        System.arraycopy(fromServer, 0, cells, 0, Math.min(fromServer.length, cells.length));
+    }
+
     int[] cells() {
         return cells;
     }

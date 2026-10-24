@@ -38,6 +38,101 @@ public final class BasaltUnsafe extends UnsafeValuesBase {
         return material;
     }
 
+    private static org.bukkit.Material modernOf(org.bukkit.Material material, byte data) {
+        if (!material.isLegacy()) {
+            return material;
+        }
+        org.bukkit.Material modern = org.bukkit.Material.getMaterial(material.name().substring("LEGACY_".length()));
+        if (modern == null || data != 0) {
+            throw Unsupported.hit("UnsafeValues#fromLegacy of " + material + " with data " + data);
+        }
+        return modern;
+    }
+
+    @Override
+    public org.bukkit.block.data.BlockData fromLegacy(org.bukkit.Material material, byte data) {
+        return org.bukkit.Bukkit.createBlockData(modernOf(material, data));
+    }
+
+    @Override
+    public org.bukkit.Material fromLegacy(org.bukkit.material.MaterialData data) {
+        return modernOf(data.getItemType(), data.getData());
+    }
+
+    @Override
+    public org.bukkit.Material fromLegacy(org.bukkit.material.MaterialData data, boolean itemPriority) {
+        return modernOf(data.getItemType(), data.getData());
+    }
+
+    @Override
+    public com.google.gson.JsonObject serializeItemAsJson(org.bukkit.inventory.ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) {
+            throw new IllegalArgumentException("Cannot serialize an empty stack");
+        }
+        return org.basaltmc.bukkit.item.ItemJson.write(stack, kDataVersion);
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemStack deserializeItemFromJson(com.google.gson.JsonObject json) {
+        return org.basaltmc.bukkit.item.ItemJson.read(json);
+    }
+
+    @Override
+    public int nextEntityId(org.bukkit.World world) {
+        return RestNatives.nextEntityId();
+    }
+
+    private static final String kPackMeta = "{\"pack\":{\"description\":\"Data pack for resources provided by "
+        + "Bukkit plugins\",\"min_format\":121,\"max_format\":121}}";
+
+    private static java.io.File advancementFile(String namespace, String path) {
+        java.io.File pack = new java.io.File(new java.io.File(org.bukkit.Bukkit.getWorlds().get(0).getWorldFolder(),
+            "datapacks"), "bukkit");
+        return new java.io.File(new java.io.File(pack, "data/" + namespace + "/advancement"), path + ".json");
+    }
+
+    @Override
+    public org.bukkit.advancement.Advancement loadAdvancement(net.kyori.adventure.key.Key key, String advancement,
+            boolean persist) {
+        java.io.File file = advancementFile(key.namespace(), key.value());
+        try {
+            java.io.File meta = new java.io.File(file.getParentFile().getParentFile().getParentFile().getParentFile(),
+                "pack.mcmeta");
+            java.nio.file.Files.createDirectories(file.getParentFile().toPath());
+            if (!meta.exists()) {
+                java.nio.file.Files.writeString(meta.toPath(), kPackMeta);
+            }
+            java.nio.file.Files.writeString(file.toPath(), advancement);
+        } catch (java.io.IOException e) {
+            return null;
+        }
+        boolean reloaded = RestNatives.reloadData();
+        org.bukkit.advancement.Advancement loaded = reloaded
+            ? org.bukkit.Bukkit.getAdvancement(new org.bukkit.NamespacedKey(key.namespace(), key.value())) : null;
+        if (!persist) {
+            file.delete();
+        }
+        return loaded;
+    }
+
+    @Override
+    public java.util.List<org.bukkit.advancement.Advancement> loadAdvancements(
+            java.util.Map<net.kyori.adventure.key.Key, String> advancements, boolean persist) {
+        java.util.List<org.bukkit.advancement.Advancement> loaded = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<net.kyori.adventure.key.Key, String> entry : advancements.entrySet()) {
+            org.bukkit.advancement.Advancement one = loadAdvancement(entry.getKey(), entry.getValue(), persist);
+            if (one != null) {
+                loaded.add(one);
+            }
+        }
+        return loaded;
+    }
+
+    @Override
+    public boolean removeAdvancement(org.bukkit.NamespacedKey key) {
+        return advancementFile(key.getNamespace(), key.getKey()).delete();
+    }
+
     @Override
     public org.bukkit.Material toLegacy(org.bukkit.Material material) {
         return material;

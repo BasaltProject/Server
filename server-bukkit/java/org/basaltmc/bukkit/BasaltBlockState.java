@@ -31,6 +31,11 @@ public final class BasaltBlockState extends BlockStateBase {
         this.data = data;
     }
 
+    /** A state that is in no world, as the one inside an item. */
+    public static BlockState detached(BlockData data) {
+        return new BasaltBlockState(null, 0, 0, 0, data);
+    }
+
     @Override
     public Block getBlock() {
         return world.getBlockAt(x, y, z);

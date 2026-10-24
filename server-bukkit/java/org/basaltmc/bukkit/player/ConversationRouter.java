@@ -29,6 +29,9 @@ final class ConversationRouter implements Listener {
         ConversationRouter router = new ConversationRouter();
         Bukkit.getPluginManager().registerEvent(AsyncPlayerChatEvent.class, router, EventPriority.LOWEST,
             (listener, event) -> router.chat((AsyncPlayerChatEvent) event), plugin);
+        Bukkit.getPluginManager().registerEvent(org.bukkit.event.server.ServerCommandEvent.class, router,
+            EventPriority.LOWEST, (listener, event) -> router.console((org.bukkit.event.server.ServerCommandEvent) event),
+            plugin);
         try {
             @SuppressWarnings("unchecked")
             Class<? extends Event> modern = (Class<? extends Event>) Class.forName(
@@ -45,6 +48,14 @@ final class ConversationRouter implements Listener {
         if (player.isConversing()) {
             event.setCancelled(true);
             player.acceptConversationInput(event.getMessage());
+        }
+    }
+
+    private void console(org.bukkit.event.server.ServerCommandEvent event) {
+        org.bukkit.command.ConsoleCommandSender console = Bukkit.getConsoleSender();
+        if (event.getSender() == console && console.isConversing()) {
+            event.setCancelled(true);
+            console.acceptConversationInput(event.getCommand());
         }
     }
 

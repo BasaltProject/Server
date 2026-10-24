@@ -129,37 +129,37 @@ public abstract class WorldGeo extends WorldExtras {
 
     @Override
     public void setSimulationDistance(int distance) {
-        throw Unsupported.hit("World#setSimulationDistance");
+        RestNatives.setWorldTunable(getName(), "simulation_distance", Math.max(2, distance));
     }
 
     @Override
     public boolean isVoidDamageEnabled() {
-        return true;
+        return RestNatives.worldTunable(getName(), "void_damage") != 0.0;
     }
 
     @Override
     public float getVoidDamageAmount() {
-        return 4.0F;
+        return (float) RestNatives.worldTunable(getName(), "void_damage_amount");
     }
 
     @Override
     public double getVoidDamageMinBuildHeightOffset() {
-        return -64.0;
+        return RestNatives.worldTunable(getName(), "void_damage_offset");
     }
 
     @Override
     public void setVoidDamageEnabled(boolean enabled) {
-        throw Unsupported.hit("World#setVoidDamageEnabled");
+        RestNatives.setWorldTunable(getName(), "void_damage", enabled ? 1.0 : 0.0);
     }
 
     @Override
     public void setVoidDamageAmount(float amount) {
-        throw Unsupported.hit("World#setVoidDamageAmount");
+        RestNatives.setWorldTunable(getName(), "void_damage_amount", amount);
     }
 
     @Override
     public void setVoidDamageMinBuildHeightOffset(double offset) {
-        throw Unsupported.hit("World#setVoidDamageMinBuildHeightOffset");
+        RestNatives.setWorldTunable(getName(), "void_damage_offset", offset);
     }
 
     @Override
@@ -372,22 +372,38 @@ public abstract class WorldGeo extends WorldExtras {
         return CompletableFuture.completedFuture(getChunkGenerationState(x, z));
     }
 
-    @Override
-    public boolean generateTree(Location location, TreeType type) {
-        String sapling = switch (type) {
-            case TREE, BIG_TREE, SWAMP -> "oak_sapling";
-            case REDWOOD, TALL_REDWOOD, MEGA_REDWOOD, MEGA_PINE -> "spruce_sapling";
-            case BIRCH, TALL_BIRCH -> "birch_sapling";
-            case JUNGLE, SMALL_JUNGLE, COCOA_TREE, JUNGLE_BUSH -> "jungle_sapling";
-            case ACACIA -> "acacia_sapling";
-            case DARK_OAK -> "dark_oak_sapling";
-            case CHERRY -> "cherry_sapling";
-            case PALE_OAK, PALE_OAK_CREAKING -> "pale_oak_sapling";
+    private static String treeName(TreeType type) {
+        return switch (type) {
+            case TREE -> "oak";
+            case BIG_TREE -> "fancy_oak";
+            case REDWOOD -> "spruce";
+            case TALL_REDWOOD -> "pine";
+            case BIRCH -> "birch";
+            case JUNGLE -> "mega_jungle";
+            case SMALL_JUNGLE, COCOA_TREE -> "jungle_tree";
+            case JUNGLE_BUSH -> "jungle_bush";
+            case SWAMP -> "swamp_oak";
+            case ACACIA -> "acacia";
+            case DARK_OAK -> "dark_oak";
+            case MEGA_REDWOOD -> "mega_spruce";
+            case MEGA_PINE -> "mega_pine";
+            case TALL_BIRCH -> "super_birch";
+            case AZALEA -> "azalea";
+            case MANGROVE -> "mangrove";
+            case TALL_MANGROVE -> "tall_mangrove";
+            case CHERRY -> "cherry";
+            case PALE_OAK -> "pale_oak";
+            case PALE_OAK_CREAKING -> "pale_oak_creaking";
             default -> throw Unsupported.hit("World#generateTree " + type);
         };
+    }
+
+    @Override
+    public boolean generateTree(Location location, TreeType type) {
+        String tree = treeName(type);
         Blocks.flushAll();
-        return WorldEnvNatives.growTree(getName(), location.getBlockX(), location.getBlockY(), location.getBlockZ(),
-            sapling);
+        return RestNatives.placeTree(getName(), tree, location.getBlockX(), location.getBlockY(),
+            location.getBlockZ(), true) != null;
     }
 
     @Override
@@ -397,7 +413,17 @@ public abstract class WorldGeo extends WorldExtras {
 
     @Override
     public boolean generateTree(Location location, TreeType type, org.bukkit.BlockChangeDelegate delegate) {
-        throw Unsupported.hit("World#generateTree with a block change delegate");
+        String tree = treeName(type);
+        Blocks.flushAll();
+        int[] placed = RestNatives.placeTree(getName(), tree, location.getBlockX(), location.getBlockY(),
+            location.getBlockZ(), false);
+        if (placed == null) {
+            return false;
+        }
+        for (int at = 0; at + 4 < placed.length; at += 5) {
+            delegate.setBlockData(placed[at], placed[at + 1], placed[at + 2], BasaltBlockData.of(placed[at + 4]));
+        }
+        return true;
     }
 
     @Override

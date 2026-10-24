@@ -964,8 +964,19 @@ jobjectArray JNICALL nativeDragonFight(JNIEnv* env, jclass, jstring world) {
                                    ? std::to_string((*facts->portal)[0]) + "," + std::to_string((*facts->portal)[1]) +
                                          "," + std::to_string((*facts->portal)[2])
                                    : std::string{};
+    const auto joined = [](const auto& values, auto toText) {
+        std::string out;
+        for (const auto& value : values) {
+            out += (out.empty() ? "" : ",") + toText(value);
+        }
+        return out;
+    };
     return jni::stringArrayOf(env, {facts->previouslyKilled ? "1" : "0", portal, facts->respawnStage,
-                                    std::to_string(facts->gatewaysLeft), facts->dragonUuid});
+                                    std::to_string(facts->gatewaysLeft), facts->dragonUuid,
+                                    std::to_string(facts->barProgress), facts->barVisible ? "1" : "0",
+                                    joined(facts->barPlayers, [](std::int32_t id) { return std::to_string(id); }),
+                                    joined(facts->respawnCrystals, [](const std::string& id) { return id; }),
+                                    joined(facts->healingCrystals, [](const std::string& id) { return id; })});
 }
 
 void JNICALL nativeSetDragonPreviouslyKilled(JNIEnv* env, jclass, jstring world, jboolean value) {

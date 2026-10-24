@@ -4,10 +4,10 @@ import java.util.LinkedList;
 import org.bukkit.conversations.Conversation;
 import org.bukkit.conversations.ConversationAbandonedEvent;
 
-final class PlayerConversations {
+public final class PlayerConversations {
     private final LinkedList<Conversation> queue = new LinkedList<>();
 
-    synchronized boolean begin(Conversation conversation) {
+    public synchronized boolean begin(Conversation conversation) {
         if (queue.contains(conversation)) {
             return true;
         }
@@ -20,7 +20,7 @@ final class PlayerConversations {
         return true;
     }
 
-    synchronized void abandon(Conversation conversation, ConversationAbandonedEvent details) {
+    public synchronized void abandon(Conversation conversation, ConversationAbandonedEvent details) {
         if (queue.isEmpty()) {
             return;
         }
@@ -33,11 +33,11 @@ final class PlayerConversations {
         }
     }
 
-    synchronized boolean isConversing() {
+    public synchronized boolean isConversing() {
         return !queue.isEmpty() && queue.getFirst().isModal();
     }
 
-    synchronized void accept(String input) {
+    public synchronized void accept(String input) {
         if (isConversing()) {
             queue.getFirst().acceptInput(input);
         }

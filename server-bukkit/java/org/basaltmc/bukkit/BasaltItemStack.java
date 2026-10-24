@@ -398,7 +398,7 @@ public final class BasaltItemStack extends ItemStack {
     @Override
     public java.util.List<Component> computeTooltipLines(io.papermc.paper.inventory.tooltip.TooltipContext context,
             org.bukkit.entity.Player player) {
-        throw Unsupported.hit("ItemStack#computeTooltipLines");
+        return org.basaltmc.bukkit.item.Tooltips.lines(this, components, effectiveName(), context);
     }
 
     @Override
@@ -406,7 +406,7 @@ public final class BasaltItemStack extends ItemStack {
         Map<String, Object> repairable = Nbt.map(components.get("minecraft:repairable"));
         Object types = repairable == null ? components.get("minecraft:repairable") : repairable.get("items");
         if (types == null) {
-            throw Unsupported.hit("ItemStack#isRepairableBy for an item without a repairable component");
+            return false;
         }
         return org.basaltmc.bukkit.item.TagSets.resolve("items", types)
             .contains(repairMaterial.getType().getKey().toString());

@@ -26,7 +26,7 @@ import org.bukkit.plugin.SimpleServicesManager;
 import org.bukkit.plugin.messaging.Messenger;
 import org.bukkit.scheduler.BukkitScheduler;
 
-public class BasaltServer extends ServerLeftovers {
+public class BasaltServer extends ServerTail {
     public static final String kMinecraftVersion = "26.3";
 
     private static BasaltServer instance;
@@ -375,7 +375,7 @@ public class BasaltServer extends ServerLeftovers {
 
     @Override
     public boolean isTickingWorlds() {
-        return true;
+        return !RestNatives.paused();
     }
 
     @Override
