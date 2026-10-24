@@ -18,7 +18,7 @@ import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-public interface LivingEntityOps extends LivingEntity, EntityOps {
+public interface LivingEntityOps extends LivingEntity, EntityOps, LivingExtraOps {
     default double getHealth() {
         return core().isTemplate() ? (core().property("health") instanceof Number staged ? staged.doubleValue()
             : getMaxHealth()) : core().number(EntityCore.kHealth);
@@ -133,9 +133,6 @@ public interface LivingEntityOps extends LivingEntity, EntityOps {
         core().set("no_damage_ticks", ticks);
     }
 
-    default int getMaximumNoDamageTicks() {
-        return 20;
-    }
 
     default int getArrowsInBody() {
         return core().integer("arrows_in_body");

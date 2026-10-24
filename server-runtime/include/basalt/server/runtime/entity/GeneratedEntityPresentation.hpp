@@ -51,6 +51,7 @@ struct RuntimeEntityMetadata {
     std::optional<bool> baby;
     std::optional<std::int32_t> cubeSize;
     std::optional<std::int8_t> horseFlags;
+    std::optional<std::int8_t> livingFlags;
     /// parity: `AbstractChestedHorse.DATA_ID_CHEST` and `Camel.DASH`.
     std::optional<bool> horseChest;
     std::optional<bool> camelDash;

@@ -68,6 +68,17 @@ public final class GenerateEntities {
             String name = head.substring(head.lastIndexOf(' ') + 1);
             keys.add(normalise(name, text.substring(open + 1, closeAt)));
         }
+        Matcher heritage = Pattern.compile("interface\\s+\\w+\\s+extends\\s+([^{]+)\\{").matcher(text);
+        if (heritage.find()) {
+            for (String parent : heritage.group(1).split(",")) {
+                String simple = parent.strip();
+                simple = simple.substring(simple.lastIndexOf('.') + 1);
+                if (simple.endsWith("ExtraOps") && !simple.equals(opsName)
+                    && Files.exists(opsDirectory.resolve(simple + ".java"))) {
+                    keys.addAll(keysOf(simple));
+                }
+            }
+        }
         sourceKeys.put(opsName, keys);
         return keys;
     }
@@ -308,7 +319,7 @@ public final class GenerateEntities {
             }
             mine.add(ops);
             for (String key : coverage(ops)) {
-                if (baseStubbed.get(base).contains(key)) {
+                if (baseStubbed.getOrDefault(base, Set.of()).contains(key)) {
                     throw new IllegalStateException(ops + " covers " + key + " which the base stub layer stubs");
                 }
                 if (baseStubKeys.get(base).contains(key)) {

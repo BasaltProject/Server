@@ -99,6 +99,7 @@ ServerEntity* NaturalSpawningSystem::spawnMob(world::LoadedWorld& world, const I
     auto entity = std::make_unique<ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(), type,
                                                  entry->protocolId, x, y, z);
     entity->yaw = yaw;
+    entity->spawnReason = std::string{reason};
     if (initialize) {
         initialize(*entity);
     }

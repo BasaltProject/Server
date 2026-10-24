@@ -542,6 +542,22 @@ public:
 
     std::int32_t deathTime = 0;
 
+    std::uint8_t forcedFlags = 0;
+    std::string spawnReason;
+    float hurtDirection = 0.0F;
+    bool collidable = true;
+    std::int8_t forcedPose = -1;
+    std::int8_t visualFire = -1;
+    bool freezeLocked = false;
+    bool jumping = false;
+    std::int32_t portalCooldown = 0;
+    std::int8_t activeSlot = -1;
+    std::int32_t activeTicks = 0;
+    std::int32_t activeUsed = 0;
+    bool riptiding = false;
+    std::int32_t maxNoDamageTicks = 20;
+    std::optional<std::int32_t> maxAirOverride;
+
     std::map<std::string, std::map<std::string, AttributeModifier, std::less<>>, std::less<>> attributeModifiers;
 
     /// with, else the attribute's own default. parity: `AttributeMap` built from

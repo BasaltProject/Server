@@ -191,6 +191,7 @@ basalt_module(server-runtime-core
         src/plugins/EntityOps.cpp
         src/plugins/BeastOps.cpp
         src/plugins/FlagOps.cpp
+        src/plugins/EntityStateOps.cpp
         src/plugins/HookOps.cpp
         src/plugins/VillagerOps.cpp
         src/plugins/VehicleOps.cpp

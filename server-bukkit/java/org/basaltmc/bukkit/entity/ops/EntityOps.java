@@ -28,7 +28,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
-public interface EntityOps extends Entity, Cored {
+public interface EntityOps extends Entity, Cored, EntityExtraOps {
     default int getEntityId() {
         return core().id;
     }
@@ -146,34 +146,6 @@ public interface EntityOps extends Entity, Cored {
             location.getZ() - box.getCenterZ()));
     }
 
-    default boolean isAlliedTo(Entity other) {
-        org.bukkit.scoreboard.Scoreboard board = org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
-        org.bukkit.scoreboard.Team mine = board.getEntityTeam(this);
-        return mine != null && mine.equals(board.getEntityTeam(other))
-            || org.basaltmc.bukkit.AlliedRules.matches(this, other);
-    }
-
-    default java.util.Map<net.kyori.adventure.key.Key, java.util.function.Predicate<Entity>> getAdditionalAlliedRules() {
-        return org.basaltmc.bukkit.AlliedRules.of(this);
-    }
-
-    default void addAdditionalAlliedRule(net.kyori.adventure.key.Key key,
-            java.util.function.Predicate<Entity> rule) {
-        org.basaltmc.bukkit.AlliedRules.add(this, key, rule);
-    }
-
-    default void removeAdditionalAlliedRule(net.kyori.adventure.key.Key key) {
-        org.basaltmc.bukkit.AlliedRules.remove(this, key);
-    }
-
-    default void removeAdditionalAlliedRule(net.kyori.adventure.key.Namespaced key) {
-        org.basaltmc.bukkit.AlliedRules.removeNamespace(this, key.namespace());
-    }
-
-    default String getAsString() {
-        byte[] saved = core().nbt("");
-        return saved == null ? null : org.basaltmc.bukkit.EntityNatives.nbtToSnbt(saved);
-    }
 
     default boolean isInRain() {
         World world = getWorld();
@@ -318,9 +290,6 @@ public interface EntityOps extends Entity, Cored {
         return getFreezeTicks() >= getMaxFreezeTicks();
     }
 
-    default boolean isSneaking() {
-        return false;
-    }
 
     default boolean isGlowing() {
         return core().flag("glowing");
@@ -500,25 +469,13 @@ public interface EntityOps extends Entity, Cored {
         return false;
     }
 
-    default boolean hasPermission(String permission) {
-        return false;
-    }
 
-    default Pose getPose() {
-        return core().flag("sleeping") ? Pose.SLEEPING : Pose.STANDING;
-    }
 
     default boolean isTicking() {
         return core().alive();
     }
 
-    default boolean isVisibleByDefault() {
-        return true;
-    }
 
-    default int getPortalCooldown() {
-        return 0;
-    }
 
     default boolean isInWater() {
         return core().world.getBlockAt(getLocation()).getType() == org.bukkit.Material.WATER;

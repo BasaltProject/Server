@@ -174,7 +174,7 @@ bool EntityPushSystem::isPushable(world::LoadedWorld& world, const Body& body) c
                !onClimbable(world, player.x, player.y, player.z);
     }
     const ServerEntity& mob = *body.mob;
-    if (mob.removed) {
+    if (mob.removed || !mob.collidable) {
         return false;
     }
     if (world::detectorRails::isMinecart(mob.type()) || entity::boats::isBoat(mob.type())) {

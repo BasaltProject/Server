@@ -188,11 +188,14 @@ const Accessors& accessors() {
         all["frozen_ticks"] = nbtInt("TicksFrozen");
         all["air"] = field(&ServerEntity::airSupply);
         all["max_air"] = Accessor{[](const ServerEntity& entity) -> Value {
-                                      return static_cast<std::int64_t>(entity.type().path() == "dolphin"
-                                                                           ? ServerEntity::kDolphinMaxAir
-                                                                           : ServerEntity::kDefaultMaxAir);
+                                      return static_cast<std::int64_t>(entity.maxAirOverride.value_or(
+                                          entity.type().path() == "dolphin" ? ServerEntity::kDolphinMaxAir
+                                                                            : ServerEntity::kDefaultMaxAir));
                                   },
-                                  nullptr};
+                                  [](ServerEntity& entity, const Value& value) {
+                                      entity.maxAirOverride = static_cast<std::int32_t>(asInt(value, 300));
+                                      return true;
+                                  }};
         all["fall_distance"] = field(&ServerEntity::fallDistance);
         all["no_gravity"] = field(&ServerEntity::noGravity);
         all["invulnerable"] = nbtFlag("Invulnerable");
@@ -309,7 +312,15 @@ const Accessors& accessors() {
                                                              ? Value{entity.lastHurtByPlayer->toString()}
                                                              : Value{};
                                               },
-                                              nullptr};
+                                              [](ServerEntity& entity, const Value& value) {
+                                                  const std::optional<std::string> text = asText(value);
+                                                  const auto parsed =
+                                                      text.has_value() ? wire::common::Uuid::parse(*text) : std::nullopt;
+                                                  entity.lastHurtByPlayer = parsed;
+                                                  entity.lastHurtByPlayerTime =
+                                                      parsed.has_value() ? entity::entityCombat::kPlayerHitMemoryTicks : 0;
+                                                  return true;
+                                              }};
         all["powered"] = field(&ServerEntity::powered);
         all["swell"] = field(&ServerEntity::swell);
         all["villager_level"] = field(&ServerEntity::villagerLevel);

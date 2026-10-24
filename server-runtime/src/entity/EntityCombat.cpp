@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <utility>
 
@@ -24,9 +25,6 @@ namespace basalt::server::runtime::entity::entityCombat {
 namespace {
 
 namespace reg = server::registry;
-
-/// parity: the half of the invulnerability window where only a bigger hit gets through.
-constexpr std::int32_t kCooldownHalfTicks = kHurtCooldownTicks / 2;
 
 [[nodiscard]] float attributeOf(const wire::common::Identifier& type, std::string_view name) {
     const std::optional<double> base = reg::entityAttributes::baseValue(type, name);
@@ -154,7 +152,7 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         amount = *allowed;
     }
     float incoming = amount;
-    const bool cooling = entity.hurtCooldown > kCooldownHalfTicks;
+    const bool cooling = entity.hurtCooldown > entity.maxNoDamageTicks / 2;
     if (cooling) {
         if (amount <= entity.lastHurt) {
             return {};
@@ -163,7 +161,7 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         entity.lastHurt = amount;
     } else {
         entity.lastHurt = amount;
-        entity.hurtCooldown = kHurtCooldownTicks;
+        entity.hurtCooldown = entity.maxNoDamageTicks;
     }
     // parity: `hurtServer` remembers whoever caused a hit that got past the cooldown.
     if (blamed.causingId.has_value()) {
@@ -177,6 +175,11 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     const double before = entity.health;
     entity.lastDamageCause = std::string{cause};
     entity.lastBlame = blamed;
+    if (sourceX.has_value() && sourceZ.has_value()) {
+        constexpr double kRadiansToDegrees = 180.0 / 3.14159265358979323846;
+        entity.hurtDirection = static_cast<float>(std::atan2(*sourceZ - entity.z, *sourceX - entity.x) *
+                                                  kRadiansToDegrees - static_cast<double>(entity.yaw));
+    }
     // parity: `CopperGolem.actuallyHurt`, which drops whatever pose it was working in.
     if (entity.copperGolem != nullptr) {
         entity.copperGolem->pose = copperGolems::Pose::Idle;
