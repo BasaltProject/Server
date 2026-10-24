@@ -60,6 +60,12 @@ struct CartState {
     std::optional<std::int32_t> ignitedBy;
     bool ignited = false;
     std::array<double, 3> stuck{};
+    bool slowWhenEmpty = true;
+    std::optional<double> maxSpeedOverride;
+    /// `-1` for the default friction, `0` for none at all, `1` for the vanilla one.
+    std::int8_t frictionState = -1;
+    std::array<double, 3> flyingVelocityMod{0.95F, 0.95F, 0.95F};
+    std::array<double, 3> derailedVelocityMod{0.5, 0.5, 0.5};
 };
 
 [[nodiscard]] CartState& stateOf(ServerEntity& cart);

@@ -150,7 +150,9 @@ void MobActionSystem::tickBee(world::LoadedWorld& world, const std::vector<Playe
                     4.0;
         }
     }
-    state.rolling = entity::bees::isAngry(state, world.gameTime()) && !state.hasStung && close;
+    state.rolling = state.rollingOverride >= 0
+                        ? state.rollingOverride != 0
+                        : entity::bees::isAngry(state, world.gameTime()) && !state.hasStung && close;
     if (bee.tickCount % 20 == 0 && state.hive.has_value() &&
         (!entity::bees::closerThan(bee, *state.hive, entity::bees::kTooFarDistance) ||
          !hiveAt(bee, *state.hive).hive)) {

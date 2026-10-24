@@ -50,7 +50,7 @@ void RunAroundLikeCrazyGoal::tick(MobContext& mob) {
     const std::int32_t rider = mob.mob.passengerIds.front();
     if (mob.playerById(rider) != nullptr) {
         // parity: the more it has been fed, the likelier it takes to its rider.
-        if (mob.random.nextInt(horses::maxTemper(mob.mob.type())) < horses::temper(mob.mob)) {
+        if (mob.random.nextInt(horses::maxTemper(mob.mob)) < horses::temper(mob.mob)) {
             mob.actions.tameHorse(mob.mob, rider);
             return;
         }

@@ -187,7 +187,16 @@ basalt_module(server-runtime-core
         src/plugins/ServerWorldEnv.cpp
         src/plugins/ServerWorldEnvQueries.cpp
         src/plugins/ServerSettings.cpp
+        src/MobActionPlugin.cpp
         src/plugins/EntityOps.cpp
+        src/plugins/BeastOps.cpp
+        src/plugins/FlagOps.cpp
+        src/plugins/HookOps.cpp
+        src/plugins/VillagerOps.cpp
+        src/plugins/VehicleOps.cpp
+        src/plugins/MobCommonOps.cpp
+        src/plugins/MobGoalOps.cpp
+        src/plugins/MobStateOps.cpp
         src/plugins/PlayerEntityOps.cpp
         src/plugins/DroppedItemOps.cpp
         src/plugins/WorldBlockUpdates.cpp
@@ -663,6 +672,7 @@ basalt_module(server-runtime-core
         src/entity/ai/WardenGoals.cpp
         src/entity/ai/GoalSelector.cpp
         src/entity/ai/Goals.cpp
+        src/entity/ai/PluginGoal.cpp
         src/entity/ai/IllagerGoals.cpp
         src/entity/ai/RaiderGoals.cpp
         src/entity/ai/LongDistancePatrolGoal.cpp

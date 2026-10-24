@@ -102,8 +102,8 @@ inline constexpr float kFireDamage = 1.0F;
 
 [[nodiscard]] bool burns(const wire::common::Identifier& type);
 
-[[nodiscard]] bool shouldBurn(const wire::common::Identifier& type, bool day, std::int32_t light, bool openSky,
-                              bool inWater, random::RandomSource& random);
+[[nodiscard]] bool shouldBurn(bool sensitive, bool day, std::int32_t light, bool openSky, bool inWater,
+                              random::RandomSource& random);
 
 } // namespace sunBurn
 

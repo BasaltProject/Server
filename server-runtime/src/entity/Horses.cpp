@@ -98,12 +98,17 @@ void tame(ServerEntity& horse, const wire::common::Uuid& owner) {
 
 std::int32_t maxTemper(const wire::common::Identifier& type) { return isLlama(type) ? 30 : 100; }
 
+std::int32_t maxTemper(const ServerEntity& horse) {
+    return horse.horse != nullptr && horse.horse->maxTemperOverride.has_value() ? *horse.horse->maxTemperOverride
+                                                                                : maxTemper(horse.type());
+}
+
 std::int32_t temper(const ServerEntity& horse) {
     return horse.sourceNbt.has_value() ? horse.sourceNbt->getInt("Temper") : 0;
 }
 
 std::int32_t modifyTemper(ServerEntity& horse, std::int32_t amount) {
-    const std::int32_t value = std::clamp(temper(horse) + amount, 0, maxTemper(horse.type()));
+    const std::int32_t value = std::clamp(temper(horse) + amount, 0, maxTemper(horse));
     if (!horse.sourceNbt.has_value()) {
         horse.sourceNbt.emplace();
     }

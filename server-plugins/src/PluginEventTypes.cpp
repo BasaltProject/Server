@@ -510,6 +510,12 @@ const PluginEventType& entityTarget() {
     return type;
 }
 
+const PluginEventType& entityGoal() {
+    static const PluginEventType type{
+        "entity.goal", false, {"entity_id", "entity_type", "world", "key", "phase", "result"}, {"result"}};
+    return type;
+}
+
 const PluginEventType& entityPotionEffect() {
     static const PluginEventType type{
         "entity.potion_effect",
@@ -785,6 +791,7 @@ const std::vector<const PluginEventType*>& all() {
                                                   &playerInteractAir(),
                                                   &blockDrops()};
         built.insert(built.end(), hookEvents().begin(), hookEvents().end());
+        built.push_back(&entityGoal());
         return built;
     }();
     return every;

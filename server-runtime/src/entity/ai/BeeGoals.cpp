@@ -637,7 +637,7 @@ private:
 
 template <typename GoalType, typename... Args>
 void add(GoalSelector& selector, std::int32_t priority, Args&&... args) {
-    selector.add(priority, std::make_unique<GoalType>(std::forward<Args>(args)...));
+    selector.add(priority, std::make_unique<GoalType>(std::forward<Args>(args)...), goalNameOf<GoalType>());
 }
 
 } // namespace

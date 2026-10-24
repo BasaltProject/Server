@@ -71,25 +71,25 @@ void DolphinPlayWithItemsGoal::tick(MobContext& mob) { static_cast<void>(mob.act
 bool DolphinSwimToTreasureGoal::canUse(MobContext& mob) { return mob.mob.gotFish && mob.mob.airSupply >= kTreasureAir; }
 
 bool DolphinSwimToTreasureGoal::arrived(const MobContext& mob) const {
-    if (!treasure_.has_value()) {
+    if (!mob.mob.treasurePos.has_value()) {
         return false;
     }
     // parity: `BlockPos.containing(x, dolphin.y, z).closerToCenterThan(position, 4)`.
-    const double dx = (*treasure_)[0] + 0.5 - mob.mob.x;
+    const double dx = (*mob.mob.treasurePos)[0] + 0.5 - mob.mob.x;
     const double dy = std::floor(mob.mob.y) + 0.5 - mob.mob.y;
-    const double dz = (*treasure_)[2] + 0.5 - mob.mob.z;
+    const double dz = (*mob.mob.treasurePos)[2] + 0.5 - mob.mob.z;
     return (dx * dx) + (dy * dy) + (dz * dz) < 16.0;
 }
 
 bool DolphinSwimToTreasureGoal::canContinueToUse(MobContext& mob) {
-    return treasure_.has_value() && !arrived(mob) && !stuck_ && mob.mob.airSupply >= kTreasureAir;
+    return mob.mob.treasurePos.has_value() && !arrived(mob) && !stuck_ && mob.mob.airSupply >= kTreasureAir;
 }
 
 void DolphinSwimToTreasureGoal::start(MobContext& mob) {
     stuck_ = false;
     navigation::stop(mob.mob);
-    treasure_ = mob.actions.nearestTreasure(mob.mob);
-    if (treasure_.has_value()) {
+    mob.mob.treasurePos = mob.actions.nearestTreasure(mob.mob);
+    if (mob.mob.treasurePos.has_value()) {
         mob.actions.entityEvent(mob.mob, 38);
     } else {
         stuck_ = true;
@@ -97,14 +97,14 @@ void DolphinSwimToTreasureGoal::start(MobContext& mob) {
 }
 
 void DolphinSwimToTreasureGoal::stop(MobContext& mob) {
-    if (!treasure_.has_value() || arrived(mob) || stuck_) {
+    if (!mob.mob.treasurePos.has_value() || arrived(mob) || stuck_) {
         mob.mob.gotFish = false;
         mob.actions.poseChanged(mob.mob);
     }
 }
 
 void DolphinSwimToTreasureGoal::tick(MobContext& mob) {
-    if (!treasure_.has_value()) {
+    if (!mob.mob.treasurePos.has_value()) {
         return;
     }
     // parity: `Dolphin.closeToNextPos`.
@@ -118,7 +118,8 @@ void DolphinSwimToTreasureGoal::tick(MobContext& mob) {
     if (!close && !navigation::isDone(mob.mob)) {
         return;
     }
-    const randomPos::Spot target{(*treasure_)[0] + 0.5, (*treasure_)[1] + 0.5, (*treasure_)[2] + 0.5};
+    const randomPos::Spot target{(*mob.mob.treasurePos)[0] + 0.5, (*mob.mob.treasurePos)[1] + 0.5,
+                                 (*mob.mob.treasurePos)[2] + 0.5};
     std::optional<randomPos::Spot> next = randomPos::defaultPosTowards(
         mob.world, mob.mob, mob.random, 16, 1, target, static_cast<double>(std::numbers::pi_v<float> / 8.0F));
     if (!next.has_value()) {

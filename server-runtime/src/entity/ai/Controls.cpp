@@ -78,6 +78,21 @@ pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, d
         }
         return route->nodes;
     }
+    if (mob.navigationOpensDoors.value_or(false)) {
+        const double range = mob.attributeWithModifiers("minecraft:follow_range");
+        const std::array<std::int32_t, 3> start = pathFinder::startOf(world, mob.x, mob.y, mob.z, mob.onGround);
+        const std::array<std::array<std::int32_t, 3>, 1> targets{{{blockOf(x), blockOf(y), blockOf(z)}}};
+        const std::optional<pathFinder::Route> route =
+            pathFinder::findRoute(world, start[0], start[1], start[2], targets,
+                                  pathFinder::RouteOptions{.accuracy = 1,
+                                                           .maxPathLength = static_cast<float>(range),
+                                                           .maxVisited = static_cast<std::int32_t>(range * 16.0),
+                                                           .openDoors = true});
+        if (!route.has_value()) {
+            return std::nullopt;
+        }
+        return route->nodes;
+    }
     return pathFinder::find(world, blockOf(mob.x), blockOf(mob.y), blockOf(mob.z), blockOf(x), blockOf(y), blockOf(z));
 }
 

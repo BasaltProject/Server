@@ -567,6 +567,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                            double z, float yaw, std::string_view reason) {
         return spawning_ == nullptr ? nullptr : spawning_->spawnMob(world, type, x, y, z, yaw, reason);
     };
+    model.mobSystem = [this] { return mobActions_.get(); };
     model.progress = [this] { return playerProgress_.get(); };
     model.recipes = [this] { return &vanillaData_.recipes; };
     model.store = [this] { return playerStore_.get(); };

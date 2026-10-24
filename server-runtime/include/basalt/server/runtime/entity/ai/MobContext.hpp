@@ -54,6 +54,8 @@ struct PlayerView {
     bool inWater = false;
 };
 
+enum class PluginGoalPhase : std::uint8_t { CanUse, CanContinue, Start, Stop, Tick };
+
 class MobActions {
 public:
     MobActions() = default;
@@ -145,6 +147,11 @@ public:
 
     /// parity: `Entity.playSound` from the mob itself.
     virtual void mobSound(ServerEntity& /*mob*/, std::string_view /*sound*/) {}
+
+    /// Asks the plugin that owns a custom goal; the answer matters for `CanUse` and `CanContinue` only.
+    virtual bool pluginGoal(ServerEntity& /*mob*/, std::string_view /*key*/, PluginGoalPhase /*phase*/) {
+        return false;
+    }
 
     virtual void heldItemChanged(ServerEntity& /*mob*/) {}
 

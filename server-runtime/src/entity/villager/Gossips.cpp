@@ -41,6 +41,14 @@ struct Entry {
 
 } // namespace
 
+void Gossips::set(const std::string& target, GossipType type, std::int32_t value) {
+    Values& values = entries_[target];
+    values[static_cast<std::size_t>(type)] = value;
+    if (std::ranges::all_of(values, [](std::int32_t each) { return each == 0; })) {
+        entries_.erase(target);
+    }
+}
+
 void Gossips::add(const std::string& target, GossipType type, std::int32_t amount) {
     const auto index = static_cast<std::size_t>(type);
     Values& values = entries_[target];

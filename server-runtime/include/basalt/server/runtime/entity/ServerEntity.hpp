@@ -272,6 +272,8 @@ public:
     double swimForward = 0.0;
     double swimUp = 0.0;
     bool gotFish = false;
+    /// parity: `Dolphin.treasurePos`.
+    std::optional<std::array<std::int32_t, 3>> treasurePos;
     bool canPickUpLoot = false;
 
     std::int32_t cubeSize = 1;
@@ -281,6 +283,8 @@ public:
     std::int32_t puffDeflateTimer = 0;
 
     bool charging = false;
+    /// parity: `SpellcasterIllager.DATA_SPELL_CASTING_ID`.
+    std::int8_t spellType = 0;
 
     struct Flight {
         std::int32_t floatDuration = 0;
@@ -396,6 +400,29 @@ public:
     std::int32_t removeArrowTime = 0;
 
     std::shared_ptr<ai::GoalSelector> goals;
+
+    /// Set by a plugin: whether the default ground navigation opens doors.
+    std::optional<bool> navigationOpensDoors;
+
+    /// `Mob.isAggressive`, the arms-up flag that melee goals raise and a plugin may set.
+    bool aggressive = false;
+
+    /// Plugin overrides of what a type does by itself, `-1` meaning no override.
+    std::int8_t despawnInPeaceful = -1;
+    std::int8_t burnsInDay = -1;
+    bool ageLocked = false;
+
+    /// `Fox.DATA_FLAGS_ID` bits a plugin owns (crouching, interested, pouncing, faceplanted, defending).
+    std::uint8_t foxFlags = 0;
+    /// `Panda.DATA_ID_FLAGS` bits (sneeze, roll, sit, on back) and its three counters.
+    std::uint8_t pandaFlags = 0;
+    std::int32_t pandaUnhappy = 0;
+    std::int32_t pandaSneeze = 0;
+    std::int32_t pandaEat = 0;
+
+    /// `Guardian.DATA_ID_ATTACK_TARGET` and the beam's charge counter.
+    std::optional<std::int32_t> beamTargetId;
+    std::int32_t beamTicks = 0;
 
     double wantedX = 0.0;
     double wantedY = 0.0;

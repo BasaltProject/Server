@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerConnection.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/EntityOps.hpp>
+#include <basalt/server/runtime/plugins/MobStateOps.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -616,7 +617,7 @@ std::optional<Value> get(const Environment& environment, const ServerEntity& ent
     }
     const auto found = accessors().find(name);
     if (found == accessors().end() || !found->second.read) {
-        return std::nullopt;
+        return mobState::get(environment, entity, name);
     }
     return found->second.read(entity);
 }
@@ -629,7 +630,10 @@ bool set(const Environment& environment, ServerEntity& entity, std::string_view 
         return setLeash(environment, entity, value);
     }
     const auto found = accessors().find(name);
-    return found != accessors().end() && found->second.write && found->second.write(entity, value);
+    if (found == accessors().end()) {
+        return mobState::set(environment, entity, name, value).value_or(false);
+    }
+    return found->second.write && found->second.write(entity, value);
 }
 
 std::optional<Value> invoke(const Environment& environment, ServerEntity& entity, std::string_view operation,
@@ -922,7 +926,7 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
         entity.velocityZ += asReal(at(arguments, 2));
         return true;
     }
-    return std::nullopt;
+    return mobState::invoke(environment, entity, operation, arguments);
 }
 
 } // namespace basalt::server::runtime::plugins::entityOps

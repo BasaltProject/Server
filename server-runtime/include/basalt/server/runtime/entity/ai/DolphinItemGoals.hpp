@@ -55,7 +55,6 @@ public:
 private:
     [[nodiscard]] bool arrived(const MobContext& mob) const;
 
-    std::optional<std::array<std::int32_t, 3>> treasure_;
     bool stuck_ = false;
 };
 

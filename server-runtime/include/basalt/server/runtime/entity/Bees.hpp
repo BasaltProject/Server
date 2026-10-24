@@ -50,6 +50,8 @@ struct BeeState {
     bool hasNectar = false;
     bool hasStung = false;
     bool rolling = false;
+    /// Set by a plugin: `-1` follows the bee's anger, `0` never rolls, `1` always does.
+    std::int8_t rollingOverride = -1;
     std::int32_t ticksWithoutNectar = 0;
     std::int32_t stayOutOfHive = 0;
     std::int32_t cropsGrown = 0;

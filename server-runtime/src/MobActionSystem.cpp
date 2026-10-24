@@ -377,6 +377,7 @@ void MobActionSystem::shootFireball(ServerEntity& mob, double targetX, double ta
 }
 
 void MobActionSystem::setBeamTarget(ServerEntity& mob, std::optional<std::int32_t> targetId) {
+    mob.beamTargetId = targetId;
     world::LoadedWorld* world = worldOf(mob);
     if (world == nullptr) {
         return;
@@ -403,14 +404,33 @@ void MobActionSystem::setSleeping(ServerEntity& mob, bool sleeping) {
 }
 
 void MobActionSystem::setCasting(ServerEntity& mob, bool casting) {
+    mob.spellType = casting ? kSpellCasting : kSpellNone;
     world::LoadedWorld* world = worldOf(mob);
     if (world == nullptr) {
         return;
     }
     sendEntityData(*world, mob.entityId(),
-                   SetEntityDataPacket::Entry{
-                       .index = kSpellIndex,
-                       .value = SetEntityDataPacket::ByteValue{.value = casting ? kSpellCasting : kSpellNone}});
+                   SetEntityDataPacket::Entry{.index = kSpellIndex,
+                                              .value = SetEntityDataPacket::ByteValue{.value = mob.spellType}});
+}
+
+bool MobActionSystem::pluginSpell(ServerEntity& caster, std::int32_t spell) {
+    const std::string_view path = caster.type().path();
+    if ((path != "evoker" && path != "illusioner") || spell < 0 || spell > 5) {
+        return false;
+    }
+    caster.spellType = static_cast<std::int8_t>(spell);
+    if (world::LoadedWorld* world = worldOf(caster); world != nullptr) {
+        sendEntityData(*world, caster.entityId(),
+                       SetEntityDataPacket::Entry{.index = kSpellIndex,
+                                                  .value = SetEntityDataPacket::ByteValue{.value = caster.spellType}});
+    }
+    return true;
+}
+
+bool MobActionSystem::pluginGoal(ServerEntity& mob, std::string_view key, entity::ai::PluginGoalPhase phase) {
+    const world::LoadedWorld* world = hooks_.pluginGoal ? worldOf(mob) : nullptr;
+    return world != nullptr && hooks_.pluginGoal(*world, mob, key, phase);
 }
 
 void MobActionSystem::poseChanged(ServerEntity& mob) {

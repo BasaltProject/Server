@@ -222,9 +222,15 @@ bool MeleeAttackGoal::canContinueToUse(MobContext& mob) {
     return withinReach(mob, *target) || !navigation::isDone(mob.mob);
 }
 
-void MeleeAttackGoal::start(MobContext& /*mob*/) { repathCooldown_ = 0; }
+void MeleeAttackGoal::start(MobContext& mob) {
+    repathCooldown_ = 0;
+    mob.mob.aggressive = true;
+}
 
-void MeleeAttackGoal::stop(MobContext& mob) { navigation::stop(mob.mob); }
+void MeleeAttackGoal::stop(MobContext& mob) {
+    mob.mob.aggressive = false;
+    navigation::stop(mob.mob);
+}
 
 void MeleeAttackGoal::tick(MobContext& mob) {
     constexpr std::int32_t kRepathMin = 4;

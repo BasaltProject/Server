@@ -71,6 +71,11 @@ inline constexpr std::array kEntityProperties{
     EntityPropertySpec{"villager_level", EntityValueKind::Int, true},
     EntityPropertySpec{"villager_experience", EntityValueKind::Int, true},
     EntityPropertySpec{"tamed_horse", EntityValueKind::Bool, true},
+    EntityPropertySpec{"aggressive", EntityValueKind::Bool, true},
+    EntityPropertySpec{"age_locked", EntityValueKind::Bool, true},
+    EntityPropertySpec{"burns_in_day", EntityValueKind::Bool, true},
+    EntityPropertySpec{"despawn_in_peaceful", EntityValueKind::Int, true},
+    EntityPropertySpec{"nav_open_doors", EntityValueKind::Bool, true},
 };
 
 struct EntityOperationSpec {
@@ -109,6 +114,11 @@ inline constexpr std::array kEntityOperations{
     EntityOperationSpec{"nbt_remove", ""},
     EntityOperationSpec{"push", ""},
     EntityOperationSpec{"knockback", ""},
+    EntityOperationSpec{"add_goal", ""},
+    EntityOperationSpec{"remove_goal", ""},
+    EntityOperationSpec{"remove_goals", ""},
+    EntityOperationSpec{"has_goal", ""},
+    EntityOperationSpec{"goals", "key,priority,running,plugin,flags"},
 };
 
 } // namespace basalt::server::plugins

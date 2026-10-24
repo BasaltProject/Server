@@ -38,6 +38,16 @@ struct HookState {
     std::optional<std::int32_t> hookedIn;
     std::int32_t luck = 0;
     std::int32_t lureSpeed = 0;
+    std::int32_t minWaitTime = 100;
+    std::int32_t maxWaitTime = 600;
+    std::int32_t minLureTime = 20;
+    std::int32_t maxLureTime = 80;
+    float minLureAngle = 0.0F;
+    float maxLureAngle = 360.0F;
+    bool applyLure = true;
+    bool rainInfluenced = true;
+    bool skyInfluenced = true;
+    double biteChance = -1.0;
     /// parity: `Entity.random`, a fresh stream per bobber.
     random::RandomSource random = random::RandomSource::legacy(0);
 };
@@ -55,6 +65,9 @@ struct Surroundings {
     bool rainingAbove = false;
     bool skyAbove = true;
 };
+
+/// parity: `FishingHook.resetTimeUntilLured`.
+void resetTimeUntilLured(HookState& state);
 
 /// parity: `FishingHook.catchingFish`, one turn of the fish coming, circling and biting.
 void catchingFish(ServerEntity& hook, HookState& state, const Surroundings& around);

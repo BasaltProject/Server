@@ -327,7 +327,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
     if (!allay.dying && allay.tickCount % 10 == 0) {
         allay.health = std::min(allay.health + 1.0, allay.attributeWithModifiers("minecraft:max_health"));
     }
-    if (state.dancing && allay.tickCount % 20 == 0 &&
+    if (state.dancing && !state.forceDancing && allay.tickCount % 20 == 0 &&
         (!state.jukebox.has_value() ||
          distanceSquared({(*state.jukebox)[0] + 0.5, (*state.jukebox)[1] + 0.5, (*state.jukebox)[2] + 0.5},
                          {allay.x, allay.y, allay.z}) >= allays::kJukeboxRadius * allays::kJukeboxRadius ||

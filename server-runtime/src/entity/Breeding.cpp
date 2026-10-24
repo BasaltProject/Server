@@ -81,6 +81,9 @@ bool canMate(const ServerEntity& animal, const ServerEntity& other) {
 }
 
 void growUp(ServerEntity& animal) {
+    if (animal.ageLocked) {
+        return;
+    }
     if (animal.age < 0) {
         animal.age++;
     } else if (animal.age > 0) {
