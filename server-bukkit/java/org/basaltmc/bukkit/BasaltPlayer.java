@@ -412,11 +412,6 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
     }
 
     @Override
-    public boolean isConversing() {
-        return false;
-    }
-
-    @Override
     public InetSocketAddress getAddress() {
         String text = WorldNatives.playerAddress(uuid);
         if (text == null || text.isEmpty()) {
@@ -565,35 +560,46 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
 
     @Override
     public double getHeight() {
-        return 1.8;
+        return switch (getPose()) {
+            case SLEEPING, DYING -> 0.2;
+            case FALL_FLYING, SWIMMING, SPIN_ATTACK -> 0.6;
+            case SNEAKING -> 1.5;
+            default -> 1.8;
+        };
     }
 
     @Override
     public double getWidth() {
-        return 0.6;
+        return getPose() == org.bukkit.entity.Pose.SLEEPING || getPose() == org.bukkit.entity.Pose.DYING ? 0.2 : 0.6;
     }
 
     @Override
     public double getEyeHeight() {
-        return 1.62;
+        return switch (getPose()) {
+            case SLEEPING -> 0.2;
+            case FALL_FLYING, SWIMMING, SPIN_ATTACK -> 0.4;
+            case SNEAKING -> 1.27;
+            default -> 1.62;
+        };
     }
 
     @Override
     public double getEyeHeight(boolean ignorePose) {
-        return 1.62;
+        return ignorePose ? 1.62 : getEyeHeight();
     }
 
     @Override
     public Location getEyeLocation() {
         Location here = getLocation();
-        here.setY(here.getY() + 1.62);
+        here.setY(here.getY() + getEyeHeight());
         return here;
     }
 
     @Override
     public org.bukkit.util.BoundingBox getBoundingBox() {
-        return new org.bukkit.util.BoundingBox(number(kX) - 0.3, number(kY), number(kZ) - 0.3, number(kX) + 0.3,
-            number(kY) + 1.8, number(kZ) + 0.3);
+        double half = getWidth() / 2.0;
+        return new org.bukkit.util.BoundingBox(number(kX) - half, number(kY), number(kZ) - half, number(kX) + half,
+            number(kY) + getHeight(), number(kZ) + half);
     }
 
     @Override

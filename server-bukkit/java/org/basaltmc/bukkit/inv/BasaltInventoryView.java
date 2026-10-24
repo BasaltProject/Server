@@ -16,7 +16,7 @@ public class BasaltInventoryView implements InventoryView {
     protected final HumanEntity player;
     protected final Inventory top;
     protected final PlayerInventory bottom;
-    protected final Component title;
+    protected volatile Component title;
     protected final boolean playerWindow;
     protected final int containerId;
 
@@ -177,7 +177,7 @@ public class BasaltInventoryView implements InventoryView {
     @Override
     @SuppressWarnings("removal")
     public boolean setProperty(Property prop, int value) {
-        return false;
+        return org.basaltmc.bukkit.LeftoverNatives.windowProperty(player.getUniqueId().toString(), prop.getId(), value);
     }
 
     @Override
@@ -197,7 +197,12 @@ public class BasaltInventoryView implements InventoryView {
 
     @Override
     public void setTitle(String title) {
-        throw org.basaltmc.bukkit.Unsupported.hit("InventoryView#setTitle");
+        Component next = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
+            .deserialize(title);
+        if (org.basaltmc.bukkit.player.PlayerCalls.done(player.getUniqueId(), "window_title",
+            org.basaltmc.bukkit.misc.Json.of(next))) {
+            this.title = next;
+        }
     }
 
     @Override
