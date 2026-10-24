@@ -25,7 +25,7 @@ constexpr std::array kAll = {
     GameRule::boolean("fire_damage", true),
     GameRule::integer("fire_spread_radius_around_player", 128, -1),
     GameRule::boolean("forgive_dead_players", true),
-    GameRule::boolean("freeze_damage", true),
+    gameRules::kFreezeDamage,
     GameRule::boolean("global_sound_events", true),
     gameRules::kImmediateRespawn,
     gameRules::kKeepInventory,

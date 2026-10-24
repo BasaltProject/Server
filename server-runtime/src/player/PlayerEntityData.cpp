@@ -124,6 +124,7 @@ PlayerEntityData PlayerEntityData::of(const PlayerSession& session) {
         data.sharedFlags |= SetEntityDataPacket::kFlagFallFlying;
     }
     data.airSupply = session.airSupply;
+    data.ticksFrozen = session.ticksFrozen;
     // parity: `LivingEntity.die` sets `DYING`, which the respawn replaces.
     data.pose = session.dead ? Pose::Dying : session.pose;
     if (session.usingItem) {
