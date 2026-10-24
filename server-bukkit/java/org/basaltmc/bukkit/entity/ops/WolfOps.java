@@ -23,4 +23,17 @@ public interface WolfOps extends Wolf, Cored {
         Wolf.SoundVariant found = id == null ? null : registry.get(NamespacedKey.fromString(id));
         return found != null ? found : Wolf.SoundVariant.CLASSIC;
     }
+
+    default void setSoundVariant(Wolf.SoundVariant variant) {
+        EntityNbt.variant(core(), "sound_variant", variant);
+    }
+
+    default boolean isAngry() {
+        long end = core().nbtValue("anger_end_time") instanceof Number number ? number.longValue() : 0L;
+        return end - getWorld().getGameTime() > 0L;
+    }
+
+    default void setAngry(boolean angry) {
+        core().nbtSet("anger_end_time", "long", angry ? getWorld().getGameTime() + 600L : 0L);
+    }
 }

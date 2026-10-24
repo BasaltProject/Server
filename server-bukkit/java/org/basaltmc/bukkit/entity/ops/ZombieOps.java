@@ -44,4 +44,8 @@ public interface ZombieOps extends Zombie, Cored {
     default boolean isConverting() {
         return core().nbtValue("ConversionTime") instanceof Number time && time.intValue() > -1;
     }
+
+    default void setConversionTime(int time) {
+        core().nbtSet("DrownedConversionTime", "int", time);
+    }
 }

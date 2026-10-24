@@ -110,4 +110,17 @@ final class EntityNbt {
             put(core, key, org.basaltmc.bukkit.item.Convert.stack(stack));
         }
     }
+
+    @SuppressWarnings("unchecked")
+    static <T extends org.bukkit.Keyed> T variant(EntityCore core, String key, io.papermc.paper.registry.RegistryKey<T> registry,
+            String fallback) {
+        Object id = compound(core, "").get(key);
+        org.bukkit.Registry<T> held = io.papermc.paper.registry.RegistryAccess.registryAccess().getRegistry(registry);
+        T found = id == null ? null : held.get(org.bukkit.NamespacedKey.fromString(String.valueOf(id)));
+        return found != null ? found : held.get(org.bukkit.NamespacedKey.minecraft(fallback));
+    }
+
+    static void variant(EntityCore core, String key, org.bukkit.Keyed value) {
+        core.nbtSet(key, "string", value.getKey().toString());
+    }
 }
