@@ -59,6 +59,7 @@ basalt_module(server-runtime-core
         src/entity/MobRules.cpp
         src/entity/MobSounds.cpp
         src/entity/GeneratedEntityPresentation.cpp
+        src/entity/GeneratedEntityRuntime.cpp
         src/entity/Villagers.cpp
         src/entity/Raids.cpp
         src/entity/RaiderEquipment.cpp
@@ -146,10 +147,13 @@ basalt_module(server-runtime-core
         src/BasaltServerMelee.cpp
         src/BasaltServerData.cpp
         src/BasaltServerTick.cpp
+        src/BasaltServerBoats.cpp
+        src/BasaltServerEntities.cpp
         src/BasaltServerScores.cpp
         src/BlockInteractionHandler.cpp
         src/BlockUseHelpers.cpp
         src/BlockUseOn.cpp
+        src/BlockUseOnBlocks.cpp
         src/plugins/EventHooks.cpp
         src/plugins/EventSink.cpp
         src/plugins/HookEvents.cpp
@@ -184,11 +188,17 @@ basalt_module(server-runtime-core
         src/plugins/ServerSelectors.cpp
         src/plugins/DataFix.cpp
         src/plugins/ServerWorldModel.cpp
+        src/plugins/ServerWorldRefs.cpp
+        src/plugins/ServerWorldRefA.cpp
+        src/plugins/ServerWorldRefB.cpp
+        src/plugins/ServerWorldRefC.cpp
+        src/plugins/ServerWorldRefD.cpp
         src/plugins/ServerWorldEnv.cpp
         src/plugins/ServerWorldEnvQueries.cpp
         src/plugins/ServerSettings.cpp
         src/MobActionPlugin.cpp
         src/plugins/EntityOps.cpp
+        src/plugins/EntityOpsAccessors.cpp
         src/plugins/BeastOps.cpp
         src/plugins/FlagOps.cpp
         src/plugins/EntityStateOps.cpp
@@ -208,6 +218,8 @@ basalt_module(server-runtime-core
         src/CommandWiring.cpp
         src/SessionLogin.cpp
         src/SessionPlay.cpp
+        src/SessionPlayConnection.cpp
+        src/SessionPlayPackets.cpp
         src/SessionChat.cpp
         src/chat/ChatBroadcast.cpp
         src/chat/ChatMessage.cpp
@@ -217,11 +229,14 @@ basalt_module(server-runtime-core
         src/ChunkStreamer.cpp
         src/CombatArrows.cpp
         src/CombatAttack.cpp
+        src/CombatAttackInteract.cpp
+        src/CombatAttackVehicles.cpp
         src/CombatFireballs.cpp
         src/CombatSpit.cpp
         src/CombatHandler.cpp
         src/BlockTests.cpp
         src/CombatSystem.cpp
+        src/CombatSystemHits.cpp
         src/CombatWindCharges.cpp
         src/ContainerClicks.cpp
         src/ContainerMenuController.cpp
@@ -233,6 +248,7 @@ basalt_module(server-runtime-core
         src/ContainerGrindstone.cpp
         src/ContainerEnchantment.cpp
         src/ContainerSlots.cpp
+        src/ContainerSlotsCrafting.cpp
         src/ContainerRecipeAwards.cpp
         src/ContainerRecipePlacing.cpp
         src/MobActionSystem.cpp
@@ -242,6 +258,7 @@ basalt_module(server-runtime-core
         src/MerchantSlots.cpp
         src/UiStateSync.cpp
         src/RedstoneTickSystem.cpp
+        src/RedstoneTickBlocks.cpp
         src/BlockEventTick.cpp
         src/ScheduledBlockTick.cpp
         src/MobTickSystem.cpp
@@ -266,6 +283,7 @@ basalt_module(server-runtime-core
         src/MobActionHoglin.cpp
         src/MobActionNeutral.cpp
         src/MobActionPiglin.cpp
+        src/MobActionPiglinBrain.cpp
         src/MobActionSniffer.cpp
         src/MobActionPiglinItems.cpp
         src/MobActionCopperGolem.cpp
@@ -483,6 +501,7 @@ basalt_module(server-runtime-core
         src/world/PistonSlide.cpp
         src/world/Pistons.cpp
         src/world/NeighbourUpdates.cpp
+        src/world/NeighbourUpdatesChange.cpp
         src/world/RealVillagerTrades.cpp
         src/world/RuinedPortalVariants.cpp
         src/world/RealSurfaceEnvironment.cpp
@@ -591,6 +610,7 @@ basalt_module(server-runtime-core
         src/world/LavaGrowth.cpp
         src/world/Lecterns.cpp
         src/world/LoadedWorld.cpp
+        src/world/LoadedWorldChunks.cpp
         src/world/LocalMobCaps.cpp
         src/world/Sponges.cpp
         src/world/StemGrowth.cpp
@@ -735,6 +755,8 @@ basalt_module(server-runtime-core
         src/world/PostPiercingEffects.cpp
         src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
+        src/world/WorldStateSections.cpp
+        src/world/WorldStateTicks.cpp
         src/world/SpawnPotential.cpp
     DEPENDS basalt::metamorph-datafix basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
