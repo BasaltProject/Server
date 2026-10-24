@@ -540,6 +540,80 @@ public abstract class PlayerTail extends PlayerActions {
     }
 
     @Override
+    public void removeResourcePacks(UUID id, UUID... others) {
+        PlayerCalls.call(key(), "remove_resource_pack", id.toString());
+        for (UUID other : others) {
+            PlayerCalls.call(key(), "remove_resource_pack", other.toString());
+        }
+    }
+
+    @Override
+    public String getAsString() {
+        return null;
+    }
+
+    private Entity shoulder(int side) {
+        Object value = PlayerCalls.call(key(), "shoulder", (long) side);
+        String held = value instanceof String text ? text : null;
+        if (held != null && !held.isEmpty()) {
+            throw org.basaltmc.bukkit.Unsupported.hit("Player#getShoulderEntity of an entity on a shoulder");
+        }
+        return null;
+    }
+
+    private void putOnShoulder(int side, Entity entity) {
+        if (entity == null) {
+            PlayerCalls.call(key(), "set_shoulder", (long) side, "");
+            return;
+        }
+        if (!(entity.createSnapshot() instanceof org.basaltmc.bukkit.entity.BasaltEntitySnapshot snapshot)) {
+            throw new IllegalArgumentException("Cannot put " + entity + " on a shoulder");
+        }
+        String snbt = EntityNatives.nbtToSnbt(snapshot.nbt());
+        PlayerCalls.call(key(), "set_shoulder", (long) side, snbt == null ? "" : snbt);
+        entity.remove();
+    }
+
+    private Entity release(int side) {
+        Object held = PlayerCalls.call(key(), "shoulder", (long) side);
+        if (!(held instanceof String snbt) || snbt.isEmpty()) {
+            return null;
+        }
+        PlayerCalls.call(key(), "set_shoulder", (long) side, "");
+        return org.basaltmc.bukkit.entity.BasaltEntitySnapshot.parse(snbt).createEntity(getLocation());
+    }
+
+    @Override
+    public Entity getShoulderEntityLeft() {
+        return shoulder(0);
+    }
+
+    @Override
+    public void setShoulderEntityLeft(Entity entity) {
+        putOnShoulder(0, entity);
+    }
+
+    @Override
+    public Entity getShoulderEntityRight() {
+        return shoulder(1);
+    }
+
+    @Override
+    public void setShoulderEntityRight(Entity entity) {
+        putOnShoulder(1, entity);
+    }
+
+    @Override
+    public Entity releaseLeftShoulderEntity() {
+        return release(0);
+    }
+
+    @Override
+    public Entity releaseRightShoulderEntity() {
+        return release(1);
+    }
+
+    @Override
     public boolean breakBlock(Block block) {
         return org.basaltmc.bukkit.player.PlayerBreaking.breakBlock(this, block);
     }
