@@ -77,11 +77,13 @@ public final class BasaltPluginManager extends PluginManagerBase {
 
     @Override
     public Plugin[] loadPlugins(File directory) {
-        List<Candidate> pending = new ArrayList<>();
         File[] files = directory.listFiles((dir, name) -> name.endsWith(".jar"));
-        if (files == null) {
-            return new Plugin[0];
-        }
+        return files == null ? new Plugin[0] : loadAll(files);
+    }
+
+    private Plugin[] loadAll(File[] given) {
+        List<Candidate> pending = new ArrayList<>();
+        File[] files = given.clone();
         Arrays.sort(files);
         Set<String> names = new HashSet<>();
         for (File file : files) {
@@ -444,7 +446,7 @@ public final class BasaltPluginManager extends PluginManagerBase {
 
     @Override
     public Plugin[] loadPlugins(File[] files) {
-        throw Unsupported.hit("PluginManager#loadPlugins(File[])");
+        return loadAll(files);
     }
 
     @Override
