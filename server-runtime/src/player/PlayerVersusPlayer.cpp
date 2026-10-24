@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
@@ -18,6 +19,8 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/scoreboard/Teams.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -168,9 +171,10 @@ void wearSlot(const Context& context, PlayerSession& owner, std::int32_t slot, s
 }
 
 /// Whether the attacker's team is also theirs. parity: `Entity.isAlliedTo`.
-[[nodiscard]] bool allied(const Context& context, const PlayerSession& attacker, std::string_view member) {
+[[nodiscard]] bool allied(const Context& context, const PlayerSession& attacker, std::string_view member,
+                          std::int32_t otherId) {
     const scoreboard::Team* own = context.teams == nullptr ? nullptr : context.teams->teamOf(attacker.name());
-    return own != nullptr && own == context.teams->teamOf(member);
+    return (own != nullptr && own == context.teams->teamOf(member)) || alliedByRules(attacker, otherId);
 }
 
 [[nodiscard]] double distanceSquared(const PlayerSession& attacker, double x, double y, double z) {
@@ -207,6 +211,21 @@ void wearWeapon(const Context& context, PlayerSession& attacker, const std::opti
 }
 
 } // namespace
+
+bool alliedByRules(const PlayerSession& attacker, const std::int32_t otherId) {
+    if (attacker.events == nullptr) {
+        return false;
+    }
+    const server::plugins::PluginEvent* answered = attacker.events->ask(
+        &server::plugins::pluginEventTypes::entityAlliedCheck, [&](server::plugins::PluginEvent& event) {
+            plugins::hookEvents::entity(event, attacker.worldName, attacker.entityId(), "minecraft:player", attacker.x,
+                                        attacker.y, attacker.z);
+            event.set("other_id", static_cast<std::int64_t>(otherId));
+            event.set("allied", false);
+        });
+    const bool* allied = answered == nullptr ? nullptr : std::get_if<bool>(&answered->get("allied"));
+    return allied != nullptr && *allied;
+}
 
 /// parity: `EnchantmentHelper.doPostAttackEffectsWithItemSource` after a melee blow on `victim` or `mob`.
 void postAttack(const Context& context, world::LoadedWorld& world, PlayerSession& attacker, PlayerSession* victim,
@@ -486,7 +505,7 @@ void sweep(PlayerSession& attacker, world::LoadedWorld& world, const Context& co
         if (nearby->entityId() == targetId || nearby->removed || nearby->dying ||
             !server::registry::entityAttributes::isLiving(nearby->type()) ||
             !entity::Aabb::of(nearby->x, nearby->y, nearby->z, nearby->width(), nearby->height()).intersects(reach) ||
-            allied(context, attacker, nearby->uuid().toString()) ||
+            allied(context, attacker, nearby->uuid().toString(), nearby->entityId()) ||
             (nearby->type().path() == "armor_stand" && nearby->sourceNbt.has_value() &&
              nearby->sourceNbt->getBoolean("Marker")) ||
             distanceSquared(attacker, nearby->x, nearby->y, nearby->z) >= kSweepReachSquared) {
@@ -520,7 +539,7 @@ void sweep(PlayerSession& attacker, world::LoadedWorld& world, const Context& co
     for (PlayerSession* nearby : playersIn(context, attacker.worldName)) {
         if (nearby == &attacker || nearby->entityId() == targetId || nearby->dead ||
             nearby->gamemode == wire::protocol::play::Gamemode::Spectator || !boxOf(*nearby).intersects(reach) ||
-            allied(context, attacker, nearby->name()) ||
+            allied(context, attacker, nearby->name(), nearby->entityId()) ||
             distanceSquared(attacker, nearby->x, nearby->y, nearby->z) >= kSweepReachSquared ||
             !nearby->connection().hurt) {
             continue;

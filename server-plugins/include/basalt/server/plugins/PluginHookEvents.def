@@ -37,6 +37,7 @@ HOOK_EVENT(playerPickupExperience, "player.pickup_experience", true, FIELDS("pla
 HOOK_EVENT(worldUnload, "world.unload", true, FIELDS("world"), MUTABLE())
 HOOK_EVENT(playerPickupArrow, "player.pickup_arrow", true, FIELDS("player_name", "player_uuid", "world", "entity_id", "entity_type"), MUTABLE())
 HOOK_EVENT(blockCanBuild, "block.can_build", false, FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "block", "buildable"), MUTABLE("buildable"))
+HOOK_EVENT(entityAlliedCheck, "entity.allied_check", false, FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "other_id", "allied"), MUTABLE("allied"))
 HOOK_EVENT(entityTransform, "entity.transform", true, FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "to_type"), MUTABLE())
 HOOK_EVENT(entitySplit, "entity.split", true, FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "count"), MUTABLE("count"))
 HOOK_EVENT(entityPiglinBarter, "entity.piglin_barter", true, FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "outcome"), MUTABLE("outcome"))

@@ -573,6 +573,12 @@ private:
 
     void enterConfiguration();
 
+public:
+    /// parity: `ServerGamePacketListenerImpl.switchToConfig`; false for a client that has no configuration phase.
+    bool reenterConfiguration();
+
+private:
+
     void sendRegistriesThenFinish();
 
     void finishConfiguration();
@@ -619,6 +625,7 @@ private:
     player::ClientOptions pendingOptions_;
     std::string pendingBrand_;
     std::atomic<bool> streaming_{false};
+    std::atomic<bool> switchingToConfiguration_{false};
     std::atomic<bool> tickTaskPending_{false};
     std::atomic<bool> closeWhenDrained_{false};
     std::jthread outbound_;

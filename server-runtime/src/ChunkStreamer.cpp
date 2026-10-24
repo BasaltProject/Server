@@ -114,6 +114,12 @@ void ChunkStreamer::sendInitialChunks(const server::world::ChunkTracker::Delta& 
     }
 }
 
+void ChunkStreamer::forgetAll() {
+    chunkTracker_.reset();
+    const std::lock_guard<std::mutex> guard{chunkStreamMutex_};
+    pendingChunks_.clear();
+}
+
 void ChunkStreamer::resetForRespawn(double spawnX, double spawnZ) {
     centerChunkX_ = static_cast<std::int32_t>(spawnX) >> 4;
     centerChunkZ_ = static_cast<std::int32_t>(spawnZ) >> 4;

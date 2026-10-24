@@ -398,7 +398,7 @@ public final class BasaltItemStack extends ItemStack {
     @Override
     public java.util.List<Component> computeTooltipLines(io.papermc.paper.inventory.tooltip.TooltipContext context,
             org.bukkit.entity.Player player) {
-        return org.basaltmc.bukkit.item.Tooltips.lines(this, components, effectiveName(), context);
+        return org.basaltmc.bukkit.item.Tooltips.lines(this, components, effectiveName(), context, player);
     }
 
     @Override

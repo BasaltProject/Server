@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import net.kyori.adventure.text.Component;
-import org.basaltmc.bukkit.Unsupported;
 import org.bukkit.NamespacedKey;
 import org.bukkit.ServerLinks;
 import org.bukkit.entity.Player;
@@ -29,7 +28,9 @@ public final class BasaltConnection implements PlayerGameConnection {
 
     @Override
     public void reenterConfiguration() {
-        throw Unsupported.hit("PlayerGameConnection#reenterConfiguration");
+        if (!(PlayerCalls.call(player.getUniqueId(), "reenter_configuration") instanceof Boolean started) || !started) {
+            throw new IllegalStateException("This client cannot be sent back to the configuration phase");
+        }
     }
 
     @Override

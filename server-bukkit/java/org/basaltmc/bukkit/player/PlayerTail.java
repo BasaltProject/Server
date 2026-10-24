@@ -516,7 +516,11 @@ public abstract class PlayerTail extends PlayerActions {
 
     @Override
     public void showDialog(net.kyori.adventure.dialog.DialogLike dialog) {
-        throw org.basaltmc.bukkit.Unsupported.hit("Audience#showDialog");
+        if (!(dialog instanceof io.papermc.paper.dialog.Dialog shown)) {
+            throw new IllegalArgumentException("Not a dialog: " + dialog);
+        }
+        PlayerCalls.call(key(), "show_dialog", shown instanceof org.basaltmc.bukkit.dialog.BasaltDialog inline
+            ? inline.snbt() : shown.getKey().toString());
     }
 
     @Override
@@ -549,16 +553,28 @@ public abstract class PlayerTail extends PlayerActions {
 
     @Override
     public String getAsString() {
-        return null;
+        return PlayerCalls.call(key(), "as_string") instanceof String text && !text.isEmpty() ? text : null;
     }
 
     private Entity shoulder(int side) {
         Object value = PlayerCalls.call(key(), "shoulder", (long) side);
-        String held = value instanceof String text ? text : null;
-        if (held != null && !held.isEmpty()) {
-            throw org.basaltmc.bukkit.Unsupported.hit("Player#getShoulderEntity of an entity on a shoulder");
+        if (!(value instanceof String held) || held.isEmpty()) {
+            return null;
         }
-        return null;
+        byte[] saved = EntityNatives.snbtToNbt(held);
+        net.minecraft.nbt.CompoundTag tag = saved == null ? null : org.basaltmc.bukkit.facade.NbtCodec.fromBytes(saved);
+        if (tag == null) {
+            return null;
+        }
+        org.bukkit.entity.EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(tag.getStringOr("id", ""));
+        if (type == org.bukkit.entity.EntityType.UNKNOWN) {
+            return null;
+        }
+        Location at = getLocation();
+        Entity made = org.basaltmc.bukkit.entity.EntityCore.template(
+            (org.basaltmc.bukkit.BasaltWorld) at.getWorld(), type, at.getX(), at.getY(), at.getZ(), 0.0F, 0.0F);
+        ((org.basaltmc.bukkit.entity.Cored) made).core().seedNbt(saved);
+        return made;
     }
 
     private void putOnShoulder(int side, Entity entity) {

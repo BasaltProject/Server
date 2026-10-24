@@ -161,6 +161,8 @@ final class EventBridge {
         BlockEvents.install();
         HookBlockEvents.install();
         HookEntityEvents.install();
+        AlliedRules.install();
+        DialogEvents.install();
         HookPlayerEvents.install();
         HookWorldEvents.install();
         HookVehicleEvents.install();

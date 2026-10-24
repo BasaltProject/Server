@@ -46,9 +46,10 @@ constexpr double kHang = static_cast<double>(0.01F);
     return found;
 }
 
-[[nodiscard]] bool allied(const pvp::Context& context, const PlayerSession& attacker, std::string_view member) {
+[[nodiscard]] bool allied(const pvp::Context& context, const PlayerSession& attacker, std::string_view member,
+                          std::int32_t otherId) {
     const scoreboard::Team* own = context.teams == nullptr ? nullptr : context.teams->teamOf(attacker.name());
-    return own != nullptr && own == context.teams->teamOf(member);
+    return (own != nullptr && own == context.teams->teamOf(member)) || pvp::alliedByRules(attacker, otherId);
 }
 
 /// parity: `getKnockbackPower`.
@@ -84,7 +85,7 @@ void shockWave(const pvp::Context& context, world::LoadedWorld& world, PlayerSes
     for (ServerEntity* nearby : world.state().entities()) {
         if (nearby->entityId() == struck.entityId || nearby->removed || nearby->dying ||
             !server::registry::entityAttributes::isLiving(nearby->type()) ||
-            allied(context, attacker, nearby->uuid().toString()) ||
+            allied(context, attacker, nearby->uuid().toString(), nearby->entityId()) ||
             (nearby->type().path() == "armor_stand" && nearby->sourceNbt.has_value() &&
              nearby->sourceNbt->getBoolean("Marker"))) {
             continue;
@@ -106,7 +107,7 @@ void shockWave(const pvp::Context& context, world::LoadedWorld& world, PlayerSes
     for (PlayerSession* nearby : players) {
         if (nearby == &attacker || nearby->entityId() == struck.entityId || nearby->dead ||
             nearby->gamemode == Gamemode::Spectator || (nearby->gamemode == Gamemode::Creative && nearby->flying) ||
-            allied(context, attacker, nearby->name())) {
+            allied(context, attacker, nearby->name(), nearby->entityId())) {
             continue;
         }
         if (const auto thrown = push(nearby->x, nearby->y, nearby->z,

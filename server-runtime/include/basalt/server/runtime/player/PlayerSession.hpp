@@ -173,6 +173,15 @@ public:
 
     static constexpr std::size_t kMaxCombatRecords = 256;
     std::vector<CombatRecord> combatRecords;
+    /// parity: `Entity.DATA_TICKS_FROZEN`.
+    std::int32_t ticksFrozen = 0;
+    /// parity: `Entity.isInPowderSnow`.
+    bool inPowderSnow = false;
+    /// parity: the `powder_snow` movement speed modifier `LivingEntity.tryAddFrost` adds.
+    float frostSlowdown = 0.0F;
+    std::int64_t aliveTicks = 0;
+    /// parity: `CombatTracker.inCombat`.
+    bool inCombat = false;
 
     /// parity: `LivingEntity.lastHurt`.
     float lastHurt = 0.0F;
