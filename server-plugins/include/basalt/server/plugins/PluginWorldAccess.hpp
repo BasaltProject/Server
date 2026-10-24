@@ -735,8 +735,7 @@ public:
         return -1;
     }
 
-    /// The ender dragon fight of an End world: whether it was won before, the exit portal, the respawn stage and
-    /// gateways.
+    /// The ender dragon fight of an End world: won before, exit portal, respawn stage and gateways.
     struct DragonFightFacts {
         bool previouslyKilled = false;
         std::optional<std::array<std::int32_t, 3>> portal;
@@ -760,8 +759,7 @@ public:
         return false;
     }
 
-    /// Drives the fight: "respawn" (as placing the fourth crystal does), "stage" (value is the respawn stage index),
-    /// "portal" (value non-zero lights it), "gateway" and "crystals" (rebuild the pillar crystals).
+    /// Drives the fight: "respawn", "stage" (value is the stage index), "portal", "gateway" or "crystals".
     virtual bool dragonFightAction(std::string_view action, std::int32_t value) {
         static_cast<void>(action);
         static_cast<void>(value);
@@ -1165,15 +1163,13 @@ public:
     /// The item ids, in registry order.
     [[nodiscard]] virtual std::vector<std::string> itemIds() const { return {}; }
 
-    /// The ids of a registry by name (`damage_type`, `particle_type`, `worldgen/biome`...), empty when the server has
-    /// none.
+    /// The ids of a registry by name (`damage_type`, `worldgen/biome`...), empty when the server has none.
     [[nodiscard]] virtual std::vector<std::string> registryIds(std::string_view registry) const {
         static_cast<void>(registry);
         return {};
     }
 
-    /// The data of one entry of a registry the client is sent (`damage_type`, `jukebox_song`, `instrument`...) as an
-    /// unnamed NBT compound.
+    /// The data of one entry of a client-synced registry (`damage_type`, `instrument`...) as an unnamed NBT compound.
     [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> registryData(std::string_view registry,
                                                                                 std::string_view id) const {
         static_cast<void>(registry);

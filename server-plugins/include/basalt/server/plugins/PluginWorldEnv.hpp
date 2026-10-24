@@ -98,8 +98,7 @@ struct PluginPlacedBlock {
     std::int32_t after = 0;
 };
 
-/// What a plugin changed about natural spawning; a value under zero is vanilla's. Categories in `MobCategory` order:
-/// monster, creature, ambient, axolotls, underground water creature, water creature, water ambient, misc.
+/// What a plugin changed about natural spawning; under zero is vanilla's. Indexed by `MobCategory` order.
 struct PluginSpawnTunables {
     std::array<std::int32_t, 8> limits{-1, -1, -1, -1, -1, -1, -1, -1};
     std::array<std::int32_t, 8> ticksPer{-1, -1, -1, -1, -1, -1, -1, -1};
@@ -143,8 +142,7 @@ public:
         static_cast<void>(global);
     }
 
-    /// A block event (a chest lid, a bell, a note) to the players watching the block; the numbers mean what the block
-    /// says.
+    /// A block event (a chest lid, a bell, a note) sent to the players watching the block.
     virtual void blockEvent(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t first, std::int32_t second) {
         static_cast<void>(x);
         static_cast<void>(y);
@@ -284,10 +282,7 @@ public:
         return false;
     }
 
-    /// Points of interest of the named types (empty: all) within `radius` of the point; `occupancy` 0 free, 1 taken, 2
-    /// any.
-    /// Plants a named tree (`oak`, `fancy_oak`, `birch`, `mega_jungle`...) as the world generator would, without a
-    /// sapling; with `apply` false nothing changes and the blocks it would set come back. Empty when it does not fit.
+    /// Plants a named tree as the world generator would; with `apply` false it only returns the blocks it would set.
     [[nodiscard]] virtual std::optional<std::vector<PluginPlacedBlock>>
     placeTree(std::string_view tree, std::int32_t x, std::int32_t y, std::int32_t z, bool apply) {
         static_cast<void>(tree);
@@ -309,6 +304,7 @@ public:
     /// Loaded block entities that run code every tick (furnaces, hoppers, spawners, beacons...).
     [[nodiscard]] virtual std::int32_t tickableBlockEntityCount() { return 0; }
 
+    /// Points of interest of the named types (empty: all) within `radius`; `occupancy` 0 free, 1 taken, 2 any.
     [[nodiscard]] virtual std::vector<PluginPoi> pointsOfInterest(const std::vector<std::string>& types, std::int32_t x,
                                                                   std::int32_t y, std::int32_t z, std::int32_t radius,
                                                                   std::int32_t occupancy) {
@@ -374,8 +370,8 @@ public:
         static_cast<void>(ticks);
     }
 
-    /// Hands the chunks of a void world to `fill`, which gives one block state id per block of each section from the
-    /// lowest (x fastest, then z, then y) and one biome id per 4x4x4 cell; empty answers leave a chunk empty.
+    /// Hands the chunks of a void world to `fill`: a block state id per block of each section, a biome id per 4x4x4
+    /// cell.
     using ChunkFill = std::function<void(std::int32_t chunkX, std::int32_t chunkZ, std::vector<std::int32_t>& blocks,
                                          std::vector<std::int32_t>& biomes)>;
 

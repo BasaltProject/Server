@@ -88,8 +88,7 @@ public:
         return {};
     }
 
-    /// The components of a filled map that shows the nearest of these structures from the point, as an unnamed NBT
-    /// compound; nothing when none is found.
+    /// The components of a filled map showing the nearest of these structures, as an unnamed NBT compound.
     [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>>
     explorerMap(std::string_view world, double x, double y, double z, const PluginExploration& request) {
         static_cast<void>(world);
