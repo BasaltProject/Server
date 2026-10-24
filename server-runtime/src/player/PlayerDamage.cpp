@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
+#include <basalt/server/runtime/player/PlayerCombatMessage.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -663,6 +664,12 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     session->stats.addDamageTaken(damage);
     {
         world::LoadedWorld* recorded = context.world ? context.world() : nullptr;
+        // parity: `CombatTracker.recheckStatus` runs before each hit is recorded.
+        if (recorded != nullptr && !session->combatRecords.empty() &&
+            recorded->gameTime() - session->combatRecords.back().tick > (session->inCombat ? 300 : 100)) {
+            session->combatRecords.clear();
+            session->inCombat = false;
+        }
         if (session->combatRecords.size() >= PlayerSession::kMaxCombatRecords) {
             session->combatRecords.erase(session->combatRecords.begin());
         }
@@ -675,6 +682,10 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
             .fallDistance = static_cast<float>(session->fallDistance),
             .fallLocation = recorded == nullptr ? std::string{} : fallLocationAt(*session, *recorded),
             .tick = recorded == nullptr ? 0 : recorded->gameTime()});
+        const std::int32_t cause = session->combatRecords.back().causeId;
+        if (!session->inCombat && cause >= 0 && context.death.labelOf && context.death.labelOf(cause).has_value()) {
+            session->inCombat = true;
+        }
     }
     // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE`.
     if (world::LoadedWorld* world = context.world ? context.world() : nullptr; world != nullptr) {
@@ -708,7 +719,8 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         }
     }
     if (session->health() <= 0.0F) {
-        killPlayer(*session, deathMessageId, source.has_value() ? source->name : std::nullopt, context.death);
+        killPlayer(*session, deathMessageId, source.has_value() ? source->name : std::nullopt, context.death,
+                   trackedDeathMessage(*session, deathMessageId, source, context.death));
     } else if (session->connection().syncHealth) {
         session->connection().syncHealth();
     }

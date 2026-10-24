@@ -116,6 +116,8 @@ void PlayerSession::resetForRespawn() {
     removeArrowTime = 0;
     stingerCount = 0;
     removeStingerTime = 0;
+    combatRecords.clear();
+    inCombat = false;
 }
 
 } // namespace basalt::server::runtime::player
