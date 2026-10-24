@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/MobMisc.hpp>
+#include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -176,6 +177,51 @@ void MobActionSystem::tickWitchDrinking(world::LoadedWorld& world, ServerEntity&
     if (random.nextFloat() < 7.5E-4F) {
         entityEvent(witch, 15);
     }
+}
+
+void MobActionSystem::traderUsesItem(ServerEntity& trader, bool potion, entity::ai::UsePhase phase) {
+    world::LoadedWorld* world = worldOf(trader);
+    if (world == nullptr) {
+        return;
+    }
+    const auto holding = [&](const std::optional<server::world::loot::ItemStack>& stack, std::int32_t slot) {
+        equipment::set(trader, equipment::Slot::MainHand, stack, false);
+        equipmentChanged(trader, static_cast<std::uint8_t>(equipment::Slot::MainHand));
+        trader.activeSlot = static_cast<std::int8_t>(slot);
+    };
+    if (phase == entity::ai::UsePhase::Start) {
+        holding(potion ? potionOf("invisibility")
+                       : server::world::loot::ItemStack{.item = wire::common::Identifier::vanilla("milk_bucket"),
+                                                        .count = 1},
+                0);
+        return;
+    }
+    if (phase == entity::ai::UsePhase::Finish) {
+        if (potion) {
+            const server::world::loot::ItemStack stack = potionOf("invisibility");
+            if (const wire::nbt::NbtCompound* contents = stack.components.getCompound("minecraft:potion_contents");
+                contents != nullptr) {
+                for (const world::ActiveEffect& effect : world::potionEffects::of(*contents, 1.0F)) {
+                    static_cast<void>(addMobEffect(*world, watchersOf(*world), trader, effect, trader.entityId()));
+                }
+            }
+        } else {
+            std::vector<wire::common::Identifier> carried;
+            for (const auto& [effect, active] : trader.effects) {
+                carried.push_back(effect);
+            }
+            for (const wire::common::Identifier& effect : carried) {
+                static_cast<void>(entity::mobStatusEffects::remove(trader, effect));
+            }
+        }
+        trader.activeSlot = -1;
+        return;
+    }
+    // parity: `UseItemGoal.stop`.
+    holding(std::nullopt, -1);
+    random::RandomSource voice = freshRandom();
+    playSound(*world, trader, potion ? "entity.wandering_trader.disappeared" : "entity.wandering_trader.reappeared",
+              1.0F, (voice.nextFloat() * 0.2F) + 0.9F, wire::protocol::play::SoundSource::Neutral);
 }
 
 void MobActionSystem::tickStriderWarmth(world::LoadedWorld& world, ServerEntity& strider) {

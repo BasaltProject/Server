@@ -23,6 +23,7 @@
 #include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TameGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
+#include <basalt/server/runtime/entity/ai/TurtleGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WanderingTraderGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WardenGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WitherGoals.hpp>
@@ -212,8 +213,21 @@ bool buildHorse(GoalSelector& selector, std::string_view path) {
 }
 
 bool buildAnimal(GoalSelector& selector, const wire::common::Identifier& type, std::string_view path) {
-    static const Names kSlow{"turtle", "panda", "fox", "strider"};
+    static const Names kSlow{"panda", "fox", "strider"};
     if (buildHorse(selector, path)) {
+        return true;
+    }
+    // parity: `Turtle.registerGoals`.
+    if (path == "turtle") {
+        add<PanicGoal>(selector, 0, 1.2);
+        add<BreedGoal>(selector, 1, 1.0);
+        add<TurtleLayEggGoal>(selector, 1, 1.0);
+        add<TemptGoal>(selector, 2, 1.1, entity::breeding::foodFor(type));
+        add<TurtleGoToWaterGoal>(selector, 3, 1.0);
+        add<TurtleGoHomeGoal>(selector, 4, 1.0);
+        add<TurtleTravelGoal>(selector, 7, 1.0);
+        add<LookAtPlayerGoal>(selector, 8, kLookFar);
+        add<TurtleRandomStrollGoal>(selector, 9, 1.0, 100);
         return true;
     }
     if (path == "cow" || path == "mooshroom") {
@@ -608,6 +622,8 @@ bool buildFlier(GoalSelector& selector, std::string_view path) {
 bool buildVillage(GoalSelector& selector, std::string_view path) {
     if (path == "wandering_trader") {
         add<FloatGoal>(selector, 0);
+        add<TraderUseItemGoal>(selector, 0, true);
+        add<TraderUseItemGoal>(selector, 0, false);
         add<AvoidEntityGoal>(selector, 1, Names{"zombie"}, 8.0, 0.5, 0.5);
         add<AvoidEntityGoal>(selector, 1, Names{"evoker"}, 12.0, 0.5, 0.5);
         add<AvoidEntityGoal>(selector, 1, Names{"vindicator"}, 8.0, 0.5, 0.5);

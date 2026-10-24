@@ -160,7 +160,12 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
     // parity: the first index each of these mobs defines after `Animal`'s, or `Raider`'s for the witch.
     plain(polarStanding, &RuntimeEntityMetadata::polarStanding, 18);
     plain(striderCold, &RuntimeEntityMetadata::striderCold, 19);
+    plain(turtleHasEgg, &RuntimeEntityMetadata::turtleHasEgg, 18);
     plain(turtleLaying, &RuntimeEntityMetadata::turtleLaying, 19);
+    if (sulfurMaxFuse.has_value() && (previous == nullptr || previous->sulfurMaxFuse != sulfurMaxFuse) &&
+        (previous != nullptr || *sulfurMaxFuse != -1)) {
+        entries.push_back(Entry{.index = 20, .value = SetEntityDataPacket::IntValue{.value = *sulfurMaxFuse}});
+    }
     plain(witchUsing, &RuntimeEntityMetadata::witchUsing, 17);
     if (boostTotal.has_value() && (previous == nullptr || previous->boostTotal != boostTotal) &&
         (previous != nullptr || *boostTotal != 0)) {
@@ -564,9 +569,13 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
             live.boostTotal = held->boostTotal;
         } else if (kind == "turtle") {
             live.turtleLaying = held->turtleLaying;
+            live.turtleHasEgg = held->turtleHasEgg;
         } else if (kind == "witch") {
             live.witchUsing = held->witchDrinking;
         }
+    }
+    if (entity.type().path() == "sulfur_cube") {
+        live.sulfurMaxFuse = entity.fuse;
     }
     if (entity.allay != nullptr) {
         live.allayDancing = entity.allay->dancing;

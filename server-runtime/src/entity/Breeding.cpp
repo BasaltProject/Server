@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobBrain.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Sniffers.hpp>
 
@@ -53,7 +54,19 @@ bool isFood(const wire::common::Identifier& type, const wire::common::Identifier
     return foodFor(type).contains(item.path());
 }
 
-bool canFallInLove(const ServerEntity& animal) { return animal.loveTicks <= 0 && animal.age == 0; }
+namespace {
+
+[[nodiscard]] bool carriesEgg(const ServerEntity& animal) {
+    const mobMisc::State* held = mobMisc::peek(animal);
+    return held != nullptr && held->turtleHasEgg;
+}
+
+} // namespace
+
+// parity: `Turtle.canFallInLove`, not while it carries an egg.
+bool canFallInLove(const ServerEntity& animal) {
+    return animal.loveTicks <= 0 && animal.age == 0 && !carriesEgg(animal);
+}
 
 void feed(ServerEntity& animal, std::optional<std::string> cause) {
     animal.loveTicks = kLoveTicks;
@@ -76,8 +89,9 @@ bool canMate(const ServerEntity& animal, const ServerEntity& other) {
     if (animal.type().path() == "sniffer" && (!sniffers::canMateNow(animal) || !sniffers::canMateNow(other))) {
         return false;
     }
+    // parity: `TurtleBreedGoal.canUse`.
     return animal.entityId() != other.entityId() && animal.type() == other.type() && animal.loveTicks > 0 &&
-           other.loveTicks > 0;
+           other.loveTicks > 0 && !carriesEgg(animal);
 }
 
 void growUp(ServerEntity& animal) {

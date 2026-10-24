@@ -24,11 +24,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <expected>
 #include <set>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::runtime::entity::entityNbt {
@@ -328,6 +330,10 @@ NbtCompound encode(const ServerEntity& entity) {
         // parity: `PrimedTnt.TAG_FUSE` is lowercase; `Fuse` is a creeper's own swell time.
         tag.putShort("fuse", static_cast<std::int16_t>(entity.fuse));
     }
+    // parity: `SulfurCube.addAdditionalSaveData`.
+    if (path == "sulfur_cube") {
+        tag.putInt("fuse", entity.fuse);
+    }
     // parity: `MinecartTNT.addAdditionalSaveData`.
     if (path == "tnt_minecart") {
         tag.putInt("fuse", entity.fuse);
@@ -448,6 +454,29 @@ NbtCompound encode(const ServerEntity& entity) {
         } else {
             tag.remove("wander_target");
         }
+    }
+    if (path == "wandering_trader") {
+        const mobMisc::State* held = mobMisc::peek(entity);
+        for (const auto& [key, disabled] :
+             {std::pair<std::string_view, bool>{"Paper.CanDrinkPotionDisabled",
+                                                held != nullptr && held->traderNoPotion},
+              std::pair<std::string_view, bool>{"Paper.CanDrinkMilkDisabled", held != nullptr && held->traderNoMilk}}) {
+            if (disabled) {
+                tag.putBoolean(key, true);
+            } else {
+                tag.remove(key);
+            }
+        }
+    }
+    // parity: `Turtle.addAdditionalSaveData`.
+    if (path == "turtle") {
+        const mobMisc::State* held = mobMisc::peek(entity);
+        if (held != nullptr && held->turtleHome.has_value()) {
+            tag.putIntArray("home_pos", {held->turtleHome->begin(), held->turtleHome->end()});
+        } else {
+            tag.remove("home_pos");
+        }
+        tag.putBoolean("has_egg", held != nullptr && held->turtleHasEgg);
     }
     if (path == "skeleton_horse") {
         tag.putBoolean("SkeletonTrap", entity.skeletonTrap);
@@ -673,6 +702,26 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
         if (const std::span<const std::int32_t> target = tag.getIntArray("wander_target"); target.size() >= 3) {
             entity->wanderTarget = std::array<std::int32_t, 3>{target[0], target[1], target[2]};
         }
+    }
+    if (path == "wandering_trader") {
+        if (numericBoolean(tag, "Paper.CanDrinkPotionDisabled")) {
+            mobMisc::of(*entity).traderNoPotion = true;
+        }
+        if (numericBoolean(tag, "Paper.CanDrinkMilkDisabled")) {
+            mobMisc::of(*entity).traderNoMilk = true;
+        }
+    }
+    // parity: `Turtle.readAdditionalSaveData`, the home falling back to where it stands.
+    if (path == "turtle") {
+        mobMisc::State& held = mobMisc::of(*entity);
+        if (const std::span<const std::int32_t> home = tag.getIntArray("home_pos"); home.size() >= 3) {
+            held.turtleHome = std::array<std::int32_t, 3>{home[0], home[1], home[2]};
+        } else {
+            held.turtleHome = std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(entity->x)),
+                                                          static_cast<std::int32_t>(std::floor(entity->y)),
+                                                          static_cast<std::int32_t>(std::floor(entity->z))};
+        }
+        held.turtleHasEgg = numericBoolean(tag, "has_egg");
     }
     if (path == "skeleton_horse") {
         entity->skeletonTrap = numericBoolean(tag, "SkeletonTrap");

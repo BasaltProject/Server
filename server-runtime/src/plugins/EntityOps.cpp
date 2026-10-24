@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/FishingHooks.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -28,6 +29,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -256,6 +258,24 @@ void sourceChanged(ServerEntity& entity) {
     ++entity.sourceNbtVersion;
     if (entity::bees::isBee(entity.type())) {
         entity::bees::reload(entity);
+    }
+    if (!entity.sourceNbt.has_value()) {
+        return;
+    }
+    const NbtCompound& saved = *entity.sourceNbt;
+    const std::string_view path = entity.type().path();
+    if (path == "turtle") {
+        auto& held = entity::mobMisc::of(entity);
+        if (saved.contains("has_egg")) {
+            held.turtleHasEgg = saved.getBoolean("has_egg");
+        }
+        if (const std::span<const std::int32_t> home = saved.getIntArray("home_pos"); home.size() >= 3) {
+            held.turtleHome = std::array<std::int32_t, 3>{home[0], home[1], home[2]};
+        }
+    } else if (path == "wandering_trader") {
+        auto& held = entity::mobMisc::of(entity);
+        held.traderNoPotion = saved.getBoolean("Paper.CanDrinkPotionDisabled");
+        held.traderNoMilk = saved.getBoolean("Paper.CanDrinkMilkDisabled");
     }
 }
 

@@ -115,6 +115,11 @@ public:
 
     void primeCreeper(entity::ServerEntity& mob) override;
 
+    void traderUsesItem(entity::ServerEntity& trader, bool potion, entity::ai::UsePhase phase) override;
+
+    void layTurtleEgg(entity::ServerEntity& turtle, std::int32_t x, std::int32_t y, std::int32_t z,
+                      std::int32_t eggs) override;
+
     void explodeCreeper(entity::ServerEntity& mob) override;
 
     void setCharging(entity::ServerEntity& mob, bool charging) override;
@@ -560,6 +565,23 @@ public:
 
     bool pluginSulfurSwallow(entity::ServerEntity& cube, const server::world::loot::ItemStack& item);
 
+    /// parity: `SulfurCube.canExplode`, an explosive archetype inside it and the fuse not yet lit.
+    [[nodiscard]] bool pluginSulfurCanExplode(entity::ServerEntity& cube);
+
+    /// parity: `SulfurCube.primeTime`.
+    bool pluginSulfurPrime(entity::ServerEntity& cube, bool imminent);
+
+    /// parity: `ItemSteerable.boost`: false when the vehicle does not take this item or is already boosting.
+    bool boostSteerable(entity::ServerEntity& vehicle, std::string_view item);
+
+    /// parity: `SulfurCube.tick`, the fuse and the blast it ends in.
+    void tickSulfurCube(world::LoadedWorld& world, entity::ServerEntity& cube);
+
+    enum class SulfurUse : std::uint8_t { Pass, Consume, Wear };
+
+    /// parity: `SulfurCube.mobInteract`, lighting the cube or swallowing what the player holds.
+    [[nodiscard]] SulfurUse useOnSulfurCube(entity::ServerEntity& cube, const server::world::loot::ItemStack& held);
+
     /// Starts the witch drinking this potion, or stops it drinking with none.
     bool pluginWitchDrink(entity::ServerEntity& witch, const std::optional<server::world::loot::ItemStack>& potion);
 
@@ -574,6 +596,8 @@ public:
     [[nodiscard]] bool mobGriefing(const entity::ServerEntity& mob) override;
 
 private:
+    void refreshSulfurBody(entity::ServerEntity& cube);
+
     [[nodiscard]] std::optional<bool> heartClaims(world::LoadedWorld& world, const std::array<std::int32_t, 3>& home,
                                                   const entity::ServerEntity& creaking);
 
