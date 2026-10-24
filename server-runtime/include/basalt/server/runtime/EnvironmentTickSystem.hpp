@@ -77,6 +77,9 @@ public:
 
     void tickPortals(world::LoadedWorld& world);
 
+    /// parity: `Entity.handlePortal` for everything that is not a player.
+    void tickEntityPortals(world::LoadedWorld& world);
+
     void tickInsideBlocks(world::LoadedWorld& world);
 
     void honeySlide(world::LoadedWorld& world, player::PlayerSession& player, std::int32_t x, std::int32_t y,
