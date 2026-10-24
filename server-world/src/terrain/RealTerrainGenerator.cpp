@@ -80,6 +80,16 @@ GeneratedTerrain::GeneratedTerrain(Chunk chunk, std::unique_ptr<densityfunction:
                                    std::unique_ptr<surface::SurfaceRuleEnvironment> environment)
     : chunk_(std::move(chunk)), cache_(std::move(cache)), environment_(std::move(environment)) {}
 
+namespace {
+thread_local TerrainSteps tCurrentSteps;
+} // namespace
+
+TerrainStepsScope::TerrainStepsScope(TerrainSteps steps) noexcept : previous_(tCurrentSteps) {
+    tCurrentSteps = steps;
+}
+
+TerrainStepsScope::~TerrainStepsScope() { tCurrentSteps = previous_; }
+
 GeneratedTerrain::~GeneratedTerrain() = default;
 GeneratedTerrain::GeneratedTerrain(GeneratedTerrain&&) noexcept = default;
 GeneratedTerrain& GeneratedTerrain::operator=(GeneratedTerrain&&) noexcept = default;
@@ -97,16 +107,26 @@ GeneratedTerrain buildTerrain(const NoiseRouter& router, const surface::SurfaceR
     NoiseChunk noiseChunk{router, std::move(beardifier),
                           densityfunction::DensityVolume{16, router.height, 16, chunkX * 16, router.minY, chunkZ * 16},
                           blender};
-    generationMetrics::measure(generationMetrics::Phase::TerrainFill, [&] { fillNoise(chunk, noiseChunk, router); });
+    const TerrainSteps steps = tCurrentSteps;
+    if (steps.noise) {
+        generationMetrics::measure(generationMetrics::Phase::TerrainFill,
+                                   [&] { fillNoise(chunk, noiseChunk, router); });
+    }
     const material::BiomeGetter biomeGetter = [&biomes](std::int32_t x, std::int32_t y,
                                                         std::int32_t z) -> const std::string& {
         return biomes->biomeAt(x, y, z);
     };
     generationMetrics::measure(generationMetrics::Phase::SurfaceRules, [&] {
+        if (!steps.surface) {
+            return;
+        }
         router.materialSystem->buildSurface(chunk, noiseChunk.samplers(), noiseChunk.volume(), *router.materialRule,
                                             biomeGetter, router.minY, router.height);
     });
     generationMetrics::measure(generationMetrics::Phase::Carvers, [&] {
+        if (!steps.caves) {
+            return;
+        }
         // parity: the carvers' biome is the uncached climate resolver's, not the chunk's container.
         const carver::CarverBiome carverBiome = [&biomes](std::int32_t quartX, std::int32_t quartY,
                                                           std::int32_t quartZ) -> const std::string& {

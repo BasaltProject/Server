@@ -54,6 +54,24 @@ struct TerrainStructureGenerators {
 /// parity: `ChunkGenerator.applyBiomeDecoration`.
 namespace realTerrainGenerator {
 
+/// Which of the world's own terrain steps `buildTerrain` runs on this thread, for a plugin generator that skips some.
+struct TerrainSteps {
+    bool noise = true;
+    bool surface = true;
+    bool caves = true;
+};
+
+class TerrainStepsScope {
+public:
+    explicit TerrainStepsScope(TerrainSteps steps) noexcept;
+    ~TerrainStepsScope();
+    TerrainStepsScope(const TerrainStepsScope&) = delete;
+    TerrainStepsScope& operator=(const TerrainStepsScope&) = delete;
+
+private:
+    TerrainSteps previous_;
+};
+
 class GeneratedTerrain {
 public:
     GeneratedTerrain(Chunk chunk, std::unique_ptr<densityfunction::SamplerContext> cache,

@@ -19,6 +19,7 @@ struct WorldSettings {
     std::int32_t saveIntervalSeconds = 300;
 
     bool openEndExitPortal = false;
+    bool hardcore = false;
 
     [[nodiscard]] static WorldSettings vanilla() { return WorldSettings{}; }
 

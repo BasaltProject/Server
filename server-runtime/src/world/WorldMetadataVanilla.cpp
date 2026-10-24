@@ -80,11 +80,13 @@ std::optional<WorldMetadata> WorldMetadata::fromVanilla(const std::string& world
         if (const NbtCompound* difficulty = level->getCompound("difficulty_settings"); difficulty != nullptr) {
             metadata.difficulty = std::string{difficulty->getString("difficulty")};
             metadata.difficultyLocked = difficulty->getBoolean("locked");
+            metadata.hardcore = difficulty->getBoolean("hardcore");
         } else if (level->contains("Difficulty")) {
             static constexpr std::array<std::string_view, 4> kDifficulties{"peaceful", "easy", "normal", "hard"};
             metadata.difficulty =
                 std::string{kDifficulties[static_cast<std::size_t>(level->getByte("Difficulty") & 3)]};
             metadata.difficultyLocked = level->getBoolean("DifficultyLocked");
+            metadata.hardcore = level->getBoolean("hardcore");
         }
         if (level->contains("GameType")) {
             metadata.defaultGamemode = gamemodeName(level->getInt("GameType"));

@@ -53,6 +53,7 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
     settings.saveIntervalSeconds = static_cast<std::int32_t>(
         std::max<std::int64_t>(table->integer("save-interval-seconds").value_or(inherited.saveIntervalSeconds), 0));
     settings.openEndExitPortal = table->boolean("open-end-exit-portal").value_or(inherited.openEndExitPortal);
+    settings.hardcore = table->boolean("hardcore").value_or(inherited.hardcore);
     return settings;
 }
 

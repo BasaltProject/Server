@@ -34,6 +34,9 @@ bool WorldMetadata::writeTo(const std::string& worldRoot) const {
         root.putString("Difficulty", *difficulty);
     }
     root.putBoolean("DifficultyLocked", difficultyLocked);
+    if (hardcore.has_value()) {
+        root.putBoolean("Hardcore", *hardcore);
+    }
     if (defaultGamemode.has_value()) {
         root.putString("DefaultGamemode", *defaultGamemode);
     }
@@ -96,6 +99,9 @@ std::optional<WorldMetadata> WorldMetadata::read(const std::string& worldRoot) {
         metadata.difficulty = std::string{root->getString("Difficulty")};
     }
     metadata.difficultyLocked = root->getBoolean("DifficultyLocked");
+    if (root->contains("Hardcore")) {
+        metadata.hardcore = root->getBoolean("Hardcore");
+    }
     if (root->contains("DefaultGamemode")) {
         metadata.defaultGamemode = std::string{root->getString("DefaultGamemode")};
     }

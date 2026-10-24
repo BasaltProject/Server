@@ -29,6 +29,7 @@
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
+#include <basalt/server/runtime/world/RealDialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PlayerAdvancements.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
@@ -513,6 +514,26 @@ player::PlayerConnection ClientSession::playerConnection() {
             play::ShowDialogPacket{.dialogId = dialogId}.write(buffer);
         });
     };
+    connection.reenterConfiguration = [this] { return reenterConfiguration(); };
+    connection.showDialogData = [this](const wire::nbt::NbtCompound& dialog) {
+        play::ShowDialogPacket packet;
+        packet.inlineDialog = dialog;
+        sendPlayPacket(play::ShowDialogPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        return true;
+    };
+    connection.showDialogNamed = [this](const std::string& id) {
+        const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(id);
+        const std::optional<std::int32_t> dialogId = options_.dialogs == nullptr || !parsed.has_value()
+                                                         ? std::nullopt
+                                                         : options_.dialogs->protocolIdOf(*parsed);
+        if (!dialogId.has_value()) {
+            return false;
+        }
+        sendPlayPacket(play::ShowDialogPacket::kId, [dialogId](wire::io::ByteBuffer& buffer) {
+            play::ShowDialogPacket{.dialogId = *dialogId}.write(buffer);
+        });
+        return true;
+    };
     connection.showForm = [this](const world::dialogs::Dialog& dialog) {
         std::int32_t id = 0;
         auto held = std::make_shared<const world::dialogs::Dialog>(dialog);
@@ -708,6 +729,10 @@ player::PlayerConnection ClientSession::playerConnection() {
 
 void ClientSession::enterPlay() {
     state_ = wire::protocol::ProtocolState::Play;
+    if (switchingToConfiguration_.exchange(false)) {
+        entityTracker_->forgetEverythingDrawn();
+        chunkStreamer_->forgetAll();
+    }
     player::PlayerRegistry* registry = options_.playerRegistry;
     if (registry == nullptr || !pendingProfile_.has_value()) {
         connection_.close();
@@ -790,7 +815,7 @@ void ClientSession::enterPlay() {
     const bool online = options_.onlineMode != nullptr;
     sendCompressed(play::LoginPlayPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         play::LoginPlayPacket{.entityId = entityId,
-                              .isHardcore = false,
+                              .isHardcore = currentWorld() != nullptr && currentWorld()->hardcore(),
                               .worldNames = worldNames,
                               .maxPlayers = 20,
                               .viewDistance = chunkRadius,
