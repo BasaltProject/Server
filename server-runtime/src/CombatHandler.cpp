@@ -32,10 +32,10 @@
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
-#include <basalt/wire/text/ComponentNbt.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 #include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
+#include <basalt/wire/text/ComponentNbt.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <algorithm>

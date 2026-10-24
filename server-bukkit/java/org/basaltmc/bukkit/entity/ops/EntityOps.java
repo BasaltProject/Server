@@ -170,6 +170,11 @@ public interface EntityOps extends Entity, Cored {
         org.basaltmc.bukkit.AlliedRules.removeNamespace(this, key.namespace());
     }
 
+    default String getAsString() {
+        byte[] saved = core().nbt("");
+        return saved == null ? null : org.basaltmc.bukkit.EntityNatives.nbtToSnbt(saved);
+    }
+
     default boolean isInRain() {
         World world = getWorld();
         if (!world.hasStorm()) {

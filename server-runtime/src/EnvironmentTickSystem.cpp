@@ -320,7 +320,8 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
         player::tickFreezing(
             *player,
             [&world](std::int32_t x, std::int32_t y, std::int32_t z) { return world.state().blockState(x, y, z); },
-            world.gameRules().get(world::gameRules::kFreezeDamage), [&player](float amount) {
+            world.gameRules().get(world::gameRules::kFreezeDamage),
+            [&player](float amount) {
                 if (player->connection().hurt) {
                     player->connection().hurt(amount, "freeze", world::damageTypes::kFreeze, std::nullopt);
                 }

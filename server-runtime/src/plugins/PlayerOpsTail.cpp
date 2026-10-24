@@ -3,9 +3,9 @@
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
-#include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/plugins/PlayerOps.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
+#include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/common/json/Json.hpp>
@@ -211,8 +211,8 @@ std::optional<Value> tail(Context& context, const Verb verb, const std::string_v
         if (verb == Verb::Get) {
             return static_cast<std::int64_t>(session.inventory.slotLimit());
         }
-        session.inventory.setSlotLimit(static_cast<std::int32_t>(
-            std::clamp<std::int64_t>(asInt(first), 1, player::PlayerInventory::kSlotLimit)));
+        session.inventory.setSlotLimit(
+            static_cast<std::int32_t>(std::clamp<std::int64_t>(asInt(first), 1, player::PlayerInventory::kSlotLimit)));
         return true;
     }
     if (name == "freeze_locked") {
@@ -421,10 +421,8 @@ std::optional<Value> tail(Context& context, const Verb verb, const std::string_v
         if (connection.showDialogData) {
             return connection.showDialogData(*dialog);
         }
-        const std::optional<world::dialogs::Dialog> form =
-            world::dialogs::read(*dialog, [](const wire::common::Identifier&) -> const wire::nbt::NbtCompound* {
-                return nullptr;
-            });
+        const std::optional<world::dialogs::Dialog> form = world::dialogs::read(
+            *dialog, [](const wire::common::Identifier&) -> const wire::nbt::NbtCompound* { return nullptr; });
         if (!form.has_value() || !connection.showForm) {
             return false;
         }

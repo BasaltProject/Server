@@ -578,7 +578,6 @@ public:
     bool reenterConfiguration();
 
 private:
-
     void sendRegistriesThenFinish();
 
     void finishConfiguration();

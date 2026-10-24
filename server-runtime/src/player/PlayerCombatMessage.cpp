@@ -105,11 +105,12 @@ Component trackedDeathMessage(const PlayerSession& session, const std::string_vi
         }
     }
     if (killing.damageType == "minecraft:bad_respawn_point") {
-        const Component link = Component::text("[")
-                                   .append(Component::translatable(id + ".link"))
-                                   .append(Component::text("]"))
-                                   .clickEvent(wire::text::ClickEvent::openUrl("https://bugs.mojang.com/browse/MCPE-28723"))
-                                   .hoverEvent(wire::text::HoverEvent::showText(Component::text("MCPE-28723")));
+        const Component link =
+            Component::text("[")
+                .append(Component::translatable(id + ".link"))
+                .append(Component::text("]"))
+                .clickEvent(wire::text::ClickEvent::openUrl("https://bugs.mojang.com/browse/MCPE-28723"))
+                .hoverEvent(wire::text::HoverEvent::showText(Component::text("MCPE-28723")));
         return Component::translatable(id + ".message", {victim, link});
     }
     const std::int32_t named = killing.causeId >= 0 ? killing.causeId : killing.directId;
@@ -121,9 +122,9 @@ Component trackedDeathMessage(const PlayerSession& session, const std::string_vi
                 return Component::translatable(id + ".player", {victim, credit->name});
             }
         } else if (session.lastHurtByMobType.has_value() && session.lastHurtByMobTime.load() > 0) {
-            return Component::translatable(id + ".player",
-                                           {victim, Component::translatable("entity.minecraft." +
-                                                                            session.lastHurtByMobType->path())});
+            return Component::translatable(
+                id + ".player",
+                {victim, Component::translatable("entity.minecraft." + session.lastHurtByMobType->path())});
         }
         return Component::translatable(id, {victim});
     }

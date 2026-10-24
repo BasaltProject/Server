@@ -89,8 +89,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       clock_(metadata_.timeOfDay, metadata_.clockRate, metadata_.clockPaused), gameRules_(metadata_.gameRules),
       biomeZoomSeed_(obfuscateBiomeSeed(metadata_.seed)), biomeZoomer_(biomeZoomSeed_), gameTime_(metadata_.gameTime),
       difficulty_(metadata_.difficulty.value_or(settings_.difficulty)), difficultyLocked_(metadata_.difficultyLocked),
-      hardcore_(metadata_.hardcore.value_or(settings_.hardcore)),
-      defaultGamemode_(metadata_.defaultGamemode) {
+      hardcore_(metadata_.hardcore.value_or(settings_.hardcore)), defaultGamemode_(metadata_.defaultGamemode) {
     if (hardcore_) {
         difficulty_ = "hard";
     }

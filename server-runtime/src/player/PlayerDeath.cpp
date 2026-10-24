@@ -42,9 +42,9 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     if (killer.has_value()) {
         arguments.push_back(*killer);
     }
-    const Component message =
-        tracked.has_value() ? *tracked
-                            : Component::translatable("death.attack." + std::string{deathMessageId}, arguments);
+    const Component message = tracked.has_value()
+                                  ? *tracked
+                                  : Component::translatable("death.attack." + std::string{deathMessageId}, arguments);
     Announcement said;
     if (context.died) {
         said = context.died(session, wire::text::resolvePlainText(message, context.lang));

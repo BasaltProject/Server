@@ -84,9 +84,7 @@ namespace {
 thread_local TerrainSteps tCurrentSteps;
 } // namespace
 
-TerrainStepsScope::TerrainStepsScope(TerrainSteps steps) noexcept : previous_(tCurrentSteps) {
-    tCurrentSteps = steps;
-}
+TerrainStepsScope::TerrainStepsScope(TerrainSteps steps) noexcept : previous_(tCurrentSteps) { tCurrentSteps = steps; }
 
 TerrainStepsScope::~TerrainStepsScope() { tCurrentSteps = previous_; }
 
