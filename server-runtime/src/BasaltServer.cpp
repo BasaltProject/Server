@@ -314,6 +314,14 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         .hasPlayers = [this] { return playerRegistry_.count() > 0; },
         .onTick =
             [this](bool worldRuns) {
+                if (const bool paused = tickLoop_->isPaused(); paused != pausedLogged_) {
+                    pausedLogged_ = paused;
+                    logger_.info([&] {
+                        return paused ? "Server empty for " + std::to_string(settings_.pauseWhenEmptySeconds()) +
+                                            " seconds, pausing"
+                                      : std::string{"Server resumed"};
+                    });
+                }
                 const auto began = std::chrono::steady_clock::now();
                 tickWorlds(worldRuns);
                 eventSink_.notify(

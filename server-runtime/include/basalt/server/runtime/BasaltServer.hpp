@@ -301,6 +301,7 @@ private:
     std::unique_ptr<plugins::SessionChannels> pluginChannels_;
     plugins::MiscServices miscServices_;
     plugins::ServerSettings settings_;
+    bool pausedLogged_ = false;
     std::atomic<bool> anyOperator_{false};
     std::atomic<std::int64_t> operatorsCheckedAt_{-100};
     std::unique_ptr<plugins::ServerPluginServices> pluginServices_;
