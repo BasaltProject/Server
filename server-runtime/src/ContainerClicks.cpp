@@ -249,7 +249,7 @@ void ContainerMenuController::handleContainerClickChecked(const ServerboundConta
             sendInventory();
             return;
         }
-        carriedItem_ = withCount(*stack, PlayerInventory::maxStackIn(*stack));
+        carriedItem_ = withCount(*stack, PlayerInventory::maxStackIn(*stack, session->inventory.slotLimit()));
         break;
     }
     case ServerboundContainerClickPacket::Mode::PickupAll:
@@ -264,7 +264,7 @@ void ContainerMenuController::collectMatching(PlayerSession& session, bool rever
         return;
     }
     const storage::StoredItemStack carried = *carriedItem_;
-    const std::int32_t most = PlayerInventory::maxStackIn(carried);
+    const std::int32_t most = PlayerInventory::maxStackIn(carried, session.inventory.slotLimit());
     std::int32_t total = carried.count;
     if (total >= most) {
         return;
@@ -292,7 +292,7 @@ void ContainerMenuController::collectMatching(PlayerSession& session, bool rever
             if (!existing.has_value() || !sameItem(*existing, carried)) {
                 continue;
             }
-            if (pass == 0 && existing->count >= PlayerInventory::maxStackIn(*existing)) {
+            if (pass == 0 && existing->count >= PlayerInventory::maxStackIn(*existing, session.inventory.slotLimit())) {
                 continue;
             }
             const std::int32_t taken = std::min(most - total, existing->count);
@@ -374,7 +374,7 @@ void ContainerMenuController::distributeQuickCraft(PlayerSession& session) {
         return;
     }
 
-    std::int32_t perSlot = PlayerInventory::maxStackIn(carried);
+    std::int32_t perSlot = PlayerInventory::maxStackIn(carried, session.inventory.slotLimit());
     if (quickCraftType_ == kQuickCraftTypeLeft) {
         perSlot = carried.count / static_cast<std::int32_t>(targets.size());
     } else if (quickCraftType_ == kQuickCraftTypeRight) {

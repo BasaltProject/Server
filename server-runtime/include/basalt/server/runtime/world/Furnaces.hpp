@@ -46,6 +46,9 @@ struct State {
     std::int32_t cookingTotalTime = 0;
     /// parity: 26.3's `speedMultiplier`.
     float speedMultiplier = 1.0F;
+    /// A plugin's own factor on how fast this furnace cooks; 1 is vanilla.
+    double cookSpeed = 1.0;
+    bool cookSpeedDirty = false;
     blockInventory::Slots items = blockInventory::Slots(kSize);
     /// parity: `AbstractFurnaceBlockEntity.recipesUsed`.
     RecipesUsed recipesUsed;

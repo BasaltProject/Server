@@ -139,9 +139,16 @@ final class Common {
                 return null;
             }
             case "getCookSpeedMultiplier":
-                return 1.0;
-            case "setCookSpeedMultiplier":
-                throw Unsupported.hit("Furnace#setCookSpeedMultiplier");
+                return Nbt.real(tile.data, "Paper.CookSpeedMultiplier", 1.0);
+            case "setCookSpeedMultiplier": {
+                double multiplier = (Double) args[0];
+                if (multiplier < 0.0 || multiplier > 200.0) {
+                    throw new IllegalArgumentException("Furnace speed multiplier must be between 0 and 200");
+                }
+                tile.put("Paper.CookSpeedMultiplier", multiplier);
+                tile.put("Basalt.CookSpeedChanged", (byte) 1);
+                return null;
+            }
             case "getRecipeUsedCount":
                 return Nbt.integer(Nbt.mapOrCreate(tile.data, "RecipesUsed"), args[0].toString(), 0);
             case "hasRecipeUsedCount":

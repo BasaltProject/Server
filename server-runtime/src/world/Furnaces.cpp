@@ -28,6 +28,8 @@ constexpr std::string_view kCookedKey = "cooking_time_spent";
 constexpr std::string_view kCookTotalKey = "cooking_total_time";
 constexpr std::string_view kRecipesUsedKey = "RecipesUsed";
 constexpr std::string_view kSpeedKey = "speed_multiplier";
+constexpr std::string_view kCookSpeedKey = "Paper.CookSpeedMultiplier";
+constexpr std::string_view kCookSpeedDirtyKey = "Basalt.CookSpeedChanged";
 
 /// parity: `cooking/fast_burn_time_reduction_factor` and `cooking/fast_speed_multiplier`.
 constexpr std::int32_t kFastBurnDivisor = 2;
@@ -115,6 +117,10 @@ void consumeFuel(State& state, const ItemStack& fuel, const DropRemainder& drop)
     return static_cast<std::int32_t>(std::ceil(static_cast<double>(static_cast<float>(cookingTime) / speed)));
 }
 
+[[nodiscard]] float effectiveSpeed(const State& state) {
+    return static_cast<float>(static_cast<double>(state.speedMultiplier) * state.cookSpeed);
+}
+
 /// parity: `getIntOr`.
 [[nodiscard]] std::int32_t counterOf(const wire::nbt::NbtCompound& data, std::string_view key) {
     const wire::nbt::NbtTag* tag = data.find(key);
@@ -154,7 +160,7 @@ FuelEffect fuelEffect(const wire::common::Identifier& fuel, Cooker cooker) {
 std::int32_t cookTimeFor(const State& state, const RecipeFor& recipeFor) {
     const std::optional<ItemStack>& ingredient = state.items[kInput];
     const Recipe* recipe = (ingredient.has_value() && recipeFor) ? recipeFor(*ingredient) : nullptr;
-    return recipe == nullptr ? kDefaultCookTime : atSpeed(recipe->cookingTime, state.speedMultiplier);
+    return recipe == nullptr ? kDefaultCookTime : atSpeed(recipe->cookingTime, effectiveSpeed(state));
 }
 
 Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize, Cooker cooker,
@@ -173,7 +179,12 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize,
     // parity: `setItem` sets `cookingTotalTime` and zeroes the progress.
     if (ingredient.has_value()) {
         const std::int32_t wanted = cookTimeFor(state, recipeFor);
-        if (state.cookingTotalTime != wanted) {
+        if (state.cookSpeedDirty) {
+            state.cookSpeedDirty = false;
+            state.cookingTotalTime = wanted;
+            moved = true;
+            changed = true;
+        } else if (state.cookingTotalTime != wanted) {
             state.cookingTotalTime = wanted;
             state.cookingTimer = 0;
             moved = true;
@@ -201,7 +212,7 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize,
                         if (state.cookingTotalTime > 0 && state.cookingTimer < state.cookingTotalTime) {
                             const float ratio =
                                 static_cast<float>(state.cookingTimer) / static_cast<float>(state.cookingTotalTime);
-                            const std::int32_t total = atSpeed(recipe->cookingTime, state.speedMultiplier);
+                            const std::int32_t total = atSpeed(recipe->cookingTime, effectiveSpeed(state));
                             const auto timer = static_cast<std::int32_t>(
                                 std::ceil(static_cast<double>(ratio * static_cast<float>(total))));
                             moved = moved || total != state.cookingTotalTime || timer != state.cookingTimer;
@@ -223,7 +234,7 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize,
                         moved = true;
                         if (state.cookingTimer >= state.cookingTotalTime) {
                             state.cookingTimer = 0;
-                            state.cookingTotalTime = atSpeed(recipe->cookingTime, state.speedMultiplier);
+                            state.cookingTotalTime = atSpeed(recipe->cookingTime, effectiveSpeed(state));
                             ItemStack made = recipe->result;
                             if (!notify.smelt || notify.smelt(*ingredient, made, recipe->id)) {
                                 burn(state, *ingredient, made);
@@ -306,6 +317,10 @@ State read(const wire::nbt::NbtCompound& data) {
     const wire::nbt::NbtTag* speed = data.find(kSpeedKey);
     const float* saved = speed == nullptr ? nullptr : speed->get<float>();
     state.speedMultiplier = saved == nullptr ? 1.0F : *saved;
+    if (const wire::nbt::NbtTag* cook = data.find(kCookSpeedKey); cook != nullptr && cook->get<double>() != nullptr) {
+        state.cookSpeed = *cook->get<double>();
+    }
+    state.cookSpeedDirty = data.getBoolean(kCookSpeedDirtyKey);
     state.items = blockInventory::read(data, kSize);
     state.recipesUsed = recipesUsedIn(data);
     return state;
@@ -317,6 +332,12 @@ void write(const State& state, wire::nbt::NbtCompound& data) {
     data.putInt(kCookedKey, state.cookingTimer);
     data.putInt(kCookTotalKey, state.cookingTotalTime);
     data.putFloat(kSpeedKey, state.speedMultiplier);
+    if (state.cookSpeed != 1.0) {
+        data.putDouble(kCookSpeedKey, state.cookSpeed);
+    }
+    if (state.cookSpeedDirty) {
+        data.putBoolean(kCookSpeedDirtyKey, true);
+    }
     blockInventory::write(data, state.items);
     wire::nbt::NbtCompound used;
     for (const auto& [name, count] : state.recipesUsed) {

@@ -145,7 +145,7 @@ std::int32_t PlayerInventory::add(const storage::StoredItemStack& stack) {
         if (!target.has_value()) {
             target = storage::StoredItemStack{.id = stack.id, .count = 0, .components = stack.components};
         }
-        const std::int32_t moved = std::min(remaining, maxStackIn(*target) - target->count);
+        const std::int32_t moved = std::min(remaining, maxStackIn(*target, slotLimit_) - target->count);
         if (moved <= 0) {
             break;
         }
@@ -160,8 +160,8 @@ std::optional<std::int32_t> PlayerInventory::slotWithRoomFor(const storage::Stor
     // parity: `Inventory.getSlotWithRemainingSpace`.
     const auto hasRoom = [&](std::int32_t slot) {
         const std::optional<storage::StoredItemStack>& existing = slots_[static_cast<std::size_t>(slot)];
-        return existing.has_value() && sameStack(*existing, stack) && maxStackIn(*existing) > 1 &&
-               existing->count < maxStackIn(*existing);
+        return existing.has_value() && sameStack(*existing, stack) && maxStackIn(*existing, slotLimit_) > 1 &&
+               existing->count < maxStackIn(*existing, slotLimit_);
     };
     if (hasRoom(kHotbarStart + heldSlot_)) {
         return kHotbarStart + heldSlot_;
@@ -177,8 +177,8 @@ std::optional<std::int32_t> PlayerInventory::slotWithRoomFor(const storage::Stor
     return std::nullopt;
 }
 
-std::int32_t PlayerInventory::maxStackIn(const storage::StoredItemStack& stack) {
-    return std::min(kSlotLimit, registry::itemStacking::maxStackSize(stack.id, stack.components));
+std::int32_t PlayerInventory::maxStackIn(const storage::StoredItemStack& stack, std::int32_t slotLimit) {
+    return std::min(slotLimit, registry::itemStacking::maxStackSize(stack.id, stack.components));
 }
 
 std::int32_t PlayerInventory::countOf(std::string_view id) const {
