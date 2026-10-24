@@ -380,6 +380,15 @@ public:
 
     float explosionPower = 0.0F;
 
+    /// Plugin controls of a projectile: bounce off what it hits, hit this entity or land on the next tick.
+    bool bounces = false;
+    std::optional<std::int32_t> forcedHitId;
+    bool forcedLand = false;
+    /// Fire an explosion leaves, or a fireball sets; unset means what vanilla does for the type.
+    std::optional<bool> incendiary;
+    /// Arrow knockback in levels; unset means what the weapon's enchantments say.
+    std::optional<std::int32_t> arrowKnockback;
+
     bool dangerousSkull = false;
 
     std::int32_t swell = 0;

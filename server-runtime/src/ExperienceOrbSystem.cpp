@@ -150,6 +150,24 @@ void ExperienceOrbSystem::award(world::LoadedWorld& world, double x, double y, d
     }
 }
 
+namespace {
+
+thread_local const ExperienceOrbSystem::ReasonScope* gScope = nullptr;
+
+constexpr std::array<std::string_view, 11> kReasonNames{"UNKNOWN", "PLAYER_DEATH",   "ENTITY_DEATH", "FURNACE",
+                                                        "BREED",   "VILLAGER_TRADE", "FISHING",      "BLOCK_BREAK",
+                                                        "CUSTOM",  "EXP_BOTTLE",     "GRINDSTONE"};
+
+} // namespace
+
+ExperienceOrbSystem::ReasonScope::ReasonScope(Reason reason, std::optional<wire::common::Uuid> source,
+                                              std::optional<wire::common::Uuid> trigger)
+    : reason_(reason), source_(source), trigger_(trigger), previous_(gScope) {
+    gScope = this;
+}
+
+ExperienceOrbSystem::ReasonScope::~ReasonScope() { gScope = previous_; }
+
 void ExperienceOrbSystem::spawn(world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
     const std::scoped_lock guard{lock_};
     spawnLocked(world, x, y, z, value);
@@ -171,6 +189,15 @@ void ExperienceOrbSystem::spawnLocked(world::LoadedWorld& world, double x, doubl
     tag.putShort("Age", 0);
     tag.putShort("Value", static_cast<std::int16_t>(value));
     tag.putInt("Count", 1);
+    if (gScope != nullptr) {
+        tag.putString("SpawnReason", std::string{kReasonNames[static_cast<std::size_t>(gScope->reason_)]});
+        if (gScope->source_.has_value()) {
+            tag.putString("SourceEntity", gScope->source_->toString());
+        }
+        if (gScope->trigger_.has_value()) {
+            tag.putString("TriggerEntity", gScope->trigger_->toString());
+        }
+    }
     static_cast<void>(world.state().spawnEntity(std::move(orb)));
 }
 

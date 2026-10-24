@@ -35,6 +35,7 @@ ServerEntity& prime(world::WorldState& world, const std::int32_t x, const std::i
     entity->velocityY = kPrimeHop;
     entity->velocityZ = -std::cos(angle) * kPrimeDrift;
     entity->fuse = fuse;
+    entity->explosionPower = kExplosionPower;
     return world.spawnEntity(std::move(entity));
 }
 

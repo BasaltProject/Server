@@ -293,6 +293,12 @@ void pushAway(PlayerSession& session, const entity::DamageSource& source, bool b
     }
     std::array<double, 3> moved = player::combat::knockback(entity::entityCombat::kDefaultKnockback, towardsX, towardsZ,
                                                             start[0], start[1], start[2], session.onGround, resistance);
+    if (source.punch[0] != 0.0 || source.punch[1] != 0.0) {
+        const double kept = std::max(0.0, 1.0 - resistance);
+        moved[0] += source.punch[0] * kept;
+        moved[1] += 0.1;
+        moved[2] += source.punch[1] * kept;
+    }
     if (!velocityAllowed(session, moved)) {
         return;
     }

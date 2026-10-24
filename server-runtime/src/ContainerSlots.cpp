@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
+#include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
@@ -431,6 +432,8 @@ void ContainerMenuController::payFurnace(world::LoadedWorld& world, server::worl
         }
     }
     if (owner_->options().awardExperience) {
+        const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::Furnace, std::nullopt,
+                                                      session->uuid()};
         if (replaced.has_value()) {
             owner_->options().awardExperience(world, session->x, session->y, session->z, *replaced);
         } else {

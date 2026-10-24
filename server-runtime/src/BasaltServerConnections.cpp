@@ -217,6 +217,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
         orbs_->award(world, x, y, z, amount);
     };
     options.spawnOrb = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
+        const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::VillagerTrade};
         orbs_->spawn(world, x, y, z, value);
     };
     options.plugins = pluginHooks();

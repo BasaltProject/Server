@@ -324,7 +324,8 @@ void VehicleSystem::explodeTnt(world::LoadedWorld& world, ServerEntity& cart, do
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     explosions_->blowUp(world, watchers, cart.x, cart.y, cart.z, static_cast<float>(power), "tnt", cart.entityId(),
                         primed ? world::explosions::Spares{world::explosions::sparesRails}
-                               : world::explosions::Spares{});
+                               : world::explosions::Spares{},
+                        {}, cart.incendiary.value_or(false));
     world::vibrations::emit(world.state(), "explode", cart.x, cart.y, cart.z, world.gameTime(),
                             {.entity = cart.uuid()});
 }

@@ -23,7 +23,7 @@ std::vector<PickedItem> pickupNearbyItems(
     }
     for (const world::DroppedItem& candidate : world.nearbyItems(session.x, session.y, session.z, kPickupRadius)) {
         // parity: a player's own toss cannot be picked straight back up (`ItemEntity.pickupDelay`).
-        if (!candidate.canBePickedUp()) {
+        if (!candidate.canBePickedUpByPlayer()) {
             continue;
         }
         std::optional<world::DroppedItem> removed = world.removeItem(candidate.entityId);

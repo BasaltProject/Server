@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
+#include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -66,7 +67,8 @@ double ExplosionSystem::jitter() const {
 
 void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
                              double y, double z, float power, std::string_view cause, std::int32_t sourceEntityId,
-                             const world::explosions::Spares& spares, const world::explosions::Resistance& resistance) {
+                             const world::explosions::Spares& spares, const world::explosions::Resistance& resistance,
+                             bool fire) {
     if (hooks_.allowed && !hooks_.allowed(world, x, y, z, power, cause, sourceEntityId)) {
         return;
     }
@@ -170,6 +172,20 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
 
     for (const Drop& drop : drops) {
         popResource(world, drop);
+    }
+    // parity: `ServerExplosion.createFire`.
+    if (fire) {
+        for (const world::explosions::Broken& block : broken) {
+            if (random.nextInt(3) != 0 ||
+                !world::fires::igniteOnImpact(world.state(), block.x, block.y, block.z,
+                                              world::fires::kMinDelay + random.nextInt(world::fires::kDelaySpread))) {
+                continue;
+            }
+            if (const std::optional<std::int32_t> lit = world.state().blockState(block.x, block.y, block.z);
+                lit.has_value()) {
+                sendBlock(watchers, block.x, block.y, block.z, *lit);
+            }
+        }
     }
     for (player::PlayerSession* player : watchers) {
         const double distance = std::sqrt((player->x - x) * (player->x - x) + (player->y - y) * (player->y - y) +

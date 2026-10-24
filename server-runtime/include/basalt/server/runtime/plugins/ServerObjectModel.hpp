@@ -92,6 +92,7 @@ struct ModelHooks {
     std::function<void(world::LoadedWorld& world, double x, double y, double z, float power, bool breakBlocks,
                        std::int32_t sourceEntityId)>
         explode;
+    std::function<std::int32_t(world::LoadedWorld& world, player::PlayerSession& player, bool offHand)> reelIn;
     std::function<MobActionSystem*()> mobSystem;
     std::function<world::PlayerProgress*()> progress;
     std::function<world::RealRecipes*()> recipes;

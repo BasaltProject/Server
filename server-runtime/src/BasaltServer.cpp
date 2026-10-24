@@ -567,6 +567,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                            double z, float yaw, std::string_view reason) {
         return spawning_ == nullptr ? nullptr : spawning_->spawnMob(world, type, x, y, z, yaw, reason);
     };
+    model.reelIn = [this](world::LoadedWorld& world, player::PlayerSession& player, bool offHand) {
+        const std::int32_t slot = offHand ? player::PlayerInventory::kOffhandSlot
+                                          : player::PlayerInventory::kHotbarStart + player.inventory.heldSlot();
+        return fishing_ == nullptr ? -1 : fishing_->reelIn(breakContext(), player, world, slot);
+    };
     model.mobSystem = [this] { return mobActions_.get(); };
     model.progress = [this] { return playerProgress_.get(); };
     model.recipes = [this] { return &vanillaData_.recipes; };
@@ -881,8 +886,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        entity::ServerEntity& skull, entity::ServerEntity* mob,
                        player::PlayerSession* player) { withers_->skullLanded(world, watchers, skull, mob, player); },
-            .awardExperience = [this](world::LoadedWorld& world, double x, double y, double z,
-                                      std::int32_t amount) { orbs_->award(world, x, y, z, amount); },
+            .awardExperience =
+                [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
+                    const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::ExpBottle};
+                    orbs_->award(world, x, y, z, amount);
+                },
             .targetHit =
                 [this](world::LoadedWorld& world, player::PlayerSession& shooter,
                        const entity::ServerEntity& projectile, std::int32_t signal) {
@@ -926,16 +934,16 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             .projectileHit =
                 [this](world::LoadedWorld& world, const entity::ServerEntity& projectile, std::int32_t hitId,
                        std::int32_t x, std::int32_t y, std::int32_t z) {
-                    eventSink_.notify(&server::plugins::pluginEventTypes::projectileHit,
-                                      [&](server::plugins::PluginEvent& event) {
-                                          event.set("entity_id", static_cast<std::int64_t>(projectile.entityId()));
-                                          event.set("entity_type", projectile.type().toString());
-                                          event.set("world", world.name());
-                                          event.set("hit_id", static_cast<std::int64_t>(hitId));
-                                          event.set("x", static_cast<std::int64_t>(x));
-                                          event.set("y", static_cast<std::int64_t>(y));
-                                          event.set("z", static_cast<std::int64_t>(z));
-                                      });
+                    return eventSink_.allowed(
+                        &server::plugins::pluginEventTypes::projectileHit, [&](server::plugins::PluginEvent& event) {
+                            event.set("entity_id", static_cast<std::int64_t>(projectile.entityId()));
+                            event.set("entity_type", projectile.type().toString());
+                            event.set("world", world.name());
+                            event.set("hit_id", static_cast<std::int64_t>(hitId));
+                            event.set("x", static_cast<std::int64_t>(x));
+                            event.set("y", static_cast<std::int64_t>(y));
+                            event.set("z", static_cast<std::int64_t>(z));
+                        });
                 }});
     fireworks_ = std::make_unique<FireworkSystem>(playerRegistry_, *combat_,
                                                   FireworkSystem::Options{.nextSeed = [] { return scratchSeed(); }});
@@ -946,8 +954,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         EndFightSystem::Options{
             .nextSeed = [] { return scratchSeed(); },
             .blockTags = &vanillaData_.blockTags,
-            .awardExperience = [this](world::LoadedWorld& world, double x, double y, double z,
-                                      std::int32_t amount) { orbs_->award(world, x, y, z, amount); }});
+            .awardExperience =
+                [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
+                    const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::EntityDeath};
+                    orbs_->award(world, x, y, z, amount);
+                }});
     RedstoneTickSystem::Hooks redstoneHooks;
     plugins::worldEventHooks::redstone(redstoneHooks, eventSink_);
     plugins::worldEventHooks::growth(redstoneHooks, eventSink_);
@@ -1170,6 +1181,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         static_cast<void>(fireworks_->launch(world, std::move(item), x, y, z, ownerId));
     };
     mobHooks.spawnOrb = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
+        const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::Breed};
         orbs_->spawn(world, x, y, z, value);
     };
     mobHooks.bredAnimals = [this](std::string_view cause, const wire::common::Identifier& parent,

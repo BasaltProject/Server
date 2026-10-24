@@ -44,6 +44,9 @@ constexpr double kItemSize = 0.25;
     if (item.thrower.has_value()) {
         out.putString("Thrower", item.thrower->toString());
     }
+    out.putShort("CanMobPickup", item.mobsMayPickUp ? 1 : 0);
+    out.putShort("CanPlayerPickup", item.playersMayPickUp ? 1 : 0);
+    out.putShort("FrictionState", item.frictionState);
     return out;
 }
 
@@ -69,6 +72,15 @@ void apply(DroppedItem& item, const NbtCompound& patch) {
     }
     if (patch.contains("Health")) {
         item.health = patch.getShort("Health");
+    }
+    if (patch.contains("CanMobPickup")) {
+        item.mobsMayPickUp = patch.getShort("CanMobPickup") != 0;
+    }
+    if (patch.contains("CanPlayerPickup")) {
+        item.playersMayPickUp = patch.getShort("CanPlayerPickup") != 0;
+    }
+    if (patch.contains("FrictionState")) {
+        item.frictionState = static_cast<std::int8_t>(std::clamp<std::int16_t>(patch.getShort("FrictionState"), 0, 2));
     }
     if (patch.contains("Thrower")) {
         item.thrower = wire::common::Uuid::parse(std::string{patch.getString("Thrower")});

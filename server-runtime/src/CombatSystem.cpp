@@ -136,6 +136,16 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     if (trident && tridentReturns(world, watchers, living, entity)) {
         return;
     }
+
+    struct ForcedHit {
+        ServerEntity& projectile;
+
+        ~ForcedHit() {
+            projectile.forcedHitId.reset();
+            projectile.forcedLand = false;
+        }
+    } const forcedHit{entity};
+
     const double fromX = entity.x;
     const double fromY = entity.y;
     const double fromZ = entity.z;
@@ -151,10 +161,28 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         return;
     }
 
+    if (!kind.sticks) {
+        const std::optional<Target> struck = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
+        if (hit.has_value() || struck.has_value()) {
+            const std::int32_t struckId =
+                struck.has_value() ? (struck->mob != nullptr ? struck->mob->entityId() : struck->player->entityId())
+                                   : -1;
+            const auto bx = static_cast<std::int32_t>(std::floor(hit.has_value() ? hit->x : entity.x));
+            const auto by = static_cast<std::int32_t>(std::floor(hit.has_value() ? hit->y : entity.y));
+            const auto bz = static_cast<std::int32_t>(std::floor(hit.has_value() ? hit->z : entity.z));
+            if (!hitAllowed(world, entity, struckId, bx, by, bz)) {
+                return;
+            }
+            if (entity.bounces) {
+                bounceOff(entity, struck.has_value() ? std::nullopt : hit);
+                return;
+            }
+        }
+    }
     // parity: `AbstractWindCharge.onHitBlock`.
     if (path == "wind_charge" || path == "breeze_wind_charge") {
         const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
-        if (!hit.has_value() && !target.has_value()) {
+        if (!entity.forcedLand && !hit.has_value() && !target.has_value()) {
             return;
         }
         entity.removed = true;
@@ -193,6 +221,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             gustWhereItLanded(world, watchers, living, entity, entity.x, entity.y, entity.z);
             return;
         }
+        if (entity.incendiary.value_or(false)) {
+            lightWhereItLanded(world, watchers, *hit);
+        }
         const double back = world::windBursts::kBackOff;
         gustWhereItLanded(world, watchers, living, entity, hit->x + (back * server::registry::stepX(hit->face)),
                           hit->y + (back * server::registry::stepY(hit->face)),
@@ -211,11 +242,13 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             if (target.has_value()) {
                 hitByLargeFireball(world, watchers, living, entity, *target, fromX, fromZ);
             }
+            // parity: `LargeFireball.onHit` sets fire wherever it explodes when mobs may grief.
             explosions_.blowUp(world, watchers, entity.x, entity.y, entity.z, entity.explosionPower, "tnt",
-                               entity.entityId());
+                               entity.entityId(), {}, {},
+                               entity.incendiary.value_or(world.gameRules().get(world::gameRules::kMobGriefing)));
             return;
         }
-        if (hit.has_value()) {
+        if (hit.has_value() && entity.incendiary.value_or(true)) {
             lightWhereItLanded(world, watchers, *hit);
         }
         if (!target.has_value()) {
@@ -330,7 +363,8 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         return;
     }
     if (path == "potion") {
-        if (!hit.has_value() && !targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
+        if (!entity.forcedLand && !hit.has_value() &&
+            !targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
             return;
         }
         entity.removed = true;
@@ -351,6 +385,14 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     if (!hit.has_value()) {
         return;
     }
+    if (!hitAllowed(world, entity, -1, static_cast<std::int32_t>(std::floor(hit->x)),
+                    static_cast<std::int32_t>(std::floor(hit->y)), static_cast<std::int32_t>(std::floor(hit->z)))) {
+        return;
+    }
+    if (entity.bounces) {
+        bounceOff(entity, hit);
+        return;
+    }
     // parity: `AbstractArrow.onHitBlock`.
     if (trident) {
         channelOnBlock(world, watchers, entity, *hit);
@@ -367,11 +409,31 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     }
 }
 
+void CombatSystem::bounceOff(ServerEntity& projectile, const std::optional<entity::BlockHit>& block) {
+    constexpr double kBounceKept = 0.8;
+    if (!block.has_value()) {
+        projectile.velocityX = -projectile.velocityX * kBounceKept;
+        projectile.velocityY = -projectile.velocityY * kBounceKept;
+        projectile.velocityZ = -projectile.velocityZ * kBounceKept;
+        return;
+    }
+    const double stepX = server::registry::stepX(block->face);
+    const double stepY = server::registry::stepY(block->face);
+    const double stepZ = server::registry::stepZ(block->face);
+    const double into =
+        (projectile.velocityX * stepX) + (projectile.velocityY * stepY) + (projectile.velocityZ * stepZ);
+    projectile.velocityX = (projectile.velocityX - (2.0 * into * stepX)) * kBounceKept;
+    projectile.velocityY = (projectile.velocityY - (2.0 * into * stepY)) * kBounceKept;
+    projectile.velocityZ = (projectile.velocityZ - (2.0 * into * stepZ)) * kBounceKept;
+}
+
+bool CombatSystem::hitAllowed(world::LoadedWorld& world, const ServerEntity& projectile, std::int32_t hitId,
+                              std::int32_t x, std::int32_t y, std::int32_t z) const {
+    return !options_.projectileHit || options_.projectileHit(world, projectile, hitId, x, y, z);
+}
+
 void CombatSystem::hitBlock(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                             const ServerEntity& projectile, const entity::BlockHit& hit, bool byArrow) {
-    if (options_.projectileHit) {
-        options_.projectileHit(world, projectile, -1, hit.x, hit.y, hit.z);
-    }
     // parity: `Projectile.onHitBlock` sends `PROJECTILE_LAND` where it landed, owning player included.
     emitVibration(world, "projectile_land", hit.x, hit.y, hit.z,
                   {.entity = projectile.uuid(), .projectileOwner = projectileOwnerOf(world, watchers, projectile)});
@@ -609,6 +671,18 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
                                                               const ServerEntity& projectile, double fromX,
                                                               double fromY, double fromZ, double margin,
                                                               const std::vector<std::int32_t>* spared) {
+    if (projectile.forcedHitId.has_value()) {
+        for (ServerEntity* candidate : living) {
+            if (candidate->entityId() == *projectile.forcedHitId) {
+                return Target{.mob = candidate, .player = nullptr};
+            }
+        }
+        for (PlayerSession* candidate : watchers) {
+            if (candidate->entityId() == *projectile.forcedHitId) {
+                return Target{.mob = nullptr, .player = candidate};
+            }
+        }
+    }
     double nearest = std::numeric_limits<double>::max();
     Target found;
     // parity: `Projectile.canHitEntity`; without `spared` the owner alone is left out.

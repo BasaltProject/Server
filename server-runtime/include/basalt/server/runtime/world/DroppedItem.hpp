@@ -65,7 +65,16 @@ struct DroppedItem {
 
     bool countChanged = false;
 
+    /// Plugin controls: who may take it, and whether the ground slows it (0 default, 1 never, 2 always).
+    bool mobsMayPickUp = true;
+    bool playersMayPickUp = true;
+    std::int8_t frictionState = 0;
+
     [[nodiscard]] bool canBePickedUp() const noexcept { return pickupDelay <= 0; }
+
+    [[nodiscard]] bool canBePickedUpByMob() const noexcept { return pickupDelay <= 0 && mobsMayPickUp; }
+
+    [[nodiscard]] bool canBePickedUpByPlayer() const noexcept { return pickupDelay <= 0 && playersMayPickUp; }
 };
 
 } // namespace basalt::server::runtime::world

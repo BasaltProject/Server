@@ -1,3 +1,4 @@
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
@@ -24,6 +25,28 @@ namespace {
 
 using entity::ServerEntity;
 using player::PlayerSession;
+
+constexpr double kPunchScale = 0.6;
+constexpr double kPunchLift = 0.1;
+
+/// parity: `AbstractArrow.doKnockback`, the weapon's knockback or the one a plugin set.
+[[nodiscard]] double punchOf(const ServerEntity& arrow) {
+    if (arrow.arrowKnockback.has_value()) {
+        return static_cast<double>(std::max(0, *arrow.arrowKnockback));
+    }
+    const wire::nbt::NbtCompound* levels = arrow.firedFromWeaponComponents.getCompound("minecraft:enchantments");
+    return levels == nullptr ? 0.0 : static_cast<double>(std::max(0, levels->getInt("minecraft:punch")));
+}
+
+[[nodiscard]] std::array<double, 2> punchPush(const ServerEntity& arrow) {
+    const double length = std::hypot(arrow.velocityX, arrow.velocityZ);
+    const double power = punchOf(arrow);
+    if (power <= 0.0 || length <= 0.0) {
+        return {0.0, 0.0};
+    }
+    const double scale = power * kPunchScale / length;
+    return {arrow.velocityX * scale, arrow.velocityZ * scale};
+}
 
 /// parity: `death.attack.arrow`, and `AbstractArrow`'s own two points of damage.
 constexpr std::string_view kDeathArrow = "arrow";
@@ -158,11 +181,14 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
     if (!target.has_value()) {
         return ArrowHit::Missed;
     }
-    if (options_.projectileHit) {
-        const std::int32_t struck = target->mob != nullptr ? target->mob->entityId() : target->player->entityId();
-        options_.projectileHit(world, arrow, struck, static_cast<std::int32_t>(std::floor(arrow.x)),
-                               static_cast<std::int32_t>(std::floor(arrow.y)),
-                               static_cast<std::int32_t>(std::floor(arrow.z)));
+    const std::int32_t struck = target->mob != nullptr ? target->mob->entityId() : target->player->entityId();
+    if (!hitAllowed(world, arrow, struck, static_cast<std::int32_t>(std::floor(arrow.x)),
+                    static_cast<std::int32_t>(std::floor(arrow.y)), static_cast<std::int32_t>(std::floor(arrow.z)))) {
+        return ArrowHit::Missed;
+    }
+    if (arrow.bounces) {
+        bounceOff(arrow, std::nullopt);
+        return ArrowHit::Stopped;
     }
     // parity: `AbstractArrow.onHitEntity`.
     // rounded up.
@@ -228,6 +254,14 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
             return ArrowHit::Stopped;
         }
         emitVibration(world, "entity_damage", mob.x, mob.y, mob.z, mob.uuid());
+        if (const std::array<double, 2> push = punchPush(arrow); push[0] != 0.0 || push[1] != 0.0) {
+            const std::optional<double> resistance = server::registry::entityAttributes::baseValue(
+                mob.type(), server::registry::entityAttributes::kKnockbackResistance);
+            const double kept = std::max(0.0, 1.0 - resistance.value_or(0.0));
+            mob.velocityX += push[0] * kept;
+            mob.velocityY += kPunchLift;
+            mob.velocityZ += push[1] * kept;
+        }
         // parity: `AbstractArrow.onHitEntity` leaves a non-piercing arrow stuck in it.
         if (!piercing) {
             ++mob.arrowCount;
@@ -268,7 +302,8 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
                                                                .z = fromZ,
                                                                .name = shooterName(watchers, living, arrow),
                                                                .ownerId = arrow.ownerId,
-                                                               .piercing = piercing});
+                                                               .piercing = piercing,
+                                                               .punch = punchPush(arrow)});
     }
     if (shielded) {
         deflectArrow(arrow);

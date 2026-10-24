@@ -648,7 +648,7 @@ void VillagerWorldSystem::itemsNear(ServerEntity& mob, double horizontal, double
             .x = item.x,
             .y = item.y,
             .z = item.z,
-            .pickable = item.canBePickedUp()});
+            .pickable = item.canBePickedUpByMob()});
     }
 }
 

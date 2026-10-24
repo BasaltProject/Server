@@ -48,7 +48,8 @@ public:
     /// parity: `ServerExplosion`.
     void blowUp(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x, double y,
                 double z, float power, std::string_view cause = "explosion", std::int32_t sourceEntityId = 0,
-                const world::explosions::Spares& spares = {}, const world::explosions::Resistance& resistance = {});
+                const world::explosions::Spares& spares = {}, const world::explosions::Resistance& resistance = {},
+                bool fire = false);
 
 private:
     struct Drop {

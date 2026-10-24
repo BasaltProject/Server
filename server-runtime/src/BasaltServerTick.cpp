@@ -475,6 +475,7 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
         mobActions_->askDeathDrops(world, *dead, loot, experience);
         mobActions_->spawnLoot(world, *dead, loot);
         if (experience > 0) {
+            const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::EntityDeath, dead->uuid()};
             orbs_->award(world, dead->x, dead->y, dead->z, experience);
         }
         // parity: `AbstractMinecartContainer.remove`.
@@ -541,6 +542,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             const server::world::crafting::Recipe* recipe =
                 id.has_value() ? vanillaData_.recipes.recipeFor(*id) : nullptr;
             if (recipe != nullptr) {
+                const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::Furnace};
                 orbs_->award(world, spilled.x + 0.5, spilled.y + 0.5, spilled.z + 0.5,
                              world::furnaces::experienceFor(count, recipe->experience, random));
             }
@@ -767,6 +769,14 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         if (!ticking(entity->x, entity->z)) {
             continue;
         }
+        if (entity->sourceNbt.has_value() && entity->type().path() == "armor_stand") {
+            if (entity->sourceNbt->getBoolean("BasaltNoTick")) {
+                continue;
+            }
+            if (entity->sourceNbt->getBoolean("BasaltNoMove")) {
+                entity->velocityX = entity->velocityY = entity->velocityZ = 0.0;
+            }
+        }
         if (entity->type() == world::lightning::bolt()) {
             lightning_->tick(world, watchers, living, *entity, random);
             continue;
@@ -777,7 +787,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             }
             entity->removed = true;
             explosions_->blowUp(world, watchers, entity->x, entity->y + entity::primedTnt::kExplosionOffset, entity->z,
-                                entity::primedTnt::kExplosionPower, "tnt", entity->entityId());
+                                entity->explosionPower > 0.0F ? entity->explosionPower
+                                                              : entity::primedTnt::kExplosionPower,
+                                "tnt", entity->entityId(), {}, {}, entity->incendiary.value_or(false));
             // parity: `GameEvent.EXPLODE`, which is fifteen: the top of the scale.
             world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z, world.gameTime(),
                                     {.entity = entity->uuid()});

@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
@@ -15,6 +16,7 @@
 #include <basalt/server/runtime/plugins/MobStateOps.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/EnderEyes.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
@@ -345,6 +347,87 @@ const Accessors& accessors() {
                                          asInt(value, 1), entity::cubeMobs::kMinSize, entity::cubeMobs::kMaxSize)));
                          return true;
                      }};
+        all["bounce"] = field(&ServerEntity::bounces);
+        all["incendiary"] =
+            Accessor{[](const ServerEntity& entity) -> Value {
+                         const std::string_view path = entity.type().path();
+                         return entity.incendiary.value_or(path == "fireball" || path == "small_fireball");
+                     },
+                     [](ServerEntity& entity, const Value& value) {
+                         entity.incendiary = asBool(value);
+                         return true;
+                     }};
+        all["arrow_knockback"] =
+            Accessor{[](const ServerEntity& entity) -> Value {
+                         if (entity.arrowKnockback.has_value()) {
+                             return static_cast<std::int64_t>(*entity.arrowKnockback);
+                         }
+                         const NbtCompound* levels =
+                             entity.firedFromWeaponComponents.getCompound("minecraft:enchantments");
+                         return static_cast<std::int64_t>(levels == nullptr ? 0 : levels->getInt("minecraft:punch"));
+                     },
+                     [](ServerEntity& entity, const Value& value) {
+                         entity.arrowKnockback = static_cast<std::int32_t>(std::max<std::int64_t>(0, asInt(value)));
+                         return true;
+                     }};
+        all["fired_from"] = Accessor{
+            [](const ServerEntity& entity) -> Value {
+                return entity.firedFromWeapon.has_value() ? Value{entity.firedFromWeapon->toString()} : Value{};
+            },
+            [](ServerEntity& entity, const Value& value) {
+                const std::optional<std::string> text = asText(value);
+                entity.firedFromWeapon.reset();
+                if (text.has_value() && !text->empty()) {
+                    if (const auto parsed = wire::common::Identifier::parse(*text); parsed.has_value()) {
+                        entity.firedFromWeapon = *parsed;
+                    }
+                }
+                return true;
+            }};
+        all["bolt_cause"] = Accessor{[](const ServerEntity& entity) -> Value { return idOrNone(entity.boltCause); },
+                                     [](ServerEntity& entity, const Value& value) {
+                                         const std::int64_t id = asInt(value, -1);
+                                         entity.boltCause =
+                                             id < 0 ? std::nullopt : std::optional{static_cast<std::int32_t>(id)};
+                                         return true;
+                                     }};
+        all["arrow_life"] = field(&ServerEntity::arrowLife);
+        all["wither_charged"] = field(&ServerEntity::dangerousSkull);
+        all["trident_glint"] = field(&ServerEntity::tridentFoil);
+        all["attached_to"] = Accessor{[](const ServerEntity& entity) -> Value {
+                                          return entity.firework == nullptr ? static_cast<std::int64_t>(-1)
+                                                                            : idOrNone(entity.firework->attachedTo);
+                                      },
+                                      [](ServerEntity& entity, const Value& value) {
+                                          if (entity.firework == nullptr) {
+                                              return false;
+                                          }
+                                          const std::int64_t id = asInt(value, -1);
+                                          entity.firework->attachedTo =
+                                              id < 0 ? std::nullopt : std::optional{static_cast<std::int32_t>(id)};
+                                          return true;
+                                      }};
+        all["eye_despawn"] =
+            Accessor{[](const ServerEntity& entity) -> Value {
+                         return static_cast<std::int64_t>(entity.enderEye == nullptr ? 0 : entity.enderEye->life);
+                     },
+                     [](ServerEntity& entity, const Value& value) {
+                         if (entity.enderEye == nullptr) {
+                             return false;
+                         }
+                         entity.enderEye->life = static_cast<std::int32_t>(asInt(value));
+                         return true;
+                     }};
+        all["eye_drops"] = Accessor{[](const ServerEntity& entity) -> Value {
+                                        return entity.enderEye != nullptr && entity.enderEye->surviveAfterDeath;
+                                    },
+                                    [](ServerEntity& entity, const Value& value) {
+                                        if (entity.enderEye == nullptr) {
+                                            return false;
+                                        }
+                                        entity.enderEye->surviveAfterDeath = asBool(value);
+                                        return true;
+                                    }};
         all["owner"] = Accessor{[](const ServerEntity& entity) -> Value {
                                     return entity.owner.has_value() ? Value{*entity.owner} : Value{};
                                 },
@@ -929,6 +1012,45 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
     if (operation == "knockback") {
         entity::entityCombat::knockback(entity, asReal(at(arguments, 0)), asReal(at(arguments, 1)),
                                         asReal(at(arguments, 2)));
+        return true;
+    }
+    if (operation == "hook_retrieve") {
+        if (environment.world == nullptr || environment.hooks == nullptr || !environment.hooks->reelIn ||
+            !environment.players || !entity.ownerId.has_value()) {
+            return static_cast<std::int64_t>(-1);
+        }
+        for (player::PlayerSession* session : environment.players()) {
+            if (session->entityId() == *entity.ownerId) {
+                return static_cast<std::int64_t>(
+                    environment.hooks->reelIn(*environment.world, *session, asBool(at(arguments, 0))));
+            }
+        }
+        return static_cast<std::int64_t>(-1);
+    }
+    if (operation == "hit_entity") {
+        entity.forcedHitId = static_cast<std::int32_t>(asInt(at(arguments, 0), -1));
+        return true;
+    }
+    if (operation == "land") {
+        entity.forcedLand = true;
+        return true;
+    }
+    if (operation == "eye_target") {
+        if (entity.enderEye == nullptr || !entity.enderEye->target.has_value()) {
+            return std::vector<std::string>{};
+        }
+        const auto& [x, y, z] = *entity.enderEye->target;
+        return std::vector<std::string>{std::to_string(x), std::to_string(y), std::to_string(z)};
+    }
+    if (operation == "set_eye_target") {
+        if (entity.enderEye == nullptr) {
+            return false;
+        }
+        entity.enderEye->target =
+            std::array{asReal(at(arguments, 0)), asReal(at(arguments, 1)), asReal(at(arguments, 2))};
+        if (asBool(at(arguments, 3))) {
+            entity.enderEye->life = 0;
+        }
         return true;
     }
     if (operation == "push") {

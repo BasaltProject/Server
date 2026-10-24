@@ -449,6 +449,7 @@ player::BreakContext BasaltServer::breakContext() {
     };
     context.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
         if (orbs_ != nullptr) {
+            const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::BlockBreak};
             orbs_->award(world, x, y, z, amount);
         }
     };
@@ -1927,6 +1928,8 @@ void BasaltServer::startBedrockListener() {
                                 random::RandomSource::legacy(static_cast<std::int64_t>(scratchRandom()()));
                             const std::int32_t orb = entity::villager::villagerBrain::rewardTradeXp(
                                 *merchant, mobActions_->villagersIn(*where), applied.tradeExperience, random);
+                            const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::VillagerTrade,
+                                                                          merchant->uuid()};
                             orbs_->spawn(*where, merchant->x, merchant->y + 0.5, merchant->z, orb);
                         }
                     }
@@ -1959,6 +1962,7 @@ void BasaltServer::startBedrockListener() {
                         std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()) * static_cast<double>(half));
                     const std::int32_t points = world::grindstones::experienceFor(*applied.grindstoneWorth, roll);
                     if (points > 0 && where != nullptr) {
+                        const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::Grindstone};
                         orbs_->award(*where, windows->open->x + 0.5, windows->open->y + 0.5, windows->open->z + 0.5,
                                      points);
                     }

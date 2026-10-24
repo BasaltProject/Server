@@ -559,9 +559,10 @@ void WitherSystem::skullLanded(world::LoadedWorld& world, const std::vector<Play
             return tagged(stateId, "minecraft:wither_immune") ? base : std::min(kDangerousResistance, base);
         };
     }
-    explosions_->blowUp(
-        world, watchers, skull.x, skull.y, skull.z, kSkullExplosion, "wither_skull", skull.entityId(),
-        griefing ? world::explosions::Spares{} : world::explosions::Spares{[](auto&&...) { return true; }}, resistance);
+    explosions_->blowUp(world, watchers, skull.x, skull.y, skull.z, kSkullExplosion, "wither_skull", skull.entityId(),
+                        griefing ? world::explosions::Spares{}
+                                 : world::explosions::Spares{[](auto&&...) { return true; }},
+                        resistance, skull.incendiary.value_or(false));
 }
 
 void WitherSystem::dropStar(world::LoadedWorld& world, const ServerEntity& wither) {

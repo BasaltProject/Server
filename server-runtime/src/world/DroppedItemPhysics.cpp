@@ -440,7 +440,7 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
 
     // parity: `ItemEntity.tick`'s own drag: the air takes its share every tick, and the block.
     double horizontalDrag = kAirDrag;
-    if (onGround) {
+    if (onGround && item.frictionState != 1) {
         horizontalDrag *= static_cast<double>(registry::blockMovement::frictionOf(underState));
     }
     item.velocityX *= horizontalDrag;

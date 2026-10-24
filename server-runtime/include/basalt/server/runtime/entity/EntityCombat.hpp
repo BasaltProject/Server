@@ -4,6 +4,7 @@
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/text/Component.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -87,6 +88,8 @@ struct DamageSource {
     std::optional<std::int32_t> ownerId;
     /// parity: `LivingEntity.applyItemBlocking`.
     bool piercing = false;
+    /// parity: `AbstractArrow.doKnockback`, the horizontal push on top of the blow's own.
+    std::array<double, 2> punch{};
     /// parity: breach.
     float armorFractionAdd = 0.0F;
 };

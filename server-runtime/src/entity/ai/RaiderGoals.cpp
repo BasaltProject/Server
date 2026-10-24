@@ -61,7 +61,7 @@ constexpr double kTenthTurn = static_cast<double>(std::numbers::pi_v<float> / 10
         const bool inside = std::abs(item.x - mob.mob.x) < half + reach &&
                             std::abs(item.z - mob.mob.z) < half + reach && item.y > mob.mob.y - kBannerVertical &&
                             item.y < mob.mob.y + mob.mob.height() + kBannerVertical;
-        if (inside && item.canBePickedUp() &&
+        if (inside && item.canBePickedUpByMob() &&
             raiderEquipment::isOminousBanner(item.item, item.count, item.components)) {
             found.push_back(std::move(item));
         }
