@@ -22,12 +22,18 @@ public final class BasaltRegistryAccess implements RegistryAccess {
     public BasaltRegistryAccess() {}
 
     static synchronized BlockType blockType(int block) {
-        return blockTypes.computeIfAbsent(block, BasaltBlockType::new);
+        BasaltBlockType type = blockTypes.get(block);
+        if (type == null) {
+            type = new BasaltBlockType(block);
+            blockTypes.putIfAbsent(block, type);
+            type = blockTypes.get(block);
+        }
+        return type;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static synchronized <T extends Keyed> Registry<T> named(String name, Class<?> type) {
-        return (Registry<T>) registries.computeIfAbsent(name, key -> genericRegistry(key, type));
+        return (Registry<T>) org.basaltmc.bukkit.facade.Memo.get(registries, name, key -> genericRegistry(key, type));
     }
 
     /** Entries come from the server's own registry when it has one; an interface type also answers for any key named. */

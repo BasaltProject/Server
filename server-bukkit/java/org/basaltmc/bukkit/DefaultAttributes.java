@@ -30,7 +30,7 @@ final class DefaultAttributes implements Attributable {
         if (value == null) {
             return null;
         }
-        return made.computeIfAbsent(attribute, key -> new Held(key, value));
+        return org.basaltmc.bukkit.facade.Memo.get(made, attribute, key -> new Held(key, value));
     }
 
     @Override

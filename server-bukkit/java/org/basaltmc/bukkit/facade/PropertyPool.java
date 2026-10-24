@@ -21,7 +21,7 @@ public final class PropertyPool {
 
     @SuppressWarnings("unchecked")
     public static <P> P intern(String key, Supplier<P> maker) {
-        return (P) kPool.computeIfAbsent(key, ignored -> maker.get());
+        return (P) org.basaltmc.bukkit.facade.Memo.get(kPool, key, ignored -> maker.get());
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

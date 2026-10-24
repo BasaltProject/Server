@@ -41,7 +41,7 @@ public final class BasaltLog4jFactory implements LoggerContextFactory {
 
         @Override
         public ExtendedLogger getLogger(String name, MessageFactory factory) {
-            return loggers.computeIfAbsent(name, key -> new BasaltLog4jLogger(key,
+            return org.basaltmc.bukkit.facade.Memo.get(loggers, name, key -> new BasaltLog4jLogger(key,
                 LogTags.ofCaller(key.substring(key.lastIndexOf('.') + 1)), factory));
         }
 

@@ -274,7 +274,7 @@ final class InventoryEvents {
         if (id.isEmpty()) {
             return null;
         }
-        return recipeCache.computeIfAbsent(id, key -> org.basaltmc.bukkit.recipe.Recipes.get(
+        return org.basaltmc.bukkit.facade.Memo.get(recipeCache, id, key -> org.basaltmc.bukkit.recipe.Recipes.get(
             org.bukkit.NamespacedKey.fromString(key)));
     }
 

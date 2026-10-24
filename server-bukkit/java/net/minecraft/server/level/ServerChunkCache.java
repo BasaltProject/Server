@@ -101,7 +101,7 @@ public class ServerChunkCache extends ChunkSource {
             if (chunks.size() >= kCapacity) {
                 chunks.values().removeIf(chunk -> !chunk.hasUnflushed());
             }
-            found = chunks.computeIfAbsent(key, k -> new LevelChunk(level, chunkX, chunkZ));
+            found = org.basaltmc.bukkit.facade.Memo.get(chunks, key, k -> new LevelChunk(level, chunkX, chunkZ));
         }
         return found;
     }

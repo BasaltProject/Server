@@ -44,7 +44,7 @@ public final class ServerAccess {
 
     @SuppressWarnings("unchecked")
     private static <E> Registry<E> registry(ResourceKey<? extends Registry<? extends E>> key) {
-        return (Registry<E>) kRegistries.computeIfAbsent(key.identifier(), id -> build(key));
+        return (Registry<E>) org.basaltmc.bukkit.facade.Memo.get(kRegistries, key.identifier(), id -> build(key));
     }
 
     private static Registry<?> build(ResourceKey<? extends Registry<?>> key) {
