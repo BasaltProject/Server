@@ -44,7 +44,7 @@ final class ItemParser {
         return new BasaltItemStack(material, 1, components);
     }
 
-    private static Object value(String snbt) {
+    static Object value(String snbt) {
         byte[] bytes = InventoryNatives.parseSnbt(snbt);
         Map<String, Object> wrapped = bytes == null ? null : Nbt.read(bytes);
         if (wrapped == null || !wrapped.containsKey("value")) {

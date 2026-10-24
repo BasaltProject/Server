@@ -113,6 +113,41 @@ public final class BasaltItemFactory extends ItemFactoryBase {
     }
 
     @Override
+    public ItemStack enchantWithLevels(ItemStack item, int levels, boolean allowTreasures, java.util.Random random) {
+        return enchantRolled(item, levels, allowTreasures ? "#minecraft:on_random_loot" : "#minecraft:in_enchanting_table",
+            random);
+    }
+
+    @Override
+    public ItemStack enchantWithLevels(ItemStack item, int levels,
+            io.papermc.paper.registry.set.RegistryKeySet<org.bukkit.enchantments.Enchantment> options,
+            java.util.Random random) {
+        if (options instanceof io.papermc.paper.registry.tag.Tag<?> tag) {
+            return enchantRolled(item, levels, "#" + tag.tagKey().key().asString(), random);
+        }
+        StringBuilder ids = new StringBuilder();
+        for (var key : options.values()) {
+            ids.append(ids.length() == 0 ? "" : ",").append(key.key().asString());
+        }
+        return enchantRolled(item, levels, ids.toString(), random);
+    }
+
+    private static ItemStack enchantRolled(ItemStack item, int levels, String options, java.util.Random random) {
+        if (item.getType().isAir()) {
+            throw new IllegalArgumentException("Cannot enchant an empty stack");
+        }
+        String[] made = LeftoverNatives.enchantItem(new String[] {item.getType().getKey().toString(),
+            String.valueOf(item.getAmount()), ItemMetas.snbt(Items.componentsOf(item))},
+            org.bukkit.Bukkit.getWorlds().get(0).getName(), options, levels, random.nextLong());
+        if (made == null) {
+            throw new IllegalStateException("The server could not roll enchantments");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> components = made[2].isEmpty() ? Nbt.compound() : (Map<String, Object>) ItemParser.value(made[2]);
+        return new BasaltItemStack(item.getType(), item.getAmount(), components);
+    }
+
+    @Override
     public HoverEvent<HoverEvent.ShowItem> asHoverEvent(ItemStack item, UnaryOperator<HoverEvent.ShowItem> op) {
         return HoverEvent.showItem(op.apply(HoverEvent.ShowItem.showItem(Key.key(item.getType().getKey().toString()),
             item.getAmount())));
