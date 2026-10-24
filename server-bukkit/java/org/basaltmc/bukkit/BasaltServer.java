@@ -449,6 +449,11 @@ public class BasaltServer extends ServerTail {
     }
 
     @Override
+    public com.destroystokyo.paper.entity.ai.MobGoals getMobGoals() {
+        return BasaltMobGoals.INSTANCE;
+    }
+
+    @Override
     public org.bukkit.UnsafeValues getUnsafe() {
         return BasaltUnsafe.INSTANCE;
     }
