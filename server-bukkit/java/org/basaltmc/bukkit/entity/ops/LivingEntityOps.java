@@ -272,6 +272,9 @@ public interface LivingEntityOps extends LivingEntity, EntityOps, LivingExtraOps
                 if (projectile instanceof org.basaltmc.bukkit.entity.Cored cored) {
                     cored.core().set("owner_id", getEntityId());
                     cored.core().velocity(launch);
+                    if (projectile instanceof org.bukkit.entity.FishHook && this instanceof org.bukkit.entity.Player) {
+                        cored.core().call("hook_own", getEntityId());
+                    }
                 }
                 if (before != null) {
                     before.accept((T) projectile);

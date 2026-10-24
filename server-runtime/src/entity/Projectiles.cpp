@@ -196,7 +196,9 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
 }
 
 const Kind* kindOf(const wire::common::Identifier& type) {
-    const auto found = std::ranges::find_if(all(), [&](const Kind& one) { return one.type == type; });
+    const bool thrownPotion = type.path() == "splash_potion" || type.path() == "lingering_potion";
+    const auto found = std::ranges::find_if(
+        all(), [&](const Kind& one) { return one.type == type || (thrownPotion && one.type.path() == "potion"); });
     return found == all().end() ? nullptr : &*found;
 }
 

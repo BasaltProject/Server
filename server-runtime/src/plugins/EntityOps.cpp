@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
+#include <basalt/server/runtime/entity/FishingHooks.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
@@ -399,8 +400,13 @@ const Accessors& accessors() {
                                                                             : idOrNone(entity.firework->attachedTo);
                                       },
                                       [](ServerEntity& entity, const Value& value) {
-                                          if (entity.firework == nullptr) {
+                                          if (!entity::fireworkRockets::isRocket(entity)) {
                                               return false;
+                                          }
+                                          if (entity.firework == nullptr) {
+                                              entity.firework =
+                                                  std::make_shared<entity::fireworkRockets::RocketState>();
+                                              entity.firework->item = entity::fireworkRockets::plainRocket();
                                           }
                                           const std::int64_t id = asInt(value, -1);
                                           entity.firework->attachedTo =
@@ -412,8 +418,11 @@ const Accessors& accessors() {
                          return static_cast<std::int64_t>(entity.enderEye == nullptr ? 0 : entity.enderEye->life);
                      },
                      [](ServerEntity& entity, const Value& value) {
-                         if (entity.enderEye == nullptr) {
+                         if (!world::enderEyes::isEye(entity)) {
                              return false;
+                         }
+                         if (entity.enderEye == nullptr) {
+                             entity.enderEye = std::make_shared<entity::enderEyes::EyeState>();
                          }
                          entity.enderEye->life = static_cast<std::int32_t>(asInt(value));
                          return true;
@@ -422,8 +431,11 @@ const Accessors& accessors() {
                                         return entity.enderEye != nullptr && entity.enderEye->surviveAfterDeath;
                                     },
                                     [](ServerEntity& entity, const Value& value) {
-                                        if (entity.enderEye == nullptr) {
+                                        if (!world::enderEyes::isEye(entity)) {
                                             return false;
+                                        }
+                                        if (entity.enderEye == nullptr) {
+                                            entity.enderEye = std::make_shared<entity::enderEyes::EyeState>();
                                         }
                                         entity.enderEye->surviveAfterDeath = asBool(value);
                                         return true;
@@ -1014,6 +1026,24 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
                                         asReal(at(arguments, 2)));
         return true;
     }
+    if (operation == "hook_own") {
+        if (!environment.players) {
+            return false;
+        }
+        const auto id = static_cast<std::int32_t>(asInt(at(arguments, 0), -1));
+        for (player::PlayerSession* session : environment.players()) {
+            if (session->entityId() == id) {
+                entity.ownerId = id;
+                if (entity.hook == nullptr) {
+                    entity.hook = std::make_shared<entity::fishingHooks::HookState>();
+                }
+                entity.hook->ownerId = id;
+                session->fishingHook = entity.entityId();
+                return true;
+            }
+        }
+        return false;
+    }
     if (operation == "hook_retrieve") {
         if (environment.world == nullptr || environment.hooks == nullptr || !environment.hooks->reelIn ||
             !environment.players || !entity.ownerId.has_value()) {
@@ -1043,8 +1073,11 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
         return std::vector<std::string>{std::to_string(x), std::to_string(y), std::to_string(z)};
     }
     if (operation == "set_eye_target") {
-        if (entity.enderEye == nullptr) {
+        if (!world::enderEyes::isEye(entity)) {
             return false;
+        }
+        if (entity.enderEye == nullptr) {
+            entity.enderEye = std::make_shared<entity::enderEyes::EyeState>();
         }
         entity.enderEye->target =
             std::array{asReal(at(arguments, 0)), asReal(at(arguments, 1)), asReal(at(arguments, 2))};
