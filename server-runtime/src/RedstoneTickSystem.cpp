@@ -716,7 +716,13 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         .beaconPulse =
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t levels,
                            const std::string& primary, const std::string& secondary) {
-                const world::beacons::Beam beam = world::beacons::beamOf(levels, primary == secondary);
+                world::beacons::Beam beam = world::beacons::beamOf(levels, primary == secondary);
+                if (const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4); chunk != nullptr) {
+                    const server::world::ChunkBlockEntity* held = chunk->blockEntityAt(x & 15, y, z & 15);
+                    if (held != nullptr && held->data().contains("BeaconRange")) {
+                        beam.range = held->data().getDouble("BeaconRange");
+                    }
+                }
                 const std::expected<wire::common::Identifier, wire::common::IdentifierError> first =
                     wire::common::Identifier::parse(primary);
                 if (!first.has_value()) {

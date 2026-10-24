@@ -201,9 +201,23 @@ public final class BasaltBlockData implements InvocationHandler {
                 return faces(false);
             case "hasFace":
                 return "true".equals(get(((BlockFace) args[0]).name().toLowerCase(Locale.ROOT)));
-            case "setFace":
-                set(((BlockFace) args[0]).name().toLowerCase(Locale.ROOT), String.valueOf(args[1]));
-                return null;
+            case "setFace", "setHeight":
+                if (args.length == 2 && args[0] instanceof BlockFace) {
+                    String side = ((BlockFace) args[0]).name().toLowerCase(Locale.ROOT);
+                    set(side, toText(args[1], side));
+                    return null;
+                }
+                break;
+            case "getFace", "getHeight":
+                if (args != null && args.length == 1 && args[0] instanceof BlockFace) {
+                    String side = ((BlockFace) args[0]).name().toLowerCase(Locale.ROOT);
+                    String value = get(side);
+                    if (value == null) {
+                        throw new IllegalArgumentException("Invalid face " + args[0]);
+                    }
+                    return fromText(value, method.getReturnType(), side);
+                }
+                break;
             case "getAxes": {
                 Set<Axis> axes = EnumSet.noneOf(Axis.class);
                 Registries.Properties properties = properties();

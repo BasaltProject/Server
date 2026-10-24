@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
+#include <algorithm>
 #include <map>
 #include <span>
 #include <string>
@@ -42,7 +43,11 @@ std::size_t occupantCount(const NbtCompound& data) {
     return bees == nullptr ? 0 : bees->size();
 }
 
-bool isFull(const NbtCompound& data) { return occupantCount(data) == kMaxOccupants; }
+std::size_t maxOccupants(const NbtCompound& data) {
+    return data.contains("MaxBees") ? static_cast<std::size_t>(std::max(data.getInt("MaxBees"), 0)) : kMaxOccupants;
+}
+
+bool isFull(const NbtCompound& data) { return occupantCount(data) >= maxOccupants(data); }
 
 void addOccupant(NbtCompound& data, NbtCompound bee) {
     // parity: `Occupant.of`, whose minimum stay is read from the saved nectar.

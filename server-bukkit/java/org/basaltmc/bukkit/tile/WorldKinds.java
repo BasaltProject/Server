@@ -77,7 +77,16 @@ final class WorldKinds {
                     set(tile, "secondary_effect", args[0]);
                     return null;
                 case "getEffectRange":
-                    return tile.integer("Levels", 0) * 10.0 + 10.0;
+                    {
+                    double custom = org.basaltmc.bukkit.item.Nbt.real(tile.data, "BeaconRange", -1.0);
+                    return custom >= 0.0 ? custom : tile.integer("Levels", 0) * 10.0 + 10.0;
+                }
+                case "setEffectRange":
+                    tile.put("BeaconRange", ((Number) args[0]).doubleValue());
+                    return null;
+                case "resetEffectRange":
+                    tile.put("BeaconRange", null);
+                    return null;
                 case "getEntitiesInRange": {
                     List<LivingEntity> out = new ArrayList<>();
                     double range = tile.integer("Levels", 0) * 10.0 + 10.0;
@@ -93,8 +102,6 @@ final class WorldKinds {
                     }
                     return out;
                 }
-                case "setEffectRange", "resetEffectRange":
-                    throw Unsupported.hit("Beacon#" + name);
                 default:
                     return Tile.kNone;
             }

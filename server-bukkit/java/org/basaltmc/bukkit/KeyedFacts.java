@@ -84,6 +84,15 @@ final class KeyedFacts {
         return stored == null ? null : Registry.SOUNDS.get(NamespacedKey.fromString(String.valueOf(stored)));
     }
 
+    private static final Map<String, String> kPatternCodes = new HashMap<>();
+
+    static {
+        for (String pair : "b:base bs:stripe_bottom ts:stripe_top ls:stripe_left rs:stripe_right cs:stripe_center ms:stripe_middle drs:stripe_downright dls:stripe_downleft ss:small_stripes cr:cross sc:straight_cross ld:diagonal_left rd:diagonal_right lud:diagonal_up_left rud:diagonal_up_right vh:half_vertical vhr:half_vertical_right hh:half_horizontal hhb:half_horizontal_bottom bl:square_bottom_left br:square_bottom_right tl:square_top_left tr:square_top_right bt:triangle_bottom tt:triangle_top bts:triangles_bottom tts:triangles_top mc:circle mr:rhombus bo:border cbo:curly_border bri:bricks gra:gradient gru:gradient_up cre:creeper sku:skull flo:flower moj:mojang glb:globe pig:piglin flw:flow gus:guster".split(" ")) {
+            String[] parts = pair.split(":");
+            kPatternCodes.put(parts[1], parts[0]);
+        }
+    }
+
     static Object answer(Class<?> type, NamespacedKey key, Method method, Object[] args) {
         String name = method.getName();
         if (type == io.papermc.paper.entity.poi.PoiType.class) {
@@ -127,6 +136,25 @@ final class KeyedFacts {
                 default:
                     return kNone;
             }
+        }
+        if (type == org.bukkit.inventory.meta.trim.TrimMaterial.class
+            || type == org.bukkit.inventory.meta.trim.TrimPattern.class) {
+            boolean material = type == org.bukkit.inventory.meta.trim.TrimMaterial.class;
+            String translation = (material ? "trim_material." : "trim_pattern.") + key.getNamespace() + "."
+                + key.getKey();
+            switch (name) {
+                case "getTranslationKey", "translationKey":
+                    return translation;
+                case "description":
+                    Map<String, Object> data = data(material ? "trim_material" : "trim_pattern", key);
+                    return data == null || data.get("description") == null ? Component.translatable(translation)
+                        : Texts.fromNbt(data.get("description"));
+                default:
+                    return kNone;
+            }
+        }
+        if (type == org.bukkit.block.banner.PatternType.class && name.equals("getIdentifier")) {
+            return kPatternCodes.getOrDefault(key.getKey(), key.getKey());
         }
         if (type == org.bukkit.JukeboxSong.class) {
             Map<String, Object> data = data("jukebox_song", key);

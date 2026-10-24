@@ -206,9 +206,57 @@ final class ActorKinds {
                 case "getEntityCount":
                     return bees(tile);
                 case "getMaxEntities":
-                    return 3;
+                    return Nbt.integer(tile.data, "MaxBees", 3);
+                case "setMaxEntities": {
+                    int limit = (Integer) args[0];
+                    if (limit < 1) {
+                        throw new IllegalArgumentException("Max bees must be more than 0");
+                    }
+                    tile.put("MaxBees", limit);
+                    return null;
+                }
                 case "isFull":
-                    return bees(tile) >= 3;
+                    return bees(tile) >= Nbt.integer(tile.data, "MaxBees", 3);
+                case "addEntity": {
+                    org.bukkit.entity.Bee bee = (org.bukkit.entity.Bee) args[0];
+                    if (bees(tile) >= Nbt.integer(tile.data, "MaxBees", 3)) {
+                        throw new IllegalStateException("Hive is full");
+                    }
+                    org.bukkit.entity.EntitySnapshot snapshot = bee.createSnapshot();
+                    if (!(snapshot instanceof org.basaltmc.bukkit.entity.BasaltEntitySnapshot own)) {
+                        throw new IllegalArgumentException("The bee is not a valid entity");
+                    }
+                    Map<String, Object> occupant = Nbt.compound();
+                    Map<String, Object> saved = Nbt.readNamed(own.nbt());
+                    saved.remove("UUID");
+                    occupant.put("entity_data", saved);
+                    occupant.put("ticks_in_hive", 0);
+                    occupant.put("min_ticks_in_hive", bee.hasNectar() ? 2400 : 600);
+                    List<Object> list = Nbt.list(tile.data, "bees");
+                    list = list == null ? new ArrayList<>() : new ArrayList<>(list);
+                    list.add(occupant);
+                    tile.put("bees", list);
+                    bee.remove();
+                    return null;
+                }
+                case "releaseEntities": {
+                    List<Object> list = Nbt.list(tile.data, "bees");
+                    List<org.bukkit.entity.Entity> released = new ArrayList<>();
+                    if (list != null) {
+                        Location above = tile.location().add(0.5, 1.0, 0.5);
+                        for (Object entry : list) {
+                            Map<String, Object> saved = Nbt.map(Nbt.map(entry), "entity_data");
+                            org.bukkit.entity.EntitySnapshot snapshot = saved == null ? null
+                                : org.basaltmc.bukkit.entity.BasaltEntitySnapshot.ofNbt(Nbt.writeNamed(saved));
+                            org.bukkit.entity.Entity made = snapshot == null ? null : snapshot.createEntity(above);
+                            if (made != null) {
+                                released.add(made);
+                            }
+                        }
+                    }
+                    tile.put("bees", new ArrayList<Object>());
+                    return released;
+                }
                 case "clearEntities":
                     tile.put("bees", new ArrayList<Object>());
                     return null;
@@ -227,8 +275,6 @@ final class ActorKinds {
                     return below.getType().name().endsWith("CAMPFIRE")
                         && below.getBlockData() instanceof org.bukkit.block.data.Lightable lit && lit.isLit();
                 }
-                case "setMaxEntities", "releaseEntities", "addEntity":
-                    throw Unsupported.hit("Beehive#" + name);
                 default:
                     return Tile.kNone;
             }
