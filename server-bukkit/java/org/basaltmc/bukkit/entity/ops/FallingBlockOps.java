@@ -67,4 +67,12 @@ public interface FallingBlockOps extends FallingBlock, Cored {
     default void setMaxDamage(int damage) {
         core().nbtSet("FallHurtMax", "int", damage);
     }
+
+    default boolean doesAutoExpire() {
+        return !core().nbtFlag("BasaltNoExpire");
+    }
+
+    default void shouldAutoExpire(boolean expires) {
+        core().nbtSet("BasaltNoExpire", "bool", !expires);
+    }
 }

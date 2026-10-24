@@ -281,4 +281,36 @@ public interface ArmorStandOps extends ArmorStand, Cored {
         }
         setDisabledSlots(disabled.toArray(new EquipmentSlot[0]));
     }
+
+    private static int lockBit(EquipmentSlot slot, LockType type) {
+        return slotBit(slot) + type.ordinal() * 8;
+    }
+
+    default void addEquipmentLock(EquipmentSlot slot, LockType type) {
+        core().nbtSet("DisabledSlots", "int", core().nbtInt("DisabledSlots") | (1 << lockBit(slot, type)));
+    }
+
+    default void removeEquipmentLock(EquipmentSlot slot, LockType type) {
+        core().nbtSet("DisabledSlots", "int", core().nbtInt("DisabledSlots") & ~(1 << lockBit(slot, type)));
+    }
+
+    default boolean hasEquipmentLock(EquipmentSlot slot, LockType type) {
+        return (core().nbtInt("DisabledSlots") & (1 << lockBit(slot, type))) != 0;
+    }
+
+    default boolean canMove() {
+        return !core().nbtFlag("BasaltNoMove");
+    }
+
+    default void setCanMove(boolean move) {
+        core().nbtSet("BasaltNoMove", "bool", !move);
+    }
+
+    default boolean canTick() {
+        return !core().nbtFlag("BasaltNoTick");
+    }
+
+    default void setCanTick(boolean tick) {
+        core().nbtSet("BasaltNoTick", "bool", !tick);
+    }
 }

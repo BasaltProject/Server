@@ -31,4 +31,20 @@ public interface LightningStrikeOps extends LightningStrike, Cored {
     default void setFlashes(int flashes) {
         setFlashCount(flashes);
     }
+
+    default org.bukkit.entity.Entity getCausingEntity() {
+        return core().entity(core().integer("bolt_cause"));
+    }
+
+    default org.bukkit.entity.Player getCausingPlayer() {
+        return getCausingEntity() instanceof org.bukkit.entity.Player player ? player : null;
+    }
+
+    default void setCausingPlayer(org.bukkit.entity.Player player) {
+        core().set("bolt_cause", player == null ? -1 : player.getEntityId());
+    }
+
+    default LightningStrike.Spigot spigot() {
+        return new LightningStrike.Spigot();
+    }
 }

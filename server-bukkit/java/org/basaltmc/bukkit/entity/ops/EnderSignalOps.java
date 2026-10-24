@@ -18,4 +18,40 @@ public interface EnderSignalOps extends EnderSignal, Cored {
             EntityNbt.put(core(), "Item", org.basaltmc.bukkit.item.Convert.stack(item));
         }
     }
+
+    default int getDespawnTimer() {
+        return core().integer("eye_despawn");
+    }
+
+    default void setDespawnTimer(int timer) {
+        core().set("eye_despawn", timer);
+    }
+
+    default boolean getDropItem() {
+        return core().flag("eye_drops");
+    }
+
+    default void setDropItem(boolean drop) {
+        core().set("eye_drops", drop);
+    }
+
+    default org.bukkit.Location getTargetLocation() {
+        Object stored = core().call("eye_target");
+        if (!(stored instanceof String[] position) || position.length != 3) {
+            return null;
+        }
+        return new org.bukkit.Location(getWorld(), Double.parseDouble(position[0]), Double.parseDouble(position[1]),
+            Double.parseDouble(position[2]));
+    }
+
+    default void setTargetLocation(org.bukkit.Location location) {
+        setTargetLocation(location, true);
+    }
+
+    default void setTargetLocation(org.bukkit.Location location, boolean update) {
+        if (location == null || !java.util.Objects.equals(location.getWorld(), getWorld())) {
+            throw new IllegalArgumentException("Cannot target an eye of ender in another world");
+        }
+        core().call("set_eye_target", location.getX(), location.getY(), location.getZ(), update);
+    }
 }

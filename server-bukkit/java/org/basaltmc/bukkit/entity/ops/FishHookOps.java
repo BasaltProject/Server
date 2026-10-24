@@ -182,6 +182,9 @@ public interface FishHookOps extends FishHook, Cored {
         if (slot != EquipmentSlot.HAND && slot != EquipmentSlot.OFF_HAND) {
             throw new IllegalArgumentException("Equipment slot must be HAND or OFF_HAND");
         }
-        throw org.basaltmc.bukkit.Unsupported.hit("FishHook#retrieve");
+        if (!(core().call("hook_retrieve", slot == EquipmentSlot.OFF_HAND) instanceof Number wear) || wear.intValue() < 0) {
+            throw new IllegalStateException("The owner of this hook holds no fishing rod in " + slot);
+        }
+        return wear.intValue();
     }
 }
