@@ -18,7 +18,11 @@ final class BasaltGameEvent extends GameEvent {
 
     @Override
     public int getRange() {
-        throw Unsupported.hit("GameEvent#getRange");
+        return switch (key.getKey()) {
+            case "jukebox_play", "jukebox_stop_play" -> 10;
+            case "shriek" -> 32;
+            default -> 16;
+        };
     }
 
     @Override

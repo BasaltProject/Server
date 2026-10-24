@@ -134,12 +134,13 @@ public final class BasaltBlockType extends BlockTypeTypedBase {
 
     @Override
     public boolean isFlammable() {
-        return false;
+        return BlockFacts.ignitedByLava(key.getKey());
     }
 
     @Override
     public boolean isBurnable() {
-        return false;
+        double[] info = WorldNatives.blockInfo(Registries.defaultState(block));
+        return info != null && info[5] > 0;
     }
 
     @Override
@@ -156,7 +157,7 @@ public final class BasaltBlockType extends BlockTypeTypedBase {
 
     @Override
     public boolean isInteractable() {
-        return false;
+        return BlockFacts.interactable(key.getKey());
     }
 
     @Override
@@ -171,7 +172,8 @@ public final class BasaltBlockType extends BlockTypeTypedBase {
 
     @Override
     public float getSlipperiness() {
-        return 0.6f;
+        double[] info = WorldNatives.blockInfo(Registries.defaultState(block));
+        return info == null ? 0.6f : (float) info[0];
     }
 
     @Override
