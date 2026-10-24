@@ -463,7 +463,8 @@ void WitherSystem::updateBar(const std::vector<PlayerSession*>& watchers, Server
     bar.view->track(*players_, seenBy);
 }
 
-bool WitherSystem::withBar(std::int32_t entityId, const std::function<void(BossBarView&, player::PlayerRegistry&)>& use) {
+bool WitherSystem::withBar(std::int32_t entityId,
+                           const std::function<void(BossBarView&, player::PlayerRegistry&)>& use) {
     const std::scoped_lock lock{barsLock_};
     const auto found = bars_.find(entityId);
     if (found == bars_.end() || found->second.view == nullptr) {

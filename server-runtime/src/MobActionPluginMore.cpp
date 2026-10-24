@@ -1,3 +1,6 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
@@ -10,8 +13,6 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PotionEffects.hpp>
-#include <basalt/server/registry/BlockStateDefinitions.hpp>
-#include <basalt/server/registry/Entities.hpp>
 
 #include <cmath>
 #include <memory>
@@ -79,7 +80,8 @@ bool MobActionSystem::mobGriefing(const ServerEntity& mob) {
     return world == nullptr || world->gameRules().get(world::gameRules::kMobGriefing);
 }
 
-bool MobActionSystem::pluginWitchDrink(ServerEntity& witch, const std::optional<server::world::loot::ItemStack>& potion) {
+bool MobActionSystem::pluginWitchDrink(ServerEntity& witch,
+                                       const std::optional<server::world::loot::ItemStack>& potion) {
     world::LoadedWorld* world = worldOf(witch);
     if (world == nullptr || witch.type().path() != "witch") {
         return false;
@@ -102,9 +104,9 @@ bool MobActionSystem::pluginWitchDrink(ServerEntity& witch, const std::optional<
         playSound(*world, witch, "entity.witch.drink", 1.0F, 0.8F + (voice.nextFloat() * 0.4F));
     }
     witch.attributeModifiers[std::string{entity::attribute::kMovementSpeed}].insert_or_assign(
-        std::string{kDrinkingModifier},
-        entity::AttributeModifier{
-            .id = std::string{kDrinkingModifier}, .amount = -0.25, .operation = entity::AttributeOperation::AddValue});
+        std::string{kDrinkingModifier}, entity::AttributeModifier{.id = std::string{kDrinkingModifier},
+                                                                  .amount = -0.25,
+                                                                  .operation = entity::AttributeOperation::AddValue});
     return true;
 }
 
@@ -133,7 +135,7 @@ void MobActionSystem::tickWitchDrinking(world::LoadedWorld& world, ServerEntity&
         return;
     }
     const auto hasEffect = [&witch](std::string_view name) {
-        return witch.effects.contains(wire::common::Identifier::vanilla(name));
+        return witch.effects.contains(wire::common::Identifier::vanilla(std::string{name}));
     };
     const std::optional<std::int32_t> eyeState = world.state().blockState(
         static_cast<std::int32_t>(std::floor(witch.x)), static_cast<std::int32_t>(std::floor(witch.y + 1.62)),

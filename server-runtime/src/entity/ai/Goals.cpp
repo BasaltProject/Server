@@ -470,7 +470,8 @@ void SwellGoal::tick(MobContext& mob) {
     constexpr std::int32_t kMaxSwell = 30;
     const std::optional<TargetView> target = targetOf(mob);
     const std::int32_t direction =
-        !ignited(mob.mob) && (!target.has_value() || mob.distanceSquaredTo(target->x, target->y, target->z) > kStopRange)
+        !ignited(mob.mob) &&
+                (!target.has_value() || mob.distanceSquaredTo(target->x, target->y, target->z) > kStopRange)
             ? -1
             : 1;
     if (direction > 0 && mob.mob.swell == 0) {

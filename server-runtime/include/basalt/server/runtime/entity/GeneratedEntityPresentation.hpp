@@ -124,7 +124,8 @@ struct RuntimeEntityMetadata {
     std::optional<bool> piglinBaby;
     std::optional<bool> piglinCharging;
     std::optional<bool> piglinDancing;
-    /// parity: `PolarBear.DATA_STANDING_ID`, `Strider.DATA_SUFFOCATING`, `Turtle.LAYING_EGG` and `Witch.DATA_USING_ITEM`.
+    /// parity: `PolarBear.DATA_STANDING_ID`, `Strider.DATA_SUFFOCATING`, `Turtle.LAYING_EGG` and
+    /// `Witch.DATA_USING_ITEM`.
     std::optional<bool> polarStanding;
     std::optional<bool> striderCold;
     std::optional<bool> turtleLaying;

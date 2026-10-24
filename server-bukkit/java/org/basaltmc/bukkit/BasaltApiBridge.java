@@ -174,4 +174,9 @@ public final class BasaltApiBridge extends InternalAPIBridgeBase {
         return java.util.EnumSet.of(org.bukkit.entity.Pose.STANDING, org.bukkit.entity.Pose.SNEAKING,
             org.bukkit.entity.Pose.SWIMMING, org.bukkit.entity.Pose.FALL_FLYING, org.bukkit.entity.Pose.SLEEPING);
     }
+
+    @Override
+    public com.destroystokyo.paper.SkinParts.Mutable allSkinParts() {
+        return new org.basaltmc.bukkit.misc.BasaltSkinParts(0x7F);
+    }
 }

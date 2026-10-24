@@ -178,21 +178,20 @@ void NaturalSpawningSystem::tickSpawning(world::LoadedWorld& world, const sched:
         world.difficulty() != "peaceful" && world.gameRules().get(world::gameRules::kSpawnMonsters);
     WorldSpawners& spawners = spawnersFor(world);
     spawners.phantom.tick(world, spawnEnemies, worldPlayers, random, [&](const world::SpawnRequest& request) {
-        ServerEntity* phantom = materializeNaturalForest(world, request, static_cast<std::int32_t>(std::floor(request.x)),
-                                                         static_cast<std::int32_t>(std::floor(request.y)),
-                                                         static_cast<std::int32_t>(std::floor(request.z)), random);
+        ServerEntity* phantom = materializeNaturalForest(
+            world, request, static_cast<std::int32_t>(std::floor(request.x)),
+            static_cast<std::int32_t>(std::floor(request.y)), static_cast<std::int32_t>(std::floor(request.z)), random);
         if (phantom != nullptr && request.spawnedFor.has_value()) {
             // parity: `PhantomSpawner`'s `setSpawningEntity`, kept the way Paper saves it.
             if (!phantom->sourceNbt.has_value()) {
                 phantom->sourceNbt = wire::nbt::NbtCompound{};
             }
             const wire::common::Uuid& who = *request.spawnedFor;
-            phantom->sourceNbt->putIntArray(
-                "Paper.SpawningEntity",
-                {static_cast<std::int32_t>(static_cast<std::uint32_t>(who.high() >> 32)),
-                 static_cast<std::int32_t>(static_cast<std::uint32_t>(who.high())),
-                 static_cast<std::int32_t>(static_cast<std::uint32_t>(who.low() >> 32)),
-                 static_cast<std::int32_t>(static_cast<std::uint32_t>(who.low()))});
+            phantom->sourceNbt->putIntArray("Paper.SpawningEntity",
+                                            {static_cast<std::int32_t>(static_cast<std::uint32_t>(who.high() >> 32)),
+                                             static_cast<std::int32_t>(static_cast<std::uint32_t>(who.high())),
+                                             static_cast<std::int32_t>(static_cast<std::uint32_t>(who.low() >> 32)),
+                                             static_cast<std::int32_t>(static_cast<std::uint32_t>(who.low()))});
         }
     });
     spawners.patrol.tick(world, spawnEnemies, worldPlayers, random, [&](const world::PatrolSpawnRequest& request) {

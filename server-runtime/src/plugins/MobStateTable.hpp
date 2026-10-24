@@ -90,6 +90,7 @@ void addBeasts(Table& table, Operations& operations);
 
 void addFlagOps(Table& table, Operations& operations);
 
+void addEntityState(Table& table, Operations& operations);
 void addMobMore(Table& table, Operations& operations);
 
 } // namespace basalt::server::runtime::plugins::entityOps::mobState

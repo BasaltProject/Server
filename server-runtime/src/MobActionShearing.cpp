@@ -20,7 +20,7 @@ namespace equipment = entity::mobEquipment;
 
 namespace {
 
-constexpr std::array<std::string_view, 16> kDyes{"white", "orange", "magenta", "light_blue", "yellow", "lime",
+constexpr std::array<std::string_view, 16> kDyes{"white", "orange", "magenta",    "light_blue", "yellow", "lime",
                                                  "pink",  "gray",   "light_gray", "cyan",       "purple", "blue",
                                                  "brown", "green",  "red",        "black"};
 
@@ -175,9 +175,8 @@ bool MobActionSystem::shearMob(ServerEntity& mob, wire::protocol::play::SoundSou
         const double x = mob.x;
         const double y = mob.y + 1.0;
         const double z = mob.z;
-        const entity::mobConversions::Conversion conversion{.into = wire::common::Identifier::vanilla("cow"),
-                                                            .keepEquipment = false,
-                                                            .keepCanPickUpLoot = false};
+        const entity::mobConversions::Conversion conversion{
+            .into = wire::common::Identifier::vanilla("cow"), .keepEquipment = false, .keepCanPickUpLoot = false};
         if (!convertMob(*world, watchersOf(*world), mob, conversion, {})) {
             return false;
         }

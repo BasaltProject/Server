@@ -189,7 +189,8 @@ bool WololoSpellGoal::canUse(MobContext& mob) {
     if (sheep.empty()) {
         return false;
     }
-    mobMisc::of(mob.mob).wololoTarget = sheep[static_cast<std::size_t>(mob.random.nextInt(static_cast<std::int32_t>(sheep.size())))]->entityId();
+    mobMisc::of(mob.mob).wololoTarget =
+        sheep[static_cast<std::size_t>(mob.random.nextInt(static_cast<std::int32_t>(sheep.size())))]->entityId();
     return true;
 }
 
