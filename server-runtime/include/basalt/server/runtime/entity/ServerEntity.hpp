@@ -446,6 +446,8 @@ public:
     bool noAi = false;
 
     std::optional<wire::nbt::NbtCompound> sourceNbt;
+    /// Counts the changes made to `sourceNbt` after the entity was made, so the viewers are sent its data again.
+    std::uint32_t sourceNbtVersion = 0;
 
     /// What plugins keep on the entity, saved as `PublicBukkitValues` and given back by `entity_data`.
     wire::nbt::NbtCompound pluginData;

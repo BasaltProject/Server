@@ -59,4 +59,25 @@ public interface ItemOps extends Item, Cored {
     default void setUnlimitedLifetime(boolean unlimited) {
         core().nbtSet("Age", "short", unlimited ? kUnlimited : 0);
     }
+
+    default UUID getOwner() {
+        Object stored = EntityNbt.compound(core(), "").get("Owner");
+        return stored instanceof int[] ? org.basaltmc.bukkit.item.Convert.uuidOf(stored) : null;
+    }
+
+    default void setOwner(UUID owner) {
+        if (owner == null) {
+            core().nbtRemove("Owner");
+        } else {
+            core().nbtSet("Owner", "uuid", owner.toString());
+        }
+    }
+
+    default boolean willAge() {
+        return !isUnlimitedLifetime();
+    }
+
+    default void setWillAge(boolean ages) {
+        setUnlimitedLifetime(!ages);
+    }
 }

@@ -41,4 +41,16 @@ public interface CreeperOps extends Creeper, Cored {
     default void explode() {
         setFuseTicks(kMaxFuse);
     }
+
+    default int getExplosionRadius() {
+        return core().nbtInt("ExplosionRadius", 3);
+    }
+
+    default void setExplosionRadius(int radius) {
+        core().nbtSet("ExplosionRadius", "byte", radius);
+    }
+
+    default void setMaxFuseTicks(int ticks) {
+        core().nbtSet("Fuse", "short", ticks);
+    }
 }

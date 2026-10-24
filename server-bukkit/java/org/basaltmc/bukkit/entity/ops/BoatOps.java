@@ -17,4 +17,15 @@ public interface BoatOps extends Boat, Cored {
     default org.bukkit.Material getBoatMaterial() {
         return getBoatType().getMaterial();
     }
+
+    default org.bukkit.TreeSpecies getWoodType() {
+        return switch (getBoatType()) {
+            case SPRUCE -> org.bukkit.TreeSpecies.REDWOOD;
+            case BIRCH -> org.bukkit.TreeSpecies.BIRCH;
+            case JUNGLE -> org.bukkit.TreeSpecies.JUNGLE;
+            case ACACIA -> org.bukkit.TreeSpecies.ACACIA;
+            case DARK_OAK -> org.bukkit.TreeSpecies.DARK_OAK;
+            default -> org.bukkit.TreeSpecies.GENERIC;
+        };
+    }
 }

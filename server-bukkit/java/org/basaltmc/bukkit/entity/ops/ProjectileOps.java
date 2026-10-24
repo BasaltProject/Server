@@ -18,4 +18,20 @@ public interface ProjectileOps extends Projectile, Cored {
     default UUID getOwnerUniqueId() {
         return getShooter() instanceof Entity entity ? entity.getUniqueId() : null;
     }
+
+    default boolean hasBeenShot() {
+        return core().nbtFlag("HasBeenShot");
+    }
+
+    default void setHasBeenShot(boolean shot) {
+        core().nbtSet("HasBeenShot", "bool", shot);
+    }
+
+    default boolean hasLeftShooter() {
+        return core().nbtFlag("LeftOwner");
+    }
+
+    default void setHasLeftShooter(boolean left) {
+        core().nbtSet("LeftOwner", "bool", left);
+    }
 }

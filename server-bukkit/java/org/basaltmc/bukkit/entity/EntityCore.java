@@ -356,7 +356,7 @@ public final class EntityCore {
 
     public volatile org.bukkit.event.entity.EntityDamageEvent lastDamageCause;
 
-    private Object nbtValue(String path) {
+    public Object nbtValue(String path) {
         if (staged != null) {
             return stagedProperties.get("nbt:" + path);
         }
@@ -389,6 +389,13 @@ public final class EntityCore {
             stagedProperties.put("nbt:" + path, value);
         }
         call("nbt_set", path, type, value);
+    }
+
+    public void nbtRemove(String path) {
+        if (staged != null) {
+            stagedProperties.remove("nbt:" + path);
+        }
+        call("nbt_remove", path);
     }
 
     public byte[] nbt(String path) {

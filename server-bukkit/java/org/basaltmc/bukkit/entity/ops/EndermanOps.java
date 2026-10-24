@@ -48,4 +48,13 @@ public interface EndermanOps extends Enderman, Cored {
             core().nbtSet("carriedBlockState", "string", "");
         }
     }
+
+    default org.bukkit.material.MaterialData getCarriedMaterial() {
+        BlockData carried = getCarriedBlock();
+        return carried == null ? null : new org.bukkit.material.MaterialData(carried.getMaterial());
+    }
+
+    default void setCarriedMaterial(org.bukkit.material.MaterialData data) {
+        setCarriedBlock(data == null ? null : org.bukkit.Bukkit.createBlockData(data.getItemType()));
+    }
 }

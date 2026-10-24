@@ -67,4 +67,12 @@ public interface MobOps extends Mob, org.basaltmc.bukkit.entity.Cored {
     default int getMaxHeadPitch() {
         return 40;
     }
+
+    default boolean isAware() {
+        return !core().flag("no_ai");
+    }
+
+    default void setAware(boolean aware) {
+        core().set("no_ai", !aware);
+    }
 }

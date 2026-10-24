@@ -169,4 +169,116 @@ public interface ArmorStandOps extends ArmorStand, Cored {
     default void setHelmet(ItemStack item) {
         getEquipment().setHelmet(item);
     }
+
+    private io.papermc.paper.math.Rotations rotations(String part, EulerAngle fallback) {
+        EulerAngle angle = readPose(part, fallback);
+        return io.papermc.paper.math.Rotations.ofDegrees(Math.toDegrees(angle.getX()), Math.toDegrees(angle.getY()),
+            Math.toDegrees(angle.getZ()));
+    }
+
+    private void writeRotations(String part, io.papermc.paper.math.Rotations rotations) {
+        writePose(part, new EulerAngle(Math.toRadians(rotations.x()), Math.toRadians(rotations.y()),
+            Math.toRadians(rotations.z())));
+    }
+
+    default io.papermc.paper.math.Rotations getHeadRotations() {
+        return rotations("Head", EulerAngle.ZERO);
+    }
+
+    default void setHeadRotations(io.papermc.paper.math.Rotations rotations) {
+        writeRotations("Head", rotations);
+    }
+
+    default io.papermc.paper.math.Rotations getBodyRotations() {
+        return rotations("Body", EulerAngle.ZERO);
+    }
+
+    default void setBodyRotations(io.papermc.paper.math.Rotations rotations) {
+        writeRotations("Body", rotations);
+    }
+
+    default io.papermc.paper.math.Rotations getLeftArmRotations() {
+        return rotations("LeftArm", new EulerAngle(Math.toRadians(-10), 0, Math.toRadians(-10)));
+    }
+
+    default void setLeftArmRotations(io.papermc.paper.math.Rotations rotations) {
+        writeRotations("LeftArm", rotations);
+    }
+
+    default io.papermc.paper.math.Rotations getRightArmRotations() {
+        return rotations("RightArm", new EulerAngle(Math.toRadians(-15), 0, Math.toRadians(10)));
+    }
+
+    default void setRightArmRotations(io.papermc.paper.math.Rotations rotations) {
+        writeRotations("RightArm", rotations);
+    }
+
+    default io.papermc.paper.math.Rotations getLeftLegRotations() {
+        return rotations("LeftLeg", new EulerAngle(Math.toRadians(-1), 0, Math.toRadians(-1)));
+    }
+
+    default void setLeftLegRotations(io.papermc.paper.math.Rotations rotations) {
+        writeRotations("LeftLeg", rotations);
+    }
+
+    default io.papermc.paper.math.Rotations getRightLegRotations() {
+        return rotations("RightLeg", new EulerAngle(Math.toRadians(1), 0, Math.toRadians(1)));
+    }
+
+    default void setRightLegRotations(io.papermc.paper.math.Rotations rotations) {
+        writeRotations("RightLeg", rotations);
+    }
+
+    private static int slotBit(EquipmentSlot slot) {
+        return switch (slot) {
+            case HAND -> 0;
+            case OFF_HAND -> 5;
+            case FEET -> 1;
+            case LEGS -> 2;
+            case CHEST -> 3;
+            case HEAD -> 4;
+            case BODY -> 6;
+            case SADDLE -> 7;
+        };
+    }
+
+    default boolean isSlotDisabled(EquipmentSlot slot) {
+        return (core().nbtInt("DisabledSlots") & (1 << slotBit(slot))) != 0
+            || slot.isHand() && !hasArms();
+    }
+
+    default java.util.Set<EquipmentSlot> getDisabledSlots() {
+        java.util.Set<EquipmentSlot> disabled = new java.util.HashSet<>();
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            if (isSlotDisabled(slot)) {
+                disabled.add(slot);
+            }
+        }
+        return disabled;
+    }
+
+    default void setDisabledSlots(EquipmentSlot... slots) {
+        int disabled = 0;
+        for (EquipmentSlot slot : slots) {
+            if (slot != EquipmentSlot.OFF_HAND) {
+                int bit = slotBit(slot);
+                disabled += (1 << bit) + (1 << (bit + 8)) + (1 << (bit + 16));
+            }
+        }
+        core().nbtSet("DisabledSlots", "int", disabled);
+    }
+
+    default void addDisabledSlots(EquipmentSlot... slots) {
+        java.util.Set<EquipmentSlot> disabled = getDisabledSlots();
+        java.util.Collections.addAll(disabled, slots);
+        setDisabledSlots(disabled.toArray(new EquipmentSlot[0]));
+    }
+
+    default void removeDisabledSlots(EquipmentSlot... slots) {
+        java.util.Set<EquipmentSlot> disabled = getDisabledSlots();
+        for (EquipmentSlot slot : slots) {
+            disabled.remove(slot);
+        }
+        setDisabledSlots(disabled.toArray(new EquipmentSlot[0]));
+    }
 }

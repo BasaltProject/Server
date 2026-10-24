@@ -39,4 +39,12 @@ public interface AbstractHorseOps extends AbstractHorse, Cored {
             default -> Horse.Variant.HORSE;
         };
     }
+
+    default boolean isEatingHaystack() {
+        return core().nbtFlag("EatingHaystack");
+    }
+
+    default void setEatingHaystack(boolean eating) {
+        core().nbtSet("EatingHaystack", "bool", eating);
+    }
 }
