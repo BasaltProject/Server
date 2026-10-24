@@ -43,6 +43,14 @@ void ServerDatapacks::refresh() {
     }
 }
 
+bool ServerDatapacks::reload() {
+    datapack::DataPacks* packs = packs_ ? packs_() : nullptr;
+    if (packs == nullptr || !reload_) {
+        return false;
+    }
+    return reload_(packs->discoverNewPacks());
+}
+
 std::vector<server::plugins::PluginDatapack> ServerDatapacks::packs() {
     std::vector<server::plugins::PluginDatapack> out;
     datapack::DataPacks* packs = packs_ ? packs_() : nullptr;

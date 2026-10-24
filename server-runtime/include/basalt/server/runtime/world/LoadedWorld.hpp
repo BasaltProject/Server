@@ -29,6 +29,7 @@
 #include <basalt/wire/common/timings/Timings.hpp>
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -207,9 +208,31 @@ public:
     /// Fills each chunk a void world generates, from a thread that generates; set before any chunk is asked for.
     using ChunkFiller = std::function<void(std::int32_t chunkX, std::int32_t chunkZ, server::world::Chunk& chunk)>;
 
-    void setChunkFiller(ChunkFiller filler) {
-        const std::lock_guard<std::mutex> lock{fillerMutex_};
-        chunkFiller_ = std::move(filler);
+    /// What of the world's own generation a plugin generator keeps beside its own blocks.
+    struct FillerTraits {
+        /// The plugin builds on the vanilla terrain instead of replacing it.
+        bool vanillaTerrain = false;
+        bool decorations = false;
+        bool structures = false;
+        bool mobs = false;
+
+        [[nodiscard]] bool needsPipeline() const noexcept { return vanillaTerrain || decorations || structures; }
+    };
+
+    /// A filler stands in for the world's own terrain, so the vanilla pipeline is put aside unless traits ask for it.
+    void setChunkFiller(ChunkFiller filler) { setChunkFiller(std::move(filler), FillerTraits{}); }
+
+    void setChunkFiller(ChunkFiller filler, FillerTraits traits) {
+        {
+            const std::lock_guard<std::mutex> lock{fillerMutex_};
+            chunkFiller_ = std::move(filler);
+            fillerTraits_ = traits;
+        }
+        filled_.store(true, std::memory_order_release);
+        if (!traits.needsPipeline() || protoChunks_ == nullptr) {
+            setAside_.store(true, std::memory_order_release);
+            generationQueue_.usePipeline(nullptr);
+        }
     }
 
     /// What a plugin changed about natural spawning here; a value under zero is vanilla's.
@@ -219,6 +242,18 @@ public:
         bool allowMonsters = true;
         bool allowAnimals = true;
     };
+
+    /// Per-world knobs a plugin can turn; the defaults are vanilla's.
+    struct Tunables {
+        bool voidDamage = true;
+        float voidDamageAmount = 4.0F;
+        double voidDamageOffset = -64.0;
+        std::optional<std::int32_t> simulationDistance;
+    };
+
+    [[nodiscard]] Tunables& tunables() noexcept { return tunables_; }
+
+    [[nodiscard]] const Tunables& tunables() const noexcept { return tunables_; }
 
     [[nodiscard]] SpawnTunables& spawnTunables() noexcept { return spawnTunables_; }
 
@@ -289,6 +324,8 @@ public:
 
 private:
     [[nodiscard]] server::world::Chunk generateChunk(std::int32_t chunkX, std::int32_t chunkZ);
+
+    [[nodiscard]] bool pipelineSetAside() const noexcept { return setAside_.load(std::memory_order_acquire); }
 
     [[nodiscard]] std::optional<server::world::Chunk> loadOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ);
     void restoreBelowZero(server::world::Chunk& chunk);
@@ -370,8 +407,12 @@ private:
     server::world::terrain::BiomeZoomer biomeZoomer_;
     WorldBorder border_;
     SpawnTunables spawnTunables_;
+    Tunables tunables_;
     mutable std::mutex fillerMutex_;
     ChunkFiller chunkFiller_;
+    FillerTraits fillerTraits_;
+    std::atomic<bool> filled_{false};
+    std::atomic<bool> setAside_{false};
     std::set<std::int64_t> forcedChunks_;
     std::mutex pluginDataMutex_;
     std::optional<wire::nbt::NbtCompound> pluginData_;

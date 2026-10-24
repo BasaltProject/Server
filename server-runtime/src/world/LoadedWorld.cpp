@@ -110,8 +110,57 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
                 return oldTerrain_->blenderFor(chunkX, chunkZ);
             };
         }
+        const auto baseTerrain = hooks.terrain;
+        const auto baseAdopt = hooks.adopt;
+        const auto baseDecorate = hooks.decorate;
+        hooks.terrain = [this, baseTerrain, baseAdopt](std::int32_t chunkX, std::int32_t chunkZ,
+                                                       const server::world::blending::Blender* blender) {
+            ChunkFiller filler;
+            FillerTraits traits;
+            {
+                const std::lock_guard<std::mutex> lock{fillerMutex_};
+                filler = chunkFiller_;
+                traits = fillerTraits_;
+            }
+            if (!filler) {
+                return baseTerrain(chunkX, chunkZ, blender);
+            }
+            const config::DimensionFacts& facts = config::dimensionFacts(declaration_.dimension);
+            if (traits.vanillaTerrain || traits.structures) {
+                server::world::terrain::realTerrainGenerator::GeneratedTerrain terrain =
+                    baseTerrain(chunkX, chunkZ, blender);
+                if (!traits.vanillaTerrain) {
+                    for (std::size_t index = 0; index < terrain.chunk().sectionCount(); ++index) {
+                        terrain.chunk().section(index).setBlockStateIds(
+                            std::vector<std::int32_t>(server::world::ChunkSection::kBlocks, 0));
+                    }
+                }
+                filler(chunkX, chunkZ, terrain.chunk());
+                return terrain;
+            }
+            Chunk made = server::world::voidWorldGenerator::generate(chunkX, chunkZ, metadata_.spawnX, metadata_.spawnY,
+                                                                     metadata_.spawnZ, 0, facts.chunkHeight);
+            filler(chunkX, chunkZ, made);
+            return baseAdopt(std::move(made));
+        };
+        hooks.decorate = [this, baseDecorate](server::world::terrain::realTerrainGenerator::GeneratedTerrain& terrain,
+                                              server::world::terrain::ProtoRegion& region) {
+            bool skip = false;
+            {
+                const std::lock_guard<std::mutex> lock{fillerMutex_};
+                skip = chunkFiller_ && !fillerTraits_.decorations && !fillerTraits_.structures;
+            }
+            if (!skip) {
+                baseDecorate(terrain, region);
+            }
+        };
         hooks.finish = [this](Chunk& chunk, bool generated) {
-            if (generated && spawnMobs_) {
+            bool mobs = true;
+            {
+                const std::lock_guard<std::mutex> lock{fillerMutex_};
+                mobs = !chunkFiller_ || fillerTraits_.mobs;
+            }
+            if (generated && spawnMobs_ && mobs) {
                 spawnMobs_(chunk, gameTime_, difficulty_);
             }
             portals_.scan(chunk);
@@ -395,6 +444,10 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     }
     const config::DimensionFacts& facts = config::dimensionFacts(declaration_.dimension);
     Chunk chunk = [&] {
+        if (filler && pipelineSetAside()) {
+            return server::world::voidWorldGenerator::generate(chunkX, chunkZ, metadata_.spawnX, metadata_.spawnY,
+                                                               metadata_.spawnZ, 0, facts.chunkHeight);
+        }
         switch (declaration_.type) {
         case config::WorldType::Flat:
             return server::world::flatWorldGenerator::generate(chunkX, chunkZ, facts.chunkHeight);
@@ -412,7 +465,7 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
         }
         return server::world::noiseWorldGenerator::generate(chunkX, chunkZ);
     }();
-    if (filler && declaration_.type == config::WorldType::Void) {
+    if (filler && pipelineSetAside()) {
         filler(chunkX, chunkZ, chunk);
     }
     timings_.of("world.generate")
@@ -452,7 +505,8 @@ std::optional<Chunk> LoadedWorld::loadOrGenerateChunk(std::int32_t chunkX, std::
     if (stored.has_value()) {
         restoreBelowZero(*stored);
     }
-    if (protoChunks_ != nullptr && (!stored.has_value() || stored->stage() != server::world::ChunkStage::Full)) {
+    if (protoChunks_ != nullptr && !pipelineSetAside() &&
+        (!stored.has_value() || stored->stage() != server::world::ChunkStage::Full)) {
         // A proto chunk on disk is the pipeline's to finish, and it reads it back itself.
         const auto started = std::chrono::steady_clock::now();
         std::optional<Chunk> made = protoChunks_->generateNow(chunkX, chunkZ);

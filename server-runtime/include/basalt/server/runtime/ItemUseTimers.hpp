@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <optional>
 #include <string>
 
 namespace basalt::server::runtime::player {
@@ -69,6 +70,17 @@ public:
 
     [[nodiscard]] static float bowPower(std::int32_t ticks);
 
+    struct UseState {
+        std::int32_t used = 0;
+        std::int32_t duration = 0;
+    };
+
+    [[nodiscard]] std::optional<UseState> useState() const;
+    bool setRemaining(std::int32_t ticks);
+    void completeUse(player::PlayerSession& session);
+    void clearUse();
+    bool startUse(player::PlayerSession& session, std::int32_t slot);
+
 private:
     ClientSession* owner_;
     Hooks hooks_;
@@ -85,6 +97,7 @@ private:
     std::int32_t spyglassSlot_ = -1;
     std::int32_t spyglassTicks_ = 0;
     std::int32_t eatingTicks_ = 0;
+    std::int32_t eatingDuration_ = 0;
     std::int32_t drawingSlot_ = -1;
     std::int32_t drawingTicks_ = 0;
     player::crossbow::Charging crossbowCharging_;

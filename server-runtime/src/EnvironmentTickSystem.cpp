@@ -328,7 +328,7 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
 
         const bool drowns =
             !player->invulnerable() && eyes.has_value() && world::fluids::of(*eyes) == world::Submersion::Water;
-        player->airSupply = world::fluids::airAfterTick(player->airSupply, drowns);
+        player->airSupply = world::fluids::airAfterTick(player->airSupply, drowns, player->extras.maxAir);
         if (player->airSupply != air) {
             const server::plugins::PluginEvent* answered = world.events().ask(
                 &server::plugins::pluginEventTypes::entityAirChange, [&](server::plugins::PluginEvent& event) {
@@ -350,6 +350,16 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
                 player->connection().hurt(world::fluids::kDrownDamage, "drown", world::damageTypes::kDrown,
                                           std::nullopt);
             }
+        }
+
+        const world::LoadedWorld::Tunables& tunables = world.tunables();
+        // parity: `Entity.checkBelowWorld`, with the amount and the depth a server owner can tune.
+        if (tunables.voidDamage &&
+            player->y <
+                config::dimensionFacts(world.declaration().dimension).chunkHeight.minY() + tunables.voidDamageOffset &&
+            player->connection().hurt) {
+            player->connection().hurt(tunables.voidDamageAmount, "outOfWorld", world::damageTypes::kOutOfWorld,
+                                      std::nullopt);
         }
 
         const bool inLava =

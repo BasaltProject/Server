@@ -15,7 +15,9 @@ ChunkSimulationView::ChunkSimulationView(player::PlayerRegistry& players) : play
 std::vector<std::array<std::int32_t, 2>> ChunkSimulationView::simulatedChunks(const world::LoadedWorld& world,
                                                                               const sched::Region* region,
                                                                               const std::int32_t extraRadius) const {
-    const std::int32_t radius = std::min(world.settings().viewDistance, kVanillaSimulationDistance) + extraRadius;
+    const std::int32_t radius = std::min(world.settings().viewDistance,
+                                         world.tunables().simulationDistance.value_or(kVanillaSimulationDistance)) +
+                                extraRadius;
     std::unordered_set<std::int64_t> seen;
     std::vector<std::array<std::int32_t, 2>> chunks;
     for (const player::PlayerSession* player : players_->snapshot()) {

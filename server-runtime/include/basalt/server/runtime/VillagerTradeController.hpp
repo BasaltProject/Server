@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/world/Trades.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/wire/text/Component.hpp>
 
 #include <array>
 #include <cstdint>
@@ -42,6 +43,9 @@ public:
 
     void openTrades(entity::ServerEntity& villager, bool mainHand = true);
 
+    /// Opens the merchant window on a list of trades a plugin made, with no villager behind it.
+    bool openCustom(const wire::text::Component& title, std::vector<world::trades::Offer> offers);
+
     void sendOffers();
 
     void selectTrade(std::int32_t index);
@@ -50,7 +54,7 @@ public:
 
     void tick();
 
-    [[nodiscard]] bool open() const noexcept { return openTradingWith_.has_value(); }
+    [[nodiscard]] bool open() const noexcept { return openTradingWith_.has_value() || custom_; }
 
     [[nodiscard]] const std::optional<storage::StoredItemStack>& slot(std::int32_t index) const;
 
@@ -62,6 +66,7 @@ public:
 
 private:
     [[nodiscard]] bool tradingStillValid();
+    void sendOfferList(const entity::ServerEntity* villager);
     [[nodiscard]] std::vector<world::trades::Offer>* offers();
     void updateSellItem();
     void takeResult();
@@ -71,6 +76,7 @@ private:
     ClientSession* owner_;
     Hooks hooks_;
     std::optional<std::int32_t> openTradingWith_;
+    bool custom_ = false;
     std::shared_ptr<entity::villagers::Offers> openOffers_;
     std::array<std::optional<storage::StoredItemStack>, 3> slots_;
     std::int32_t selectionHint_ = 0;

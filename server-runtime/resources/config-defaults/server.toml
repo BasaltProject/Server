@@ -48,6 +48,13 @@ gamemode = "survival"
 # /whitelist on and off move this for the run; a restart follows this file again.
 whitelist = false
 
+# Seconds with nobody online before the server stops ticking, as vanilla's pause-when-empty-seconds
+# does. 0 never pauses. Connections are still served while paused.
+pause-when-empty-seconds = 60
+
+# Blocks around the world spawn only operators may change, as vanilla's spawn-protection does. 0 turns it off.
+spawn-protection = 16
+
 [network]
 # The two editions are two doors into the same server: the same worlds, the same
 # players, the same chat. Neither is a layer on top of the other, so each one has

@@ -34,6 +34,9 @@ public:
     /// Looks for packs added to the world's folder since the last look.
     virtual void refresh() {}
 
+    /// Finds new packs and reloads the data of the server, as `/reload` does; false when the reload failed.
+    virtual bool reload() { return false; }
+
     [[nodiscard]] virtual std::vector<PluginDatapack> packs() { return {}; }
 };
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -54,6 +55,26 @@ public:
 
     /// Where the player respawns when a bed or anchor holds their spawn point (a known player with one set).
     [[nodiscard]] virtual std::optional<PluginKnownPlayer> spawnPoint(std::string_view uuid) {
+        static_cast<void>(uuid);
+        return std::nullopt;
+    }
+
+    /// A statistic counter of a player who may be offline, by its stored key (`minecraft:custom/minecraft:jump`).
+    [[nodiscard]] virtual std::int64_t statistic(std::string_view uuid, std::string_view key) {
+        static_cast<void>(uuid);
+        static_cast<void>(key);
+        return 0;
+    }
+
+    virtual bool setStatistic(std::string_view uuid, std::string_view key, std::int64_t value) {
+        static_cast<void>(uuid);
+        static_cast<void>(key);
+        static_cast<void>(value);
+        return false;
+    }
+
+    /// Where the player last died: the dimension key, then x, y and z.
+    [[nodiscard]] virtual std::optional<std::array<std::string, 4>> lastDeath(std::string_view uuid) {
         static_cast<void>(uuid);
         return std::nullopt;
     }

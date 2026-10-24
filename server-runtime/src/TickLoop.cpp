@@ -115,6 +115,15 @@ bool TickLoop::stopSprinting() {
     return true;
 }
 
+std::vector<std::int64_t> TickLoop::recentTickNanos() const {
+    std::vector<std::int64_t> out;
+    out.reserve(recentNanos_.size());
+    for (const std::atomic<std::int64_t>& nanos : recentNanos_) {
+        out.push_back(nanos.load(std::memory_order_relaxed));
+    }
+    return out;
+}
+
 std::int64_t TickLoop::nextAutosaveInterval() const {
     return std::max(kMinAutosaveTicks, static_cast<std::int64_t>(targetRate_.load(std::memory_order_relaxed) *
                                                                  static_cast<float>(options_.saveIntervalSeconds)));
@@ -133,11 +142,25 @@ void TickLoop::runTicks() {
     std::int64_t ticksUntilSave = nextAutosaveInterval();
     const Clock::time_point clock = Clock::now();
     std::int64_t nextTickMillis = 0;
+    std::int64_t emptyTicks = 0;
     while (running_.load(std::memory_order_relaxed)) {
         const Clock::time_point started = Clock::now();
         const bool sprinting = sprintTicksLeft_.load(std::memory_order_relaxed) > 0;
         const bool stepping = stepsOwed_.load(std::memory_order_relaxed) > 0;
-        const bool skip = frozen_.load(std::memory_order_relaxed) && !stepping;
+        bool skip = frozen_.load(std::memory_order_relaxed) && !stepping;
+        // parity: `MinecraftServer.tickServer` counts empty ticks and only serves connections once past the limit.
+        const std::int64_t pauseAfter =
+            options_.pauseWhenEmptySeconds ? static_cast<std::int64_t>(options_.pauseWhenEmptySeconds()) * 20 : 0;
+        if (pauseAfter > 0) {
+            emptyTicks = options_.hasPlayers && !options_.hasPlayers() && !sprinting ? emptyTicks + 1 : 0;
+            if (emptyTicks == pauseAfter) {
+                sweepRequested_.store(true, std::memory_order_relaxed);
+            }
+            skip = skip || emptyTicks >= pauseAfter;
+        } else {
+            emptyTicks = 0;
+        }
+        paused_.store(pauseAfter > 0 && emptyTicks >= pauseAfter, std::memory_order_relaxed);
         if (stepping) {
             stepsOwed_.fetch_sub(1, std::memory_order_relaxed);
         }
@@ -159,6 +182,9 @@ void TickLoop::runTicks() {
             unloadRequested_.store(true, std::memory_order_relaxed);
         }
 
+        if (!skip) {
+            recentNanos_[static_cast<std::size_t>(tick % 100)].store(nanosSince(started), std::memory_order_relaxed);
+        }
         durations_.record(nanosSince(clock), nanosSince(started));
         const TickRates rates = meter.tick();
         oneMinute_.store(rates.oneMinute, std::memory_order_relaxed);

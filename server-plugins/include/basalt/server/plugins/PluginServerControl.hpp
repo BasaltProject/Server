@@ -43,6 +43,12 @@ public:
     /// Ticks per second over the last minute, five minutes and fifteen minutes, then the mean tick in milliseconds.
     [[nodiscard]] virtual std::array<double, 4> pace() { return {20.0, 20.0, 20.0, 0.0}; }
 
+    /// The last hundred tick durations in nanoseconds, as vanilla keeps them in a ring.
+    [[nodiscard]] virtual std::vector<std::int64_t> tickTimes() { return {}; }
+
+    /// True while the server ticks nothing because nobody has been online for the pause-when-empty time.
+    [[nodiscard]] virtual bool paused() { return false; }
+
     virtual void setTickRate(float rate) { static_cast<void>(rate); }
 
     [[nodiscard]] virtual bool frozen() { return false; }
@@ -73,6 +79,12 @@ public:
     virtual void setLinks(std::vector<PluginServerLink> links) { static_cast<void>(links); }
 
     [[nodiscard]] virtual std::optional<PluginResourcePack> resourcePack() { return std::nullopt; }
+
+    /// The 64 by 64 PNG the server list shows for the default profile.
+    [[nodiscard]] virtual std::vector<std::uint8_t> serverIcon() { return {}; }
+
+    /// Reads the configuration files again and rebuilds the command tree with the aliases they name.
+    virtual bool reloadCommands() { return false; }
 
     [[nodiscard]] virtual std::vector<std::string> settingKeys() { return {}; }
 

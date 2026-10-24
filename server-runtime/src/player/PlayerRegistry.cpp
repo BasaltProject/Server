@@ -86,6 +86,11 @@ PlayerSession* PlayerRegistry::get(const wire::common::Uuid& uuid) const {
     return found == sessions_.end() ? nullptr : found->second;
 }
 
+std::size_t PlayerRegistry::count() const {
+    const std::lock_guard<std::mutex> guard{lock_};
+    return order_.size();
+}
+
 std::vector<PlayerSession*> PlayerRegistry::snapshot() const {
     const std::lock_guard<std::mutex> guard{lock_};
     return order_;

@@ -93,6 +93,39 @@ std::optional<PluginKnownPlayer> ServerAccess::spawnPoint(std::string_view uuid)
     return PluginKnownPlayer{.uuid = point->uuid, .world = point->world, .x = point->x, .y = point->y, .z = point->z};
 }
 
+std::int64_t ServerAccess::statistic(std::string_view uuid, std::string_view key) {
+    storage::PlayerStore* store = open();
+    const std::optional<storage::StoredPlayer> stored = store == nullptr ? std::nullopt : store->players().load(uuid);
+    return stored.has_value() ? stored->stats.get(key) : 0;
+}
+
+bool ServerAccess::setStatistic(std::string_view uuid, std::string_view key, std::int64_t value) {
+    storage::PlayerStore* store = open();
+    std::optional<storage::StoredPlayer> stored = store == nullptr ? std::nullopt : store->players().load(uuid);
+    if (!stored.has_value()) {
+        return false;
+    }
+    stored->stats.counters.insert_or_assign(std::string{key}, value);
+    store->players().save(*stored);
+    return true;
+}
+
+std::optional<std::array<std::string, 4>> ServerAccess::lastDeath(std::string_view uuid) {
+    storage::PlayerStore* store = open();
+    const std::optional<storage::StoredPlayer> stored = store == nullptr ? std::nullopt : store->players().load(uuid);
+    const wire::nbt::NbtCompound* death =
+        stored.has_value() ? stored->entityData.getCompound("LastDeathLocation") : nullptr;
+    if (death == nullptr) {
+        return std::nullopt;
+    }
+    const std::span<const std::int32_t> pos = death->getIntArray("pos");
+    if (pos.size() != 3) {
+        return std::nullopt;
+    }
+    return std::array<std::string, 4>{std::string{death->getString("dimension")}, std::to_string(pos[0]),
+                                      std::to_string(pos[1]), std::to_string(pos[2])};
+}
+
 bool ServerAccess::isOperator(std::string_view uuid) {
     storage::PlayerStore* store = open();
     if (store == nullptr || !hooks_.groups) {

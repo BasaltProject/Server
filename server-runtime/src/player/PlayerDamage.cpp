@@ -1,5 +1,6 @@
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -21,6 +22,7 @@
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
+#include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
@@ -53,8 +55,6 @@ constexpr std::int32_t kPlayerHitMemoryTicks = 100;
 using wire::common::Identifier;
 
 /// parity: `LivingEntity.invulnerableDuration` and the half inside.
-constexpr std::int32_t kHurtCooldownTicks = 20;
-constexpr std::int32_t kCooldownHalfTicks = 10;
 
 constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
 
@@ -87,7 +87,6 @@ constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
 }
 
 /// parity: `blocks_attacks`.
-constexpr std::int32_t kShieldDelayTicks = 5;
 constexpr float kBlockingAngleDegrees = 90.0F;
 constexpr float kShieldWearThreshold = 3.0F;
 constexpr float kAxeDisableSeconds = 5.0F;
@@ -191,7 +190,8 @@ attackerAnswers(const PlayerSession& session, std::int32_t attackerId, const Dam
 /// parity: `LivingEntity.applyItemBlocking` for a shield.
 [[nodiscard]] Blocked blockWithShield(PlayerSession& session, float damage, const std::optional<Identifier>& damageType,
                                       const std::optional<entity::DamageSource>& source, const DamageContext& context) {
-    if (damage <= 0.0F || !session.blockingSlot.has_value() || session.blockingTicks < kShieldDelayTicks) {
+    if (damage <= 0.0F || !session.blockingSlot.has_value() ||
+        session.blockingTicks < session.extras.shieldBlockingDelay) {
         return {};
     }
     const std::int32_t slot = *session.blockingSlot;
@@ -465,8 +465,42 @@ float damageAfterProtection(const PlayerSession& session, const float amount,
     return protection > 0.0F ? player::combat::afterProtection(damage, protection) : damage;
 }
 
+/// parity: `FallLocation.getCurrentFallLocation`, from the block the player stands in.
+[[nodiscard]] std::string fallLocationAt(const PlayerSession& session, world::LoadedWorld& world) {
+    const std::optional<std::int32_t> state = world.state().blockState(
+        static_cast<std::int32_t>(std::floor(session.x)), static_cast<std::int32_t>(std::floor(session.y)),
+        static_cast<std::int32_t>(std::floor(session.z)));
+    if (!state.has_value()) {
+        return {};
+    }
+    const Identifier* block = server::registry::blockStateDefinitions::blockOf(*state);
+    if (block == nullptr) {
+        return {};
+    }
+    const std::string_view path = block->path();
+    if (path == "ladder") {
+        return "ladder";
+    }
+    if (path == "vine") {
+        return "vines";
+    }
+    if (path == "weeping_vines" || path == "weeping_vines_plant") {
+        return "weeping_vines";
+    }
+    if (path == "twisting_vines" || path == "twisting_vines_plant") {
+        return "twisting_vines";
+    }
+    if (path == "scaffolding") {
+        return "scaffolding";
+    }
+    if (path == "cave_vines" || path == "cave_vines_plant") {
+        return "other_climbable";
+    }
+    return world::fluids::of(*state) == world::Submersion::Water ? "water" : std::string{};
+}
+
 bool shieldFaces(const PlayerSession& session, double fromX, double fromZ) {
-    if (!session.blockingSlot.has_value() || session.blockingTicks < kShieldDelayTicks) {
+    if (!session.blockingSlot.has_value() || session.blockingTicks < session.extras.shieldBlockingDelay) {
         return false;
     }
     const std::optional<storage::StoredItemStack> shield = session.inventory.at(*session.blockingSlot);
@@ -478,7 +512,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
                 const DamageContext& context) {
     PlayerSession* session = &player;
     session->lastHurtLanded = false;
-    if (session->dead || session->invulnerable()) {
+    if (session->dead || (session->invulnerable() && !tagged(context, "bypasses_invulnerability", damageType))) {
         return;
     }
     // parity: `ServerPlayer.hurtServer`.
@@ -510,7 +544,8 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     incoming -= blocked.amount;
     // parity: `LivingEntity.hurt`'s cooldown.
     const float dealt = incoming;
-    const bool cooling = session->invulnerableTicks > kCooldownHalfTicks;
+    const std::int32_t hurtCooldown = session->extras.maxNoDamageTicks;
+    const bool cooling = session->invulnerableTicks * 2 > hurtCooldown;
     if (cooling) {
         if (dealt <= session->lastHurt) {
             return;
@@ -519,7 +554,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         session->lastHurt = dealt;
     } else {
         session->lastHurt = dealt;
-        session->invulnerableTicks = kHurtCooldownTicks;
+        session->invulnerableTicks = hurtCooldown;
     }
     // parity: `hurtServer` answers `!blocked || damage > 0`.
     session->lastHurtLanded = blocked.amount <= 0.0F || incoming > 0.0F;
@@ -626,6 +661,21 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         }
     }
     session->stats.addDamageTaken(damage);
+    {
+        world::LoadedWorld* recorded = context.world ? context.world() : nullptr;
+        if (session->combatRecords.size() >= PlayerSession::kMaxCombatRecords) {
+            session->combatRecords.erase(session->combatRecords.begin());
+        }
+        session->combatRecords.push_back(PlayerSession::CombatRecord{
+            .damageType = damageType.value_or(world::triggerFacts::damageTypeOf(deathMessageId)).toString(),
+            .messageId = std::string{deathMessageId},
+            .directId = source.has_value() ? source->entityId : -1,
+            .causeId = source.has_value() ? source->ownerId.value_or(source->entityId) : -1,
+            .damage = damage,
+            .fallDistance = static_cast<float>(session->fallDistance),
+            .fallLocation = recorded == nullptr ? std::string{} : fallLocationAt(*session, *recorded),
+            .tick = recorded == nullptr ? 0 : recorded->gameTime()});
+    }
     // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE`.
     if (world::LoadedWorld* world = context.world ? context.world() : nullptr; world != nullptr) {
         world::vibrations::emit(world->state(), "entity_damage", session->x, session->y, session->z, world->gameTime());

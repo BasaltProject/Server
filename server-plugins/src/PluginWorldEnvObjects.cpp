@@ -440,6 +440,75 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                     args.pushBoolean(rules.allowAnimals);
                     args.setField("allow_animals");
                 })
+        .reads("tickable_block_entity_count",
+               [world] {
+                   PluginWorldEnv* env = world->env();
+                   return PluginValue{static_cast<std::int64_t>(env == nullptr ? 0 : env->tickableBlockEntityCount())};
+               })
+        .method("random_tick",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    args.pushBoolean(env != nullptr &&
+                                     env->randomTick(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                     static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                     static_cast<std::int32_t>(args.checkInteger(base + 2))));
+                    return 1;
+                })
+        .method("place_tree",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const std::string tree = args.checkString(base);
+                    const bool apply = args.isNil(base + 4) || args.toBoolean(base + 4);
+                    const auto placed =
+                        env == nullptr ? std::nullopt
+                                       : env->placeTree(tree, static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                        static_cast<std::int32_t>(args.checkInteger(base + 2)),
+                                                        static_cast<std::int32_t>(args.checkInteger(base + 3)), apply);
+                    if (!placed.has_value()) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    args.pushTable();
+                    std::int64_t position = 1;
+                    for (const PluginPlacedBlock& block : *placed) {
+                        args.pushTable();
+                        args.pushInteger(block.x);
+                        args.setField("x");
+                        args.pushInteger(block.y);
+                        args.setField("y");
+                        args.pushInteger(block.z);
+                        args.setField("z");
+                        args.pushInteger(block.before);
+                        args.setField("before");
+                        args.pushInteger(block.after);
+                        args.setField("after");
+                        args.setIndex(position++);
+                    }
+                    return 1;
+                })
+        .method("tunable",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const std::optional<double> value =
+                        env == nullptr ? std::nullopt : env->tunable(args.checkString(base));
+                    if (!value.has_value()) {
+                        args.pushNil();
+                    } else {
+                        args.pushNumber(*value);
+                    }
+                    return 1;
+                })
+        .method("set_tunable",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    args.pushBoolean(env != nullptr &&
+                                     env->setTunable(args.checkString(base), args.checkNumber(base + 1)));
+                    return 1;
+                })
         .method("set_spawn_rules",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);

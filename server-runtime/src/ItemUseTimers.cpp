@@ -75,6 +75,7 @@ bool ItemUseTimers::startEating(PlayerSession& session, const Identifier& item, 
     }
     eatingSlot_ = slot;
     eatingTicks_ = food->consumeTicks();
+    eatingDuration_ = eatingTicks_;
     setUsingItem(true, item);
     return true;
 }
@@ -120,6 +121,87 @@ void ItemUseTimers::tickEating(PlayerSession& session) {
         triggers->fire("consume_item", session.name(), session.uuid().toString(),
                        world::TriggerEvent{.items = {{"item", *item}}});
     }
+}
+
+namespace {
+/// parity: `Item.getUseDuration` of a bow, a crossbow, a trident and a shield.
+constexpr std::int32_t kHeldUseTicks = 72000;
+} // namespace
+
+std::optional<ItemUseTimers::UseState> ItemUseTimers::useState() const {
+    if (eatingSlot_ >= 0) {
+        return UseState{.used = eatingDuration_ - eatingTicks_, .duration = eatingDuration_};
+    }
+    if (spyglassSlot_ >= 0) {
+        return UseState{.used = kSpyglassUseTicks - spyglassTicks_, .duration = kSpyglassUseTicks};
+    }
+    if (drawingSlot_ >= 0) {
+        return UseState{.used = drawingTicks_, .duration = kHeldUseTicks};
+    }
+    const PlayerSession* session = owner_->playerSession();
+    if (session != nullptr && session->blockingSlot.has_value()) {
+        return UseState{.used = session->blockingTicks, .duration = kHeldUseTicks};
+    }
+    return std::nullopt;
+}
+
+bool ItemUseTimers::setRemaining(std::int32_t ticks) {
+    ticks = std::max(ticks, 1);
+    if (eatingSlot_ >= 0) {
+        eatingTicks_ = ticks;
+        return true;
+    }
+    if (spyglassSlot_ >= 0) {
+        spyglassTicks_ = ticks;
+        return true;
+    }
+    if (drawingSlot_ >= 0) {
+        drawingTicks_ = std::max(kHeldUseTicks - ticks, 0);
+        return true;
+    }
+    if (PlayerSession* session = owner_->playerSession(); session != nullptr && session->blockingSlot.has_value()) {
+        session->blockingTicks = std::max(kHeldUseTicks - ticks, 0);
+        return true;
+    }
+    return false;
+}
+
+void ItemUseTimers::completeUse(PlayerSession& session) {
+    if (eatingSlot_ >= 0) {
+        eatingTicks_ = 1;
+        tickEating(session);
+    } else if (drawingSlot_ >= 0) {
+        releaseBow();
+    } else if (spyglassSlot_ >= 0) {
+        stopSpyglass();
+    } else if (session.blockingSlot.has_value()) {
+        stopBlocking();
+    }
+}
+
+void ItemUseTimers::clearUse() {
+    if (eatingSlot_ >= 0) {
+        stopEating();
+    }
+    if (drawingSlot_ >= 0) {
+        stopDrawing();
+    }
+    if (spyglassSlot_ >= 0) {
+        spyglassSlot_ = -1;
+        spyglassTicks_ = 0;
+        setUsingItem(false);
+    }
+    stopBlocking();
+}
+
+bool ItemUseTimers::startUse(PlayerSession& session, std::int32_t slot) {
+    const std::optional<storage::StoredItemStack>& held = session.inventory.at(slot);
+    const std::optional<Identifier> id = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
+    if (!id.has_value() || useState().has_value()) {
+        return false;
+    }
+    return startEating(session, *id, slot) || startDrawing(session, *id, slot) || startBlocking(session, *id, slot) ||
+           startSpyglass(session, *id, slot);
 }
 
 bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item, std::int32_t slot) {

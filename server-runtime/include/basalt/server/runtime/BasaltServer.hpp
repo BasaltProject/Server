@@ -181,6 +181,11 @@ private:
 
     void serveConnection(wire::io::TcpConnection connection);
 
+    [[nodiscard]] bool reloadCommandConfig();
+
+    [[nodiscard]] bool underSpawnProtection(const player::PlayerSession& who, const world::LoadedWorld& world,
+                                            std::int32_t x, std::int32_t z);
+
     [[nodiscard]] ClientSession::PluginHooks pluginHooks();
 
     [[nodiscard]] std::map<std::string, world::LoadedWorld*, std::less<>> namedWorlds() const;
@@ -296,6 +301,8 @@ private:
     std::unique_ptr<plugins::SessionChannels> pluginChannels_;
     plugins::MiscServices miscServices_;
     plugins::ServerSettings settings_;
+    std::atomic<bool> anyOperator_{false};
+    std::atomic<std::int64_t> operatorsCheckedAt_{-100};
     std::unique_ptr<plugins::ServerPluginServices> pluginServices_;
     std::unique_ptr<server::plugins::PluginHost> plugins_;
     std::shared_ptr<void> bukkit_;

@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/Trades.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Uuid.hpp>
@@ -197,6 +198,24 @@ struct PlayerConnection {
     std::function<void(std::int32_t entityId, std::optional<std::array<std::int32_t, 3>> bed)> showSleeping;
 
     std::function<void()> wakeUp;
+
+    std::function<bool(const wire::text::Component& title)> retitleScreen;
+
+    std::function<void()> refreshProfile;
+
+    std::function<bool(const wire::text::Component& title, std::vector<world::trades::Offer> offers)> openMerchant;
+
+    std::function<bool(std::int32_t villagerId)> openTrades;
+
+    /// parity: `PlayerList.reloadRecipes`, the recipe packet and the recipe book again.
+    std::function<void()> resendRecipes;
+
+    /// Attaches a firework rocket of the stack (as `{id,count,components}` text) to this gliding player; its entity id.
+    std::function<std::int32_t(const std::string& stack)> attachFirework;
+
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, bool force)> sleepAt;
+
+    std::function<std::int64_t(std::string_view operation, std::int64_t value)> itemUse;
 
     std::function<void()> sendTrades;
 

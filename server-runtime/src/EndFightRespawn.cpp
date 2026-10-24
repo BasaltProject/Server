@@ -144,6 +144,10 @@ bool EndFightSystem::control(world::LoadedWorld& world, std::string_view action,
         spawnNewGateway(world, *fight);
     } else if (action == "crystals") {
         resetSpikeCrystals(world);
+    } else if (action == "bar_progress") {
+        updateBar(*fight, std::clamp(static_cast<float>(value) / 10000.0F, 0.0F, 1.0F));
+    } else if (action == "bar_visible") {
+        showBar(*fight, value != 0);
     } else {
         return false;
     }

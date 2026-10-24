@@ -310,6 +310,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 }
             },
         .onUnloadInterval = [this] { persistence_->unloadUnreachableChunks(); },
+        .pauseWhenEmptySeconds = [this] { return settings_.pauseAllowed() ? settings_.pauseWhenEmptySeconds() : 0; },
+        .hasPlayers = [this] { return playerRegistry_.count() > 0; },
         .onTick =
             [this](bool worldRuns) {
                 const auto began = std::chrono::steady_clock::now();
@@ -513,6 +515,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         return flat;
     };
+    model.endGatewayAt = [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+        return endFight_ != nullptr && endFight_->spawnGatewayAt(world, x, y, z);
+    };
     model.endFight = [this](world::LoadedWorld& world, std::string_view action, std::int32_t value) {
         return endFight_ != nullptr && endFight_->control(world, action, value);
     };
@@ -521,6 +526,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     model.blockTags = &vanillaData_.blockTags;
     model.itemTags = &vanillaData_.itemTags;
     model.nextEntityId = [this] { return playerRegistry_.allocateEntityId(); };
+    model.randomTick = [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+        return redstone_ != nullptr && redstone_->randomTickAt(world, x, y, z);
+    };
     model.spawnAllowed = [this](const world::LoadedWorld& world, const wire::common::Identifier& type, double x,
                                 double y, double z, std::string_view cause) {
         return spawning_ == nullptr || spawning_->askSpawn(world, type, x, y, z, cause);
@@ -580,7 +588,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                            .progress = [this] { return playerProgress_.get(); },
                                            .triggers = [this] { return advancementTriggers_.get(); },
                                            .sessions = sessions});
-    miscServices_.datapacks = std::make_unique<plugins::ServerDatapacks>([this] { return options_.datapacks; });
+    miscServices_.datapacks = std::make_unique<plugins::ServerDatapacks>(
+        [this] { return options_.datapacks; },
+        [this](const std::vector<std::string>& selected) { return reloadData(selected); });
     miscServices_.maps = std::make_unique<plugins::ServerMaps>(
         plugins::ServerMaps::Hooks{.storage = &mapStorage_,
                                    .sessions = sessions,
@@ -605,7 +615,14 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         .serverList = [this]() -> const config::ServerListConfig& { return live_->current()->serverList; },
         .worlds = model.allWorlds,
         .idleTimeout = [this] { return idleTimeoutMinutes_; },
-        .setIdleTimeout = [this](std::int32_t minutes) { idleTimeoutMinutes_ = minutes; }});
+        .setIdleTimeout = [this](std::int32_t minutes) { idleTimeoutMinutes_ = minutes; },
+        .autoSave = [this] { return saveControl_ == nullptr || saveControl_->enabled(); },
+        .setAutoSave =
+            [this](bool on) {
+                if (saveControl_ != nullptr) {
+                    static_cast<void>(saveControl_->setEnabled(on));
+                }
+            }});
     miscServices_.control = std::make_unique<plugins::ServerControl>(plugins::ServerControl::Hooks{
         .tickLoop = [this] { return tickLoop_.get(); },
         .bugReportLink = config.bugReportLink,
@@ -621,6 +638,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 .required = config_->requireResourcePack,
                 .prompt = config_->resourcePackPrompt};
         },
+        .serverIcon = [this] { return serverList_->iconFor(live_->current()->serverList.defaultProfile()); },
+        .reloadCommands = [this] { return reloadCommandConfig(); },
         .settings = &settings_});
 
     plugins::ServerPluginServices::Parts parts;
@@ -1341,6 +1360,27 @@ std::map<std::string, world::LoadedWorld*, std::less<>> BasaltServer::namedWorld
         named.emplace(name, world);
     }
     return named;
+}
+
+} // namespace basalt::server::runtime
+
+namespace basalt::server::runtime {
+
+bool BasaltServer::reloadCommandConfig() {
+    std::expected<config::ConfigSnapshot, std::string> next =
+        config::LiveConfigs::read(config::ConfigDirectory{}, logger_);
+    if (!next.has_value()) {
+        logger_.warn([&next] { return "Commands not reloaded: " + next.error(); });
+        return false;
+    }
+    live_->replace(std::move(*next));
+    wired_.dispatcher->rebuild();
+    for (player::PlayerSession* session : playerRegistry_.snapshot()) {
+        if (session->connection().sendCommandTree) {
+            session->connection().sendCommandTree();
+        }
+    }
+    return true;
 }
 
 } // namespace basalt::server::runtime

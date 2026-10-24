@@ -35,7 +35,7 @@ inline constexpr float kFireDamage = 1.0F;
 [[nodiscard]] bool touchesLava(WorldState& world, const entity::ServerEntity& entity);
 
 /// parity: `LivingEntity.decreaseAirSupply`/`increaseAirSupply`.
-[[nodiscard]] std::int32_t airAfterTick(std::int32_t air, bool eyesInWater);
+[[nodiscard]] std::int32_t airAfterTick(std::int32_t air, bool eyesInWater, std::int32_t maxAir = kMaxAir);
 
 } // namespace fluids
 

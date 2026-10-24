@@ -34,6 +34,8 @@ public:
 
     [[nodiscard]] std::vector<PlayerSession*> snapshot() const;
 
+    [[nodiscard]] std::size_t count() const;
+
 private:
     static constexpr std::chrono::seconds kRetirement{2};
 

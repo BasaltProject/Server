@@ -142,6 +142,13 @@ std::string mergeLegacyProperties(std::string_view templateText,
             replaceOnce("online-mode = true", "online-mode = " + std::string{*online});
         }
     }
+    for (const auto& [key, fallback] :
+         {std::pair{"pause-when-empty-seconds", "60"}, std::pair{"spawn-protection", "16"}}) {
+        if (const auto value = imported(key); value.has_value() && asInteger(*value).has_value()) {
+            replaceOnce(std::string{key} + " = " + fallback,
+                        std::string{key} + " = " + std::to_string(*asInteger(*value)));
+        }
+    }
     if (const auto enforce = imported("enforce-secure-profile"); enforce.has_value()) {
         if (*enforce == "true" || *enforce == "false") {
             replaceOnce("enforce-secure-profile = true", "enforce-secure-profile = " + std::string{*enforce});
@@ -237,6 +244,10 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
             std::string{server->string("resource-pack-prompt").value_or(defaults.resourcePackPrompt)};
         config.gamemode = std::string{server->string("gamemode").value_or(defaults.gamemode)};
         config.whitelist = server->boolean("whitelist").value_or(defaults.whitelist);
+        config.pauseWhenEmptySeconds = static_cast<std::int32_t>(std::max<std::int64_t>(
+            server->integer("pause-when-empty-seconds").value_or(defaults.pauseWhenEmptySeconds), 0));
+        config.spawnProtection = static_cast<std::int32_t>(
+            std::max<std::int64_t>(server->integer("spawn-protection").value_or(defaults.spawnProtection), 0));
     }
 
     if (const TomlTable* network = root.table("network"); network != nullptr) {

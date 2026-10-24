@@ -80,7 +80,39 @@ void VillagerTradeController::openTrades(entity::ServerEntity& villager, bool ma
     owner_->sendInventory();
 }
 
+bool VillagerTradeController::openCustom(const wire::text::Component& title, std::vector<world::trades::Offer> list) {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr || owner_->currentWorld() == nullptr) {
+        return false;
+    }
+    ContainerMenuController& menus = owner_->menus();
+    menus.openMerchantMenu(*session);
+    if (!menus.merchantOpen()) {
+        return false;
+    }
+    custom_ = true;
+    openTradingWith_.reset();
+    openOffers_ = std::make_shared<entity::villagers::Offers>();
+    openOffers_->list = std::move(list);
+    slots_ = {};
+    selectionHint_ = 0;
+    activeOffer_.reset();
+    owner_->sendCompressed(OpenScreenPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        OpenScreenPacket{.containerId = menus.openMenu.containerId(),
+                         .menuType = wire::protocol::play::menuType::kMerchant,
+                         .title = title}
+            .write(buffer);
+    });
+    sendOffers();
+    owner_->sendInventory();
+    return true;
+}
+
 void VillagerTradeController::sendOffers() {
+    if (custom_ && openOffers_ != nullptr && owner_->currentWorld() != nullptr) {
+        sendOfferList(nullptr);
+        return;
+    }
     if (!openTradingWith_.has_value() || openOffers_ == nullptr || openOffers_->list.empty() ||
         owner_->currentWorld() == nullptr) {
         return;
@@ -89,6 +121,10 @@ void VillagerTradeController::sendOffers() {
     if (villager == nullptr) {
         return;
     }
+    sendOfferList(villager);
+}
+
+void VillagerTradeController::sendOfferList(const entity::ServerEntity* villager) {
     std::vector<MerchantOffer> wire;
     const PlayerSession* session = owner_->playerSession();
     for (const world::trades::Offer& offer : openOffers_->list) {
@@ -126,10 +162,10 @@ void VillagerTradeController::sendOffers() {
     owner_->sendPlayPacket(MerchantOffersPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         MerchantOffersPacket{.containerId = owner_->menus().openMenu.containerId(),
                              .offers = wire,
-                             .level = villager->villagerLevel,
-                             .experience = villager->villagerExperience,
-                             .showProgress = true,
-                             .canRestock = true}
+                             .level = villager == nullptr ? 1 : villager->villagerLevel,
+                             .experience = villager == nullptr ? 0 : villager->villagerExperience,
+                             .showProgress = villager != nullptr,
+                             .canRestock = villager != nullptr}
             .write(buffer);
     });
 }
@@ -178,9 +214,10 @@ void VillagerTradeController::selectTrade(std::int32_t index) {
 }
 
 void VillagerTradeController::menuClosed() {
-    if (!openTradingWith_.has_value()) {
+    if (!openTradingWith_.has_value() && !custom_) {
         return;
     }
+    custom_ = false;
     PlayerSession* session = owner_->playerSession();
     if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
         if (entity::ServerEntity* villager = world->state().entity(*openTradingWith_); villager != nullptr) {
@@ -222,6 +259,9 @@ namespace basalt::server::runtime {
 bool VillagerTradeController::tradingStillValid() {
     const PlayerSession* session = owner_->playerSession();
     world::LoadedWorld* world = owner_->currentWorld();
+    if (custom_) {
+        return session != nullptr && world != nullptr;
+    }
     if (session == nullptr || world == nullptr || !openTradingWith_.has_value()) {
         return false;
     }

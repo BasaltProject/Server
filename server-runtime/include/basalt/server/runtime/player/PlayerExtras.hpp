@@ -70,6 +70,19 @@ struct PlayerExtras {
     std::string respawnWorld;
     bool respawnForced = false;
 
+    std::int32_t maxNoDamageTicks = 20;
+    std::int32_t shieldBlockingDelay = 5;
+    std::int32_t visualFire = -1;
+    std::int32_t fixedPose = -1;
+    std::int64_t noPhysicsTick = -1;
+    bool freezeLocked = false;
+    std::string waypointStyle = "minecraft:default";
+    std::int32_t waypointColor = -1;
+    std::optional<float> bodyYaw;
+    float hurtDirection = 0.0F;
+    std::int32_t maxAir = 300;
+    std::int64_t profileVersion = 0;
+
     std::map<std::string, std::string, std::less<>> state;
 };
 

@@ -50,6 +50,12 @@ public:
                                                                            std::int32_t x, std::int32_t y,
                                                                            std::int32_t z, std::int32_t radius,
                                                                            std::int32_t occupancy) override;
+    [[nodiscard]] std::optional<std::vector<server::plugins::PluginPlacedBlock>>
+    placeTree(std::string_view tree, std::int32_t x, std::int32_t y, std::int32_t z, bool apply) override;
+    bool randomTick(std::int32_t x, std::int32_t y, std::int32_t z) override;
+    [[nodiscard]] std::int32_t tickableBlockEntityCount() override;
+    [[nodiscard]] std::optional<double> tunable(std::string_view key) override;
+    bool setTunable(std::string_view key, double value) override;
     [[nodiscard]] server::plugins::PluginSpawnTunables spawnTunables() override;
     void setSpawnTunables(const server::plugins::PluginSpawnTunables& tunables) override;
     [[nodiscard]] std::int32_t viewDistance() override;
@@ -62,6 +68,7 @@ public:
     [[nodiscard]] std::int64_t inhabitedTime(std::int32_t chunkX, std::int32_t chunkZ) override;
     void setInhabitedTime(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t ticks) override;
     bool useChunkFill(ChunkFill fill) override;
+    bool useChunkFill(ChunkFill fill, const ChunkFillTraits& traits) override;
     [[nodiscard]] bool survives(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) override;
 
 private:

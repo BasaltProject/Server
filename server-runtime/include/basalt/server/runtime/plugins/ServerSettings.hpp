@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <mutex>
@@ -28,6 +29,8 @@ public:
         std::function<std::vector<world::LoadedWorld*>()> worlds;
         std::function<std::int32_t()> idleTimeout;
         std::function<void(std::int32_t)> setIdleTimeout;
+        std::function<bool()> autoSave;
+        std::function<void(bool)> setAutoSave;
     };
 
     void use(Hooks hooks) { hooks_ = std::move(hooks); }
@@ -44,11 +47,24 @@ public:
 
     [[nodiscard]] std::optional<std::int32_t> maxPlayersOverride() const;
 
+    [[nodiscard]] std::int32_t pauseWhenEmptySeconds() const;
+
+    /// False once a plugin forbids the server to pause.
+    [[nodiscard]] bool pauseAllowed() const { return pauseAllowed_.load(std::memory_order_relaxed); }
+
+    [[nodiscard]] std::optional<std::string> respawnWorldOverride() const;
+
+    [[nodiscard]] std::int32_t spawnProtection() const;
+
 private:
     Hooks hooks_;
     mutable std::mutex mutex_;
     std::optional<std::string> motd_;
     std::optional<std::int32_t> maxPlayers_;
+    std::atomic<std::int32_t> pauseWhenEmpty_{-1};
+    std::atomic<std::int32_t> spawnProtection_{-1};
+    std::atomic<bool> pauseAllowed_{true};
+    std::optional<std::string> respawnWorld_;
 };
 
 } // namespace basalt::server::runtime::plugins

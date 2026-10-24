@@ -15,6 +15,8 @@ public:
         std::function<TickLoop*()> tickLoop;
         std::string bugReportLink;
         std::function<std::optional<server::plugins::PluginResourcePack>()> resourcePack;
+        std::function<std::vector<std::uint8_t>()> serverIcon;
+        std::function<bool()> reloadCommands;
         ServerSettings* settings = nullptr;
     };
 
@@ -22,6 +24,8 @@ public:
 
     [[nodiscard]] float tickRate() override;
     [[nodiscard]] std::array<double, 4> pace() override;
+    [[nodiscard]] std::vector<std::int64_t> tickTimes() override;
+    [[nodiscard]] bool paused() override;
     void setTickRate(float rate) override;
     [[nodiscard]] bool frozen() override;
     void setFrozen(bool value) override;
@@ -34,6 +38,8 @@ public:
     [[nodiscard]] std::vector<server::plugins::PluginServerLink> links() override;
     void setLinks(std::vector<server::plugins::PluginServerLink> links) override;
     [[nodiscard]] std::optional<server::plugins::PluginResourcePack> resourcePack() override;
+    [[nodiscard]] std::vector<std::uint8_t> serverIcon() override;
+    bool reloadCommands() override;
     [[nodiscard]] std::vector<std::string> settingKeys() override;
     [[nodiscard]] std::optional<std::string> setting(std::string_view key) override;
     bool setSetting(std::string_view key, std::string_view value) override;

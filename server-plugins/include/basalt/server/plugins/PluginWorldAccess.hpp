@@ -744,6 +744,13 @@ public:
         std::string respawnStage;
         std::int32_t gatewaysLeft = 0;
         std::string dragonUuid;
+        float barProgress = 1.0F;
+        bool barVisible = true;
+        /// Entity ids of the players who see the fight's boss bar.
+        std::vector<std::int32_t> barPlayers;
+        /// Uuids of the crystals the respawn uses, and of those that stand on the pillars.
+        std::vector<std::string> respawnCrystals;
+        std::vector<std::string> healingCrystals;
     };
 
     [[nodiscard]] virtual std::optional<DragonFightFacts> dragonFight() { return std::nullopt; }
@@ -758,6 +765,14 @@ public:
     virtual bool dragonFightAction(std::string_view action, std::int32_t value) {
         static_cast<void>(action);
         static_cast<void>(value);
+        return false;
+    }
+
+    /// Puts a delayed end gateway at the position, with the spawn effect, whether or not a fight is on.
+    virtual bool placeEndGateway(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
         return false;
     }
 
@@ -1058,6 +1073,27 @@ public:
 
     /// Physical facts about one state: friction, speed, jump, push reaction, map colour 0xRRGGBB, fire odds.
     [[nodiscard]] virtual std::vector<double> blockInfo(std::int32_t stateId) const {
+        static_cast<void>(stateId);
+        return {};
+    }
+
+    /// The point of interest type a block state is (`armorer`, `home`...), or empty.
+    [[nodiscard]] virtual std::string poiTypeOf(std::int32_t stateId) const {
+        static_cast<void>(stateId);
+        return {};
+    }
+
+    /// How many occupants a point of interest type holds.
+    [[nodiscard]] virtual std::int32_t poiTickets(std::string_view type) const {
+        static_cast<void>(type);
+        return 0;
+    }
+
+    /// A fresh entity id, the next one the server would give to anything it spawns.
+    [[nodiscard]] virtual std::int32_t nextEntityId() { return -1; }
+
+    /// The note block instrument that sounds over a state, by its serialized name (`harp`, `basedrum`...).
+    [[nodiscard]] virtual std::string blockInstrument(std::int32_t stateId) const {
         static_cast<void>(stateId);
         return {};
     }

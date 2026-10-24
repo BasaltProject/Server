@@ -45,6 +45,7 @@ inline const wire::common::Identifier kBypassesEnchantments =
 namespace damageTypes {
 
 inline const wire::common::Identifier kOutsideBorder = wire::common::Identifier::vanilla("outside_border");
+inline const wire::common::Identifier kOutOfWorld = wire::common::Identifier::vanilla("out_of_world");
 inline const wire::common::Identifier kDrown = wire::common::Identifier::vanilla("drown");
 inline const wire::common::Identifier kLightningBolt = wire::common::Identifier::vanilla("lightning_bolt");
 inline const wire::common::Identifier kSonicBoom = wire::common::Identifier::vanilla("sonic_boom");

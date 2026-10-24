@@ -29,6 +29,7 @@
 #include <basalt/server/runtime/plugins/ServerWorldEnv.hpp>
 #include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
+#include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -36,10 +37,12 @@
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/runtime/world/maps/MapDecorationTypes.hpp>
+#include <basalt/server/runtime/world/poi/PoiTypes.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/light/Light.hpp>
 #include <basalt/server/world/structure/StructureTemplate.hpp>
+#include <basalt/server/world/terrain/decoration/end/EndSpikes.hpp>
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
@@ -940,6 +943,24 @@ public:
         if (fight->dragonUuid.has_value()) {
             facts.dragonUuid = fight->dragonUuid->toString();
         }
+        facts.barProgress = fight->barProgress;
+        facts.barVisible = fight->barVisible;
+        facts.barPlayers.assign(fight->barPlayers.begin(), fight->barPlayers.end());
+        for (const wire::common::Uuid& crystal : fight->respawnCrystals) {
+            facts.respawnCrystals.push_back(crystal.toString());
+        }
+        // parity: `EnderDragonFight.getSpikeCrystals`, the crystals over each pillar.
+        for (const auto& spike : server::world::terrain::decoration::end::endSpikes::forSeed(world_->metadata().seed)) {
+            for (const entity::ServerEntity* candidate : world_->state().entities()) {
+                if (!candidate->removed && world::endCrystals::isCrystal(candidate->type()) &&
+                    candidate->x + 1.0 > spike.centerX - spike.radius &&
+                    candidate->x - 1.0 < spike.centerX + spike.radius &&
+                    candidate->z + 1.0 > spike.centerZ - spike.radius &&
+                    candidate->z - 1.0 < spike.centerZ + spike.radius) {
+                    facts.healingCrystals.push_back(candidate->uuid().toString());
+                }
+            }
+        }
         return facts;
     }
 
@@ -950,6 +971,10 @@ public:
         }
         fight->previouslyKilled = value;
         return true;
+    }
+
+    bool placeEndGateway(std::int32_t x, std::int32_t y, std::int32_t z) override {
+        return hooks_.endGatewayAt && hooks_.endGatewayAt(*world_, x, y, z);
     }
 
     bool dragonFightAction(std::string_view action, std::int32_t value) override {
@@ -1733,6 +1758,23 @@ std::vector<std::string> LoadedWorlds::gameRuleSpecs() const {
 
 std::int32_t LoadedWorlds::gameEventFrequency(std::string_view event) const {
     return world::vibrations::frequencyOf(event);
+}
+
+std::string LoadedWorlds::poiTypeOf(std::int32_t stateId) const {
+    const world::poi::PoiType type = world::poi::poiTypes::forState(stateId);
+    return type == world::poi::PoiType::kNone ? std::string{} : std::string{world::poi::poiTypes::name(type)};
+}
+
+std::int32_t LoadedWorlds::poiTickets(std::string_view name) const {
+    const std::optional<world::poi::PoiType> type = world::poi::poiTypes::byName(name);
+    return type.has_value() ? world::poi::poiTypes::maxTickets(*type) : 0;
+}
+
+std::int32_t LoadedWorlds::nextEntityId() { return hooks_->nextEntityId ? hooks_->nextEntityId() : -1; }
+
+std::string LoadedWorlds::blockInstrument(std::int32_t stateId) const {
+    const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+    return block == nullptr ? std::string{} : std::string{reg::noteBlockInstruments::of(*block).serializedName()};
 }
 
 std::vector<std::string> LoadedWorlds::blockSounds(std::int32_t stateId) const {

@@ -73,6 +73,7 @@ struct ModelHooks {
     const world::realBlockTags::TagMembers* blockTags = nullptr;
     const world::realBlockTags::TagMembers* itemTags = nullptr;
     std::function<bool(world::LoadedWorld& world, std::string_view action, std::int32_t value)> endFight;
+    std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> endGatewayAt;
     std::function<std::int32_t()> nextEntityId;
     std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                        double z, std::string_view cause)>
@@ -93,6 +94,7 @@ struct ModelHooks {
     std::function<world::PlayerProgress*()> progress;
     std::function<world::RealRecipes*()> recipes;
     std::function<storage::PlayerStore*()> store;
+    std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> randomTick;
 };
 
 [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef>
@@ -142,6 +144,10 @@ public:
     [[nodiscard]] std::vector<std::int32_t> collisionBoxes(std::int32_t stateId) const override;
     [[nodiscard]] std::vector<std::string> gameRuleSpecs() const override;
     [[nodiscard]] std::int32_t gameEventFrequency(std::string_view event) const override;
+    [[nodiscard]] std::string blockInstrument(std::int32_t stateId) const override;
+    [[nodiscard]] std::int32_t nextEntityId() override;
+    [[nodiscard]] std::string poiTypeOf(std::int32_t stateId) const override;
+    [[nodiscard]] std::int32_t poiTickets(std::string_view type) const override;
     [[nodiscard]] std::vector<std::string> blockSounds(std::int32_t stateId) const override;
     [[nodiscard]] std::int32_t transformState(std::int32_t stateId, std::int32_t rotation,
                                               std::int32_t mirror) const override;

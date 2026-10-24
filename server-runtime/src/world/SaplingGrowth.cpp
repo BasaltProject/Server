@@ -129,12 +129,13 @@ struct Grower {
     return std::nullopt;
 }
 
-[[nodiscard]] std::vector<BlockChange> plant(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                             const trees::TreeConfiguration& config, random::RandomSource& random,
-                                             bool square) {
+[[nodiscard]] std::optional<std::vector<PlannedBlock>> planConfig(WorldState& world, std::int32_t x, std::int32_t y,
+                                                                  std::int32_t z,
+                                                                  const trees::TreeConfiguration& config,
+                                                                  random::RandomSource& random, std::int32_t clear) {
     const server::world::Chunk* here = world.chunkIfLoaded(x >> 4, z >> 4);
     if (here == nullptr) {
-        return {};
+        return std::nullopt;
     }
     const server::world::ChunkHeight bounds = here->verticalBounds();
     const std::int32_t originX = x - kCentre;
@@ -154,8 +155,10 @@ struct Grower {
         }
     }
     // The sapling itself goes first, as vanilla clears it before placing; a 2x2 clears all four.
-    scratch.setBlockStateId(kCentre, y, kCentre, registry::blocks::air().stateId);
-    if (square) {
+    if (clear >= 1) {
+        scratch.setBlockStateId(kCentre, y, kCentre, registry::blocks::air().stateId);
+    }
+    if (clear >= 2) {
         scratch.setBlockStateId(kCentre + 1, y, kCentre, registry::blocks::air().stateId);
         scratch.setBlockStateId(kCentre, y, kCentre + 1, registry::blocks::air().stateId);
         scratch.setBlockStateId(kCentre + 1, y, kCentre + 1, registry::blocks::air().stateId);
@@ -163,22 +166,33 @@ struct Grower {
 
     random::RandomSource worldgen = random::RandomSource::worldgen(random::RandomSource::legacy(random.nextLong()));
     if (!trees::treeFeature::place(scratch, worldgen, kCentre, y, kCentre, config)) {
-        return {};
+        return std::nullopt;
     }
 
-    std::vector<BlockChange> changes;
+    std::vector<PlannedBlock> planned;
     std::size_t index = 0;
     for (std::int32_t localX = 0; localX < 16; ++localX) {
         for (std::int32_t localZ = 0; localZ < 16; ++localZ) {
             for (std::int32_t level = lowest; level <= highest; ++level) {
                 const std::int32_t after = scratch.blockStateId(localX, level, localZ);
                 const std::int32_t was = before[index++];
-                if (after == was) {
-                    continue;
+                if (after != was) {
+                    planned.push_back(PlannedBlock{
+                        .x = originX + localX, .y = level, .z = originZ + localZ, .before = was, .after = after});
                 }
-                growthSupport::set(world, originX + localX, level, originZ + localZ, after, changes);
             }
         }
+    }
+    return planned;
+}
+
+[[nodiscard]] std::vector<BlockChange> plant(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                             const trees::TreeConfiguration& config, random::RandomSource& random,
+                                             bool square) {
+    const std::optional<std::vector<PlannedBlock>> planned = planConfig(world, x, y, z, config, random, square ? 2 : 1);
+    std::vector<BlockChange> changes;
+    for (const PlannedBlock& block : planned.value_or(std::vector<PlannedBlock>{})) {
+        growthSupport::set(world, block.x, block.y, block.z, block.after, changes);
     }
     return changes;
 }
@@ -234,6 +248,38 @@ std::vector<BlockChange> advance(WorldState& world, std::int32_t x, std::int32_t
         return {};
     }
     return plant(world, x, y, z, **config, random, false);
+}
+
+std::optional<std::vector<PlannedBlock>> planTree(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                  std::string_view tree, random::RandomSource& random) {
+    namespace configs = trees::treeConfigs;
+    static const std::map<std::string, const trees::TreeConfiguration*, std::less<>> byName{
+        {"oak", &configs::oak()},
+        {"fancy_oak", &configs::fancyOak()},
+        {"swamp_oak", &configs::swampOak()},
+        {"azalea", &configs::azalea()},
+        {"birch", &configs::birch()},
+        {"super_birch", &configs::superBirch()},
+        {"jungle_tree", &configs::jungleTree()},
+        {"jungle_bush", &configs::jungleBush()},
+        {"mega_jungle", &configs::megaJungle()},
+        {"spruce", &configs::spruce()},
+        {"pine", &configs::pine()},
+        {"acacia", &configs::acacia()},
+        {"dark_oak", &configs::darkOak()},
+        {"pale_oak", &configs::paleOak()},
+        {"pale_oak_creaking", &configs::paleOakCreaking()},
+        {"mega_spruce", &configs::megaSpruce()},
+        {"mega_pine", &configs::megaPine()},
+        {"mangrove", &configs::mangrove()},
+        {"tall_mangrove", &configs::tallMangrove()},
+        {"cherry", &configs::cherry()},
+    };
+    const auto found = byName.find(tree);
+    if (found == byName.end()) {
+        return std::nullopt;
+    }
+    return planConfig(world, x, y, z, *found->second, random, 0);
 }
 
 } // namespace basalt::server::runtime::world::saplingGrowth

@@ -3,16 +3,20 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/entity/Raids.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/ServerWorldEnv.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
+#include <basalt/server/runtime/world/GrowthSupport.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/SaplingGrowth.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/poi/PoiManager.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>
+#include <array>
 
 namespace basalt::server::runtime::plugins {
 namespace {
@@ -163,6 +167,60 @@ bool ServerWorldEnv::growTree(const std::int32_t x, const std::int32_t y, const 
     return true;
 }
 
+std::optional<std::vector<server::plugins::PluginPlacedBlock>>
+ServerWorldEnv::placeTree(const std::string_view tree, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                          const bool apply) {
+    random::RandomSource random =
+        random::RandomSource::legacy(world_->gameTime() ^ (static_cast<std::int64_t>(x) * 31 + z) ^ y);
+    const std::optional<std::vector<world::saplingGrowth::PlannedBlock>> planned =
+        world::saplingGrowth::planTree(world_->state(), x, y, z, tree, random);
+    if (!planned.has_value()) {
+        return std::nullopt;
+    }
+    std::vector<server::plugins::PluginPlacedBlock> out;
+    std::vector<world::BlockChange> changes;
+    for (const world::saplingGrowth::PlannedBlock& block : *planned) {
+        out.push_back({block.x, block.y, block.z, block.before, block.after});
+        if (apply) {
+            world::growthSupport::set(world_->state(), block.x, block.y, block.z, block.after, changes);
+        }
+    }
+    if (BlockChangeBroadcaster* blocks = hooks_->blocks ? hooks_->blocks() : nullptr; blocks != nullptr) {
+        for (const world::BlockChange& change : changes) {
+            blocks->announceBlock(watchers(), change);
+        }
+    }
+    return out;
+}
+
+bool ServerWorldEnv::randomTick(const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    return hooks_->randomTick && hooks_->randomTick(*world_, x, y, z);
+}
+
+std::int32_t ServerWorldEnv::tickableBlockEntityCount() {
+    // parity: the block entity types whose block hands out a server-side ticker.
+    static constexpr std::array<std::string_view, 24> kTicking{"furnace",        "blast_furnace",
+                                                               "smoker",         "brewing_stand",
+                                                               "hopper",         "beacon",
+                                                               "bell",           "campfire",
+                                                               "conduit",        "end_gateway",
+                                                               "jukebox",        "mob_spawner",
+                                                               "trial_spawner",  "vault",
+                                                               "crafter",        "creaking_heart",
+                                                               "sculk_sensor",   "calibrated_sculk_sensor",
+                                                               "sculk_catalyst", "sculk_shrieker",
+                                                               "shulker_box",    "daylight_detector",
+                                                               "beehive",        "sign"};
+    std::int32_t total = 0;
+    for (const server::world::Chunk* chunk : world_->state().chunks()) {
+        for (const server::world::ChunkBlockEntity& entity : chunk->blockEntities()) {
+            const std::string_view path = entity.type().path();
+            total += std::ranges::find(kTicking, path) != kTicking.end() || path.ends_with("_sign") ? 1 : 0;
+        }
+    }
+    return total;
+}
+
 std::vector<PluginPoi> ServerWorldEnv::pointsOfInterest(const std::vector<std::string>& types, const std::int32_t x,
                                                         const std::int32_t y, const std::int32_t z,
                                                         const std::int32_t radius, const std::int32_t occupancy) {
@@ -191,6 +249,47 @@ std::vector<PluginPoi> ServerWorldEnv::pointsOfInterest(const std::vector<std::s
                                 .freeTickets = record.freeTickets});
     }
     return out;
+}
+
+std::optional<double> ServerWorldEnv::tunable(const std::string_view key) {
+    const world::LoadedWorld::Tunables& held = world_->tunables();
+    if (key == "void_damage") {
+        return held.voidDamage ? 1.0 : 0.0;
+    }
+    if (key == "void_damage_amount") {
+        return static_cast<double>(held.voidDamageAmount);
+    }
+    if (key == "void_damage_offset") {
+        return held.voidDamageOffset;
+    }
+    if (key == "simulation_distance") {
+        return static_cast<double>(held.simulationDistance.value_or(world_->settings().viewDistance));
+    }
+    return std::nullopt;
+}
+
+bool ServerWorldEnv::setTunable(const std::string_view key, const double value) {
+    world::LoadedWorld::Tunables& held = world_->tunables();
+    if (key == "void_damage") {
+        held.voidDamage = value != 0.0;
+    } else if (key == "void_damage_amount") {
+        held.voidDamageAmount = static_cast<float>(std::max(value, 0.0));
+    } else if (key == "void_damage_offset") {
+        held.voidDamageOffset = value;
+    } else if (key == "simulation_distance") {
+        held.simulationDistance = std::clamp(static_cast<std::int32_t>(value), 2, 32);
+        for (player::PlayerSession* player : watchers()) {
+            if (!player->extras.simulationDistance.has_value() && player->connection().sendPlayPacket) {
+                const wire::protocol::play::SetSimulationDistancePacket packet{.simulationDistance =
+                                                                                   *held.simulationDistance};
+                player->connection().sendPlayPacket(wire::protocol::play::SetSimulationDistancePacket::kId,
+                                                    [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+            }
+        }
+    } else {
+        return false;
+    }
+    return true;
 }
 
 PluginSpawnTunables ServerWorldEnv::spawnTunables() {
@@ -256,38 +355,56 @@ void ServerWorldEnv::setInhabitedTime(const std::int32_t chunkX, const std::int3
     }
 }
 
-bool ServerWorldEnv::useChunkFill(ChunkFill fill) {
-    if (world_->declaration().type != config::WorldType::Void) {
-        return false;
-    }
+bool ServerWorldEnv::useChunkFill(ChunkFill fill) { return useChunkFill(std::move(fill), ChunkFillTraits{}); }
+
+bool ServerWorldEnv::useChunkFill(ChunkFill fill, const ChunkFillTraits& traits) {
     std::vector<std::int32_t> biomeIds;
     for (const auto& [id, name] : reg::biomeIdsTable()) {
         biomeIds.push_back(id);
     }
-    world_->setChunkFiller([fill = std::move(fill), biomeIds = std::move(biomeIds)](
-                               const std::int32_t chunkX, const std::int32_t chunkZ, server::world::Chunk& chunk) {
-        std::vector<std::int32_t> blocks;
-        std::vector<std::int32_t> biomes;
-        fill(chunkX, chunkZ, blocks, biomes);
-        for (std::int32_t& biome : biomes) {
-            biome = biome >= 0 && static_cast<std::size_t>(biome) < biomeIds.size()
-                        ? biomeIds[static_cast<std::size_t>(biome)]
-                        : biomeIds.front();
-        }
-        constexpr std::size_t kBlocks = server::world::ChunkSection::kBlocks;
-        constexpr std::size_t kBiomes = server::world::ChunkSection::kBiomes;
-        for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
-            if (blocks.size() >= (index + 1) * kBlocks) {
-                chunk.section(index).setBlockStateIds(
-                    std::span<const std::int32_t>{blocks}.subspan(index * kBlocks, kBlocks));
+    const bool compose = traits.vanillaTerrain;
+    world_->setChunkFiller(
+        [fill = std::move(fill), biomeIds = std::move(biomeIds),
+         compose](const std::int32_t chunkX, const std::int32_t chunkZ, server::world::Chunk& chunk) {
+            constexpr std::size_t kBlocks = server::world::ChunkSection::kBlocks;
+            constexpr std::size_t kBiomes = server::world::ChunkSection::kBiomes;
+            std::vector<std::int32_t> blocks;
+            std::vector<std::int32_t> biomes;
+            if (compose) {
+                for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
+                    const auto here = chunk.section(index).blockStateIds();
+                    blocks.insert(blocks.end(), here.begin(), here.end());
+                    const auto cells = chunk.section(index).biomeIds();
+                    biomes.insert(biomes.end(), cells.begin(), cells.end());
+                }
+                // The plugin counts biomes by their place in the table, so the ids go back to that.
+                for (std::int32_t& biome : biomes) {
+                    const auto at = std::ranges::find(biomeIds, biome);
+                    biome = at == biomeIds.end() ? 0 : static_cast<std::int32_t>(at - biomeIds.begin());
+                }
             }
-            if (biomes.size() >= (index + 1) * kBiomes) {
-                chunk.section(index).setBiomeIds(
-                    std::span<const std::int32_t>{biomes}.subspan(index * kBiomes, kBiomes));
+            fill(chunkX, chunkZ, blocks, biomes);
+            for (std::int32_t& biome : biomes) {
+                biome = biome >= 0 && static_cast<std::size_t>(biome) < biomeIds.size()
+                            ? biomeIds[static_cast<std::size_t>(biome)]
+                            : biomeIds.front();
             }
-        }
-        chunk.invalidateHeightmaps();
-    });
+            for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
+                if (blocks.size() >= (index + 1) * kBlocks) {
+                    chunk.section(index).setBlockStateIds(
+                        std::span<const std::int32_t>{blocks}.subspan(index * kBlocks, kBlocks));
+                }
+                if (biomes.size() >= (index + 1) * kBiomes) {
+                    chunk.section(index).setBiomeIds(
+                        std::span<const std::int32_t>{biomes}.subspan(index * kBiomes, kBiomes));
+                }
+            }
+            chunk.invalidateHeightmaps();
+        },
+        world::LoadedWorld::FillerTraits{.vanillaTerrain = traits.vanillaTerrain,
+                                         .decorations = traits.decorations,
+                                         .structures = traits.structures,
+                                         .mobs = traits.mobs});
     return true;
 }
 

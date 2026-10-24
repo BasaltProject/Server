@@ -207,6 +207,8 @@ public:
 
     void sendInventorySlot(std::int32_t slot);
 
+    [[nodiscard]] bool merchantOpen() const noexcept { return openMerchant_; }
+
 private:
     [[nodiscard]] std::int32_t allocateContainerId();
 

@@ -51,6 +51,9 @@ public:
 
     void respawn();
 
+    /// What `CraftPlayer.refreshPlayer` does after a skin changes: the tab list entry again and a respawn in place.
+    void refreshProfile();
+
     void setGamemode(wire::protocol::play::Gamemode mode);
 
     bool switchWorld(world::LoadedWorld& target, double x, double y, double z);

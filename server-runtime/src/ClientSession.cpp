@@ -22,6 +22,7 @@
 #include <basalt/wire/protocol/PacketFraming.hpp>
 #include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
+#include <basalt/wire/protocol/play/InventoryPackets.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 
@@ -559,7 +560,29 @@ void ClientSession::sendCompressed(std::int32_t id, const std::function<void(wir
     wire::io::ByteBuffer body;
     wire::protocol::varInt::write(body, id);
     writeBody(body);
+    if (id == play::OpenScreenPacket::kId) {
+        wire::io::ByteBuffer copy;
+        copy.writeBytes(body.readable());
+        static_cast<void>(wire::protocol::varInt::read(copy));
+        if (const std::optional<play::OpenScreenPacket> screen = play::OpenScreenPacket::read(copy);
+            screen.has_value()) {
+            lastScreenId_ = screen->containerId;
+            lastScreenType_ = screen->menuType;
+        }
+    }
     dispatchOutgoing(id, body.readable(), true);
+}
+
+bool ClientSession::retitleScreen(const wire::text::Component& title) {
+    if (lastScreenType_ < 0 || menus_ == nullptr || lastScreenId_ == 0 ||
+        menus_->openMenu.containerId() != lastScreenId_) {
+        return false;
+    }
+    sendCompressed(play::OpenScreenPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        play::OpenScreenPacket{.containerId = lastScreenId_, .menuType = lastScreenType_, .title = title}.write(buffer);
+    });
+    sendInventory();
+    return true;
 }
 
 void ClientSession::sendTranslated(const wire::multiversion::ProtocolChain& chain, std::int32_t id,

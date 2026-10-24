@@ -3,12 +3,21 @@
 #include <basalt/server/plugins/PluginSurfaces.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/command/CommandEnvironment.hpp>
+#include <basalt/server/runtime/command/CommandSource.hpp>
+#include <basalt/server/runtime/config/GroupsConfig.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/PacketNames.hpp>
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <expected>
 #include <optional>
@@ -105,6 +114,32 @@ void fillPlayer(server::plugins::PluginEvent& event, const player::PlayerSession
 
 } // namespace
 
+bool BasaltServer::underSpawnProtection(const player::PlayerSession& who, const world::LoadedWorld& world,
+                                        const std::int32_t x, const std::int32_t z) {
+    const std::int32_t radius = settings_.spawnProtection();
+    if (radius <= 0 || world.declaration().dimension != config::WorldDimension::Overworld) {
+        return false;
+    }
+    const config::GroupsConfig& groups = wired_.dispatcher->environment().groups();
+    if (groups.resolve(who.group, command::kAdminPermission)) {
+        return false;
+    }
+    // parity: with nobody opped the whole spawn is open, so a fresh server stays buildable.
+    const auto now =
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (now - operatorsCheckedAt_.load(std::memory_order_relaxed) >= 2 && playerStore_ != nullptr) {
+        operatorsCheckedAt_.store(now, std::memory_order_relaxed);
+        anyOperator_.store(!playerStore_->players().findInGroup(groups.operatorGroup().name).empty(),
+                           std::memory_order_relaxed);
+    }
+    if (!anyOperator_.load(std::memory_order_relaxed)) {
+        return false;
+    }
+    const std::array<double, 3>& spawn = world.spawn();
+    return std::max(std::abs(x - static_cast<std::int32_t>(std::floor(spawn[0]))),
+                    std::abs(z - static_cast<std::int32_t>(std::floor(spawn[2])))) <= radius;
+}
+
 void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     ClientSession::Options options;
     options.statusProvider = [this](std::int32_t protocolVersion, const std::string& host,
@@ -137,6 +172,14 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.blockTransformers = &vanillaData_.blockTransformers;
     options.jukeboxes = &vanillaData_.jukeboxSongs;
     options.whitelistEnforced = [this] { return whitelistEnforced_; };
+    options.respawnWorld = [this]() -> world::LoadedWorld* {
+        const std::optional<std::string> name = settings_.respawnWorldOverride();
+        const auto worlds = namedWorlds();
+        const auto found = name.has_value() ? worlds.find(*name) : worlds.end();
+        return found == worlds.end() ? &worldRegistry_->defaultWorld() : found->second;
+    };
+    options.spawnProtected = [this](const player::PlayerSession& who, const world::LoadedWorld& world, std::int32_t x,
+                                    std::int32_t z) { return underSpawnProtection(who, world, x, z); };
     options.enchantments = &vanillaData_.enchantments;
     options.progress = playerProgress_.get();
     options.advancements = playerAdvancements_.get();
