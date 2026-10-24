@@ -207,7 +207,7 @@ public abstract class WorldGeo extends WorldExtras {
 
     @Override
     public double getHumidity(int x, int y, int z) {
-        throw Unsupported.hit("World#getHumidity");
+        return LeftoverNatives.humidity(getName(), x, y, z);
     }
 
     @Override
@@ -388,6 +388,11 @@ public abstract class WorldGeo extends WorldExtras {
         Blocks.flushAll();
         return WorldEnvNatives.growTree(getName(), location.getBlockX(), location.getBlockY(), location.getBlockZ(),
             sapling);
+    }
+
+    @Override
+    public boolean generateTree(Location location, java.util.Random random, TreeType type) {
+        return generateTree(location, type);
     }
 
     @Override

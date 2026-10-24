@@ -208,6 +208,15 @@ public abstract class PlayerActions extends PlayerMisc {
     }
 
     @Override
+    public boolean setWindowProperty(InventoryView.Property property, int value) {
+        InventoryView view = getOpenInventory();
+        if (view.getType() != property.getType()) {
+            return false;
+        }
+        return org.basaltmc.bukkit.LeftoverNatives.windowProperty(getUniqueId().toString(), property.getId(), value);
+    }
+
+    @Override
     public InventoryView openWorkbench(Location location, boolean force) {
         return openTable(location, force, InventoryType.WORKBENCH, Material.CRAFTING_TABLE);
     }

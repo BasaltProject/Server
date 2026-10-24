@@ -58,4 +58,34 @@ ServerLoot::roll(std::string_view table, const server::plugins::PluginLootRoll& 
     return out;
 }
 
+std::optional<server::plugins::PluginLootItem> ServerLoot::enchant(const server::plugins::PluginLootItem& stack,
+                                                                   const server::plugins::PluginLootEnchant& how) {
+    world::LoadedWorld* world = hooks_.worldFor ? hooks_.worldFor(how.world) : nullptr;
+    const auto item = wire::common::Identifier::parse(stack.item);
+    if (world == nullptr || hooks_.tables == nullptr || !item.has_value()) {
+        return std::nullopt;
+    }
+    server::world::loot::LootContext context;
+    hooks_.tables->prepareAt(context, *world, 0.0, 0.0, 0.0);
+    server::world::loot::ItemStack given{.item = *item, .count = stack.count};
+    if (!stack.components.empty()) {
+        const auto parsed = wire::nbt::snbt::parse(stack.components);
+        const wire::nbt::NbtCompound* compound = parsed.has_value() ? parsed->get<wire::nbt::NbtCompound>() : nullptr;
+        if (compound != nullptr) {
+            given.components = *compound;
+        }
+    }
+    random::RandomSource random =
+        random::RandomSource::legacy(how.seed != 0 ? how.seed : static_cast<std::int64_t>(std::random_device{}()));
+    const server::world::loot::LootFunction function = server::world::loot::LootFunction::enchantWithLevels(
+        server::world::loot::IntProvider::constant(how.levels), {how.options});
+    const server::world::loot::ItemStack made = function.apply(std::move(given), random, std::nullopt, context);
+    return server::plugins::PluginLootItem{
+        .item = made.item.toString(),
+        .count = made.count,
+        .components = made.components.empty()
+                          ? std::string{}
+                          : wire::nbt::snbt::stringify(wire::nbt::NbtTag::ofCompound(made.components))};
+}
+
 } // namespace basalt::server::runtime::plugins

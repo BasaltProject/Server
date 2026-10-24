@@ -221,6 +221,18 @@ PluginWindowInfo ContainerMenuController::windowInfo() const {
     return info;
 }
 
+bool ContainerMenuController::setWindowProperty(std::int32_t id, std::int32_t value) {
+    if (owner_->playerSession() == nullptr || openMenu.containerId() == 0) {
+        return false;
+    }
+    const wire::protocol::play::ContainerSetDataPacket packet{.containerId = openMenu.containerId(),
+                                                              .id = static_cast<std::int16_t>(id),
+                                                              .value = static_cast<std::int16_t>(value)};
+    owner_->sendCompressed(wire::protocol::play::ContainerSetDataPacket::kId,
+                           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    return true;
+}
+
 std::optional<PluginItem> ContainerMenuController::windowItem(std::int32_t slot) const {
     const PlayerSession* session = owner_->playerSession();
     const std::optional<MenuSlot> found = openMenu.slotAt(slot);

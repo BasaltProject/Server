@@ -2,6 +2,7 @@ package org.basaltmc.bukkit.misc;
 
 import java.util.Collection;
 import java.util.List;
+import org.basaltmc.bukkit.LeftoverNatives;
 import org.basaltmc.bukkit.MiscNatives;
 import org.basaltmc.bukkit.Unsupported;
 import org.bukkit.Bukkit;
@@ -57,7 +58,7 @@ public final class BasaltDragonBattle implements DragonBattle {
 
     @Override
     public boolean generateEndPortal(boolean withPortals) {
-        throw Unsupported.hit("DragonBattle#generateEndPortal");
+        return LeftoverNatives.dragonAction(world.getName(), "portal", withPortals ? 1 : 0);
     }
 
     @Override
@@ -72,12 +73,13 @@ public final class BasaltDragonBattle implements DragonBattle {
 
     @Override
     public void initiateRespawn() {
-        throw Unsupported.hit("DragonBattle#initiateRespawn");
+        LeftoverNatives.dragonAction(world.getName(), "respawn", 0);
     }
 
     @Override
     public boolean initiateRespawn(Collection<EnderCrystal> crystals) {
-        throw Unsupported.hit("DragonBattle#initiateRespawn");
+        LeftoverNatives.dragonAction(world.getName(), "respawn", 0);
+        return getRespawnPhase() != RespawnPhase.NONE;
     }
 
     @Override
@@ -94,12 +96,13 @@ public final class BasaltDragonBattle implements DragonBattle {
 
     @Override
     public boolean setRespawnPhase(RespawnPhase phase) {
-        throw Unsupported.hit("DragonBattle#setRespawnPhase");
+        return phase != RespawnPhase.NONE && getRespawnPhase() != RespawnPhase.NONE
+            && LeftoverNatives.dragonAction(world.getName(), "stage", phase.ordinal());
     }
 
     @Override
     public void resetCrystals() {
-        throw Unsupported.hit("DragonBattle#resetCrystals");
+        LeftoverNatives.dragonAction(world.getName(), "crystals", 0);
     }
 
     @Override
@@ -109,7 +112,7 @@ public final class BasaltDragonBattle implements DragonBattle {
 
     @Override
     public boolean spawnNewGateway() {
-        throw Unsupported.hit("DragonBattle#spawnNewGateway");
+        return LeftoverNatives.dragonAction(world.getName(), "gateway", 0);
     }
 
     @Override

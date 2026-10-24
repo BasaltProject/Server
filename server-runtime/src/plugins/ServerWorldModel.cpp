@@ -952,6 +952,10 @@ public:
         return true;
     }
 
+    bool dragonFightAction(std::string_view action, std::int32_t value) override {
+        return hooks_.endFight && hooks_.endFight(*world_, action, value);
+    }
+
     [[nodiscard]] std::optional<std::array<std::int32_t, 2>> locateStructure(std::string_view structure, std::int32_t x,
                                                                              std::int32_t z, std::int32_t cells,
                                                                              bool skipExisting) override {
@@ -1906,6 +1910,35 @@ std::vector<std::string> LoadedWorlds::registryIds(std::string_view registry) co
         }
     }
     return {};
+}
+
+std::optional<std::vector<std::uint8_t>> LoadedWorlds::registryData(std::string_view registry,
+                                                                    std::string_view id) const {
+    static const std::vector<wire::protocol::configuration::RegistryDataPacket> synced =
+        registry::vanillaConfigurationRegistries::packets();
+    for (const wire::protocol::configuration::RegistryDataPacket& packet : synced) {
+        if (packet.registryId != "minecraft:" + std::string{registry}) {
+            continue;
+        }
+        for (const wire::protocol::configuration::RegistryEntry& entry : packet.entries) {
+            if (entry.key == id && entry.value.has_value()) {
+                return wire::nbt::nbtIO::writeAnonymous(*entry.value);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::vector<std::string> LoadedWorlds::entityDefaultAttributes(std::string_view type) const {
+    std::vector<std::string> out;
+    const auto parsed = Identifier::parse(std::string{type});
+    if (!parsed.has_value() || !reg::entityAttributes::isLiving(*parsed)) {
+        return out;
+    }
+    for (const auto& [name, value] : reg::entityAttributes::of(*parsed)) {
+        out.push_back("minecraft:" + name + "=" + std::to_string(value));
+    }
+    return out;
 }
 
 std::vector<std::string> LoadedWorlds::entityTypeIds() const {

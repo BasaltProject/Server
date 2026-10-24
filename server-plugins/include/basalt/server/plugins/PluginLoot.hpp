@@ -27,6 +27,15 @@ struct PluginLootRoll {
     std::string looter;
 };
 
+struct PluginLootEnchant {
+    std::string world;
+    /// An enchantment id, or a tag with a leading #, the pick is made among.
+    std::string options = "#minecraft:in_enchanting_table";
+    std::int32_t levels = 0;
+    /// Zero rolls without a fixed seed.
+    std::int64_t seed = 0;
+};
+
 /// The loot tables the server loaded.
 class PluginLoot {
 public:
@@ -44,6 +53,14 @@ public:
     [[nodiscard]] virtual bool has(std::string_view table) {
         static_cast<void>(table);
         return false;
+    }
+
+    /// The stack with enchantments rolled as `enchant_with_levels` does; nothing when the world is unknown.
+    [[nodiscard]] virtual std::optional<PluginLootItem> enchant(const PluginLootItem& stack,
+                                                                const PluginLootEnchant& how) {
+        static_cast<void>(stack);
+        static_cast<void>(how);
+        return std::nullopt;
     }
 
     /// What the table gives for this roll; nothing when the table or the world is unknown.

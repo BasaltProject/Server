@@ -27,6 +27,8 @@ public:
     [[nodiscard]] bool has(std::string_view table) override;
     [[nodiscard]] std::optional<std::vector<server::plugins::PluginLootItem>>
     roll(std::string_view table, const server::plugins::PluginLootRoll& roll) override;
+    [[nodiscard]] std::optional<server::plugins::PluginLootItem>
+    enchant(const server::plugins::PluginLootItem& stack, const server::plugins::PluginLootEnchant& how) override;
 
 private:
     Hooks hooks_;

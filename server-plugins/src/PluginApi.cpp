@@ -558,6 +558,19 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("registry");
+    wire::lua::pushHostFunction(lua, "worlds.registry_data", [server](LuaArgs& args) {
+        const std::optional<std::vector<std::uint8_t>> data =
+            server->services().worlds().registryData(args.checkString(1), args.checkString(2));
+        const std::expected<wire::nbt::AnonymousTag, wire::nbt::NbtError> read =
+            data.has_value() ? wire::nbt::nbtIO::readAnonymous(*data) : std::unexpected(wire::nbt::NbtError{});
+        if (read.has_value()) {
+            args.pushString(wire::nbt::snbt::stringify(read->tag));
+        } else {
+            args.pushNil();
+        }
+        return 1;
+    });
+    lua.setField("registry_data");
     wire::lua::pushHostFunction(lua, "worlds.tags", [server](LuaArgs& args) {
         const std::vector<std::string> flat = server->services().worlds().tags(args.checkString(1));
         args.pushTable();

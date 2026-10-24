@@ -292,7 +292,12 @@ public final class BasaltBlock extends BlockBase {
 
     @Override
     public double getHumidity() {
-        throw Unsupported.hit("Block#getHumidity");
+        return LeftoverNatives.humidity(world.getName(), x, y, z);
+    }
+
+    @Override
+    public org.bukkit.SoundGroup getBlockSoundGroup() {
+        return BlockDataSpecials.soundsOf(state());
     }
 
     @Override

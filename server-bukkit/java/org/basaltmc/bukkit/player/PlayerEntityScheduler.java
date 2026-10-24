@@ -8,10 +8,10 @@ import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
-final class PlayerEntityScheduler implements EntityScheduler {
+public final class PlayerEntityScheduler implements EntityScheduler {
     private final Entity entity;
 
-    PlayerEntityScheduler(Entity entity) {
+    public PlayerEntityScheduler(Entity entity) {
         this.entity = entity;
     }
 

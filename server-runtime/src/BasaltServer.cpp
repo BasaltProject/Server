@@ -513,6 +513,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         return flat;
     };
+    model.endFight = [this](world::LoadedWorld& world, std::string_view action, std::int32_t value) {
+        return endFight_ != nullptr && endFight_->control(world, action, value);
+    };
     model.npcs = &npcs_;
     model.lootTables = &vanillaData_.lootTables;
     model.blockTags = &vanillaData_.blockTags;

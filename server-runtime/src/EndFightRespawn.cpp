@@ -126,6 +126,30 @@ void EndFightSystem::tryRespawn(world::LoadedWorld& world) {
     fight->respawnCrystals = std::move(crystals);
 }
 
+bool EndFightSystem::control(world::LoadedWorld& world, std::string_view action, std::int32_t value) {
+    world::DragonFight* fight = world.dragonFight();
+    if (fight == nullptr) {
+        return false;
+    }
+    if (action == "respawn") {
+        tryRespawn(world);
+    } else if (action == "stage") {
+        if (value < 0 || value > static_cast<std::int32_t>(RespawnStage::End)) {
+            return false;
+        }
+        setRespawnStage(world, *fight, static_cast<RespawnStage>(value));
+    } else if (action == "portal") {
+        spawnExitPortal(world, *fight, value != 0);
+    } else if (action == "gateway") {
+        spawnNewGateway(world, *fight);
+    } else if (action == "crystals") {
+        resetSpikeCrystals(world);
+    } else {
+        return false;
+    }
+    return true;
+}
+
 void EndFightSystem::setRespawnStage(world::LoadedWorld& world, DragonFight& fight, RespawnStage stage) {
     fight.respawnTime = 0;
     if (stage != RespawnStage::End) {
