@@ -51,6 +51,8 @@ public final class WorldEnvNatives {
     /** Fluid name, source flag, level and falling flag joined by bars. */
     public static native String fluidAt(String world, int x, int y, int z);
 
+    public static native double[] fluidFlow(String world, int x, int y, int z);
+
     public static native int[] lightningTarget(String world, int x, int z);
 
     public static native void gameEvent(String world, String event, double x, double y, double z, String source);

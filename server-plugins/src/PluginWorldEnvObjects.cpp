@@ -332,6 +332,24 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                     args.setField("falling");
                     return 1;
                 })
+        .method("fluid_flow",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const std::array<double, 3> flow =
+                        env == nullptr ? std::array<double, 3>{}
+                                       : env->fluidFlow(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                        static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                        static_cast<std::int32_t>(args.checkInteger(base + 2)));
+                    args.pushTable();
+                    args.pushNumber(flow[0]);
+                    args.setField("x");
+                    args.pushNumber(flow[1]);
+                    args.setField("y");
+                    args.pushNumber(flow[2]);
+                    args.setField("z");
+                    return 1;
+                })
         .method("lightning_target",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);

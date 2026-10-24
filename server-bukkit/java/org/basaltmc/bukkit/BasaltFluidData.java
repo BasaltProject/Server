@@ -57,7 +57,10 @@ final class BasaltFluidData implements FluidData {
 
     @Override
     public Vector computeFlowDirection(Location location) {
-        throw Unsupported.hit("FluidData#computeFlowDirection");
+        Blocks.flushAll();
+        double[] flow = WorldEnvNatives.fluidFlow(world.getName(), location.getBlockX(), location.getBlockY(),
+            location.getBlockZ());
+        return flow == null ? new Vector() : new Vector(flow[0], flow[1], flow[2]);
     }
 
     @Override

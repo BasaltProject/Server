@@ -257,6 +257,14 @@ public:
         return {};
     }
 
+    /// The unit vector a fluid at the block pushes things along; zero when there is no fluid or no current.
+    [[nodiscard]] virtual std::array<double, 3> fluidFlow(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return {};
+    }
+
     /// Where lightning striking near the column would land: a lightning rod in range, else the highest point.
     [[nodiscard]] virtual std::optional<std::array<std::int32_t, 3>> lightningTarget(std::int32_t x, std::int32_t z) {
         static_cast<void>(x);

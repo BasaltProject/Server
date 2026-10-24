@@ -404,6 +404,20 @@ jstring JNICALL nativeFluidAt(JNIEnv* env, jclass, jstring world, jint x, jint y
                            (fluid.falling ? "1" : "0"));
 }
 
+jdoubleArray JNICALL nativeFluidFlow(JNIEnv* env, jclass, jstring world, jint x, jint y, jint z) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const std::array<double, 3> flow = jni::onServer<std::array<double, 3>>({}, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? std::array<double, 3>{} : target->fluidFlow(x, y, z);
+    });
+    jdoubleArray array = env->NewDoubleArray(3);
+    env->SetDoubleArrayRegion(array, 0, 3, flow.data());
+    return array;
+}
+
 jintArray JNICALL nativeLightningTarget(JNIEnv* env, jclass, jstring world, jint x, jint z) {
     const auto found = worldOf(env, world);
     if (found == nullptr) {
@@ -714,6 +728,7 @@ void registerWorldEnvNatives(JNIEnv* env, jclass natives) {
         method("raids", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeRaids)),
         method("setRaid", "(Ljava/lang/String;III)Z", reinterpret_cast<void*>(&nativeSetRaid)),
         method("fluidAt", "(Ljava/lang/String;III)Ljava/lang/String;", reinterpret_cast<void*>(&nativeFluidAt)),
+        method("fluidFlow", "(Ljava/lang/String;III)[D", reinterpret_cast<void*>(&nativeFluidFlow)),
         method("lightningTarget", "(Ljava/lang/String;II)[I", reinterpret_cast<void*>(&nativeLightningTarget)),
         method("gameEvent", "(Ljava/lang/String;Ljava/lang/String;DDDLjava/lang/String;)V",
                reinterpret_cast<void*>(&nativeGameEvent)),
