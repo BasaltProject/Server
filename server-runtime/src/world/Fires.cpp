@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/World.hpp>
+#include <basalt/server/runtime/config/WorldRules.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/world/terrain/BiomeClimateData.hpp>
 #include <basalt/server/world/terrain/BiomeTemperature.hpp>
@@ -247,7 +248,9 @@ const wire::common::Identifier& tickType() {
     return instance;
 }
 
-std::int32_t tickDelay(random::RandomSource& random) { return kMinDelay + random.nextInt(kDelaySpread); }
+std::int32_t tickDelay(const WorldState& world, random::RandomSource& random) {
+    return world.rules().gameplay.fireTickDelay + random.nextInt(kDelaySpread);
+}
 
 bool isFire(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
@@ -269,7 +272,7 @@ bool igniteOnImpact(WorldState& world, std::int32_t x, std::int32_t y, std::int3
 }
 
 void schedule(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random) {
-    world.scheduleBlockTick(x, y, z, tickType(), tickDelay(random));
+    world.scheduleBlockTick(x, y, z, tickType(), tickDelay(world, random));
 }
 
 bool ignite(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,

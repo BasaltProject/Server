@@ -23,7 +23,7 @@ inline constexpr std::int32_t kMaxAge = 15;
 
 [[nodiscard]] const wire::common::Identifier& tickType();
 
-[[nodiscard]] std::int32_t tickDelay(random::RandomSource& random);
+[[nodiscard]] std::int32_t tickDelay(const WorldState& world, random::RandomSource& random);
 
 [[nodiscard]] bool isFire(std::int32_t stateId);
 

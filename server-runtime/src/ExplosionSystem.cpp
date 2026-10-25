@@ -178,7 +178,8 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         for (const world::explosions::Broken& block : broken) {
             if (random.nextInt(3) != 0 ||
                 !world::fires::igniteOnImpact(world.state(), block.x, block.y, block.z,
-                                              world::fires::kMinDelay + random.nextInt(world::fires::kDelaySpread))) {
+                                              world.settings().rules.gameplay.fireTickDelay +
+                                                  random.nextInt(world::fires::kDelaySpread))) {
                 continue;
             }
             if (const std::optional<std::int32_t> lit = world.state().blockState(block.x, block.y, block.z);
