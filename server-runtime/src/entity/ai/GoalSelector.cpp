@@ -43,6 +43,7 @@ std::vector<GoalSelector::Row> GoalSelector::rows() const {
                               .priority = wrapped->priority(),
                               .running = wrapped->running(),
                               .plugin = wrapped->plugin(),
+                              .usable = wrapped->lastUsable(),
                               .flags = wrapped->goal().flags()});
         }
     }
@@ -127,13 +128,26 @@ void GoalSelector::tick(MobContext& mob) {
         sweep(mob);
     }
     for (const std::unique_ptr<WrappedGoal>& wrapped : goals_) {
-        if (wrapped->running() && !wrapped->goal().canContinueToUse(mob)) {
-            wrapped->stop(mob);
+        if (wrapped->running()) {
+            const bool keepGoing = wrapped->goal().canContinueToUse(mob);
+            wrapped->noteUsable(keepGoing);
+            if (!keepGoing) {
+                wrapped->stop(mob);
+            }
         }
     }
     std::erase_if(lockedFlags_, [](const auto& entry) { return !entry.second->running(); });
     for (const std::unique_ptr<WrappedGoal>& wrapped : goals_) {
-        if (wrapped->running() || wrapped->retired() || !canTakeFlags(*wrapped) || !wrapped->goal().canUse(mob)) {
+        if (wrapped->running() || wrapped->retired()) {
+            continue;
+        }
+        if (!canTakeFlags(*wrapped)) {
+            wrapped->noteUsable(false);
+            continue;
+        }
+        const bool usable = wrapped->goal().canUse(mob);
+        wrapped->noteUsable(usable);
+        if (!usable) {
             continue;
         }
         for (const GoalFlag flag : wrapped->goal().flags()) {
