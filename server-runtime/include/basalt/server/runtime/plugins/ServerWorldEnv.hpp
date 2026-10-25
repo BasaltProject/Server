@@ -27,6 +27,9 @@ public:
                std::int32_t sourceY, std::int32_t sourceZ, std::int32_t value, std::string_view player) override;
     [[nodiscard]] std::string creakingHeart(std::string_view action, std::int32_t x, std::int32_t y,
                                             std::int32_t z) override;
+    bool raidBar(std::int32_t id, std::string_view action, std::string_view text, std::int32_t value) override;
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> raidValues(std::int32_t id) override;
+    bool setRaidValues(std::int32_t id, std::span<const std::uint8_t> nbt) override;
     [[nodiscard]] server::plugins::PluginBorder border() override;
     void setBorder(const server::plugins::PluginBorder& border, double seconds) override;
     [[nodiscard]] std::int32_t playerCount() override;

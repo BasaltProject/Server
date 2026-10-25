@@ -14,7 +14,10 @@
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/poi/PoiManager.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/wire/common/json/Json.hpp>
+#include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
+#include <basalt/wire/text/ComponentJson.hpp>
 
 #include <algorithm>
 #include <array>
@@ -82,7 +85,14 @@ std::vector<PluginRaid> ServerWorldEnv::raids() {
                         .status = std::string{statusName(raid.status)},
                         .groupsSpawned = raid.groupsSpawned,
                         .totalGroups = raid.numGroups,
-                        .totalHealth = raid.totalHealth};
+                        .totalHealth = raid.totalHealth,
+                        .barTitle = wire::common::writeJson(wire::text::componentJson::serialize(raid.barName)),
+                        .barColor = raid.barColor,
+                        .barStyle = raid.barStyle,
+                        .barFlags = raid.barFlags,
+                        .barProgress = raid.barProgress,
+                        .barVisible = raid.barVisible,
+                        .barPlayers = std::vector<std::int32_t>(raid.barPlayers.begin(), raid.barPlayers.end())};
         for (const wire::common::Uuid& hero : raid.heroes) {
             made.heroes.push_back(hero.toString());
         }
@@ -93,6 +103,30 @@ std::vector<PluginRaid> ServerWorldEnv::raids() {
         return true;
     });
     return out;
+}
+
+bool ServerWorldEnv::raidBar(const std::int32_t id, const std::string_view action, const std::string_view text,
+                             const std::int32_t value) {
+    return hooks_->raidBar && hooks_->raidBar(*world_, id, action, text, value);
+}
+
+std::optional<std::vector<std::uint8_t>> ServerWorldEnv::raidValues(const std::int32_t id) {
+    const entity::Raid* raid = RaidSystem::raidsIn(*world_).get(id);
+    if (raid == nullptr) {
+        return std::nullopt;
+    }
+    return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(raid->values));
+}
+
+bool ServerWorldEnv::setRaidValues(const std::int32_t id, const std::span<const std::uint8_t> nbt) {
+    entity::Raid* raid = RaidSystem::raidsIn(*world_).get(id);
+    const auto parsed = wire::nbt::nbtIO::read(nbt);
+    const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+    if (raid == nullptr || given == nullptr) {
+        return false;
+    }
+    raid->values = *given;
+    return true;
 }
 
 bool ServerWorldEnv::setRaid(const std::int32_t id, const std::int32_t omenLevel, const std::int32_t totalGroups) {

@@ -411,6 +411,67 @@ jobjectArray JNICALL nativeRaids(JNIEnv* env, jclass, jstring world) {
     return jni::stringArrayOf(env, rows);
 }
 
+jobjectArray JNICALL nativeRaidBar(JNIEnv* env, jclass, jstring world, jint id) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const auto raids = jni::onServer<std::vector<plugins::PluginRaid>>({}, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? std::vector<plugins::PluginRaid>{} : target->raids();
+    });
+    for (const plugins::PluginRaid& raid : raids) {
+        if (raid.id != id) {
+            continue;
+        }
+        return jni::stringArrayOf(
+            env,
+            {raid.barTitle, std::to_string(raid.barColor), std::to_string(raid.barStyle), std::to_string(raid.barFlags),
+             std::to_string(raid.barProgress), raid.barVisible ? "1" : "0",
+             joinWith(
+                 ',', [&](std::size_t at) { return std::to_string(raid.barPlayers[at]); }, raid.barPlayers.size())});
+    }
+    return nullptr;
+}
+
+jboolean JNICALL nativeRaidBarControl(JNIEnv* env, jclass, jstring world, jint id, jstring action, jstring text,
+                                      jint value) {
+    const auto found = worldOf(env, world);
+    const std::string what = toStd(env, action);
+    const std::string content = text == nullptr ? std::string{} : toStd(env, text);
+    return found != nullptr && jni::onServer<bool>(false,
+                                                   [&] {
+                                                       PluginWorldEnv* target = found->env();
+                                                       return target != nullptr &&
+                                                              target->raidBar(id, what, content, value);
+                                                   })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jbyteArray JNICALL nativeRaidValues(JNIEnv* env, jclass, jstring world, jint id) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    return jni::byteArrayOf(env, jni::onServer<std::optional<std::vector<std::uint8_t>>>(std::nullopt, [&] {
+                                PluginWorldEnv* target = found->env();
+                                return target == nullptr ? std::nullopt : target->raidValues(id);
+                            }));
+}
+
+jboolean JNICALL nativeSetRaidValues(JNIEnv* env, jclass, jstring world, jint id, jbyteArray nbt) {
+    const auto found = worldOf(env, world);
+    const std::vector<std::uint8_t> bytes = jni::bytesOf(env, nbt);
+    return found != nullptr && jni::onServer<bool>(false,
+                                                   [&] {
+                                                       PluginWorldEnv* target = found->env();
+                                                       return target != nullptr && target->setRaidValues(id, bytes);
+                                                   })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
 jboolean JNICALL nativeSetRaid(JNIEnv* env, jclass, jstring world, jint id, jint omen, jint groups) {
     const auto found = worldOf(env, world);
     return found != nullptr && jni::onServer<bool>(false,
@@ -762,6 +823,11 @@ void registerWorldEnvNatives(JNIEnv* env, jclass natives) {
                reinterpret_cast<void*>(&nativeStructureStarts)),
         method("raids", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeRaids)),
         method("setRaid", "(Ljava/lang/String;III)Z", reinterpret_cast<void*>(&nativeSetRaid)),
+        method("raidBar", "(Ljava/lang/String;I)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeRaidBar)),
+        method("raidBarControl", "(Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;I)Z",
+               reinterpret_cast<void*>(&nativeRaidBarControl)),
+        method("raidValues", "(Ljava/lang/String;I)[B", reinterpret_cast<void*>(&nativeRaidValues)),
+        method("setRaidValues", "(Ljava/lang/String;I[B)Z", reinterpret_cast<void*>(&nativeSetRaidValues)),
         method("fluidAt", "(Ljava/lang/String;III)Ljava/lang/String;", reinterpret_cast<void*>(&nativeFluidAt)),
         method("fluidFlow", "(Ljava/lang/String;III)[D", reinterpret_cast<void*>(&nativeFluidFlow)),
         method("lightningTarget", "(Ljava/lang/String;II)[I", reinterpret_cast<void*>(&nativeLightningTarget)),

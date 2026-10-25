@@ -16,6 +16,8 @@ final class BasaltEndedRaid implements Raid {
     private final int waves;
     private int badOmen;
     private int totalWaves;
+    private BossBar bar;
+    private PersistentDataContainer container;
 
     BasaltEndedRaid(Location center, RaidStatus status, int waves) {
         this.center = center;
@@ -96,11 +98,19 @@ final class BasaltEndedRaid implements Raid {
 
     @Override
     public BossBar getBossBar() {
-        throw Unsupported.hit("Raid#getBossBar() after the raid ended");
+        if (bar == null) {
+            bar = org.bukkit.Bukkit.createBossBar("Raid", org.bukkit.boss.BarColor.RED,
+                org.bukkit.boss.BarStyle.SEGMENTED_10);
+        }
+        return bar;
     }
 
     @Override
     public PersistentDataContainer getPersistentDataContainer() {
-        throw Unsupported.hit("Raid#getPersistentDataContainer()");
+        if (container == null) {
+            container = new org.bukkit.craftbukkit.persistence.CraftPersistentDataContainer(
+                new org.basaltmc.bukkit.persistence.MemoryPdcStore(new net.minecraft.nbt.CompoundTag()));
+        }
+        return container;
     }
 }

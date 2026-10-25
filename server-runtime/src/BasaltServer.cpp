@@ -570,6 +570,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                  const std::array<std::int32_t, 3>& at) {
         return mobActions_ != nullptr ? mobActions_->heartCommand(world, at, action) : std::string{};
     };
+    model.raidBar = [this](world::LoadedWorld& world, std::int32_t id, std::string_view action, std::string_view text,
+                           std::int32_t value) {
+        return raids_ != nullptr && raids_->controlBar(world, id, action, text, value);
+    };
     model.npcs = &npcs_;
     model.lootTables = &vanillaData_.lootTables;
     model.blockTags = &vanillaData_.blockTags;

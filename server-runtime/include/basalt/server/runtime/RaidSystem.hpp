@@ -74,6 +74,10 @@ public:
 
     [[nodiscard]] static bool isRaider(const entity::ServerEntity& mob);
 
+    /// What a plugin asks of a raid's boss bar: title (component JSON), color, style, flags, progress, who sees it.
+    bool controlBar(world::LoadedWorld& world, std::int32_t id, std::string_view action, std::string_view text,
+                    std::int32_t value);
+
     static void setCelebrating(entity::ServerEntity& raider, bool celebrating);
 
 private:

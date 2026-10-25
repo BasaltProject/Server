@@ -24,6 +24,7 @@ final class BasaltRaid implements Raid {
     private final float totalHealth;
     private final Set<UUID> heroes = new LinkedHashSet<>();
     private final List<Integer> raiders = new ArrayList<>();
+    private PersistentDataContainer container;
 
     BasaltRaid(BasaltWorld world, String row) {
         this.world = world;
@@ -129,12 +130,17 @@ final class BasaltRaid implements Raid {
 
     @Override
     public org.bukkit.boss.BossBar getBossBar() {
-        throw Unsupported.hit("Raid#getBossBar");
+        return new org.basaltmc.bukkit.misc.BasaltRaidBar(world.getName(), id);
     }
 
     @Override
     public PersistentDataContainer getPersistentDataContainer() {
-        throw Unsupported.hit("Raid#getPersistentDataContainer");
+        if (container == null) {
+            container = new org.bukkit.craftbukkit.persistence.CraftPersistentDataContainer(
+                new org.basaltmc.bukkit.persistence.BytesPdcStore(() -> WorldEnvNatives.raidValues(world.getName(), id),
+                    bytes -> WorldEnvNatives.setRaidValues(world.getName(), id, bytes)));
+        }
+        return container;
     }
 
     @Override

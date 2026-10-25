@@ -59,8 +59,11 @@ void sendBar(PlayerSession& player, const Raid& raid, BossEventPacket::Operation
 [[nodiscard]] BossEventPacket::Add addOf(const Raid& raid) {
     return BossEventPacket::Add{.name = raid.barName,
                                 .progress = raid.barProgress,
-                                .color = wire::protocol::play::BossBarColor::Red,
-                                .overlay = wire::protocol::play::BossBarOverlay::Notched10};
+                                .color = static_cast<wire::protocol::play::BossBarColor>(raid.barColor),
+                                .overlay = static_cast<wire::protocol::play::BossBarOverlay>(raid.barStyle),
+                                .darkenScreen = (raid.barFlags & 1) != 0,
+                                .playMusic = (raid.barFlags & 2) != 0,
+                                .createWorldFog = (raid.barFlags & 4) != 0};
 }
 
 } // namespace
@@ -259,6 +262,63 @@ void RaidSystem::setBarVisible(world::LoadedWorld& world, Raid& raid, bool visib
             sendBar(*player, raid, visible ? BossEventPacket::Operation{addOf(raid)} : BossEventPacket::Remove{});
         }
     }
+}
+
+bool RaidSystem::controlBar(world::LoadedWorld& world, const std::int32_t id, const std::string_view action,
+                            const std::string_view text, const std::int32_t value) {
+    Raid* raid = raidsIn(world).get(id);
+    if (raid == nullptr) {
+        return false;
+    }
+    const auto toWatchers = [&](const BossEventPacket::Operation& operation) {
+        if (!raid->barVisible) {
+            return;
+        }
+        for (PlayerSession* player : playersIn(world)) {
+            if (raid->barPlayers.contains(player->entityId())) {
+                sendBar(*player, *raid, operation);
+            }
+        }
+    };
+    if (action == "bar_title") {
+        const auto parsed = wire::common::parseJson(text);
+        setBarName(world, *raid,
+                   parsed.has_value() ? wire::text::componentJson::deserialize(*parsed)
+                                      : wire::text::Component::text(std::string{text}));
+    } else if (action == "bar_color" || action == "bar_style") {
+        (action == "bar_color" ? raid->barColor : raid->barStyle) = std::clamp(value, 0, action == "bar_color" ? 6 : 4);
+        toWatchers(
+            BossEventPacket::UpdateStyle{.color = static_cast<wire::protocol::play::BossBarColor>(raid->barColor),
+                                         .overlay = static_cast<wire::protocol::play::BossBarOverlay>(raid->barStyle)});
+    } else if (action == "bar_flags") {
+        raid->barFlags = value & 7;
+        toWatchers(BossEventPacket::UpdateProperties{.darkenScreen = (raid->barFlags & 1) != 0,
+                                                     .playMusic = (raid->barFlags & 2) != 0,
+                                                     .createWorldFog = (raid->barFlags & 4) != 0});
+    } else if (action == "bar_progress") {
+        setBarProgress(world, *raid, std::clamp(static_cast<float>(value) / 10000.0F, 0.0F, 1.0F));
+    } else if (action == "bar_visible") {
+        setBarVisible(world, *raid, value != 0);
+    } else if (action == "bar_add" || action == "bar_remove") {
+        for (PlayerSession* player : playersIn(world)) {
+            if (player->entityId() != value) {
+                continue;
+            }
+            const bool adding = action == "bar_add";
+            if (adding && raid->barPlayers.insert(value).second && raid->barVisible) {
+                sendBar(*player, *raid, addOf(*raid));
+            } else if (!adding && raid->barPlayers.erase(value) > 0 && raid->barVisible) {
+                sendBar(*player, *raid, BossEventPacket::Remove{});
+            }
+            return true;
+        }
+        return false;
+    } else if (action == "bar_clear") {
+        removeAllBarPlayers(world, *raid);
+    } else {
+        return false;
+    }
+    return true;
 }
 
 void RaidSystem::removeAllBarPlayers(world::LoadedWorld& world, Raid& raid) {

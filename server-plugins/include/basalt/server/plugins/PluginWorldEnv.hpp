@@ -72,6 +72,13 @@ struct PluginRaid {
     float totalHealth = 0.0F;
     std::vector<std::string> heroes;
     std::vector<std::int32_t> raiders;
+    std::string barTitle;
+    std::int32_t barColor = 2;
+    std::int32_t barStyle = 2;
+    std::int32_t barFlags = 0;
+    float barProgress = 0.0F;
+    bool barVisible = true;
+    std::vector<std::int32_t> barPlayers;
 };
 
 struct PluginFluid {
@@ -176,6 +183,28 @@ public:
         static_cast<void>(y);
         static_cast<void>(z);
         return {};
+    }
+
+    /// Edits a raid's boss bar: "bar_title" (component JSON), "bar_color", "bar_style", "bar_flags" (bits one to four),
+    /// "bar_progress" (ten thousandths), "bar_visible", "bar_add" and "bar_remove" (a player's entity id), "bar_clear".
+    virtual bool raidBar(std::int32_t id, std::string_view action, std::string_view text, std::int32_t value) {
+        static_cast<void>(id);
+        static_cast<void>(action);
+        static_cast<void>(text);
+        static_cast<void>(value);
+        return false;
+    }
+
+    /// The values a plugin keeps on a raid, as a named compound; empty when there is none.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> raidValues(std::int32_t id) {
+        static_cast<void>(id);
+        return std::nullopt;
+    }
+
+    virtual bool setRaidValues(std::int32_t id, std::span<const std::uint8_t> nbt) {
+        static_cast<void>(id);
+        static_cast<void>(nbt);
+        return false;
     }
 
     [[nodiscard]] virtual PluginBorder border() { return {}; }
