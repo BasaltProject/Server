@@ -52,9 +52,11 @@ WorldRegistry::WorldRegistry(const config::BasaltConfig& config, const config::W
                 inherited = found->second.seed;
             }
         }
-        metadata_.insert_or_assign(declaration->name, world::WorldMetadata::loadOrCreate(
-                                                          options_.worldsRoot + "/" + declaration->name, inherited,
-                                                          world::WorldMetadata::kDefaultSpawn, logger_));
+        const config::WorldSettings settings = worlds.settingsFor(*declaration);
+        metadata_.insert_or_assign(declaration->name,
+                                   world::WorldMetadata::loadOrCreate(options_.worldsRoot + "/" + declaration->name,
+                                                                      inherited, world::WorldMetadata::kDefaultSpawn,
+                                                                      logger_, &settings.rules.gameRules));
     }
     for (const config::WorldDeclaration& declaration : worlds.worlds()) {
         owned_.push_back(buildWorld(declaration, metadata_.at(declaration.name)));
@@ -72,8 +74,10 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
     options.vanillaKey =
         worldsConfig_->overworldOf(declaration).isDefault && linked != nullptr && linked->name == declaration.name;
     options.generationWorkers = options_.generationMetrics ? 1 : world::ChunkGenerationQueue::defaultWorkers();
+    config::WorldSettings settings = worldsConfig_->settingsFor(declaration);
     if (generators_ != nullptr && isNormal(declaration.type)) {
-        world::VanillaWorldGeneratorFactory::Generators built = generators_->create(declaration, metadata);
+        world::VanillaWorldGeneratorFactory::Generators built =
+            generators_->create(declaration, metadata, settings.rules.generateStructures);
         // The same generator, so `/place structure` and `/locate structure` act on the villages the world has.
         options.villageGenerator = built.villages;
         options.campGenerator = built.camps;
@@ -85,9 +89,8 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         options.spawnMobs = built.spawnMobs;
         built_.insert_or_assign(declaration.name, std::move(built));
     }
-    std::unique_ptr<world::LoadedWorld> world =
-        std::make_unique<world::LoadedWorld>(declaration, worldsConfig_->settingsFor(declaration), std::move(metadata),
-                                             options_.worldsRoot, logger_, std::move(options));
+    std::unique_ptr<world::LoadedWorld> world = std::make_unique<world::LoadedWorld>(
+        declaration, std::move(settings), std::move(metadata), options_.worldsRoot, logger_, std::move(options));
     world->setEvents(options_.events);
     // parity: `SculkShriekerBlockEntity.tryGetPlayer`, which only the runtime can answer.
     world->state().setPlayerCheck([players = players_, holder = world.get()](const wire::common::Uuid& entity) {
@@ -164,9 +167,10 @@ world::LoadedWorld* WorldRegistry::createWorld(const std::string& name, config::
     const config::WorldDeclaration declaration{
         .name = name, .dimension = dimension, .type = type, .seed = seed, .isDefault = false};
     wire::io::fileIO::createDirectories(options_.worldsRoot + "/" + name);
+    const config::WorldSettings settings = worldsConfig_->settingsFor(declaration);
     world::WorldMetadata metadata = world::WorldMetadata::loadOrCreate(
         options_.worldsRoot + "/" + name, seed.has_value() ? seed : std::optional{worldSeed()},
-        world::WorldMetadata::kDefaultSpawn, logger_);
+        world::WorldMetadata::kDefaultSpawn, logger_, &settings.rules.gameRules);
     const std::int64_t madeWith = metadata.seed;
     owned_.push_back(buildWorld(declaration, std::move(metadata)));
     world::LoadedWorld* made = owned_.back().get();

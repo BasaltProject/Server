@@ -2,6 +2,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
+#include <charconv>
 #include <cstdint>
 #include <random>
 #include <stdexcept>
@@ -122,9 +123,37 @@ std::optional<WorldMetadata> WorldMetadata::read(const std::string& worldRoot) {
     return metadata;
 }
 
+namespace {
+
+void applyInitialGameRules(GameRuleValues& values, const std::map<std::string, std::string>& wanted,
+                           const std::string& worldRoot, const wire::common::Logger& logger) {
+    for (const auto& [name, value] : wanted) {
+        const GameRule* rule = gameRules::byId(name);
+        std::int64_t number = 0;
+        bool valid = rule != nullptr;
+        if (valid && rule->kind == GameRule::Kind::Boolean) {
+            valid = value == "true" || value == "false";
+        } else if (valid) {
+            const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), number);
+            valid = error == std::errc{} && end == value.data() + value.size() && number >= rule->min &&
+                    number <= rule->max;
+        }
+        if (!valid) {
+            logger.warn([&] {
+                return "Ignoring the game rule '" + name + "' = " + value + " configured for '" + worldRoot +
+                       "': it is not a rule of this version or the value does not fit it.";
+            });
+            continue;
+        }
+        values.set(*rule, value);
+    }
+}
+
+} // namespace
+
 WorldMetadata WorldMetadata::loadOrCreate(const std::string& worldRoot, std::optional<std::int64_t> declaredSeed,
-                                          std::array<std::int32_t, 3> defaultSpawn,
-                                          const wire::common::Logger& logger) {
+                                          std::array<std::int32_t, 3> defaultSpawn, const wire::common::Logger& logger,
+                                          const std::map<std::string, std::string>* initialGameRules) {
     if (std::optional<WorldMetadata> existing = read(worldRoot); existing.has_value()) {
         if (declaredSeed.has_value() && *declaredSeed != existing->seed) {
             logger.warn([&worldRoot, declaredSeed, &existing] {
@@ -164,6 +193,9 @@ WorldMetadata WorldMetadata::loadOrCreate(const std::string& worldRoot, std::opt
     created.spawnX = defaultSpawn[0];
     created.spawnY = defaultSpawn[1];
     created.spawnZ = defaultSpawn[2];
+    if (initialGameRules != nullptr) {
+        applyInitialGameRules(created.gameRules, *initialGameRules, worldRoot, logger);
+    }
     static_cast<void>(created.writeTo(worldRoot));
     return created;
 }

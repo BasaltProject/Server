@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -64,10 +65,10 @@ struct WorldMetadata {
 
     [[nodiscard]] static std::optional<WorldMetadata> read(const std::string& worldRoot);
 
-    [[nodiscard]] static WorldMetadata loadOrCreate(const std::string& worldRoot,
-                                                    std::optional<std::int64_t> declaredSeed,
-                                                    std::array<std::int32_t, 3> defaultSpawn,
-                                                    const wire::common::Logger& logger);
+    [[nodiscard]] static WorldMetadata
+    loadOrCreate(const std::string& worldRoot, std::optional<std::int64_t> declaredSeed,
+                 std::array<std::int32_t, 3> defaultSpawn, const wire::common::Logger& logger,
+                 const std::map<std::string, std::string>* initialGameRules = nullptr);
 };
 
 } // namespace basalt::server::runtime::world

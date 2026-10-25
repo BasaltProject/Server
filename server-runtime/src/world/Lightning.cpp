@@ -161,6 +161,6 @@ std::optional<BlockChange> releaseRod(WorldState& world, std::int32_t x, std::in
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
-bool shouldStrike(random::RandomSource& random) { return random.nextInt(kStrikeOdds) == 0; }
+bool shouldStrike(random::RandomSource& random, const std::int32_t odds) { return random.nextInt(odds) == 0; }
 
 } // namespace basalt::server::runtime::world::lightning

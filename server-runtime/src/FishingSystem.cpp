@@ -175,6 +175,8 @@ void FishingSystem::cast(const player::BreakContext& context, PlayerSession& pla
     auto state = std::make_shared<hooks::HookState>();
     state->ownerId = player.entityId();
     state->random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    state->minWaitTime = world.settings().rules.environment.fishingMinWaitTicks;
+    state->maxWaitTime = world.settings().rules.environment.fishingMaxWaitTicks;
     if (rod.has_value()) {
         state->luck = player::enchantmentLevel(*rod, Identifier::vanilla("luck_of_the_sea"));
         state->lureSpeed = player::enchantmentLevel(*rod, Identifier::vanilla("lure")) * kLureTicksPerLevel;

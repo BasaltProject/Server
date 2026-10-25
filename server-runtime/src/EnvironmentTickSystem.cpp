@@ -657,6 +657,9 @@ void EnvironmentTickSystem::tickTime(world::LoadedWorld& world) {
     const bool wasThundering = world.weather().thundering;
     random::RandomSource weatherRandom = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     world.tickTime(weatherRandom);
+    if (world.settings().rules.environment.disableThunder) {
+        world.weather().thundering = false;
+    }
     if (world.weather().raining != wasRaining || world.weather().thundering != wasThundering) {
         if (hooks_.weatherChangeAllowed &&
             !hooks_.weatherChangeAllowed(world, world.weather().raining, world.weather().thundering, wasRaining,
@@ -683,8 +686,9 @@ void EnvironmentTickSystem::strikeLightning(world::LoadedWorld& world) {
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    const std::int32_t odds = world.settings().rules.environment.thunderChance;
     for (const std::array<std::int32_t, 2>& chunk : chunks) {
-        if (!world::lightning::shouldStrike(random)) {
+        if (!world::lightning::shouldStrike(random, odds)) {
             continue;
         }
         const std::int32_t x = (chunk[0] << 4) + random.nextInt(16);

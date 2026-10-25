@@ -21,9 +21,6 @@ using portal::PortalAxis;
 using portal::PortalShape;
 
 /// parity: `PortalForcer`'s two radii: the Nether side is searched much closer in.
-constexpr std::int32_t kNetherSearchRadius = 16;
-constexpr std::int32_t kOverworldSearchRadius = 128;
-constexpr std::int32_t kCreateSearchRadius = 16;
 constexpr std::int32_t kSectionHeight = 16;
 
 /// parity: `PortalForcer`'s own floor for a forced portal.
@@ -113,8 +110,9 @@ void reindex(LoadedWorld& world, const std::vector<std::array<std::int32_t, 3>>&
                                                                        std::int32_t ceiling) {
     std::optional<std::array<std::int32_t, 3>> best;
     std::int64_t bestDistance = std::numeric_limits<std::int64_t>::max();
-    for (std::int32_t offsetX = -kCreateSearchRadius; offsetX <= kCreateSearchRadius; offsetX++) {
-        for (std::int32_t offsetZ = -kCreateSearchRadius; offsetZ <= kCreateSearchRadius; offsetZ++) {
+    const std::int32_t reach = world.settings().rules.environment.portalCreateRadius;
+    for (std::int32_t offsetX = -reach; offsetX <= reach; offsetX++) {
+        for (std::int32_t offsetZ = -reach; offsetZ <= reach; offsetZ++) {
             const std::int32_t columnX = x + offsetX;
             const std::int32_t columnZ = z + offsetZ;
             const server::world::Chunk& chunk = world.state().getOrGenerateChunk(columnX >> 4, columnZ >> 4);
@@ -324,8 +322,9 @@ std::optional<PortalExit> exitFor(LoadedWorld& from, LoadedWorld& to, double x, 
     const auto targetX = static_cast<std::int32_t>(std::floor(x * scale));
     const auto targetZ = static_cast<std::int32_t>(std::floor(z * scale));
     const std::int32_t targetY = std::clamp(static_cast<std::int32_t>(y), minY(to) + 1, maxY(to) - 3);
-    const bool toNether = to.declaration().dimension == config::WorldDimension::Nether;
-    const std::int32_t radius = toNether ? kNetherSearchRadius : kOverworldSearchRadius;
+    const std::int32_t radius =
+        std::max(1, static_cast<std::int32_t>(to.settings().rules.environment.portalSearchRadius /
+                                              config::dimensionFacts(to.declaration().dimension).coordinateScale));
 
     const std::optional<std::array<std::int32_t, 3>> existing =
         findClosestPortal(to, targetX, targetY, targetZ, radius);

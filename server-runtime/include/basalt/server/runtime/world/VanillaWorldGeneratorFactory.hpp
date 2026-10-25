@@ -64,7 +64,8 @@ public:
 
     [[nodiscard]] CacheStats cacheStats() const;
 
-    [[nodiscard]] Generators create(const config::WorldDeclaration& declaration, const WorldMetadata& metadata);
+    [[nodiscard]] Generators create(const config::WorldDeclaration& declaration, const WorldMetadata& metadata,
+                                    bool generateStructures = true);
 
 private:
     struct Built;
@@ -79,6 +80,7 @@ private:
 
     Jar jar_;
     wire::common::Logger logger_;
+    bool structuresEnabled_ = true;
     /// One entry per world built, kept alive for the process: a chunk function closes over its own.
     std::vector<std::unique_ptr<Built>> built_;
 };

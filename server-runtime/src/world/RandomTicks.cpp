@@ -454,8 +454,8 @@ void melt(const randomTicks::Context& context, std::int32_t x, std::int32_t y, s
     set(context, x, y, z, becomes, changes);
 }
 
-void act(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
-         random::RandomSource& random, std::vector<BlockChange>& changes) {
+void actOnce(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+             random::RandomSource& random, std::vector<BlockChange>& changes) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
         return;
@@ -531,6 +531,26 @@ void act(const randomTicks::Context& context, std::int32_t x, std::int32_t y, st
         melt(context, x, y, z, stateId, context.evaporates ? airState() : registry::blocks::water().stateId, changes);
     } else if (path == "snow") {
         melt(context, x, y, z, stateId, airState(), changes);
+    }
+}
+
+void act(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+         random::RandomSource& random, std::vector<BlockChange>& changes) {
+    const wire::common::Identifier* block =
+        context.growth == nullptr ? nullptr : registry::blockStateDefinitions::blockOf(stateId);
+    const std::int32_t percent = block == nullptr ? 100 : context.growth->forBlock(block->path());
+    if (percent == 100) {
+        actOnce(context, x, y, z, stateId, random, changes);
+        return;
+    }
+    // Not vanilla: a percent of vanilla's growth attempts, the whole part always and the rest by chance.
+    const std::int32_t attempts = percent / 100 + (random.nextInt(100) < percent % 100 ? 1 : 0);
+    for (std::int32_t attempt = 0; attempt < attempts; attempt++) {
+        const std::int32_t current = attempt == 0 ? stateId : stateAt(context.world, x, y, z);
+        if (registry::blockStateDefinitions::blockOf(current) != block) {
+            break;
+        }
+        actOnce(context, x, y, z, current, random, changes);
     }
 }
 

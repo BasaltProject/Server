@@ -249,6 +249,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     .recipeFor = hooks.recipeFor,
                     .changes = &changes,
                     .gameTime = gameTime,
+                    .transferTicks = hooks.hopperTransferTicks,
                 };
                 if (hoppers::tick(world, x, y, z, random, around)) {
                     chunk->markDirty();

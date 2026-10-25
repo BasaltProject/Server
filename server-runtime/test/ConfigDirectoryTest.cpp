@@ -2,7 +2,7 @@
 
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
-#include <basalt/server/runtime/config/MobsConfig.hpp>
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <doctest.h>
@@ -84,8 +84,6 @@ TEST_CASE("every commented default is valid TOML") {
         {"server.toml", kServerDefaultToml},
         {"server_list.toml", kServerListDefaultToml},
         {"tab_list.toml", kTabListDefaultToml},
-        {"world_mobs.toml", kWorldMobsDefaultToml},
-        {"world_mobs_local.toml", kWorldMobsLocalDefaultToml},
         {"world_settings.toml", kWorldSettingsDefaultToml},
         {"worlds.toml", kWorldsDefaultToml},
     };
@@ -97,18 +95,10 @@ TEST_CASE("every commented default is valid TOML") {
     }
 }
 
-TEST_CASE("the generated mob defaults are vanilla's") {
-    const std::string root = scratch("config-mobs");
-    const std::expected<MobSettings, std::string> loaded = loadMobDefaults(ConfigDirectory{root});
-    REQUIRE(loaded.has_value());
-    CHECK(*loaded == MobSettings::vanilla());
-}
-
-TEST_CASE("an override naming an unknown field is refused with the file") {
-    const std::expected<toml::TomlTable, toml::TomlError> parsed = toml::parse("[overrides.zombie]\nmax-helth = 5\n");
+TEST_CASE("the generated world rules read back as vanilla's") {
+    const std::string text = std::string{kWorldsDefaultToml} + worldRulesTemplate(true);
+    const auto parsed = toml::parse(text);
     REQUIRE(parsed.has_value());
-    const std::expected<MobSettings, std::string> settings =
-        MobSettings::from(*parsed, MobSettings::vanilla(), "mobs.toml");
-    REQUIRE_FALSE(settings.has_value());
-    CHECK(settings.error().starts_with("mobs.toml: overrides.zombie.max-helth"));
+    CHECK(WorldSettings::from(parsed->table("defaults"), WorldSettings::vanilla()) == WorldSettings::vanilla());
+    CHECK(toml::parse(std::string{kWorldSettingsDefaultToml} + worldRulesTemplate(false)).has_value());
 }

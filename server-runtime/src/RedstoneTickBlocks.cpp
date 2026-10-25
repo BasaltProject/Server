@@ -132,6 +132,7 @@ world::randomTicks::Context RedstoneTickSystem::randomContext(world::LoadedWorld
         .seed = world.metadata().seed,
         .maxY = facts.chunkHeight.maxY(),
         .gameRules = world.gameRules(),
+        .growth = &world.settings().rules.growth,
         .clock = world.clock(),
         .difficulty = world.difficulty(),
         .hasSkylight = facts.hasSkylight,
@@ -368,7 +369,8 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             },
         .ticking = tickingChunks(world, region, 1),
         .spawnerTick = [this, &world](wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y,
-                                      std::int32_t z) { return tickSpawner(world, data, x, y, z); }};
+                                      std::int32_t z) { return tickSpawner(world, data, x, y, z); },
+        .hopperTransferTicks = world.settings().rules.hopperTransferTicks};
     random::RandomSource random = freshRandom();
     std::vector<world::BlockChange> changes = world::blockEntityTicks::tick(
         world.state(), world.name(), world.clock(), world.skyDarken(), world.gameTime(), chunks, random, hooks,

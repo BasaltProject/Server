@@ -20,6 +20,9 @@ namespace hoppers {
 
 inline constexpr std::int32_t kSize = 5;
 
+/// parity: `HopperBlockEntity.MOVE_ITEM_SPEED`.
+inline constexpr std::int32_t kVanillaCooldown = 8;
+
 struct Around {
     /// parity: `ChiseledBookShelfBlockEntity.acceptsItemType`.
     std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
@@ -32,6 +35,7 @@ struct Around {
     std::vector<BlockChange>* changes = nullptr;
     /// parity: `ShelfBlockEntity.setChanged`.
     std::int64_t gameTime = 0;
+    std::int32_t transferTicks = kVanillaCooldown;
 };
 
 /// `random` is required: a hopper feeding a composter rolls the item's chance, the one non-deterministic spot.

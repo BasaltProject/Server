@@ -16,6 +16,8 @@ public:
     static constexpr double kMaxSize = 5.999997E7;
     static constexpr double kMaxCenterCoordinate = 2.9999984E7;
 
+    /// parity: `max-world-size`, which clamps where the border can stand.
+    std::int32_t absoluteMaxSize = 29999984;
     std::int32_t warningBlocks = 5;
     std::int32_t warningSeconds = 15;
     double damageBuffer = 5.0;
@@ -60,6 +62,8 @@ public:
     void restore(const wire::nbt::NbtCompound& settings);
 
 private:
+    [[nodiscard]] double clampedBound(double bound) const noexcept;
+
     double centerX_ = 0.0;
     double centerZ_ = 0.0;
     double size_ = kDefaultSize;

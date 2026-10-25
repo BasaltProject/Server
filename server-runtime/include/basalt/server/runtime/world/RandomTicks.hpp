@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/runtime/config/WorldRules.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/SaplingGrowth.hpp>
@@ -37,6 +38,8 @@ struct Context {
     /// Only the pitcher crop asks, to leave itself room.
     std::int32_t maxY = 319;
     const GameRuleValues& gameRules;
+    /// Unset, every plant grows at vanilla's rate.
+    const config::GrowthPercents* growth = nullptr;
     const WorldClock& clock;
     /// `peaceful`, `easy`, `normal`; anything else is hard.
     std::string_view difficulty = "normal";
