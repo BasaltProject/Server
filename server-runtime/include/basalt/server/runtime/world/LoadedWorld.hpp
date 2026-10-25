@@ -92,6 +92,7 @@ public:
 
     [[nodiscard]] const config::WorldSettings& settings() const noexcept { return settings_; }
 
+    [[nodiscard]] const config::MobSettings& mobSettings() const noexcept { return settings_.mobs; }
     /// Null unless the world hides its ores.
     [[nodiscard]] const AntiXray* antiXray() const noexcept { return antiXray_.get(); }
 

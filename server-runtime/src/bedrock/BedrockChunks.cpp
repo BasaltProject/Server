@@ -39,7 +39,8 @@ namespace {
 
 } // namespace
 
-std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const int protocol) {
+std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const int protocol,
+                                      const std::vector<std::vector<std::int32_t>>& replacements) {
     const auto sections = static_cast<std::int32_t>(chunk.sectionCount());
     const std::int32_t bottom = chunk.verticalBounds().minY();
 
@@ -69,7 +70,10 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
                 for (std::int32_t x = 0; x < 16; ++x) {
                     const std::size_t at = (static_cast<std::size_t>(y) << 8U) | (static_cast<std::size_t>(z) << 4U) |
                                            static_cast<std::size_t>(x);
-                    blocks[at] = chunk.blockStateId(x, bottom + (section * 16) + y, z);
+                    const auto index = static_cast<std::size_t>(section);
+                    blocks[at] = index < replacements.size() && !replacements[index].empty()
+                                     ? replacements[index][at]
+                                     : chunk.blockStateId(x, bottom + (section * 16) + y, z);
                     if (const auto colour = bedColourOf(blocks[at]); colour) {
                         beds.push_back({x, bottom + (section * 16) + y, z, *colour});
                     }

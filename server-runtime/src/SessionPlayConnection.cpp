@@ -497,6 +497,11 @@ void ClientSession::enterPlay() {
         }
         logger_.info([&session] { return "Loaded " + session->name() + " from players.db."; });
     }
+    // parity: `ServerPlayer.calculateGameModeForNewPlayer`, which a dedicated server applies to operators too.
+    if (options_.tuning.forceGamemode) {
+        session->gamemode = options_.defaultGamemode;
+        session->flying = session->gamemode == play::Gamemode::Spectator;
+    }
     session->profileProperties.clear();
     for (const wire::auth::SessionProfileProperty& property : pendingProfile_->properties) {
         session->profileProperties.push_back(wire::protocol::login::GameProfileProperty{
@@ -526,9 +531,9 @@ void ClientSession::enterPlay() {
         play::LoginPlayPacket{.entityId = entityId,
                               .isHardcore = currentWorld() != nullptr && currentWorld()->hardcore(),
                               .worldNames = worldNames,
-                              .maxPlayers = 20,
+                              .maxPlayers = options_.maxPlayers ? options_.maxPlayers() : 20,
                               .viewDistance = chunkRadius,
-                              .simulationDistance = world->settings().rules.simulationDistance,
+                              .simulationDistance = world->tunables().simulationDistance.value_or(chunkRadius),
                               .reducedDebugInfo = false,
                               .enableRespawnScreen = true,
                               .doLimitedCrafting = false,
@@ -548,6 +553,9 @@ void ClientSession::enterPlay() {
     const server::world::ChunkTracker::Delta initialChunks =
         chunkStreamer_->initialJoin(player.x, player.z, chunkRadius);
 
+    // parity: `PlayerList.sendLevelInfo` opens with the world border.
+    sendCompressed(play::InitializeBorderPacket::kId,
+                   [world](wire::io::ByteBuffer& buffer) { world->border().initializePacket().write(buffer); });
     uiState_->sendTime(*world);
     if (world->weather().raining) {
         uiState_->sendWeather(world->weather());
@@ -600,8 +608,11 @@ void ClientSession::enterPlay() {
     if (options_.advancementTriggers != nullptr) {
         options_.advancementTriggers->grantAutomatic(player.name(), player.uuid().toString());
     }
-    logger_.info([&player, entityId] {
-        return player.name() + " logged in with entity id " + std::to_string(entityId) + " at (" +
+    logger_.info([this, &player, entityId] {
+        // parity: `PlayerList.placeNewPlayer` logs `Connection.getLoggableAddress`.
+        const std::string address =
+            options_.tuning.logIps ? "/" + peerAddress() + ":" + std::to_string(peerPort()) : "IP hidden";
+        return player.name() + "[" + address + "] logged in with entity id " + std::to_string(entityId) + " at (" +
                oneDecimal(player.x) + ", " + oneDecimal(player.y) + ", " + oneDecimal(player.z) + ")";
     });
     logger_.info([&player] { return player.name() + " joined the game"; });

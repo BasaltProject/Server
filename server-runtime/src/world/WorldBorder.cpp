@@ -45,7 +45,7 @@ double WorldBorder::distanceOutside(double x, double z) const {
 }
 
 bool WorldBorder::contains(double x, double z) const {
-    // parity: `isWithinBounds(x, z, 0)`.
+    // parity: `isWithinBounds(x, z, 0)`, the extent's edges clamped to `max-world-size`.
     const double half = size_ / 2.0;
     return x >= clampedBound(centerX_ - half) && x < clampedBound(centerX_ + half) &&
            z >= clampedBound(centerZ_ - half) && z < clampedBound(centerZ_ + half);
