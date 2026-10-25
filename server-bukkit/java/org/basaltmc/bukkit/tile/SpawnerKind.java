@@ -35,12 +35,12 @@ public final class SpawnerKind implements TileKind {
         return spawn == null ? null : Nbt.map(spawn, "entity");
     }
 
-    private static EntitySnapshot snapshot(Map<String, Object> entity) {
+    static EntitySnapshot snapshot(Map<String, Object> entity) {
         return entity == null || !(entity.get("id") instanceof String) ? null
             : BasaltEntitySnapshot.ofNbt(Nbt.writeNamed(entity));
     }
 
-    private static Map<String, Object> compound(EntitySnapshot snapshot) {
+    static Map<String, Object> compound(EntitySnapshot snapshot) {
         return Nbt.readNamed(((BasaltEntitySnapshot) snapshot).nbt());
     }
 
@@ -51,7 +51,7 @@ public final class SpawnerKind implements TileKind {
         return limit;
     }
 
-    private static Map<String, Object> potential(EntitySnapshot snapshot, int weight, SpawnRule rule) {
+    static Map<String, Object> potential(EntitySnapshot snapshot, int weight, SpawnRule rule) {
         Map<String, Object> data = Nbt.compound();
         data.put("entity", compound(snapshot));
         if (rule != null) {
@@ -66,7 +66,7 @@ public final class SpawnerKind implements TileKind {
         return entry;
     }
 
-    private static SpawnerEntry entryOf(Object value) {
+    static SpawnerEntry entryOf(Object value) {
         Map<String, Object> entry = Nbt.map(value);
         Map<String, Object> data = entry == null ? null : Nbt.map(entry, "data");
         EntitySnapshot snapshot = data == null ? null : snapshot(Nbt.map(data, "entity"));

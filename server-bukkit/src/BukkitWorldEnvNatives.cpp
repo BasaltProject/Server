@@ -124,6 +124,37 @@ void JNICALL nativeBlockEvent(JNIEnv* env, jclass, jstring world, jint x, jint y
     }));
 }
 
+jboolean JNICALL nativeSculk(JNIEnv* env, jclass, jstring world, jstring action, jint x, jint y, jint z, jint sourceX,
+                             jint sourceY, jint sourceZ, jint value, jstring player) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return JNI_FALSE;
+    }
+    const std::string what = toStd(env, action);
+    const std::string who = player == nullptr ? std::string{} : toStd(env, player);
+    return jni::onServer<bool>(false,
+                               [&] {
+                                   PluginWorldEnv* target = found->env();
+                                   return target != nullptr &&
+                                          target->sculk(what, x, y, z, sourceX, sourceY, sourceZ, value, who);
+                               })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jstring JNICALL nativeCreakingHeart(JNIEnv* env, jclass, jstring world, jstring action, jint x, jint y, jint z) {
+    const auto found = worldOf(env, world);
+    if (found == nullptr) {
+        return nullptr;
+    }
+    const std::string what = toStd(env, action);
+    const std::string answer = jni::onServer<std::string>(std::string{}, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? std::string{} : target->creakingHeart(what, x, y, z);
+    });
+    return answer.empty() ? nullptr : env->NewStringUTF(answer.c_str());
+}
+
 jdoubleArray JNICALL nativeBorder(JNIEnv* env, jclass, jstring world) {
     const auto found = worldOf(env, world);
     if (found == nullptr) {
@@ -704,6 +735,10 @@ void registerWorldEnvNatives(JNIEnv* env, jclass natives) {
                reinterpret_cast<void*>(&nativeParticle)),
         method("levelEvent", "(Ljava/lang/String;IIIIIZ)V", reinterpret_cast<void*>(&nativeLevelEvent)),
         method("blockEvent", "(Ljava/lang/String;IIIII)V", reinterpret_cast<void*>(&nativeBlockEvent)),
+        method("creakingHeart", "(Ljava/lang/String;Ljava/lang/String;III)Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeCreakingHeart)),
+        method("sculk", "(Ljava/lang/String;Ljava/lang/String;IIIIIIILjava/lang/String;)Z",
+               reinterpret_cast<void*>(&nativeSculk)),
         method("border", "(Ljava/lang/String;)[D", reinterpret_cast<void*>(&nativeBorder)),
         method("setBorder", "(Ljava/lang/String;[DD)V", reinterpret_cast<void*>(&nativeSetBorder)),
         method("playerCount", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativePlayerCount)),

@@ -540,6 +540,36 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                std::int32_t value) {
         return endFight_ != nullptr && endFight_->controlBar(world, action, text, value);
     };
+    model.sculk = [this](world::LoadedWorld& world, std::string_view action, const std::array<std::int32_t, 3>& at,
+                         const std::array<std::int32_t, 3>& source, std::int32_t value, std::string_view player) {
+        if (action == "shriek") {
+            const std::optional<wire::common::Uuid> id = wire::common::Uuid::parse(player);
+            player::PlayerSession* session = id.has_value() ? playerRegistry_.get(*id) : nullptr;
+            if (shriekers_ == nullptr || session == nullptr) {
+                return false;
+            }
+            shriekers_->tryShriek(world, *session, at[0], at[1], at[2]);
+            return true;
+        }
+        if (action == "bloom") {
+            if (sculkCatalysts_ == nullptr) {
+                return false;
+            }
+            const server::world::Chunk* chunk = world.state().chunkIfLoaded(at[0] >> 4, at[2] >> 4);
+            const server::world::ChunkBlockEntity* held =
+                chunk == nullptr ? nullptr : chunk->blockEntityAt(at[0] & 15, at[1], at[2] & 15);
+            if (held == nullptr || held->type().path() != "sculk_catalyst") {
+                return false;
+            }
+            sculkCatalysts_->drink(world, at, source[0], source[1], source[2], value);
+            return true;
+        }
+        return false;
+    };
+    model.creakingHeart = [this](world::LoadedWorld& world, std::string_view action,
+                                 const std::array<std::int32_t, 3>& at) {
+        return mobActions_ != nullptr ? mobActions_->heartCommand(world, at, action) : std::string{};
+    };
     model.npcs = &npcs_;
     model.lootTables = &vanillaData_.lootTables;
     model.blockTags = &vanillaData_.blockTags;

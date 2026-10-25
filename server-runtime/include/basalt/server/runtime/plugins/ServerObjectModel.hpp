@@ -77,6 +77,11 @@ struct ModelHooks {
     std::function<bool(world::LoadedWorld& world, std::string_view action, std::int32_t value)> endFight;
     std::function<bool(world::LoadedWorld& world, std::string_view action, std::string_view text, std::int32_t value)>
         endFightBar;
+    std::function<bool(world::LoadedWorld& world, std::string_view action, const std::array<std::int32_t, 3>& at,
+                       const std::array<std::int32_t, 3>& source, std::int32_t value, std::string_view player)>
+        sculk;
+    std::function<std::string(world::LoadedWorld& world, std::string_view action, const std::array<std::int32_t, 3>& at)>
+        creakingHeart;
     std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> endGatewayAt;
     std::function<std::int32_t()> nextEntityId;
     std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
