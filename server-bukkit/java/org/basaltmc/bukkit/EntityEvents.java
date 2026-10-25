@@ -263,6 +263,18 @@ final class EntityEvents {
                 action.equals("changed") ? EntityPotionEffectEvent.Action.CHANGED
                     : EntityPotionEffectEvent.Action.ADDED, false);
         });
+        EventBridge.map("player.effect", EntityPotionEffectEvent.class, f -> {
+            Player affected = f.player();
+            PotionEffectType type = Registry.EFFECT.get(NamespacedKey.fromString(f.text("effect")));
+            if (affected == null || type == null) {
+                return null;
+            }
+            PotionEffect old = affected.getPotionEffect(type);
+            return new EntityPotionEffectEvent(affected, old,
+                new PotionEffect(type, (int) f.whole("duration"), (int) f.whole("amplifier")), null,
+                EntityPotionEffectEvent.Cause.UNKNOWN, old == null ? EntityPotionEffectEvent.Action.ADDED
+                    : EntityPotionEffectEvent.Action.CHANGED, false);
+        });
         EventBridge.map("entity.tame", EntityTameEvent.class, f -> {
             Entity animal = f.entity();
             return animal instanceof LivingEntity living && f.player() != null
