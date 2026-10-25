@@ -13,7 +13,6 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Generates one class per spawnable entity type, plus the stub layers below them, from the ops traits. */
 public final class GenerateEntities {
     private static final Pattern kDefault = Pattern.compile("\\bdefault\\s+(?![-:])");
     private static final Pattern kTypeVariable = Pattern.compile("^[A-Z][A-Z0-9]?$");

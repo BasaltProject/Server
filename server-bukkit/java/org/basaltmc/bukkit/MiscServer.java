@@ -13,7 +13,6 @@ import org.bukkit.BanList;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
-/** The parts of the server object that live in the player database and the smaller services. */
 public abstract class MiscServer extends ServerBase {
     private final BasaltBanList.Profiles profileBans = new BasaltBanList.Profiles();
     private final BasaltBanList.Addresses addressBans = new BasaltBanList.Addresses();

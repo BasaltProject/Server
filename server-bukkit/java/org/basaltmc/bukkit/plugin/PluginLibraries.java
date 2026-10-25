@@ -24,7 +24,6 @@ import org.eclipse.aether.graph.Dependency;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.yaml.snakeyaml.Yaml;
 
-/** The libraries a plugin asks for, in plugin.yml or through the loader class of paper-plugin.yml. */
 public final class PluginLibraries {
     private PluginLibraries() {}
 

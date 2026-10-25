@@ -90,7 +90,6 @@ public:
     world::RealTrialSpawnerConfigs trialSpawnerConfigs;
     world::StructureTemplates structureTemplates;
 
-    /// Hands the brewing stand the brewing recipes the recipe list holds now.
     void useBrewingRecipes() const;
 };
 

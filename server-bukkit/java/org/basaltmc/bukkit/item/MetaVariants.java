@@ -16,7 +16,6 @@ import org.bukkit.inventory.meta.MusicInstrumentMeta;
 import org.bukkit.inventory.meta.OminousBottleMeta;
 import org.bukkit.inventory.meta.TropicalFishBucketMeta;
 
-/** The metas that are one or two plain components. */
 public final class MetaVariants {
     private MetaVariants() {}
 

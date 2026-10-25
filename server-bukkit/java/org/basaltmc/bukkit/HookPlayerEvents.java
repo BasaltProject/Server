@@ -3,7 +3,6 @@ package org.basaltmc.bukkit;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The player events raised from deep in the game systems, as the Bukkit and Paper events plugins listen for. */
 final class HookPlayerEvents {
     private HookPlayerEvents() {}
 

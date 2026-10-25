@@ -4,7 +4,6 @@ import io.papermc.paper.world.damagesource.CombatEntry;
 import io.papermc.paper.world.damagesource.FallLocationType;
 import org.bukkit.damage.DamageSource;
 
-/** One damage a living entity took, as the combat tracker keeps it. */
 record BasaltCombatEntry(DamageSource source, float damage, FallLocationType location, float distance)
         implements CombatEntry {
     @Override

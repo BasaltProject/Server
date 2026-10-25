@@ -10,7 +10,6 @@
 
 namespace basalt::server::runtime::plugins {
 
-/// The player database, groups and ban lists as the plugin API sees them.
 class ServerAccess final : public server::plugins::PluginAccess {
 public:
     struct Hooks {

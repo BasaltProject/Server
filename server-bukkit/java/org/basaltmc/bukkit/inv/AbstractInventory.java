@@ -9,7 +9,6 @@ import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.inventory.ItemStack;
 
-/** An inventory that only says how to read and write one slot; the rest follows from that. */
 public abstract class AbstractInventory extends InventoryBase {
     private int maxStack = 64;
 

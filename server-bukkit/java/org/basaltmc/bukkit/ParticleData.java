@@ -7,7 +7,6 @@ import org.bukkit.Vibration;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.inventory.ItemStack;
 
-/** Turns what a plugin attaches to a particle into the numbers the server reads for that particle's options. */
 final class ParticleData {
     final double[] numbers;
     final String item;

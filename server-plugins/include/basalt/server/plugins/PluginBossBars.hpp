@@ -48,10 +48,8 @@ public:
         return std::nullopt;
     }
 
-    /// The ids of the kept bars.
     [[nodiscard]] virtual std::vector<std::string> kept() { return {}; }
 
-    /// Writes every field of the bar and tells the players watching it what changed.
     virtual bool update(const PluginBossBar& bar) {
         static_cast<void>(bar);
         return false;
@@ -76,7 +74,6 @@ public:
 
     virtual void clearPlayers(std::string_view id) { static_cast<void>(id); }
 
-    /// The uuids of the online players watching the bar.
     [[nodiscard]] virtual std::vector<std::string> players(std::string_view id) {
         static_cast<void>(id);
         return {};

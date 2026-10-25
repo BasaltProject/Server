@@ -15,7 +15,6 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-/** The items of a container block, kept in its block entity, so a window and a plugin always see the same stacks. */
 public class BlockInventory extends AbstractInventory {
     protected final String world;
     protected final int x;

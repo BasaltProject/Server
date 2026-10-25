@@ -8,7 +8,6 @@ import java.util.List;
 import net.kyori.adventure.text.Component;
 import org.jspecify.annotations.Nullable;
 
-/** The four kinds of input a dialog can ask for. */
 final class DialogInputs {
     private DialogInputs() {}
 

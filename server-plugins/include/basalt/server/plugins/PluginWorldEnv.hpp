@@ -26,7 +26,6 @@ struct PluginParticle {
     bool force = false;
     /// Numbers the particle's options read in order: a state id, a colour, a scale, a target.
     std::vector<double> data;
-    /// The item id of an item particle.
     std::string item;
     /// The player who alone sees it, or empty for everyone in range.
     std::string receiver;
@@ -66,7 +65,6 @@ struct PluginRaid {
     std::int64_t ticksActive = 0;
     std::int32_t omenLevel = 0;
     std::array<std::int32_t, 3> center{};
-    /// ongoing, victory, loss or stopped.
     std::string status;
     std::int32_t groupsSpawned = 0;
     std::int32_t totalGroups = 0;
@@ -215,7 +213,6 @@ public:
 
     [[nodiscard]] virtual std::int32_t playerCount() { return 0; }
 
-    /// The loaded block entities of the world.
     [[nodiscard]] virtual std::int32_t blockEntityCount() { return 0; }
 
     /// What the block at the position drops when broken with `tool` (an item id, empty for a hand), no stack spawned.

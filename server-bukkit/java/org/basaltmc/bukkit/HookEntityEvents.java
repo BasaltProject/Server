@@ -8,7 +8,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.LivingEntity;
 
-/** The entity events raised from deep in the game systems, as the Bukkit and Paper events plugins listen for. */
 final class HookEntityEvents {
     private HookEntityEvents() {}
 

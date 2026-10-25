@@ -11,7 +11,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.MenuType;
 import org.bukkit.inventory.PlayerInventory;
 
-/** One player's open window: the inventory above, their own below, and the item on their cursor. */
 public class BasaltInventoryView implements InventoryView {
     protected final HumanEntity player;
     protected final Inventory top;

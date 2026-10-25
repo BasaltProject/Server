@@ -13,7 +13,6 @@ import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Entity;
 
-/** The fight of an End world as the server keeps it; what only the fight's own ticking can do is not offered. */
 public final class BasaltDragonBattle implements DragonBattle {
     private final World world;
 

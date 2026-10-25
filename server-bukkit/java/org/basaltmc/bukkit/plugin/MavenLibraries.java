@@ -22,7 +22,6 @@ import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
 
-/** Resolves Maven coordinates into libraries/; one process owns the folder, so the resolver takes no locks. */
 public final class MavenLibraries implements ClassPathLibrary {
     private final RepositorySystem system;
     private final DefaultRepositorySystemSession session;

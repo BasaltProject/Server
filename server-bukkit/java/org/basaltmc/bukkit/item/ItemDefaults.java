@@ -11,7 +11,6 @@ import java.util.Map;
 import net.kyori.adventure.text.Component;
 import org.basaltmc.bukkit.Natives;
 
-/** The components every stack of an item kind carries unless they are overridden, as the server's tables give them. */
 public final class ItemDefaults {
     private static final Map<String, Map<String, Object>> cache = new HashMap<>();
     private static volatile Map<String, String> rarities;

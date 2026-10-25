@@ -9,7 +9,6 @@ import org.bukkit.map.MapFont;
 import org.bukkit.map.MapPalette;
 import org.bukkit.map.MapView;
 
-/** The picture a renderer draws on: a copy of what the world keeps, and the cursors the renderers add. */
 public final class BasaltMapCanvas implements MapCanvas {
     private final BasaltMapView view;
     private final byte[] base;

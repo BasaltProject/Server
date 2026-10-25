@@ -23,7 +23,6 @@ import net.kyori.adventure.key.Key;
 import org.bukkit.Keyed;
 import org.bukkit.NamespacedKey;
 
-/** Runs the registry handlers a bootstrapper registered, against the registries plugins see, at bootstrap time. */
 public final class RegistryLifecycle {
     private RegistryLifecycle() {}
 

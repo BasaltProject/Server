@@ -9,7 +9,6 @@ import java.util.Set;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemFlag;
 
-/** Item flags as the components the tooltip display hides. */
 final class MetaFlags {
     private static final String kDisplay = "minecraft:tooltip_display";
 

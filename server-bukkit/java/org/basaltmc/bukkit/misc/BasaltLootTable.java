@@ -13,7 +13,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.loot.LootContext;
 import org.bukkit.loot.LootTable;
 
-/** A loot table the server loaded, rolled by the server with the context a plugin gives. */
 public final class BasaltLootTable implements LootTable {
     private final NamespacedKey key;
 

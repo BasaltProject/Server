@@ -34,7 +34,6 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
-/** The part of the World API that reads or sets how the world around a position is made and ruled. */
 public abstract class WorldGeo extends WorldExtras {
     private final Map<Plugin, Set<Long>> tickets = new LinkedHashMap<>();
 

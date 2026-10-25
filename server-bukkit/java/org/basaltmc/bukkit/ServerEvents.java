@@ -7,7 +7,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.event.server.ServerListPingEvent;
 
-/** The server events Basalt raises, as the Bukkit and Paper events plugins listen for. */
 final class ServerEvents {
     private ServerEvents() {}
 

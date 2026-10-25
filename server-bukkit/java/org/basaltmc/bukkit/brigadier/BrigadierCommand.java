@@ -17,7 +17,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginIdentifiableCommand;
 import org.bukkit.plugin.Plugin;
 
-/** A command a plugin built with Brigadier or as a BasicCommand, run through the Bukkit command map. */
 public final class BrigadierCommand extends Command implements PluginIdentifiableCommand {
     private final Plugin plugin;
     private final CommandDispatcher<CommandSourceStack> dispatcher;

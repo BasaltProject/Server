@@ -5,7 +5,6 @@ import org.bukkit.Fluid;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 
-/** The fluid at a block, as the server held it when it was asked for. */
 final class BasaltFluidData implements FluidData {
     private final BasaltWorld world;
     private final int x;

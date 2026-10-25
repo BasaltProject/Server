@@ -6,7 +6,6 @@ import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.util.CachedServerIcon;
 
-/** The server settings that pause it, protect its spawn and pick where players come back, and a few more. */
 public abstract class ServerTail extends ServerLeftovers {
     private final Set<String> pauseVetoes = ConcurrentHashMap.newKeySet();
 

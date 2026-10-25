@@ -13,7 +13,6 @@ import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
-/** The block events Basalt raises, as the Bukkit and Paper events plugins listen for. */
 final class BlockEvents {
     private BlockEvents() {}
 

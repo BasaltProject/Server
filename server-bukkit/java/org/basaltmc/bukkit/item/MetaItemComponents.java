@@ -22,7 +22,6 @@ import org.bukkit.inventory.meta.Repairable;
 import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataContainer;
 
-/** Data components of an item meta. */
 public abstract class MetaItemComponents extends MetaItemCore {
     protected MetaItemComponents(Material type, Map<String, Object> components) {
         super(type, components);

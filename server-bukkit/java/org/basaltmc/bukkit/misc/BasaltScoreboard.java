@@ -17,7 +17,6 @@ import org.bukkit.scoreboard.Score;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
-/** A scoreboard held by the server under a handle: handle 0 is the one /scoreboard commands work on. */
 public final class BasaltScoreboard implements Scoreboard {
     private static final Cleaner kCleaner = Cleaner.create();
 

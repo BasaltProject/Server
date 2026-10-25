@@ -12,7 +12,6 @@ import io.papermc.paper.registry.RegistryKey;
 import io.papermc.paper.registry.tag.TagKey;
 import org.basaltmc.bukkit.Unsupported;
 
-/** The lifecycle event types plugins name; the server runs the ones it has a use for and lists the rest as unused. */
 public final class BasaltLifecycleEventTypeProvider implements LifecycleEventTypeProvider {
     /** What a plugin asked for: a handler on an event type, with how it wants to be ordered. */
     public static final class Handler<O extends LifecycleEventOwner> implements

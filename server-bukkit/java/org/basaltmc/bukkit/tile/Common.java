@@ -11,7 +11,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.loot.LootTable;
 
-/** The members several kinds share: a custom name, a lock, a loot table. */
 final class Common {
     private Common() {}
 

@@ -5,7 +5,6 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
 
-/** The border of one world, read from and written to the server on every call. */
 public final class BasaltWorldBorder implements WorldBorder {
     private static final int kCenterX = 0;
     private static final int kCenterZ = 1;

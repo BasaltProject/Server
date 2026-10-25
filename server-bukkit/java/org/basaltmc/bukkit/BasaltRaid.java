@@ -10,7 +10,6 @@ import org.bukkit.Raid;
 import org.bukkit.entity.Raider;
 import org.bukkit.persistence.PersistentDataContainer;
 
-/** A raid as the server held it when it was asked for; the setters write through to the server. */
 final class BasaltRaid implements Raid {
     private final BasaltWorld world;
     private final int id;

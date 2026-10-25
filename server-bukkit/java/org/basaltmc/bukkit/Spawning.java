@@ -2,7 +2,6 @@ package org.basaltmc.bukkit;
 
 import org.bukkit.entity.SpawnCategory;
 
-/** The natural spawning caps and rhythms the server runs by, which Bukkit names by spawn category. */
 final class Spawning {
     private Spawning() {}
 

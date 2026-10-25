@@ -5,7 +5,6 @@ import org.basaltmc.bukkit.facade.NbtCodec;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
-/** The one place entity state turns an item stack into the stack NBT the server stores, and back. */
 public final class EntityItems {
     private EntityItems() {}
 

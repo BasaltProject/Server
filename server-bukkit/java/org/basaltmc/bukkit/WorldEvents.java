@@ -5,7 +5,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.event.world.ClockTimeSkipEvent;
 
-/** The world events Basalt raises, as the Bukkit and Paper events plugins listen for. */
 final class WorldEvents {
     private WorldEvents() {}
 

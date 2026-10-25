@@ -18,7 +18,6 @@ import org.bukkit.potion.PotionType;
 import org.bukkit.structure.StructureManager;
 import org.bukkit.util.CachedServerIcon;
 
-/** The server calls that reach structures, maps, brewing and the data the server reloads. */
 public abstract class ServerLeftovers extends ServerExtras {
     private final BasaltStructureManager structures = new BasaltStructureManager();
 

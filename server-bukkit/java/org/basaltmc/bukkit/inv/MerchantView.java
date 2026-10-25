@@ -5,7 +5,6 @@ import org.bukkit.entity.HumanEntity;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.Merchant;
 
-/** A merchant window that has not been opened yet: opening it hands the merchant to the player. */
 final class MerchantView extends BasaltInventoryView {
     private final Merchant merchant;
 

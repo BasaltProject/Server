@@ -5,7 +5,6 @@ import org.basaltmc.bukkit.item.Nbt;
 import org.bukkit.Location;
 import org.bukkit.World;
 
-/** The data of a spawner and where it stands, whatever holds it. */
 public final class SpawnerView {
     public final World world;
     public final Map<String, Object> data;

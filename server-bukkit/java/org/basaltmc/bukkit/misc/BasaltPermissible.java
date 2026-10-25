@@ -11,7 +11,6 @@ import org.bukkit.permissions.PermissibleBase;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.permissions.ServerOperator;
 
-/** Bukkit's permissible over the server's groups: attachments answer first, then the group, then plugin defaults. */
 public final class BasaltPermissible extends PermissibleBase {
     private final UUID id;
     private boolean ready;

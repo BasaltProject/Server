@@ -12,7 +12,6 @@ namespace basalt::server::runtime::entity {
 class ServerEntity;
 }
 
-/// Field fillers shared by the events that sit deep in the game systems.
 namespace basalt::server::runtime::plugins::hookEvents {
 
 void entity(server::plugins::PluginEvent& event, std::string_view world, const entity::ServerEntity& who);

@@ -177,7 +177,6 @@ public:
 
     [[nodiscard]] virtual float experienceProgress() const { return 0.0F; }
 
-    /// Total experience points, as the level and progress add up.
     [[nodiscard]] virtual std::int32_t experiencePoints() const { return 0; }
 
     [[nodiscard]] virtual float saturation() const { return 0.0F; }

@@ -15,7 +15,6 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
 
-/** The region schedulers over the one tick Basalt runs a world on: a region is the whole server. */
 public final class PaperSchedulers {
     private PaperSchedulers() {}
 

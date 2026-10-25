@@ -9,7 +9,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-/** The inventory of a block whose items live in its block entity, with the accessors its kind adds. */
 final class Inventories {
     private Inventories() {}
 

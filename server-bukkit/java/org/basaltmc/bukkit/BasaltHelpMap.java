@@ -14,7 +14,6 @@ import org.bukkit.help.GenericCommandHelpTopic;
 import org.bukkit.help.HelpTopic;
 import org.bukkit.help.HelpTopicFactory;
 
-/** The help topics plugins register, plus one generic topic for every command the server knows. */
 public final class BasaltHelpMap extends HelpMapBase {
     private final Map<String, HelpTopic> topics = new ConcurrentHashMap<>();
     private final Map<Class<?>, HelpTopicFactory<?>> factories = new ConcurrentHashMap<>();

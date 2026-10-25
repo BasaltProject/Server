@@ -9,7 +9,6 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.material.MaterialData;
 
-/** The blocks of one chunk a generator is making, as the server's block state ids, section by section. */
 public final class BasaltChunkData implements ChunkGenerator.ChunkData {
     private final int minY;
     private final int maxY;

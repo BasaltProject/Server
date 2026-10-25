@@ -8,7 +8,6 @@ import net.kyori.adventure.nbt.api.BinaryTagHolder;
 import org.basaltmc.bukkit.dialog.DialogCallbacks;
 import org.bukkit.entity.Player;
 
-/** Gives the answers that come back from a dialog to the function behind the button, or else to the plugins. */
 final class DialogEvents {
     private DialogEvents() {}
 

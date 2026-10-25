@@ -4,7 +4,6 @@ import java.util.LinkedHashMap;
 import net.kyori.adventure.text.ComponentLike;
 import org.basaltmc.bukkit.datacomponent.ItemSpecs;
 
-/** Builds the attribute modifier tooltip displays the item component API hands out. */
 public final class BasaltDisplayBridge implements AttributeModifierDisplayBridge {
     @Override
     public AttributeModifierDisplay.Default reset() {

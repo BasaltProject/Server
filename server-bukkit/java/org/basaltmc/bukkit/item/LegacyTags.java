@@ -7,7 +7,6 @@ import org.bukkit.inventory.meta.tags.ItemTagType;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
-/** The deprecated item tag container over the persistent data container the stack already keeps. */
 @SuppressWarnings({"deprecation", "removal"})
 final class LegacyTags implements CustomItemTagContainer {
     private final PersistentDataContainer container;

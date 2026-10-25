@@ -11,9 +11,7 @@ import io.papermc.paper.registry.event.type.RegistryEntryAddEventType;
 import java.lang.reflect.ParameterizedType;
 import java.util.function.Predicate;
 
-/** Hands out the registry event types a bootstrapper asks for; each handler is kept for the server to run. */
 public final class BasaltRegistryEventTypeProvider implements RegistryEventTypeProvider {
-    /** A registry handler a bootstrapper asked for, with the filter and priority it set. */
     public static final class Recorded<T> implements RegistryEntryAddConfiguration<T> {
         private final String event;
         private final boolean compose;

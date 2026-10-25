@@ -6,7 +6,6 @@ import org.basaltmc.bukkit.datacomponent.Builders;
 import org.basaltmc.bukkit.datacomponent.ContentSpecs;
 import org.basaltmc.bukkit.datacomponent.ItemSpecs;
 
-/** The factories the item component interfaces reach the server through; the kinds not held yet say so on use. */
 public final class BasaltComponentBridge implements ItemComponentTypesBridge {
     @Override
     public ItemLore.Builder lore() {

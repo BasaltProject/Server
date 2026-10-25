@@ -17,7 +17,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 
-/** The window each player has open, with the Java object that stands for it. */
 public final class Windows {
     private static final Map<String, BasaltInventoryView> views = new HashMap<>();
 

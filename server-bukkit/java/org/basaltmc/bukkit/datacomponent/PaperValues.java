@@ -38,7 +38,6 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ItemType;
 
-/** The Paper component values the server can hold, each knowing the stored form it was read from and goes back to. */
 final class PaperValues {
     private PaperValues() {}
 

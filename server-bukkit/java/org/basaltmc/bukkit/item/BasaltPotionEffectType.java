@@ -14,7 +14,6 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionEffectTypeCategory;
 
-/** A mob effect with the registry facts the server holds: its protocol id and colour. */
 public final class BasaltPotionEffectType extends PotionEffectType {
     private static final Set<String> kBeneficial = Set.of("speed", "haste", "strength", "instant_health", "jump_boost",
         "regeneration", "resistance", "fire_resistance", "water_breathing", "invisibility", "night_vision",

@@ -55,7 +55,6 @@ public:
         mergeListened_ = std::move(listened);
     }
 
-    /// The items that reach their lifetime on the next tick.
     [[nodiscard]] std::vector<DroppedItem> expiring(const sched::Region* region) const;
 
     void restartAge(std::int32_t entityId);

@@ -6,7 +6,6 @@ import org.bukkit.Registry;
 import org.bukkit.block.Biome;
 import org.bukkit.generator.ChunkGenerator;
 
-/** One biome for each 4 by 4 by 4 cell of a chunk, which is the grain the server stores biomes in. */
 public final class CellBiomes implements ChunkGenerator.BiomeGrid {
     private final int minY;
     private final int height;

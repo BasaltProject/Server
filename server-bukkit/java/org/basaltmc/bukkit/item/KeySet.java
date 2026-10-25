@@ -11,7 +11,6 @@ import org.bukkit.Keyed;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 
-/** A set of registry keys held by id. */
 public final class KeySet<T extends Keyed> implements RegistryKeySet<T> {
     private final RegistryKey<T> registry;
     private final List<TypedKey<T>> keys = new ArrayList<>();

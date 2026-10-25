@@ -12,7 +12,6 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-/** An inventory a plugin made: its contents live here, and each window that shows it is kept in step. */
 public class CustomInventory extends AbstractInventory {
     private final InventoryHolder holder;
     private final InventoryType type;

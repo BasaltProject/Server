@@ -13,7 +13,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
-/** Text components as they sit inside item data: NBT, with strings, legacy codes and Adventure on either side. */
 public final class Texts {
     private static final GsonComponentSerializer GSON = GsonComponentSerializer.gson();
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();

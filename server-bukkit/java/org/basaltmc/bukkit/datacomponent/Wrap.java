@@ -16,7 +16,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.inventory.ItemStack;
 
-/** Small conversions the component specs share. */
 final class Wrap {
     private Wrap() {}
 

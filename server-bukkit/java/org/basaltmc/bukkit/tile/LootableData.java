@@ -8,7 +8,6 @@ import org.basaltmc.bukkit.RestNatives;
 import org.basaltmc.bukkit.item.Convert;
 import org.basaltmc.bukkit.item.Nbt;
 
-/** The refill bookkeeping of a loot container, stored the way the server writes it under Paper.LootableData. */
 public final class LootableData {
     private static final String kRoot = "Paper.LootableData";
 

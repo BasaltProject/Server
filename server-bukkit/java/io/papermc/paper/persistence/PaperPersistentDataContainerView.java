@@ -15,7 +15,6 @@ import org.bukkit.persistence.PersistentDataAdapterContext;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
-/** The read half of a persistent data container; the compound lives in whichever store the holder gave it. */
 public abstract class PaperPersistentDataContainerView implements PersistentDataContainerView {
     private static final PersistentDataAdapterContext kContext = CraftPersistentDataContainer::newContainer;
 

@@ -16,7 +16,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
-/** The damage a player has taken lately, kept by the server and read here with the game's own rules for combat. */
 public final class BasaltCombatTracker implements CombatTracker {
     private static final int kStride = 8;
     private static final int kResetDamageTicks = 100;

@@ -17,7 +17,6 @@ import org.bukkit.block.sign.SignSide;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
-/** Signs and hanging signs: two sides of four lines each, a wax flag and the player allowed to edit. */
 final class SignKind implements TileKind {
     private static final int kLines = 4;
     private final Class<? extends BlockState> face;

@@ -19,7 +19,6 @@ import org.bukkit.permissions.PermissionAttachment;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.permissions.ServerOperator;
 
-/** Entity facts every entity answers the same way, kept out of the ops interface that exposes them. */
 final class EntityExtras {
     private static final ServerOperator kNeverOp = new ServerOperator() {
         @Override

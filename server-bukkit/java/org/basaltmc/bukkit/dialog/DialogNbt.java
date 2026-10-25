@@ -28,11 +28,9 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import org.basaltmc.bukkit.item.Texts;
 
-/** A dialog written the way the game's own dialog data is, as the SNBT the server sends to the client. */
 public final class DialogNbt {
     private DialogNbt() {}
 
-    /** SNBT that is embedded as it is. */
     record Raw(String snbt) {}
 
     private static Map<String, Object> map(Object... pairs) {

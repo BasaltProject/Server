@@ -80,7 +80,6 @@ public final class EntityCore {
         return staged != null;
     }
 
-    /** Turns a template into the entity that now exists, keeping what it was told. */
     public void bind(int realId, UUID realUuid) {
         Map<String, Object> properties = stagedProperties;
         List<Object[]> calls = stagedCalls;
@@ -101,7 +100,6 @@ public final class EntityCore {
         return staged;
     }
 
-    /** Hands what a template was told to the entity that took its place. */
     public void replayOnto(EntityCore real) {
         if (staged == null) {
             return;

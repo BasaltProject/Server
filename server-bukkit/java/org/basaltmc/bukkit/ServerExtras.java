@@ -19,7 +19,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.SpawnCategory;
 import org.bukkit.util.CachedServerIcon;
 
-/** The server-wide settings and the world lifecycle, answered by the server rather than held here. */
 public abstract class ServerExtras extends MiscServer {
     private static String setting(String key) {
         String value = WorldEnvNatives.setting(key);

@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.bukkit.profile.PlayerTextures;
 
-/** The skin and cape a profile's "textures" property carries, read and written as Mojang's JSON. */
 public final class BasaltPlayerTextures implements PlayerTextures {
     private final BasaltPlayerProfile owner;
     private URL skin;

@@ -11,7 +11,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 
-/** What OfflinePlayer asks of the player database, shared by the offline objects and the online ones. */
 public final class OfflineSupport {
     private OfflineSupport() {}
 

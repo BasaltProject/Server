@@ -13,7 +13,6 @@ import org.basaltmc.bukkit.Natives;
 import org.bukkit.FeatureFlag;
 import org.bukkit.NamespacedKey;
 
-/** The data packs the server found, read from it each time so /datapack changes show at once. */
 public final class BasaltDatapackManager implements DatapackManager {
     private record Pack(String id, Component title, Component description, boolean required, boolean enabled,
             Compatibility compatibility, DatapackSource source, Set<FeatureFlag> features) implements Datapack {

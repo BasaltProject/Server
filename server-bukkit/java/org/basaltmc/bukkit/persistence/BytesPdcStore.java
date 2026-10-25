@@ -5,7 +5,6 @@ import java.util.function.Supplier;
 import net.minecraft.nbt.CompoundTag;
 import org.basaltmc.bukkit.facade.NbtCodec;
 
-/** A store over a named NBT compound held as bytes by the server; an empty or missing blob is an empty container. */
 public final class BytesPdcStore implements PdcStore {
     private final Supplier<byte[]> reader;
     private final Consumer<byte[]> writer;

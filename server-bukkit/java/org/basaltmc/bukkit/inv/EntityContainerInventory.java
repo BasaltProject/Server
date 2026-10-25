@@ -15,7 +15,6 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-/** The chest of a chest minecart, chest boat or hopper minecart, kept in the vehicle's own data. */
 public class EntityContainerInventory extends AbstractInventory {
     protected final EntityCore core;
     protected final Entity holder;

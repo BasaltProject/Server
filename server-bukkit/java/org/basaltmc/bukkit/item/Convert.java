@@ -11,7 +11,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-/** Conversions between API value types and their stored component form. */
 public final class Convert {
     private Convert() {}
 

@@ -16,11 +16,9 @@ import java.util.function.Function;
 import org.basaltmc.bukkit.Unsupported;
 import org.basaltmc.bukkit.item.Nbt;
 
-/** Component values and their builders as proxies over a field map, each spec knowing its stored form. */
 public final class Dyn {
     private Dyn() {}
 
-    /** What every value built here can say about itself: the stored form it goes back to. */
     public interface Value {
         Object nbt();
     }

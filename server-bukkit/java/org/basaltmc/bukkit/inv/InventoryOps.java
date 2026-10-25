@@ -5,7 +5,6 @@ import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-/** The searching and stacking rules every inventory shares, over nothing but its slots. */
 public final class InventoryOps {
     private InventoryOps() {}
 

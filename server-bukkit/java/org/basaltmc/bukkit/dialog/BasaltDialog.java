@@ -6,7 +6,6 @@ import io.papermc.paper.registry.data.dialog.type.DialogType;
 import java.util.Map;
 import org.bukkit.NamespacedKey;
 
-/** A dialog a plugin made, which belongs to no registry and is sent to a client as it is. */
 public final class BasaltDialog implements Dialog {
     private final DialogBase base;
     private final DialogType type;

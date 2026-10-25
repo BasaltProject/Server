@@ -15,7 +15,6 @@ import org.bukkit.BanList;
 import org.bukkit.ban.IpBanList;
 import org.bukkit.ban.ProfileBanList;
 
-/** The two ban lists, backed by the same rows the /ban and /ban-ip commands write. */
 public final class BasaltBanList {
     private BasaltBanList() {}
 

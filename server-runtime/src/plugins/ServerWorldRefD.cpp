@@ -257,7 +257,6 @@ std::shared_ptr<server::plugins::PluginNpcRef> LoadedWorldRef::npc(std::string_v
     if (hooks_.npcs == nullptr || !hooks_.nextEntityId) {
         return nullptr;
     }
-    // Nameless on purpose: what is read over its head is the display made below.
     auto npc = std::make_shared<Npc>(hooks_.nextEntityId(), wire::common::Uuid::random(), std::string{}, world_->name(),
                                      x, y, z);
     hooks_.npcs->add(npc, std::move(onClick));

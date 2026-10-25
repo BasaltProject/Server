@@ -2,7 +2,6 @@ package org.basaltmc.bukkit.inv;
 
 import org.bukkit.event.inventory.InventoryType;
 
-/** How an inventory type is named by the server's windows, and what a slot of each is for. */
 public final class InventoryTypes {
     private InventoryTypes() {}
 

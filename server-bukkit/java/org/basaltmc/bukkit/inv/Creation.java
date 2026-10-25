@@ -6,7 +6,6 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
-/** What `Bukkit.createInventory` builds. */
 public final class Creation {
     private Creation() {}
 

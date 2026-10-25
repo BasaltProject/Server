@@ -19,7 +19,6 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-/** Mob spawners: the timer, the ranges and the weighted entities they pick from. */
 public final class SpawnerKind implements TileKind {
     @Override
     public Class<? extends BlockState> face() {

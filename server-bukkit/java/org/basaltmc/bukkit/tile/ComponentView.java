@@ -4,7 +4,6 @@ import java.util.AbstractMap;
 import java.util.Map;
 import java.util.Set;
 
-/** The data of a block entity seen as the component map of the matching item, so the item metas can edit it. */
 final class ComponentView extends AbstractMap<String, Object> {
     private final Map<String, Object> data;
     private final Map<String, String> aliases;

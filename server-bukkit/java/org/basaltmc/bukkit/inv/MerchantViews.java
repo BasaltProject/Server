@@ -6,7 +6,6 @@ import org.bukkit.inventory.Merchant;
 import org.bukkit.inventory.MerchantInventory;
 import org.bukkit.inventory.view.MerchantView;
 
-/** A merchant window as the trade a player picked sees it. */
 public final class MerchantViews extends BasaltInventoryView implements MerchantView {
     private final Merchant merchant;
 

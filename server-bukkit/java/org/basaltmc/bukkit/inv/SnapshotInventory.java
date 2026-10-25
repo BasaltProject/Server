@@ -6,7 +6,6 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-/** The slots of a window as they stood at one moment, which an event's listeners may change before they are applied. */
 public final class SnapshotInventory extends AbstractInventory {
     private final InventoryType type;
     private final ItemStack[] slots;

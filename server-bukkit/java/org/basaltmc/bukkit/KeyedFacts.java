@@ -15,7 +15,6 @@ import org.bukkit.damage.DamageScaling;
 import org.bukkit.damage.DamageType;
 import org.bukkit.damage.DeathMessageType;
 
-/** What a registry entry known only by its key can still tell, read from the server's registry data. */
 final class KeyedFacts {
     static final Object kNone = new Object();
 

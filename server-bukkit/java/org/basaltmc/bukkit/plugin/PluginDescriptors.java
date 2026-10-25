@@ -13,7 +13,6 @@ import org.bukkit.plugin.InvalidDescriptionException;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.yaml.snakeyaml.Yaml;
 
-/** Reads plugin.yml and paper-plugin.yml into one description, whichever the jar carries. */
 public final class PluginDescriptors {
     private PluginDescriptors() {}
 

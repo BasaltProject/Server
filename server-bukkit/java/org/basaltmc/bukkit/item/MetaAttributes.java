@@ -13,7 +13,6 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.EquipmentSlotGroup;
 
-/** The `minecraft:attribute_modifiers` list of an item, read and written as Bukkit's attribute modifiers. */
 public final class MetaAttributes {
     private static final String kAttributes = "minecraft:attribute_modifiers";
 

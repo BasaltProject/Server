@@ -24,7 +24,6 @@ import org.bukkit.persistence.PersistentDataAdapterContext;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
-/** The conversion between persistent data values and the NBT tags they are stored as. */
 public final class PdcTags {
     private PdcTags() {}
 

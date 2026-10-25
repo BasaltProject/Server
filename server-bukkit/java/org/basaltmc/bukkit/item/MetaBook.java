@@ -8,7 +8,6 @@ import org.bukkit.Material;
 import org.bukkit.configuration.serialization.DelegateDeserialization;
 import org.bukkit.inventory.meta.BookMeta;
 
-/** A written book: title, author, generation and component pages, with pages numbered from one. */
 @DelegateDeserialization(ItemMetas.Serial.class)
 public final class MetaBook extends MetaItem implements BookMeta {
     private static final String kContent = "minecraft:written_book_content";

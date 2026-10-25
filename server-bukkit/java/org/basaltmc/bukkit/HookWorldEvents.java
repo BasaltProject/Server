@@ -1,6 +1,5 @@
 package org.basaltmc.bukkit;
 
-/** The world and server events raised from deep in the game systems, as Bukkit and Paper events. */
 final class HookWorldEvents {
     private HookWorldEvents() {}
 

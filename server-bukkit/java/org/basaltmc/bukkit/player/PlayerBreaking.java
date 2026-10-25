@@ -11,7 +11,6 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 
-/** A player breaking a block by API: the event, then the drops and the wear of the tool, as a dig does. */
 final class PlayerBreaking {
     private PlayerBreaking() {}
 

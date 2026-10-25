@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.basaltmc.bukkit.WorldEnvNatives;
 import org.bukkit.Bukkit;
 
-/** Lids a plugin opened: the lid shows open until it closes it, whatever players do with the container. */
 final class Lids {
     private static final Set<String> kOpen = ConcurrentHashMap.newKeySet();
 

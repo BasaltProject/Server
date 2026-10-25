@@ -23,7 +23,6 @@ public:
         return std::nullopt;
     }
 
-    /// The ids of every enchantment the datapack defines.
     [[nodiscard]] virtual std::vector<std::string> enchantmentIds() const { return {}; }
 
     /// What a crafting grid makes: `{items:[...]}` in, `{recipe, result, remaining:[...]}` out; empty if none fits.

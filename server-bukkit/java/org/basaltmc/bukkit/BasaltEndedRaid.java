@@ -9,7 +9,6 @@ import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Raider;
 import org.bukkit.persistence.PersistentDataContainer;
 
-/** A raid as it stood when it ended, which is all the server tells about it. */
 final class BasaltEndedRaid implements Raid {
     private final Location center;
     private final RaidStatus status;

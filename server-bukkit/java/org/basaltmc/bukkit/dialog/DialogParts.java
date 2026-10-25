@@ -15,7 +15,6 @@ import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.inventory.ItemStack;
 import org.jspecify.annotations.Nullable;
 
-/** The values a dialog is made of apart from its inputs and its type. */
 final class DialogParts {
     private DialogParts() {}
 

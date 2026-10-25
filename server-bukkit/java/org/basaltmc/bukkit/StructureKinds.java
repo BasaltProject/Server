@@ -7,7 +7,6 @@ import org.bukkit.Registry;
 import org.bukkit.generator.structure.Structure;
 import org.bukkit.generator.structure.StructureType;
 
-/** Which kind of structure each structure is, as the game's structure definitions say. */
 final class StructureKinds {
     private StructureKinds() {}
 

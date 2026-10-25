@@ -19,7 +19,6 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.yaml.snakeyaml.Yaml;
 
-/** Runs the bootstrapper class paper-plugin.yml names: it sees the plugin before the plugin exists. */
 public final class Bootstraps {
     private Bootstraps() {}
 

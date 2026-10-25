@@ -13,7 +13,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
-/** What a plugin sets in World#rayTrace(Consumer): the ray, what it may hit and what it ignores. */
 public final class RayTraceBuilder implements PositionedRayTraceConfigurationBuilder {
     private Location start;
     private Vector direction;

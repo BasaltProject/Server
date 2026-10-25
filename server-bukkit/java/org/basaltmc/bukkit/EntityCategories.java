@@ -6,7 +6,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-/** The spawn category the game gives each entity type. */
 final class EntityCategories {
     private static volatile Map<String, String> categories;
 

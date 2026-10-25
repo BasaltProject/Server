@@ -22,7 +22,6 @@ import org.bukkit.inventory.meta.components.JukeboxPlayableComponent;
 import org.bukkit.inventory.meta.components.ToolComponent;
 import org.bukkit.inventory.meta.components.UseCooldownComponent;
 
-/** The Bukkit views of the food, tool, equippable, use cooldown and jukebox components over their stored compound. */
 public final class MetaComponents {
     private MetaComponents() {}
 

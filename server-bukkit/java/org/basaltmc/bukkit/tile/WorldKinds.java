@@ -34,7 +34,6 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.BlockVector;
 
-/** Blocks that act on the world around them. */
 final class WorldKinds {
     private WorldKinds() {}
 

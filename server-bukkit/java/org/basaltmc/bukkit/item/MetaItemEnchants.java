@@ -22,7 +22,6 @@ import org.bukkit.inventory.meta.Repairable;
 import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataContainer;
 
-/** Enchantments, flags and tooltip of an item meta. */
 public abstract class MetaItemEnchants extends MetaItemComponents {
     protected MetaItemEnchants(Material type, Map<String, Object> components) {
         super(type, components);

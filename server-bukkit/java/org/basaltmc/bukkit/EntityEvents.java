@@ -30,7 +30,6 @@ import org.basaltmc.bukkit.entity.Cored;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-/** The entity events Basalt raises, as the Bukkit events plugins listen for. */
 final class EntityEvents {
     private EntityEvents() {}
 

@@ -11,7 +11,6 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 
-/** The boss bar of a raid the server runs: the raid decides its own title and who stands near enough to see it. */
 public final class BasaltRaidBar implements BossBar {
     private static final BarColor[] kColors = {BarColor.PINK, BarColor.BLUE, BarColor.RED, BarColor.GREEN,
         BarColor.YELLOW, BarColor.PURPLE, BarColor.WHITE};
