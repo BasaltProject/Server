@@ -36,7 +36,6 @@ using server::plugins::pluginEventTypes::inventoryOpen;
 using server::plugins::pluginEventTypes::inventoryPrepare;
 using server::plugins::pluginEventTypes::inventoryTake;
 using server::plugins::pluginEventTypes::inventoryTrade;
-using server::plugins::pluginEventTypes::itemSpawn;
 using server::plugins::pluginEventTypes::playerBed;
 using server::plugins::pluginEventTypes::playerBucket;
 using server::plugins::pluginEventTypes::playerDeath;
@@ -327,18 +326,6 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
             event.set("entering", false);
         });
     };
-    hooks.itemSpawnAllowed = [&sink](std::string_view worldName, double x, double y, double z, const std::string& item,
-                                     std::int32_t count, std::string_view cause) {
-        return sink.allowed(&itemSpawn, [&](PluginEvent& event) {
-            event.set("world", std::string{worldName});
-            event.set("x", x);
-            event.set("y", y);
-            event.set("z", z);
-            event.set("item", item);
-            event.set("count", static_cast<std::int64_t>(count));
-            event.set("cause", std::string{cause});
-        });
-    };
     return hooks;
 }
 
@@ -459,7 +446,7 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
     hooks.healed = [&sink](const player::PlayerSession& who, float amount, std::string_view cause, bool fast) {
         return raiseHeal(sink, who, amount, cause, fast);
     };
-    hooks.died = [&sink](const player::PlayerSession& who, const std::string& deathMessage) {
+    hooks.died = [&sink](const player::PlayerSession& who, const std::string& deathMessage, player::DeathLoot& loot) {
         Announcement said;
         const server::plugins::PluginEvent* event = sink.ask(&playerDeath, [&](PluginEvent& filled) {
             EventSink::player(filled, who);
@@ -467,6 +454,15 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
             filled.set("y", who.y);
             filled.set("z", who.z);
             filled.set("cause", deathMessage);
+            std::string drops;
+            for (const storage::StoredItemStack& stack : loot.drops) {
+                drops += (drops.empty() ? "" : "\n") + snbtOf(stack);
+            }
+            filled.set("drops", std::move(drops));
+            filled.set("exp", static_cast<std::int64_t>(loot.experience));
+            filled.set("keep_inventory", loot.keepInventory);
+            filled.set("keep_level", loot.keepLevel);
+            filled.set("show_messages", loot.showMessages);
         });
         if (event != nullptr) {
             if (const auto* text = std::get_if<std::string>(&event->get("message")); text != nullptr) {
@@ -474,6 +470,28 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
             }
             if (const auto* silent = std::get_if<bool>(&event->get("silent")); silent != nullptr) {
                 said.silent = *silent;
+            }
+            if (const auto* drops = std::get_if<std::string>(&event->get("drops")); drops != nullptr) {
+                loot.drops.clear();
+                std::size_t from = 0;
+                while (from <= drops->size() && !drops->empty()) {
+                    const std::size_t end = std::min(drops->find('\n', from), drops->size());
+                    if (const std::optional<storage::StoredItemStack> stack =
+                            stackFromSnbt(drops->substr(from, end - from));
+                        stack.has_value()) {
+                        loot.drops.push_back(*stack);
+                    }
+                    from = end + 1;
+                }
+            }
+            if (const auto* exp = std::get_if<std::int64_t>(&event->get("exp")); exp != nullptr) {
+                loot.experience = static_cast<std::int32_t>(std::max<std::int64_t>(0, *exp));
+            }
+            if (const auto* keep = std::get_if<bool>(&event->get("keep_inventory")); keep != nullptr) {
+                loot.keepInventory = *keep;
+            }
+            if (const auto* keep = std::get_if<bool>(&event->get("keep_level")); keep != nullptr) {
+                loot.keepLevel = *keep;
             }
         }
         return said;

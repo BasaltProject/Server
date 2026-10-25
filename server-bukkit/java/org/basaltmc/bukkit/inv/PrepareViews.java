@@ -28,7 +28,7 @@ public final class PrepareViews {
         if (resultSlot < slots.length) {
             slots[resultSlot] = result;
         }
-        return new SnapshotInventory(type, slots);
+        return new SnapshotInventory(type, slots).withViewers(top.getViewers());
     }
 
     public static BasaltInventoryView view(HumanEntity player, Inventory top, BasaltInventoryView window) {

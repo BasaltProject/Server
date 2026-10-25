@@ -121,12 +121,13 @@ const Kind& snowball() {
 }
 
 std::span<const Kind> all() {
-    static const std::array<Kind, 15> kinds{
+    static const std::array<Kind, 16> kinds{
         arrow(), make("spectral_arrow", 0.05, 0.99, true),
         // parity: `ThrownTrident` is an arrow whose water inertia is its air drag.
         make("trident", 0.05, 0.99, true), snowball(), make("egg", 0.03, 0.99, false),
         make("ender_pearl", 0.03, 0.99, false), make("experience_bottle", 0.07, 0.99, false),
-        make("potion", 0.05, 0.99, false), fireball(), make("small_fireball", 0.0, 0.95, false, kAcceleration),
+        make("splash_potion", 0.05, 0.99, false), make("lingering_potion", 0.05, 0.99, false), fireball(),
+        make("small_fireball", 0.0, 0.95, false, kAcceleration),
         // parity: `AbstractWindCharge` has inertia one and acceleration zeroed in its constructor.
         make("wind_charge", 0.0, 1.0, false), make("breeze_wind_charge", 0.0, 1.0, false),
         make("dragon_fireball", 0.0, 0.95, false, kAcceleration), make("wither_skull", 0.0, 0.95, false, kAcceleration),
@@ -154,7 +155,7 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
     constexpr double kChargeReach = 1.0;
     constexpr float kChargePower = 1.0F;
     constexpr float kChargeUncertainty = 6.6666665F;
-    static const std::array<Entry, 12> table{
+    static const std::array<Entry, 13> table{
         // parity: `TridentItem.asProjectile`, the default dispense config.
         Entry{.item = "trident", .kind = "trident"},
         Entry{.item = "arrow", .kind = "arrow", .carries = false},
@@ -165,7 +166,12 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
         Entry{.item = "brown_egg", .kind = "egg"},
         Entry{.item = "snowball", .kind = "snowball"},
         Entry{.item = "experience_bottle", .kind = "experience_bottle"},
-        Entry{.item = "splash_potion", .kind = "potion", .power = kPotionPower, .uncertainty = kPotionUncertainty},
+        Entry{
+            .item = "splash_potion", .kind = "splash_potion", .power = kPotionPower, .uncertainty = kPotionUncertainty},
+        Entry{.item = "lingering_potion",
+              .kind = "lingering_potion",
+              .power = kPotionPower,
+              .uncertainty = kPotionUncertainty},
         Entry{.item = "wind_charge",
               .kind = "wind_charge",
               .reach = kChargeReach,
@@ -196,9 +202,7 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
 }
 
 const Kind* kindOf(const wire::common::Identifier& type) {
-    const bool thrownPotion = type.path() == "splash_potion" || type.path() == "lingering_potion";
-    const auto found = std::ranges::find_if(
-        all(), [&](const Kind& one) { return one.type == type || (thrownPotion && one.type.path() == "potion"); });
+    const auto found = std::ranges::find_if(all(), [&](const Kind& one) { return one.type == type; });
     return found == all().end() ? nullptr : &*found;
 }
 

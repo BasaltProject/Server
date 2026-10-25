@@ -97,7 +97,7 @@ struct MobActionHooks {
         deathDrops;
     std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& animal)> tameAllowed;
     std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& animal,
-                       const entity::ServerEntity& partner)>
+                       const entity::ServerEntity& partner, const std::string& breeder, std::int32_t& experience)>
         breedAllowed;
     std::function<void(std::string_view cause, const wire::common::Identifier& parent,
                        const wire::common::Identifier& partner, const wire::common::Identifier& child)>

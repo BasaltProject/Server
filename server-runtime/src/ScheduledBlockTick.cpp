@@ -49,6 +49,7 @@
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -342,7 +343,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
         const wire::common::Identifier* ticking = registry::blockStateDefinitions::blockOf(here);
         const bool dispenser = ticking != nullptr && (ticking->path() == "dispenser" || ticking->path() == "dropper");
-        if (!dispenser || !hooks_.dispenseAllowed || hooks_.dispenseAllowed(world, x, y, z)) {
+        if (dispenser) {
             const world::fluidFlow::Context context{.world = world.state(),
                                                     .gameRules = world.gameRules(),
                                                     .random = random,
@@ -352,6 +353,15 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             const world::dispensers::Result result = world::dispensers::fire(
                 context, x, y, z,
                 {.allocateEntityId = [this] { return players_->allocateEntityId(); },
+                 .dispensing =
+                     [this, &world, x, y, z](const server::world::loot::ItemStack& stack,
+                                             server::registry::BlockFace out) {
+                         constexpr std::array<std::string_view, 6> kFaces{"down",  "up",   "north",
+                                                                          "south", "west", "east"};
+                         return !hooks_.dispenseAllowed ||
+                                hooks_.dispenseAllowed(world, x, y, z, stack.item.toString(),
+                                                       kFaces[static_cast<std::size_t>(out)]);
+                     },
                  .isCopper =
                      [this](std::int32_t stateId) {
                          const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);

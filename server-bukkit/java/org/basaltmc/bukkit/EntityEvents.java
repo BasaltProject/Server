@@ -144,7 +144,10 @@ final class EntityEvents {
                 f.whole("z") + 0.5, 0f, 0f);
             return made instanceof org.bukkit.entity.Hanging hanging ? new org.bukkit.event.hanging.HangingPlaceEvent(
                 hanging, f.player(), f.block(), PlayerEvents.face(f.text("face")),
-                org.bukkit.inventory.EquipmentSlot.HAND) : null;
+                org.bukkit.inventory.EquipmentSlot.HAND, new org.bukkit.inventory.ItemStack(
+                    type == EntityType.PAINTING ? org.bukkit.Material.PAINTING
+                        : type == EntityType.GLOW_ITEM_FRAME ? org.bukkit.Material.GLOW_ITEM_FRAME
+                        : org.bukkit.Material.ITEM_FRAME)) : null;
         });
         EventBridge.map("hanging.break", org.bukkit.event.hanging.HangingBreakByEntityEvent.class, f -> {
             Entity hanging = f.entity();
@@ -177,9 +180,11 @@ final class EntityEvents {
             }
             Entity child = org.basaltmc.bukkit.entity.EntityCore.template(f.world(), type, m.getLocation().getX(),
                 m.getLocation().getY(), m.getLocation().getZ(), 0f, 0f);
-            return child instanceof LivingEntity baby ? new org.bukkit.event.entity.EntityBreedEvent(baby, m, d, null,
-                null, 0) : null;
-        });
+            String named = f.text("breeder");
+            LivingEntity breeder = named.isEmpty() ? null : org.bukkit.Bukkit.getPlayerExact(named);
+            return child instanceof LivingEntity baby ? new org.bukkit.event.entity.EntityBreedEvent(baby, m, d, breeder,
+                null, (int) f.whole("experience")) : null;
+        }, (e, f) -> f.put("experience", (long) ((org.bukkit.event.entity.EntityBreedEvent) e).getExperience()));
 
         EventBridge.map("projectile.hit", org.bukkit.event.entity.ProjectileHitEvent.class, f -> {
             Entity shot = f.entity();

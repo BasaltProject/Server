@@ -603,7 +603,8 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
         if (item.has_value()) {
             entity->heldItem = std::string{item->path()};
         }
-        if (const NbtCompound* components = held->getCompound("components"); arrow && components != nullptr) {
+        if (const NbtCompound* components = held->getCompound("components");
+            (arrow || type->path().ends_with("_potion")) && components != nullptr) {
             entity->heldItemComponents = *components;
         }
     }

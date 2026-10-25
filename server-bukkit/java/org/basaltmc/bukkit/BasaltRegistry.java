@@ -27,7 +27,7 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
         this(source, null);
     }
 
-    /** A registry the server cannot list in full still answers for a key a plugin names, through {@code open}. */
+    /** A registry the server cannot list at all still answers for a key a plugin names, through {@code open}. */
     BasaltRegistry(Supplier<List<T>> source, Function<NamespacedKey, T> open) {
         this.source = source;
         this.open = open;
@@ -96,7 +96,7 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
     @Override
     public T get(NamespacedKey key) {
         T found = entries().get(key);
-        if (found == null && open != null) {
+        if (found == null && open != null && entries().isEmpty()) {
             synchronized (this) {
                 found = entries().get(key);
                 if (found == null) {

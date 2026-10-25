@@ -46,14 +46,18 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
                                   ? *tracked
                                   : Component::translatable("death.attack." + std::string{deathMessageId}, arguments);
     Announcement said;
+    DeathLoot loot = context.lootOf ? context.lootOf(session) : DeathLoot{};
     if (context.died) {
-        said = context.died(session, wire::text::resolvePlainText(message, context.lang));
+        said = context.died(session, wire::text::resolvePlainText(message, context.lang), loot);
+    }
+    if (context.spread) {
+        context.spread(session, loot);
     }
     if (session.connection().sendCombatDeath) {
         session.connection().sendCombatDeath(message);
     }
     const Component announced = said.text.empty() ? message : wire::text::miniMessage::parse(said.text);
-    if (said.silent) {
+    if (said.silent || !loot.showMessages) {
         return;
     }
     context.logger.info([&] { return wire::text::resolvePlainText(announced, context.lang); });

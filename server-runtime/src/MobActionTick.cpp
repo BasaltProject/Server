@@ -550,7 +550,19 @@ void MobActionSystem::askDeathDrops(world::LoadedWorld& world, const ServerEntit
 
 void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, ServerEntity& partner) {
     const server::registry::EntityTypeEntry* entry = server::registry::entityTypes::of(animal.type());
-    if (entry == nullptr || (hooks_.breedAllowed && !hooks_.breedAllowed(world, animal, partner))) {
+    if (entry == nullptr) {
+        return;
+    }
+    // parity: `Animal.spawnChildFromBreeding` rolls the orb before `EntityBreedEvent`, whose cancel resets the love.
+    std::int32_t experience = freshRandom().nextInt(7) + 1;
+    const std::optional<std::string>& breeder = animal.loveCause.has_value() ? animal.loveCause : partner.loveCause;
+    if (hooks_.breedAllowed &&
+        !hooks_.breedAllowed(world, animal, partner, breeder.value_or(std::string{}), experience)) {
+        for (ServerEntity* parent : {&animal, &partner}) {
+            parent->loveTicks = 0;
+            parent->loveCause.reset();
+            parent->courtshipTicks = 0;
+        }
         return;
     }
     // parity: `Frog.spawnChildFromBreeding`.
@@ -593,15 +605,13 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
         world.state().spawnEntity(std::move(baby));
     }
     // parity: `finalizeSpawnChildFromBreeding` credits whoever fed either parent.
-    const std::optional<std::string>& cause = animal.loveCause.has_value() ? animal.loveCause : partner.loveCause;
-    if (cause.has_value() && hooks_.bredAnimals) {
-        hooks_.bredAnimals(*cause, animal.type(), partner.type(), childType);
+    if (breeder.has_value() && hooks_.bredAnimals) {
+        hooks_.bredAnimals(*breeder, animal.type(), partner.type(), childType);
     }
     entity::breeding::afterBreeding(animal, partner);
     // parity: `Animal.finalizeSpawnChildFromBreeding`, one orb of one to seven points.
-    if (world.gameRules().get(world::gameRules::kMobDrops) && hooks_.spawnOrb) {
-        random::RandomSource random = freshRandom();
-        hooks_.spawnOrb(world, animal.x, animal.y, animal.z, random.nextInt(7) + 1);
+    if (world.gameRules().get(world::gameRules::kMobDrops) && hooks_.spawnOrb && experience > 0) {
+        hooks_.spawnOrb(world, animal.x, animal.y, animal.z, experience);
     }
 }
 

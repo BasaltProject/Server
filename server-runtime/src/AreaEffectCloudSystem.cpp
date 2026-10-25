@@ -219,6 +219,27 @@ void AreaEffectCloudSystem::affect(world::LoadedWorld& world, const ServerEntity
     }
 }
 
+void AreaEffectCloudSystem::potionLanded(world::LoadedWorld& world, const ServerEntity& bottle,
+                                         const std::vector<world::ActiveEffect>& effects) {
+    if (effects.empty()) {
+        return;
+    }
+    // parity: `ThrownLingeringPotion.onHitAsPotion`: a three block cloud that thins out over thirty seconds.
+    constexpr float kRadius = 3.0F;
+    constexpr std::int32_t kDuration = 600;
+    clouds::Cloud settings;
+    settings.radius = kRadius;
+    settings.duration = kDuration;
+    settings.waitTime = 10;
+    settings.radiusOnUse = -0.5F;
+    settings.radiusPerTick = -kRadius / static_cast<float>(kDuration);
+    settings.potionDurationScale = 0.25F;
+    settings.effect = clouds::Effect{.id = effects.front().effect,
+                                     .amplifier = effects.front().amplifier,
+                                     .duration = effects.front().remainingTicks};
+    static_cast<void>(spawn(world, settings, bottle.x, bottle.y, bottle.z, bottle.ownerId));
+}
+
 void AreaEffectCloudSystem::fireballLanded(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                            const std::vector<ServerEntity*>& living, const ServerEntity& fireball) {
     clouds::Cloud settings = clouds::dragonBreath(

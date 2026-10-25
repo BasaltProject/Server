@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -220,7 +221,20 @@ std::vector<GeneratedWorldEntity> WorldState::generatedEntities(const std::funct
 
 DroppedItem& WorldState::spawnItem(DroppedItem dropped) {
     mine("A dropped item");
-    return itemPhysics_.spawnItem(std::move(dropped));
+    const bool allowed = events().allowed(&server::plugins::pluginEventTypes::itemSpawn, [&](auto& event) {
+        plugins::hookEvents::position(event, eventWorld_, static_cast<std::int32_t>(std::floor(dropped.x)),
+                                      static_cast<std::int32_t>(std::floor(dropped.y)),
+                                      static_cast<std::int32_t>(std::floor(dropped.z)));
+        event.set("entity_id", static_cast<std::int64_t>(dropped.entityId));
+        event.set("item", dropped.item.toString());
+        event.set("count", static_cast<std::int64_t>(dropped.count));
+        event.set("cause", std::string{dropped.thrower.has_value() ? "drop" : "spawn"});
+    });
+    DroppedItem& spawned = itemPhysics_.spawnItem(std::move(dropped));
+    if (!allowed) {
+        spawned.health = 0;
+    }
+    return spawned;
 }
 
 std::vector<DroppedItem> WorldState::items() const { return itemPhysics_.items(); }

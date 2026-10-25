@@ -193,7 +193,6 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     };
     context.breakAllowed = hooks_.breakAllowed;
     context.blockDrops = hooks_.blockDrops;
-    context.itemSpawnAllowed = hooks_.itemSpawnAllowed;
     context.itemDamageAllowed = hooks_.itemDamageAllowed;
     context.bedLeft = hooks_.bedLeft;
     context.fishing = hooks_.fishing;

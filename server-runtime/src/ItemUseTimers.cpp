@@ -37,7 +37,6 @@ using wire::protocol::play::SoundSource;
 
 constexpr std::string_view kBow = "bow";
 constexpr std::string_view kCrossbow = "crossbow";
-constexpr std::string_view kEnderPearl = "ender_pearl";
 
 constexpr std::string_view kShield = "shield";
 constexpr std::string_view kSpyglass = "spyglass";
@@ -305,8 +304,8 @@ void ItemUseTimers::releaseBow() {
 
 bool ItemUseTimers::throwEnderPearl(PlayerSession& session, const Identifier& item, std::int32_t slot) {
     world::LoadedWorld* world = owner_->currentWorld();
-    if (world == nullptr || item.path() != kEnderPearl) {
-        return item.path() == kEnderPearl;
+    if (world == nullptr || !player::isThrowable(item)) {
+        return player::isThrowable(item);
     }
     if (!player::throwItemFor(owner_->blockInteraction().breakContext(), session, *world, item, slot)) {
         return false;

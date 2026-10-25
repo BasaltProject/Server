@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <numbers>
 #include <optional>
@@ -19,9 +20,6 @@ namespace {
 
 using wire::common::Identifier;
 using wire::protocol::play::Gamemode;
-
-constexpr std::string_view kEnderPearl = "ender_pearl";
-constexpr std::string_view kSoundPearlThrow = "entity.ender_pearl.throw";
 
 /// parity: `ThrowableProjectileItem.use`.
 constexpr float kPearlPower = 1.5F;
@@ -61,6 +59,41 @@ struct Aim {
                .z = static_cast<double>(std::cos(yaw) * std::cos(pitch))};
 }
 
+struct Throwable {
+    std::string_view item;
+    std::string_view entity;
+    std::string_view kind;
+    float power;
+    float pitchOffset;
+    std::string_view sound;
+    wire::protocol::play::SoundSource source;
+    bool carries;
+};
+
+[[nodiscard]] const Throwable* throwableOf(std::string_view item) {
+    using wire::protocol::play::SoundSource;
+    // parity: `SnowballItem`, `EggItem`, `EnderpearlItem`, `ExperienceBottleItem`, `ThrowablePotionItem`,
+    // `WindChargeItem`.
+    static constexpr std::array<Throwable, 9> kThrowables{{
+        {"ender_pearl", "ender_pearl", "ender_pearl", 1.5F, 0.0F, "entity.ender_pearl.throw", SoundSource::Neutral,
+         false},
+        {"snowball", "snowball", "snowball", 1.5F, 0.0F, "entity.snowball.throw", SoundSource::Neutral, true},
+        {"egg", "egg", "egg", 1.5F, 0.0F, "entity.egg.throw", SoundSource::Players, true},
+        {"blue_egg", "egg", "egg", 1.5F, 0.0F, "entity.egg.throw", SoundSource::Players, true},
+        {"brown_egg", "egg", "egg", 1.5F, 0.0F, "entity.egg.throw", SoundSource::Players, true},
+        {"experience_bottle", "experience_bottle", "experience_bottle", 0.7F, -20.0F, "entity.experience_bottle.throw",
+         SoundSource::Neutral, true},
+        {"splash_potion", "splash_potion", "splash_potion", 0.5F, -20.0F, "entity.splash_potion.throw",
+         SoundSource::Players, true},
+        {"lingering_potion", "lingering_potion", "lingering_potion", 0.5F, -20.0F, "entity.lingering_potion.throw",
+         SoundSource::Neutral, true},
+        {"wind_charge", "wind_charge", "wind_charge", 1.5F, 0.0F, "entity.wind_charge.throw", SoundSource::Neutral,
+         false},
+    }};
+    const auto found = std::ranges::find_if(kThrowables, [&](const Throwable& one) { return one.item == item; });
+    return found == kThrowables.end() ? nullptr : &*found;
+}
+
 void spendOne(const BreakContext& context, PlayerSession& player, const std::int32_t slot) {
     const std::optional<storage::StoredItemStack>& stack = player.inventory.at(slot);
     if (!stack.has_value()) {
@@ -80,33 +113,46 @@ void spendOne(const BreakContext& context, PlayerSession& player, const std::int
 
 } // namespace
 
+bool isThrowable(const Identifier& item) { return throwableOf(item.path()) != nullptr; }
+
 bool throwItemFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, const Identifier& item,
                   const std::int32_t slot) {
-    if (item.path() != kEnderPearl) {
+    const Throwable* throwable = throwableOf(item.path());
+    if (throwable == nullptr) {
         return false;
     }
-    const entity::projectiles::Kind* kind = entity::projectiles::kindOf(Identifier::vanilla(std::string{kEnderPearl}));
+    const entity::projectiles::Kind* kind =
+        entity::projectiles::kindOf(Identifier::vanilla(std::string{throwable->kind}));
     const server::registry::EntityTypeEntry* entry =
-        kind == nullptr ? nullptr : server::registry::entityTypes::of(kind->type);
+        kind == nullptr ? nullptr
+                        : server::registry::entityTypes::of(Identifier::vanilla(std::string{throwable->entity}));
     if (context.registry == nullptr || entry == nullptr) {
         return true;
     }
-    const Aim aim = aimOf(player);
+    const std::optional<storage::StoredItemStack>& held = player.inventory.at(slot);
+    // parity: `Projectile.shootFromRotation`, whose pitch offset only tilts the climb.
+    const float pitch = (player.pitch + throwable->pitchOffset) * std::numbers::pi_v<float> / kHalfCircle;
+    const float yaw = player.yaw * std::numbers::pi_v<float> / kHalfCircle;
     random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
-    entity::ServerEntity& pearl = entity::projectiles::spawn(
+    entity::ServerEntity& thrown = entity::projectiles::spawn(
         world.state(), *kind, context.registry->allocateEntityId(), entry->protocolId, player.x,
-        player.y + kThrowEyeHeight, player.z, aim.x, aim.y, aim.z, kPearlPower, kPearlUncertainty, random);
-    pearl.ownerId = player.entityId();
-    pearl.ownerUuid = player.uuid();
+        player.y + kThrowEyeHeight, player.z, static_cast<double>(-std::sin(yaw) * std::cos(pitch)),
+        static_cast<double>(-std::sin(pitch)), static_cast<double>(std::cos(yaw) * std::cos(pitch)), throwable->power,
+        kPearlUncertainty, random);
+    thrown.ownerId = player.entityId();
+    thrown.ownerUuid = player.uuid();
+    if (throwable->carries && held.has_value()) {
+        thrown.heldItem = std::string{item.path()};
+        thrown.heldItemComponents = held->components;
+    }
 
     const double roll = context.nextDouble ? context.nextDouble() : 0.5;
     const auto pitchOfSound = static_cast<float>(0.4 / ((roll * 0.4) + 0.8));
     const std::int64_t seed = context.nextSeed ? context.nextSeed() : 0;
     for (const PlayerSession* heard : playersIn(context, world.name())) {
-        playSoundFor(*heard, kSoundPearlThrow, wire::protocol::play::SoundSource::Neutral, player.x, player.y, player.z,
-                     0.5F, pitchOfSound, seed);
+        playSoundFor(*heard, throwable->sound, throwable->source, player.x, player.y, player.z, 0.5F, pitchOfSound,
+                     seed);
     }
-    // parity: `EnderpearlItem.use`.
     statAwards::used(player, item.toString());
     if (player.gamemode == Gamemode::Creative) {
         return true;

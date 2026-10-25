@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GolemPatterns.hpp>
@@ -29,6 +30,8 @@ inline constexpr std::int32_t kSize = 9;
 /// Every field falls back to the registry when unset, so `{}` gives vanilla behaviour.
 struct Hooks {
     std::function<std::int32_t()> allocateEntityId;
+    /// False cancels the shot of the chosen stack, as `BlockDispenseEvent` does.
+    std::function<bool(const server::world::loot::ItemStack& stack, server::registry::BlockFace out)> dispensing;
     /// Unset, only snow and iron golems can stand up from a carved pumpkin.
     golemPatterns::IsCopper isCopper;
     std::function<std::optional<std::int32_t>(std::string_view path)> containerSize;

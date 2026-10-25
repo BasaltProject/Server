@@ -937,6 +937,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                        entity::ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId) {
                     return mobActions_ != nullptr && mobActions_->addMobEffect(world, watchers, mob, effect, sourceId);
                 },
+            .lingeringLanded =
+                [this](world::LoadedWorld& world, const entity::ServerEntity& bottle,
+                       const std::vector<world::ActiveEffect>& effects) {
+                    clouds_->potionLanded(world, bottle, effects);
+                },
             .witherSkullLanded =
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        entity::ServerEntity& skull, entity::ServerEntity* mob,

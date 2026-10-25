@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
 
 #include <cstdint>
@@ -42,6 +43,9 @@ public:
               const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& cloud);
 
     /// parity: `DragonFireball.onHit`.
+    void potionLanded(world::LoadedWorld& world, const entity::ServerEntity& bottle,
+                      const std::vector<world::ActiveEffect>& effects);
+
     void fireballLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball);
 

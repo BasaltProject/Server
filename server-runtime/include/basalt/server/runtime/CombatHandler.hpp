@@ -40,7 +40,9 @@ public:
                                            bool fast)>
             healed;
         std::function<bool(const player::PlayerSession& player, bool offhand)> resurrectAllowed;
-        std::function<Announcement(const player::PlayerSession& player, const std::string& deathMessage)> died;
+        std::function<Announcement(const player::PlayerSession& player, const std::string& deathMessage,
+                                   player::DeathLoot& loot)>
+            died;
         std::function<bool(const player::PlayerSession& player, std::int32_t targetEntityId)> attackAllowed;
         std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& vehicle)> mountAllowed;
         std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& vehicle)> dismountAllowed;
@@ -121,6 +123,10 @@ private:
     [[nodiscard]] player::DamageContext damageContext() const;
 
     void die(std::string_view deathMessageId, const std::optional<wire::text::Component>& killer);
+
+    [[nodiscard]] player::DeathLoot deathLootOf(player::PlayerSession& session) const;
+
+    void spreadDeathLoot(player::PlayerSession& session, const player::DeathLoot& loot) const;
 
     /// parity: `Entity.restituteMovementAfterCollisions` calling `Block.bounceOn` on landing.
     void bounceOn(player::PlayerSession& session, world::LoadedWorld& world, double landingY);

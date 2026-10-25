@@ -55,7 +55,8 @@ public:
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::int32_t stateId, std::int32_t fromX, std::int32_t fromY, std::int32_t fromZ)>
             burnAllowed;
-        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
+        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           const std::string& item, std::string_view face)>
             dispenseAllowed;
         world::randomTicks::MayChange mayChange;
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
