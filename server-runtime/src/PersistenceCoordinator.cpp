@@ -44,6 +44,9 @@ void PersistenceCoordinator::persistEverything() const {
         // Clock, weather and game rules no chunk carries: cheap per save, and losing world time to a crash is worse.
         commandStorage_->save();
         world->saveMetadata();
+        if (hooks_.worldSaved) {
+            hooks_.worldSaved(name);
+        }
     }
     if (hooks_.saveShared) {
         hooks_.saveShared();
