@@ -293,7 +293,15 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
     };
     // parity: `EntityType.loadEntityRecursive`, every rider snapped to the same spot.
     Loaded loaded;
-    loaded.entities = entity::entityNbt::decodeTree(tag, allocate, protocolTypeOf);
+    NbtCompound placed = tag;
+    if (savedPosition(tag) == std::nullopt) {
+        wire::nbt::NbtList position{wire::nbt::NbtType::Double};
+        for (const double axis : at) {
+            position.push(NbtTag::ofDouble(axis));
+        }
+        placed.set("Pos", NbtTag::ofList(std::move(position)));
+    }
+    loaded.entities = entity::entityNbt::decodeTree(placed, allocate, protocolTypeOf);
     if (loaded.entities.empty()) {
         return Attempt::Abort;
     }
