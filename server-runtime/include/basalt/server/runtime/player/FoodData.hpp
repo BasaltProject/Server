@@ -32,6 +32,18 @@ public:
     std::int32_t unsaturatedRegenTicks = kDefaultUnsaturatedRegenTicks;
     std::int32_t starveTicks = kDefaultStarveTicks;
 
+    /// Exhaustion per action; vanilla's until the world the player is in says otherwise.
+    struct Tuning {
+        float sprint = 0.1F;
+        float swim = 0.01F;
+        float jump = 0.05F;
+        float sprintJump = 0.2F;
+        float combat = 0.1F;
+        float regen = 6.0F;
+    };
+
+    Tuning tuning;
+
     void addExhaustion(float amount);
 
     void eat(std::int32_t food, float saturation);
@@ -45,10 +57,10 @@ public:
     void tick(Difficulty difficulty, float health, float maxHealth, const std::function<void(float, bool fast)>& heal,
               const std::function<void(float)>& hurt, bool naturalRegeneration = true);
 
-    [[nodiscard]] static float movementExhaustion(double dx, double dy, double dz, bool sprinting, bool onGround,
-                                                  bool inWater);
+    [[nodiscard]] float movementExhaustion(double dx, double dy, double dz, bool sprinting, bool onGround,
+                                           bool inWater) const;
 
-    [[nodiscard]] static float jumpExhaustion(bool sprinting);
+    [[nodiscard]] float jumpExhaustion(bool sprinting) const;
 
 private:
     std::int32_t foodLevel_ = kMaxFood;

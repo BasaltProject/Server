@@ -91,6 +91,10 @@ void EnvironmentTickSystem::tickPlayers(world::LoadedWorld& world) {
     vitals.naturalRegeneration = world.gameRules().get(world::gameRules::kNaturalHealthRegeneration);
     for (PlayerSession* player : players_->snapshot()) {
         if (player->worldName == world.name()) {
+            const config::HungerRules& hunger = world.settings().rules.gameplay.hunger;
+            player->food.tuning = {hunger.sprintExhaustion,     hunger.swimExhaustion,   hunger.jumpExhaustion,
+                                   hunger.sprintJumpExhaustion, hunger.combatExhaustion, hunger.regenExhaustion};
+            player->keepSprintOnAttack = world.settings().rules.gameplay.keepSprintOnAttack;
             player::tickVitals(*player, vitals);
         }
     }
@@ -459,6 +463,14 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
         if (tunables.voidDamage &&
             player->y <
                 config::dimensionFacts(world.declaration().dimension).chunkHeight.minY() + tunables.voidDamageOffset &&
+            player->connection().hurt) {
+            player->connection().hurt(tunables.voidDamageAmount, "outOfWorld", world::damageTypes::kOutOfWorld,
+                                      std::nullopt);
+        }
+
+        // Not vanilla: Paper's `nether-ceiling-void-damage-height`.
+        if (const std::int32_t roof = world.settings().rules.environment.netherCeilingVoidDamageHeight;
+            roof > 0 && world.declaration().dimension == config::WorldDimension::Nether && player->y >= roof &&
             player->connection().hurt) {
             player->connection().hurt(tunables.voidDamageAmount, "outOfWorld", world::damageTypes::kOutOfWorld,
                                       std::nullopt);

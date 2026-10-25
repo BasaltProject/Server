@@ -288,7 +288,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     // parity: `itemAttackInteraction`.
     player::pvp::itemAttackInteraction(melee, *world, *session, nullptr, target, heldStack,
                                        PlayerInventory::kHotbarStart + session->inventory.heldSlot());
-    session->food.addExhaustion(kAttackExhaustion);
+    session->food.addExhaustion(session->food.tuning.combat);
     if (result.died) {
         killEntity(*target);
     } else {

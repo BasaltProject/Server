@@ -47,7 +47,6 @@ using wire::common::Identifier;
 using wire::protocol::play::SoundSource;
 namespace mth = wire::common::mth;
 
-constexpr float kAttackExhaustion = 0.1F;
 /// parity: `Player.attack`'s sprinting push, on top of the weapon's.
 constexpr float kSprintKnockback = 0.5F;
 /// parity: `doSweepAttack`'s own push on everything it caught.
@@ -341,7 +340,7 @@ void knockMob(PlayerSession& attacker, ServerEntity& mob, float power) {
     }
     const std::array<double, 2> towards = facing(attacker);
     entity::entityCombat::knockback(mob, static_cast<double>(power), towards[0], towards[1]);
-    attacker.sprinting = false;
+    attacker.sprinting = attacker.sprinting && attacker.keepSprintOnAttack;
 }
 
 bool criticalPossible(const PlayerSession& attacker, world::LoadedWorld& world, bool falling) {
@@ -451,7 +450,7 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
         knockbackOf(context, attacker, swing.weapon) + (blow.knockbackAttack ? kSprintKnockback : 0.0F);
     if (knockback > 0.0F) {
         pushPlayer(context, attacker, victim, static_cast<double>(knockback));
-        attacker.sprinting = false;
+        attacker.sprinting = attacker.sprinting && attacker.keepSprintOnAttack;
     }
     victim.deltaMovement = oldMovement;
     if (sweeping) {
@@ -480,7 +479,7 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
     attacker.stats.addDamageDealt(lost);
     showDamageIndicator(playersIn(context, attacker.worldName), victim.x, victim.y + (playerHeight() * 0.5), victim.z,
                         lost);
-    attacker.food.addExhaustion(kAttackExhaustion);
+    attacker.food.addExhaustion(attacker.food.tuning.combat);
     return true;
 }
 
