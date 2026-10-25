@@ -78,7 +78,14 @@ bool MobTickSystem::hasActiveVehicle(world::LoadedWorld& world, ServerEntity& en
 void MobTickSystem::tickTree(world::LoadedWorld& world, ServerEntity& root, const std::vector<PlayerSession*>& watchers,
                              const std::vector<entity::ai::PlayerView>& views, const std::vector<ServerEntity*>& living,
                              random::RandomSource& random) {
+    const std::array<double, 5> from{root.x, root.y, root.z, static_cast<double>(root.yaw),
+                                     static_cast<double>(root.pitch)};
     tickMob(world, root, watchers, views, living, random);
+    if (moveCheck_ && (root.x != from[0] || root.y != from[1] || root.z != from[2]) && !moveCheck_(world, root, from)) {
+        root.x = from[0];
+        root.y = from[1];
+        root.z = from[2];
+    }
     std::set<std::int32_t> visited{root.entityId()};
     tickPassengers(world, root, watchers, views, living, random, visited);
 }

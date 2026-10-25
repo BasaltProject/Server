@@ -18,6 +18,17 @@ final class HookEntityEvents {
     }
 
     static void install() {
+        EventBridge.map("entity.move", io.papermc.paper.event.entity.EntityMoveEvent.class, f -> {
+            BasaltWorld world = f.world();
+            if (world == null || !(f.entity() instanceof LivingEntity living) || living instanceof org.bukkit.entity.Player) {
+                return null;
+            }
+            return new io.papermc.paper.event.entity.EntityMoveEvent(living,
+                new Location(world, f.real("from_x"), f.real("from_y"), f.real("from_z"),
+                    (float) f.real("from_yaw"), (float) f.real("from_pitch")),
+                new Location(world, f.real("x"), f.real("y"), f.real("z"), (float) f.real("yaw"),
+                    (float) f.real("pitch")));
+        });
         EventBridge.map("entity.potion_splash", org.bukkit.event.entity.PotionSplashEvent.class, f -> {
             if (!(f.entity() instanceof org.bukkit.entity.ThrownPotion potion)) {
                 return null;

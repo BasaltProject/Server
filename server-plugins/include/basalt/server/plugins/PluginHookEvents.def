@@ -52,3 +52,4 @@ HOOK_EVENT(playerRecipeBookClick, "player.recipe_book_click", true, FIELDS("play
 HOOK_EVENT(inventoryCreative, "inventory.creative", true, FIELDS("player_name", "player_uuid", "world", "slot", "item", "count"), MUTABLE("item", "count"))
 HOOK_EVENT(raidTrigger, "raid.trigger", true, FIELDS("player_name", "player_uuid", "world", "x", "y", "z"), MUTABLE())
 HOOK_EVENT(raidWave, "raid.wave", false, FIELDS("world", "x", "y", "z", "wave", "raiders", "leader_id"), MUTABLE())
+HOOK_EVENT(entityMove, "entity.move", true, FIELDS("entity_id", "entity_type", "world", "from_x", "from_y", "from_z", "x", "y", "z", "from_yaw", "from_pitch", "yaw", "pitch"), MUTABLE())
