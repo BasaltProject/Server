@@ -277,7 +277,12 @@ public final class MenuTypes {
 
         @Override
         public InventoryView build(HumanEntity player) {
-            throw Unsupported.hit("MenuType.MERCHANT#build");
+            if (merchant == null) {
+                throw new IllegalStateException("A merchant menu needs a merchant");
+            }
+            Component name = title == null ? menu.type.defaultTitle() : title;
+            Inventory top = TypedInventories.wrap(new CustomInventory(null, menu.type, 3, name));
+            return new MerchantView(player, top, name, merchant);
         }
     }
 }
