@@ -191,14 +191,13 @@ jobjectArray JNICALL nativeDragonFight(JNIEnv* env, jclass, jstring world) {
         }
         return out;
     };
-    return jni::stringArrayOf(env, {facts->previouslyKilled ? "1" : "0", portal, facts->respawnStage,
-                                    std::to_string(facts->gatewaysLeft), facts->dragonUuid,
-                                    std::to_string(facts->barProgress), facts->barVisible ? "1" : "0",
-                                    joined(facts->barPlayers, [](std::int32_t id) { return std::to_string(id); }),
-                                    joined(facts->respawnCrystals, [](const std::string& id) { return id; }),
-                                    joined(facts->healingCrystals, [](const std::string& id) { return id; }),
-                                    facts->barTitle, std::to_string(facts->barColor), std::to_string(facts->barStyle),
-                                    std::to_string(facts->barFlags)});
+    return jni::stringArrayOf(
+        env, {facts->previouslyKilled ? "1" : "0", portal, facts->respawnStage, std::to_string(facts->gatewaysLeft),
+              facts->dragonUuid, std::to_string(facts->barProgress), facts->barVisible ? "1" : "0",
+              joined(facts->barPlayers, [](std::int32_t id) { return std::to_string(id); }),
+              joined(facts->respawnCrystals, [](const std::string& id) { return id; }),
+              joined(facts->healingCrystals, [](const std::string& id) { return id; }), facts->barTitle,
+              std::to_string(facts->barColor), std::to_string(facts->barStyle), std::to_string(facts->barFlags)});
 }
 
 void JNICALL nativeSetDragonPreviouslyKilled(JNIEnv* env, jclass, jstring world, jboolean value) {

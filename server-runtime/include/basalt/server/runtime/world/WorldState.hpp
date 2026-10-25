@@ -270,9 +270,8 @@ public:
 
     [[nodiscard]] bool hasSculkSensorNear(double x, double y, double z, std::int32_t range) const;
 
-    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> sculkSensorsWithin(std::int32_t x, std::int32_t y,
-                                                                              std::int32_t z,
-                                                                              std::int32_t range) const {
+    [[nodiscard]] std::vector<std::array<std::int32_t, 3>>
+    sculkSensorsWithin(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t range) const {
         return sculkSensors_.within(x, y, z, range);
     }
 
