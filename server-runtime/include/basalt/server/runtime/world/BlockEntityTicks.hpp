@@ -67,6 +67,8 @@ struct Hooks {
     WorldState::Ticking ticking;
     std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> spawnerTick;
     std::int32_t hopperTransferTicks = hoppers::kVanillaCooldown;
+    std::int32_t hopperAmount = 1;
+    std::int32_t hopperCheckTicks = 1;
 };
 
 [[nodiscard]] std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,

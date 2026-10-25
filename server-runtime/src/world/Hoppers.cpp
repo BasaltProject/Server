@@ -575,8 +575,12 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
     Slots slots = blockInventory::read(entity->data(), kSize);
     // parity: `tryMoveItems` gives one away when it has something and takes one when it has room.
     bool moved = false;
-    if (!isEmpty(slots)) {
-        moved = push(world, x, y, z, *out, slots, random, around);
+    for (std::int32_t repeat = 0; repeat < around.amount && !isEmpty(slots); repeat++) {
+        const bool pushed = push(world, x, y, z, *out, slots, random, around);
+        moved = pushed || moved;
+        if (!pushed) {
+            break;
+        }
     }
     if (!isFull(slots)) {
         // parity: `suckInItems` looks at what is lying above only when there is no container there.
@@ -587,6 +591,14 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
                            (above.has_value() ? pullFrom(world, *above, slots, around.gameTime)
                                               : suckIn(world, x, y, z, slots, around));
         moved = taken || moved;
+        // Not vanilla when `amount` is above one: more of the same turn.
+        for (std::int32_t repeat = 1; taken && repeat < around.amount && !isFull(slots); repeat++) {
+            const bool more = above.has_value() ? pullFrom(world, *above, slots, around.gameTime)
+                                                : suckIn(world, x, y, z, slots, around);
+            if (!more) {
+                break;
+            }
+        }
     }
     if (!moved) {
         return false;

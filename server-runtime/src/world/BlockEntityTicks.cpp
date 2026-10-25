@@ -240,6 +240,9 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             }
             // parity: `HopperBlockEntity.pushItemsTick`, one move per turn and then a rest.
             if (path == "hopper") {
+                if (gameTime % hooks.hopperCheckTicks != 0) {
+                    continue;
+                }
                 if (hooks.allowHopperMove && !hooks.allowHopperMove(worldName, x, y, z)) {
                     continue;
                 }
@@ -250,6 +253,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     .changes = &changes,
                     .gameTime = gameTime,
                     .transferTicks = hooks.hopperTransferTicks,
+                    .amount = hooks.hopperAmount,
                 };
                 if (hoppers::tick(world, x, y, z, random, around)) {
                     chunk->markDirty();

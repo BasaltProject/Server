@@ -36,6 +36,7 @@ struct Around {
     /// parity: `ShelfBlockEntity.setChanged`.
     std::int64_t gameTime = 0;
     std::int32_t transferTicks = kVanillaCooldown;
+    std::int32_t amount = 1;
 };
 
 /// `random` is required: a hopper feeding a composter rolls the item's chance, the one non-deterministic spot.
