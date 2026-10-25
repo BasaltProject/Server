@@ -371,6 +371,7 @@ basalt_module(server-runtime-core
         src/player/PlayerMovementStats.cpp
         src/player/PlayerSession.cpp
         src/player/PlayerEntityData.cpp
+        src/player/PlayerBlockContact.cpp
         src/player/PlayerFreezing.cpp
         src/player/PlayerImpulse.cpp
         src/player/PlayerPersistence.cpp
