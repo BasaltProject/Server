@@ -312,12 +312,12 @@ void CombatHandler::hurt(const float amount, const std::string_view deathMessage
     player::hurtPlayer(*session, amount, deathMessageId, damageType, source, damageContext());
 }
 
-void CombatHandler::heal(const float amount) {
+void CombatHandler::heal(const float amount, const std::string_view cause) {
     PlayerSession* session = owner_->playerSession();
     if (session == nullptr) {
         return;
     }
-    player::healPlayer(*session, amount, damageContext());
+    player::healPlayer(*session, amount, damageContext(), cause);
 }
 
 void CombatHandler::killPlayer(std::string_view deathMessageId) {

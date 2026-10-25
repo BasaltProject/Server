@@ -50,6 +50,9 @@ public:
                                                   std::int32_t before)>
             foodChanged;
         std::function<void(player::PlayerSession& player)> armorWatch;
+        std::function<std::optional<float>(const player::PlayerSession& player, float amount, std::string_view cause,
+                                           bool fast)>
+            healed;
     };
 
     /// The storm's own stream, which is not the level's: a strike must not shift what else spawns.

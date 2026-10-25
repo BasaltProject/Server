@@ -371,7 +371,7 @@ public:
     void hurt(float amount, std::string_view deathMessageId, const wire::common::Identifier& damageType,
               const std::optional<entity::DamageSource>& source = std::nullopt);
 
-    void heal(float amount);
+    void heal(float amount, std::string_view cause);
 
     void killPlayer(std::string_view deathMessageId);
 

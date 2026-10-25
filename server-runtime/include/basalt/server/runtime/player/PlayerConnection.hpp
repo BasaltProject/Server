@@ -131,7 +131,7 @@ struct PlayerConnection {
 
     std::function<void(std::int32_t slot)> setHeldSlot;
 
-    std::function<void(float amount)> heal;
+    std::function<void(float amount, std::string_view cause)> heal;
 
     std::function<void(float amount, std::string_view deathMessageId, const wire::common::Identifier& damageType,
                        const std::optional<entity::DamageSource>& source)>

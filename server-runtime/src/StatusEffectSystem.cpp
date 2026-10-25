@@ -66,7 +66,7 @@ void StatusEffectSystem::applyEffectTick(world::LoadedWorld& world, player::Play
     if (active.effect == world::mobEffects::regeneration()) {
         if (onInterval(ticks, kRegenerationInterval, active.amplifier) && player.health() < player.maxHealth() &&
             connection.heal) {
-            connection.heal(1.0F);
+            connection.heal(1.0F, "magic_regen");
         }
     } else if (active.effect == world::mobEffects::poison()) {
         // parity: poison never kills, so it stops at one point of health rather than at zero.

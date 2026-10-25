@@ -42,7 +42,7 @@ public:
 
     void reset();
 
-    void tick(Difficulty difficulty, float health, float maxHealth, const std::function<void(float)>& heal,
+    void tick(Difficulty difficulty, float health, float maxHealth, const std::function<void(float, bool fast)>& heal,
               const std::function<void(float)>& hurt, bool naturalRegeneration = true);
 
     [[nodiscard]] static float movementExhaustion(double dx, double dy, double dz, bool sprinting, bool onGround,

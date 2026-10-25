@@ -157,7 +157,7 @@ void ClientSession::hurt(float amount, std::string_view deathMessageId, const Id
     combat_->hurt(amount, deathMessageId, damageType, source);
 }
 
-void ClientSession::heal(float amount) { combat_->heal(amount); }
+void ClientSession::heal(float amount, std::string_view cause) { combat_->heal(amount, cause); }
 
 void ClientSession::killPlayer(std::string_view deathMessageId) { combat_->killPlayer(deathMessageId); }
 

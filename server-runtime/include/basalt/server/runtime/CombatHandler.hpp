@@ -36,7 +36,9 @@ public:
         std::function<std::optional<float>(const player::PlayerSession& player, float amount, std::string_view cause,
                                            const std::optional<std::int32_t>& sourceEntityId)>
             damaged;
-        std::function<std::optional<float>(const player::PlayerSession& player, float amount)> healed;
+        std::function<std::optional<float>(const player::PlayerSession& player, float amount, std::string_view cause,
+                                           bool fast)>
+            healed;
         std::function<bool(const player::PlayerSession& player, bool offhand)> resurrectAllowed;
         std::function<Announcement(const player::PlayerSession& player, const std::string& deathMessage)> died;
         std::function<bool(const player::PlayerSession& player, std::int32_t targetEntityId)> attackAllowed;
@@ -111,7 +113,7 @@ public:
               const std::optional<wire::common::Identifier>& damageType = std::nullopt,
               const std::optional<entity::DamageSource>& source = std::nullopt);
 
-    void heal(float amount);
+    void heal(float amount, std::string_view cause);
 
     void killPlayer(std::string_view deathMessageId);
 

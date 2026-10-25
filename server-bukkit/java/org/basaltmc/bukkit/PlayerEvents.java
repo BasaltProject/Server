@@ -135,14 +135,16 @@ final class PlayerEvents {
             }
         });
         EventBridge.map("player.bucket", org.bukkit.event.player.PlayerBucketFillEvent.class, f -> {
-            ItemStack held = stackOf(f.text("item"), 1);
             Player who = f.player();
-            if (!f.flag("filling") || who == null || held == null) {
+            if (!f.flag("filling") || who == null) {
                 return null;
             }
             Block block = f.block();
-            return new org.bukkit.event.player.PlayerBucketFillEvent(who, block, block, BlockFace.UP, held.getType(),
-                held, EquipmentSlot.HAND);
+            Material filled = block.getType() == Material.LAVA ? Material.LAVA_BUCKET
+                : block.getType() == Material.POWDER_SNOW ? Material.POWDER_SNOW_BUCKET : Material.WATER_BUCKET;
+            ItemStack held = stackOf(f.text("item"), 1);
+            return new org.bukkit.event.player.PlayerBucketFillEvent(who, block, block, face(f.text("face")), filled,
+                held == null ? new ItemStack(Material.BUCKET) : held, EquipmentSlot.HAND);
         });
         EventBridge.map("player.bucket", org.bukkit.event.player.PlayerBucketEmptyEvent.class, f -> {
             ItemStack held = stackOf(f.text("item"), 1);
@@ -150,9 +152,10 @@ final class PlayerEvents {
             if (f.flag("filling") || who == null || held == null) {
                 return null;
             }
+            BlockFace face = face(f.text("face"));
             Block block = f.block();
-            return new org.bukkit.event.player.PlayerBucketEmptyEvent(who, block, block, BlockFace.UP, held.getType(),
-                held, EquipmentSlot.HAND);
+            return new org.bukkit.event.player.PlayerBucketEmptyEvent(who, block, block.getRelative(face.getOppositeFace()),
+                face, held.getType(), held, EquipmentSlot.HAND);
         });
         EventBridge.map("player.bed", org.bukkit.event.player.PlayerBedEnterEvent.class, f -> {
             Player who = f.player();
@@ -317,9 +320,15 @@ final class PlayerEvents {
                 return null;
             }
             org.bukkit.inventory.meta.BookMeta before = (org.bukkit.inventory.meta.BookMeta) org.bukkit.Bukkit
-                .getItemFactory().getItemMeta(Material.WRITABLE_BOOK);
+                .getItemFactory().getItemMeta(Material.WRITTEN_BOOK);
             org.bukkit.inventory.meta.BookMeta after = (org.bukkit.inventory.meta.BookMeta) org.bukkit.Bukkit
-                .getItemFactory().getItemMeta(Material.WRITABLE_BOOK);
+                .getItemFactory().getItemMeta(Material.WRITTEN_BOOK);
+            ItemStack book = who.getInventory().getItem((int) f.whole("slot"));
+            if (book != null && book.getItemMeta() instanceof org.bukkit.inventory.meta.WritableBookMeta old) {
+                for (String page : old.getPages()) {
+                    before.addPages(Component.text(page));
+                }
+            }
             for (String page : f.text("pages").split("\f", -1)) {
                 after.addPages(Component.text(page));
             }
@@ -374,8 +383,18 @@ final class PlayerEvents {
                 options.put(com.destroystokyo.paper.ClientOption.CHAT_COLORS_ENABLED, f.flag("chat_colors"));
                 options.put(com.destroystokyo.paper.ClientOption.MAIN_HAND, f.text("main_hand").equals("left")
                     ? org.bukkit.inventory.MainHand.LEFT : org.bukkit.inventory.MainHand.RIGHT);
-                return f.player() == null ? null
-                    : new com.destroystokyo.paper.event.player.PlayerClientOptionsChangeEvent(f.player(), options);
+                Player who = f.player();
+                if (who == null) {
+                    return null;
+                }
+                for (com.destroystokyo.paper.ClientOption<?> rest : java.util.List.of(
+                    com.destroystokyo.paper.ClientOption.CHAT_VISIBILITY, com.destroystokyo.paper.ClientOption.SKIN_PARTS,
+                    com.destroystokyo.paper.ClientOption.ALLOW_SERVER_LISTINGS,
+                    com.destroystokyo.paper.ClientOption.TEXT_FILTERING_ENABLED,
+                    com.destroystokyo.paper.ClientOption.PARTICLE_VISIBILITY)) {
+                    options.put(rest, who.getClientOption(rest));
+                }
+                return new com.destroystokyo.paper.event.player.PlayerClientOptionsChangeEvent(who, options);
             });
         EventBridge.map("player.chat", io.papermc.paper.event.player.AsyncChatEvent.class, f -> {
             Player who = f.player();

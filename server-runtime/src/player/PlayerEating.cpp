@@ -168,7 +168,17 @@ bool eatHeldItem(const BreakContext& context, PlayerSession& player, world::Load
     world::vibrations::emit(world.state(), drunk ? "drink" : "eat", player.x, player.y, player.z, world.gameTime());
     statAwards::used(player, eaten.id);
 
-    player.food.eat(food->nutrition, food->saturation);
+    std::int32_t nutrition = food->nutrition;
+    bool nourished = true;
+    if (context.foodEaten) {
+        const std::int32_t before = player.food.foodLevel();
+        const std::optional<std::int32_t> wanted = context.foodEaten(player, eaten.id, before + nutrition, before);
+        nourished = wanted.has_value();
+        nutrition = wanted.value_or(before) - before;
+    }
+    if (nourished) {
+        player.food.eat(nutrition, food->saturation);
+    }
     // parity: `OminousBottleAmplifier.onConsume`.
     if (id->path() == "ominous_bottle") {
         const world::ActiveEffect omen{.effect = world::mobEffects::badOmen(),

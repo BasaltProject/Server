@@ -377,7 +377,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             context_.hurt(*session_, amount, deathMessageId, damageType, source);
         }
     };
-    connection.heal = [this](const float amount) {
+    connection.heal = [this](const float amount, std::string_view) {
         if (session_ != nullptr && context_.heal) {
             context_.heal(*session_, amount);
         }

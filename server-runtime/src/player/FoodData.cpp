@@ -51,8 +51,9 @@ void FoodData::reset() {
     tickTimer_ = 0;
 }
 
-void FoodData::tick(Difficulty difficulty, float health, float maxHealth, const std::function<void(float)>& heal,
-                    const std::function<void(float)>& hurt, bool naturalRegeneration) {
+void FoodData::tick(Difficulty difficulty, float health, float maxHealth,
+                    const std::function<void(float, bool fast)>& heal, const std::function<void(float)>& hurt,
+                    bool naturalRegeneration) {
     if (exhaustionLevel_ > kExhaustionPerPoint) {
         exhaustionLevel_ -= kExhaustionPerPoint;
         if (saturationLevel_ > 0.0F) {
@@ -67,7 +68,7 @@ void FoodData::tick(Difficulty difficulty, float health, float maxHealth, const 
         tickTimer_++;
         if (tickTimer_ >= saturatedRegenTicks) {
             const float spent = std::min(saturationLevel_, kSaturatedRegenCost);
-            heal(spent / kSaturatedRegenCost);
+            heal(spent / kSaturatedRegenCost, true);
             addExhaustion(spent);
             tickTimer_ = 0;
         }
@@ -76,7 +77,7 @@ void FoodData::tick(Difficulty difficulty, float health, float maxHealth, const 
     if (naturalRegeneration && foodLevel_ >= kRegenFoodThreshold && hurtAlready) {
         tickTimer_++;
         if (tickTimer_ >= unsaturatedRegenTicks) {
-            heal(1.0F);
+            heal(1.0F, false);
             addExhaustion(kRegenExhaustion);
             tickTimer_ = 0;
         }

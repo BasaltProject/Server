@@ -223,7 +223,7 @@ final class EntityEvents {
         EventBridge.map("entity.heal", EntityRegainHealthEvent.class, f -> {
             Entity healed = f.entity();
             return healed == null ? null : new EntityRegainHealthEvent(healed, f.real("amount"),
-                regainReason(f.text("cause")));
+                regainReason(f.text("cause")), f.flag("fast_regen"));
         }, (e, f) -> f.put("amount", ((EntityRegainHealthEvent) e).getAmount()));
         EventBridge.map("entity.target", EntityTargetEvent.class, f -> {
             Entity hunter = f.entity();

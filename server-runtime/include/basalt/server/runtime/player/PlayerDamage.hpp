@@ -36,7 +36,8 @@ struct DamageContext {
     std::function<std::optional<float>(const PlayerSession& player, float amount, std::string_view cause,
                                        const std::optional<std::int32_t>& sourceEntityId)>
         damaged;
-    std::function<std::optional<float>(const PlayerSession& player, float amount)> healed;
+    std::function<std::optional<float>(const PlayerSession& player, float amount, std::string_view cause, bool fast)>
+        healed;
     std::function<bool(const PlayerSession& player, bool offhand)> resurrectAllowed;
     std::function<void(const PlayerSession& player, std::int32_t slot)> slotChanged;
     std::function<void(PlayerSession& player, std::int32_t cooldownTicks)> disableBlocking;
@@ -55,6 +56,7 @@ void hurtPlayer(PlayerSession& session, float amount, std::string_view deathMess
                 const std::optional<wire::common::Identifier>& damageType,
                 const std::optional<entity::DamageSource>& source, const DamageContext& context);
 
-void healPlayer(PlayerSession& session, float amount, const DamageContext& context);
+void healPlayer(PlayerSession& session, float amount, const DamageContext& context,
+                std::string_view cause = "regeneration", bool fast = false);
 
 } // namespace basalt::server::runtime::player

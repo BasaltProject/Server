@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventHooks.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
 #include <basalt/server/runtime/plugins/WorldEventHooks.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -228,7 +229,7 @@ void environment(EnvironmentTickSystem::Hooks& hooks, const EventSink& sink) {
         if (!sink.listening(&playerArmorChange)) {
             return;
         }
-        constexpr std::array<std::string_view, 4> kSlots{"feet", "legs", "chest", "head"};
+        constexpr std::array<std::string_view, 4> kSlots{"head", "chest", "legs", "feet"};
         for (std::int32_t index = 0; index < 4; ++index) {
             const auto& stack = who.inventory.at(36 + index);
             const std::string now = stack.has_value() ? stack->id : std::string{};
@@ -243,6 +244,9 @@ void environment(EnvironmentTickSystem::Hooks& hooks, const EventSink& sink) {
             who.armorSeen[static_cast<std::size_t>(index)] = now;
         }
         who.armorKnown = true;
+    };
+    hooks.healed = [&sink](const player::PlayerSession& who, float amount, std::string_view cause, bool fast) {
+        return plugins::eventHooks::raiseHeal(sink, who, amount, cause, fast);
     };
     hooks.foodChanged = [&sink](const player::PlayerSession& who, std::int32_t now,
                                 std::int32_t before) -> std::optional<std::int32_t> {

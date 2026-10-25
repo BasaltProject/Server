@@ -45,7 +45,18 @@ void tickVitals(PlayerSession& player, const VitalsContext& context) {
     const float saturationBefore = player.food.saturationLevel();
     player.food.tick(
         context.difficulty, player.health(), player.maxHealth(),
-        [&player](const float amount) { player.setHealth(std::min(player.health() + amount, player.maxHealth())); },
+        [&player, &context](const float amount, const bool fast) {
+            float healed = amount;
+            if (context.healed) {
+                // parity: `FoodData.tick` heals with `RegainReason.SATIATED`.
+                const std::optional<float> allowed = context.healed(player, amount, "satiated", fast);
+                if (!allowed.has_value()) {
+                    return;
+                }
+                healed = *allowed;
+            }
+            player.setHealth(std::min(player.health() + healed, player.maxHealth()));
+        },
         [&player](const float amount) {
             if (player.connection().hurt) {
                 player.connection().hurt(amount, kDeathStarve, world::damageTypes::kStarve, std::nullopt);

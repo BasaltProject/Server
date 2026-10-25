@@ -17,15 +17,33 @@ namespace basalt::server::runtime::player {
 
 namespace {
 
-[[nodiscard]] bool refused(PlayerSession& player, const wire::common::Identifier& item, const BucketGate& allowed) {
-    if (!allowed || allowed(player, static_cast<std::int32_t>(player.x), static_cast<std::int32_t>(player.y),
-                            static_cast<std::int32_t>(player.z), item.toString(), item.path() == "bucket")) {
+[[nodiscard]] world::buckets::Gate gateFor(PlayerSession& player, const wire::common::Identifier& item,
+                                           const BucketGate& allowed) {
+    if (!allowed) {
+        return {};
+    }
+    return [&player, &item, &allowed](const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                      const std::int32_t faceX, const std::int32_t faceY, const std::int32_t faceZ) {
+        std::string_view face = "up";
+        if (faceY < 0) {
+            face = "down";
+        } else if (faceZ < 0) {
+            face = "north";
+        } else if (faceZ > 0) {
+            face = "south";
+        } else if (faceX < 0) {
+            face = "west";
+        } else if (faceX > 0) {
+            face = "east";
+        }
+        if (allowed(player, x, y, z, item.toString(), item.path() == "bucket", face)) {
+            return true;
+        }
+        if (player.connection().sendInventoryAll) {
+            player.connection().sendInventoryAll();
+        }
         return false;
-    }
-    if (player.connection().sendInventoryAll) {
-        player.connection().sendInventoryAll();
-    }
-    return true;
+    };
 }
 
 [[nodiscard]] world::fluidFlow::Context flowingIn(const BreakContext& context, world::LoadedWorld& world,
@@ -83,14 +101,11 @@ bool useBucketFor(const BreakContext& context, PlayerSession& player, world::Loa
     if (!world::buckets::isBucket(item)) {
         return false;
     }
-    if (refused(player, item, allowed)) {
-        return true;
-    }
     random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
     const world::fluidFlow::Context flowing = flowingIn(context, world, random);
-    const std::optional<world::buckets::Result> result =
-        world::buckets::use(flowing, item, player.x, player.y + world::fluids::eyeHeight(player.sneaking), player.z,
-                            yaw, pitch, player.gamemode == wire::protocol::play::Gamemode::Creative);
+    const std::optional<world::buckets::Result> result = world::buckets::use(
+        flowing, item, player.x, player.y + world::fluids::eyeHeight(player.sneaking), player.z, yaw, pitch,
+        player.gamemode == wire::protocol::play::Gamemode::Creative, gateFor(player, item, allowed));
     if (result.has_value()) {
         settle(context, player, world, item, heldSlot, held, *result);
     }
@@ -104,13 +119,11 @@ bool useBucketOnFor(const BreakContext& context, PlayerSession& player, world::L
     if (!world::buckets::isBucket(item)) {
         return false;
     }
-    if (refused(player, item, allowed)) {
-        return true;
-    }
     random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
     const world::fluidFlow::Context flowing = flowingIn(context, world, random);
-    const std::optional<world::buckets::Result> result = world::buckets::useOn(
-        flowing, item, x, y, z, face, player.gamemode == wire::protocol::play::Gamemode::Creative);
+    const std::optional<world::buckets::Result> result =
+        world::buckets::useOn(flowing, item, x, y, z, face, player.gamemode == wire::protocol::play::Gamemode::Creative,
+                              gateFor(player, item, allowed));
     if (result.has_value()) {
         settle(context, player, world, item, heldSlot, held, *result);
     }

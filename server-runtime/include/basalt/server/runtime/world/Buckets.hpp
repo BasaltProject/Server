@@ -4,6 +4,7 @@
 #include <basalt/wire/protocol/play/BlockPos.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -17,6 +18,9 @@ namespace buckets {
 
 [[nodiscard]] const wire::common::Identifier& lavaBucket();
 
+using Gate = std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t faceX, std::int32_t faceY,
+                                std::int32_t faceZ)>;
+
 struct Result {
     std::vector<FluidChange> changes;
     std::optional<wire::common::Identifier> replacement;
@@ -27,11 +31,12 @@ struct Result {
 [[nodiscard]] bool isBucket(const wire::common::Identifier& item);
 
 [[nodiscard]] std::optional<Result> use(const fluidFlow::Context& context, const wire::common::Identifier& item,
-                                        double eyeX, double eyeY, double eyeZ, float yaw, float pitch, bool creative);
+                                        double eyeX, double eyeY, double eyeZ, float yaw, float pitch, bool creative,
+                                        const Gate& gate = {});
 
 [[nodiscard]] std::optional<Result> useOn(const fluidFlow::Context& context, const wire::common::Identifier& item,
                                           std::int32_t x, std::int32_t y, std::int32_t z,
-                                          wire::protocol::play::Direction face, bool creative);
+                                          wire::protocol::play::Direction face, bool creative, const Gate& gate = {});
 
 } // namespace buckets
 
