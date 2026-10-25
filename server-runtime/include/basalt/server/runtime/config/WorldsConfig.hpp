@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
@@ -27,6 +28,8 @@ struct WorldSettings {
     std::int32_t lootRefillMaxSeconds = 172800;
     std::int32_t lootMaxRefills = -1;
     std::int32_t lootRelootSeconds = -1;
+
+    MobSettings mobs;
 
     [[nodiscard]] static WorldSettings vanilla() { return WorldSettings{}; }
 

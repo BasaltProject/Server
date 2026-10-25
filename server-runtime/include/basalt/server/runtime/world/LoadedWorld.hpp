@@ -90,6 +90,8 @@ public:
 
     [[nodiscard]] const config::WorldSettings& settings() const noexcept { return settings_; }
 
+    [[nodiscard]] const config::MobSettings& mobSettings() const noexcept { return settings_.mobs; }
+
     [[nodiscard]] const WorldMetadata& metadata() const noexcept { return metadata_; }
 
     [[nodiscard]] const std::string& name() const noexcept { return declaration_.name; }

@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/world/EntityRegistry.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
@@ -94,6 +95,9 @@ entity::ServerEntity* EntityRegistry::entity(std::int32_t entityId) const {
 
 entity::ServerEntity& EntityRegistry::spawnEntity(std::unique_ptr<entity::ServerEntity> entity) {
     const WorldWriteLock lock{*mutex_};
+    if (mobSettings_ != nullptr) {
+        entity::mobOverrides::apply(*entity, *mobSettings_);
+    }
     entity::cubeMobs::applySize(*entity);
     const std::int32_t id = entity->entityId();
     if (byId_.erase(id) != 0) {

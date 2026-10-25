@@ -1,0 +1,162 @@
+# Mob, spawning and entity-lifetime settings, inherited by every world.
+#
+# A world overrides any key here in worlds/<name>/mobs.toml; whatever it leaves out comes from this file.
+# Every value below is vanilla's own, so an untouched file changes nothing. A change takes effect when the
+# world loads (restart the server).
+
+[caps]
+# Mobs of a category that may be alive in the area around the players (vanilla's "mob cap", scaled by the
+# number of loaded spawn chunks). 0 stops natural spawning of that category.
+monster = 70
+creature = 10
+ambient = 15
+axolotls = 5
+underground-water-creature = 5
+water-creature = 5
+water-ambient = 20
+
+[spawn-interval-ticks]
+# A category is tried for natural spawning once every this many ticks. Vanilla tries creatures (animals) every
+# 400 ticks and everything else every tick. 0 stops natural spawning of that category.
+monster = 1
+creature = 400
+ambient = 1
+axolotls = 1
+underground-water-creature = 1
+water-creature = 1
+water-ambient = 1
+
+[spawning]
+# NOT VANILLA when true. Skips the world-wide cap check, so only each player's own share of the cap limits
+# spawning near them: one busy player no longer starves everyone else's surroundings.
+per-player-mob-spawns = false
+# How far from a player, in chunks, natural spawning reaches. Vanilla spawns within 8 chunks (128 blocks).
+range-chunks = 8
+# NOT VANILLA when 0 or more. Monsters then spawn wherever the brightness (sky and block light together) is at
+# most this level, replacing vanilla's own darkness rules. -1 keeps vanilla's.
+monster-max-light-level = -1
+
+[despawn]
+# sphere is vanilla: distance to the nearest player is measured in three dimensions. cylinder ignores height.
+shape = "sphere"
+# A mob must have gone this many ticks without a player near before it may despawn at random (vanilla 600).
+idle-ticks-before-random = 600
+# Between the soft and hard ranges, a mob that has idled long enough despawns with a chance of 1 in this
+# number each tick (vanilla 800).
+random-odds = 800
+
+# Per category: farther than hard-range from every player a mob despawns at once, between soft-range and
+# hard-range it may despawn at random, and inside soft-range it never does. Ranges are in blocks.
+[despawn.monster]
+soft-range = 32
+hard-range = 128
+[despawn.creature]
+soft-range = 32
+hard-range = 128
+[despawn.ambient]
+soft-range = 32
+hard-range = 128
+[despawn.axolotls]
+soft-range = 32
+hard-range = 128
+[despawn.underground-water-creature]
+soft-range = 32
+hard-range = 128
+[despawn.water-creature]
+soft-range = 32
+hard-range = 128
+[despawn.water-ambient]
+soft-range = 32
+hard-range = 64
+
+[items]
+# Ticks a dropped item lives before it vanishes (vanilla 6000, five minutes).
+despawn-ticks = 6000
+# Blocks around an item within which same-kind items merge into one stack (vanilla 0.5).
+merge-radius = 0.5
+
+[experience]
+# Blocks around an experience orb within which orbs of the same size merge (vanilla 0.5).
+merge-radius = 0.5
+
+[projectiles]
+# Ticks an arrow stays stuck in the ground before it vanishes (vanilla 1200).
+arrow-despawn-ticks = 1200
+# The same for a thrown trident that does not return to its owner (vanilla 1200).
+trident-despawn-ticks = 1200
+
+[tracking-range]
+# How far, in chunks, an entity of the category is shown to a player. 0 keeps vanilla's own range for each
+# entity type; a larger value is capped by the player's view distance.
+animals = 0
+monsters = 0
+misc = 0
+display = 0
+other = 0
+
+[phantoms]
+# Seconds between phantom spawn attempts are drawn between these two values (vanilla 60 to 119).
+spawn-attempt-min-seconds = 60
+spawn-attempt-max-seconds = 119
+# A player who has not rested for this many ticks starts attracting phantoms (vanilla 72000, one hour).
+insomnia-ticks = 72000
+
+[pillager-patrols]
+# Ticks between patrol attempts (vanilla 12000 plus up to 1200 more at random).
+interval-ticks = 12000
+interval-jitter-ticks = 1200
+# An attempt goes ahead with a chance of 1 in this number (vanilla 5).
+attempt-odds = 5
+# World time, in ticks, before patrols may start (vanilla 120000, five days).
+start-ticks = 120000
+
+[wandering-trader]
+# Ticks between the day-long countdowns that may bring a trader (vanilla 24000).
+spawn-delay-ticks = 24000
+# Percent chance a trader comes when the countdown ends: it starts at the minimum, grows by the increase each
+# miss up to the maximum, and returns to the minimum after a spawn (vanilla 25, 75 and 25).
+min-spawn-chance = 25
+max-spawn-chance = 75
+spawn-chance-increase = 25
+# Ticks between checks of the countdown (vanilla 1200).
+check-interval-ticks = 1200
+
+# Per entity type tweaks. Each [overrides.<entity_type>] table lists only the fields to change; a field left out
+# is vanilla's value for that type. <entity_type> is a type name such as zombie (minecraft: is implied).
+# Fields are applied to a mob when it is created, so mobs already saved with their own values keep them.
+#
+# Attributes (numbers):
+#   max-health, attack-damage, movement-speed, follow-range, armor, armor-toughness, knockback-resistance,
+#   attack-knockback, flying-speed, jump-strength, scale, safe-fall-distance, fall-damage-multiplier,
+#   explosion-knockback-resistance, oxygen-bonus
+# Rewards (number):
+#   experience-multiplier   multiplies the experience a death drops (0 drops none)
+# Behaviour (true or false):
+#   burn-in-daylight          burns in sunlight (or stops burning)
+#   no-ai                     does nothing at all, like a mob with NoAI
+#   persistent                never despawns
+#   can-pick-up-loot          picks up items it walks over
+#   no-gravity                floats without falling
+#   collidable                pushes and is pushed by other entities
+#   can-swim                  navigation may route through water and the mob floats in it
+#   opens-doors               navigation may open doors
+#   passes-doors              navigation may walk through open doors
+#   takes-damage-from-water   water and rain hurt it, one heart of damage per tick like an enderman's
+#   spawn-enabled             false stops natural spawning of this type
+#   drops-enabled             false removes its death loot
+#   mob-griefing              true or false overrides the world's mobGriefing rule for this type
+# Whole numbers:
+#   max-no-damage-ticks  invulnerability after a hit, in ticks
+#   max-air-supply       air it holds underwater, in ticks
+#   breed-cooldown       ticks before an animal can breed again (vanilla 6000)
+#   despawn-soft-range, despawn-hard-range   despawn distances in blocks for this type
+#   explosion-radius     power of a creeper's blast (vanilla 3)
+#
+# [overrides.zombie]
+# max-health = 40.0
+# burn-in-daylight = false
+# [overrides.cow]
+# breed-cooldown = 1200
+# [overrides.creeper]
+# explosion-radius = 1
+# mob-griefing = false

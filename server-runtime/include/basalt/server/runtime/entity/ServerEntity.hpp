@@ -15,6 +15,10 @@
 #include <string>
 #include <vector>
 
+namespace basalt::server::runtime::config {
+struct MobOverride;
+}
+
 namespace basalt::server::runtime::entity::boats {
 struct BoatState;
 }
@@ -425,6 +429,7 @@ public:
     /// Plugin overrides of what a type does by itself, `-1` meaning no override.
     std::int8_t despawnInPeaceful = -1;
     std::int8_t burnsInDay = -1;
+    std::shared_ptr<const config::MobOverride> tuning;
     bool ageLocked = false;
 
     /// `Fox.DATA_FLAGS_ID` bits a plugin owns (crouching, interested, pouncing, faceplanted, defending).

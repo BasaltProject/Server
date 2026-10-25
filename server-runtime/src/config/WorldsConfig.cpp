@@ -208,16 +208,18 @@ WorldSettings WorldsConfig::settingsFor(const WorldDeclaration& world) const {
     const std::string directory = worldsRoot_ + "/" + world.name;
     const std::string path = directory + "/settings.toml";
     const std::optional<std::string> text = wire::io::fileIO::readText(path);
+    WorldSettings settings = defaults_;
+    settings.mobs = loadWorldMobs(directory, defaults_.mobs);
     if (!text.has_value()) {
         // Asked rather than left to the write failing: what is being decided is whether the world exists.
         if (wire::io::fileIO::isDirectory(directory)) {
             wire::io::fileIO::writeText(path, kWorldSettingsDefaultToml);
         }
-        return defaults_;
+        return settings;
     }
     const std::expected<TomlTable, wire::common::toml::TomlError> parsed = wire::common::toml::parse(*text);
     // An unparsable settings file loses one world's preferences, not the server's configuration.
-    return parsed.has_value() ? WorldSettings::from(&*parsed, defaults_) : defaults_;
+    return parsed.has_value() ? WorldSettings::from(&*parsed, settings) : settings;
 }
 
 namespace {
@@ -277,7 +279,12 @@ std::expected<WorldsConfig, std::string> WorldsConfig::load(const ConfigDirector
     if (!root.has_value()) {
         return std::unexpected(root.error());
     }
-    const WorldSettings defaults = WorldSettings::from(root->table("defaults"), WorldSettings::vanilla());
+    WorldSettings defaults = WorldSettings::from(root->table("defaults"), WorldSettings::vanilla());
+    std::expected<MobSettings, std::string> mobs = loadMobDefaults(directory);
+    if (!mobs.has_value()) {
+        return std::unexpected(mobs.error());
+    }
+    defaults.mobs = *std::move(mobs);
     const TomlTable* declared = root->table("worlds");
 
     std::vector<WorldDeclaration> worlds;

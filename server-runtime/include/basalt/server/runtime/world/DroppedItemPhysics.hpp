@@ -55,6 +55,11 @@ public:
         mergeListened_ = std::move(listened);
     }
 
+    void setRules(std::int32_t lifetimeTicks, double mergeRadius) noexcept {
+        lifetimeTicks_ = lifetimeTicks;
+        mergeRange_ = mergeRadius + kItemWidth;
+    }
+
     [[nodiscard]] std::vector<DroppedItem> expiring(const sched::Region* region) const;
 
     void restartAge(std::int32_t entityId);
@@ -93,6 +98,8 @@ private:
                              std::vector<std::int32_t>& absorbed, std::unique_lock<WorldMutex>& lock);
 
     WorldMutex* mutex_;
+    std::int32_t lifetimeTicks_ = kItemLifetimeTicks;
+    double mergeRange_ = kMergeRange;
     entity::entityCollision::BlockAt blockAt_;
     std::vector<DroppedItem> droppedItems_;
     MergeGate mergeGate_;

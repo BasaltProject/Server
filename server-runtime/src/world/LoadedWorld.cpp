@@ -71,6 +71,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     tunables_.simulationDistance = settings_.simulationDistance;
     tunables_.lootRefill = settings_.lootRefill;
     tunables_.lootRelootSeconds = settings_.lootRelootSeconds;
+    state_.setMobSettings(&settings_.mobs);
     if (hardcore_) {
         difficulty_ = "hard";
     }

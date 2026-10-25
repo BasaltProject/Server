@@ -1,0 +1,69 @@
+# Mob settings for this world only. Anything left out is inherited from config/worlds/mobs.toml, where every
+# key is explained. This file lives inside the world directory on purpose: it travels with the world.
+# A change takes effect when the world loads (restart the server).
+
+# [caps]
+# monster = 70
+# creature = 10
+# ambient = 15
+# axolotls = 5
+# underground-water-creature = 5
+# water-creature = 5
+# water-ambient = 20
+
+# [spawn-interval-ticks]
+# monster = 1
+# creature = 400
+
+# [spawning]
+# per-player-mob-spawns = false
+# range-chunks = 8
+# monster-max-light-level = -1
+
+# [despawn]
+# shape = "sphere"
+# idle-ticks-before-random = 600
+# random-odds = 800
+# [despawn.monster]
+# soft-range = 32
+# hard-range = 128
+
+# [items]
+# despawn-ticks = 6000
+# merge-radius = 0.5
+
+# [experience]
+# merge-radius = 0.5
+
+# [projectiles]
+# arrow-despawn-ticks = 1200
+# trident-despawn-ticks = 1200
+
+# [tracking-range]
+# animals = 0
+# monsters = 0
+# misc = 0
+# display = 0
+# other = 0
+
+# [phantoms]
+# spawn-attempt-min-seconds = 60
+# spawn-attempt-max-seconds = 119
+# insomnia-ticks = 72000
+
+# [pillager-patrols]
+# interval-ticks = 12000
+# interval-jitter-ticks = 1200
+# attempt-odds = 5
+# start-ticks = 120000
+
+# [wandering-trader]
+# spawn-delay-ticks = 24000
+# min-spawn-chance = 25
+# max-spawn-chance = 75
+# spawn-chance-increase = 25
+# check-interval-ticks = 1200
+
+# Per entity type tweaks, merged field by field over the defaults file's.
+# [overrides.zombie]
+# max-health = 40.0
