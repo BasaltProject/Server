@@ -12,7 +12,7 @@ final class ServerEvents {
     private ServerEvents() {}
 
     static void install() {
-        EventBridge.map("server.ping", ServerListPingEvent.class, f -> {
+        EventBridge.map("server.ping", com.destroystokyo.paper.event.server.PaperServerListPingEvent.class, f -> {
             String text = f.text("address");
             int colon = text.lastIndexOf(':');
             String host = colon > 0 && text.indexOf(':') == colon ? text.substring(0, colon) : text;
@@ -22,8 +22,31 @@ final class ServerEvents {
             } catch (java.io.IOException unresolved) {
                 address = InetAddress.getLoopbackAddress();
             }
-            return new ServerListPingEvent(address, Component.text(f.text("motd")), (int) f.whole("online"),
-                (int) f.whole("max_players"));
+            java.net.InetSocketAddress remote = new java.net.InetSocketAddress(address, 0);
+            com.destroystokyo.paper.network.StatusClient client = new com.destroystokyo.paper.network.StatusClient() {
+                @Override
+                public java.net.SocketAddress getSocketAddress() {
+                    return remote;
+                }
+
+                @Override
+                public java.net.InetSocketAddress getAddress() {
+                    return remote;
+                }
+
+                @Override
+                public int getProtocolVersion() {
+                    return 777;
+                }
+
+                @Override
+                public java.net.InetSocketAddress getVirtualHost() {
+                    return null;
+                }
+            };
+            return new com.destroystokyo.paper.event.server.PaperServerListPingEvent(client,
+                Component.text(f.text("motd")), (int) f.whole("online"), (int) f.whole("max_players"),
+                BasaltServer.instance().getMinecraftVersion(), 777, null);
         }, (e, f) -> {
             ServerListPingEvent ping = (ServerListPingEvent) e;
             f.put("motd", PlainTextComponentSerializer.plainText().serialize(ping.motd()));
