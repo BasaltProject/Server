@@ -3,25 +3,20 @@ package org.basaltmc.bukkit.entity.ops;
 import com.destroystokyo.paper.loottable.LootableEntityInventory;
 import java.util.UUID;
 import org.basaltmc.bukkit.entity.Cored;
+import org.basaltmc.bukkit.item.Nbt;
+import org.basaltmc.bukkit.tile.LootableData;
 import org.bukkit.entity.Entity;
 
-/** Loot bookkeeping of a container entity; the server fills it on the first opening and never refills it. */
+/** Loot bookkeeping of a container entity, kept in the data the server writes under Paper.LootableData. */
 public interface LootableEntityInventoryOps extends LootableEntityInventory, Cored {
-    private java.util.Map<String, Object> data() {
-        java.util.Map<String, Object> found = org.basaltmc.bukkit.item.Nbt.map(EntityNbt.compound(core(), "")
-            .get("Paper.LootableData"));
-        return found == null ? org.basaltmc.bukkit.item.Nbt.compound() : found;
+    private LootableData data() {
+        return LootableData.of(EntityNbt.compound(core(), ""));
     }
 
-    private void save(java.util.Map<String, Object> data) {
-        java.util.Map<String, Object> patch = org.basaltmc.bukkit.item.Nbt.compound();
-        patch.put("Paper.LootableData", data);
-        core().mergeNbt(org.basaltmc.bukkit.item.Nbt.writeNamed(patch));
-    }
-
-    private java.util.Map<String, Object> looted() {
-        java.util.Map<String, Object> found = org.basaltmc.bukkit.item.Nbt.map(data().get("lootedPlayers"));
-        return found == null ? org.basaltmc.bukkit.item.Nbt.compound() : found;
+    private void save(LootableData data) {
+        java.util.Map<String, Object> patch = Nbt.compound();
+        patch.put(LootableData.key(), data.toNbt() == null ? Nbt.compound() : data.toNbt());
+        core().mergeNbt(Nbt.writeNamed(patch));
     }
 
     default Entity getEntity() {
@@ -34,56 +29,47 @@ public interface LootableEntityInventoryOps extends LootableEntityInventory, Cor
     }
 
     default boolean isRefillEnabled() {
-        return false;
+        return LootableData.refillEnabled(getWorld().getName());
     }
 
     default boolean hasBeenFilled() {
-        return getLastFilled() != -1L || !hasLootTable();
+        return getLastFilled() != -1L;
     }
 
     default boolean canPlayerLoot(UUID player) {
-        return true;
+        return data().canPlayerLoot(getWorld().getName(), player);
     }
 
     default boolean hasPlayerLooted(UUID player) {
-        return looted().containsKey(player.toString());
+        return data().hasPlayerLooted(player);
     }
 
     default Long getLastLooted(UUID player) {
-        return looted().get(player.toString()) instanceof Number time ? time.longValue() : null;
+        return data().lastLooted(player);
     }
 
     default boolean setHasPlayerLooted(UUID player, boolean looted) {
-        boolean was = hasPlayerLooted(player);
-        java.util.Map<String, Object> all = looted();
-        if (looted) {
-            all.put(player.toString(), System.currentTimeMillis());
-        } else {
-            all.remove(player.toString());
-        }
-        java.util.Map<String, Object> data = data();
-        data.put("lootedPlayers", all);
+        LootableData data = data();
+        boolean was = data.setHasPlayerLooted(player, looted);
         save(data);
         return was;
     }
 
     default boolean hasPendingRefill() {
-        long next = getNextRefill();
-        return next != -1L && next < System.currentTimeMillis();
+        return data().hasPendingRefill();
     }
 
     default long getLastFilled() {
-        return data().get("lastFill") instanceof Number time ? time.longValue() : -1L;
+        return data().lastFill();
     }
 
     default long getNextRefill() {
-        return data().get("nextRefill") instanceof Number time ? time.longValue() : -1L;
+        return data().nextRefill();
     }
 
     default long setNextRefill(long refillAt) {
-        long previous = getNextRefill();
-        java.util.Map<String, Object> data = data();
-        data.put("nextRefill", refillAt);
+        LootableData data = data();
+        long previous = data.setNextRefill(refillAt);
         save(data);
         return previous;
     }

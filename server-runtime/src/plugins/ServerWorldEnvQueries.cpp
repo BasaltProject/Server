@@ -281,6 +281,12 @@ std::optional<double> ServerWorldEnv::tunable(const std::string_view key) {
     if (key == "hardcore") {
         return world_->hardcore() ? 1.0 : 0.0;
     }
+    if (key == "loot_refill") {
+        return held.lootRefill ? 1.0 : 0.0;
+    }
+    if (key == "loot_reloot_seconds") {
+        return static_cast<double>(held.lootRelootSeconds);
+    }
     return std::nullopt;
 }
 
@@ -292,6 +298,10 @@ bool ServerWorldEnv::setTunable(const std::string_view key, const double value) 
         held.voidDamageAmount = static_cast<float>(std::max(value, 0.0));
     } else if (key == "void_damage_offset") {
         held.voidDamageOffset = value;
+    } else if (key == "loot_refill") {
+        held.lootRefill = value != 0.0;
+    } else if (key == "loot_reloot_seconds") {
+        held.lootRelootSeconds = std::max(static_cast<std::int32_t>(value), -1);
     } else if (key == "hardcore") {
         world_->setHardcore(value != 0.0);
         if (world_->hardcore()) {

@@ -21,6 +21,12 @@ struct WorldSettings {
     bool openEndExitPortal = false;
     bool hardcore = false;
 
+    bool lootRefill = false;
+    std::int32_t lootRefillMinSeconds = 43200;
+    std::int32_t lootRefillMaxSeconds = 172800;
+    std::int32_t lootMaxRefills = -1;
+    std::int32_t lootRelootSeconds = -1;
+
     [[nodiscard]] static WorldSettings vanilla() { return WorldSettings{}; }
 
     [[nodiscard]] static WorldSettings from(const wire::common::toml::TomlTable* table, const WorldSettings& inherited);
