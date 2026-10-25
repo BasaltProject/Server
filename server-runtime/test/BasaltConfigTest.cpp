@@ -287,7 +287,9 @@ TEST_CASE("moving a vanilla server over is copy the folder and start") {
     const std::optional<std::string> written = fileIO::readText(directory.pathOf("server.toml"));
     REQUIRE(written.has_value());
     CHECK(written->find("port = 25599") != std::string::npos);
-    CHECK(written->find("port = 25565") == std::string::npos);
+    const std::size_t javaAt = written->find("[network.java]");
+    CHECK(written->substr(javaAt, written->find("[network.bedrock]") - javaAt).find("port = 25565") ==
+          std::string::npos);
     CHECK(written->find('#') != std::string::npos);
 
     fileIO::writeText(properties, "server-port=25000\n");

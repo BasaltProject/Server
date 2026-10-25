@@ -34,13 +34,23 @@ std::expected<ConfigSnapshot, std::string> LiveConfigs::read(const ConfigDirecto
     if (!bossBar.has_value()) {
         return std::unexpected(bossBar.error());
     }
+    std::expected<LimitsConfig, std::string> limits = LimitsConfig::load(directory, logger);
+    if (!limits.has_value()) {
+        return std::unexpected(limits.error());
+    }
+    std::expected<MessagesConfig, std::string> messages = MessagesConfig::load(directory);
+    if (!messages.has_value()) {
+        return std::unexpected(messages.error());
+    }
     return ConfigSnapshot{.groups = std::move(*groups),
                           .serverList = std::move(*serverList),
                           .commands = std::move(*commands),
                           .animations = std::move(*animations),
                           .ui = UiConfigs{.tabList = std::move(*tabList),
                                           .scoreboard = std::move(*scoreboard),
-                                          .bossBar = std::move(*bossBar)}};
+                                          .bossBar = std::move(*bossBar)},
+                          .limits = std::move(*limits),
+                          .messages = std::move(*messages)};
 }
 
 } // namespace basalt::server::runtime::config

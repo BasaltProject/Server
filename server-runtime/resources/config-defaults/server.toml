@@ -16,6 +16,11 @@ max-players = 80
 # claimed username with no verification (vanilla's "cracked" mode).
 online-mode = true
 
+# Send the player's address to Mojang's session server when they log in, as vanilla's prevent-proxy-connections
+# does, so a player whose address differs from the one they authenticated from is refused. Only takes effect in
+# online mode.
+prevent-proxy-connections = false
+
 # Require signed chat from every player, as vanilla's enforce-secure-profile does.
 # Only takes effect in online mode and while Mojang's public keys could be
 # fetched at startup; unsigned chat from a player then is refused.
@@ -48,12 +53,63 @@ gamemode = "survival"
 # /whitelist on and off move this for the run; a restart follows this file again.
 whitelist = false
 
+# Kick the players already online who are not on the whitelist whenever it is switched on or a name leaves
+# it, as vanilla's enforce-whitelist does. Off lets them stay until they leave on their own.
+enforce-whitelist = false
+
+# Seconds between saves of the players alone (inventory, position, stats), on top of the world save interval in
+# worlds.toml that saves them together with the world. 0 saves them only with the world, as vanilla does.
+player-autosave-seconds = 0
+
 # Seconds with nobody online before the server stops ticking, as vanilla's pause-when-empty-seconds
 # does. 0 never pauses. Connections are still served while paused.
 pause-when-empty-seconds = 60
 
 # Blocks around the world spawn only operators may change, as vanilla's spawn-protection does. 0 turns it off.
 spawn-protection = 16
+
+# Name sent to clients as the server brand, which they show on the F3 screen. Empty sends "Basalt <version>".
+brand = ""
+
+# Console commands to run once the worlds are up, in order, each time the server starts.
+# startup-commands = ["gamerule doDaylightCycle false", "difficulty hard"]
+startup-commands = []
+
+# Put every player back in the game mode above on each join, as vanilla's force-gamemode does, instead of
+# the one they left in.
+force-gamemode = false
+
+# A regular expression (ECMAScript) every player name must match to log in, on top of vanilla's own rule that a
+# name has at most 16 characters between "!" and "~". Empty applies only the vanilla rule. NO VANILLA when set.
+# username-pattern = "^[A-Za-z0-9_]+$"
+username-pattern = ""
+
+# Let clients that were sent here by another server's transfer packet join, as vanilla's accepts-transfers
+# does. Off turns them away with the "transfers are disabled" screen.
+accepts-transfers = false
+
+# Minutes without any action before a player is kicked as idle, as vanilla's player-idle-timeout does. 0 never
+# kicks. /setidletimeout changes it until the next restart.
+player-idle-timeout = 0
+
+# Stop kicking players who hover in the air for four seconds without being able to fly, as vanilla's
+# allow-flight does. Turn it on only if a mod or a plugin lets players float, since it also lets a flying
+# hack through.
+allow-flight = false
+
+# How far from a player other entities are drawn, as a percentage of the distance each kind is drawn at,
+# 10 to 1000, as vanilla's entity-broadcast-range-percentage does. 200 doubles it, 50 halves it. Never goes past
+# the player's view distance.
+entity-broadcast-range-percentage = 100
+
+# How many block updates one change may set off in a row before the server stops answering them, as vanilla's
+# max-chained-neighbor-updates does. -1 never stops. Redstone machines that loop on purpose hit this; lowering it
+# makes them stall sooner. NO VANILLA below 1000000.
+max-chained-neighbor-updates = 1000000
+
+# Farthest from the center, in blocks, that the world border may reach, as vanilla's max-world-size does:
+# the playable area is never wider than twice this, whatever size the border is set to. 1 to 29999984.
+max-world-size = 29999984
 
 [network]
 # The two editions are two doors into the same server: the same worlds, the same
@@ -104,6 +160,31 @@ snapshots = "refuse"
 # somebody named themselves keeps that name.
 name-substitutes = true
 
+# Packets of at least this many bytes are compressed, as vanilla's network-compression-threshold does. -1
+# turns compression off, 0 compresses everything. Lower it on a slow link, raise it on a fast local network.
+compression-threshold = 256
+
+# Answer server list pings, as vanilla's enable-status does. Off makes the server invisible in the list
+# (clients show it as unreachable) while still letting players join by address.
+status-replies = true
+
+# Send each packet at once instead of letting the system wait to merge small ones (TCP_NODELAY), which is what
+# vanilla does. Turning it off trades a little latency for fewer, larger network packets.
+tcp-no-delay = true
+
+# Expect a HAProxy PROXY protocol header (v1 or v2) at the start of every connection and take the player's
+# address from it. Turn it on only behind a load balancer or hosting panel that sends one, and only when this
+# port cannot be reached any other way: with it on, a connection without the header is dropped.
+proxy-protocol = false
+
+# Milliseconds a player's address must wait between two login attempts (the CraftBukkit connection-throttle,
+# which ships as 4000). 0 turns it off. Loopback is never throttled, and neither are server list pings.
+# NO VANILLA: vanilla has no throttle.
+connection-throttle-ms = 0
+
+# Most connections open at once from one address, pings included. 0 means no limit. NO VANILLA.
+max-connections-per-address = 0
+
 [network.bedrock]
 # Minecraft Bedrock clients (phone, console, Windows). On by default: nobody
 # should have to configure being able to join.
@@ -135,39 +216,13 @@ protocols = "all"
 # screen that offers to update the server instead.
 future-protocols = "warn"
 
-[network.rcon]
-# RCON, for tools that only speak it. It is PLAINTEXT: the password and every command cross the network
-# unencrypted, so keep it on loopback or behind a VPN and prefer [network.api] below. Off by default; it
-# also refuses to start with an empty password.
+[network.query]
+# Answer GameSpy 4 status queries over UDP, as vanilla's enable-query does: server list sites and monitoring tools
+# ask it for the player names and counts. IPv4 only.
 enabled = false
-bind = "127.0.0.1"
-port = 25575
-password = ""
-# Wrong passwords from one address before it is locked out, and for how long the first lockout lasts.
-# Every further lockout of the same address doubles it, up to a day.
-max-failures = 5
-lockout-seconds = 30
 
-[network.api]
-# The management API: REST under /v1 and a WebSocket console at /v1/console, JSON everywhere. Every route
-# needs "Authorization: Bearer <token>". The token is generated on the first run, printed once in the log and
-# kept in .basalt/remote-token (state, readable only by its owner). Only loopback by default.
-enabled = true
-bind = "127.0.0.1"
-port = 25580
-# Serve HTTPS/WSS. Needs PEM files; without it the token crosses the network in the clear off loopback.
-tls = false
-tls-cert = ""
-tls-key = ""
-# Bad tokens from one address before it is locked out, and the first lockout (it doubles each time).
-max-failures = 5
-lockout-seconds = 30
-# Requests an address may make per minute, open connections at once, the largest request body, and how many
-# seconds a connection may stay silent before it is dropped.
-requests-per-minute = 120
-max-connections = 32
-max-body-bytes = 65536
-idle-seconds = 60
+# UDP port the query listens on, vanilla's query.port. It may share the number of the Java port: one is TCP, the other UDP.
+port = 25565
 
 # A proxy in front of this server (BungeeCord, Waterfall, Velocity, Gate) connects
 # on behalf of every player, so without forwarding the whole server sees one address
@@ -224,6 +279,15 @@ tokens = []
 property-name = "safe_net_passphrase"
 
 [performance]
+# Seconds one server tick may take before the watchdog gives up on the server, logs it and exits, as vanilla's
+# max-tick-time does (it ships as 60000 milliseconds). 0 turns the watchdog off.
+watchdog-seconds = 60
+
+# Most chunks sent to one player per second, however many their client asks for. 0 leaves it to the client, which
+# in vanilla asks for up to 1280 a second. Lowering it eases the load of players who fly fast or join together, at
+# the price of slower loading. NO VANILLA below 1280.
+chunk-send-rate = 0
+
 # Count noise evaluations, biome lookups and per-phase timings while generating
 # chunks, then log a report once the startup chunks are ready. Diagnostics only:
 # it also forces startup generation onto a single thread so the counts are exact,
@@ -288,6 +352,10 @@ function-permission-level = 2
 # One of: trace, debug, info, warn, error.
 level = "info"
 
+# Put each player's address in the log line of their login, as vanilla's log-ips does. Off logs "IP hidden"
+# instead, for servers that must not keep addresses in their logs.
+log-ips = true
+
 # Mirror everything the console shows into .basalt/logs/latest.log, archiving the
 # previous run as .basalt/logs/archive/<date>-<n>.log.gz on every start.
 file = true
@@ -298,3 +366,4 @@ keep-days = 14
 # Colour the console output. One of: auto, always, never. "auto" colours only when
 # writing to a terminal, so redirected output and log files stay clean.
 color = "auto"
+

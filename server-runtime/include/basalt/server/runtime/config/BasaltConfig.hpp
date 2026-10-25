@@ -1,7 +1,7 @@
 #pragma once
 
-#include <basalt/server/remote/RemoteSettings.hpp>
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
+#include <basalt/server/runtime/config/ServerTuning.hpp>
 #include <basalt/wire/auth/forwarding/ProxyForwarding.hpp>
 #include <basalt/wire/common/logging/LogLevel.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
@@ -51,7 +51,7 @@ struct BasaltConfig {
     /// parity: `spawn-protection`.
     std::int32_t spawnProtection = 16;
     wire::auth::forwarding::ProxyForwarding forwarding;
-    remote::RemoteSettings remote;
+    ServerTuning tuning;
     wire::common::LogLevel logLevel = wire::common::LogLevel::Info;
     bool logToFile = true;
     std::int32_t logKeepDays = 14;

@@ -16,6 +16,7 @@ namespace basalt::server::runtime::config {
 struct WorldSettings {
     std::string difficulty = "easy";
     std::int32_t viewDistance = 10;
+    std::int32_t simulationDistance = 10;
     std::int32_t saveIntervalSeconds = 300;
 
     bool openEndExitPortal = false;

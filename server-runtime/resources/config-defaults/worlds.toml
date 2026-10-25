@@ -80,6 +80,10 @@ difficulty = "easy"
 # Radius, in chunks, sent to a client around its own position (vanilla's own
 # server.properties default is 10).
 view-distance = 10
+# Radius, in chunks, around each player inside which the world ticks (mobs move, crops grow, redstone runs), as
+# vanilla's simulation-distance does (2 to 32). It never ticks farther than view-distance. Lowering it is the
+# strongest way to spare the tick on a busy server.
+simulation-distance = 10
 # How often changes are written to the region files: a crash costs at most this
 # much. Vanilla's own interval. 0 disables it, leaving chunks to save when they
 # unload or on stop.

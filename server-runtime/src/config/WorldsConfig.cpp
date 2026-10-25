@@ -50,6 +50,9 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
     WorldSettings settings = inherited;
     settings.difficulty = std::string{table->string("difficulty").value_or(inherited.difficulty)};
     settings.viewDistance = static_cast<std::int32_t>(table->integer("view-distance").value_or(inherited.viewDistance));
+    // parity: `PlayerList.setSimulationDistance`, clamped as `setViewDistance` is.
+    settings.simulationDistance = static_cast<std::int32_t>(
+        std::clamp<std::int64_t>(table->integer("simulation-distance").value_or(inherited.simulationDistance), 2, 32));
     settings.saveIntervalSeconds = static_cast<std::int32_t>(
         std::max<std::int64_t>(table->integer("save-interval-seconds").value_or(inherited.saveIntervalSeconds), 0));
     settings.openEndExitPortal = table->boolean("open-end-exit-portal").value_or(inherited.openEndExitPortal);
