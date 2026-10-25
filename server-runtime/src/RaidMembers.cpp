@@ -9,8 +9,10 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/UiPackets.hpp>
+#include <basalt/wire/text/ComponentJson.hpp>
 
 #include <algorithm>
 #include <cmath>

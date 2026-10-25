@@ -1,5 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
-#include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
 #include <basalt/server/runtime/TrialSpawnerSystem.hpp>
