@@ -189,6 +189,20 @@ public final class TypedInventories {
 
         private static final Object kNone = new Object();
 
+        private boolean smelts(ItemStack item) {
+            Class<?> kind = base.getType() == InventoryType.BLAST_FURNACE ? org.bukkit.inventory.BlastingRecipe.class
+                : base.getType() == InventoryType.SMOKER ? org.bukkit.inventory.SmokingRecipe.class
+                : org.bukkit.inventory.FurnaceRecipe.class;
+            java.util.Iterator<org.bukkit.inventory.Recipe> all = org.basaltmc.bukkit.recipe.Recipes.iterator();
+            while (all.hasNext()) {
+                org.bukkit.inventory.Recipe recipe = all.next();
+                if (kind.isInstance(recipe) && ((org.bukkit.inventory.CookingRecipe<?>) recipe).getInputChoice().test(item)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private Object typed(Object proxy, Method method, String name, Object[] args) {
             int count = args == null ? 0 : args.length;
             if (name.equals("getMatrix") && count == 0) {
@@ -223,7 +237,7 @@ public final class TypedInventories {
                 return args[0] != null && ((ItemStack) args[0]).getType().isFuel();
             }
             if (name.equals("canSmelt") && count == 1) {
-                throw Unsupported.hit("FurnaceInventory#canSmelt");
+                return args[0] != null && smelts((ItemStack) args[0]);
             }
             if (name.startsWith("get") && count == 0 && slots.containsKey(name.substring(3))) {
                 return base.getItem(slots.get(name.substring(3)));

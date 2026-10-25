@@ -6,6 +6,8 @@ public final class InventoryNatives {
     public static native byte[] playerItem(String uuid, int slot);
     public static native void setPlayerItem(String uuid, int slot, byte[] item);
     public static native int windowOpen(String uuid, String kind, int size, byte[] title, byte[][] items, boolean editable);
+    public static native int windowOpenBlock(String uuid, int x, int y, int z);
+    public static native int windowOpenEntity(String uuid, int entityId);
     public static native void windowClose(String uuid);
     public static native String[] windowInfo(String uuid);
     public static native byte[] windowItem(String uuid, int slot);

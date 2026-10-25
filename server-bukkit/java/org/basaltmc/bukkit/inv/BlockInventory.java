@@ -35,6 +35,22 @@ public class BlockInventory extends AbstractInventory {
         this.holder = holder;
     }
 
+    public String worldName() {
+        return world;
+    }
+
+    public int blockX() {
+        return x;
+    }
+
+    public int blockY() {
+        return y;
+    }
+
+    public int blockZ() {
+        return z;
+    }
+
     public static int sizeOf(String block) {
         switch (block) {
             case "hopper", "brewing_stand":

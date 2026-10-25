@@ -41,6 +41,20 @@ public:
     /// Opens a window of plugin-held contents and returns its container id, or zero when the kind is unknown.
     virtual std::int32_t openWindow(const PluginWindowSpec& spec) = 0;
 
+    /// Opens the screen the container block at the position has, as if the player used it; the container id, or zero.
+    virtual std::int32_t openBlockWindow(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return 0;
+    }
+
+    /// Opens the chest of a chest minecart or chest boat; the container id, or zero.
+    virtual std::int32_t openEntityWindow(std::int32_t entityId) {
+        static_cast<void>(entityId);
+        return 0;
+    }
+
     virtual void closeWindow() = 0;
 
     [[nodiscard]] virtual PluginWindowInfo windowInfo() const = 0;

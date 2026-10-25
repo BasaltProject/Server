@@ -33,6 +33,10 @@ public class EntityContainerInventory extends AbstractInventory {
         this.key = key;
     }
 
+    public int entityId() {
+        return holder.getEntityId();
+    }
+
     @Override
     public int getSize() {
         return size;

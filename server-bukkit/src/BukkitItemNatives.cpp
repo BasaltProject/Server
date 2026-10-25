@@ -99,6 +99,22 @@ void JNICALL nativeSetPlayerItem(JNIEnv* env, jclass, jstring uuid, jint slot, j
     return player == nullptr ? nullptr : player->window();
 }
 
+jint JNICALL nativeWindowOpenBlock(JNIEnv* env, jclass, jstring uuid, jint x, jint y, jint z) {
+    const std::string who = toStd(env, uuid);
+    return onServerThread<jint>(0, [&] {
+        plugins::PluginWindow* window = windowOf(who);
+        return window == nullptr ? 0 : window->openBlockWindow(x, y, z);
+    });
+}
+
+jint JNICALL nativeWindowOpenEntity(JNIEnv* env, jclass, jstring uuid, jint entityId) {
+    const std::string who = toStd(env, uuid);
+    return onServerThread<jint>(0, [&] {
+        plugins::PluginWindow* window = windowOf(who);
+        return window == nullptr ? 0 : window->openEntityWindow(entityId);
+    });
+}
+
 jint JNICALL nativeWindowOpen(JNIEnv* env, jclass, jstring uuid, jstring kind, jint size, jbyteArray title,
                               jobjectArray items, jboolean editable) {
     plugins::PluginWindowSpec spec;
@@ -357,6 +373,10 @@ void registerInventoryNatives(JNIEnv* env, jclass natives) {
         JNINativeMethod{const_cast<char*>("windowOpen"),
                         const_cast<char*>("(Ljava/lang/String;Ljava/lang/String;I[B[[BZ)I"),
                         reinterpret_cast<void*>(&nativeWindowOpen)},
+        JNINativeMethod{const_cast<char*>("windowOpenBlock"), const_cast<char*>("(Ljava/lang/String;III)I"),
+                        reinterpret_cast<void*>(&nativeWindowOpenBlock)},
+        JNINativeMethod{const_cast<char*>("windowOpenEntity"), const_cast<char*>("(Ljava/lang/String;I)I"),
+                        reinterpret_cast<void*>(&nativeWindowOpenEntity)},
         JNINativeMethod{const_cast<char*>("windowClose"), const_cast<char*>("(Ljava/lang/String;)V"),
                         reinterpret_cast<void*>(&nativeWindowClose)},
         JNINativeMethod{const_cast<char*>("windowInfo"), const_cast<char*>("(Ljava/lang/String;)[Ljava/lang/String;"),

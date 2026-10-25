@@ -3,6 +3,8 @@
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
+#include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/text/ComponentNbt.hpp>
 
@@ -100,6 +102,55 @@ std::int32_t ContainerMenuController::openWindow(const PluginWindowSpec& spec) {
     });
     sendInventory();
     return openMenu.containerId();
+}
+
+std::int32_t ContainerMenuController::openBlockWindow(const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    PlayerSession* session = owner_->playerSession();
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (session == nullptr || world == nullptr) {
+        return 0;
+    }
+    const std::optional<std::int32_t> stateId = world->state().blockState(x, y, z);
+    const wire::common::Identifier* block =
+        stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+    if (block == nullptr) {
+        return 0;
+    }
+    const std::string path{block->path()};
+    const wire::protocol::play::BlockPos pos{.x = x, .y = y, .z = z};
+    const std::int32_t before = nextContainerId;
+    if (path == "crafting_table") {
+        openCraftingTable(*session);
+    } else if (world::furnaces::cookerFor(path).has_value()) {
+        openFurnace(*session, pos, path);
+    } else if (path == "brewing_stand") {
+        openBrewingStand(*session, pos);
+    } else if (world::containers::isPlain(path)) {
+        openChest(*session, pos, path);
+    } else if (path == "crafter") {
+        openCrafter(*session, pos);
+    } else if (path == "ender_chest") {
+        openEnderChest(*session, pos);
+    } else {
+        return 0;
+    }
+    return nextContainerId != before ? openMenu.containerId() : 0;
+}
+
+std::int32_t ContainerMenuController::openEntityWindow(const std::int32_t entityId) {
+    PlayerSession* session = owner_->playerSession();
+    world::LoadedWorld* world = owner_->currentWorld();
+    entity::ServerEntity* vehicle = world == nullptr ? nullptr : world->state().entity(entityId);
+    if (session == nullptr || vehicle == nullptr) {
+        return 0;
+    }
+    const std::string_view path = vehicle->type().path();
+    if (path != "chest_minecart" && !path.ends_with("_chest_boat") && !path.ends_with("_chest_raft")) {
+        return 0;
+    }
+    const std::int32_t before = nextContainerId;
+    openEntityChest(*session, *vehicle);
+    return nextContainerId != before ? openMenu.containerId() : 0;
 }
 
 void ContainerMenuController::closeWindow() { closeOpenMenu(); }
