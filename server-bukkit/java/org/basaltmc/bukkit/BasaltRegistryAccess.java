@@ -48,6 +48,9 @@ public final class BasaltRegistryAccess implements RegistryAccess {
         switch (name) {
             case "game_event":
                 return new BasaltRegistry<T>(source, key -> (T) new BasaltGameEvent(key), kGameEvents);
+            case "instrument":
+                return new BasaltRegistry<T>(source, key -> (T) new BasaltMusicInstrument(key),
+                    BasaltMusicInstrument.kNames);
             case "worldgen/structure":
                 return new BasaltRegistry<T>(source, key -> (T) new BasaltStructure(key), kStructures);
             case "worldgen/structure_type":
@@ -57,7 +60,8 @@ public final class BasaltRegistryAccess implements RegistryAccess {
         }
         if (type != null && type.isInterface() && !BUILT_IN.contains(name)) {
             Class<T> keyed = (Class<T>) type;
-            return new BasaltRegistry<T>(source, key -> KeyedProxy.of(keyed, key, -1));
+            BasaltRegistry<T> opened = new BasaltRegistry<T>(source, key -> KeyedProxy.of(keyed, key, -1));
+            return isSynced(name) ? opened.complete() : opened;
         }
         return new BasaltRegistry<T>(source);
     }
@@ -89,6 +93,14 @@ public final class BasaltRegistryAccess implements RegistryAccess {
     private static final java.util.List<String> kStructureTypes = java.util.List.of("buried_treasure", "desert_pyramid",
         "end_city", "fortress", "igloo", "jigsaw", "jungle_temple", "mineshaft", "nether_fossil", "ocean_monument",
         "ocean_ruin", "ruined_portal", "shipwreck", "stronghold", "swamp_hut", "woodland_mansion");
+
+    /** The registries the server sends to clients are listed in full by the server itself. */
+    private static boolean isSynced(String name) {
+        return WorldNatives.registryIds(name).length > 0 && !kCustomLists.contains(name);
+    }
+
+    private static final java.util.Set<String> kCustomLists = java.util.Set.of("sound_event", "menu", "data_component_type",
+        "game_rule", "mob_effect", "block", "item", "entity_type", "worldgen/biome", "biome");
 
     private static final java.util.Set<String> BUILT_IN = java.util.Set.of("block", "item", "worldgen/biome", "entity_type");
 

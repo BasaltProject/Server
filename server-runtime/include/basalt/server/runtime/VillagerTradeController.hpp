@@ -56,6 +56,8 @@ public:
 
     [[nodiscard]] bool open() const noexcept { return openTradingWith_.has_value() || custom_; }
 
+    [[nodiscard]] std::optional<std::int32_t> tradingWith() const noexcept { return openTradingWith_; }
+
     [[nodiscard]] const std::optional<storage::StoredItemStack>& slot(std::int32_t index) const;
 
     void setSlot(std::int32_t index, std::optional<storage::StoredItemStack> stack);

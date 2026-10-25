@@ -1,3 +1,5 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/ProgressCommands.hpp>
@@ -226,6 +228,21 @@ void RecipeCommand::build(const CommandNodeBuilder& root) const {
             for (const Identifier& id : ids) {
                 bool applied = false;
                 if (giving) {
+                    // parity: `ServerPlayer.awardRecipes` asks `PlayerRecipeDiscoverEvent` for each new recipe.
+                    const server::plugins::PluginEvent* discover = nullptr;
+                    if (!progress_->knownRecipes(target->uuid().toString()).contains(id)) {
+                        discover = server::plugins::emit(context.environment().pluginEvents(),
+                                                         &server::plugins::pluginEventTypes::playerRecipeDiscover(),
+                                                         [&](server::plugins::PluginEvent& event) {
+                                                             event.set("player_name", target->name());
+                                                             event.set("player_uuid", target->uuid().toString());
+                                                             event.set("world", target->worldName);
+                                                             event.set("recipe", id.toString());
+                                                         });
+                    }
+                    if (discover != nullptr && discover->cancelled()) {
+                        continue;
+                    }
                     applied = progress_->learn(target->uuid().toString(), id);
                     // parity: `ServerPlayer.awardRecipes` fires the unlock trigger itself.
                     if (applied && context.environment().options().advancementTriggers != nullptr) {

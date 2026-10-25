@@ -70,6 +70,8 @@ public final class TypedInventories {
                 return JukeboxInventory.class;
             case CARTOGRAPHY:
                 return CartographyInventory.class;
+            case MERCHANT:
+                return org.bukkit.inventory.MerchantInventory.class;
             default:
                 return null;
         }
@@ -225,6 +227,14 @@ public final class TypedInventories {
                 return recipe;
             }
             switch (name) {
+                case "getMerchant":
+                    return state.get("merchant");
+                case "getSelectedRecipeIndex":
+                    return state.getOrDefault("index", -1);
+                case "getSelectedRecipe":
+                    return state.get("merchant") instanceof org.bukkit.inventory.Merchant merchant
+                        && state.get("index") instanceof Integer at && at >= 0 && at < merchant.getRecipeCount()
+                        ? merchant.getRecipe(at) : null;
                 case "getRenameText":
                     return state.get("rename") instanceof String text && !text.isEmpty() ? text : null;
                 case "getRepairCost", "getRepairCostAmount", "getMaximumRepairCost":

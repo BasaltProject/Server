@@ -119,7 +119,15 @@ bool ExperienceOrbSystem::isOrb(const ServerEntity& entity) {
 }
 
 std::int32_t ExperienceOrbSystem::valueOf(const ServerEntity& orb) {
-    return orb.sourceNbt.has_value() ? orb.sourceNbt->getShort("Value") : 0;
+    if (!orb.sourceNbt.has_value()) {
+        return 0;
+    }
+    // parity: `CompoundTag.getShort` reads any number, so a summoned `Value:7` is seven points too.
+    const wire::nbt::NbtTag* value = orb.sourceNbt->find("Value");
+    if (value != nullptr && value->get<std::int32_t>() != nullptr) {
+        return *value->get<std::int32_t>();
+    }
+    return orb.sourceNbt->getShort("Value");
 }
 
 void ExperienceOrbSystem::award(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {

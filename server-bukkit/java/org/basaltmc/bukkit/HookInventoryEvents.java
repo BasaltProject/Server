@@ -7,9 +7,18 @@ final class HookInventoryEvents {
     static void install() {
         EventBridge.map("inventory.trade", org.bukkit.event.inventory.TradeSelectEvent.class, f -> {
             org.bukkit.entity.Player who = f.player();
-            org.bukkit.inventory.InventoryView view = who == null ? null : org.basaltmc.bukkit.inv.Windows.current(who);
-            return view instanceof org.bukkit.inventory.view.MerchantView merchant
-                ? new org.bukkit.event.inventory.TradeSelectEvent(merchant, (int) f.whole("index")) : null;
+            org.basaltmc.bukkit.inv.BasaltInventoryView window = who == null ? null
+                : org.basaltmc.bukkit.inv.Windows.current(who);
+            if (window == null || !(BasaltServer.instance().entityById(f.world(), (int) f.whole("entity_id"))
+                instanceof org.bukkit.inventory.Merchant merchant)) {
+                return null;
+            }
+            int index = (int) f.whole("index");
+            org.bukkit.inventory.Inventory top = org.basaltmc.bukkit.inv.TypedInventories.wrap(
+                org.basaltmc.bukkit.inv.TypedInventories.unwrap(window.getTopInventory()), null,
+                java.util.Map.of("merchant", merchant, "index", index));
+            return new org.bukkit.event.inventory.TradeSelectEvent(
+                new org.basaltmc.bukkit.inv.MerchantViews(who, top, window, merchant), index);
         });
         EventBridge.map("inventory.furnace_extract", org.bukkit.event.inventory.FurnaceExtractEvent.class, f -> {
             org.bukkit.Material material = org.bukkit.Material.matchMaterial(f.text("item"));
