@@ -15,6 +15,7 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityCombustEvent;
+import org.bukkit.event.entity.EntityDamageByBlockEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
@@ -354,12 +355,44 @@ final class EntityEvents {
             builder.withCausingEntity(culprit != null ? culprit : attacker).withDirectEntity(attacker);
         }
         DamageSource source = builder.build();
-        Event event = attacker == null ? new EntityDamageEvent(target, mapped, source, f.real("amount"))
-            : new EntityDamageByEntityEvent(attacker, target, mapped, source, f.real("amount"));
+        org.bukkit.block.Block blockSource = attacker == null ? damagingBlock(cause, target) : null;
+        Event event = attacker != null ? new EntityDamageByEntityEvent(attacker, target, mapped, source, f.real("amount"))
+            : blockSource != null ? new EntityDamageByBlockEvent(blockSource, blockSource.getState(), target, mapped, source,
+                f.real("amount")) : new EntityDamageEvent(target, mapped, source, f.real("amount"));
         if (target instanceof Cored cored) {
             cored.core().lastDamageCause = (EntityDamageEvent) event;
         }
         return event;
+    }
+
+    private static org.bukkit.block.Block damagingBlock(String cause, Entity target) {
+        java.util.Set<org.bukkit.Material> wanted = switch (cause) {
+            case "cactus" -> java.util.Set.of(org.bukkit.Material.CACTUS);
+            case "sweet_berry_bush" -> java.util.Set.of(org.bukkit.Material.SWEET_BERRY_BUSH);
+            case "lava" -> java.util.Set.of(org.bukkit.Material.LAVA);
+            case "hot_floor" -> java.util.Set.of(org.bukkit.Material.MAGMA_BLOCK);
+            case "in_fire" -> java.util.Set.of(org.bukkit.Material.FIRE, org.bukkit.Material.SOUL_FIRE);
+            case "campfire" -> java.util.Set.of(org.bukkit.Material.CAMPFIRE, org.bukkit.Material.SOUL_CAMPFIRE);
+            case "stalagmite" -> java.util.Set.of(org.bukkit.Material.POINTED_DRIPSTONE);
+            case "bad_respawn_point" -> java.util.Set.of(org.bukkit.Material.RESPAWN_ANCHOR);
+            default -> null;
+        };
+        if (wanted == null) {
+            return null;
+        }
+        org.bukkit.Location at = target.getLocation();
+        for (int dy = 0; dy >= -1; dy--) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    org.bukkit.block.Block block = at.getWorld().getBlockAt(at.getBlockX() + dx, at.getBlockY() + dy,
+                        at.getBlockZ() + dz);
+                    if (wanted.contains(block.getType())) {
+                        return block;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     static EntityDamageEvent.DamageCause damageCause(String name) {
@@ -390,6 +423,7 @@ final class EntityEvents {
             case "dragon_breath" -> EntityDamageEvent.DamageCause.DRAGON_BREATH;
             case "hot_floor" -> EntityDamageEvent.DamageCause.HOT_FLOOR;
             case "freeze" -> EntityDamageEvent.DamageCause.FREEZE;
+            case "bad_respawn_point" -> EntityDamageEvent.DamageCause.BLOCK_EXPLOSION;
             case "sonic_boom" -> EntityDamageEvent.DamageCause.SONIC_BOOM;
             case "outside_border" -> EntityDamageEvent.DamageCause.WORLD_BORDER;
             default -> EntityDamageEvent.DamageCause.CUSTOM;
