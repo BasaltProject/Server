@@ -69,6 +69,13 @@ LightningBoltSystem::LightningBoltSystem(BlockChangeBroadcaster& broadcaster, Mo
 void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                const std::vector<ServerEntity*>& living, ServerEntity& bolt,
                                random::RandomSource& random) {
+    if (!bolt.boltAnnounced) {
+        bolt.boltAnnounced = true;
+        if (struckCheck_ && !struckCheck_(world, bolt)) {
+            bolt.removed = true;
+            return;
+        }
+    }
     // parity: the constructor's roll of one to three flashes.
     if (bolt.boltFlashes < 0) {
         bolt.boltFlashes = random.nextInt(3) + 1;

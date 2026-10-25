@@ -377,6 +377,7 @@ public:
     bool tridentReturning = false;
     std::optional<std::int32_t> boltCause;
     bool boltVisualOnly = false;
+    bool boltAnnounced = false;
 
     std::int32_t ravagerAttackTicks = 0;
     std::int32_t ravagerStunTicks = 0;
