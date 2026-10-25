@@ -45,6 +45,7 @@ basalt_module(server-runtime-core
         src/config/ServerTuning.cpp
         src/config/UiConfigs.cpp
         src/config/WorldRules.cpp
+        src/config/WorldRulesGameplay.cpp
         src/entity/Aabb.cpp
         src/entity/BlockClip.cpp
         src/entity/BlockRay.cpp

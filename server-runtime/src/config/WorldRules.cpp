@@ -45,6 +45,10 @@ chorus-flower = 100
 [hopper]
 # Ticks a hopper rests after moving an item. Vanilla is 8; anything else is NOT VANILLA.
 transfer-ticks = 8
+# Items moved each time a hopper acts, from the same stack. Vanilla is 1; anything else is NOT VANILLA.
+amount = 1
+# A hopper only looks for work on ticks that are a multiple of this. Vanilla is 1, every tick.
+check-ticks = 1
 
 [environment]
 # One in this many chances per chunk and tick, while it thunders, that lightning strikes there.
@@ -58,6 +62,9 @@ portal-create-radius = 16
 void-damage = true
 # NOT VANILLA. Rain can still fall but it never thunders, so there is no lightning and no skeleton traps.
 disable-thunder = false
+# NOT VANILLA. Players at or above this height in the Nether take void damage, which keeps them off the roof.
+# 0 turns it off, as vanilla has it.
+nether-ceiling-void-damage-height = 0
 # Ticks a bobber waits for a fish to come, drawn between the two (before Lure shortens it). Vanilla is 100 to 600.
 fishing-min-wait-ticks = 100
 fishing-max-wait-ticks = 600
@@ -155,6 +162,8 @@ void readEnvironment(const TomlTable& table, EnvironmentRules& environment) {
     environment.portalSearchRadius = whole(table, "portal-search-radius", environment.portalSearchRadius, 1, 512);
     environment.portalCreateRadius = whole(table, "portal-create-radius", environment.portalCreateRadius, 1, 128);
     environment.voidDamage = table.boolean("void-damage").value_or(environment.voidDamage);
+    environment.netherCeilingVoidDamageHeight =
+        whole(table, "nether-ceiling-void-damage-height", environment.netherCeilingVoidDamageHeight, 0, 4096);
     environment.disableThunder = table.boolean("disable-thunder").value_or(environment.disableThunder);
     environment.fishingMinWaitTicks = whole(table, "fishing-min-wait-ticks", environment.fishingMinWaitTicks, 1, 72000);
     environment.fishingMaxWaitTicks =
@@ -284,6 +293,8 @@ WorldRules WorldRules::from(const TomlTable* table, const WorldRules& inherited)
     }
     if (const TomlTable* section = table->table("hopper"); section != nullptr) {
         rules.hopperTransferTicks = whole(*section, "transfer-ticks", rules.hopperTransferTicks, 1, 1 << 20);
+        rules.hopperAmount = whole(*section, "amount", rules.hopperAmount, 1, 64);
+        rules.hopperCheckTicks = whole(*section, "check-ticks", rules.hopperCheckTicks, 1, 1 << 20);
     }
     if (const TomlTable* section = table->table("environment"); section != nullptr) {
         readEnvironment(*section, rules.environment);
@@ -291,22 +302,23 @@ WorldRules WorldRules::from(const TomlTable* table, const WorldRules& inherited)
     if (const TomlTable* section = table->table("border"); section != nullptr) {
         readBorder(*section, rules.border);
     }
+    readGameplayRules(*table, rules.gameplay);
     if (const TomlTable* section = table->table("anti-xray"); section != nullptr) {
         readAntiXray(*section, rules.antiXray);
     }
     return rules;
 }
 
-std::string worldRulesTemplate(const bool forDefaults) {
+std::string renderRulesTemplate(const std::string_view text, const bool forDefaults) {
     std::string out = "\n";
     std::int32_t depth = 0;
     std::size_t start = 0;
-    while (start < kTemplate.size()) {
-        std::size_t end = kTemplate.find('\n', start);
+    while (start < text.size()) {
+        std::size_t end = text.find('\n', start);
         if (end == std::string_view::npos) {
-            end = kTemplate.size();
+            end = text.size();
         }
-        const std::string_view line = kTemplate.substr(start, end - start);
+        const std::string_view line = text.substr(start, end - start);
         start = end + 1;
         const bool plain = line.empty() || line.front() == '#';
         if (depth == 0 && !plain && line.front() == '[') {
@@ -324,6 +336,10 @@ std::string worldRulesTemplate(const bool forDefaults) {
         }
     }
     return out;
+}
+
+std::string worldRulesTemplate(const bool forDefaults) {
+    return renderRulesTemplate(kTemplate, forDefaults) + renderRulesTemplate(gameplayRulesTemplate(), forDefaults);
 }
 
 } // namespace basalt::server::runtime::config

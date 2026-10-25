@@ -30,6 +30,10 @@
 #include <utility>
 #include <vector>
 
+namespace basalt::server::runtime::config {
+struct WorldRules;
+}
+
 namespace basalt::server::runtime::plugins {
 class EventSink;
 }
@@ -156,6 +160,11 @@ public:
             lootUnpacker_(x, y, z, player);
         }
     }
+
+    /// What the operator configured for this world; vanilla's values until the world sets them.
+    void setRules(const config::WorldRules* rules) noexcept { rules_ = rules; }
+
+    [[nodiscard]] const config::WorldRules& rules() const noexcept;
 
     /// parity: `SculkShriekerBlockEntity.tryGetPlayer`.
     using PlayerCheck = std::function<bool(const wire::common::Uuid& entity)>;
@@ -451,6 +460,7 @@ private:
     SongOutput songOutput_;
     LootUnpacker lootUnpacker_;
     PlayerCheck playerCheck_;
+    const config::WorldRules* rules_ = nullptr;
     sched::Owner* owner_ = nullptr;
     sched::Owner* installOwner_ = nullptr;
 
