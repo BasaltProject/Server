@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ShieldBlows.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -73,7 +74,8 @@ void MobActionSystem::tickRavager(world::LoadedWorld& world, const std::vector<P
         return;
     }
     // parity: `Ravager.roar`.
-    const bool griefing = world.gameRules().get(world::gameRules::kMobGriefing);
+    const bool griefing =
+        entity::mobOverrides::griefing(ravager, world.gameRules().get(world::gameRules::kMobGriefing));
     for (ServerEntity* other : world.state().entities()) {
         if (other == &ravager || other->removed || other->dying || other->type().path() == "ravager" ||
             !server::registry::entityAttributes::isLiving(other->type()) ||

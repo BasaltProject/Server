@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/MobMisc.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -78,7 +79,8 @@ bool MobActionSystem::wololo(ServerEntity& evoker, std::int32_t sheepId) {
 
 bool MobActionSystem::mobGriefing(const ServerEntity& mob) {
     world::LoadedWorld* world = worldOf(mob);
-    return world == nullptr || world->gameRules().get(world::gameRules::kMobGriefing);
+    return world == nullptr ||
+           entity::mobOverrides::griefing(mob, world->gameRules().get(world::gameRules::kMobGriefing));
 }
 
 bool MobActionSystem::pluginWitchDrink(ServerEntity& witch,

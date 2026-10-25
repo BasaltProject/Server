@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/BeeNavigation.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
@@ -158,8 +159,10 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
         });
         for (const world::DroppedItem* item : sorted) {
             const ItemStack stack{.item = item->item, .count = item->count, .components = item->components};
-            const bool wants = hand.has_value() && world.gameRules().get(world::gameRules::kMobGriefing) &&
-                               allays::considersEqual(*hand, stack) && allays::roomFor(state, stack) > 0;
+            const bool wants =
+                hand.has_value() &&
+                entity::mobOverrides::griefing(allay, world.gameRules().get(world::gameRules::kMobGriefing)) &&
+                allays::considersEqual(*hand, stack) && allays::roomFor(state, stack) > 0;
             const double itemEyes = item->y + static_cast<double>(0.2125F);
             if (wants &&
                 distanceSquared({item->x, item->y, item->z}, {allay.x, allay.y, allay.z}) <
@@ -321,7 +324,8 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
         allay.velocityY += 0.04;
     }
     // parity: `Mob.aiStep`'s pickup, then the rest of `Allay.aiStep`.
-    if (canPickUp && !allay.dying && world.gameRules().get(world::gameRules::kMobGriefing)) {
+    if (canPickUp && !allay.dying &&
+        entity::mobOverrides::griefing(allay, world.gameRules().get(world::gameRules::kMobGriefing))) {
         allayPicksUp(world, allay, state);
     }
     if (!allay.dying && allay.tickCount % 10 == 0) {

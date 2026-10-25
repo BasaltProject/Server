@@ -1,10 +1,12 @@
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/DeathDrops.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <string_view>
 
 namespace basalt::server::runtime::entity::deathDrops {
@@ -106,6 +108,9 @@ constexpr double kBabyZombieFactor = 2.5;
 } // namespace
 
 bool dropsLoot(const ServerEntity& entity, bool mobDrops) {
+    if (entity.tuning != nullptr && entity.tuning->dropsEnabled == false) {
+        return false;
+    }
     return mobDrops && (in(kMonsters, entity.type().path()) || !isBaby(entity));
 }
 
@@ -118,7 +123,7 @@ bool dropsExperience(const ServerEntity& entity, bool mobDrops) {
     return entity.lastHurtByPlayerTime > 0 && shouldDropExperience(entity) && mobDrops;
 }
 
-std::int32_t experienceReward(const ServerEntity& entity, random::RandomSource& random) {
+static std::int32_t rawReward(const ServerEntity& entity, random::RandomSource& random) {
     const std::string_view path = entity.type().path();
     if (path == "hoglin") {
         return isBaby(entity) ? 3 : 5;
@@ -140,6 +145,14 @@ std::int32_t experienceReward(const ServerEntity& entity, random::RandomSource& 
         reward = static_cast<std::int32_t>(static_cast<double>(reward) * kBabyZombieFactor);
     }
     return withEquipment(entity, reward, random);
+}
+
+std::int32_t experienceReward(const ServerEntity& entity, random::RandomSource& random) {
+    const std::int32_t reward = rawReward(entity, random);
+    if (entity.tuning == nullptr || !entity.tuning->experienceMultiplier.has_value()) {
+        return reward;
+    }
+    return static_cast<std::int32_t>(std::lround(static_cast<double>(reward) * *entity.tuning->experienceMultiplier));
 }
 
 } // namespace basalt::server::runtime::entity::deathDrops

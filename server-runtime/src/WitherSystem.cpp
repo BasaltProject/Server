@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/DragonNavigation.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -382,11 +383,12 @@ void WitherSystem::afterTurn(world::LoadedWorld& world, const std::vector<Player
         const std::int32_t left = state.invulnerableTicks - 1;
         progress = 1.0F - (static_cast<float>(left) / static_cast<float>(boss::kInvulnerableTicks));
         if (left <= 0) {
-            explosions_->blowUp(world, watchers, wither.x, wither.y + eyeOf(wither), wither.z, kBirthExplosion,
-                                "wither", wither.entityId(),
-                                world.gameRules().get(world::gameRules::kMobGriefing)
-                                    ? world::explosions::Spares{}
-                                    : world::explosions::Spares{[](auto&&...) { return true; }});
+            explosions_->blowUp(
+                world, watchers, wither.x, wither.y + eyeOf(wither), wither.z, kBirthExplosion, "wither",
+                wither.entityId(),
+                entity::mobOverrides::griefing(wither, world.gameRules().get(world::gameRules::kMobGriefing))
+                    ? world::explosions::Spares{}
+                    : world::explosions::Spares{[](auto&&...) { return true; }});
             if (!(wither.sourceNbt.has_value() && wither.sourceNbt->getBoolean("Silent"))) {
                 // parity: `globalLevelEvent`, heard by every player on the server wherever they are.
                 const play::LevelEventPacket event{
@@ -412,7 +414,8 @@ void WitherSystem::afterTurn(world::LoadedWorld& world, const std::vector<Player
         state.targets[0] = wither.targetId.value_or(0);
         if (state.destroyBlocksTick > 0) {
             state.destroyBlocksTick--;
-            if (state.destroyBlocksTick == 0 && world.gameRules().get(world::gameRules::kMobGriefing)) {
+            if (state.destroyBlocksTick == 0 &&
+                entity::mobOverrides::griefing(wither, world.gameRules().get(world::gameRules::kMobGriefing))) {
                 destroyBlocks(world, watchers, wither);
             }
         }

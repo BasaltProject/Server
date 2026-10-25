@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/MobMisc.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/SulfurCubes.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -75,7 +76,8 @@ void MobActionSystem::tickSulfurCube(world::LoadedWorld& world, ServerEntity& cu
     if (misc.sulfurExplosive && cube.fuse == 0) {
         cube.removed = true;
         if (world.gameRules().get(world::gameRules::kTntExplodes)) {
-            const bool griefing = world.gameRules().get(world::gameRules::kMobGriefing);
+            const bool griefing =
+                entity::mobOverrides::griefing(cube, world.gameRules().get(world::gameRules::kMobGriefing));
             const world::explosions::Spares sparing = [griefing](world::WorldState&, std::int32_t, std::int32_t,
                                                                  std::int32_t, std::int32_t) { return !griefing; };
             explosions_->blowUp(world, watchersOf(world), cube.x, cube.y + kExplosionLift, cube.z,

@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/Goats.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
@@ -181,7 +182,7 @@ void MobActionSystem::goatRam(world::LoadedWorld& world, entity::ai::MobContext&
     ServerEntity& goat = context.mob;
     const std::int64_t now = context.gameTime;
     const std::array<std::int32_t, 2>& between = screaming ? goats::kTimeBetweenRamsScreamer : goats::kTimeBetweenRams;
-    const bool griefing = world.gameRules().get(world::gameRules::kMobGriefing);
+    const bool griefing = entity::mobOverrides::griefing(goat, world.gameRules().get(world::gameRules::kMobGriefing));
     const auto candidates = [&]() {
         std::vector<RamCandidate> found;
         for (const kit::Seen& seen : kit::nearby(context, goat.attributeWithModifiers("minecraft:follow_range"))) {

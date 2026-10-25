@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -142,7 +143,8 @@ void MobActionSystem::entityEvent(ServerEntity& mob, std::int8_t event) {
 }
 
 void MobActionSystem::dolphinPicksUp(world::LoadedWorld& world, ServerEntity& dolphin) {
-    if (!dolphin.canPickUpLoot || dolphin.dying || !world.gameRules().get(world::gameRules::kMobGriefing) ||
+    if (!dolphin.canPickUpLoot || dolphin.dying ||
+        !entity::mobOverrides::griefing(dolphin, world.gameRules().get(world::gameRules::kMobGriefing)) ||
         entity::copperGolems::mainHand(dolphin).has_value()) {
         return;
     }

@@ -152,13 +152,17 @@ std::size_t trackingCategory(const ServerEntity& entity) {
 
 /// parity: `ChunkMap.TrackedEntity.updatePlayer`, the horizontal range an entity is drawn within.
 bool inTrackingRange(const ServerEntity& entity, double viewerX, double viewerZ, std::int32_t viewDistanceChunks,
+                     std::int32_t broadcastPercentage,
                      const config::MobSettings& mobs) {
     const server::registry::entityTypeShapes::Shape* shape = server::registry::entityTypeShapes::of(entity.type());
     if (shape == nullptr || shape->trackingRange <= 0) {
         return true;
     }
     const std::int32_t configured = mobs.trackingRange[trackingCategory(entity)];
-    const double range = std::min(configured > 0 ? configured : shape->trackingRange, viewDistanceChunks) * 16.0;
+    const std::int32_t trackingChunks = configured > 0 ? configured : shape->trackingRange;
+    // parity: `DedicatedServer.getScaledTrackingDistance`, whole blocks scaled by `entity-broadcast-range-percentage`.
+    const std::int32_t scaled = broadcastPercentage * (trackingChunks * 16) / 100;
+    const double range = std::min(static_cast<double>(scaled), viewDistanceChunks * 16.0);
     const double dx = viewerX - entity.x;
     const double dz = viewerZ - entity.z;
     return (dx * dx) + (dz * dz) <= range * range;
@@ -197,7 +201,9 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             continue;
         }
         if (!visibleTo(*entity, me) || session->extras.hiddenEntities.contains(entity->entityId()) ||
-            !inTrackingRange(*entity, session->x, session->z, viewDistance, owner_->currentWorld()->mobSettings())) {
+            !inTrackingRange(*entity, session->x, session->z, viewDistance,
+                             owner_->options().tuning.entityBroadcastRangePercentage,
+                             owner_->currentWorld()->mobSettings())) {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
                 lastRuntimeEntityMetadata_.erase(entity->entityId());

@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -86,7 +87,8 @@ void TeleportAwayGoal::tick(MobContext& mob) {
     const auto blockY = static_cast<std::int32_t>(std::floor(mob.mob.y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(mob.mob.z));
     // parity: `isSensitiveToWater`: water hurts it, and it leaves.
-    if (isWater(world, blockX, blockY, blockZ)) {
+    const bool immuneToWater = mob.mob.tuning != nullptr && mob.mob.tuning->takesDamageFromWater == false;
+    if (!immuneToWater && isWater(world, blockX, blockY, blockZ)) {
         mob.actions.hurtMob(mob.mob, mob.mob, kWaterDamage);
         teleportRandomly(mob);
         return;

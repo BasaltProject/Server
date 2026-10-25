@@ -6,8 +6,10 @@
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -16,6 +18,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -624,8 +627,15 @@ void MobActionSystem::explodeCreeper(ServerEntity& mob) {
     const std::vector<PlayerSession*> watchers = watchersOf(*world);
     mob.removed = true;
     // parity: `Creeper.explodeCreeper`, twice as hard when it is charged.
-    explosions_->blowUp(*world, watchers, mob.x, mob.y, mob.z, kCreeperExplosionPower * (mob.powered ? 2.0F : 1.0F),
-                        "creeper", mob.entityId());
+    explosions_->blowUp(*world, watchers, mob.x, mob.y, mob.z,
+                        (mob.tuning != nullptr && mob.tuning->explosionRadius.has_value()
+                             ? static_cast<float>(*mob.tuning->explosionRadius)
+                             : kCreeperExplosionPower) *
+                            (mob.powered ? 2.0F : 1.0F),
+                        "creeper", mob.entityId(),
+                        entity::mobOverrides::griefing(mob, world->gameRules().get(world::gameRules::kMobGriefing))
+                            ? world::explosions::Spares{}
+                            : world::explosions::Spares{[](auto&&...) { return true; }});
 }
 
 void MobActionSystem::shootArrow(ServerEntity& mob, double targetX, double targetY, double targetZ, float power) {

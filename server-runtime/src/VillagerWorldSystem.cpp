@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
@@ -614,8 +615,9 @@ std::int32_t VillagerWorldSystem::motionBlockingHeight(ServerEntity& /*mob*/, st
     return chunk == nullptr ? 0 : chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::MotionBlocking);
 }
 
-bool VillagerWorldSystem::mobGriefing(ServerEntity& /*mob*/) {
-    return world_ != nullptr && world_->gameRules().get(world::gameRules::kMobGriefing);
+bool VillagerWorldSystem::mobGriefing(ServerEntity& mob) {
+    return world_ != nullptr &&
+           entity::mobOverrides::griefing(mob, world_->gameRules().get(world::gameRules::kMobGriefing));
 }
 
 std::int64_t VillagerWorldSystem::currentDay(ServerEntity& /*mob*/) {

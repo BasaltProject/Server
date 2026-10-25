@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobBrain.hpp>
@@ -149,8 +150,11 @@ void afterBreeding(ServerEntity& animal, ServerEntity& partner) {
         parent->loveTicks = 0;
         parent->loveCause.reset();
         parent->courtshipTicks = 0;
-        parent->age = kParentCooldown;
-        parent->breedCooldown = kParentCooldown;
+        const std::int32_t cooldown = parent->tuning != nullptr && parent->tuning->breedCooldown.has_value()
+                                          ? *parent->tuning->breedCooldown
+                                          : kParentCooldown;
+        parent->age = cooldown;
+        parent->breedCooldown = cooldown;
     }
 }
 
