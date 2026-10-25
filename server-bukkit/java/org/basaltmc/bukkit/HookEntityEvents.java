@@ -170,8 +170,12 @@ final class HookEntityEvents {
             f -> f.entity() instanceof LivingEntity who
                 ? new org.bukkit.event.entity.EntityToggleSwimEvent(who, f.flag("swimming")) : null);
         EventBridge.map("entity.portal_enter", org.bukkit.event.entity.EntityPortalEnterEvent.class,
-            f -> f.entity() == null ? null
-                : new org.bukkit.event.entity.EntityPortalEnterEvent(f.entity(), f.location()));
+            f -> f.entity() == null ? null : new org.bukkit.event.entity.EntityPortalEnterEvent(f.entity(),
+                f.location(), switch (f.text("kind")) {
+                    case "nether" -> org.bukkit.PortalType.NETHER;
+                    case "end" -> org.bukkit.PortalType.ENDER;
+                    default -> org.bukkit.PortalType.CUSTOM;
+                }));
         EventBridge.map("entity.enter_block", org.bukkit.event.entity.EntityEnterBlockEvent.class, f -> {
             Entity who = f.entity();
             return who == null || f.world() == null ? null : new org.bukkit.event.entity.EntityEnterBlockEvent(who,

@@ -70,11 +70,12 @@ public final class Bootstraps {
             .getDeclaredConstructor().newInstance();
         ComponentLogger logger = ComponentLogger.logger(meta.getName());
         List<BasaltLifecycleEventTypeProvider.Handler<?>> commands = new ArrayList<>();
+        List<io.papermc.paper.registry.event.BasaltRegistryEventTypeProvider.Recorded<?>> registry = new ArrayList<>();
         LifecycleEventManager<BootstrapContext> manager = new LifecycleEventManager<>() {
             @Override
             public void registerEventHandler(LifecycleEventHandlerConfiguration<? super BootstrapContext> config) {
-                if ((Object) config instanceof io.papermc.paper.registry.event.BasaltRegistryEventTypeProvider.Unused<?> unused) {
-                    BasaltLifecycleManager.reportUnused(unused.event());
+                if ((Object) config instanceof io.papermc.paper.registry.event.BasaltRegistryEventTypeProvider.Recorded<?> recorded) {
+                    registry.add(recorded);
                     return;
                 }
                 if (!(config instanceof BasaltLifecycleEventTypeProvider.Handler<?> handler)) {
@@ -119,6 +120,7 @@ public final class Bootstraps {
             }
         };
         bootstrap.bootstrap(context);
+        org.basaltmc.bukkit.RegistryLifecycle.run(registry, meta.getName());
         return new Started(bootstrap, context, commands);
     }
 }

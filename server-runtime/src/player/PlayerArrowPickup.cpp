@@ -53,6 +53,25 @@ std::vector<PickedArrow> pickupNearbyArrows(PlayerSession& session, world::World
         if ((dx * dx) + (dy * dy) + (dz * dz) > kPickupRadius * kPickupRadius) {
             continue;
         }
+        // parity: `tryPickup`, asked before `PlayerPickupArrowEvent` so a stuck arrow is not announced every tick.
+        const bool creative = session.gamemode == wire::protocol::play::Gamemode::Creative;
+        bool eligible = false;
+        switch (candidate->arrowPickup) {
+        case entity::ServerEntity::ArrowPickup::Disallowed:
+            // parity: `ThrownTrident.tryPickup`.
+            eligible = trident && candidate->noPhysics && owned &&
+                       PlayerInventory{session.inventory}.add(itemOf(*candidate)) == 0;
+            break;
+        case entity::ServerEntity::ArrowPickup::CreativeOnly:
+            eligible = creative;
+            break;
+        case entity::ServerEntity::ArrowPickup::Allowed:
+            eligible = creative || PlayerInventory{session.inventory}.add(itemOf(*candidate)) == 0;
+            break;
+        }
+        if (!eligible) {
+            continue;
+        }
         if (session.events != nullptr &&
             !session.events->allowed(&server::plugins::pluginEventTypes::playerPickupArrow,
                                      [&](server::plugins::PluginEvent& event) {
@@ -62,25 +81,8 @@ std::vector<PickedArrow> pickupNearbyArrows(PlayerSession& session, world::World
                                      })) {
             continue;
         }
-        // parity: `tryPickup`.
-        const bool creative = session.gamemode == wire::protocol::play::Gamemode::Creative;
-        switch (candidate->arrowPickup) {
-        case entity::ServerEntity::ArrowPickup::Disallowed:
-            // parity: `ThrownTrident.tryPickup`.
-            if (!(trident && candidate->noPhysics && owned && session.inventory.add(itemOf(*candidate)) == 0)) {
-                continue;
-            }
-            break;
-        case entity::ServerEntity::ArrowPickup::CreativeOnly:
-            if (!creative) {
-                continue;
-            }
-            break;
-        case entity::ServerEntity::ArrowPickup::Allowed:
-            if (session.inventory.add(itemOf(*candidate)) > 0 && !creative) {
-                continue;
-            }
-            break;
+        if (candidate->arrowPickup != entity::ServerEntity::ArrowPickup::CreativeOnly) {
+            static_cast<void>(session.inventory.add(itemOf(*candidate)));
         }
         candidate->removed = true;
         taken.push_back(PickedArrow{.entityId = candidate->entityId()});
