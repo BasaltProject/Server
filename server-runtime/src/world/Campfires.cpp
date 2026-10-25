@@ -9,6 +9,7 @@ namespace {
 
 constexpr std::string_view kProgressKey = "CookingTimes";
 constexpr std::string_view kTotalKey = "CookingTotalTimes";
+constexpr std::string_view kStoppedKey = "Paper.StopCooking";
 
 /// parity: `cooldownTick`, which takes two off the progress of each slot per tick.
 constexpr std::int32_t kCooldownStep = 2;
@@ -33,7 +34,7 @@ std::vector<server::world::loot::ItemStack> tick(State& state, bool lit, const R
     std::vector<server::world::loot::ItemStack> done;
     for (std::int32_t slot = 0; slot < kSize; ++slot) {
         const auto index = static_cast<std::size_t>(slot);
-        if (!state.items[index].has_value()) {
+        if (!state.items[index].has_value() || state.stopped[index]) {
             continue;
         }
         ++state.progress[index];
@@ -95,6 +96,10 @@ State read(const wire::nbt::NbtCompound& data) {
     for (std::size_t index = 0; index < total.size() && index < state.total.size(); ++index) {
         state.total[index] = total[index];
     }
+    const std::span<const std::int32_t> stopped = data.getIntArray(kStoppedKey);
+    for (std::size_t index = 0; index < stopped.size() && index < state.stopped.size(); ++index) {
+        state.stopped[index] = stopped[index] != 0;
+    }
     return state;
 }
 
@@ -102,6 +107,11 @@ void write(const State& state, wire::nbt::NbtCompound& data) {
     blockInventory::write(data, state.items);
     data.putIntArray(kProgressKey, std::vector<std::int32_t>{state.progress.begin(), state.progress.end()});
     data.putIntArray(kTotalKey, std::vector<std::int32_t>{state.total.begin(), state.total.end()});
+    if (std::ranges::any_of(state.stopped, [](bool stopped) { return stopped; })) {
+        data.putIntArray(kStoppedKey, std::vector<std::int32_t>{state.stopped.begin(), state.stopped.end()});
+    } else {
+        static_cast<void>(data.remove(kStoppedKey));
+    }
 }
 
 } // namespace basalt::server::runtime::world::campfires

@@ -27,6 +27,7 @@ struct State {
     blockInventory::Slots items = blockInventory::Slots(kSize);
     std::array<std::int32_t, kSize> progress{};
     std::array<std::int32_t, kSize> total{};
+    std::array<bool, kSize> stopped{};
 };
 
 [[nodiscard]] std::vector<server::world::loot::ItemStack> tick(State& state, bool lit, const ResultFor& resultFor);
