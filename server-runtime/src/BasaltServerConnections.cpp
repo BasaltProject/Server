@@ -13,6 +13,7 @@
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
+#include <basalt/wire/text/MiniMessage.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -114,6 +115,23 @@ void fillPlayer(server::plugins::PluginEvent& event, const player::PlayerSession
 
 } // namespace
 
+// parity: `MinecraftServer.kickUnlistedPlayers`.
+void BasaltServer::kickUnlistedPlayers() {
+    if (!config_->tuning.enforceWhitelist || !whitelistEnforced_ || playerStore_ == nullptr ||
+        !playerStore_->isOpen()) {
+        return;
+    }
+    const std::shared_ptr<const config::ConfigSnapshot> snapshot = live_->current();
+    for (player::PlayerSession* player : playerRegistry_.snapshot()) {
+        if (!playerStore_->access().isWhitelisted(player->uuid().toString()) && player->connection().disconnect) {
+            const std::string* custom = snapshot->messages.find("not-whitelisted");
+            player->connection().disconnect(
+                custom != nullptr ? wire::text::miniMessage::parse(*custom)
+                                  : wire::text::Component::translatable("multiplayer.disconnect.not_whitelisted"));
+        }
+    }
+}
+
 bool BasaltServer::underSpawnProtection(const player::PlayerSession& who, const world::LoadedWorld& world,
                                         const std::int32_t x, const std::int32_t z) {
     const std::int32_t radius = settings_.spawnProtection();
@@ -142,10 +160,45 @@ bool BasaltServer::underSpawnProtection(const player::PlayerSession& who, const 
 
 void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     ClientSession::Options options;
+    if (!net::setTcpNoDelay(connection.nativeHandle(), config_->tuning.tcpNoDelay)) {
+        logger_.debug([] { return std::string{"The system refused TCP_NODELAY on a new connection."}; });
+    }
+    if (config_->tuning.proxyProtocol) {
+        const std::expected<net::proxyProtocol::Parsed, std::string> header =
+            net::proxyProtocol::readHeader([&connection](std::span<std::uint8_t> into) -> std::size_t {
+                const std::expected<std::size_t, wire::io::SocketError> got = connection.read(into);
+                return got.has_value() ? *got : 0;
+            });
+        if (!header.has_value()) {
+            logger_.warn([&connection, &header] {
+                return "Dropped " + connection.remoteAddress() + ": " + header.error() + ".";
+            });
+            connection.close();
+            return;
+        }
+        options.origin = *header;
+    }
+    const std::string& peer = options.origin.has_value() ? options.origin->address : connection.remoteAddress();
+    const std::optional<net::ConnectionGate::Slot> slot =
+        connectionGate_.open(peer, config_->tuning.maxConnectionsPerAddress);
+    if (!slot.has_value()) {
+        connection.close();
+        return;
+    }
+    options.gate = &connectionGate_;
     options.statusProvider = [this](std::int32_t protocolVersion, const std::string& host,
                                     const std::optional<std::string>& address) {
         return serverList_->statusFor(protocolVersion, host, address);
     };
+    options.tuning = config_->tuning;
+    {
+        const std::shared_ptr<const config::ConfigSnapshot> snapshot = live_->current();
+        options.limits = std::shared_ptr<const config::LimitsConfig>{snapshot, &snapshot->limits};
+        options.messages = std::shared_ptr<const config::MessagesConfig>{snapshot, &snapshot->messages};
+    }
+    options.idleTimeoutMinutes = [this] { return idleTimeoutMinutes_; };
+    options.maxPlayers = [this] { return config_->maxPlayers; };
+    options.compressionThreshold = config_->tuning.compressionThreshold;
     options.onlineMode = options_.sessionService;
     options.keyPair = options_.keyPair;
     options.servicesKeys = options_.servicesKeys;

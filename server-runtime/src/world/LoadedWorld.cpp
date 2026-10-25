@@ -68,6 +68,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       biomeZoomSeed_(obfuscateBiomeSeed(metadata_.seed)), biomeZoomer_(biomeZoomSeed_), gameTime_(metadata_.gameTime),
       difficulty_(metadata_.difficulty.value_or(settings_.difficulty)), difficultyLocked_(metadata_.difficultyLocked),
       hardcore_(metadata_.hardcore.value_or(settings_.hardcore)), defaultGamemode_(metadata_.defaultGamemode) {
+    tunables_.simulationDistance = settings_.simulationDistance;
     tunables_.lootRefill = settings_.lootRefill;
     tunables_.lootRelootSeconds = settings_.lootRelootSeconds;
     if (hardcore_) {

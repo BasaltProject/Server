@@ -34,13 +34,25 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <charconv>
 #include <cstdint>
 #include <deque>
+#include <limits>
 #include <string>
 #include <utility>
 
 namespace basalt::server::runtime::world::neighbourUpdates {
+
+namespace {
+std::atomic<std::int32_t> gChainedLimit{kMaxChainedNeighbourUpdates};
+} // namespace
+
+std::int32_t chainedLimit() noexcept { return gChainedLimit.load(std::memory_order_relaxed); }
+
+void setChainedLimit(std::int32_t limit) noexcept {
+    gChainedLimit.store(limit < 0 ? std::numeric_limits<std::int32_t>::max() : limit, std::memory_order_relaxed);
+}
 using namespace detail;
 
 std::optional<BlockChange> leafTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {

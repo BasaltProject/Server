@@ -31,6 +31,9 @@ public:
 
     [[nodiscard]] std::int64_t lerpTimeTicks() const noexcept { return lerpTimeTicks_; }
 
+    /// parity: `WorldBorder.setAbsoluteMaxSize`, fed by `max-world-size`.
+    void setAbsoluteMaxSize(std::int32_t limit) noexcept { absoluteMaxSize_ = limit; }
+
     void center(double x, double z);
 
     void setSize(double newSize);
@@ -62,6 +65,7 @@ private:
     double size_ = kDefaultSize;
     double targetSize_ = kDefaultSize;
     std::int64_t lerpTimeTicks_ = 0;
+    std::int32_t absoluteMaxSize_ = wire::protocol::play::InitializeBorderPacket::kAbsoluteMaxSize;
 };
 
 } // namespace basalt::server::runtime::world

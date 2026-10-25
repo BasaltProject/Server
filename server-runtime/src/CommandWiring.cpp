@@ -182,6 +182,7 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     hooks.setIdleTimeout = wiring.setIdleTimeout;
     hooks.whitelistState = wiring.whitelistEnforced;
     hooks.setWhitelistState = wiring.setWhitelistEnforced;
+    hooks.kickUnlistedPlayers = wiring.kickUnlistedPlayers;
     registerVanillaCommands(*dispatcher, hooks);
 
     // A missing dependency means the command is simply not registered, which is how a fixture gets the ones it can run.
@@ -265,7 +266,7 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     }
     if (wiring.whitelistEnforced && wiring.setWhitelistEnforced && wiring.nowEpochSeconds) {
         add(std::make_shared<cmd::WhitelistCommand>(wiring.whitelistEnforced, wiring.setWhitelistEnforced,
-                                                    wiring.nowEpochSeconds));
+                                                    wiring.nowEpochSeconds, wiring.kickUnlistedPlayers));
     }
     if (wiring.saveControl != nullptr) {
         add(std::make_shared<cmd::SaveAllCommand>(*wiring.saveControl));

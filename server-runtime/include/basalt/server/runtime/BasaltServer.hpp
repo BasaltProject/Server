@@ -30,6 +30,7 @@
 #include <basalt/server/runtime/SculkCatalystSystem.hpp>
 #include <basalt/server/runtime/ServerListStatus.hpp>
 #include <basalt/server/runtime/ServerMetrics.hpp>
+#include <basalt/server/runtime/ServerWatchdog.hpp>
 #include <basalt/server/runtime/ShriekerSystem.hpp>
 #include <basalt/server/runtime/StatusEffectSystem.hpp>
 #include <basalt/server/runtime/StructureBlockSystem.hpp>
@@ -181,6 +182,12 @@ private:
 
     void startPluginWatchdog();
 
+    void kickUnlistedPlayers();
+
+    void runStartupCommands();
+
+    void startQuery();
+
     void reportOrphanedPluginData();
 
     void awaitShutdown();
@@ -274,6 +281,8 @@ private:
     std::unique_ptr<world::AdvancementTriggers> advancementTriggers_;
     std::unique_ptr<WorldRegistry> worldRegistry_;
     std::unique_ptr<TickLoop> tickLoop_;
+    std::unique_ptr<ServerWatchdog> serverWatchdog_;
+    std::unique_ptr<net::QueryServer> query_;
 
     wire::common::placeholder::PlaceholderRegistry placeholders_;
     scoreboard::Scoreboard scoreboard_;
@@ -293,6 +302,7 @@ private:
     std::unique_ptr<command::commands::SaveControl> saveControl_;
 
     std::int32_t idleTimeoutMinutes_ = 0;
+    net::ConnectionGate connectionGate_;
     bool whitelistEnforced_ = false;
 
     WiredCommands wired_;

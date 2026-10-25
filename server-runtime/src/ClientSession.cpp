@@ -111,6 +111,11 @@ ClientSession::ClientSession(wire::io::TcpConnection connection, Options options
       trades_(std::make_unique<VillagerTradeController>(
           *this, options_.events == nullptr ? VillagerTradeController::Hooks{}
                                             : plugins::eventHooks::villagerTrade(*this, *options_.events))) {
+    if (options_.limits != nullptr) {
+        packetLimiter_ = net::PacketLimiter{options_.limits};
+        chatSpam_.configure(options_.limits->chatSpamThresholdSeconds);
+        commandSpam_.configure(options_.limits->commandSpamThresholdSeconds);
+    }
     attachEndpoint();
 }
 
@@ -137,7 +142,15 @@ std::optional<std::string> ClientSession::remoteAddress() const {
     if (proxy_.login().has_value()) {
         return proxy_.login()->address;
     }
-    return connection_.remoteAddress();
+    return peerAddress();
+}
+
+const std::string& ClientSession::peerAddress() const {
+    return options_.origin.has_value() ? options_.origin->address : connection_.remoteAddress();
+}
+
+std::uint16_t ClientSession::peerPort() const {
+    return options_.origin.has_value() ? options_.origin->port : connection_.remotePort();
 }
 
 void ClientSession::onOwner(std::function<void()> work) {
@@ -190,13 +203,19 @@ void ClientSession::startOutboundLoop() {
             if (!switching && tickTaskPending_.compare_exchange_strong(idle, true)) {
                 // The player's turn goes to the world's owner; it only queues packets, so it never waits on a socket.
                 onOwner([this] {
+                    const float rateCap = options_.tuning.chunkSendRate > 0
+                                              ? static_cast<float>(options_.tuning.chunkSendRate) / 20.0F
+                                              : kMaxBurstChunks;
                     chunkStreamer_->sendBudget =
-                        std::min(chunkStreamer_->sendBudget + chunkStreamer_->desiredChunksPerTick, kMaxBurstChunks);
+                        std::min(chunkStreamer_->sendBudget + std::min(chunkStreamer_->desiredChunksPerTick, rateCap),
+                                 std::min(kMaxBurstChunks, std::max(rateCap, 1.0F)));
                     const auto allowed = static_cast<std::int32_t>(chunkStreamer_->sendBudget);
                     if (allowed > 0) {
                         chunkStreamer_->sendBudget -= static_cast<float>(chunkStreamer_->flushReadyChunks(allowed));
                     }
                     lifecycle_->tickPlayer();
+                    kickIfIdle();
+                    kickIfFloating();
                     chatSpam_.tick();
                     commandSpam_.tick();
                     trades_->tick();
@@ -405,8 +424,17 @@ void ClientSession::activateEnvelope(const wire::protocol::sessionEnvelope::Open
 
 void ClientSession::sendEnvelopeControl(std::span<const std::uint8_t> control) {
     wire::io::ByteBuffer frame;
-    static_cast<void>(wire::protocol::packetFraming::writeCompressed(frame, control, options_.compressionThreshold));
+    appendFrame(frame, control);
     writeToSocket(frame);
+}
+
+void ClientSession::appendFrame(wire::io::ByteBuffer& frame, std::span<const std::uint8_t> packetIdAndData) {
+    if (compressionEnabled_) {
+        static_cast<void>(
+            wire::protocol::packetFraming::writeCompressed(frame, packetIdAndData, options_.compressionThreshold));
+    } else {
+        static_cast<void>(wire::protocol::packetFraming::writeUncompressed(frame, packetIdAndData));
+    }
 }
 
 void ClientSession::frameOutgoing(std::span<const std::uint8_t> whole) {
@@ -416,10 +444,9 @@ void ClientSession::frameOutgoing(std::span<const std::uint8_t> whole) {
         if (carried.empty()) {
             return;
         }
-        static_cast<void>(
-            wire::protocol::packetFraming::writeCompressed(frame, carried, options_.compressionThreshold));
+        appendFrame(frame, carried);
     } else {
-        static_cast<void>(wire::protocol::packetFraming::writeCompressed(frame, whole, options_.compressionThreshold));
+        appendFrame(frame, whole);
     }
     writeToSocket(frame);
 }
@@ -447,6 +474,30 @@ void ClientSession::handleOriginalPacket(wire::io::ByteBuffer& body) {
 }
 
 void ClientSession::handleFrameBody(std::int32_t packetId, wire::io::ByteBuffer& body) {
+    if (packetLimiter_.active()) {
+        const net::PacketLimiter::Verdict verdict = packetLimiter_.receive(
+            static_cast<server::plugins::PacketPhase>(state_), packetId, net::PacketLimiter::Clock::now());
+        if (verdict == net::PacketLimiter::Verdict::Drop) {
+            return;
+        }
+        if (verdict == net::PacketLimiter::Verdict::Kick) {
+            logger_.warn([this, packetId] {
+                const bool average = options_.limits->packetRateLimit > 0 &&
+                                     packetLimiter_.average() > static_cast<float>(options_.limits->packetRateLimit);
+                return average
+                           ? "Player exceeded rate-limit (sent " + std::to_string(packetLimiter_.average()) +
+                                 " packets per second)"
+                           : "Player exceeded a packet limit of limits.toml (packet " + std::to_string(packetId) + ")";
+            });
+            if (state_ == wire::protocol::ProtocolState::Play) {
+                disconnect(
+                    messageFor("packet-rate", wire::text::Component::translatable("disconnect.exceeded_packet_rate")));
+            } else {
+                connection_.close();
+            }
+            return;
+        }
+    }
     if (tapListens(true, packetId)) {
         std::optional<std::vector<std::uint8_t>> replacement;
         if (!tap(true, packetId, body.readable(), replacement)) {

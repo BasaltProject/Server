@@ -23,28 +23,32 @@ void WorldBorder::moveSize(double newSize, std::int64_t overTicks) {
 }
 
 wire::protocol::play::InitializeBorderPacket WorldBorder::initializePacket() const {
-    return wire::protocol::play::InitializeBorderPacket{
-        .centerX = centerX_,
-        .centerZ = centerZ_,
-        .oldSize = size_,
-        .newSize = targetSize_,
-        .lerpTimeTicks = lerpTimeTicks_,
-        .absoluteMaxSize = wire::protocol::play::InitializeBorderPacket::kAbsoluteMaxSize,
-        .warningBlocks = warningBlocks,
-        .warningSeconds = warningSeconds};
+    return wire::protocol::play::InitializeBorderPacket{.centerX = centerX_,
+                                                        .centerZ = centerZ_,
+                                                        .oldSize = size_,
+                                                        .newSize = targetSize_,
+                                                        .lerpTimeTicks = lerpTimeTicks_,
+                                                        .absoluteMaxSize = absoluteMaxSize_,
+                                                        .warningBlocks = warningBlocks,
+                                                        .warningSeconds = warningSeconds};
 }
 
 double WorldBorder::distanceOutside(double x, double z) const {
     const double half = targetSize_ / 2.0;
-    const double outsideX = std::max(std::abs(x - centerX_) - half, 0.0);
-    const double outsideZ = std::max(std::abs(z - centerZ_) - half, 0.0);
+    const double limit = absoluteMaxSize_;
+    const double outsideX =
+        std::max({std::clamp(centerX_ - half, -limit, limit) - x, x - std::clamp(centerX_ + half, -limit, limit), 0.0});
+    const double outsideZ =
+        std::max({std::clamp(centerZ_ - half, -limit, limit) - z, z - std::clamp(centerZ_ + half, -limit, limit), 0.0});
     return std::max(outsideX, outsideZ);
 }
 
 bool WorldBorder::contains(double x, double z) const {
-    // parity: `isWithinBounds(x, z, 0)`.
+    // parity: `isWithinBounds(x, z, 0)`, the extent's edges clamped to `max-world-size`.
     const double half = size_ / 2.0;
-    return x >= centerX_ - half && x < centerX_ + half && z >= centerZ_ - half && z < centerZ_ + half;
+    const double limit = absoluteMaxSize_;
+    return x >= std::clamp(centerX_ - half, -limit, limit) && x < std::clamp(centerX_ + half, -limit, limit) &&
+           z >= std::clamp(centerZ_ - half, -limit, limit) && z < std::clamp(centerZ_ + half, -limit, limit);
 }
 
 float WorldBorder::damageAt(double x, double z) const {

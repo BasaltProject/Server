@@ -160,7 +160,7 @@ std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommand
         add(std::make_shared<commands::BanIpCommand>(hooks.nowEpochSeconds));
         if (hooks.whitelistState && hooks.setWhitelistState) {
             add(std::make_shared<commands::WhitelistCommand>(hooks.whitelistState, hooks.setWhitelistState,
-                                                             hooks.nowEpochSeconds));
+                                                             hooks.nowEpochSeconds, hooks.kickUnlistedPlayers));
         }
     }
     return built;

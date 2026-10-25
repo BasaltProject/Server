@@ -54,6 +54,7 @@ struct VanillaCommandHooks {
     bool whitelistEnforced = false;
     std::function<bool()> whitelistState;
     std::function<void(bool)> setWhitelistState;
+    std::function<void()> kickUnlistedPlayers;
 };
 
 [[nodiscard]] std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommandHooks& hooks);

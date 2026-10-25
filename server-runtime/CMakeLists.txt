@@ -152,6 +152,7 @@ basalt_module(server-runtime-core
         src/BasaltServerLife.cpp
         src/BasaltServerMelee.cpp
         src/BasaltServerData.cpp
+        src/BasaltServerStartup.cpp
         src/BasaltServerTick.cpp
         src/BasaltServerBoats.cpp
         src/BasaltServerEntities.cpp
@@ -268,6 +269,8 @@ basalt_module(server-runtime-core
         src/RedstoneTickBlocks.cpp
         src/BlockEventTick.cpp
         src/ScheduledBlockTick.cpp
+        src/SessionFlying.cpp
+        src/ServerWatchdog.cpp
         src/MobTickSystem.cpp
         src/MobActionTick.cpp
         src/MobActionConversion.cpp
@@ -363,6 +366,7 @@ basalt_module(server-runtime-core
         src/placeholder/ServerPlaceholders.cpp
         src/item/ItemWear.cpp
         src/item/ItemComponentCodecs.cpp
+        src/item/ItemLimits.cpp
         src/item/ItemDamageEffects.cpp
         src/item/ItemComponentPayloads.cpp
         src/function/FunctionLibrary.cpp
@@ -429,7 +433,12 @@ basalt_module(server-runtime-core
         src/player/StatAwards.cpp
         src/player/PlayerCakesAndPots.cpp
         src/player/PlayerCauldrons.cpp
+        src/net/ConnectionGate.cpp
+        src/net/PacketLimiter.cpp
         src/net/ProxyLogin.cpp
+        src/net/ProxyProtocol.cpp
+        src/net/QueryServer.cpp
+        src/net/SocketOptions.cpp
         src/net/SessionOutbox.cpp
         src/registry/VanillaBiomes.cpp
         src/registry/VanillaConfigurationRegistries.cpp

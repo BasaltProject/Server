@@ -51,11 +51,12 @@ public:
 class WhitelistCommand final : public Command {
 public:
     WhitelistCommand(std::function<bool()> enforced, std::function<void(bool)> setEnforced,
-                     std::function<std::int64_t()> nowEpochSeconds);
+                     std::function<std::int64_t()> nowEpochSeconds, std::function<void()> kickUnlisted = {});
 
     void build(const CommandNodeBuilder& root) const override;
 
 private:
+    std::function<void()> kickUnlisted_;
     std::function<bool()> enforced_;
     std::function<void(bool)> setEnforced_;
     std::function<std::int64_t()> nowEpochSeconds_;

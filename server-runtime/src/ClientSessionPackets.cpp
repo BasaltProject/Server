@@ -76,12 +76,12 @@ public:
 
     [[nodiscard]] std::string address() const override {
         const Pin pin{*this};
-        return pin.session == nullptr ? std::string{} : pin.session->connection_.remoteAddress();
+        return pin.session == nullptr ? std::string{} : pin.session->peerAddress();
     }
 
     [[nodiscard]] std::uint16_t port() const override {
         const Pin pin{*this};
-        return pin.session == nullptr ? 0 : pin.session->connection_.remotePort();
+        return pin.session == nullptr ? 0 : pin.session->peerPort();
     }
 
 private:

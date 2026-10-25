@@ -7,10 +7,18 @@
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
 #include <basalt/server/runtime/bedrock/BedrockCarry.hpp>
 #include <basalt/server/runtime/chat/SecureChat.hpp>
+#include <basalt/server/runtime/config/LimitsConfig.hpp>
+#include <basalt/server/runtime/config/MessagesConfig.hpp>
+#include <basalt/server/runtime/config/ServerTuning.hpp>
 #include <basalt/server/runtime/config/UiConfigs.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/net/ConnectionGate.hpp>
+#include <basalt/server/runtime/net/PacketLimiter.hpp>
 #include <basalt/server/runtime/net/ProxyLogin.hpp>
+#include <basalt/server/runtime/net/ProxyProtocol.hpp>
+#include <basalt/server/runtime/net/QueryServer.hpp>
 #include <basalt/server/runtime/net/SessionOutbox.hpp>
+#include <basalt/server/runtime/net/SocketOptions.hpp>
 #include <basalt/server/runtime/player/PlayerConnection.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -179,6 +187,13 @@ public:
                                                                   const std::optional<std::string>& address)>
             statusProvider;
         std::int32_t compressionThreshold = 256;
+        config::ServerTuning tuning;
+        std::function<std::int32_t()> idleTimeoutMinutes;
+        std::function<std::int32_t()> maxPlayers;
+        std::optional<net::proxyProtocol::Origin> origin;
+        net::ConnectionGate* gate = nullptr;
+        std::shared_ptr<const config::LimitsConfig> limits;
+        std::shared_ptr<const config::MessagesConfig> messages;
         wire::auth::SessionService* onlineMode = nullptr;
         /// Takes a Bedrock player a proxy carries; null when this server does not serve Bedrock.
         std::function<std::shared_ptr<bedrock::Carried>(const bedrock::Identity&, std::unique_ptr<bedrock::Channel>)>
@@ -302,6 +317,10 @@ public:
     [[nodiscard]] std::string worldName() const;
 
     [[nodiscard]] std::optional<std::string> remoteAddress() const;
+
+    /// The client's address as the socket or a PROXY header reports it, before any forwarding mode is applied.
+    [[nodiscard]] const std::string& peerAddress() const;
+    [[nodiscard]] std::uint16_t peerPort() const;
 
     [[nodiscard]] std::optional<std::string> rememberAddress() const;
 
@@ -485,6 +504,8 @@ private:
     /// Frames one packet for the wire: inside a data frame once the envelope is active.
     void frameOutgoing(std::span<const std::uint8_t> whole);
 
+    void appendFrame(wire::io::ByteBuffer& frame, std::span<const std::uint8_t> packetIdAndData);
+
     void dispatchOutgoing(std::int32_t id, std::span<const std::uint8_t> whole, bool intercept);
     [[nodiscard]] bool tapListens(bool serverbound, std::int32_t id) const noexcept;
     /// False when a listener cancelled the packet; `replacement` is set when one rewrote the body.
@@ -538,6 +559,16 @@ private:
 
     /// parity: `detectRateSpam`, which spares operators.
     void detectSpam(chat::ChatThrottle& throttle);
+    void detectCommandSpam(const std::string& command);
+
+    void kickIfIdle();
+
+    [[nodiscard]] bool noBlocksAround(const player::PlayerSession& session);
+    void noteFloating(double dy);
+    void kickIfFloating();
+
+    [[nodiscard]] wire::text::Component messageFor(std::string_view key, wire::text::Component vanilla,
+                                                   std::string_view reason = {}) const;
 
     [[nodiscard]] bool translatedClient() const;
 
@@ -568,6 +599,9 @@ private:
     [[nodiscard]] bool pluginRefusesLogin(const std::string& name, const std::string& profileId);
 
     void disconnectFromLogin(const std::string& miniMessage);
+    void refuseLogin(const wire::text::Component& reason);
+    [[nodiscard]] bool validUsername(const std::string& name) const;
+    [[nodiscard]] std::optional<wire::text::Component> serverFullRefusal(wire::common::Uuid id);
 
     void refuseVersion(const std::string& name, const wire::multiversion::ProtocolVerdict::Refused& refusal);
 
@@ -650,6 +684,9 @@ private:
     std::int32_t pendingViewDistance_ = 2;
     bool awaitingResourcePack_ = false;
     std::unique_ptr<chat::SecureChat> secureChat_;
+    net::PacketLimiter packetLimiter_;
+    bool clientFloating_ = false;
+    std::int32_t floatingTicks_ = 0;
     chat::ChatThrottle chatSpam_;
     chat::ChatThrottle commandSpam_;
     std::optional<wire::auth::forwarding::ForwardingResult> forwardedHandshake_;

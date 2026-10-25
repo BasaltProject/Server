@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
+#include <basalt/server/runtime/item/ItemLimits.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPick.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
@@ -580,6 +581,16 @@ void ContainerMenuController::handleSetCreativeModeSlot(
         return;
     }
     std::optional<storage::StoredItemStack> stack;
+    if (packet.item.has_value() && owner_->options().limits != nullptr) {
+        if (const std::string_view cap =
+                item::itemLimits::exceeded(packet.item->components, owner_->options().limits->items);
+            !cap.empty()) {
+            owner_->logger().warn(
+                [&session, cap] { return session->name() + " sent an item past " + std::string{cap}; });
+            sendInventorySlot(*slot);
+            return;
+        }
+    }
     if (packet.item.has_value()) {
         const server::registry::Item* item = server::registry::items::registry().byId(packet.item->itemId);
         if (item != nullptr) {

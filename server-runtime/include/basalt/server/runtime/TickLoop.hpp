@@ -25,6 +25,9 @@ struct TickLoopOptions {
     /// parity: vanilla unloads every tick; a sweep that walks every chunk cannot, so it has its own.
     std::int32_t unloadIntervalSeconds = 30;
     std::function<void()> onSaveInterval;
+    /// Saves the players alone on their own cadence; 0 leaves them to `onSaveInterval`.
+    std::int32_t playerSaveIntervalSeconds = 0;
+    std::function<void()> onPlayerSaveInterval;
     std::function<void()> onUnloadInterval;
     /// parity: `pause-when-empty-seconds`; 0 or unset never pauses.
     std::function<std::int32_t()> pauseWhenEmptySeconds;
@@ -114,6 +117,7 @@ private:
     // A flag, not a queue: a sweep that outlasts an interval owes one more sweep, not several.
     std::atomic<bool> sweepRequested_{false};
     std::atomic<bool> unloadRequested_{false};
+    std::atomic<bool> playersRequested_{false};
     std::atomic<bool> sweeping_{false};
 
     std::atomic<float> targetRate_{static_cast<float>(kTicksPerSecond)};

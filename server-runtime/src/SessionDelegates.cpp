@@ -335,6 +335,8 @@ void ClientSession::sendPlayerPosition(double x, double y, double z, float yaw, 
         awaitingPosition_ = std::array<double, 3>{x, y, z};
         awaitingTeleportTime_ = uiTick;
     }
+    // parity: `ServerGamePacketListenerImpl.teleport` resets the flying ticks.
+    floatingTicks_ = 0;
     sendCompressed(play::PlayerPositionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         play::PlayerPositionPacket{.teleportId = teleportId, .x = x, .y = y, .z = z, .yaw = yaw, .pitch = pitch}.write(
             buffer);
@@ -439,6 +441,7 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
         session->food.addExhaustion(player::FoodData::jumpExhaustion(session->sprinting));
         session->stats.increment(storage::stats::jump());
     }
+    noteFloating(y - session->y);
     combat_->trackFall(*session, y, onGround, feet);
     combat_->spinAttack(*session, x, y, z);
     const double dx = x - session->x;
