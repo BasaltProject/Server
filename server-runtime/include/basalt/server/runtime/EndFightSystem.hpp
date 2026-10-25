@@ -61,6 +61,9 @@ public:
     /// What a plugin asks of the fight: respawn, stage, portal, gateway or crystals.
     bool control(world::LoadedWorld& world, std::string_view action, std::int32_t value);
 
+    /// What a plugin asks of the fight's boss bar: title, color, style, flags, and who sees it.
+    bool controlBar(world::LoadedWorld& world, std::string_view action, std::string_view text, std::int32_t value);
+
 private:
     [[nodiscard]] entity::enderDragon::DragonState& stateOf(entity::ServerEntity& dragon);
 

@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.List;
 import org.basaltmc.bukkit.LeftoverNatives;
 import org.basaltmc.bukkit.MiscNatives;
-import org.basaltmc.bukkit.Unsupported;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -142,7 +141,7 @@ public final class BasaltDragonBattle implements DragonBattle {
         return crystals(facts()[9]);
     }
 
-    /** The bar of the fight: its progress and who sees it can change; its look is the game's own. */
+    /** The bar of the fight, as the game keeps it: the scan of nearby players puts back who sees it. */
     private static final class FightBar implements BossBar {
         private final World world;
 
@@ -160,47 +159,73 @@ public final class BasaltDragonBattle implements DragonBattle {
 
         @Override
         public String getTitle() {
-            return "Ender Dragon";
+            String json = facts()[10];
+            return Json.legacyOf(json.isEmpty() ? net.kyori.adventure.text.Component.translatable("entity.minecraft.ender_dragon")
+                : Json.component(json));
         }
 
         @Override
         public void setTitle(String title) {
-            throw Unsupported.hit("BossBar#setTitle on the dragon fight bar");
+            LeftoverNatives.dragonBar(world.getName(), "bar_title", Json.of(Json.fromLegacy(title)), 0);
+        }
+
+        private static final org.bukkit.boss.BarColor[] kColors = {
+            org.bukkit.boss.BarColor.PINK, org.bukkit.boss.BarColor.BLUE, org.bukkit.boss.BarColor.RED,
+            org.bukkit.boss.BarColor.GREEN, org.bukkit.boss.BarColor.YELLOW, org.bukkit.boss.BarColor.PURPLE,
+            org.bukkit.boss.BarColor.WHITE};
+        private static final org.bukkit.boss.BarStyle[] kStyles = {
+            org.bukkit.boss.BarStyle.SOLID, org.bukkit.boss.BarStyle.SEGMENTED_6, org.bukkit.boss.BarStyle.SEGMENTED_10,
+            org.bukkit.boss.BarStyle.SEGMENTED_12, org.bukkit.boss.BarStyle.SEGMENTED_20};
+
+        private static int flagBit(org.bukkit.boss.BarFlag flag) {
+            return switch (flag) {
+                case DARKEN_SKY -> 1;
+                case PLAY_BOSS_MUSIC -> 2;
+                case CREATE_FOG -> 4;
+            };
         }
 
         @Override
         public org.bukkit.boss.BarColor getColor() {
-            return org.bukkit.boss.BarColor.PINK;
+            return kColors[Integer.parseInt(facts()[11])];
         }
 
         @Override
         public void setColor(org.bukkit.boss.BarColor color) {
-            throw Unsupported.hit("BossBar#setColor on the dragon fight bar");
+            if (color == null) {
+                throw new IllegalArgumentException("Color cannot be null");
+            }
+            LeftoverNatives.dragonBar(world.getName(), "bar_color", null, color.ordinal());
         }
 
         @Override
         public org.bukkit.boss.BarStyle getStyle() {
-            return org.bukkit.boss.BarStyle.SOLID;
+            return kStyles[Integer.parseInt(facts()[12])];
         }
 
         @Override
         public void setStyle(org.bukkit.boss.BarStyle style) {
-            throw Unsupported.hit("BossBar#setStyle on the dragon fight bar");
+            if (style == null) {
+                throw new IllegalArgumentException("Style cannot be null");
+            }
+            LeftoverNatives.dragonBar(world.getName(), "bar_style", null, style.ordinal());
         }
 
         @Override
         public void removeFlag(org.bukkit.boss.BarFlag flag) {
-            throw Unsupported.hit("BossBar#removeFlag on the dragon fight bar");
+            LeftoverNatives.dragonBar(world.getName(), "bar_flags", null,
+                Integer.parseInt(facts()[13]) & ~flagBit(flag));
         }
 
         @Override
         public void addFlag(org.bukkit.boss.BarFlag flag) {
-            throw Unsupported.hit("BossBar#addFlag on the dragon fight bar");
+            LeftoverNatives.dragonBar(world.getName(), "bar_flags", null,
+                Integer.parseInt(facts()[13]) | flagBit(flag));
         }
 
         @Override
         public boolean hasFlag(org.bukkit.boss.BarFlag flag) {
-            return flag == org.bukkit.boss.BarFlag.PLAY_BOSS_MUSIC || flag == org.bukkit.boss.BarFlag.CREATE_FOG;
+            return (Integer.parseInt(facts()[13]) & flagBit(flag)) != 0;
         }
 
         @Override
@@ -218,17 +243,17 @@ public final class BasaltDragonBattle implements DragonBattle {
 
         @Override
         public void addPlayer(org.bukkit.entity.Player player) {
-            throw Unsupported.hit("BossBar#addPlayer on the dragon fight bar");
+            LeftoverNatives.dragonBar(world.getName(), "bar_add", null, player.getEntityId());
         }
 
         @Override
         public void removePlayer(org.bukkit.entity.Player player) {
-            throw Unsupported.hit("BossBar#removePlayer on the dragon fight bar");
+            LeftoverNatives.dragonBar(world.getName(), "bar_remove", null, player.getEntityId());
         }
 
         @Override
         public void removeAll() {
-            throw Unsupported.hit("BossBar#removeAll on the dragon fight bar");
+            LeftoverNatives.dragonBar(world.getName(), "bar_clear", null, 0);
         }
 
         @Override

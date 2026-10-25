@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -43,6 +44,12 @@ struct DragonFight {
     std::set<std::int32_t> barPlayers;
     bool barVisible = true;
     float barProgress = 1.0F;
+    /// The title as component JSON, empty for the dragon's own name.
+    std::string barTitle;
+    std::int32_t barColor = 0;
+    std::int32_t barStyle = 0;
+    /// Bits one, two and four: darken the sky, play the boss music, create fog.
+    std::int32_t barFlags = 6;
 
     [[nodiscard]] wire::nbt::NbtCompound encode() const;
 

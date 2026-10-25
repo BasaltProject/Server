@@ -109,6 +109,16 @@ jboolean JNICALL nativeDragonAction(JNIEnv* env, jclass, jstring world, jstring 
     }));
 }
 
+jboolean JNICALL nativeDragonBar(JNIEnv* env, jclass, jstring world, jstring action, jstring text, jint value) {
+    const std::string name = toStd(env, world);
+    const std::string what = toStd(env, action);
+    const std::string content = text == nullptr ? std::string{} : toStd(env, text);
+    return flag(jni::onServer<bool>(false, [&] {
+        const auto found = BukkitBridge::current().services().worlds().byName(name);
+        return found != nullptr && found->dragonFightBar(what, content, value);
+    }));
+}
+
 jboolean JNICALL nativeWindowProperty(JNIEnv* env, jclass, jstring uuid, jint id, jint value) {
     const std::string who = toStd(env, uuid);
     return flag(jni::onServer<bool>(false, [&] {
@@ -154,6 +164,8 @@ void registerLeftoverNatives(JNIEnv* env, jclass natives) {
         method("entityDefaults", "(Ljava/lang/String;)[Ljava/lang/String;",
                reinterpret_cast<void*>(&nativeEntityDefaults)),
         method("humidity", "(Ljava/lang/String;III)D", reinterpret_cast<void*>(&nativeHumidity)),
+        method("dragonBar", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Z",
+               reinterpret_cast<void*>(&nativeDragonBar)),
         method("dragonAction", "(Ljava/lang/String;Ljava/lang/String;I)Z",
                reinterpret_cast<void*>(&nativeDragonAction)),
         method("windowProperty", "(Ljava/lang/String;II)Z", reinterpret_cast<void*>(&nativeWindowProperty)),

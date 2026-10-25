@@ -330,6 +330,7 @@ basalt_module(server-runtime-core
         src/BossBarView.cpp
         src/WitherSystem.cpp
         src/EndFightArena.cpp
+        src/EndFightBar.cpp
         src/EndFightRespawn.cpp
         src/AreaEffectCloudSystem.cpp
         src/Favicon.cpp
