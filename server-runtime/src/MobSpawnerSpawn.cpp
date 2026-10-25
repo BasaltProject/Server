@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
+#include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
@@ -38,6 +39,9 @@ using wire::nbt::NbtTag;
 
 /// parity: `LevelEvent.PARTICLES_MOBBLOCK_SPAWN`, the smoke and flames round the cage.
 constexpr std::int32_t kSpawnParticlesEvent = 2004;
+/// parity: `LevelEvent.PARTICLES_TRIAL_SPAWNER_SPAWN` and `..._SPAWN_MOB_AT`.
+constexpr std::int32_t kTrialSpawnEvent = 3011;
+constexpr std::int32_t kTrialSpawnedMobEvent = 3012;
 /// parity: the entity event `Mob.spawnAnim` broadcasts.
 constexpr std::int8_t kSpawnAnimEvent = 20;
 /// parity: `ServerLevel.levelEvent`, heard by the players within sixty-four blocks.
@@ -161,6 +165,25 @@ void mount(ServerEntity& rider, ServerEntity& vehicle) {
     return loaded;
 }
 
+/// parity: `TrialSpawner.inLineOfSight`: nothing but the spawner itself may stand between the mob and the spawner.
+[[nodiscard]] bool trialInLineOfSight(world::WorldState& world, const std::array<std::int32_t, 3>& pos, double x,
+                                      double y, double z) {
+    const double centerX = pos[0] + 0.5;
+    const double centerY = pos[1] + 0.5;
+    const double centerZ = pos[2] + 0.5;
+    const double dx = x - centerX;
+    const double dy = y - centerY;
+    const double dz = z - centerZ;
+    const double widest = std::max({std::abs(dx), std::abs(dy), std::abs(dz)});
+    if (widest < 1.0E-9) {
+        return true;
+    }
+    constexpr double kJustOutside = 0.5 + 1.0E-4;
+    const double scale = kJustOutside / widest;
+    return !entity::blockRay::clips(world, x, y, z, centerX + (dx * scale), centerY + (dy * scale),
+                                    centerZ + (dz * scale), entity::blockRay::ClipShape::Visual, {});
+}
+
 } // namespace
 
 MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::SpawnData& spawn) {
@@ -192,7 +215,24 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
     const auto blockX = static_cast<std::int32_t>(std::floor(x));
     const auto blockY = static_cast<std::int32_t>(std::floor(y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(z));
-    if (spawn.customSpawnRules.has_value()) {
+    if (turn.trial) {
+        // parity: `TrialSpawner.inLineOfSight`, a ray from the new mob to the spawner that may end in the spawner.
+        if (!trialInLineOfSight(world.state(), turn.pos, x, y, z)) {
+            return Attempt::Skipped;
+        }
+        if (!world::spawnPlacements::checkSpawnRules(world, *type, world::MobSpawnReason::TrialSpawner, blockX, blockY,
+                                                     blockZ, random, options_.facts)) {
+            return Attempt::Skipped;
+        }
+        if (spawn.customSpawnRules.has_value()) {
+            const world::CustomSpawnRules& rules = *spawn.customSpawnRules;
+            if (!rules.blockLight.contains(world::spawnPlacements::blockBrightness(world, blockX, blockY, blockZ)) ||
+                !rules.skyLight.contains(
+                    world::spawnPlacements::effectiveSkyBrightness(world, blockX, blockY, blockZ))) {
+                return Attempt::Skipped;
+            }
+        }
+    } else if (spawn.customSpawnRules.has_value()) {
         if (!isFriendly(*type) && world.difficulty() == "peaceful") {
             return Attempt::Skipped;
         }
@@ -230,7 +270,7 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
         for (const world::DroppedItem& other : world.state().items()) {
             nearby += Aabb::of(other.x, other.y, other.z, width, height).intersects(cage) ? 1 : 0;
         }
-        if (nearby >= turn.state.maxNearbyEntities) {
+        if (!turn.trial && nearby >= turn.state.maxNearbyEntities) {
             return Attempt::Abort;
         }
         static_cast<void>(random.nextFloat());
@@ -239,7 +279,12 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
         item->z = z;
         const wire::common::Uuid uuid = item->uuid;
         static_cast<void>(world.state().spawnItem(std::move(*item)));
-        broadcastSpawned(world, pos, blockX, blockY, blockZ, uuid, std::nullopt);
+        if (turn.trial) {
+            turn.spawned = uuid;
+            broadcastTrialSpawned(world, pos, blockX, blockY, blockZ, uuid, turn.ominous);
+        } else {
+            broadcastSpawned(world, pos, blockX, blockY, blockZ, uuid, std::nullopt);
+        }
         return Attempt::Spawned;
     }
 
@@ -263,7 +308,7 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
     for (const ServerEntity* other : world.state().entities()) {
         nearby += !other->removed && classOf(other->type()) == kind && boxOf(*other).intersects(cage) ? 1 : 0;
     }
-    if (nearby >= turn.state.maxNearbyEntities) {
+    if (!turn.trial && nearby >= turn.state.maxNearbyEntities) {
         return Attempt::Abort;
     }
     const float yaw = random.nextFloat() * kFullTurn;
@@ -273,7 +318,7 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
     const bool isMob = world::mobSpawnChecks::isMob(*type);
     if (isMob) {
         const std::vector<Aabb> players = playerBoxes(world);
-        if ((!spawn.customSpawnRules.has_value() &&
+        if ((!turn.trial && !spawn.customSpawnRules.has_value() &&
              !world::mobSpawnChecks::checkSpawnRules(world, *type, blockX, blockY, blockZ, options_.facts)) ||
             !world::mobSpawnChecks::checkSpawnObstruction(world, *type, boxOf(*loaded.main), x, y, z, players,
                                                           options_.facts)) {
@@ -282,10 +327,16 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
         // parity: only a bare `{id}` is finalized; anything configured spawns as it was written.
         const NbtTag* id = tag.find("id");
         if (tag.size() == 1 && id != nullptr && id->get<std::string>() != nullptr) {
-            loaded = decodeForest(spawning_->finalizeForSpawner(world, *type, x, y, z, yaw, random), allocate);
+            loaded = decodeForest(spawning_->finalizeForSpawner(world, *type, x, y, z, yaw, random,
+                                                                turn.trial ? world::MobSpawnReason::TrialSpawner
+                                                                           : world::MobSpawnReason::Spawner),
+                                  allocate);
             if (loaded.main == nullptr) {
                 return Attempt::Abort;
             }
+        }
+        if (turn.trial) {
+            loaded.main->persistent = true;
         }
         if (spawn.equipment.has_value()) {
             if (!loaded.main->sourceNbt.has_value()) {
@@ -315,7 +366,7 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
                                     event.set("x", loaded.main->x);
                                     event.set("y", loaded.main->y);
                                     event.set("z", loaded.main->z);
-                                    event.set("reason", std::string{"spawner"});
+                                    event.set("reason", std::string{turn.trial ? "trial_spawner" : "spawner"});
                                 })) {
         return Attempt::Abort;
     }
@@ -329,9 +380,61 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
     for (std::unique_ptr<ServerEntity>& entity : loaded.entities) {
         static_cast<void>(world.state().spawnEntity(std::move(entity)));
     }
+    if (turn.trial) {
+        turn.spawned = mainUuid;
+        broadcastTrialSpawned(world, pos, blockX, blockY, blockZ, mainUuid, turn.ominous);
+        return Attempt::Spawned;
+    }
     broadcastSpawned(world, pos, blockX, blockY, blockZ, mainUuid,
                      isMob ? std::optional<std::int32_t>{mainId} : std::nullopt);
     return Attempt::Spawned;
+}
+
+std::optional<wire::common::Uuid> MobSpawnerSystem::spawnForTrial(world::LoadedWorld& world,
+                                                                  const world::SpawnData& spawn,
+                                                                  const std::array<std::int32_t, 3>& pos,
+                                                                  const std::int32_t spawnRange, const bool ominous,
+                                                                  random::RandomSource& random) {
+    world::BaseSpawnerState state;
+    state.spawnRange = spawnRange;
+    const std::function<void(std::int32_t)> ignoreEvent = [](std::int32_t) {};
+    const std::function<void()> ignoreChange = [] {};
+    Turn turn{.world = world,
+              .state = state,
+              .pos = pos,
+              .random = random,
+              .broadcastEvent = ignoreEvent,
+              .spawnDataChanged = ignoreChange,
+              .trial = true,
+              .ominous = ominous};
+    return attempt(turn, spawn) == Attempt::Spawned ? turn.spawned : std::nullopt;
+}
+
+void MobSpawnerSystem::broadcastTrialSpawned(world::LoadedWorld& world, const std::array<std::int32_t, 3>& pos,
+                                             const std::int32_t blockX, const std::int32_t blockY,
+                                             const std::int32_t blockZ, const wire::common::Uuid& source,
+                                             const bool ominous) const {
+    // parity: `levelEvent(3011, spawnerPos, flame)` and `levelEvent(3012, spawnBlockPos, flame)`.
+    const std::int32_t flame = ominous ? 1 : 0;
+    for (player::PlayerSession* player : playersIn(world)) {
+        if (!player->connection().sendLevelEvent) {
+            continue;
+        }
+        const auto heard = [&](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+            const double dx = x + 0.5 - player->x;
+            const double dy = y + 0.5 - player->y;
+            const double dz = z + 0.5 - player->z;
+            return (dx * dx) + (dy * dy) + (dz * dz) < kLevelEventRange * kLevelEventRange;
+        };
+        if (heard(pos[0], pos[1], pos[2])) {
+            player->connection().sendLevelEvent(kTrialSpawnEvent, pos[0], pos[1], pos[2], flame);
+        }
+        if (heard(blockX, blockY, blockZ)) {
+            player->connection().sendLevelEvent(kTrialSpawnedMobEvent, blockX, blockY, blockZ, flame);
+        }
+    }
+    world::vibrations::emit(world.state(), "entity_place", blockX + 0.5, blockY + 0.5, blockZ + 0.5, world.gameTime(),
+                            {.entity = source});
 }
 
 void MobSpawnerSystem::broadcastSpawned(world::LoadedWorld& world, const std::array<std::int32_t, 3>& pos,

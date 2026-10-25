@@ -203,7 +203,8 @@ ServerEntity* NaturalSpawningSystem::spawnEventRaider(world::LoadedWorld& world,
 
 world::MobSpawnForest NaturalSpawningSystem::finalizeForSpawner(world::LoadedWorld& world, const Identifier& type,
                                                                 double x, double y, double z, float yaw,
-                                                                random::RandomSource& random) {
+                                                                random::RandomSource& random,
+                                                                world::MobSpawnReason reason) {
     const auto blockX = static_cast<std::int32_t>(std::floor(x));
     const auto blockY = static_cast<std::int32_t>(std::floor(y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(z));
@@ -213,7 +214,7 @@ world::MobSpawnForest NaturalSpawningSystem::finalizeForSpawner(world::LoadedWor
                                          .equipment = equipment_,
                                          .biome = world::naturalSpawner::biomeAt(world, blockX, blockY, blockZ),
                                          .gameTime = world.gameTime(),
-                                         .reason = world::MobSpawnReason::Spawner,
+                                         .reason = reason,
                                          .entityRandomFactory = [this] { return freshRandom(); },
                                          .moonBrightness = world::spawnPlaces::moonBrightness(world),
                                          .structureAt = world::spawnPlaces::structureAt(world)};

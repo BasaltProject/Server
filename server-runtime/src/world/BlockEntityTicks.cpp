@@ -218,6 +218,12 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 catalysts.push_back({x, y, z});
                 continue;
             }
+            if (path == "trial_spawner") {
+                if (hooks.trialSpawner && hooks.trialSpawner(x, y, z)) {
+                    chunk->markDirty();
+                }
+                continue;
+            }
             if (path == "bell") {
                 server::world::ChunkBlockEntity* bellEntity = chunk->blockEntityAt(stored.localX(), y, stored.localZ());
                 if (bellEntity != nullptr && bells::ringing(bellEntity->data()) && hooks.bell &&
