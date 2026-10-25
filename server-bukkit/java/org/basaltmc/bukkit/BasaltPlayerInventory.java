@@ -26,7 +26,7 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
         this.uuid = uuid;
     }
 
-    /** Bukkit counts the hotbar first (0 to 8) and the storage rows after it, armor boots first; Basalt keeps the rows first and armor head first. */
+    /** Bukkit counts the hotbar first and armor boots first; Basalt keeps the rows first and armor head first. */
     private static int basaltSlot(int slot) {
         if (slot >= 0 && slot < 9) {
             return slot + 27;
