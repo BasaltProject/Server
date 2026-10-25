@@ -217,11 +217,12 @@ std::int32_t LoadedWorldRef::dropItem(std::span<const std::uint8_t> stack, doubl
                : -1;
 }
 
-bool LoadedWorldRef::explode(double x, double y, double z, float power, bool breakBlocks, std::int32_t sourceEntityId) {
+bool LoadedWorldRef::explode(double x, double y, double z, float power, bool breakBlocks, std::int32_t sourceEntityId,
+                             bool fire) {
     if (!hooks_.explode) {
         return false;
     }
-    hooks_.explode(*world_, x, y, z, power, breakBlocks, sourceEntityId);
+    hooks_.explode(*world_, x, y, z, power, breakBlocks, sourceEntityId, fire);
     return true;
 }
 

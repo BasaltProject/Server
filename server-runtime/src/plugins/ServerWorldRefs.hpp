@@ -222,7 +222,8 @@ public:
     std::shared_ptr<PluginEntityRef> spawn(std::string_view type, double x, double y, double z) override;
     std::int32_t dropItem(std::span<const std::uint8_t> stack, double x, double y, double z, double velocityX,
                           double velocityY, double velocityZ) override;
-    bool explode(double x, double y, double z, float power, bool breakBlocks, std::int32_t sourceEntityId) override;
+    bool explode(double x, double y, double z, float power, bool breakBlocks, std::int32_t sourceEntityId,
+                 bool fire) override;
     std::shared_ptr<PluginEntityRef> spawnAs(std::string_view type, double x, double y, double z, float yaw,
                                              std::string_view reason) override;
     std::shared_ptr<PluginHologramRef> hologram(std::string_view text, double x, double y, double z) override;
