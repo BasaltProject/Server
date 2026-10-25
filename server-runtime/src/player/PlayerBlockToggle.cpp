@@ -116,7 +116,7 @@ bool ringBellFor(const BreakContext& context, world::LoadedWorld& world, const s
                                   .volume = 2.0F,
                                   .pitch = 1.0F}};
     context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, *stateId, effects);
-    world::bells::ringAt(world.state(), x, y, z);
+    static_cast<void>(world::bells::ringAt(world.state(), x, y, z));
     // parity: `BellBlockEntity.triggerEvent` over `updateEntities`.
     VillagerWorldSystem::alertVillagers(world, x, y, z);
     if (player != nullptr) {
