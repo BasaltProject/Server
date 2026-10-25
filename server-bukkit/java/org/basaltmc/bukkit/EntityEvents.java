@@ -182,7 +182,8 @@ final class EntityEvents {
                 m.getLocation().getY(), m.getLocation().getZ(), 0f, 0f);
             String named = f.text("breeder");
             LivingEntity breeder = named.isEmpty() ? null : org.bukkit.Bukkit.getPlayerExact(named);
-            return child instanceof LivingEntity baby ? new org.bukkit.event.entity.EntityBreedEvent(baby, m, d, breeder,
+            return child instanceof LivingEntity baby ? new org.bukkit.event.entity.EntityBreedEvent(baby, m, d,
+                    breeder,
                 null, (int) f.whole("experience")) : null;
         }, (e, f) -> f.put("experience", (long) ((org.bukkit.event.entity.EntityBreedEvent) e).getExperience()));
 
@@ -373,8 +374,10 @@ final class EntityEvents {
         }
         DamageSource source = builder.build();
         org.bukkit.block.Block blockSource = attacker == null ? damagingBlock(cause, target) : null;
-        Event event = attacker != null ? new EntityDamageByEntityEvent(attacker, target, mapped, source, f.real("amount"))
-            : blockSource != null ? new EntityDamageByBlockEvent(blockSource, blockSource.getState(), target, mapped, source,
+        Event event = attacker != null ? new EntityDamageByEntityEvent(attacker, target, mapped, source,
+                f.real("amount"))
+            : blockSource != null ? new EntityDamageByBlockEvent(blockSource, blockSource.getState(), target, mapped,
+                    source,
                 f.real("amount")) : new EntityDamageEvent(target, mapped, source, f.real("amount"));
         if (target instanceof Cored cored) {
             cored.core().lastDamageCause = (EntityDamageEvent) event;

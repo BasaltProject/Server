@@ -198,7 +198,8 @@ public final class TypedInventories {
             java.util.Iterator<org.bukkit.inventory.Recipe> all = org.basaltmc.bukkit.recipe.Recipes.iterator();
             while (all.hasNext()) {
                 org.bukkit.inventory.Recipe recipe = all.next();
-                if (kind.isInstance(recipe) && ((org.bukkit.inventory.CookingRecipe<?>) recipe).getInputChoice().test(item)) {
+                if (kind.isInstance(recipe)
+                        && ((org.bukkit.inventory.CookingRecipe<?>) recipe).getInputChoice().test(item)) {
                     return true;
                 }
             }

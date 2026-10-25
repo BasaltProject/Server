@@ -160,7 +160,8 @@ public final class RegistryLifecycle {
         BasaltRegistry<Keyed> registry = live(one.registry());
         boolean warned = false;
         for (Keyed entry : registry.stream().toList()) {
-            TypedKey key = TypedKey.create(one.registry(), Key.key(entry.getKey().getNamespace(), entry.getKey().getKey()));
+            TypedKey key = TypedKey.create(one.registry(), Key.key(entry.getKey().getNamespace(),
+                    entry.getKey().getKey()));
             if (!one.accepts(key)) {
                 continue;
             }

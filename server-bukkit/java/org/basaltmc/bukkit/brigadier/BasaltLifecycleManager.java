@@ -22,7 +22,8 @@ public final class BasaltLifecycleManager implements LifecycleEventManager<Plugi
 
     @Override
     public void registerEventHandler(LifecycleEventHandlerConfiguration<? super Plugin> configuration) {
-        if ((Object) configuration instanceof io.papermc.paper.registry.event.BasaltRegistryEventTypeProvider.Recorded<?> unused) {
+        if ((Object) configuration
+            instanceof io.papermc.paper.registry.event.BasaltRegistryEventTypeProvider.Recorded<?> unused) {
             reportUnused(unused.event());
             return;
         }

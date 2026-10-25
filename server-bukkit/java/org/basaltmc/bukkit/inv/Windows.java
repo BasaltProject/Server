@@ -104,7 +104,8 @@ public final class Windows {
             if (!block.worldName().equals(player.getWorld().getName())) {
                 return null;
             }
-            int container = InventoryNatives.windowOpenBlock(uuid(player), block.blockX(), block.blockY(), block.blockZ());
+            int container = InventoryNatives.windowOpenBlock(uuid(player), block.blockX(), block.blockY(),
+                    block.blockZ());
             return container == 0 ? null : current(player);
         }
         if (real instanceof EntityContainerInventory entity) {
@@ -112,7 +113,8 @@ public final class Windows {
             return container == 0 ? null : current(player);
         }
         if (!(real instanceof CustomInventory custom)) {
-            throw org.basaltmc.bukkit.Unsupported.hit("HumanEntity#openInventory of " + real.getClass().getSimpleName());
+            throw org.basaltmc.bukkit.Unsupported.hit("HumanEntity#openInventory of "
+                    + real.getClass().getSimpleName());
         }
         String kind = InventoryTypes.kindOf(custom.getType());
         if (kind == null) {

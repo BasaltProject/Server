@@ -96,7 +96,6 @@ bool CombatHandler::useItemFrame(PlayerSession& session, ServerEntity& frame) {
     }
     broadcastFrame(frame);
     // parity: both halves of `interact` end in `updateNeighbourForOutputSignal`.
-    // the comparator reading the frame that its number moved.
     const std::array<std::int32_t, 3> square = world::itemFrames::squareOf(frame);
     world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), square[0], square[1], square[2],
                                                          world::comparatorReading::of(world->state()));
@@ -222,7 +221,6 @@ void CombatHandler::breakVehicle(PlayerSession& session, ServerEntity& vehicle) 
         return;
     }
     // parity: `Player.attack` against something not alive.
-    // hit handed to `VehicleEntity.hurtServer`.
     const std::optional<storage::StoredItemStack>& heldStack = session.inventory.heldItem();
     world::RealEnchantments* enchantments = owner_->options().enchantments;
     const player::playerAttributes::DefinitionOf definitionOf = [enchantments](const Identifier& id) {
@@ -273,7 +271,6 @@ void CombatHandler::breakCushion(PlayerSession& session, ServerEntity& cushion) 
         return;
     }
     // parity: `BlockAttachedEntity.hurtServer` kills it and `Cushion.dropItem` follows.
-    // always, the item only outside creative and with `entity_drops` on.
     for (const std::int32_t passenger : cushion.passengerIds) {
         for (PlayerSession* rider : owner_->playersInSameWorld()) {
             if (rider->entityId() == passenger) {
@@ -307,13 +304,11 @@ void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {
     }
     const std::optional<server::world::loot::ItemStack> shown = world::itemFrames::shownIn(frame);
     // parity: `dropItem` puts nothing in the world for a creative player or with `entity_drops` off.
-    // and the frame is emptied either way.
     const bool drops = session.gamemode != Gamemode::Creative && world->gameRules().get(world::gameRules::kEntityDrops);
     if (shown.has_value()) {
         static_cast<void>(frame.sourceNbt->remove("Item"));
         broadcastFrame(frame);
-        // parity: `dropItem` takes the map's marker off unless drops are off, where only a frame.
-        // coming down on its own does.
+        // parity: `dropItem` takes the map's marker off unless drops are off.
         if (world->gameRules().get(world::gameRules::kEntityDrops) && owner_->options().maps != nullptr) {
             owner_->options().maps->frameLostMap(shown->components, frame);
         }
@@ -331,7 +326,6 @@ void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {
         }
     }
     // parity: both halves raise `GameEvent.BLOCK_CHANGE`.
-    // hear that it is empty now.
     const std::array<std::int32_t, 3> square = world::itemFrames::squareOf(frame);
     world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), square[0], square[1], square[2],
                                                          world::comparatorReading::of(world->state()));

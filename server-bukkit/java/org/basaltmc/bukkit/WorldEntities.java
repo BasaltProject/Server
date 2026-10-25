@@ -187,13 +187,15 @@ public abstract class WorldEntities extends WorldGeo {
 
     @Override
     public org.bukkit.entity.LightningStrike strikeLightning(Location location) {
-        return (org.bukkit.entity.LightningStrike) org.basaltmc.bukkit.entity.EntitySpawner.spawn((BasaltWorld) this, location,
+        return (org.bukkit.entity.LightningStrike) org.basaltmc.bukkit.entity.EntitySpawner.spawn((BasaltWorld) this,
+                location,
             EntityType.LIGHTNING_BOLT, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM, null);
     }
 
     @Override
     public org.bukkit.entity.LightningStrike strikeLightningEffect(Location location) {
-        return (org.bukkit.entity.LightningStrike) org.basaltmc.bukkit.entity.EntitySpawner.spawn((BasaltWorld) this, location,
+        return (org.bukkit.entity.LightningStrike) org.basaltmc.bukkit.entity.EntitySpawner.spawn((BasaltWorld) this,
+                location,
             EntityType.LIGHTNING_BOLT, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM,
             bolt -> ((org.basaltmc.bukkit.entity.Cored) bolt).core().set("bolt_visual_only", true));
     }
@@ -202,7 +204,8 @@ public abstract class WorldEntities extends WorldGeo {
     public org.bukkit.entity.FallingBlock spawnFallingBlock(Location location, org.bukkit.block.data.BlockData data)
             throws IllegalArgumentException {
         int state = BasaltBlockData.stateOf(data);
-        return (org.bukkit.entity.FallingBlock) org.basaltmc.bukkit.entity.EntitySpawner.spawn((BasaltWorld) this, location,
+        return (org.bukkit.entity.FallingBlock) org.basaltmc.bukkit.entity.EntitySpawner.spawn((BasaltWorld) this,
+                location,
             EntityType.FALLING_BLOCK, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM,
             block -> ((org.basaltmc.bukkit.entity.Cored) block).core().set("object_data", state));
     }
@@ -245,7 +248,8 @@ public abstract class WorldEntities extends WorldGeo {
     @Override
     public org.bukkit.entity.Item dropItem(Location location, org.bukkit.inventory.ItemStack item,
             Consumer<? super org.bukkit.entity.Item> function) {
-        return org.basaltmc.bukkit.entity.EntitySpawner.drop((BasaltWorld) this, location, item, 0.0, 0.0, 0.0, function);
+        return org.basaltmc.bukkit.entity.EntitySpawner.drop((BasaltWorld) this, location, item, 0.0, 0.0, 0.0,
+                function);
     }
 
     @Override
@@ -254,7 +258,8 @@ public abstract class WorldEntities extends WorldGeo {
         java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
         Location at = location.clone().add(random.nextDouble() * 0.5 + 0.25, random.nextDouble() * 0.5 + 0.25,
             random.nextDouble() * 0.5 + 0.25);
-        return org.basaltmc.bukkit.entity.EntitySpawner.drop((BasaltWorld) this, at, item, random.nextDouble() * 0.2 - 0.1, 0.2,
+        return org.basaltmc.bukkit.entity.EntitySpawner.drop((BasaltWorld) this, at, item,
+                random.nextDouble() * 0.2 - 0.1, 0.2,
             random.nextDouble() * 0.2 - 0.1, function);
     }
 }

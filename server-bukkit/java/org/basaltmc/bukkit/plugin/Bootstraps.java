@@ -74,7 +74,8 @@ public final class Bootstraps {
         LifecycleEventManager<BootstrapContext> manager = new LifecycleEventManager<>() {
             @Override
             public void registerEventHandler(LifecycleEventHandlerConfiguration<? super BootstrapContext> config) {
-                if ((Object) config instanceof io.papermc.paper.registry.event.BasaltRegistryEventTypeProvider.Recorded<?> recorded) {
+                if ((Object) config instanceof
+                        io.papermc.paper.registry.event.BasaltRegistryEventTypeProvider.Recorded<?> recorded) {
                     registry.add(recorded);
                     return;
                 }
