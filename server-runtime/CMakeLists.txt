@@ -32,6 +32,9 @@ basalt_module(server-runtime-core
         src/bukkit/JavaPluginScan.cpp
         src/config/ConfigDirectory.cpp
         src/config/ForwardingConfig.cpp
+        src/config/RemoteConfig.cpp
+        src/remote/BasaltServerRemote.cpp
+        src/remote/RemoteHostImpl.cpp
         src/config/GroupsConfig.cpp
         src/config/LiveConfigs.cpp
         src/config/ProfileSelection.cpp
@@ -769,7 +772,7 @@ basalt_module(server-runtime-core
         src/world/WorldStateSections.cpp
         src/world/WorldStateTicks.cpp
         src/world/SpawnPotential.cpp
-    DEPENDS basalt::metamorph-datafix basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
+    DEPENDS basalt::metamorph-datafix basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io basalt::server-remote
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 

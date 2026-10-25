@@ -58,9 +58,9 @@ final class ServerEvents {
                 everyone);
         }, (e, f) -> f.put("message", PlainTextComponentSerializer.plainText().serialize(
             ((org.bukkit.event.server.BroadcastMessageEvent) e).message())));
-        EventBridge.map("server.command", org.bukkit.event.server.RemoteServerCommandEvent.class,
-            f -> f.text("source").equals("rcon") ? new org.bukkit.event.server.RemoteServerCommandEvent(
-                BasaltServer.instance().consoleImpl(), f.text("command")) : null,
+        EventBridge.map("server.remote_command", org.bukkit.event.server.RemoteServerCommandEvent.class,
+            f -> new org.bukkit.event.server.RemoteServerCommandEvent(
+                new BasaltRemoteConsole(f.text("address")), f.text("command")),
             (e, f) -> f.put("command", ((org.bukkit.event.server.ServerCommandEvent) e).getCommand()));
         EventBridge.map("server.tick_end", com.destroystokyo.paper.event.server.ServerTickEndEvent.class,
             f -> new com.destroystokyo.paper.event.server.ServerTickEndEvent((int) f.whole("tick"), f.real("duration_ms"),

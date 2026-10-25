@@ -10,7 +10,7 @@
 namespace basalt::server::runtime::plugins {
 namespace {
 
-constexpr std::array<std::string_view, 23> kKeys{"motd",
+constexpr std::array<std::string_view, 27> kKeys{"motd",
                                                  "max_players",
                                                  "port",
                                                  "bind",
@@ -32,7 +32,11 @@ constexpr std::array<std::string_view, 23> kKeys{"motd",
                                                  "spawn_protection",
                                                  "pause_allowed",
                                                  "respawn_world",
-                                                 "autosave"};
+                                                 "autosave",
+                                                 "rcon_enabled",
+                                                 "rcon_port",
+                                                 "api_enabled",
+                                                 "api_port"};
 
 [[nodiscard]] std::string joined(const std::vector<std::string>& values) {
     std::string out;
@@ -122,6 +126,18 @@ std::optional<std::string> ServerSettings::get(const std::string_view key) const
     }
     if (key == "port") {
         return std::to_string(config.port);
+    }
+    if (key == "rcon_enabled") {
+        return boolText(config.remote.rcon.enabled && !config.remote.rcon.password.empty());
+    }
+    if (key == "rcon_port") {
+        return std::to_string(config.remote.rcon.port);
+    }
+    if (key == "api_enabled") {
+        return boolText(config.remote.api.enabled);
+    }
+    if (key == "api_port") {
+        return std::to_string(config.remote.api.port);
     }
     if (key == "bedrock_port") {
         return std::to_string(config.bedrockPort);

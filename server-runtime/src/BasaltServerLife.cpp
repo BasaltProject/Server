@@ -137,6 +137,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         listener_ = std::move(*bound);
     }
     startBedrockListener();
+    startRemote(startedAt);
 
     // Logged at startup because regional mode changes the observable tick order.
     if (worldRegistry_->scheduler().regional()) {
@@ -283,6 +284,7 @@ void BasaltServer::shutdown() {
 
     // First, so an auto-reconnecting client cannot walk back in mid-save.
     accepting_.store(false);
+    stopRemote();
     // Closed, not destroyed: the thread that started the server is inside `accept` on it.
     if (listener_.has_value()) {
         listener_->close();

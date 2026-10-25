@@ -24,3 +24,4 @@ org.bukkit.OfflinePlayer
 org.bukkit.inventory.meta.ItemMeta
 io.papermc.paper.registry.data.InlinedRegistryBuilderProvider
 org.bukkit.entity.ComplexEntityPart
+org.bukkit.command.RemoteConsoleCommandSender
