@@ -88,7 +88,7 @@ public:
     world::RealTestEnvironments testEnvironments;
     world::StructureTemplates structureTemplates;
 
-private:
+    /// Hands the brewing stand the brewing recipes the recipe list holds now.
     void useBrewingRecipes() const;
 };
 
