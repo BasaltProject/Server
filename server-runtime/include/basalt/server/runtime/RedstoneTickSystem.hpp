@@ -101,6 +101,9 @@ public:
         std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::vector<world::BlockChange>& pending)>
             tickCreakingHeart;
+        std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           wire::nbt::NbtCompound& data)>
+            tickBell;
         std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
             tickSculkCatalyst;
         std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,

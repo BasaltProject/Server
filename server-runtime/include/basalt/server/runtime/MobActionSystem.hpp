@@ -205,6 +205,9 @@ public:
     bool tickCreakingHeart(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::vector<world::BlockChange>& pending);
 
+    bool tickBell(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                  wire::nbt::NbtCompound& data);
+
     void creakingHeartBroken(world::LoadedWorld& world, const player::PlayerSession& player,
                              const std::array<std::int32_t, 3>& at);
 

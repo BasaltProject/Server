@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/player/PlayerFaces.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
+#include <basalt/server/runtime/world/Bells.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -115,6 +116,7 @@ bool ringBellFor(const BreakContext& context, world::LoadedWorld& world, const s
                                   .volume = 2.0F,
                                   .pitch = 1.0F}};
     context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, *stateId, effects);
+    world::bells::ringAt(world.state(), x, y, z);
     // parity: `BellBlockEntity.triggerEvent` over `updateEntities`.
     VillagerWorldSystem::alertVillagers(world, x, y, z);
     if (player != nullptr) {

@@ -1063,6 +1063,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                        std::vector<world::BlockChange>& pending) {
                     return mobActions_ != nullptr && mobActions_->tickCreakingHeart(world, x, y, z, pending);
                 },
+            .tickBell =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                       wire::nbt::NbtCompound& data) {
+                    return mobActions_ != nullptr && mobActions_->tickBell(world, x, y, z, data);
+                },
             .tickSculkCatalyst =
                 [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
                     return sculkCatalysts_ != nullptr && sculkCatalysts_->tick(world, x, y, z);
