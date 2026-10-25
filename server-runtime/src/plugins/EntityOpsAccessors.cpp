@@ -1,5 +1,7 @@
 #include "EntityOpsInternal.hpp"
 
+#include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
+
 namespace basalt::server::runtime::plugins::entityOps::internal {
 namespace {
 template <typename Member>
@@ -216,6 +218,12 @@ const Accessors& accessors() {
             }};
         all["powered"] = field(&ServerEntity::powered);
         all["swell"] = field(&ServerEntity::swell);
+        all["trading_player"] = Accessor{[](const ServerEntity& entity) -> Value {
+                                             return entity.villager != nullptr && entity.villager->tradingPlayer
+                                                        ? static_cast<std::int64_t>(*entity.villager->tradingPlayer)
+                                                        : static_cast<std::int64_t>(-1);
+                                         },
+                                         nullptr};
         all["villager_level"] = field(&ServerEntity::villagerLevel);
         all["villager_experience"] = field(&ServerEntity::villagerExperience);
         all["profession"] = Accessor{[](const ServerEntity& entity) -> Value { return entity.profession; },
