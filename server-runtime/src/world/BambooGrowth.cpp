@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/config/WorldRules.hpp>
 #include <basalt/server/runtime/world/BambooGrowth.hpp>
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
@@ -61,7 +62,7 @@ void bamboo(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, s
     while (isBamboo(world, x, y - height, z)) {
         ++height;
     }
-    if (height >= kMaxHeight) {
+    if (height >= world.rules().gameplay.bambooMaxHeight) {
         return;
     }
 

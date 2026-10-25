@@ -396,7 +396,13 @@ void WitherSystem::afterTurn(world::LoadedWorld& world, const std::vector<Player
                     .pos = play::BlockPos{mth::floor(wither.x), mth::floor(wither.y), mth::floor(wither.z)},
                     .data = 0,
                     .global = true};
+                const double radius = world.settings().rules.gameplay.witherSpawnSoundRadius;
                 for (PlayerSession* player : players_->snapshot()) {
+                    if (radius > 0.0 &&
+                        (player->worldName != world.name() || std::abs(player->x - wither.x) > radius ||
+                         std::abs(player->y - wither.y) > radius || std::abs(player->z - wither.z) > radius)) {
+                        continue;
+                    }
                     if (player->connection().sendPlayPacket) {
                         player->connection().sendPlayPacket(
                             play::LevelEventPacket::kId,
