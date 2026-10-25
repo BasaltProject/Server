@@ -91,6 +91,9 @@ public:
     [[nodiscard]] std::optional<server::world::loot::ItemStack>
     resultFor(const server::world::crafting::CraftingInput& input) const;
 
+    /// Drops the brewing recipes added after the load and brings back the loaded ones that were removed.
+    void restoreBrewing();
+
 private:
     void load(const Jar& jar);
     void index();
@@ -100,6 +103,7 @@ private:
     std::deque<server::world::crafting::Recipe> recipes_;
     std::deque<wire::common::Identifier> parsedIds_;
     std::deque<bool> live_;
+    std::size_t loaded_ = 0;
     std::set<wire::common::Identifier> ids_;
     std::map<server::world::crafting::Cooker, std::vector<const server::world::crafting::Recipe*>> cooking_;
     std::vector<const server::world::crafting::Recipe*> stonecutting_;

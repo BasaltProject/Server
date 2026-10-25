@@ -40,6 +40,7 @@ public:
     void clearRecipes() override;
 
     void resetRecipes() override;
+    void resetBrewingRecipes() override;
 
     [[nodiscard]] std::vector<std::string> registryTags(std::string_view registry) const override;
 
