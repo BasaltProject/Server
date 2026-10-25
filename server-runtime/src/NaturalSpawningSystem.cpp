@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
@@ -220,7 +221,14 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
     for (const PlayerSession* player : watchers) {
         capPlayers.push_back(world::MobCapPlayer{player->entityId(), player->x, player->z});
     }
-    world::LocalMobCaps localCaps{std::move(capPlayers)};
+    const config::MobSettings& mobs = world.mobSettings();
+    const world::LoadedWorld::SpawnTunables& tunables = world.spawnTunables();
+    world::LocalMobCaps::Limits limits{};
+    for (const MobCategory category : kCappedCategories) {
+        const auto slot = static_cast<std::size_t>(category);
+        limits[slot] = tunables.limits[slot] >= 0 ? tunables.limits[slot] : mobs.caps[slot];
+    }
+    world::LocalMobCaps localCaps{std::move(capPlayers), limits, mobs.spawnRangeChunks};
 
     std::vector<std::array<std::int32_t, 2>> chunks;
     for (const std::array<std::int32_t, 2>& chunk : chunkSimulation_->simulatedChunks(world)) {
@@ -245,17 +253,16 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
         }
     }
     std::vector<MobCategory> categories = world::naturalSpawner::categoriesFor(world.difficulty(), world.gameTime());
-    const world::LoadedWorld::SpawnTunables& tunables = world.spawnTunables();
     std::map<MobCategory, std::int32_t> caps;
     std::map<MobCategory, std::int32_t> counts;
     for (const MobCategory category : kCappedCategories) {
         const auto slot = static_cast<std::size_t>(category);
-        caps[category] =
-            tunables.limits[slot] >= 0
-                ? tunables.limits[slot] * static_cast<std::int32_t>(chunks.size()) / world::naturalSpawner::kCapChunks
-                : world::naturalSpawner::capFor(category, static_cast<std::int32_t>(chunks.size()));
+        caps[category] = limits[slot] * static_cast<std::int32_t>(chunks.size()) / world::naturalSpawner::kCapChunks;
         counts[category] = 0;
-        if (const std::int32_t every = tunables.ticksPer[slot]; every >= 0) {
+        const std::int32_t vanillaInterval = entity::mobCategoryFacts(category).persistent ? 400 : 1;
+        const std::int32_t every =
+            tunables.ticksPer[slot] >= 0 ? tunables.ticksPer[slot] : mobs.spawnIntervalTicks[slot];
+        if (tunables.ticksPer[slot] >= 0 || every != vanillaInterval) {
             std::erase(categories, category);
             const bool peaceful = world.difficulty() == "peaceful" && !entity::mobCategoryFacts(category).friendly;
             if (every > 0 && world.gameTime() % every == 0 && !peaceful) {
@@ -292,7 +299,8 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
     }
     for (const std::array<std::int32_t, 2>& chunk : chunks) {
         for (const MobCategory category : categories) {
-            if (counts[category] >= caps[category] || !localCaps.canSpawn(category, chunk[0], chunk[1])) {
+            if ((!mobs.perPlayerMobSpawns && counts[category] >= caps[category]) ||
+                !localCaps.canSpawn(category, chunk[0], chunk[1])) {
                 continue;
             }
             const world::naturalSpawner::Hooks hooks{
@@ -333,6 +341,10 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
                             cost = biomeSpawns_->costFor(*biome, request.type);
                         }
                         if (cost.has_value() && !spawnPotential.allows(blockX, blockY, blockZ, *cost)) {
+                            return false;
+                        }
+                        if (const config::MobOverride* tweak = mobs.overrideFor(request.type.path());
+                            tweak != nullptr && tweak->spawnEnabled == false) {
                             return false;
                         }
                         if (materializeNaturalForest(world, request, blockX, blockY, blockZ, random) == nullptr) {

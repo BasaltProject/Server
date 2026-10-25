@@ -22,6 +22,13 @@ LocalMobCaps::LocalMobCaps(std::vector<MobCapPlayer> players) : players_(std::mo
     }
 }
 
+LocalMobCaps::LocalMobCaps(std::vector<MobCapPlayer> players, const Limits& limits, std::int32_t rangeChunks)
+    : LocalMobCaps(std::move(players)) {
+    limits_ = limits;
+    rangeChunks_ = rangeChunks;
+    distanceSquared_ = static_cast<double>(rangeChunks) * 16.0 * static_cast<double>(rangeChunks) * 16.0;
+}
+
 const std::vector<std::size_t>& LocalMobCaps::nearby(std::int32_t chunkX, std::int32_t chunkZ) {
     const std::int64_t key = WorldState::key(chunkX, chunkZ);
     if (const auto found = nearbyCache_.find(key); found != nearbyCache_.end()) {
@@ -33,7 +40,7 @@ const std::vector<std::size_t>& LocalMobCaps::nearby(std::int32_t chunkX, std::i
     for (std::size_t at = 0; at < players_.size(); ++at) {
         const double dx = centreX - players_[at].x;
         const double dz = centreZ - players_[at].z;
-        if ((dx * dx) + (dz * dz) < kSpawningDistanceSquared) {
+        if ((dx * dx) + (dz * dz) < distanceSquared_) {
             within.push_back(at);
         }
     }
@@ -41,18 +48,19 @@ const std::vector<std::size_t>& LocalMobCaps::nearby(std::int32_t chunkX, std::i
 }
 
 bool LocalMobCaps::canSpawn(MobCategory category, std::int32_t chunkX, std::int32_t chunkZ) {
-    const std::int32_t maximum = entity::mobCategoryFacts(category).maxPerChunk;
+    const std::int32_t maximum = limits_.has_value() && indexOf(category) < limits_->size()
+                                     ? (*limits_)[indexOf(category)]
+                                     : entity::mobCategoryFacts(category).maxPerChunk;
     return std::ranges::any_of(nearby(chunkX, chunkZ), [this, category, maximum](std::size_t at) {
         return counts_.at(players_[at].id)[indexOf(category)] < maximum;
     });
 }
 
 bool LocalMobCaps::isSpawnCandidate(std::int32_t chunkX, std::int32_t chunkZ) const {
-    return std::ranges::any_of(players_, [chunkX, chunkZ](const MobCapPlayer& player) {
+    return std::ranges::any_of(players_, [this, chunkX, chunkZ](const MobCapPlayer& player) {
         const std::int32_t playerChunkX = wire::common::mth::floor(player.x) >> 4;
         const std::int32_t playerChunkZ = wire::common::mth::floor(player.z) >> 4;
-        return std::abs(chunkX - playerChunkX) <= kGlobalCapRadius &&
-               std::abs(chunkZ - playerChunkZ) <= kGlobalCapRadius;
+        return std::abs(chunkX - playerChunkX) <= rangeChunks_ && std::abs(chunkZ - playerChunkZ) <= rangeChunks_;
     });
 }
 

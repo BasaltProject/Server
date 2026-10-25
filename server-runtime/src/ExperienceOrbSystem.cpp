@@ -141,11 +141,12 @@ void ExperienceOrbSystem::award(world::LoadedWorld& world, double x, double y, d
         amount -= value;
         // parity: `tryMergeToExisting`, any orb of that size in the block round the point.
         const std::int32_t group = random_.nextInt(kMergeGroups);
+        const double radius = world.mobSettings().experienceMergeRadius;
         bool merged = false;
         for (ServerEntity* other : world.state().entities()) {
-            if (canMerge(*other, group, value) && std::abs(other->x - x) < 0.5 + (other->width() / 2.0) &&
-                other->y < y + 0.5 && other->y + other->height() > y - 0.5 &&
-                std::abs(other->z - z) < 0.5 + (other->width() / 2.0)) {
+            if (canMerge(*other, group, value) && std::abs(other->x - x) < radius + (other->width() / 2.0) &&
+                other->y < y + radius && other->y + other->height() > y - radius &&
+                std::abs(other->z - z) < radius + (other->width() / 2.0)) {
                 tagOf(*other).putInt("Count", countOf(*other) + 1);
                 tagOf(*other).putShort("Age", 0);
                 merged = true;
@@ -239,9 +240,10 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
     const bool colliding = inside.has_value() && !registry::blockShapes::isEmptyShape(*inside);
     if (orb.tickCount % kScanPeriod == 1) {
         // parity: `scanForMerges`, the orbs within half a block of this one's box.
+        const double reach = world.mobSettings().experienceMergeRadius + orb.width();
         for (ServerEntity* other : living) {
-            if (other != &orb && canMerge(*other, orb.entityId(), value) && std::abs(other->x - orb.x) < 1.0 &&
-                std::abs(other->y - orb.y) < 1.0 && std::abs(other->z - orb.z) < 1.0 &&
+            if (other != &orb && canMerge(*other, orb.entityId(), value) && std::abs(other->x - orb.x) < reach &&
+                std::abs(other->y - orb.y) < reach && std::abs(other->z - orb.z) < reach &&
                 world.events().allowed(&server::plugins::pluginEventTypes::entityOrbMerge,
                                        [&](server::plugins::PluginEvent& event) {
                                            plugins::hookEvents::entity(event, world.name(), orb);

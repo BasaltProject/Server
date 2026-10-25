@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockShapes.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 
 #include <algorithm>
@@ -33,9 +34,6 @@ constexpr double kAcceleration = 0.1;
 
 /// parity: `AbstractArrow.onHitBlock` scales by the float `0.05F`.
 constexpr double kStuckBackoff = static_cast<double>(0.05F);
-
-/// parity: `AbstractArrow.tickDespawn`'s twelve hundred turns.
-constexpr std::int32_t kDespawnTicks = 1200;
 
 /// parity: `Vec3.normalize`.
 constexpr double kNormalizeFloor = 1.0E-4;
@@ -256,7 +254,10 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
             // parity: `tickDespawn`, a minute in the ground and gone, save a trident that comes home.
             const bool keeps = entity.type().path() == "trident" && entity.tridentLoyalty > 0 &&
                                entity.arrowPickup == ServerEntity::ArrowPickup::Allowed;
-            if (!keeps && ++entity.arrowLife >= kDespawnTicks) {
+            const config::MobSettings& mobs = world.mobSettings();
+            const std::int32_t limit =
+                entity.type().path() == "trident" ? mobs.tridentDespawnTicks : mobs.arrowDespawnTicks;
+            if (!keeps && ++entity.arrowLife >= limit) {
                 entity.removed = true;
             }
             ++entity.inGroundTime;

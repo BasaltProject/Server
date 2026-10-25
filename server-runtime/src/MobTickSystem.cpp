@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/EntityPushSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
@@ -19,6 +20,7 @@
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 namespace basalt::server::runtime {
@@ -309,14 +311,31 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     }
     const entity::MobCategory category =
         entity::mobCategoryByName(entity::mobs::categoryOf(entity.type())).value_or(entity::MobCategory::Misc);
+    const config::MobSettings& mobs = world.mobSettings();
+    const auto categoryAt = static_cast<std::size_t>(category);
+    entity::mobDespawn::Ranges ranges;
+    ranges.idleTicks = mobs.despawnIdleTicks;
+    ranges.randomOdds = mobs.despawnRandomOdds;
+    if (categoryAt < config::kMobCategoryCount) {
+        ranges.soft = mobs.despawn[categoryAt].softRange;
+        ranges.hard = mobs.despawn[categoryAt].hardRange;
+    } else {
+        ranges.hard = entity::mobCategoryFacts(category).despawnDistance;
+    }
+    if (const config::MobOverride* tweak = entity.tuning.get(); tweak != nullptr) {
+        ranges.soft = tweak->despawnSoftRange.value_or(static_cast<std::int32_t>(ranges.soft));
+        ranges.hard = tweak->despawnHardRange.value_or(static_cast<std::int32_t>(ranges.hard));
+    }
     std::optional<double> nearest;
     for (const PlayerSession* player : watchers) {
-        const double distance = entity::mobBrain::distanceTo(entity, player->x, player->y, player->z);
+        const double distance = mobs.despawnCylinder
+                                    ? std::hypot(player->x - entity.x, player->z - entity.z)
+                                    : entity::mobBrain::distanceTo(entity, player->x, player->y, player->z);
         if (!nearest.has_value() || distance < *nearest) {
             nearest = distance;
         }
     }
-    if (entity::mobDespawn::shouldDespawn(entity, category, nearest, random)) {
+    if (entity::mobDespawn::shouldDespawn(entity, category, ranges, nearest, random)) {
         entity.removed = true;
     }
 }

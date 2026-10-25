@@ -236,8 +236,8 @@ bool sunBurn::shouldBurn(bool sensitive, bool day, std::int32_t light, bool open
     return random.nextFloat() * kRoll < (brightness - kMargin) * 2.0F;
 }
 
-bool mobDespawn::shouldDespawn(ServerEntity& mob, MobCategory category, std::optional<double> nearestDistance,
-                               random::RandomSource& random) {
+bool mobDespawn::shouldDespawn(ServerEntity& mob, MobCategory category, const Ranges& ranges,
+                               std::optional<double> nearestDistance, random::RandomSource& random) {
     static constexpr double kPatrolHardDespawnSquared = 16384.0;
     static constexpr std::int32_t kCatDespawnGraceTicks = 2400;
     static constexpr std::array<std::string_view, 25> kNeverDespawnAnimals{
@@ -281,12 +281,11 @@ bool mobDespawn::shouldDespawn(ServerEntity& mob, MobCategory category, std::opt
         return false;
     }
     const double distanceSquared = *nearestDistance * *nearestDistance;
-    const double despawn =
-        static_cast<double>(mobCategoryFacts(category).despawnDistance) * mobCategoryFacts(category).despawnDistance;
+    const double despawn = ranges.hard * ranges.hard;
     if (distanceSquared > despawn) {
         return true;
     }
-    const double keep = static_cast<double>(kNoDespawnDistance) * kNoDespawnDistance;
+    const double keep = ranges.soft * ranges.soft;
     if (distanceSquared < keep) {
         // parity: standing near it resets the clock, so it is never forgotten under your nose.
         mob.idleTicks = 0;
@@ -296,7 +295,7 @@ bool mobDespawn::shouldDespawn(ServerEntity& mob, MobCategory category, std::opt
     if (mob.patrolling && distanceSquared <= kPatrolHardDespawnSquared) {
         return false;
     }
-    return mob.idleTicks > kIdleBeforeRandom && random.nextInt(kRandomOdds) == 0;
+    return mob.idleTicks > ranges.idleTicks && random.nextInt(ranges.randomOdds) == 0;
 }
 
 Identifier wardens::type() { return Identifier::vanilla("warden"); }
