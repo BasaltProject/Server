@@ -108,9 +108,9 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 }
 
 [[nodiscard]] std::optional<Position> step(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                           bool doors = false, bool amphibious = false) {
-    // parity: `findAcceptedNode` hands an amphibious mob the water node as it is.
-    if (standable(world, x, y, z, doors) || (amphibious && isWater(world, x, y, z))) {
+                                           bool doors = false, bool waterNodes = false) {
+    // parity: `findAcceptedNode` hands an amphibious or floating mob the water node as it is.
+    if (standable(world, x, y, z, doors) || (waterNodes && isWater(world, x, y, z))) {
         return Position{x, y, z};
     }
     if (standable(world, x, y + 1, z, doors) && isOpen(world, x, y + 2, z, doors)) {
@@ -126,11 +126,12 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 
 /// parity: `WalkNodeEvaluator.getNeighbors`.
 [[nodiscard]] std::vector<Position> neighbours(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                               bool doors = false, bool amphibious = false) {
+                                               bool doors = false, bool amphibious = false, bool floats = false) {
+    const bool waterNodes = amphibious || floats;
     std::vector<Position> found;
     for (const registry::BlockFace face : kHorizontal) {
         const std::optional<Position> landed =
-            step(world, x + registry::stepX(face), y, z + registry::stepZ(face), doors, amphibious);
+            step(world, x + registry::stepX(face), y, z + registry::stepZ(face), doors, waterNodes);
         if (landed.has_value()) {
             found.push_back(*landed);
         }
@@ -141,7 +142,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
             if (!isOpen(world, x + dx, y, z, doors) || !isOpen(world, x, y, z + dz, doors)) {
                 continue;
             }
-            const std::optional<Position> landed = step(world, x + dx, y, z + dz, doors, amphibious);
+            const std::optional<Position> landed = step(world, x + dx, y, z + dz, doors, waterNodes);
             if (landed.has_value()) {
                 found.push_back(*landed);
             }
@@ -297,7 +298,7 @@ std::optional<Route> findRoute(world::WorldState& world, std::int32_t fromX, std
         const float g = node.g;
         const float walked = node.walked;
         for (const Position& neighbour :
-             neighbours(world, at[0], at[1], at[2], options.openDoors, options.amphibious)) {
+             neighbours(world, at[0], at[1], at[2], options.openDoors, options.amphibious, options.floats)) {
             const std::int64_t next = pack(neighbour[0], neighbour[1], neighbour[2]);
             const float distance = distanceTo(at, neighbour);
             const float nextWalked = walked + distance;

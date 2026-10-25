@@ -417,6 +417,8 @@ public:
 
     /// Set by a plugin: whether the default ground navigation opens doors.
     std::optional<bool> navigationOpensDoors;
+    std::optional<bool> navigationPassesDoors;
+    std::optional<bool> navigationFloats;
 
     /// `Mob.isAggressive`, the arms-up flag that melee goals raise and a plugin may set.
     bool aggressive = false;
