@@ -21,13 +21,11 @@ public final class BukkitRuntime {
             int mapped = level >= Level.SEVERE.intValue() ? 3 : level >= Level.WARNING.intValue() ? 2
                 : level >= Level.INFO.intValue() ? 1 : 0;
             String name = record.getLoggerName() == null ? "Bukkit" : record.getLoggerName();
+            String tag = record.getThrown() == null ? org.basaltmc.bukkit.log.LogTags.ofCaller(name)
+                : org.basaltmc.bukkit.log.LogTags.ofThrowable(record.getThrown(),
+                    org.basaltmc.bukkit.log.LogTags.ofCaller(name));
             String message = new java.util.logging.SimpleFormatter().formatMessage(record);
-            Natives.log(mapped, name, message);
-            if (record.getThrown() != null) {
-                java.io.StringWriter trace = new java.io.StringWriter();
-                record.getThrown().printStackTrace(new java.io.PrintWriter(trace));
-                Natives.log(mapped, name, trace.toString());
-            }
+            org.basaltmc.bukkit.log.LogTags.write(mapped, tag, message, record.getThrown());
         }
 
         @Override
@@ -35,6 +33,43 @@ public final class BukkitRuntime {
 
         @Override
         public void close() {}
+    }
+
+    private static final class StandardStream extends java.io.OutputStream {
+        private final int level;
+        private final String name;
+        private final java.io.ByteArrayOutputStream line = new java.io.ByteArrayOutputStream();
+
+        StandardStream(int level, String name) {
+            this.level = level;
+            this.name = name;
+        }
+
+        @Override
+        public synchronized void write(int b) {
+            if (b == '\n') {
+                emit();
+            } else {
+                line.write(b);
+            }
+        }
+
+        @Override
+        public synchronized void write(byte[] bytes, int from, int length) {
+            for (int at = from; at < from + length; at++) {
+                write(bytes[at]);
+            }
+        }
+
+        @Override
+        public synchronized void flush() {}
+
+        private void emit() {
+            String text = line.toString(java.nio.charset.StandardCharsets.UTF_8);
+            line.reset();
+            Natives.log(level, org.basaltmc.bukkit.log.LogTags.ofCaller(name), text.endsWith("\r")
+                ? text.substring(0, text.length() - 1) : text);
+        }
     }
 
     private static void routeLogging() {
@@ -45,6 +80,11 @@ public final class BukkitRuntime {
         }
         root.addHandler(new LogBridge());
         root.setLevel(Level.INFO);
+        System.setOut(new java.io.PrintStream(new StandardStream(1, "STDOUT"), true, java.nio.charset.StandardCharsets.UTF_8));
+        System.setErr(new java.io.PrintStream(new StandardStream(2, "STDERR"), true, java.nio.charset.StandardCharsets.UTF_8));
+        Thread.setDefaultUncaughtExceptionHandler((thread, failure) -> org.basaltmc.bukkit.log.LogTags.write(3,
+            org.basaltmc.bukkit.log.LogTags.ofThrowable(failure, "STDERR"),
+            "Exception in thread \"" + thread.getName() + "\"", failure));
     }
 
     /** A file named dump-threads in the working directory makes the VM print every thread's stack and delete it. */

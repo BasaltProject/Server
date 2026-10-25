@@ -18,6 +18,8 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
         registerAsParallelCapable();
     }
 
+    private static final ConcurrentHashMap<String, String> classOwners = new ConcurrentHashMap<>();
+
     private final BasaltPluginManager manager;
     private final PluginDescriptionFile description;
     private final File dataFolder;
@@ -32,6 +34,11 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
         this.description = description;
         this.dataFolder = dataFolder;
         this.jar = jar;
+    }
+
+    public static String pluginOfClass(String className) {
+        int lambda = className.indexOf("$$Lambda");
+        return classOwners.get(lambda < 0 ? className : className.substring(0, lambda));
     }
 
     public void addLibraries(java.util.List<URL> libraries) {
@@ -74,6 +81,7 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
         }
         Class<?> found = super.findClass(name);
         classes.put(name, found);
+        classOwners.put(name, description.getName());
         return found;
     }
 

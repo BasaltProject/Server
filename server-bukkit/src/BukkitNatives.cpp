@@ -21,9 +21,7 @@ using plugins::PluginPlayerRef;
     return array;
 }
 
-void JNICALL nativeLog(JNIEnv* env, jclass, jint level, jstring name, jstring message) {
-    const wire::common::Logger logger{toStd(env, name)};
-    std::string text = toStd(env, message);
+void logLine(const wire::common::Logger& logger, jint level, const std::string& text) {
     switch (level) {
     case 0:
         logger.debug([&text] { return text; });
@@ -37,6 +35,27 @@ void JNICALL nativeLog(JNIEnv* env, jclass, jint level, jstring name, jstring me
     default:
         logger.error([&text] { return text; });
         break;
+    }
+}
+
+void JNICALL nativeLog(JNIEnv* env, jclass, jint level, jstring name, jstring message) {
+    const wire::common::Logger logger{toStd(env, name)};
+    const std::string text = toStd(env, message);
+    std::string_view rest = text;
+    while (!rest.empty() && (rest.back() == '\n' || rest.back() == '\r')) {
+        rest.remove_suffix(1);
+    }
+    while (true) {
+        const std::size_t cut = rest.find('\n');
+        std::string_view line = rest.substr(0, cut);
+        if (!line.empty() && line.back() == '\r') {
+            line.remove_suffix(1);
+        }
+        logLine(logger, level, std::string{line});
+        if (cut == std::string_view::npos) {
+            break;
+        }
+        rest.remove_prefix(cut + 1);
     }
 }
 
