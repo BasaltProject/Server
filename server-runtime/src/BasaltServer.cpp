@@ -363,9 +363,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     persistenceHooks.worldSaved = [this](const std::string& worldName) {
         server::plugins::PluginEventBus* bus = plugins_ == nullptr ? nullptr : &plugins_->events();
-        static_cast<void>(server::plugins::emit(
-            bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::worldSave(),
-            [&worldName](server::plugins::PluginEvent& event) { event.set(0, worldName); }));
+        static_cast<void>(
+            server::plugins::emit(bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::worldSave(),
+                                  [&worldName](server::plugins::PluginEvent& event) { event.set(0, worldName); }));
     };
     persistenceHooks.saveShared = [this] {
         if (maps_ != nullptr) {
@@ -1311,27 +1311,28 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     plugins::worldEventHooks::vehicles(vehicleHooks, eventSink_);
     vehicles_->setHooks(std::move(vehicleHooks));
     mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_, *pushes_);
-    mobTicks_->setMoveCheck([this](world::LoadedWorld& world, const entity::ServerEntity& mob,
-                                   const std::array<double, 5>& from) {
-        if (!eventSink_.listening(&server::plugins::pluginEventTypes::entityMove)) {
-            return true;
-        }
-        return eventSink_.allowed(&server::plugins::pluginEventTypes::entityMove, [&](server::plugins::PluginEvent& event) {
-            event.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
-            event.set("entity_type", mob.type().toString());
-            event.set("world", world.name());
-            event.set("from_x", from[0]);
-            event.set("from_y", from[1]);
-            event.set("from_z", from[2]);
-            event.set("x", mob.x);
-            event.set("y", mob.y);
-            event.set("z", mob.z);
-            event.set("from_yaw", from[3]);
-            event.set("from_pitch", from[4]);
-            event.set("yaw", static_cast<double>(mob.yaw));
-            event.set("pitch", static_cast<double>(mob.pitch));
+    mobTicks_->setMoveCheck(
+        [this](world::LoadedWorld& world, const entity::ServerEntity& mob, const std::array<double, 5>& from) {
+            if (!eventSink_.listening(&server::plugins::pluginEventTypes::entityMove)) {
+                return true;
+            }
+            return eventSink_.allowed(&server::plugins::pluginEventTypes::entityMove,
+                                      [&](server::plugins::PluginEvent& event) {
+                                          event.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
+                                          event.set("entity_type", mob.type().toString());
+                                          event.set("world", world.name());
+                                          event.set("from_x", from[0]);
+                                          event.set("from_y", from[1]);
+                                          event.set("from_z", from[2]);
+                                          event.set("x", mob.x);
+                                          event.set("y", mob.y);
+                                          event.set("z", mob.z);
+                                          event.set("from_yaw", from[3]);
+                                          event.set("from_pitch", from[4]);
+                                          event.set("yaw", static_cast<double>(mob.yaw));
+                                          event.set("pitch", static_cast<double>(mob.pitch));
+                                      });
         });
-    });
 
     // The online count comes from the registry, not a second counter that could advertise numbers that never come down.
     ServerListStatus::Hooks listHooks;
