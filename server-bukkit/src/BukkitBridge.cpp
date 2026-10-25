@@ -182,6 +182,7 @@ std::expected<void, std::string> BukkitBridge::boot() {
     }
     if (jclass envNatives = env->FindClass("org/basaltmc/bukkit/WorldEnvNatives"); envNatives != nullptr) {
         registerWorldEnvNatives(env, envNatives);
+        registerWorldEnvMoreNatives(env, envNatives);
     } else {
         env->ExceptionClear();
     }
