@@ -12,6 +12,10 @@ namespace chunkDataCodec {
 
 [[nodiscard]] std::vector<std::uint8_t> encodeSections(const Chunk& chunk);
 
+/// `replacements` holds, per section, the block states to send instead of the stored ones; empty keeps them.
+[[nodiscard]] std::vector<std::uint8_t> encodeSections(const Chunk& chunk,
+                                                       const std::vector<std::vector<std::int32_t>>& replacements);
+
 /// parity: `ClientboundChunksBiomesPacket.ChunkBiomeData.extractChunkData`.
 [[nodiscard]] std::vector<std::uint8_t> encodeBiomes(const Chunk& chunk);
 

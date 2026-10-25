@@ -15,6 +15,10 @@ namespace basalt::server::runtime {
 
 class ClientSession;
 
+namespace world {
+class AntiXray;
+}
+
 class ChunkStreamer {
 public:
     explicit ChunkStreamer(ClientSession& owner);
@@ -52,6 +56,8 @@ public:
     float sendBudget = 0.0F;
 
 private:
+    [[nodiscard]] bool bypassesAntiXray(const world::AntiXray& antiXray) const;
+
     /// parity: `ChunkMap.getPlayerViewDistance`'s floor.
     static constexpr std::int32_t kMinViewDistance = 2;
 
