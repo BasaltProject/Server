@@ -44,7 +44,7 @@ constexpr std::string_view kDeathGenericKill = "genericKill";
             continue;
         }
         if (target->connection().setGamemode) {
-            target->connection().setGamemode(mode);
+            target->connection().setGamemode(mode, "command");
         }
         changed++;
         const player::PlayerSession* runner = context.source().player();

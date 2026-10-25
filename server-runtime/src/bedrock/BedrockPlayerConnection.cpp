@@ -330,7 +330,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
                                      yaw, pitch, 0, protocol_);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MovePlayer), body.toVector());
     };
-    connection.setGamemode = [this](const wire::protocol::play::Gamemode mode) {
+    connection.setGamemode = [this](const wire::protocol::play::Gamemode mode, std::string_view) {
         if (session_ != nullptr) {
             session_->gamemode = mode;
         }

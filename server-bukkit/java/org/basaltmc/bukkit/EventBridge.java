@@ -204,7 +204,13 @@ final class EventBridge {
                 new Location(world, f.real("x"), f.real("y"), f.real("z")), PlayerEvents.teleportCause(f.text("cause")));
         });
         map("player.gamemode_change", PlayerGameModeChangeEvent.class, f -> new PlayerGameModeChangeEvent(
-            f.player(), gameMode(f.text("gamemode")), PlayerGameModeChangeEvent.Cause.UNKNOWN, null));
+            f.player(), gameMode(f.text("gamemode")), switch (f.text("cause")) {
+                case "command" -> PlayerGameModeChangeEvent.Cause.COMMAND;
+                case "plugin" -> PlayerGameModeChangeEvent.Cause.PLUGIN;
+                case "default" -> PlayerGameModeChangeEvent.Cause.DEFAULT_GAMEMODE;
+                case "hardcore_death" -> PlayerGameModeChangeEvent.Cause.HARDCORE_DEATH;
+                default -> PlayerGameModeChangeEvent.Cause.UNKNOWN;
+            }, null));
         map("player.sneak", PlayerToggleSneakEvent.class,
             f -> new PlayerToggleSneakEvent(f.player(), f.flag("sneaking")));
         map("player.sprint", PlayerToggleSprintEvent.class,

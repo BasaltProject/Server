@@ -114,7 +114,7 @@ player::PlayerConnection ClientSession::playerConnection() {
     };
     connection.sendWeather = [this](const world::WorldWeather& weather) { sendWeather(weather); };
     connection.disconnect = [this](const wire::text::Component& reason) { disconnect(reason); };
-    connection.setGamemode = [this](play::Gamemode mode) { setGamemode(mode); };
+    connection.setGamemode = [this](play::Gamemode mode, std::string_view cause) { setGamemode(mode, cause); };
     connection.sendInventoryAll = [this] { sendInventoryAll(); };
     connection.setHeldSlot = [this](const std::int32_t slot) {
         sendCompressed(play::SetHeldSlotPacket::kId,

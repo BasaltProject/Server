@@ -499,7 +499,7 @@ std::optional<Value> tail(Context& context, const Verb verb, const std::string_v
         }
         player::playerPersistence::restore(session, *stored);
         if (connection.setGamemode) {
-            connection.setGamemode(session.gamemode);
+            connection.setGamemode(session.gamemode, "unknown");
         }
         if (connection.teleportTo) {
             connection.teleportTo(session.x, session.y, session.z, session.yaw, session.pitch);

@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
@@ -14,6 +15,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::command::commands {
@@ -35,10 +37,30 @@ constexpr float kInstantAmount = 6.0F;
 struct Targets {
     std::vector<player::PlayerSession*> players;
     std::vector<entity::ServerEntity*> mobs;
+    std::vector<std::string> mobWorlds;
     std::string firstName;
 
     [[nodiscard]] std::size_t size() const { return players.size() + mobs.size(); }
 };
+
+/// parity: `LivingEntity.addEffect` and `removeEffect` raise `EntityPotionEffectEvent` for a command as well.
+[[nodiscard]] bool mobEffectAllowed(const CommandContext& context, const entity::ServerEntity& mob,
+                                    const std::string& world, const world::ActiveEffect& effect,
+                                    std::string_view action) {
+    const server::plugins::PluginEvent* answered = server::plugins::emit(
+        context.environment().pluginEvents(), &server::plugins::pluginEventTypes::entityPotionEffect(),
+        [&](server::plugins::PluginEvent& event) {
+            event.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
+            event.set("entity_type", mob.type().toString());
+            event.set("world", world);
+            event.set("effect", effect.effect.toString());
+            event.set("amplifier", static_cast<std::int64_t>(effect.amplifier));
+            event.set("duration", static_cast<std::int64_t>(effect.remainingTicks));
+            event.set("action", std::string{action});
+            event.set("cause", std::string{"command"});
+        });
+    return answered == nullptr || !answered->cancelled();
+}
 
 [[nodiscard]] std::expected<Targets, CommandSyntaxError> targetsOf(const CommandContext& context) {
     Targets targets;
@@ -52,6 +74,7 @@ struct Targets {
         } else if (entity::ServerEntity* mob = target.entity();
                    mob != nullptr && server::registry::entityAttributes::isLiving(mob->type())) {
             targets.mobs.push_back(mob);
+            targets.mobWorlds.push_back(target.worldName());
         } else {
             continue;
         }
@@ -81,7 +104,13 @@ struct Targets {
     if (!targets.has_value()) {
         return std::unexpected{targets.error()};
     }
-    for (entity::ServerEntity* mob : targets->mobs) {
+    for (std::size_t at = 0; at < targets->mobs.size(); ++at) {
+        entity::ServerEntity* mob = targets->mobs[at];
+        const world::ActiveEffect asked{.effect = *effect, .amplifier = amplifier, .remainingTicks = durationTicks};
+        if (!mobEffectAllowed(context, *mob, targets->mobWorlds[at], asked,
+                              mob->effects.contains(*effect) ? "changed" : "added")) {
+            continue;
+        }
         const entity::mobStatusEffects::Instant instant = entity::mobStatusEffects::instantOf(*mob, *effect, amplifier);
         if (instant.heal > 0.0F) {
             mob->health = std::min(mob->attributeWithModifiers("minecraft:max_health"),
@@ -135,11 +164,15 @@ struct Targets {
 [[nodiscard]] Parsed<std::int32_t> clear(const CommandContext& context, const Targets& targets,
                                          const Identifier* effect) {
     std::int32_t cleared = 0;
-    for (entity::ServerEntity* mob : targets.mobs) {
+    for (std::size_t at = 0; at < targets.mobs.size(); ++at) {
+        entity::ServerEntity* mob = targets.mobs[at];
         if (effect == nullptr) {
             cleared += static_cast<std::int32_t>(mob->effects.size());
             entity::mobStatusEffects::clear(*mob);
-        } else if (entity::mobStatusEffects::remove(*mob, *effect)) {
+        } else if (mob->effects.contains(*effect) &&
+                   mobEffectAllowed(context, *mob, targets.mobWorlds[at], world::ActiveEffect{.effect = *effect},
+                                    "removed") &&
+                   entity::mobStatusEffects::remove(*mob, *effect)) {
             cleared++;
         }
     }

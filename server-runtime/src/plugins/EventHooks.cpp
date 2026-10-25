@@ -375,11 +375,12 @@ PlayerLifecycle::Hooks lifecycle(ClientSession& owner, const EventSink& sink) {
         return *farewell;
     };
     hooks.gamemodeAllowed = [&sink](const player::PlayerSession& who, wire::protocol::play::Gamemode mode,
-                                    wire::protocol::play::Gamemode previous) {
+                                    wire::protocol::play::Gamemode previous, std::string_view cause) {
         return sink.allowed(&playerGamemodeChange, [&](PluginEvent& event) {
             EventSink::player(event, who);
             event.set("gamemode", std::string{gamemodeName(mode)});
             event.set("from_gamemode", std::string{gamemodeName(previous)});
+            event.set("cause", std::string{cause});
         });
     };
     hooks.worldChanged = [&sink](const player::PlayerSession& who, const world::LoadedWorld&,

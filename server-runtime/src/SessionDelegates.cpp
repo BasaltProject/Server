@@ -161,7 +161,7 @@ void ClientSession::heal(float amount, std::string_view cause) { combat_->heal(a
 
 void ClientSession::killPlayer(std::string_view deathMessageId) { combat_->killPlayer(deathMessageId); }
 
-void ClientSession::setGamemode(play::Gamemode mode) { lifecycle_->setGamemode(mode); }
+void ClientSession::setGamemode(play::Gamemode mode, std::string_view cause) { lifecycle_->setGamemode(mode, cause); }
 
 bool ClientSession::switchWorld(world::LoadedWorld& target, double x, double y, double z) {
     return lifecycle_->switchWorld(target, x, y, z);

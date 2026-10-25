@@ -306,7 +306,7 @@ void PlayerLifecycle::respawn() {
     if (respawnWorld != owner_->currentWorld() && session->connection().switchWorld) {
         static_cast<void>(session->connection().switchWorld(*respawnWorld, spawnX, spawnY, spawnZ));
         if (hardcore) {
-            owner_->setGamemode(wire::protocol::play::Gamemode::Spectator);
+            owner_->setGamemode(wire::protocol::play::Gamemode::Spectator, "hardcore_death");
         }
         return;
     }
@@ -328,7 +328,7 @@ void PlayerLifecycle::respawn() {
             });
     }
     if (hardcore) {
-        owner_->setGamemode(wire::protocol::play::Gamemode::Spectator);
+        owner_->setGamemode(wire::protocol::play::Gamemode::Spectator, "hardcore_death");
     }
 }
 
@@ -370,12 +370,12 @@ void PlayerLifecycle::refreshProfile() {
     owner_->sendInventoryAll();
 }
 
-void PlayerLifecycle::setGamemode(Gamemode mode) {
+void PlayerLifecycle::setGamemode(Gamemode mode, std::string_view cause) {
     PlayerSession* session = owner_->playerSession();
     if (session == nullptr) {
         return;
     }
-    if (hooks_.gamemodeAllowed && !hooks_.gamemodeAllowed(*session, mode, session->gamemode)) {
+    if (hooks_.gamemodeAllowed && !hooks_.gamemodeAllowed(*session, mode, session->gamemode, cause)) {
         return;
     }
     session->extras.previousGamemode = static_cast<std::int32_t>(session->gamemode);
