@@ -199,6 +199,11 @@ void readLoop(const std::function<CommandDispatcher*()>& current, bool editing, 
                 }
                 return;
             }
+            if (asked != nullptr) {
+                if (const auto* edited = std::get_if<std::string>(&asked->get("command")); edited != nullptr) {
+                    line = *edited;
+                }
+            }
             static_cast<void>(dispatcher->execute(*source, line));
         };
         if (defaultWorld == nullptr) {
