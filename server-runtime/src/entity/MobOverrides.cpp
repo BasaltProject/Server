@@ -11,8 +11,8 @@ namespace basalt::server::runtime::entity::mobOverrides {
 namespace {
 
 void setBase(ServerEntity& entity, std::string_view id, const std::optional<double>& value) {
-    if (value.has_value() && !entity.attributeValues.contains(id)) {
-        entity.attributeValues.emplace(std::string{id}, *value);
+    if (value.has_value()) {
+        entity.attributeValues.insert_or_assign(std::string{id}, *value);
     }
 }
 

@@ -123,7 +123,7 @@ check-interval-ticks = 1200
 
 # Per entity type tweaks. Each [overrides.<entity_type>] table lists only the fields to change; a field left out
 # is vanilla's value for that type. <entity_type> is a type name such as zombie (minecraft: is implied).
-# Attribute fields are applied to a mob when it is created, so mobs already saved with their own values keep them.
+# Attribute fields replace the base value each time a mob enters the world, spawned or loaded.
 #
 # Attributes (numbers):
 #   max-health, attack-damage, movement-speed, follow-range, armor, armor-toughness, knockback-resistance,
