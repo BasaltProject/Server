@@ -437,6 +437,9 @@ player::PlayerConnection ClientSession::playerConnection() {
 }
 
 void ClientSession::enterPlay() {
+    if (!switchingToConfiguration_.load() && options_.gate != nullptr) {
+        options_.gate->awaitJoinSlot(options_.tuning.maxJoinsPerTick);
+    }
     state_ = wire::protocol::ProtocolState::Play;
     if (switchingToConfiguration_.exchange(false)) {
         entityTracker_->forgetEverythingDrawn();

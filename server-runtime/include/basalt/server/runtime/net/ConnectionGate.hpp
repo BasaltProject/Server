@@ -38,10 +38,15 @@ public:
     [[nodiscard]] bool throttleLogin(const std::string& address, std::int32_t throttleMs,
                                      std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
 
+    /// Lets `perTick` callers through each 50 ms window and holds the rest until the next one.
+    void awaitJoinSlot(std::int32_t perTick);
+
 private:
     void release(const std::string& address);
 
     std::mutex mutex_;
+    std::chrono::steady_clock::time_point joinWindow_{};
+    std::int32_t joinsInWindow_ = 0;
     std::map<std::string, std::int32_t, std::less<>> open_;
     std::map<std::string, std::chrono::steady_clock::time_point, std::less<>> lastLogin_;
 };

@@ -26,6 +26,11 @@ struct ServerTuning {
     std::int32_t maxWorldSize = 29999984;
 
     std::int32_t compressionThreshold = 256;
+    std::int32_t compressionLevel = -1;
+    std::int32_t maxJoinsPerTick = 0;
+    std::int32_t opPermissionLevel = 4;
+    bool broadcastConsoleToOps = true;
+    bool broadcastRconToOps = true;
     bool statusReplies = true;
     bool proxyProtocol = false;
     bool tcpNoDelay = true;
