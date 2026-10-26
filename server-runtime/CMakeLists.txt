@@ -31,6 +31,7 @@ basalt_module(server-runtime-core
         src/bukkit/BukkitRuntimeFiles.cpp
         src/bukkit/JavaPluginScan.cpp
         src/config/ConfigDirectory.cpp
+        src/config/ConfigUpgrade.cpp
         src/config/ForwardingConfig.cpp
         src/config/RemoteConfig.cpp
         src/remote/BasaltServerRemote.cpp
