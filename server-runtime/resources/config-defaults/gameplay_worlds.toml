@@ -21,7 +21,7 @@ piston-block-push-limit = 12
 powered-rail-activation-range = 8
 # NOT VANILLA when true. A sneaking player standing on magma is hurt too.
 magma-block-damage-when-sneaking = false
-# Sleeping in a bed outside the overworld explodes it (vanilla true).
+# Sleeping in a bed outside the overworld explodes it (vanilla true). False makes the use do nothing.
 bed-explode = true
 # Power of that explosion (vanilla 5.0).
 bed-explosion-power = 5.0
@@ -32,27 +32,27 @@ campfire-lit-when-placed = true
 
 [defaults.gameplay.mechanics]
 # Rules of the world that are not one block or item.
-# Ticks between drowning hits once the air is gone (vanilla 20).
+# Ticks between player drowning hits once the air is gone (vanilla 20).
 drowning-ticks-per-damage = 20
-# Health lost by one drowning hit, 2.0 being one heart (vanilla 2.0).
+# Health lost by one player drowning hit, 2.0 being one heart (vanilla 2.0).
 drowning-damage = 2.0
-# Health restored by one regeneration pulse (vanilla 1.0).
+# Health restored by one regeneration pulse on a player (vanilla 1.0).
 health-regen-amount = 1.0
-# Health lost by one poison pulse (vanilla 1.0).
+# Health lost by one poison pulse on a player (vanilla 1.0).
 poison-degeneration-amount = 1.0
-# Health lost by one wither pulse (vanilla 1.0).
+# Health lost by one wither pulse on a player (vanilla 1.0).
 wither-degeneration-amount = 1.0
 # Exhaustion added per tick by the hunger effect, per level (vanilla 0.005).
 hunger-exhaustion-amount = 0.005
 
 [defaults.gameplay.player]
 # Player rules.
-# Damage multiplier of a critical hit (vanilla 1.5).
+# Damage multiplier of a player critical hit (vanilla 1.5).
 critical-damage-multiplier = 1.5
 # NOT VANILLA when true. A totem anywhere in the inventory saves from death, not only in a hand.
 totem-of-undying-works-in-inventory = false
 
 [defaults.gameplay.items]
-# Item rules.
+# Item and projectile rules.
 # Fall damage dealt to the thrower when a pearl lands (vanilla 5.0).
 ender-pearl-damage = 5.0

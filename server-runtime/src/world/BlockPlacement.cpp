@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>

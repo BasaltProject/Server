@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockSlots.hpp>

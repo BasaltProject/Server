@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
 #include <basalt/wire/io/FileIO.hpp>
@@ -63,7 +64,9 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
         std::max(whole("loot-refill-max-seconds", inherited.lootRefillMaxSeconds, 0), settings.lootRefillMinSeconds);
     settings.lootMaxRefills = whole("loot-max-refills", inherited.lootMaxRefills, -1);
     settings.lootRelootSeconds = whole("loot-reloot-seconds", inherited.lootRelootSeconds, -1);
-    settings.gameplay = GameplayRules::from(table->table("gameplay"), inherited.gameplay);
+    const GameplayRules inheritedRules = inherited.gameplay != nullptr ? *inherited.gameplay : GameplayRules{};
+    settings.gameplay =
+        std::make_shared<const GameplayRules>(GameplayRules::from(table->table("gameplay"), inheritedRules));
     return settings;
 }
 

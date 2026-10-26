@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Armadillos.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>

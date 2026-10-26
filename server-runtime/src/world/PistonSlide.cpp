@@ -2,6 +2,7 @@
 
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
