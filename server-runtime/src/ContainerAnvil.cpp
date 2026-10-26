@@ -2,11 +2,15 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/player/PlayerAnvil.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
+#include <basalt/server/runtime/world/ColourCodes.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/wire/text/ComponentNbt.hpp>
+#include <basalt/wire/text/MiniMessage.hpp>
 
 #include <algorithm>
 #include <array>
@@ -76,6 +80,20 @@ void ContainerMenuController::recomputeAnvilResult() {
                                          .enchantmentTags = owner_->options().enchantmentTags}),
         owner_->currentWorld() == nullptr || owner_->currentWorld()->state().gameplay().blocks.anvilCumulativeCost);
     anvilSlots_[Menu::kAnvilResult] = made.output;
+    if (const world::LoadedWorld* here = owner_->currentWorld();
+        here != nullptr && here->state().gameplay().blocks.anvilAllowColors && made.output.has_value()) {
+        // Purpur's coloured renames: the typed name becomes styled text when it carries codes or MiniMessage.
+        const wire::nbt::NbtTag* typed = made.output->components.find(item::itemComponents::kCustomName);
+        const std::string* text = typed == nullptr ? nullptr : typed->get<std::string>();
+        const bool mini = here->state().gameplay().blocks.anvilUseMiniMessage;
+        if (text != nullptr && (mini || world::colourCodes::hasCodes(*text))) {
+            storage::StoredItemStack styled = *made.output;
+            styled.components.set(item::itemComponents::kCustomName,
+                                  wire::text::componentNbt::serialize(mini ? wire::text::miniMessage::parse(*text)
+                                                                           : world::colourCodes::ofAmpersands(*text)));
+            anvilSlots_[Menu::kAnvilResult] = std::move(styled);
+        }
+    }
     anvilCost_ = made.cost;
     anvilMaterials_ = made.materialCount;
     anvilOnlyRenaming_ = made.onlyRenaming;

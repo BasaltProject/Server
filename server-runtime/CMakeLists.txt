@@ -36,7 +36,7 @@ basalt_module(server-runtime-core
         src/remote/BasaltServerRemote.cpp
         src/remote/RemoteHostImpl.cpp
         src/config/MobsConfig.cpp
-        src/config/GameplayRules.cpp
+        src/config/PurpurRules.cpp
         src/config/GroupsConfig.cpp
         src/config/LimitsConfig.cpp
         src/config/LiveConfigs.cpp
@@ -561,6 +561,8 @@ basalt_module(server-runtime-core
         src/world/Signs.cpp
         src/world/BiomeZoomSeed.cpp
         src/world/Beds.cpp
+        src/world/TurtleEggs.cpp
+        src/world/ColourCodes.cpp
         src/world/ClimbingPlantGrowth.cpp
         src/world/Fluids.cpp
         src/world/MobEffects.cpp

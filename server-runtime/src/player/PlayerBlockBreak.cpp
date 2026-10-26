@@ -5,6 +5,7 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
@@ -16,6 +17,7 @@
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/BlockExperience.hpp>
+#include <basalt/server/runtime/world/BlockPickData.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -223,6 +225,31 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
     if (context.blockDrops) {
         context.blockDrops(breaker, world.name(), x, y, z, stateId, generated);
     }
+    // Purpur's hoe replanting: a ripe crop broken with a hoe goes back in at age zero for one of its own seeds.
+    if (tool != nullptr && tool->id.ends_with("_hoe")) {
+        const config::PurpurRules::Blocks& rules = world.state().gameplay().blocks;
+        const std::string_view crop = block.path();
+        const bool nether = crop == "nether_wart";
+        const bool field = crop == "wheat" || crop == "carrots" || crop == "potatoes" || crop == "beetroots";
+        const reg::blockStateDefinitions::Definition* definition = reg::blockStateDefinitions::of(block);
+        const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(stateId);
+        const auto age = properties.find("age");
+        if (((nether && rules.hoeReplantNetherWarts) || (field && rules.hoeReplantCrops)) && definition != nullptr &&
+            age != properties.end() &&
+            std::stoi(age->second) == static_cast<std::int32_t>(definition->valuesOf("age").size()) - 1) {
+            const auto seed = std::ranges::find_if(generated, [&block](const server::world::loot::ItemStack& stack) {
+                return stack.count > 0 && (stack.item == block || stack.item.path().ends_with("_seeds") ||
+                                           (stack.item.path() == "carrot" && block.path() == "carrots") ||
+                                           (stack.item.path() == "potato" && block.path() == "potatoes"));
+            });
+            const std::optional<std::int32_t> young =
+                reg::blockStateDefinitions::stateIdOf(block, {{"age", "0"}}, stateId);
+            if (seed != generated.end() && young.has_value() && world.state().setBlockState(x, y, z, *young)) {
+                --seed->count;
+                announceBlock(context, world.name(), x, y, z, *young);
+            }
+        }
+    }
     for (const server::world::loot::ItemStack& stack : generated) {
         wire::nbt::NbtCompound components = stack.components;
         if (carried != nullptr && stack.item == block) {
@@ -340,6 +367,47 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         stopDigging(context);
         return false;
     }
+    // Purpur's sneaking slab break: a double slab gives up only the half the player is looking at.
+    if (session->sneaking && broken.has_value() && brokenBlock != nullptr && brokenBlock->path().ends_with("_slab") &&
+        world.state().gameplay().blocks.slabBreakIndividualSlabsWhenSneaking) {
+        const std::map<std::string, std::string> slab = reg::blockStateDefinitions::propertiesOf(*broken);
+        const auto type = slab.find("type");
+        if (type != slab.end() && type->second == "double") {
+            constexpr double kRadians = 3.14159265358979323846 / 180.0;
+            const double yaw = static_cast<double>(session->yaw) * kRadians;
+            const double pitch = static_cast<double>(session->pitch) * kRadians;
+            const std::array<double, 3> from{session->x, session->y + world::fluids::eyeHeight(true), session->z};
+            const std::array<double, 3> way{-std::sin(yaw) * std::cos(pitch), -std::sin(pitch),
+                                            std::cos(yaw) * std::cos(pitch)};
+            double near = 0.0;
+            double far = 16.0;
+            const std::array<std::int32_t, 3> cell{x, y, z};
+            for (std::size_t axis = 0; axis < 3; ++axis) {
+                if (std::abs(way[axis]) < 1.0E-9) {
+                    continue;
+                }
+                const double first = (cell[axis] - from[axis]) / way[axis];
+                const double second = (cell[axis] + 1 - from[axis]) / way[axis];
+                near = std::max(near, std::min(first, second));
+                far = std::min(far, std::max(first, second));
+            }
+            if (near <= far) {
+                const double hitY = from[1] + (way[1] * near);
+                const bool upper = hitY - static_cast<double>(y) > 0.5;
+                if (const std::optional<std::int32_t> left = reg::blockStateDefinitions::stateIdOf(
+                        *brokenBlock, {{"type", upper ? "bottom" : "top"}}, *broken);
+                    left.has_value() && world.state().setBlockState(x, y, z, *left)) {
+                    announceBlock(context, world.name(), x, y, z, *left);
+                    if (session->gamemode != Gamemode::Creative) {
+                        spawnDroppedItem(context, world, *brokenBlock, 1, x + 0.5, y + 0.5, z + 0.5, 0.0, 0.2, 0.0,
+                                         kCreativeHivePickupDelay, wire::nbt::NbtCompound{});
+                    }
+                    stopDigging(context);
+                    return true;
+                }
+            }
+        }
+    }
     // parity: `ShulkerBoxBlock.getDrops`.
     std::optional<wire::nbt::NbtCompound> carried;
     if (brokenBlock != nullptr && world::shulkers::isShulkerBox(brokenBlock->path())) {
@@ -365,6 +433,17 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             context.awardExperience && world.gameRules().get(world::gameRules::kBlockDrops)) {
             random::RandomSource random = random::RandomSource::legacy(seedFrom(context));
             context.awardExperience(world, x + 0.5, y + 0.5, z + 0.5, random.nextIntBetweenInclusive(20, 24));
+        }
+    }
+    // Purpur's silk touch spawners need the block entity as it was before the break.
+    std::optional<server::world::ChunkBlockEntity> spawner;
+    if (brokenBlock != nullptr && brokenBlock->path() == "spawner" &&
+        world.state().gameplay().blocks.silkTouchSpawnerEnabled) {
+        server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* entity =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        if (entity != nullptr) {
+            spawner = *entity;
         }
     }
     // parity: `BeehiveBlock.playerDestroy` is handed the block entity as it was before the break.
@@ -478,6 +557,19 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             }
             // parity: `spawnAfterBreak(..., true)` after the drops.
             const bool silkTouch = held.has_value() && enchantmentLevel(*held, Identifier::vanilla("silk_touch")) > 0;
+            if (spawner.has_value() && held.has_value() && dropItems &&
+                world.gameRules().get(world::gameRules::kBlockDrops) &&
+                enchantmentLevel(*held, Identifier::vanilla("silk_touch")) >=
+                    world.state().gameplay().blocks.silkTouchMinimalLevel &&
+                std::ranges::any_of(std::array{"iron", "golden", "diamond", "netherite"},
+                                    [&held](std::string_view tier) {
+                                        return held->id == "minecraft:" + std::string{tier} + "_pickaxe";
+                                    })) {
+                wire::nbt::NbtCompound components;
+                world::blockPickData::addBlockData(*spawner, components);
+                spawnDroppedItem(context, world, *brokenBlock, 1, x + 0.5, y + 0.5, z + 0.5, 0.0, 0.2, 0.0,
+                                 kCreativeHivePickupDelay, std::move(components));
+            }
             random::RandomSource random = random::RandomSource::legacy(seedFrom(context));
             const std::int32_t points = world::blockExperience::onBreak(*brokenBlock, silkTouch, random);
             if (points > 0 && context.awardExperience && world.gameRules().get(world::gameRules::kBlockDrops)) {

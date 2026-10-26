@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -77,7 +78,10 @@ bool CombatSystem::tridentReturns(world::LoadedWorld& world, const std::vector<P
         trident.tridentDealtDamage = true;
     }
     const std::int32_t loyalty = tridentLoyalty(trident);
-    if (loyalty <= 0 || (!trident.tridentDealtDamage && !trident.noPhysics) || !trident.ownerId.has_value()) {
+    const float voidReturn = world.state().gameplay().items.tridentLoyaltyVoidReturnHeight;
+    const bool fellOut = voidReturn < 0.0F && trident.y < static_cast<double>(voidReturn);
+    if (loyalty <= 0 || (!trident.tridentDealtDamage && !trident.noPhysics && !fellOut) ||
+        !trident.ownerId.has_value()) {
         return false;
     }
     const PlayerSession* player = nullptr;

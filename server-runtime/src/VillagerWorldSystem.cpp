@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/VillagerWorldSystem.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
@@ -15,6 +16,7 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
@@ -89,10 +91,10 @@ VillagerWorldSystem::VillagerWorldSystem(player::PlayerRegistry& players, BlockC
                                          NaturalSpawningSystem& spawning, RaidSystem& raids,
                                          world::RealLootTables& lootTables, world::RealVillagerTrades* trades,
                                          std::function<std::int64_t()> nextSeed, AddEffect addEffect,
-                                         LaunchFirework launchFirework)
+                                         LaunchFirework launchFirework, Explode explode)
     : players_(&players), broadcaster_(&broadcaster), spawning_(&spawning), raids_(&raids), lootTables_(&lootTables),
       trades_(trades), nextSeed_(std::move(nextSeed)), addEffect_(std::move(addEffect)),
-      launchFirework_(std::move(launchFirework)) {}
+      launchFirework_(std::move(launchFirework)), explode_(std::move(explode)) {}
 
 std::vector<PlayerSession*> VillagerWorldSystem::watchers() const {
     std::vector<PlayerSession*> found;
@@ -376,6 +378,16 @@ void VillagerWorldSystem::throwGift(ServerEntity& mob, std::string_view lootTabl
 
 void VillagerWorldSystem::setSleeping(ServerEntity& mob, std::optional<BlockPos> bed) {
     if (world_ == nullptr) {
+        return;
+    }
+    // Purpur's villager bed blast: a bed that explodes for a player outside the overworld does so under a villager.
+    if (bed.has_value() && explode_ && world_->declaration().dimension != config::WorldDimension::Overworld &&
+        world_->state().gameplay().blocks.bedExplodeOnVillagerSleep) {
+        for (const world::BlockChange& change : world::beds::destroy(world_->state(), bed->x, bed->y, bed->z)) {
+            announce(change.x, change.y, change.z, change.stateId, true);
+        }
+        const config::PurpurRules::Blocks& rules = world_->state().gameplay().blocks;
+        explode_(*world_, bed->x + 0.5, bed->y + 0.5, bed->z + 0.5, rules.bedExplosionPower, rules.bedExplosionFire);
         return;
     }
     const auto setOccupied = [this](const BlockPos& pos, bool occupied) {

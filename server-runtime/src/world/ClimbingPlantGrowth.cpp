@@ -2,7 +2,7 @@
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Items.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/world/ClimbingPlantGrowth.hpp>
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 
@@ -60,7 +60,7 @@ void growingPlant(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
         return;
     }
     const std::optional<std::int32_t> age = ageOf(stateId);
-    const config::GameplayRules::Blocks& rules = world.gameplay().blocks;
+    const config::PurpurRules::Blocks& rules = world.gameplay().blocks;
     const std::string_view plant = block->path();
     const std::int32_t limit = std::min(kMaxAge, plant == "kelp"             ? rules.kelpMaxGrowthAge
                                                  : plant == "cave_vines"     ? rules.caveVinesMaxGrowthAge

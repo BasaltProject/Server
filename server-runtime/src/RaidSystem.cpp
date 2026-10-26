@@ -1,6 +1,6 @@
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>

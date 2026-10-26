@@ -140,6 +140,9 @@ MobActionSystem::MobActionSystem(player::PlayerRegistry& players, BlockChangeBro
               if (hooks_.launchFirework) {
                   hooks_.launchFirework(world, std::move(item), x, y, z, ownerId);
               }
+          },
+          [this](world::LoadedWorld& world, double x, double y, double z, float power, bool fire) {
+              explosions_->blowUp(world, watchersOf(world), x, y, z, power, "bed", 0, {}, {}, fire);
           })) {}
 
 entity::villager::VillagerWorld& MobActionSystem::villagersIn(world::LoadedWorld& world) {

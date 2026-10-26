@@ -15,7 +15,7 @@
 #include <basalt/server/runtime/bedrock/BedrockSeen.hpp>
 #include <basalt/server/runtime/bedrock/BedrockShield.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -1407,7 +1407,7 @@ void BasaltServer::startBedrockListener() {
                     return;
                 }
                 if (player::throwItemFor(breakContext(), *session, *found->second, *item, slot)) {
-                    const config::GameplayRules::Items& rules = found->second->state().gameplay().items;
+                    const config::PurpurRules::Items& rules = found->second->state().gameplay().items;
                     if (item->path() == "ender_pearl") {
                         player::startCooldownFor(*session, *item, found->second->gameTime(),
                                                  session->gamemode == wire::protocol::play::Gamemode::Creative
@@ -1641,7 +1641,7 @@ void BasaltServer::startBedrockListener() {
                                         watchers.push_back(other);
                                     }
                                 }
-                                const config::GameplayRules::Blocks& blocks = where.state().gameplay().blocks;
+                                const config::PurpurRules::Blocks& blocks = where.state().gameplay().blocks;
                                 explosions_->blowUp(where, watchers, bx, by, bz, blocks.bedExplosionPower, "bed",
                                                     byEntityId, {}, {}, blocks.bedExplosionFire);
                             };

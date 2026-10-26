@@ -6,7 +6,7 @@
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/MobSteps.hpp>
@@ -21,6 +21,7 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/TurtleEggs.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -114,7 +115,9 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
     }
     // parity: `FarmlandBlock.fallOn`, for any living body heavy enough to break the soil.
     if (const wire::common::Identifier* soil = server::registry::blockStateDefinitions::blockOf(onState);
-        soil != nullptr && soil->path() == "farmland" && world.gameRules().get(world::gameRules::kMobGriefing) &&
+        soil != nullptr && soil->path() == "farmland" &&
+        config::PurpurRules::resolve(world.state().gameplay().blocks.farmlandMobGriefingOverride,
+                                     world.gameRules().get(world::gameRules::kMobGriefing)) &&
         server::registry::entityAttributes::isLiving(mob.type())) {
         random::RandomSource random = freshRandom();
         const world::farmlandTrample::Faller faller{.fallDistance = fallen,
@@ -126,6 +129,20 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
                 broadcaster_->announceBlock(watchersOf(world),
                                             world::BlockChange{.x = at[0], .y = at[1], .z = at[2], .stateId = dirt});
             }
+        }
+    }
+    // parity: `TurtleEggBlock.fallOn`, one in three, for any living mob but a turtle, a bat or a zombie.
+    if (const wire::common::Identifier* nest = server::registry::blockStateDefinitions::blockOf(onState);
+        nest != nullptr && nest->path() == "turtle_egg" && mob.type().path() != "turtle" &&
+        mob.type().path() != "bat" && mob.type().path() != "zombie" &&
+        server::registry::entityAttributes::isLiving(mob.type()) &&
+        config::PurpurRules::resolve(world.state().gameplay().blocks.turtleEggMobGriefingOverride,
+                                     world.gameRules().get(world::gameRules::kMobGriefing))) {
+        random::RandomSource random = freshRandom();
+        if (const std::optional<world::BlockChange> cracked =
+                world::turtleEggs::trample(world.state(), at[0], at[1], at[2], 3, random);
+            cracked.has_value()) {
+            broadcaster_->announceBlock(watchersOf(world), *cracked);
         }
     }
     // parity: `Block.fallOn` then `causeFallDamage`, which the fall-immune skip whole.

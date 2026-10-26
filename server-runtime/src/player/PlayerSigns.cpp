@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -53,8 +54,10 @@ bool writeSignFor(const BreakContext& context, world::LoadedWorld& world, Player
     if (allowed && !allowed(session, x, y, z, lines)) {
         return false;
     }
-    const wire::nbt::NbtCompound data =
-        world::signs::withText(existing == nullptr ? world::signs::emptyData() : existing->data(), front, lines);
+    const wire::nbt::NbtCompound base = existing == nullptr ? world::signs::emptyData() : existing->data();
+    const wire::nbt::NbtCompound data = world.state().gameplay().blocks.signAllowColors
+                                            ? world::signs::withColouredText(base, front, lines)
+                                            : world::signs::withText(base, front, lines);
     chunk->setBlockEntity(world::signs::blockEntity(x & 15, y, z & 15, *type, data));
     const std::optional<std::int32_t> typeId = reg::blockEntityTypes::idOf(*type);
     if (!typeId.has_value()) {

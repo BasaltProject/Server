@@ -16,7 +16,7 @@
 
 namespace basalt::server::runtime::config {
 
-struct GameplayRules;
+struct PurpurRules;
 
 struct WorldSettings {
     std::string difficulty = "easy";
@@ -35,7 +35,7 @@ struct WorldSettings {
 
     MobSettings mobs;
     WorldRules rules;
-    std::shared_ptr<const GameplayRules> gameplay;
+    std::shared_ptr<const PurpurRules> gameplay;
 
     [[nodiscard]] static WorldSettings vanilla() { return WorldSettings{}; }
 

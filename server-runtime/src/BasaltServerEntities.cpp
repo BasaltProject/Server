@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/BlockTests.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/Creakings.hpp>
@@ -44,6 +45,7 @@
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
@@ -122,6 +124,32 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         const registry::EntityTypeEntry* entry = registry::entityTypes::of(type);
         return entry == nullptr ? std::nullopt : std::optional{entry->protocolId};
     };
+    // parity: `ItemEntity.onDestroyed`, a shulker box that is lost spills what it held.
+    random::RandomSource spillRandom = random::RandomSource::legacy(scratchSeed());
+    for (const world::DroppedItem& gone : world.state().takeDestroyedItems()) {
+        const wire::nbt::NbtCompound* held = gone.components.getCompound(std::string{world::shulkers::kContainer});
+        if (held == nullptr || !world.state().gameplay().items.shulkerBoxDropContentsWhenDestroyed) {
+            continue;
+        }
+        for (const std::optional<server::world::loot::ItemStack>& slot :
+             world::blockInventory::read(*held, world::shulkers::kSize)) {
+            if (!slot.has_value()) {
+                continue;
+            }
+            world::DroppedItem spilled{.entityId = playerRegistry_.allocateEntityId(),
+                                       .uuid = wire::common::Uuid::random(),
+                                       .item = slot->item,
+                                       .count = slot->count,
+                                       .x = gone.x,
+                                       .y = gone.y,
+                                       .z = gone.z,
+                                       .velocityX = (spillRandom.nextDouble() - 0.5) * 0.2,
+                                       .velocityY = 0.2,
+                                       .velocityZ = (spillRandom.nextDouble() - 0.5) * 0.2};
+            spilled.components = slot->components;
+            static_cast<void>(world.state().spawnItem(std::move(spilled)));
+        }
+    }
     // Entity ids are handed out by the tick loop, while chunks load on a generation thread.
     for (const wire::nbt::NbtCompound& tag : world.state().takePendingEntities()) {
         // An item on the floor is its own thing here, not a `ServerEntity`, so it comes back its own way.
@@ -383,6 +411,19 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         // parity: `EndCrystal.tick`.
         if (world::endCrystals::isCrystal(entity->type())) {
+            // Purpur's crystal cramming: more crystals than the limit inside one another set the crowd off.
+            if (const std::int32_t limit = world.state().gameplay().blocks.endCrystalCrammingAmount; limit > 0) {
+                std::int32_t crowd = 0;
+                for (const entity::ServerEntity* other : world.state().entities()) {
+                    crowd += !other->removed && world::endCrystals::isCrystal(other->type()) &&
+                             std::abs(other->x - entity->x) < 2.0 && std::abs(other->y - entity->y) < 2.0 &&
+                             std::abs(other->z - entity->z) < 2.0;
+                }
+                if (crowd > limit) {
+                    combat_->hitCrystal(world, watchers, *entity, false);
+                    continue;
+                }
+            }
             if (world.dragonFight() != nullptr) {
                 const std::int32_t delay =
                     world.settings().rules.gameplay.fireTickDelay + random.nextInt(world::fires::kDelaySpread);

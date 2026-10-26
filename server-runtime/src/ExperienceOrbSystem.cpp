@@ -2,7 +2,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/EntityPhysics.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>

@@ -1,7 +1,9 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/world/ColourCodes.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
+#include <basalt/wire/text/ComponentNbt.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 
 #include <algorithm>
@@ -76,6 +78,34 @@ wire::nbt::NbtCompound withText(const wire::nbt::NbtCompound& data, bool isFront
     return updated;
 }
 
+wire::nbt::NbtCompound withColouredText(const wire::nbt::NbtCompound& data, bool isFront,
+                                        const std::vector<std::string>& lines) {
+    const bool styled = std::ranges::any_of(lines, [](const std::string& line) { return colourCodes::hasCodes(line); });
+    if (!styled) {
+        return withText(data, isFront, lines);
+    }
+    wire::nbt::NbtList messages{wire::nbt::NbtType::Compound};
+    for (std::int32_t line = 0; line < kLines; ++line) {
+        const auto index = static_cast<std::size_t>(line);
+        const std::string text = index < lines.size() ? lines[index].substr(0, kMaxLineLength) : std::string{};
+        wire::nbt::NbtTag tag = wire::text::componentNbt::serialize(
+            colourCodes::hasCodes(text) ? colourCodes::ofAmpersands(text) : wire::text::Component::text(text));
+        if (tag.get<std::string>() != nullptr) {
+            wire::nbt::NbtCompound plain;
+            plain.putString("text", text);
+            tag = wire::nbt::NbtTag::ofCompound(std::move(plain));
+        }
+        messages.push(std::move(tag));
+    }
+    wire::nbt::NbtCompound text;
+    text.set("messages", wire::nbt::NbtTag::ofList(std::move(messages)));
+    text.putString("color", "black");
+    text.putByte("has_glowing_text", 0);
+    wire::nbt::NbtCompound updated = data;
+    updated.set(isFront ? kFront : kBack, wire::nbt::NbtTag::ofCompound(std::move(text)));
+    return updated;
+}
+
 std::string plainText(const wire::nbt::NbtCompound& data, const bool front) {
     const wire::nbt::NbtCompound* side = data.getCompound(front ? kFront : kBack);
     if (side == nullptr) {
@@ -92,6 +122,7 @@ std::string plainText(const wire::nbt::NbtCompound& data, const bool front) {
         }
         const std::string* raw = line.get<std::string>();
         if (raw == nullptr) {
+            text += wire::text::toPlainText(wire::text::componentNbt::deserialize(line));
             continue;
         }
         const std::expected<wire::common::JsonValue, wire::common::JsonError> parsed = wire::common::parseJson(*raw);

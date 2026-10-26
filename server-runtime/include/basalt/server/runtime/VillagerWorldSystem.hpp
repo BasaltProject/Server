@@ -38,10 +38,13 @@ public:
     using LaunchFirework = std::function<void(world::LoadedWorld& world, wire::nbt::NbtCompound item, double x,
                                               double y, double z, std::int32_t ownerId)>;
 
+    using Explode =
+        std::function<void(world::LoadedWorld& world, double x, double y, double z, float power, bool fire)>;
+
     VillagerWorldSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster,
                         NaturalSpawningSystem& spawning, RaidSystem& raids, world::RealLootTables& lootTables,
                         world::RealVillagerTrades* trades, std::function<std::int64_t()> nextSeed,
-                        AddEffect addEffect = {}, LaunchFirework launchFirework = {});
+                        AddEffect addEffect = {}, LaunchFirework launchFirework = {}, Explode explode = {});
 
     void bind(world::LoadedWorld& world) { world_ = &world; }
 
@@ -100,6 +103,7 @@ private:
     std::function<std::int64_t()> nextSeed_;
     AddEffect addEffect_;
     LaunchFirework launchFirework_;
+    Explode explode_;
     world::LoadedWorld* world_ = nullptr;
 };
 
