@@ -174,6 +174,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
         generationQueue_.usePipeline(protoChunks_.get());
     }
     state_.setHasSkylight(config::dimensionFacts(declaration_.dimension).hasSkylight);
+    state_.setGameplay(settings_.gameplay);
     state_.setOnNeighbourhoodComplete([this](std::int32_t chunkX, std::int32_t chunkZ, bool delayed) {
         const std::int64_t key = ChunkGenerationQueue::pack(chunkX, chunkZ);
         const std::lock_guard<std::mutex> lock{lightQueueMutex_};

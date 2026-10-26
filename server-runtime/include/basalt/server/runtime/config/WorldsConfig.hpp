@@ -1,8 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
-#include <basalt/server/runtime/config/MobsConfig.hpp>
-#include <basalt/server/runtime/config/WorldRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
@@ -18,7 +17,6 @@ namespace basalt::server::runtime::config {
 struct WorldSettings {
     std::string difficulty = "easy";
     std::int32_t viewDistance = 10;
-    std::int32_t simulationDistance = 10;
     std::int32_t saveIntervalSeconds = 300;
 
     bool openEndExitPortal = false;
@@ -30,8 +28,7 @@ struct WorldSettings {
     std::int32_t lootMaxRefills = -1;
     std::int32_t lootRelootSeconds = -1;
 
-    MobSettings mobs;
-    WorldRules rules;
+    GameplayRules gameplay;
 
     [[nodiscard]] static WorldSettings vanilla() { return WorldSettings{}; }
 

@@ -32,20 +32,12 @@ basalt_module(server-runtime-core
         src/bukkit/JavaPluginScan.cpp
         src/config/ConfigDirectory.cpp
         src/config/ForwardingConfig.cpp
-        src/config/RemoteConfig.cpp
-        src/remote/BasaltServerRemote.cpp
-        src/remote/RemoteHostImpl.cpp
-        src/config/MobsConfig.cpp
+        src/config/GameplayRules.cpp
         src/config/GroupsConfig.cpp
-        src/config/LimitsConfig.cpp
         src/config/LiveConfigs.cpp
-        src/config/MessagesConfig.cpp
         src/config/ProfileSelection.cpp
         src/config/ServerListConfig.cpp
-        src/config/ServerTuning.cpp
         src/config/UiConfigs.cpp
-        src/config/WorldRules.cpp
-        src/config/WorldRulesGameplay.cpp
         src/entity/Aabb.cpp
         src/entity/BlockClip.cpp
         src/entity/BlockRay.cpp
@@ -65,7 +57,6 @@ basalt_module(server-runtime-core
         src/entity/Projectiles.cpp
         src/entity/EntityNbt.cpp
         src/entity/EntityCollision.cpp
-        src/entity/MobOverrides.cpp
         src/entity/MobRules.cpp
         src/entity/MobSounds.cpp
         src/entity/GeneratedEntityPresentation.cpp
@@ -156,7 +147,6 @@ basalt_module(server-runtime-core
         src/BasaltServerLife.cpp
         src/BasaltServerMelee.cpp
         src/BasaltServerData.cpp
-        src/BasaltServerStartup.cpp
         src/BasaltServerTick.cpp
         src/BasaltServerBoats.cpp
         src/BasaltServerEntities.cpp
@@ -273,8 +263,6 @@ basalt_module(server-runtime-core
         src/RedstoneTickBlocks.cpp
         src/BlockEventTick.cpp
         src/ScheduledBlockTick.cpp
-        src/SessionFlying.cpp
-        src/ServerWatchdog.cpp
         src/MobTickSystem.cpp
         src/MobActionTick.cpp
         src/MobActionConversion.cpp
@@ -370,7 +358,6 @@ basalt_module(server-runtime-core
         src/placeholder/ServerPlaceholders.cpp
         src/item/ItemWear.cpp
         src/item/ItemComponentCodecs.cpp
-        src/item/ItemLimits.cpp
         src/item/ItemDamageEffects.cpp
         src/item/ItemComponentPayloads.cpp
         src/function/FunctionLibrary.cpp
@@ -437,12 +424,7 @@ basalt_module(server-runtime-core
         src/player/StatAwards.cpp
         src/player/PlayerCakesAndPots.cpp
         src/player/PlayerCauldrons.cpp
-        src/net/ConnectionGate.cpp
-        src/net/PacketLimiter.cpp
         src/net/ProxyLogin.cpp
-        src/net/ProxyProtocol.cpp
-        src/net/QueryServer.cpp
-        src/net/SocketOptions.cpp
         src/net/SessionOutbox.cpp
         src/registry/VanillaBiomes.cpp
         src/registry/VanillaConfigurationRegistries.cpp
@@ -589,7 +571,6 @@ basalt_module(server-runtime-core
         src/world/Beehives.cpp
         src/world/Books.cpp
         src/world/AnvilEnchantments.cpp
-        src/world/AntiXray.cpp
         src/world/EnchantmentBooks.cpp
         src/world/Enchanting.cpp
         src/world/Grindstones.cpp
@@ -789,7 +770,7 @@ basalt_module(server-runtime-core
         src/world/WorldStateSections.cpp
         src/world/WorldStateTicks.cpp
         src/world/SpawnPotential.cpp
-    DEPENDS basalt::metamorph-datafix basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io basalt::server-remote
+    DEPENDS basalt::metamorph-datafix basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 
@@ -805,12 +786,6 @@ endif()
 basalt_test(server-runtime-entity-selector-test
     SOURCES
         test/EntitySelectorTest.cpp
-    DEPENDS basalt::server-runtime-core
-)
-
-basalt_test(server-runtime-net-guards-test
-    SOURCES
-        test/NetGuardsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

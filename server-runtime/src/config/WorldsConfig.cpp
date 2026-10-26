@@ -50,9 +50,6 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
     WorldSettings settings = inherited;
     settings.difficulty = std::string{table->string("difficulty").value_or(inherited.difficulty)};
     settings.viewDistance = static_cast<std::int32_t>(table->integer("view-distance").value_or(inherited.viewDistance));
-    // parity: `PlayerList.setSimulationDistance`, clamped as `setViewDistance` is.
-    settings.simulationDistance = static_cast<std::int32_t>(
-        std::clamp<std::int64_t>(table->integer("simulation-distance").value_or(inherited.simulationDistance), 2, 32));
     settings.saveIntervalSeconds = static_cast<std::int32_t>(
         std::max<std::int64_t>(table->integer("save-interval-seconds").value_or(inherited.saveIntervalSeconds), 0));
     settings.openEndExitPortal = table->boolean("open-end-exit-portal").value_or(inherited.openEndExitPortal);
@@ -66,7 +63,7 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
         std::max(whole("loot-refill-max-seconds", inherited.lootRefillMaxSeconds, 0), settings.lootRefillMinSeconds);
     settings.lootMaxRefills = whole("loot-max-refills", inherited.lootMaxRefills, -1);
     settings.lootRelootSeconds = whole("loot-reloot-seconds", inherited.lootRelootSeconds, -1);
-    settings.rules = WorldRules::from(table, inherited.rules);
+    settings.gameplay = GameplayRules::from(table->table("gameplay"), inherited.gameplay);
     return settings;
 }
 
@@ -209,18 +206,17 @@ WorldSettings WorldsConfig::settingsFor(const WorldDeclaration& world) const {
     const std::string directory = worldsRoot_ + "/" + world.name;
     const std::string path = directory + "/settings.toml";
     const std::optional<std::string> text = wire::io::fileIO::readText(path);
-    WorldSettings settings = defaults_;
-    settings.mobs = loadWorldMobs(directory, defaults_.mobs);
     if (!text.has_value()) {
         // Asked rather than left to the write failing: what is being decided is whether the world exists.
         if (wire::io::fileIO::isDirectory(directory)) {
-            wire::io::fileIO::writeText(path, std::string{kWorldSettingsDefaultToml} + worldRulesTemplate(false));
+            wire::io::fileIO::writeText(path, std::string{kWorldSettingsDefaultToml} +
+                                                  std::string{kGameplayWorldSettingsDefaultToml});
         }
-        return settings;
+        return defaults_;
     }
     const std::expected<TomlTable, wire::common::toml::TomlError> parsed = wire::common::toml::parse(*text);
     // An unparsable settings file loses one world's preferences, not the server's configuration.
-    return parsed.has_value() ? WorldSettings::from(&*parsed, settings) : settings;
+    return parsed.has_value() ? WorldSettings::from(&*parsed, defaults_) : defaults_;
 }
 
 namespace {
@@ -277,16 +273,11 @@ std::expected<WorldsConfig, std::string> WorldsConfig::load(const ConfigDirector
                                                             const wire::common::Logger& logger) {
     const std::string path = directory.pathOf(kFileName);
     const std::expected<TomlTable, std::string> root =
-        directory.load(kFileName, std::string{kWorldsDefaultToml} + worldRulesTemplate(true));
+        directory.load(kFileName, std::string{kWorldsDefaultToml} + std::string{kGameplayWorldsDefaultToml});
     if (!root.has_value()) {
         return std::unexpected(root.error());
     }
-    WorldSettings defaults = WorldSettings::from(root->table("defaults"), WorldSettings::vanilla());
-    std::expected<MobSettings, std::string> mobs = loadMobDefaults(directory);
-    if (!mobs.has_value()) {
-        return std::unexpected(mobs.error());
-    }
-    defaults.mobs = *std::move(mobs);
+    const WorldSettings defaults = WorldSettings::from(root->table("defaults"), WorldSettings::vanilla());
     const TomlTable* declared = root->table("worlds");
 
     std::vector<WorldDeclaration> worlds;
