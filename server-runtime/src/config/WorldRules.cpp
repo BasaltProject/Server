@@ -302,7 +302,7 @@ WorldRules WorldRules::from(const TomlTable* table, const WorldRules& inherited)
     if (const TomlTable* section = table->table("border"); section != nullptr) {
         readBorder(*section, rules.border);
     }
-    readGameplayRules(*table, rules.gameplay);
+    readWorldTuning(*table, rules.gameplay);
     if (const TomlTable* section = table->table("anti-xray"); section != nullptr) {
         readAntiXray(*section, rules.antiXray);
     }
