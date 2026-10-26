@@ -139,7 +139,18 @@ std::expected<CommandsConfig, std::string> CommandsConfig::load(const ConfigDire
             return "Disabled by " + path + ": " + named + ".";
         });
     }
-    return CommandsConfig{std::move(overrides), std::move(custom), std::move(messages)};
+    CommandOptions options;
+    if (const TomlTable* declared = root->table("options"); declared != nullptr) {
+        options.logCommands = declared->boolean("log-commands").value_or(options.logCommands);
+        options.silentCommandBlockConsole =
+            declared->boolean("silent-commandblock-console").value_or(options.silentCommandBlockConsole);
+        const std::int64_t minimum = declared->integer("tab-complete-min-length").value_or(0);
+        if (minimum < 0 || minimum > 256) {
+            return std::unexpected(path + ": tab-complete-min-length must be between 0 and 256");
+        }
+        options.tabCompleteMinLength = static_cast<std::int32_t>(minimum);
+    }
+    return CommandsConfig{std::move(overrides), std::move(custom), std::move(messages), options};
 }
 
 } // namespace basalt::server::runtime::config

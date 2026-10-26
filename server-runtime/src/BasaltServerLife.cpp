@@ -2151,7 +2151,9 @@ void BasaltServer::startBedrockListener() {
                         return;
                     }
                 }
-                logger_.info([&name, &line] { return name + " issued server command: /" + line; });
+                if (dispatcher->environment().commands().options().logCommands) {
+                    logger_.info([&name, &line] { return name + " issued server command: /" + line; });
+                }
                 command::PlayerCommandSource source{*session, dispatcher->environment().groups()};
                 dispatcher->execute(source, line);
             });

@@ -44,6 +44,18 @@
 # permission = "basalt.command.help"
 # message = ["<gray>%basalt_server_online% of %basalt_server_max_players% playing.</gray>"]
 
+[options]
+# Write a line to the log for every command a player runs, as Spigot's commands.log does.
+log-commands = true
+
+# Stay quiet in the console about what command blocks and command block minecarts do, as Spigot's
+# commands.silent-commandblock-console does. Vanilla logs it.
+silent-commandblock-console = false
+
+# Characters of a command a player must have typed before the server suggests anything for it, Spigot's
+# tab-complete. 0 suggests from the first character. NO VANILLA above 0.
+tab-complete-min-length = 0
+
 [messages]
 # Replaces what a command answers, by the translation key it normally sends.
 #
