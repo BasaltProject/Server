@@ -120,6 +120,9 @@ public:
     /// parity: `Level.updateNeighborsAt`, which is what makes a torch fall off a broken wall.
     void notifyNeighbours(const wire::protocol::play::BlockPos& pos);
 
+    /// parity: `DragonEggBlock.teleport`, for a click or a hit on the egg.
+    void teleportDragonEgg(const wire::protocol::play::BlockPos& pos);
+
     void notifyNeighboursAfterRemoval(const wire::protocol::play::BlockPos& pos, std::int32_t removedStateId);
 
     [[nodiscard]] bool isAirLike(std::int32_t stateId) const;

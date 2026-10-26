@@ -1,6 +1,7 @@
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/Beacons.hpp>
@@ -345,7 +346,9 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     }
                     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*state);
                     return block != nullptr &&
-                           beacons::letsBeamThrough(registry::blockShapes::dampening(*state), block->path());
+                           (beacons::letsBeamThrough(registry::blockShapes::dampening(*state), block->path()) ||
+                            (world.gameplay().blocks.beaconAllowEffectsWithTintedGlass &&
+                             block->path() == "tinted_glass"));
                 };
                 // parity: with the beam blocked the jar leaves the count alone and hands out nothing.
                 if (!beacons::beamReachesSky(passes, x, y, z, server::world::worldHeight::kMaxY)) {

@@ -152,6 +152,7 @@ basalt_module(server-runtime-core
         src/BasaltServerEntities.cpp
         src/BasaltServerScores.cpp
         src/BlockInteractionHandler.cpp
+        src/BlockUseDragonEgg.cpp
         src/BlockUseHelpers.cpp
         src/BlockUseOn.cpp
         src/BlockUseOnBlocks.cpp
@@ -495,6 +496,7 @@ basalt_module(server-runtime-core
         src/world/BiomeTagLoader.cpp
         src/world/CommandBlocks.cpp
         src/world/Dispensers.cpp
+        src/world/DragonEggs.cpp
         src/world/Dripleaves.cpp
         src/world/DroppedItemNbt.cpp
         src/world/PortalIndex.cpp
@@ -590,6 +592,7 @@ basalt_module(server-runtime-core
         src/world/BambooGrowth.cpp
         src/world/BlockEntityDefaults.cpp
         src/world/BoneMeal.cpp
+        src/world/BreedingCooldowns.cpp
         src/world/BlockInventory.cpp
         src/world/BlockSurvival.cpp
         src/world/BrewingStands.cpp
@@ -608,6 +611,7 @@ basalt_module(server-runtime-core
         src/world/Cushions.cpp
         src/world/AttachedEntities.cpp
         src/world/FallLanding.cpp
+        src/world/FarmlandTrample.cpp
         src/world/DaylightDetectors.cpp
         src/world/DoubleChests.cpp
         src/world/DripstoneGrowth.cpp

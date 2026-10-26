@@ -16,6 +16,6 @@ void tickBlockContact(PlayerSession& session, const entity::entityCollision::Blo
                       random::RandomSource& random,
                       const std::function<void(float amount, std::string_view deathMessageId,
                                                const wire::common::Identifier& damageType)>& hurt,
-                      bool magmaHurtsSneaking = false);
+                      bool magmaHurtsSneaking = false, float stonecutterDamage = 0.0F);
 
 } // namespace basalt::server::runtime::player

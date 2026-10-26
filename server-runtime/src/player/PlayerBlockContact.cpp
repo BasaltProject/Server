@@ -23,7 +23,7 @@ constexpr float kSoulFireDamage = 2.0F;
 void tickBlockContact(PlayerSession& session, const entity::entityCollision::BlockAt& blockAt,
                       random::RandomSource& random,
                       const std::function<void(float, std::string_view, const wire::common::Identifier&)>& hurt,
-                      bool magmaHurtsSneaking) {
+                      bool magmaHurtsSneaking, float stonecutterDamage) {
     if (session.gamemode == wire::protocol::play::Gamemode::Spectator || !hurt) {
         return;
     }
@@ -74,6 +74,9 @@ void tickBlockContact(PlayerSession& session, const entity::entityCollision::Blo
             below.has_value() ? registry::blockStateDefinitions::blockOf(*below) : nullptr;
         if (block != nullptr && block->path() == "magma_block") {
             hurt(1.0F, "hotFloor", wire::common::Identifier::vanilla("hot_floor"));
+        }
+        if (block != nullptr && block->path() == "stonecutter" && stonecutterDamage > 0.0F) {
+            hurt(stonecutterDamage, "stonecutter", wire::common::Identifier::vanilla("generic"));
         }
     }
 }

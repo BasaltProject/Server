@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/TrialSpawnerSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/BlockTriggers.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
@@ -255,6 +256,12 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t levels,
                            const std::string& primary, const std::string& secondary) {
                 world::beacons::Beam beam = world::beacons::beamOf(levels, primary == secondary);
+                const config::GameplayRules::Blocks& rules = world.state().gameplay().blocks;
+                const std::array<std::int32_t, 4> ranges{rules.beaconEffectRangeLevel1, rules.beaconEffectRangeLevel2,
+                                                         rules.beaconEffectRangeLevel3, rules.beaconEffectRangeLevel4};
+                if (levels >= 1 && levels <= 4) {
+                    beam.range = ranges[static_cast<std::size_t>(levels - 1)];
+                }
                 if (const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4); chunk != nullptr) {
                     const server::world::ChunkBlockEntity* held = chunk->blockEntityAt(x & 15, y, z & 15);
                     if (held != nullptr && held->data().contains("BeaconRange")) {

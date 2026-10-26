@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/Minecarts.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -69,10 +70,14 @@ bool placeMinecartFor(const BreakContext& context, PlayerSession& player, world:
                       const Identifier& item, const std::int32_t heldSlot, const storage::StoredItemStack& held,
                       const BlockHit& hit) {
     const std::optional<std::int32_t> rail = world.state().blockState(hit.x, hit.y, hit.z);
-    if (!rail.has_value() || !world::rails::isRail(*rail)) {
+    const bool loose =
+        rail.has_value() && !world::rails::isRail(*rail) && world.state().gameplay().items.minecartPlaceAnywhere;
+    if (!loose && (!rail.has_value() || !world::rails::isRail(*rail))) {
         return false;
     }
-    const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(*rail);
+    const std::map<std::string, std::string> properties =
+        loose ? std::map<std::string, std::string>{{"shape", "north_south"}}
+              : reg::blockStateDefinitions::propertiesOf(*rail);
     const auto shape = properties.find("shape");
     if (shape == properties.end()) {
         return false;
@@ -94,8 +99,9 @@ bool placeMinecartFor(const BreakContext& context, PlayerSession& player, world:
             }
         }
     }
-    if (!spawnFromItem(context, player, world, type, heldSlot, held, hit.x + 0.5, hit.y + kMinecartRestHeight + slope,
-                       hit.z + 0.5)) {
+    const double lift = loose ? 1.0 : 0.0;
+    if (!spawnFromItem(context, player, world, type, heldSlot, held, hit.x + 0.5,
+                       hit.y + lift + kMinecartRestHeight + slope, hit.z + 0.5)) {
         return false;
     }
     // parity: `MinecartItem` raises `ENTITY_PLACE` at the rail's own square, not at the cart.
@@ -123,7 +129,8 @@ bool placeEndCrystalFor(const BreakContext& context, PlayerSession& player, worl
     const std::optional<std::int32_t> clicked = world.state().blockState(hit.x, hit.y, hit.z);
     const reg::BlockState* obsidian = reg::blocks::named("obsidian");
     if (!clicked.has_value() ||
-        (*clicked != reg::blocks::bedrock().stateId && (obsidian == nullptr || *clicked != obsidian->stateId))) {
+        (!world.state().gameplay().blocks.endCrystalPlaceAnywhere && *clicked != reg::blocks::bedrock().stateId &&
+         (obsidian == nullptr || *clicked != obsidian->stateId))) {
         return false;
     }
     const std::int32_t x = hit.x;

@@ -53,7 +53,17 @@ using Drunk = std::array<std::int32_t, 4>;
         return false;
     }
     const std::string_view path = block->path();
-    if (path == "water" || isUprooted(path)) {
+    const config::GameplayRules::Blocks& rules = world.gameplay().blocks;
+    if (path == "mud" && rules.spongeAbsorbsWaterFromMud) {
+        const std::int32_t clay = registry::blocks::named("clay")->stateId;
+        if (!world.setBlockState(x, y, z, clay)) {
+            return false;
+        }
+        drunk.push_back({x, y, z, *stateId});
+        onChanged(clay, x, y, z);
+        return true;
+    }
+    if (path == "water" || isUprooted(path) || (path == "lava" && rules.spongeAbsorbsLava)) {
         const std::int32_t empty = registry::blocks::air().stateId;
         if (!world.setBlockState(x, y, z, empty)) {
             return false;
