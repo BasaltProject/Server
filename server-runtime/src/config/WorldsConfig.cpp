@@ -68,9 +68,10 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
     settings.lootMaxRefills = whole("loot-max-refills", inherited.lootMaxRefills, -1);
     settings.lootRelootSeconds = whole("loot-reloot-seconds", inherited.lootRelootSeconds, -1);
     settings.rules = WorldRules::from(table, inherited.rules);
-    const PurpurRules inheritedRules = inherited.gameplay != nullptr ? *inherited.gameplay : PurpurRules{};
-    settings.gameplay =
-        std::make_shared<const PurpurRules>(PurpurRules::from(table->table("gameplay"), inheritedRules));
+    if (const TomlTable* gameplay = table->table("gameplay"); gameplay != nullptr) {
+        const PurpurRules inheritedRules = inherited.gameplay != nullptr ? *inherited.gameplay : PurpurRules{};
+        settings.gameplay = std::make_shared<const PurpurRules>(PurpurRules::from(gameplay, inheritedRules));
+    }
     return settings;
 }
 
