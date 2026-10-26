@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/LivingMovement.hpp>
 #include <basalt/server/runtime/entity/MobBrain.hpp>
@@ -173,16 +174,33 @@ void PanicGoal::start(MobContext& mob) {
 
 void PanicGoal::stop(MobContext& mob) { navigation::stop(mob.mob); }
 
+namespace {
+
+[[nodiscard]] double temptRangeOf(const ServerEntity& mob) {
+    constexpr double kTemptRange = 10.0;
+    return mob.tuning != nullptr ? mob.attributeWithModifiers("minecraft:tempt_range") : kTemptRange;
+}
+
+[[nodiscard]] bool temptedBy(const std::set<std::string, std::less<>>& items, const ServerEntity& mob,
+                             const wire::common::Identifier& held) {
+    if (mob.tuning == nullptr || !mob.tuning->breedingItems.has_value()) {
+        return items.contains(held.path());
+    }
+    return std::ranges::find(*mob.tuning->breedingItems, held.toString()) != mob.tuning->breedingItems->end();
+}
+
+} // namespace
+
 TemptGoal::TemptGoal(double speedModifier, std::set<std::string, std::less<>> items, double stopDistance)
     : speedModifier_(speedModifier), items_(std::move(items)), stopDistance_(stopDistance) {}
 
 bool TemptGoal::canUse(MobContext& mob) {
     // parity: `Attributes.TEMPT_RANGE`, ten blocks for everything that has it.
-    constexpr double kTemptRange = 10.0;
+    const double kTemptRange = temptRangeOf(mob.mob);
     player_.reset();
     double bestDistance = kTemptRange * kTemptRange;
     for (const PlayerView& player : mob.players) {
-        if (!player.targetable || !player.heldItem.has_value() || !items_.contains(player.heldItem->path())) {
+        if (!player.targetable || !player.heldItem.has_value() || !temptedBy(items_, mob.mob, *player.heldItem)) {
             continue;
         }
         const double distance = mob.distanceSquaredTo(player.x, player.y, player.z);
@@ -196,9 +214,9 @@ bool TemptGoal::canUse(MobContext& mob) {
 }
 
 bool TemptGoal::canContinueToUse(MobContext& mob) {
-    constexpr double kTemptRange = 10.0;
+    const double kTemptRange = temptRangeOf(mob.mob);
     const PlayerView* holder = player_.has_value() ? mob.playerById(*player_) : nullptr;
-    if (holder == nullptr || !holder->heldItem.has_value() || !items_.contains(holder->heldItem->path())) {
+    if (holder == nullptr || !holder->heldItem.has_value() || !temptedBy(items_, mob.mob, *holder->heldItem)) {
         return false;
     }
     return mob.distanceSquaredTo(holder->x, holder->y, holder->z) <= kTemptRange * kTemptRange;

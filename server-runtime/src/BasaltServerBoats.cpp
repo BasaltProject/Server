@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/BlockTests.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/Creakings.hpp>
@@ -17,6 +18,7 @@
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/Minecarts.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/PrimedTnt.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
@@ -202,12 +204,19 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
                 withers_->dropStar(world, *dead);
             }
         }
+        if (living && mobDrops) {
+            random::RandomSource dropRandom = random::RandomSource::legacy(scratchSeed());
+            entity::mobOverrides::customDrops(*dead, loot, dropRandom);
+        }
         if (living && !experienceTaken && entity::deathDrops::dropsExperience(*dead, mobDrops)) {
             random::RandomSource random = random::RandomSource::legacy(scratchSeed());
             experience = entity::deathDrops::experienceReward(*dead, random);
         }
         mobActions_->askDeathDrops(world, *dead, loot, experience);
         mobActions_->spawnLoot(world, *dead, loot);
+        if (dead->tuning != nullptr && dead->tuning->explodeWhenKilled == true && dead->type().path() == "creeper") {
+            mobActions_->explodeCreeper(*dead);
+        }
         if (experience > 0) {
             const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::EntityDeath, dead->uuid()};
             orbs_->award(world, dead->x, dead->y, dead->z, experience);

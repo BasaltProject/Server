@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/world/MobSpawnAttributes.hpp>
 #include <basalt/server/runtime/world/MobSpawnFinalization.hpp>
@@ -64,13 +65,22 @@ void finalizeChild(MobSpawnForestBuilder& builder, MobSpawnNode& child, const Mo
                                              blockOf(child.z()), entityRandom);
 }
 
+[[nodiscard]] const config::MobOverride* overrideOf(const MobSpawnContext& context, const MobSpawnNode& node) {
+    return context.mobs == nullptr ? nullptr : context.mobs->overrideFor(node.type().path());
+}
+
 void maybeSpawnChickenJockey(MobSpawnForestBuilder& builder, MobSpawnNode& zombie, MobSpawnGroupData& group,
-                             const MobSpawnContext& context) {
-    if (!group.zombieCanSpawnJockey) {
+                             const MobSpawnContext& context, bool adult = false) {
+    if (!group.zombieCanSpawnJockey && !adult) {
         return;
     }
     random::RandomSource& random = *context.random;
-    if (random.nextFloat() < kChickenJockeyChance) {
+    const config::MobOverride* tweak = overrideOf(context, zombie);
+    const float jockeyChance = tweak != nullptr && tweak->jockeyChance.has_value()
+                                   ? static_cast<float>(*tweak->jockeyChance)
+                                   : kChickenJockeyChance;
+    const bool tryExisting = tweak == nullptr || tweak->jockeyTryExistingChickens != false;
+    if (tryExisting && random.nextFloat() < jockeyChance) {
         // parity: a jockey first looks for a chicken already standing there, and rides nothing at.
         if (builder.environment().nearbyUnriddenChicken) {
             if (const std::optional<std::int32_t> chicken = builder.environment().nearbyUnriddenChicken(zombie);
@@ -80,7 +90,7 @@ void maybeSpawnChickenJockey(MobSpawnForestBuilder& builder, MobSpawnNode& zombi
         }
         return;
     }
-    if (random.nextFloat() >= kChickenJockeyChance) {
+    if (random.nextFloat() >= jockeyChance) {
         return;
     }
     MobSpawnNode& chicken =
@@ -180,12 +190,17 @@ void afterCommon(MobSpawnForestBuilder& builder, MobSpawnNode& node, MobSpawnGro
     random::RandomSource& random = *context.random;
     NbtCompound& data = node.data();
     data.putBoolean("CanPickUpLoot", random.nextFloat() < kPickupChance * context.specialMultiplier);
+    const config::MobOverride* tweak = overrideOf(context, node);
     if (!group.zombieBaby.has_value()) {
-        group.zombieBaby = random.nextFloat() < kBabyChance;
+        group.zombieBaby =
+            random.nextFloat() <
+            (tweak != nullptr && tweak->babyChance.has_value() ? static_cast<float>(*tweak->babyChance) : kBabyChance);
     }
     if (*group.zombieBaby) {
         data.putBoolean("IsBaby", true);
         maybeSpawnChickenJockey(builder, node, group, context);
+    } else if (tweak != nullptr && tweak->jockeyOnlyBabies == false) {
+        maybeSpawnChickenJockey(builder, node, group, context, true);
     }
     data.putBoolean("CanBreakDoors", random.nextFloat() < context.specialMultiplier * kBreakDoorChance);
     context.equipmentOrFallback().finalizeZombieEquipmentAfterCommon(data, type, random, context.specialMultiplier,

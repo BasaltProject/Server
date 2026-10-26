@@ -301,6 +301,7 @@ basalt_module(server-runtime-core
         src/MobActionHoglin.cpp
         src/MobActionNeutral.cpp
         src/MobActionPiglin.cpp
+        src/MobActionPickup.cpp
         src/MobActionPiglinBrain.cpp
         src/MobActionSniffer.cpp
         src/MobActionPiglinItems.cpp

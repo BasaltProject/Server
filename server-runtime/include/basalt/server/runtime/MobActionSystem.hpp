@@ -217,6 +217,9 @@ public:
 
     void dolphinPicksUp(world::LoadedWorld& world, entity::ServerEntity& dolphin);
 
+    /// An override's `can-pick-up-loot` mob takes a dropped item whose equipment slot is empty.
+    void mobPicksUpLoot(world::LoadedWorld& world, entity::ServerEntity& mob);
+
     void shulkerPeek(entity::ServerEntity& shulker, std::int32_t amount) override;
 
     void shootShulkerBullet(entity::ServerEntity& shulker, std::int32_t targetId) override;
@@ -347,6 +350,9 @@ public:
     void travelMob(world::LoadedWorld& world, entity::ServerEntity& mob, double speed,
                    random::RandomSource* random = nullptr,
                    const std::optional<std::array<double, 3>>& target = std::nullopt);
+
+    /// Drives a mob from its rider's keys and look, as `LivingEntity.travel` does with a controlling passenger.
+    void tickRidden(world::LoadedWorld& world, entity::ServerEntity& mob, const player::PlayerSession& rider);
 
     void tickVexLife(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& vex);
 

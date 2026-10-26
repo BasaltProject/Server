@@ -104,7 +104,9 @@ void moveBy(world::WorldState& world, ServerEntity& entity, bool noPhysics) {
     }
     const Aabb box = Aabb::of(entity.x, entity.y, entity.z, entity.width(), entity.height());
     const std::array<double, 3> moved = entityCollision::collideWithStep(
-        blocksOf(world), box, entity.velocityX, entity.velocityY, entity.velocityZ, kStepHeight, entity.onGround);
+        blocksOf(world), box, entity.velocityX, entity.velocityY, entity.velocityZ,
+        entity.tuning != nullptr ? entity.attributeWithModifiers("minecraft:step_height") : kStepHeight,
+        entity.onGround);
     entity.x += moved[0];
     entity.y += moved[1];
     entity.z += moved[2];
@@ -163,7 +165,9 @@ void travel(world::WorldState& world, ServerEntity& entity, double forward, doub
 
     const Aabb box = Aabb::of(entity.x, entity.y, entity.z, entity.width(), entity.height());
     const std::array<double, 3> moved = entityCollision::collideWithStep(
-        blocksOf(world), box, entity.velocityX, entity.velocityY, entity.velocityZ, kStepHeight, entity.onGround);
+        blocksOf(world), box, entity.velocityX, entity.velocityY, entity.velocityZ,
+        entity.tuning != nullptr ? entity.attributeWithModifiers("minecraft:step_height") : kStepHeight,
+        entity.onGround);
     entity.x += moved[0];
     entity.y += moved[1];
     entity.z += moved[2];
@@ -183,7 +187,9 @@ void travel(world::WorldState& world, ServerEntity& entity, double forward, doub
     }
 
     // parity: gravity comes off after the move, and the drag after that; a long jump keeps it all.
-    entity.velocityY -= entity.noGravity ? 0.0 : gravity;
+    entity.velocityY -= entity.noGravity
+                            ? 0.0
+                            : (entity.tuning != nullptr ? entity.attributeWithModifiers("minecraft:gravity") : gravity);
     const double horizontalDrag = entity.discardFriction ? 1.0 : blockFriction * kAirDrag;
     entity.velocityX *= horizontalDrag;
     entity.velocityY *= kVerticalDrag;
@@ -267,8 +273,9 @@ void jump(world::WorldState& world, ServerEntity& entity) {
     if (!entity.onGround) {
         return;
     }
-    entity.velocityY =
-        kJumpPower * static_cast<double>(registry::blockMovement::jumpFactorOf(blockUnder(world, entity)));
+    const double power =
+        entity.tuning != nullptr ? entity.attributeWithModifiers("minecraft:jump_strength") : kJumpPower;
+    entity.velocityY = power * static_cast<double>(registry::blockMovement::jumpFactorOf(blockUnder(world, entity)));
     entity.onGround = false;
 }
 

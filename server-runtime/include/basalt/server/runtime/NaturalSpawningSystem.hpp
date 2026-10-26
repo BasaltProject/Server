@@ -9,6 +9,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <string_view>
 
@@ -44,6 +45,8 @@ public:
 
     struct Options {
         std::function<std::int64_t()> nextSeed;
+        /// Members of a biome tag such as `minecraft:is_forest`, for the `spawn-biomes` overrides.
+        std::function<std::set<std::string>(const std::string&)> biomeTag;
     };
 
     NaturalSpawningSystem(player::PlayerRegistry& players, world::RealBiomeSpawns& biomeSpawns,

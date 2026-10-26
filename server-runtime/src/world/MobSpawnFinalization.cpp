@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -179,6 +180,13 @@ void writeGeneratedNode(MobSpawnForestBuilder& builder, MobSpawnNode& node, std:
     context.equipmentOrFallback().finalizeAfterCommon(data, type.path(), *context.random, context.specialMultiplier,
                                                       context.difficulty);
     zombieSpawnFinalizer::afterCommon(builder, node, group, context, entityRandom);
+    if (type.path() == "creeper" && context.mobs != nullptr) {
+        const config::MobOverride* tweak = context.mobs->overrideFor("creeper");
+        if (tweak != nullptr && tweak->chargedChance.has_value() &&
+            context.random->nextDouble() < *tweak->chargedChance) {
+            data.putBoolean("powered", true);
+        }
+    }
     // parity: `AbstractCubeMob` saves one less than its live size.
     if (entity::cubeMobs::isCube(type)) {
         data.putInt("Size", state.cubeSize - 1);

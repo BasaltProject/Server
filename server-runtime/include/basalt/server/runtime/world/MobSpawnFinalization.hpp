@@ -16,6 +16,10 @@ namespace basalt::server::runtime::entity {
 class ServerEntity;
 }
 
+namespace basalt::server::runtime::config {
+struct MobSettings;
+}
+
 namespace basalt::server::runtime::world {
 
 struct CatSpawnContext {
@@ -36,6 +40,7 @@ struct MobSpawnGroupData {
 
 /// A struct rather than many arguments repeated down a recursion, where a wrong `reason` or swapped random hides.
 struct MobSpawnContext {
+    const config::MobSettings* mobs = nullptr;
     random::RandomSource* random = nullptr;
     /// parity: `specialMultiplier`.
     float specialMultiplier = 0.0F;

@@ -35,6 +35,9 @@ inline constexpr double kBreedDistanceSquared = 9.0;
 
 [[nodiscard]] bool isFood(const wire::common::Identifier& type, const wire::common::Identifier& item);
 
+/// The type's food, or the item list this animal's override replaces it with.
+[[nodiscard]] bool isFood(const ServerEntity& animal, const wire::common::Identifier& item);
+
 /// parity: `Animal.mobInteract`'s own gate: `age == 0 && canFallInLove()`.
 [[nodiscard]] bool canFallInLove(const ServerEntity& animal);
 

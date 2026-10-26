@@ -55,6 +55,13 @@ bool isFood(const wire::common::Identifier& type, const wire::common::Identifier
     return foodFor(type).contains(item.path());
 }
 
+bool isFood(const ServerEntity& animal, const wire::common::Identifier& item) {
+    if (animal.tuning != nullptr && animal.tuning->breedingItems.has_value()) {
+        return std::ranges::find(*animal.tuning->breedingItems, item.toString()) != animal.tuning->breedingItems->end();
+    }
+    return isFood(animal.type(), item);
+}
+
 namespace {
 
 [[nodiscard]] bool carriesEgg(const ServerEntity& animal) {
@@ -66,7 +73,8 @@ namespace {
 
 // parity: `Turtle.canFallInLove`, not while it carries an egg.
 bool canFallInLove(const ServerEntity& animal) {
-    return animal.loveTicks <= 0 && animal.age == 0 && !carriesEgg(animal);
+    return animal.loveTicks <= 0 && animal.age == 0 && !carriesEgg(animal) &&
+           (animal.tuning == nullptr || animal.tuning->canBreed != false);
 }
 
 void feed(ServerEntity& animal, std::optional<std::string> cause) {
