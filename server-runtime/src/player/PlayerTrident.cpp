@@ -1,5 +1,6 @@
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
@@ -154,7 +155,8 @@ void release(const BreakContext& context, PlayerSession& player, world::LoadedWo
         world.state(), *kind, context.registry->allocateEntityId(), entry->protocolId, player.x,
         player.y + world::fluids::eyeHeight(player.sneaking) - kLaunchBelowEyes, player.z,
         static_cast<double>(-mth::sin(yRot) * mth::cos(xRot)), static_cast<double>(-mth::sin(xRot)),
-        static_cast<double>(mth::cos(yRot) * mth::cos(xRot)), kShootPower, 1.0F, random);
+        static_cast<double>(mth::cos(yRot) * mth::cos(xRot)), kShootPower,
+        world.state().gameplay().items.projectileOffsetTrident, random);
     trident.ownerId = player.entityId();
     trident.ownerUuid = player.uuid();
     trident.arrowPickup =

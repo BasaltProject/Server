@@ -88,6 +88,7 @@ inline const wire::common::Identifier kFireworks = wire::common::Identifier::van
 inline const wire::common::Identifier kArrow = wire::common::Identifier::vanilla("arrow");
 
 inline const wire::common::Identifier kTrident = wire::common::Identifier::vanilla("trident");
+inline const wire::common::Identifier kThrown = wire::common::Identifier::vanilla("thrown");
 
 inline const wire::common::Identifier kSpear = wire::common::Identifier::vanilla("spear");
 

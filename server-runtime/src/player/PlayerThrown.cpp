@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -23,7 +24,6 @@ using wire::protocol::play::Gamemode;
 
 /// parity: `ThrowableProjectileItem.use`.
 constexpr float kPearlPower = 1.5F;
-constexpr float kPearlUncertainty = 1.0F;
 
 /// parity: what a player throws from, which is the eye rather than the feet.
 constexpr double kThrowEyeHeight = 1.62;
@@ -38,7 +38,6 @@ constexpr std::string_view kSoundArrowShoot = "entity.arrow.shoot";
 constexpr float kBowDrawTicks = 20.0F;
 constexpr float kMinBowPower = 0.1F;
 constexpr float kBowPowerScale = 3.0F;
-constexpr float kBowUncertainty = 1.0F;
 
 [[nodiscard]] std::optional<Identifier> parsedOrNothing(const std::string& id) {
     const auto parsed = Identifier::parse(id);
@@ -93,6 +92,25 @@ struct Throwable {
     return found == kThrowables.end() ? nullptr : &*found;
 }
 
+[[nodiscard]] float uncertaintyOf(const config::GameplayRules::Items& items, std::string_view item) {
+    if (item == "ender_pearl") {
+        return items.projectileOffsetEnderPearl;
+    }
+    if (item == "snowball") {
+        return items.projectileOffsetSnowball;
+    }
+    if (item.ends_with("egg")) {
+        return items.projectileOffsetEgg;
+    }
+    if (item.ends_with("_potion")) {
+        return items.projectileOffsetThrowablePotion;
+    }
+    if (item == "wind_charge") {
+        return items.projectileOffsetWindCharge;
+    }
+    return 1.0F;
+}
+
 void spendOne(const BreakContext& context, PlayerSession& player, const std::int32_t slot) {
     const std::optional<storage::StoredItemStack>& stack = player.inventory.at(slot);
     if (!stack.has_value()) {
@@ -137,7 +155,7 @@ bool throwItemFor(const BreakContext& context, PlayerSession& player, world::Loa
         world.state(), *kind, context.registry->allocateEntityId(), entry->protocolId, player.x,
         player.y + kThrowEyeHeight, player.z, static_cast<double>(-std::sin(yaw) * std::cos(pitch)),
         static_cast<double>(-std::sin(pitch)), static_cast<double>(std::cos(yaw) * std::cos(pitch)), throwable->power,
-        kPearlUncertainty, random);
+        uncertaintyOf(world.state().gameplay().items, throwable->item), random);
     thrown.ownerId = player.entityId();
     thrown.ownerUuid = player.uuid();
     if (throwable->carries && held.has_value()) {
@@ -197,9 +215,10 @@ void shootBowFor(const BreakContext& context, PlayerSession& player, world::Load
     }
     const Aim aim = aimOf(player);
     random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
-    entity::ServerEntity& arrow = entity::projectiles::spawn(
-        world.state(), kind, context.registry->allocateEntityId(), entry->protocolId, player.x,
-        player.y + kThrowEyeHeight, player.z, aim.x, aim.y, aim.z, power * kBowPowerScale, kBowUncertainty, random);
+    entity::ServerEntity& arrow =
+        entity::projectiles::spawn(world.state(), kind, context.registry->allocateEntityId(), entry->protocolId,
+                                   player.x, player.y + kThrowEyeHeight, player.z, aim.x, aim.y, aim.z,
+                                   power * kBowPowerScale, world.state().gameplay().items.projectileOffsetBow, random);
     arrow.ownerId = player.entityId();
     arrow.ownerUuid = player.uuid();
     arrow.critical = power >= 1.0F;

@@ -1,5 +1,7 @@
 #include <basalt/server/runtime/FireworkSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/player/PlayerFireworks.hpp>
+#include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
@@ -69,6 +71,7 @@ bool useRocketFor(const BreakContext& context, FireworkSystem& fireworks, Player
     }
     static_cast<void>(
         fireworks.attach(world, rocketOf(*player.inventory.at(slot)), player.entityId(), player.x, player.y, player.z));
+    gliding::wearWings(context, player, world.state().gameplay().mechanics.elytraDamagePerFireworkBoost);
     spendOne(context, player, slot);
     return true;
 }

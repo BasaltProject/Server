@@ -63,6 +63,10 @@ public:
                            const entity::ServerEntity& projectile, std::int32_t signal)>
             targetHit;
         world::AdvancementTriggers* advancementTriggers = nullptr;
+        /// parity: `Level.addFreshEntity` for a mob created `TRIGGERED`, as a pearl's endermite is.
+        std::function<void(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
+                           double z, float yaw)>
+            spawnMob;
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer)>
             crystalDestroyed;
@@ -249,7 +253,8 @@ private:
     void tridentSound(const std::vector<player::PlayerSession*>& watchers, const entity::ServerEntity& trident,
                       std::string_view sound, float volume);
 
-    void landEnderPearl(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& pearl, float damage);
+    void landEnderPearl(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                        entity::ServerEntity& pearl);
     /// parity: `Projectile.hitTargetOrDeflectSelf` against a breeze.
     bool deflected(const std::vector<player::PlayerSession*>& watchers,
                    const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& projectile, double fromX,

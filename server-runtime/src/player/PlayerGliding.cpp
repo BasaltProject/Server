@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerGliding.hpp>
@@ -61,6 +62,35 @@ void startFallFlying(PlayerSession& player) {
     }
 }
 
+void wearWings(const BreakContext& context, PlayerSession& player, const std::int32_t damage) {
+    if (damage <= 0 || player.gamemode == wire::protocol::play::Gamemode::Creative) {
+        return;
+    }
+    const std::optional<storage::StoredItemStack>& wings = player.inventory.at(kChestSlot);
+    if (!wings.has_value()) {
+        return;
+    }
+    random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
+    const item::ItemDamageEffects effects{
+        [&context](const wire::common::Identifier& id) {
+            return context.enchantments == nullptr ? nullptr : context.enchantments->definitionOf(id);
+        },
+        [&context](const std::string_view tag, const wire::common::Identifier& item) {
+            return context.itemTags != nullptr && world::realItemTags::contains(*context.itemTags, tag, item);
+        }};
+    const std::optional<storage::StoredItemStack> worn =
+        item::itemWear::hurt(*wings, damage, random,
+                             [&effects](const storage::StoredItemStack& stack, std::int32_t cost,
+                                        random::RandomSource& source) { return effects.process(stack, cost, source); });
+    if (worn != wings) {
+        world::triggerFacts::durabilityChanged(context.triggers, player, *wings, worn);
+        player.inventory.set(kChestSlot, worn);
+        if (context.slotChanged) {
+            context.slotChanged(player, kChestSlot);
+        }
+    }
+}
+
 void tick(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world) {
     player.fallFlyTicks = player.fallFlying ? player.fallFlyTicks + 1 : 0;
     if (!player.fallFlying) {
@@ -76,28 +106,8 @@ void tick(const BreakContext& context, PlayerSession& player, world::LoadedWorld
     if (next % kCheckInterval != 0) {
         return;
     }
-    if ((next / kCheckInterval) % 2 == 0 && player.gamemode != wire::protocol::play::Gamemode::Creative) {
-        const std::optional<storage::StoredItemStack>& wings = player.inventory.at(kChestSlot);
-        random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
-        const item::ItemDamageEffects effects{
-            [&context](const wire::common::Identifier& id) {
-                return context.enchantments == nullptr ? nullptr : context.enchantments->definitionOf(id);
-            },
-            [&context](const std::string_view tag, const wire::common::Identifier& item) {
-                return context.itemTags != nullptr && world::realItemTags::contains(*context.itemTags, tag, item);
-            }};
-        const std::optional<storage::StoredItemStack> worn = item::itemWear::hurt(
-            *wings, 1, random,
-            [&effects](const storage::StoredItemStack& stack, std::int32_t cost, random::RandomSource& source) {
-                return effects.process(stack, cost, source);
-            });
-        if (worn != wings) {
-            world::triggerFacts::durabilityChanged(context.triggers, player, *wings, worn);
-            player.inventory.set(kChestSlot, worn);
-            if (context.slotChanged) {
-                context.slotChanged(player, kChestSlot);
-            }
-        }
+    if ((next / kCheckInterval) % 2 == 0) {
+        wearWings(context, player, world.state().gameplay().mechanics.elytraDamagePerSecond);
     }
     world::vibrations::emit(world.state(), "elytra_glide", player.x, player.y, player.z, world.gameTime(),
                             {.entity = player.uuid()});

@@ -57,6 +57,7 @@
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
 #include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
+#include <basalt/server/runtime/world/BreedingCooldowns.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -68,6 +69,7 @@
 #include <basalt/server/runtime/world/EnchantmentBooks.hpp>
 #include <basalt/server/runtime/world/EnderEyes.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Grindstones.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/Looms.hpp>
@@ -1053,7 +1055,10 @@ void BasaltServer::startBedrockListener() {
                 }
                 // parity: `Animal.mobInteract`: love for a grown one, a faster childhood for a calf.
                 const std::optional<world::TriggerItem> used = world::triggerFacts::itemOf(held);
-                if (entity::breeding::canFallInLove(*target)) {
+                const bool waiting = found->second->state().gameplay().mechanics.animalBreedingCooldownSeconds > 0 &&
+                                     world::breedingCooldowns::active(session->uuid().toString(), target->type(),
+                                                                      found->second->gameTime());
+                if (entity::breeding::canFallInLove(*target) && !waiting) {
                     entity::breeding::feed(*target, session->uuid().toString());
                 } else if (entity::breeding::canAgeUp(*target)) {
                     entity::breeding::feedBaby(*target);
@@ -1401,7 +1406,15 @@ void BasaltServer::startBedrockListener() {
                     return;
                 }
                 if (player::throwItemFor(breakContext(), *session, *found->second, *item, slot)) {
-                    player::startCooldownFor(*session, *item, found->second->gameTime());
+                    const config::GameplayRules::Items& rules = found->second->state().gameplay().items;
+                    if (item->path() == "ender_pearl") {
+                        player::startCooldownFor(*session, *item, found->second->gameTime(),
+                                                 session->gamemode == wire::protocol::play::Gamemode::Creative
+                                                     ? rules.enderPearlCreativeCooldown
+                                                     : rules.enderPearlCooldown);
+                    } else {
+                        player::startCooldownFor(*session, *item, found->second->gameTime());
+                    }
                 }
             });
         };

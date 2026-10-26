@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
@@ -24,6 +25,7 @@
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -80,7 +82,8 @@ bool CombatSystem::deflected(const std::vector<PlayerSession*>& watchers, const 
     return true;
 }
 
-void CombatSystem::landEnderPearl(const std::vector<PlayerSession*>& watchers, ServerEntity& pearl, float damage) {
+void CombatSystem::landEnderPearl(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                  ServerEntity& pearl) {
     pearl.removed = true;
     if (!pearl.ownerId.has_value()) {
         return;
@@ -102,13 +105,20 @@ void CombatSystem::landEnderPearl(const std::vector<PlayerSession*>& watchers, S
                                                         .source = wire::protocol::play::SoundSource::Players,
                                                         .volume = 1.0F,
                                                         .pitch = 1.0F}});
+    // parity: `ThrownEnderpearl.onHit`, a chance of an endermite at the thrower, before the teleport.
+    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    if (random.nextFloat() < world.state().gameplay().items.enderPearlEndermiteSpawnChance && options_.spawnMob &&
+        world.gameRules().get(world::gameRules::kSpawnMonsters) && world.difficulty() != "peaceful") {
+        options_.spawnMob(world, Identifier::vanilla("endermite"), owner->x, owner->y, owner->z, owner->yaw);
+    }
     if (owner->connection().teleportTo) {
         owner->connection().teleportTo(pearl.x, pearl.y, pearl.z, owner->yaw, owner->pitch);
     }
     // parity: `ThrownEnderpearl.onHit` lets go of the thrower's impulse.
     player::impulse::reset(*owner);
     if (owner->connection().hurt) {
-        owner->connection().hurt(damage, kDeathFall, world::damageTypes::kEnderPearl, std::nullopt);
+        owner->connection().hurt(world.state().gameplay().items.enderPearlDamage, kDeathFall,
+                                 world::damageTypes::kEnderPearl, std::nullopt);
     }
 }
 
@@ -218,8 +228,14 @@ void CombatSystem::hitCrystal(world::LoadedWorld& world, const std::vector<Playe
         return;
     }
     if (hit == world::endCrystals::Hit::Explodes) {
-        explosions_.blowUp(world, watchers, crystal.x, crystal.y, crystal.z, world::endCrystals::kExplosionPower,
-                           "end_crystal", crystal.entityId());
+        const config::GameplayRules::Blocks& rules = world.state().gameplay().blocks;
+        const bool based = world::endCrystals::showsBottom(crystal);
+        if (based ? rules.endCrystalBaseExplode : rules.endCrystalBaselessExplode) {
+            explosions_.blowUp(world, watchers, crystal.x, crystal.y, crystal.z,
+                               based ? rules.endCrystalBaseExplosionPower : rules.endCrystalBaselessExplosionPower,
+                               "end_crystal", crystal.entityId(), {}, {},
+                               based ? rules.endCrystalBaseExplosionFire : rules.endCrystalBaselessExplosionFire);
+        }
         emitVibration(world, "explode", crystal.x, crystal.y, crystal.z, crystal.uuid());
     }
     // parity: `EndCrystal.onDestroyedBy`, after the blast, whatever took it.

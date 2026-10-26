@@ -21,7 +21,6 @@ class ServerEntity;
 namespace minecarts {
 
 inline constexpr double kMaxSpeed = 0.4;
-inline constexpr double kMaxSpeedInWater = 0.2;
 
 inline constexpr std::int32_t kTntCartFuse = 80;
 
@@ -80,6 +79,8 @@ struct CartState {
 struct Env {
     bool experimental = false;
     std::int32_t maxMinecartSpeed = 8;
+    double legacyMaxSpeed = kMaxSpeed;
+    double poweredRailBoost = 0.06;
     std::optional<std::array<double, 3>> riderIntent;
     std::function<void(ServerEntity& cart, const std::array<std::int32_t, 3>& rail, bool powered)> activate;
     /// parity: `pushAndPickupEntities`.

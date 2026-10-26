@@ -6,7 +6,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
-#include <basalt/server/runtime/config/MobsConfig.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
@@ -21,7 +21,6 @@
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobMisc.hpp>
-#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -33,6 +32,7 @@
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
+#include <basalt/server/runtime/world/BreedingCooldowns.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -80,18 +80,6 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
         if (entity::sunBurn::shouldBurn(sensitive, day, light, openSky, inWater, random) &&
             (!hooks_.combustAllowed || hooks_.combustAllowed(world, mob, entity::sunBurn::kFireTicks, "sunlight"))) {
             mob.fireTicks = entity::sunBurn::kFireTicks;
-        }
-    }
-    // The enderman's own teleport goal already hurts it in water.
-    if (mob.tuning != nullptr && mob.tuning->takesDamageFromWater == true && mob.type().path() != "enderman") {
-        const std::optional<std::int32_t> feet = world.state().blockState(blockX, blockY, blockZ);
-        if (world::fluids::of(feet.value_or(0)) == world::Submersion::Water ||
-            world::precipitation::entityInRain(world, mob.x, mob.y, mob.z, mob.height())) {
-            const entity::entityCombat::Result result =
-                entity::entityCombat::hurt(mob, 1.0F, std::nullopt, std::nullopt, hooks_.combat, "drown");
-            if (result.landed) {
-                combat_->announceEntityHit(watchers, mob, world::damageTypes::kDrown, -1, result.died);
-            }
         }
     }
     if (mob.fireTicks > 0) {
@@ -468,7 +456,7 @@ void MobActionSystem::eatGrassUnder(world::LoadedWorld& world, const ServerEntit
 }
 
 void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& golem) {
-    if (!entity::mobOverrides::griefing(golem, world.gameRules().get(world::gameRules::kMobGriefing))) {
+    if (!world.gameRules().get(world::gameRules::kMobGriefing)) {
         return;
     }
     const server::registry::BlockState* snow = server::registry::blocks::named("snow");
@@ -621,6 +609,10 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
     // parity: `finalizeSpawnChildFromBreeding` credits whoever fed either parent.
     if (breeder.has_value() && hooks_.bredAnimals) {
         hooks_.bredAnimals(*breeder, animal.type(), partner.type(), childType);
+    }
+    if (breeder.has_value()) {
+        world::breedingCooldowns::record(*breeder, animal.type(), world.gameTime(),
+                                         world.state().gameplay().mechanics.animalBreedingCooldownSeconds);
     }
     entity::breeding::afterBreeding(animal, partner);
     // parity: `Animal.finalizeSpawnChildFromBreeding`, one orb of one to seven points.
