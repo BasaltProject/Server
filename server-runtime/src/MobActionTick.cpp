@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
@@ -21,6 +22,7 @@
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobMisc.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -80,6 +82,18 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
         if (entity::sunBurn::shouldBurn(sensitive, day, light, openSky, inWater, random) &&
             (!hooks_.combustAllowed || hooks_.combustAllowed(world, mob, entity::sunBurn::kFireTicks, "sunlight"))) {
             mob.fireTicks = entity::sunBurn::kFireTicks;
+        }
+    }
+    // The enderman's own teleport goal already hurts it in water.
+    if (mob.tuning != nullptr && mob.tuning->takesDamageFromWater == true && mob.type().path() != "enderman") {
+        const std::optional<std::int32_t> feet = world.state().blockState(blockX, blockY, blockZ);
+        if (world::fluids::of(feet.value_or(0)) == world::Submersion::Water ||
+            world::precipitation::entityInRain(world, mob.x, mob.y, mob.z, mob.height())) {
+            const entity::entityCombat::Result result =
+                entity::entityCombat::hurt(mob, 1.0F, std::nullopt, std::nullopt, hooks_.combat, "drown");
+            if (result.landed) {
+                combat_->announceEntityHit(watchers, mob, world::damageTypes::kDrown, -1, result.died);
+            }
         }
     }
     if (mob.fireTicks > 0) {
@@ -456,7 +470,7 @@ void MobActionSystem::eatGrassUnder(world::LoadedWorld& world, const ServerEntit
 }
 
 void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& golem) {
-    if (!world.gameRules().get(world::gameRules::kMobGriefing)) {
+    if (!entity::mobOverrides::griefing(golem, world.gameRules().get(world::gameRules::kMobGriefing))) {
         return;
     }
     const server::registry::BlockState* snow = server::registry::blocks::named("snow");

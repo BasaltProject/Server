@@ -179,7 +179,7 @@ bool useBoneMealFor(const BreakContext& context, PlayerSession& player, world::L
                     const storage::StoredItemStack& held) {
     const std::optional<std::int32_t> existing = world.state().blockState(x, y, z);
     // parity: `BoneMealItem.growCrop` spends the item on a valid target whether or not growth did anything.
-    if (!existing.has_value() || !world::boneMeal::grows(*existing)) {
+    if (!existing.has_value() || !world::boneMeal::grows(world.state(), *existing)) {
         return false;
     }
     if (context.fertilizeAllowed && !context.fertilizeAllowed(player, x, y, z, *existing)) {

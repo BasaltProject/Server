@@ -16,6 +16,9 @@ namespace boneMeal {
 
 [[nodiscard]] bool grows(std::int32_t stateId);
 
+/// The same, plus the plants a world's gameplay rules let bone meal reach.
+[[nodiscard]] bool grows(const WorldState& world, std::int32_t stateId);
+
 } // namespace boneMeal
 
 } // namespace basalt::server::runtime::world

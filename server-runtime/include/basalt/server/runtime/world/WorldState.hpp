@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
@@ -30,6 +31,7 @@
 #include <vector>
 
 namespace basalt::server::runtime::config {
+struct WorldRules;
 struct GameplayRules;
 } // namespace basalt::server::runtime::config
 
@@ -163,6 +165,11 @@ public:
             lootUnpacker_(x, y, z, player);
         }
     }
+
+    /// What the operator configured for this world; vanilla's values until the world sets them.
+    void setRules(const config::WorldRules* rules) noexcept { rules_ = rules; }
+
+    [[nodiscard]] const config::WorldRules& rules() const noexcept;
 
     /// parity: `SculkShriekerBlockEntity.tryGetPlayer`.
     using PlayerCheck = std::function<bool(const wire::common::Uuid& entity)>;
@@ -383,6 +390,11 @@ public:
 
     entity::ServerEntity& spawnEntity(std::unique_ptr<entity::ServerEntity> entity);
 
+    void setMobSettings(const config::MobSettings* settings);
+
+    /// This world's mob settings, vanilla's until the owning world supplies its own.
+    [[nodiscard]] const config::MobSettings& mobSettings() const noexcept;
+
     [[nodiscard]] std::vector<std::int32_t> collectRemovedEntities();
 
     /// parity: `TntBlock.explode`, which spawns the entity where the block stood.
@@ -454,6 +466,7 @@ private:
     SongOutput songOutput_;
     LootUnpacker lootUnpacker_;
     PlayerCheck playerCheck_;
+    const config::WorldRules* rules_ = nullptr;
     sched::Owner* owner_ = nullptr;
     sched::Owner* installOwner_ = nullptr;
 
@@ -504,6 +517,7 @@ private:
     std::uint64_t shapeChangeCount_ = 0;
     mutable poi::PoiManager poi_;
     EntityRegistry entityRegistry_;
+    const config::MobSettings* mobSettings_ = nullptr;
     DroppedItemPhysics itemPhysics_;
 };
 
