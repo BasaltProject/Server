@@ -5,7 +5,7 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
@@ -227,7 +227,7 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
     }
     // Purpur's hoe replanting: a ripe crop broken with a hoe goes back in at age zero for one of its own seeds.
     if (tool != nullptr && tool->id.ends_with("_hoe")) {
-        const config::PurpurRules::Blocks& rules = world.state().gameplay().blocks;
+        const config::GameplayRules::Blocks& rules = world.state().gameplay().blocks;
         const std::string_view crop = block.path();
         const bool nether = crop == "nether_wart";
         const bool field = crop == "wheat" || crop == "carrots" || crop == "potatoes" || crop == "beetroots";

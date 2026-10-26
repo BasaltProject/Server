@@ -2,7 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/DragonEggs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 

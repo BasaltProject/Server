@@ -3,7 +3,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 
 #include <algorithm>
@@ -221,7 +221,7 @@ private:
         if (kind == FluidKind::Water) {
             return fluidFlow::kWaterTickDelay;
         }
-        const config::PurpurRules::Blocks& blocks = context_.world.gameplay().blocks;
+        const config::GameplayRules::Blocks& blocks = context_.world.gameplay().blocks;
         return context_.ultrawarm ? blocks.lavaSpeedNether : blocks.lavaSpeedNotNether;
     }
 
@@ -308,7 +308,7 @@ private:
     }
 
     [[nodiscard]] bool convertsToSource(FluidKind kind, std::int32_t sources) const {
-        const config::PurpurRules::Blocks& blocks = context_.world.gameplay().blocks;
+        const config::GameplayRules::Blocks& blocks = context_.world.gameplay().blocks;
         if (kind == FluidKind::Lava && blocks.lavaInfiniteRequiredSources > 0) {
             return sources >= blocks.lavaInfiniteRequiredSources;
         }

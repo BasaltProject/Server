@@ -1,4 +1,4 @@
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 
 #include <algorithm>
 
@@ -32,11 +32,11 @@ using wire::common::toml::TomlTable;
 
 } // namespace
 
-PurpurRules PurpurRules::from(const TomlTable* gameplay, const PurpurRules& inherited) {
+GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules& inherited) {
     if (gameplay == nullptr) {
         return inherited;
     }
-    PurpurRules rules = inherited;
+    GameplayRules rules = inherited;
     if (const TomlTable* table = gameplay->table("blocks"); table != nullptr) {
         rules.blocks.waterInfiniteRequiredSources =
             whole(*table, "water-infinite-required-sources", rules.blocks.waterInfiniteRequiredSources, 1);

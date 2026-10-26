@@ -1,7 +1,7 @@
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/Sponges.hpp>
 
@@ -53,7 +53,7 @@ using Drunk = std::array<std::int32_t, 4>;
         return false;
     }
     const std::string_view path = block->path();
-    const config::PurpurRules::Blocks& rules = world.gameplay().blocks;
+    const config::GameplayRules::Blocks& rules = world.gameplay().blocks;
     if (path == "mud" && rules.spongeAbsorbsWaterFromMud) {
         const std::int32_t clay = registry::blocks::named("clay")->stateId;
         if (!world.setBlockState(x, y, z, clay)) {

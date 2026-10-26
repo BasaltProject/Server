@@ -5,7 +5,7 @@
 #include <cstdint>
 
 namespace basalt::server::runtime::config {
-struct PurpurRules;
+struct GameplayRules;
 }
 
 namespace basalt::server::runtime::world {
@@ -21,7 +21,7 @@ struct Faller {
     std::int32_t featherFalling = 0;
 };
 
-[[nodiscard]] bool tramples(const config::PurpurRules& rules, const Faller& faller, random::RandomSource& random);
+[[nodiscard]] bool tramples(const config::GameplayRules& rules, const Faller& faller, random::RandomSource& random);
 
 } // namespace farmlandTrample
 

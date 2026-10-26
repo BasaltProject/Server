@@ -1,6 +1,6 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/FireworkSystem.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>

@@ -6,7 +6,7 @@
 
 namespace basalt::server::runtime::config {
 
-struct PurpurRules {
+struct GameplayRules {
     struct Blocks {
         std::int32_t waterInfiniteRequiredSources = 2;
         std::int32_t lavaInfiniteRequiredSources = -1;
@@ -147,9 +147,9 @@ struct PurpurRules {
         return forced == 0 ? rule : forced == 1;
     }
 
-    [[nodiscard]] static PurpurRules from(const wire::common::toml::TomlTable* gameplay, const PurpurRules& inherited);
+    [[nodiscard]] static GameplayRules from(const wire::common::toml::TomlTable* gameplay, const GameplayRules& inherited);
 
-    friend bool operator==(const PurpurRules&, const PurpurRules&) = default;
+    friend bool operator==(const GameplayRules&, const GameplayRules&) = default;
 };
 
 } // namespace basalt::server::runtime::config

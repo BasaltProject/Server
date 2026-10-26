@@ -5,7 +5,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/EntityPushSystem.hpp>
 #include <basalt/server/runtime/VehicleSystem.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>

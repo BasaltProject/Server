@@ -6,7 +6,7 @@
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/MobSteps.hpp>
@@ -116,7 +116,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
     // parity: `FarmlandBlock.fallOn`, for any living body heavy enough to break the soil.
     if (const wire::common::Identifier* soil = server::registry::blockStateDefinitions::blockOf(onState);
         soil != nullptr && soil->path() == "farmland" &&
-        config::PurpurRules::resolve(world.state().gameplay().blocks.farmlandMobGriefingOverride,
+        config::GameplayRules::resolve(world.state().gameplay().blocks.farmlandMobGriefingOverride,
                                      world.gameRules().get(world::gameRules::kMobGriefing)) &&
         server::registry::entityAttributes::isLiving(mob.type())) {
         random::RandomSource random = freshRandom();
@@ -136,7 +136,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
         nest != nullptr && nest->path() == "turtle_egg" && mob.type().path() != "turtle" &&
         mob.type().path() != "bat" && mob.type().path() != "zombie" &&
         server::registry::entityAttributes::isLiving(mob.type()) &&
-        config::PurpurRules::resolve(world.state().gameplay().blocks.turtleEggMobGriefingOverride,
+        config::GameplayRules::resolve(world.state().gameplay().blocks.turtleEggMobGriefingOverride,
                                      world.gameRules().get(world::gameRules::kMobGriefing))) {
         random::RandomSource random = freshRandom();
         if (const std::optional<world::BlockChange> cracked =
