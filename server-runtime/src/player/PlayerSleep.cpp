@@ -73,6 +73,9 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
 
     // parity: `AbstractBedBlock.useWithoutItem`.
     if (rule.destroyOnUse) {
+        if (!straw && !world.state().gameplay().blocks.bedExplode) {
+            return world::BedProblem::NotHere;
+        }
         if (!rule.errorKey.empty()) {
             refuse(player, rule.errorKey);
         }

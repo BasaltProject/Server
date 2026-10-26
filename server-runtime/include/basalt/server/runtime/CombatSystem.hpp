@@ -249,7 +249,7 @@ private:
     void tridentSound(const std::vector<player::PlayerSession*>& watchers, const entity::ServerEntity& trident,
                       std::string_view sound, float volume);
 
-    void landEnderPearl(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& pearl);
+    void landEnderPearl(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& pearl, float damage);
     /// parity: `Projectile.hitTargetOrDeflectSelf` against a breeze.
     bool deflected(const std::vector<player::PlayerSession*>& watchers,
                    const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& projectile, double fromX,

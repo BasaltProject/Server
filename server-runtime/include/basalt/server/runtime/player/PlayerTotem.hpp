@@ -18,6 +18,7 @@ deathProtectionOf(const storage::StoredItemStack& stack);
 struct TotemContext {
     PlayerRegistry* registry = nullptr;
     bool bypassesInvulnerability = false;
+    bool worksAnywhereInInventory = false;
     std::function<float()> nextFloat;
     std::function<void(const PlayerSession& player, std::int32_t slot)> slotChanged;
     std::function<void(PlayerSession& player, const storage::StoredItemStack& spent)> usedTotem;

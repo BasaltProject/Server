@@ -18,8 +18,6 @@ namespace basalt::server::runtime::world {
 /// parity: `PistonStructureResolver`.
 namespace pistons {
 
-inline constexpr std::int32_t kPushLimit = 12;
-
 /// parity: `PistonBaseBlock`.
 inline constexpr std::int32_t kMoveTicks = 2;
 

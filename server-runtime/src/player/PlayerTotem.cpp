@@ -97,9 +97,16 @@ bool checkTotemDeathProtection(PlayerSession& player, const TotemContext& contex
     if (context.bypassesInvulnerability) {
         return false;
     }
-    const std::array<std::int32_t, 2> hands{PlayerInventory::kHotbarStart + player.inventory.heldSlot(),
-                                            PlayerInventory::kOffhandSlot};
-    for (const std::int32_t slot : hands) {
+    std::vector<std::int32_t> slots{PlayerInventory::kHotbarStart + player.inventory.heldSlot(),
+                                    PlayerInventory::kOffhandSlot};
+    if (context.worksAnywhereInInventory) {
+        for (std::int32_t slot = 0; slot < PlayerInventory::kMainSlots; ++slot) {
+            if (slot != slots.front()) {
+                slots.push_back(slot);
+            }
+        }
+    }
+    for (const std::int32_t slot : slots) {
         const std::optional<storage::StoredItemStack> held = player.inventory.at(slot);
         const std::optional<std::vector<reg::ConsumeEffect>> effects =
             held.has_value() ? deathProtectionOf(*held) : std::nullopt;

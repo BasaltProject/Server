@@ -409,8 +409,9 @@ void beginRetract(const Context& context, std::int32_t x, std::int32_t y, std::i
         }
         for (const BlockFace face : kAllFaces) {
             const Position next = step(at, face);
-            if (std::abs(next[0] - pistonX) > kPushLimit + 1 || std::abs(next[1] - pistonY) > kPushLimit + 1 ||
-                std::abs(next[2] - pistonZ) > kPushLimit + 1) {
+            const std::int32_t reach = context.world.gameplay().blocks.pistonBlockPushLimit + 1;
+            if (std::abs(next[0] - pistonX) > reach || std::abs(next[1] - pistonY) > reach ||
+                std::abs(next[2] - pistonZ) > reach) {
                 continue;
             }
             if (seen.insert(next).second) {
