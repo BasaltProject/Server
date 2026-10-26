@@ -58,6 +58,8 @@ public:
         std::int64_t worldSeed = 0;
         std::string defaultWorldName = "world";
         std::int32_t maxPlayers = 20;
+        bool broadcastConsoleToOps = true;
+        bool broadcastRconToOps = true;
         wire::common::Logger logger{"Command"};
         std::function<void()> stopServer;
         std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,

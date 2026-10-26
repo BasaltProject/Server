@@ -89,6 +89,8 @@ struct CommandWiring {
     std::function<void(bool)> setWhitelistEnforced;
     std::function<void()> kickUnlistedPlayers;
     std::function<void(std::int32_t minutes)> setIdleTimeout;
+    bool broadcastConsoleToOps = true;
+    bool broadcastRconToOps = true;
 };
 
 struct WiredCommands {

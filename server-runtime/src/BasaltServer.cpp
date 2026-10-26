@@ -410,6 +410,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     timingsReport_ = std::make_unique<timings::TimingsReport>(timings_, tickLoop_->durations(), std::move(sources));
     whitelistEnforced_ = config.whitelist;
     idleTimeoutMinutes_ = config.tuning.playerIdleTimeoutMinutes;
+    command::permissionLevel::setOperatorLevel(config.tuning.opPermissionLevel);
     world::neighbourUpdates::setChainedLimit(config.tuning.maxChainedNeighborUpdates);
 
     vanillaData_.lootTables.useScoreboard(&scoreboard_);
@@ -487,6 +488,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.fetchMojangUuid = [](const std::string& name) { return wire::auth::mojangUuidOf(name); };
     wiring.whitelistEnforced = [this] { return whitelistEnforced_; };
     wiring.setWhitelistEnforced = [this](bool value) { whitelistEnforced_ = value; };
+    wiring.broadcastConsoleToOps = config.tuning.broadcastConsoleToOps;
+    wiring.broadcastRconToOps = config.tuning.broadcastRconToOps;
     wiring.kickUnlistedPlayers = [this] { kickUnlistedPlayers(); };
     wiring.setIdleTimeout = [this](std::int32_t minutes) { idleTimeoutMinutes_ = minutes; };
     wired_ = buildCommands(wiring);
@@ -1048,8 +1051,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             if (dispatcher == nullptr) {
                 return 0;
             }
-            const command::CommandBlockSource source{
-                {x + 0.5, y + 0.5, z + 0.5}, "@", true, wire::common::Logger{"CommandBlock"}};
+            const command::CommandBlockSource source{{x + 0.5, y + 0.5, z + 0.5},
+                                                     "@",
+                                                     !live_->current()->commands.options().silentCommandBlockConsole,
+                                                     wire::common::Logger{"CommandBlock"}};
             std::int32_t successes = 0;
             static_cast<void>(dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line, successes));
             return successes;
@@ -1377,7 +1382,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                         return 0;
                     }
                     const command::CommandBlockSource source{
-                        {cart.x, cart.y, cart.z}, "@", true, wire::common::Logger{"CommandBlock"}};
+                        {cart.x, cart.y, cart.z},
+                        "@",
+                        !live_->current()->commands.options().silentCommandBlockConsole,
+                        wire::common::Logger{"CommandBlock"}};
                     std::int32_t successes = 0;
                     static_cast<void>(
                         dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line, successes));
