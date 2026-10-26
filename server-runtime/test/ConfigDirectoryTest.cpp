@@ -3,7 +3,6 @@
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
 #include <basalt/server/runtime/config/MobsConfig.hpp>
-#include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <doctest.h>
@@ -49,7 +48,7 @@ TEST_CASE("a missing file is written from its commented default and then read") 
     REQUIRE(java->find("port") != nullptr);
 }
 
-TEST_CASE("a file that is already there is only ever appended to") {
+TEST_CASE("a file that is already there is not overwritten by the default") {
     const std::string root = scratch("config-existing");
     fileIO::createDirectories(root);
     fileIO::writeText(root + "/server.toml", "[server]\nport = 25566\n");
@@ -60,9 +59,7 @@ TEST_CASE("a file that is already there is only ever appended to") {
     const toml::TomlTable* server = loaded->table("server");
     REQUIRE(server != nullptr);
     REQUIRE(server->find("port") != nullptr);
-    const std::string kept = *fileIO::readText(root + "/server.toml");
-    CHECK(kept.starts_with("[server]\nport = 25566\n"));
-    CHECK(kept.find("\n# compression-level = -1") != std::string::npos);
+    CHECK(*fileIO::readText(root + "/server.toml") == "[server]\nport = 25566\n");
 }
 
 TEST_CASE("a file that does not parse names itself rather than being replaced") {
@@ -116,10 +113,22 @@ TEST_CASE("an override naming an unknown field is refused with the file") {
     CHECK(settings.error().starts_with("mobs.toml: overrides.zombie.max-helth"));
 }
 
-TEST_CASE("the generated world rules read back as vanilla's") {
-    const std::string text = std::string{kWorldsDefaultToml} + worldRulesTemplate(true);
-    const auto parsed = toml::parse(text);
+TEST_CASE("an override reads drops, name lists and refuses an unknown goal") {
+    const std::expected<toml::TomlTable, toml::TomlError> parsed =
+        toml::parse("[overrides.cow]\nbreeding-items = [\"wheat\"]\ndisabled-goals = [\"panic\"]\n"
+                    "[overrides.cow.drops.diamond]\nchance = 0.5\nmin = 1\nmax = 2\n");
     REQUIRE(parsed.has_value());
-    CHECK(WorldSettings::from(parsed->table("defaults"), WorldSettings::vanilla()) == WorldSettings::vanilla());
-    CHECK(toml::parse(std::string{kWorldSettingsDefaultToml} + worldRulesTemplate(false)).has_value());
+    const std::expected<MobSettings, std::string> settings =
+        MobSettings::from(*parsed, MobSettings::vanilla(), "mobs.toml");
+    REQUIRE(settings.has_value());
+    const MobOverride* cow = settings->overrideFor("cow");
+    REQUIRE(cow != nullptr);
+    REQUIRE(cow->drops.size() == 1);
+    CHECK(cow->drops.front().item == "minecraft:diamond");
+    CHECK(cow->breedingItems == std::vector<std::string>{"minecraft:wheat"});
+
+    const std::expected<toml::TomlTable, toml::TomlError> bad =
+        toml::parse("[overrides.cow]\ndisabled-goals = [\"nope\"]\n");
+    REQUIRE(bad.has_value());
+    CHECK_FALSE(MobSettings::from(*bad, MobSettings::vanilla(), "mobs.toml").has_value());
 }
