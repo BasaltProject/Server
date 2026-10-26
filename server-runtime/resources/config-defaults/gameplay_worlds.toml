@@ -29,6 +29,64 @@ bed-explosion-power = 5.0
 bed-explosion-fire = true
 # A campfire is lit when placed (vanilla true). Placed in water it is never lit.
 campfire-lit-when-placed = true
+# A cactus breaks when a solid block touches its side (vanilla true).
+cactus-breaks-from-solid-neighbors = true
+# Coral dies a few seconds after it leaves water (vanilla true).
+coral-die-outside-water = true
+# NOT VANILLA when true. A chest opens even with a solid block on top (vanilla false).
+chest-open-with-solid-block-on-top = false
+# NOT VANILLA when true. A sponge soaks up lava as well as water.
+sponge-absorbs-lava = false
+# NOT VANILLA when true. A sponge turns mud it touches into clay.
+sponge-absorbs-water-from-mud = false
+# NOT VANILLA when true. A note block sounds even with a block on top.
+note-block-ignore-above = false
+# How far a one-level beacon reaches, in blocks (vanilla 20).
+beacon-effect-range-level-1 = 20
+# Range of a two-level beacon (vanilla 30).
+beacon-effect-range-level-2 = 30
+# Range of a three-level beacon (vanilla 40).
+beacon-effect-range-level-3 = 40
+# Range of a four-level beacon (vanilla 50).
+beacon-effect-range-level-4 = 50
+# NOT VANILLA when true. Tinted glass above a beacon no longer stops its effects.
+beacon-allow-effects-with-tinted-glass = false
+# A charged respawn anchor explodes when used outside the Nether (vanilla true). False makes the use do nothing.
+respawn-anchor-explode = true
+# Power of that explosion (vanilla 5.0).
+respawn-anchor-explosion-power = 5.0
+# That explosion starts fires (vanilla true).
+respawn-anchor-explosion-fire = true
+# An end crystal without its base plate explodes when destroyed (vanilla true).
+end-crystal-baseless-explode = true
+# Power of that explosion (vanilla 6.0).
+end-crystal-baseless-explosion-power = 6.0
+# That explosion starts fires (vanilla false).
+end-crystal-baseless-explosion-fire = false
+# An end crystal with its base plate explodes when destroyed (vanilla true).
+end-crystal-base-explode = true
+# Power of that explosion (vanilla 6.0).
+end-crystal-base-explosion-power = 6.0
+# That explosion starts fires (vanilla false).
+end-crystal-base-explosion-fire = false
+# NOT VANILLA when true. End crystals can be placed on any block, not only obsidian and bedrock.
+end-crystal-place-anywhere = false
+# The dragon egg teleports when clicked or hit (vanilla true).
+dragon-egg-teleport = true
+# NOT VANILLA when above 0. Health a player loses per hit when standing on a stonecutter.
+stonecutter-damage = 0.0
+# NOT VANILLA when true. A spawner stops while it is powered by redstone.
+spawner-deactivate-by-redstone = false
+# How far a lightning rod pulls a strike in, in blocks (vanilla 128).
+lightning-rod-range = 128
+# NOT VANILLA when true. Nothing tramples farmland by landing on it.
+farmland-disable-trampling = false
+# NOT VANILLA when true. Only players trample farmland.
+farmland-only-players-trample = false
+# NOT VANILLA when true. Feather falling at least as deep as the fall stops trampling.
+farmland-feather-fall-distance-affects-trampling = false
+# NOT VANILLA when 0 or more. Trample whenever the fall is at least this far, with no random roll. -1 keeps vanilla.
+farmland-trample-height = -1.0
 
 [defaults.gameplay.mechanics]
 # Rules of the world that are not one block or item.
@@ -44,6 +102,18 @@ poison-degeneration-amount = 1.0
 wither-degeneration-amount = 1.0
 # Exhaustion added per tick by the hunger effect, per level (vanilla 0.005).
 hunger-exhaustion-amount = 0.005
+# Durability an elytra loses every second of flight (vanilla 1).
+elytra-damage-per-second = 1
+# NOT VANILLA when above 0. Extra durability an elytra loses per firework boost.
+elytra-damage-per-firework-boost = 0
+# Milk clears bad omen and raid omen (vanilla true). False lets them survive.
+milk-cures-bad-omen = true
+# Milk clears beneficial effects too (vanilla true).
+milk-clears-beneficial-effects = true
+# NOT VANILLA when above 0. Seconds a player must wait before starting another raid.
+raid-cooldown-seconds = 0
+# NOT VANILLA when above 0. Seconds a player must wait before feeding the same kind of animal into love again.
+animal-breeding-cooldown-seconds = 0
 
 [defaults.gameplay.player]
 # Player rules.
@@ -51,8 +121,40 @@ hunger-exhaustion-amount = 0.005
 critical-damage-multiplier = 1.5
 # NOT VANILLA when true. A totem anywhere in the inventory saves from death, not only in a hand.
 totem-of-undying-works-in-inventory = false
+# Ticks a player waits between picking up experience orbs (vanilla 2).
+exp-pickup-delay-ticks = 2
 
 [defaults.gameplay.items]
 # Item and projectile rules.
 # Fall damage dealt to the thrower when a pearl lands (vanilla 5.0).
 ender-pearl-damage = 5.0
+# Ticks before a player can throw another ender pearl (vanilla 20).
+ender-pearl-cooldown = 20
+# The same for a creative player (vanilla 20).
+ender-pearl-creative-cooldown = 20
+# Chance that a landing pearl spawns an endermite (vanilla 0.05).
+ender-pearl-endermite-spawn-chance = 0.05
+# Damage a snowball deals. -1 is vanilla: nothing, or 3 to a blaze.
+snowball-damage = -1
+# Inaccuracy of an arrow shot from a bow; 0 flies straight (vanilla 1.0).
+projectile-offset-bow = 1.0
+# Inaccuracy of a crossbow bolt (vanilla 1.0).
+projectile-offset-crossbow = 1.0
+# Inaccuracy of a thrown egg (vanilla 1.0).
+projectile-offset-egg = 1.0
+# Inaccuracy of a thrown ender pearl (vanilla 1.0).
+projectile-offset-ender-pearl = 1.0
+# Inaccuracy of a thrown splash or lingering potion (vanilla 1.0).
+projectile-offset-throwable-potion = 1.0
+# Inaccuracy of a thrown trident (vanilla 1.0).
+projectile-offset-trident = 1.0
+# Inaccuracy of a thrown snowball (vanilla 1.0).
+projectile-offset-snowball = 1.0
+# Inaccuracy of a thrown wind charge (vanilla 1.0).
+projectile-offset-wind-charge = 1.0
+# Top speed of a minecart in blocks per tick, when minecart_improvements is off (vanilla 0.4).
+minecart-max-speed = 0.4
+# NOT VANILLA when true. A minecart can be placed on any block, not only on rails.
+minecart-place-anywhere = false
+# Speed a powered rail adds to a minecart, when minecart_improvements is off (vanilla 0.06).
+powered-rail-boost-modifier = 0.06

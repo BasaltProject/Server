@@ -21,6 +21,35 @@ struct GameplayRules {
         float bedExplosionPower = 5.0F;
         bool bedExplosionFire = true;
         bool campfireLitWhenPlaced = true;
+        bool cactusBreaksFromSolidNeighbors = true;
+        bool coralDieOutsideWater = true;
+        bool chestOpenWithSolidBlockOnTop = false;
+        bool spongeAbsorbsLava = false;
+        bool spongeAbsorbsWaterFromMud = false;
+        bool noteBlockIgnoreAbove = false;
+        std::int32_t beaconEffectRangeLevel1 = 20;
+        std::int32_t beaconEffectRangeLevel2 = 30;
+        std::int32_t beaconEffectRangeLevel3 = 40;
+        std::int32_t beaconEffectRangeLevel4 = 50;
+        bool beaconAllowEffectsWithTintedGlass = false;
+        bool respawnAnchorExplode = true;
+        float respawnAnchorExplosionPower = 5.0F;
+        bool respawnAnchorExplosionFire = true;
+        bool endCrystalBaselessExplode = true;
+        float endCrystalBaselessExplosionPower = 6.0F;
+        bool endCrystalBaselessExplosionFire = false;
+        bool endCrystalBaseExplode = true;
+        float endCrystalBaseExplosionPower = 6.0F;
+        bool endCrystalBaseExplosionFire = false;
+        bool endCrystalPlaceAnywhere = false;
+        bool dragonEggTeleport = true;
+        float stonecutterDamage = 0.0F;
+        bool spawnerDeactivateByRedstone = false;
+        std::int32_t lightningRodRange = 128;
+        bool farmlandDisableTrampling = false;
+        bool farmlandOnlyPlayersTrample = false;
+        bool farmlandFeatherFallDistanceAffectsTrampling = false;
+        float farmlandTrampleHeight = -1.0F;
         friend bool operator==(const Blocks&, const Blocks&) = default;
     };
 
@@ -31,17 +60,39 @@ struct GameplayRules {
         float poisonDegenerationAmount = 1.0F;
         float witherDegenerationAmount = 1.0F;
         float hungerExhaustionAmount = 0.005F;
+        std::int32_t elytraDamagePerSecond = 1;
+        std::int32_t elytraDamagePerFireworkBoost = 0;
+        bool milkCuresBadOmen = true;
+        bool milkClearsBeneficialEffects = true;
+        std::int32_t raidCooldownSeconds = 0;
+        std::int32_t animalBreedingCooldownSeconds = 0;
         friend bool operator==(const Mechanics&, const Mechanics&) = default;
     };
 
     struct Player {
         float criticalDamageMultiplier = 1.5F;
         bool totemOfUndyingWorksInInventory = false;
+        std::int32_t expPickupDelayTicks = 2;
         friend bool operator==(const Player&, const Player&) = default;
     };
 
     struct Items {
         float enderPearlDamage = 5.0F;
+        std::int32_t enderPearlCooldown = 20;
+        std::int32_t enderPearlCreativeCooldown = 20;
+        float enderPearlEndermiteSpawnChance = 0.05F;
+        std::int32_t snowballDamage = -1;
+        float projectileOffsetBow = 1.0F;
+        float projectileOffsetCrossbow = 1.0F;
+        float projectileOffsetEgg = 1.0F;
+        float projectileOffsetEnderPearl = 1.0F;
+        float projectileOffsetThrowablePotion = 1.0F;
+        float projectileOffsetTrident = 1.0F;
+        float projectileOffsetSnowball = 1.0F;
+        float projectileOffsetWindCharge = 1.0F;
+        float minecartMaxSpeed = 0.4F;
+        bool minecartPlaceAnywhere = false;
+        float poweredRailBoostModifier = 0.06F;
         friend bool operator==(const Items&, const Items&) = default;
     };
 
