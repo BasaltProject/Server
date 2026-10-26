@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -255,7 +256,8 @@ MobActionSystem::HiveView MobActionSystem::hiveAt(const ServerEntity& bee, const
         return view;
     }
     view.hive = true;
-    view.full = beehives::isFull(entity->data());
+    view.full = beehives::isFull(entity->data(),
+                                 static_cast<std::size_t>(world->state().gameplay().blocks.beehiveMaxBeesInside));
     view.fireNearby = beehives::isFireNearby(world->state(), pos);
     return view;
 }
@@ -263,7 +265,10 @@ MobActionSystem::HiveView MobActionSystem::hiveAt(const ServerEntity& bee, const
 void MobActionSystem::enterHive(ServerEntity& bee, const Pos& hive) {
     world::LoadedWorld* world = worldOf(bee);
     server::world::ChunkBlockEntity* entity = world == nullptr ? nullptr : hiveEntity(*world, hive);
-    if (entity == nullptr || beehives::isFull(entity->data()) || bee.removed) {
+    if (entity == nullptr ||
+        beehives::isFull(entity->data(),
+                         static_cast<std::size_t>(world->state().gameplay().blocks.beehiveMaxBeesInside)) ||
+        bee.removed) {
         return;
     }
     if (!world->events().allowed(&server::plugins::pluginEventTypes::entityEnterBlock,

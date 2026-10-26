@@ -138,9 +138,13 @@ void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
             return;
         }
     }
+    const config::GameplayRules& rules = world.state().gameplay();
+    if (!rules.player.canSkipNight) {
+        return;
+    }
     world.clock().setTotalTicks(world::beds::nextMorning(world.clock().totalTicks()));
-    world.weather().raining = false;
-    world.weather().thundering = false;
+    world.weather().raining = world.weather().raining && !rules.mechanics.rainStopsAfterSleep;
+    world.weather().thundering = world.weather().thundering && !rules.mechanics.thunderStopsAfterSleep;
     for (PlayerSession* player : players) {
         if (player->connection().wakeUp) {
             player->connection().wakeUp();

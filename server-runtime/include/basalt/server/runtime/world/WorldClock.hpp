@@ -35,7 +35,7 @@ public:
 
     [[nodiscard]] float partialTick() const noexcept { return partialTick_; }
 
-    bool tick(bool advanceTime);
+    bool tick(bool advanceTime, float stepScale = 1.0F);
 
     void setTotalTicks(std::int64_t ticks);
 

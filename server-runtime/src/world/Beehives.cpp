@@ -43,11 +43,13 @@ std::size_t occupantCount(const NbtCompound& data) {
     return bees == nullptr ? 0 : bees->size();
 }
 
-std::size_t maxOccupants(const NbtCompound& data) {
-    return data.contains("MaxBees") ? static_cast<std::size_t>(std::max(data.getInt("MaxBees"), 0)) : kMaxOccupants;
+std::size_t maxOccupants(const NbtCompound& data, const std::size_t fallback) {
+    return data.contains("MaxBees") ? static_cast<std::size_t>(std::max(data.getInt("MaxBees"), 0)) : fallback;
 }
 
-bool isFull(const NbtCompound& data) { return occupantCount(data) >= maxOccupants(data); }
+bool isFull(const NbtCompound& data, const std::size_t fallback) {
+    return occupantCount(data) >= maxOccupants(data, fallback);
+}
 
 void addOccupant(NbtCompound& data, NbtCompound bee) {
     // parity: `Occupant.of`, whose minimum stay is read from the saved nectar.

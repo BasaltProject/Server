@@ -101,6 +101,26 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
                  rules.blocks.farmlandFeatherFallDistanceAffectsTrampling);
         rules.blocks.farmlandTrampleHeight =
             decimal(*table, "farmland-trample-height", rules.blocks.farmlandTrampleHeight, -1);
+        rules.blocks.kelpMaxGrowthAge = whole(*table, "kelp-max-growth-age", rules.blocks.kelpMaxGrowthAge, 0);
+        rules.blocks.caveVinesMaxGrowthAge =
+            whole(*table, "cave-vines-max-growth-age", rules.blocks.caveVinesMaxGrowthAge, 0);
+        rules.blocks.twistingVinesMaxGrowthAge =
+            whole(*table, "twisting-vines-max-growth-age", rules.blocks.twistingVinesMaxGrowthAge, 0);
+        rules.blocks.weepingVinesMaxGrowthAge =
+            whole(*table, "weeping-vines-max-growth-age", rules.blocks.weepingVinesMaxGrowthAge, 0);
+        rules.blocks.bigDripleafTiltDelayUnstable =
+            whole(*table, "big-dripleaf-tilt-delay-unstable", rules.blocks.bigDripleafTiltDelayUnstable, 1);
+        rules.blocks.bigDripleafTiltDelayPartial =
+            whole(*table, "big-dripleaf-tilt-delay-partial", rules.blocks.bigDripleafTiltDelayPartial, 1);
+        rules.blocks.bigDripleafTiltDelayFull =
+            whole(*table, "big-dripleaf-tilt-delay-full", rules.blocks.bigDripleafTiltDelayFull, 1);
+        rules.blocks.magmaBlockReverseBubbleColumnFlow =
+            flag(*table, "magma-block-reverse-bubble-column-flow", rules.blocks.magmaBlockReverseBubbleColumnFlow);
+        rules.blocks.soulSandReverseBubbleColumnFlow =
+            flag(*table, "soul-sand-reverse-bubble-column-flow", rules.blocks.soulSandReverseBubbleColumnFlow);
+        rules.blocks.anvilCumulativeCost = flag(*table, "anvil-cumulative-cost", rules.blocks.anvilCumulativeCost);
+        rules.blocks.beehiveMaxBeesInside =
+            whole(*table, "beehive-max-bees-inside", rules.blocks.beehiveMaxBeesInside, 1);
     }
     if (const TomlTable* table = gameplay->table("mechanics"); table != nullptr) {
         rules.mechanics.drowningTicksPerDamage =
@@ -125,6 +145,14 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
             whole(*table, "raid-cooldown-seconds", rules.mechanics.raidCooldownSeconds, 0);
         rules.mechanics.animalBreedingCooldownSeconds =
             whole(*table, "animal-breeding-cooldown-seconds", rules.mechanics.animalBreedingCooldownSeconds, 0);
+        rules.mechanics.rainStopsAfterSleep =
+            flag(*table, "rain-stops-after-sleep", rules.mechanics.rainStopsAfterSleep);
+        rules.mechanics.thunderStopsAfterSleep =
+            flag(*table, "thunder-stops-after-sleep", rules.mechanics.thunderStopsAfterSleep);
+        rules.mechanics.daylightDaytimeTicks =
+            whole(*table, "daylight-daytime-ticks", rules.mechanics.daylightDaytimeTicks, 1);
+        rules.mechanics.daylightNighttimeTicks =
+            whole(*table, "daylight-nighttime-ticks", rules.mechanics.daylightNighttimeTicks, 1);
     }
     if (const TomlTable* table = gameplay->table("player"); table != nullptr) {
         rules.player.criticalDamageMultiplier =
@@ -132,6 +160,10 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
         rules.player.totemOfUndyingWorksInInventory =
             flag(*table, "totem-of-undying-works-in-inventory", rules.player.totemOfUndyingWorksInInventory);
         rules.player.expPickupDelayTicks = whole(*table, "exp-pickup-delay-ticks", rules.player.expPickupDelayTicks, 0);
+        rules.player.canSkipNight = flag(*table, "can-skip-night", rules.player.canSkipNight);
+        rules.player.sleepIgnoreNearbyMobs =
+            flag(*table, "sleep-ignore-nearby-mobs", rules.player.sleepIgnoreNearbyMobs);
+        rules.player.creativeOnePunch = flag(*table, "creative-one-punch", rules.player.creativeOnePunch);
     }
     if (const TomlTable* table = gameplay->table("items"); table != nullptr) {
         rules.items.enderPearlDamage = decimal(*table, "ender-pearl-damage", rules.items.enderPearlDamage, 0);

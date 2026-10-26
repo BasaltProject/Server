@@ -71,6 +71,13 @@
 #include <random>
 
 namespace basalt::server::runtime {
+
+namespace {
+
+constexpr float kOnePunchDamage = 1.0E6F;
+
+} // namespace
+
 using namespace combatAttack;
 
 void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attack) {
@@ -214,7 +221,9 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         strength, base, enchanted, player::pvp::criticalPossible(*session, *world, fallDistance > 0.0),
         session->onGround, session->sprinting, bonus, world->state().gameplay().player.criticalDamageMultiplier);
     const Identifier& damageType = smash ? world::damageTypes::kMaceSmash : world::damageTypes::kPlayerAttack;
-    const float damage = swing.damage;
+    const float damage = session->gamemode == Gamemode::Creative && world->state().gameplay().player.creativeOnePunch
+                             ? kOnePunchDamage
+                             : swing.damage;
     const bool fullStrength = swing.fullStrength;
     const bool critical = swing.critical;
     if (damage <= 0.0F) {

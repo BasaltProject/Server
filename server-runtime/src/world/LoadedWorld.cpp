@@ -1,13 +1,15 @@
 #include "LoadedWorldShared.hpp"
 
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/sched/OnOwner.hpp>
-#include <basalt/server/runtime/world/AntiXray.hpp>
+#include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BiomeZoomSeed.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/SavedDataFiles.hpp>
@@ -69,16 +71,8 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       biomeZoomSeed_(obfuscateBiomeSeed(metadata_.seed)), biomeZoomer_(biomeZoomSeed_), gameTime_(metadata_.gameTime),
       difficulty_(metadata_.difficulty.value_or(settings_.difficulty)), difficultyLocked_(metadata_.difficultyLocked),
       hardcore_(metadata_.hardcore.value_or(settings_.hardcore)), defaultGamemode_(metadata_.defaultGamemode) {
-    tunables_.simulationDistance = settings_.simulationDistance;
     tunables_.lootRefill = settings_.lootRefill;
     tunables_.lootRelootSeconds = settings_.lootRelootSeconds;
-    state_.setMobSettings(&settings_.mobs);
-    state_.setRules(&settings_.rules);
-    if (settings_.rules.antiXray.enabled) {
-        antiXray_ = std::make_shared<const AntiXray>(settings_.rules.antiXray, declaration_.dimension);
-    }
-    tunables_.simulationDistance = settings_.rules.simulationDistance;
-    tunables_.voidDamage = settings_.rules.environment.voidDamage;
     if (hardcore_) {
         difficulty_ = "hard";
     }
@@ -270,17 +264,8 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
             metadata_.dragonFight.has_value() ? DragonFight::decode(*metadata_.dragonFight) : DragonFight{});
         dragonFight_->shuffleGateways(metadata_.seed);
     }
-    border_.absoluteMaxSize = settings_.rules.maxWorldSize;
     if (metadata_.worldBorder.has_value()) {
         border_.restore(*metadata_.worldBorder);
-    } else {
-        const config::BorderRules& start = settings_.rules.border;
-        border_.center(start.centerX, start.centerZ);
-        border_.setSize(start.size);
-        border_.damagePerBlock = start.damagePerBlock;
-        border_.damageBuffer = start.damageBuffer;
-        border_.warningBlocks = start.warningDistance;
-        border_.warningSeconds = start.warningSeconds;
     }
     weather_.raining = metadata_.raining;
     weather_.rainTime = metadata_.rainTime;
@@ -398,8 +383,12 @@ void LoadedWorld::updateSkyBrightness() {
 
 bool LoadedWorld::tickTime(random::RandomSource& random) {
     // parity: `MinecraftServer.tickChildren` moves the day clock before any level ticks.
-    const bool advanced =
-        config::hasClock(declaration_.dimension) && clock_.tick(gameRules_.get(gameRules::kAdvanceTime));
+    // parity: Purpur's day and night lengths, a tick of either phase being a twelve-thousandth of the cycle.
+    const config::GameplayRules::Mechanics& cycle = state_.gameplay().mechanics;
+    const float phaseTicks = static_cast<float>(beds::isNight(clock_.totalTicks()) ? cycle.daylightNighttimeTicks
+                                                                                   : cycle.daylightDaytimeTicks);
+    const bool advanced = config::hasClock(declaration_.dimension) &&
+                          clock_.tick(gameRules_.get(gameRules::kAdvanceTime), 12000.0F / phaseTicks);
     // parity: `ServerLevel.advanceWeatherCycle` runs only.
     if (config::canHaveWeather(declaration_.dimension)) {
         weather_.tick(random, gameRules_.get(gameRules::kAdvanceWeather));

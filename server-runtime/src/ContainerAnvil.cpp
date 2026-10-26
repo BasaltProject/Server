@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/player/PlayerAnvil.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
@@ -67,12 +68,13 @@ void ContainerMenuController::setAnvilName(const std::string& name) {
 void ContainerMenuController::recomputeAnvilResult() {
     const std::optional<storage::StoredItemStack>& input = anvilSlots_[Menu::kAnvilInput];
     const std::optional<storage::StoredItemStack>& addition = anvilSlots_[Menu::kAnvilAddition];
-    const world::anvils::Result made =
-        world::anvils::combine(input.has_value() ? &*input : nullptr, addition.has_value() ? &*addition : nullptr,
-                               anvilName_, world::anvils::isRepairMaterialFor,
-                               world::anvils::enchantmentMerge({.enchantments = owner_->options().enchantments,
-                                                                .itemTags = owner_->options().itemTags,
-                                                                .enchantmentTags = owner_->options().enchantmentTags}));
+    const world::anvils::Result made = world::anvils::combine(
+        input.has_value() ? &*input : nullptr, addition.has_value() ? &*addition : nullptr, anvilName_,
+        world::anvils::isRepairMaterialFor,
+        world::anvils::enchantmentMerge({.enchantments = owner_->options().enchantments,
+                                         .itemTags = owner_->options().itemTags,
+                                         .enchantmentTags = owner_->options().enchantmentTags}),
+        owner_->currentWorld() == nullptr || owner_->currentWorld()->state().gameplay().blocks.anvilCumulativeCost);
     anvilSlots_[Menu::kAnvilResult] = made.output;
     anvilCost_ = made.cost;
     anvilMaterials_ = made.materialCount;
