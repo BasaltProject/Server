@@ -18,6 +18,18 @@ namespace basalt::server::runtime::config {
 
 struct GameplayRules;
 
+struct GameplayHandle {
+    std::shared_ptr<const GameplayRules> ptr;
+
+    GameplayHandle() = default;
+
+    GameplayHandle(std::shared_ptr<const GameplayRules> value) : ptr(std::move(value)) {}
+
+    operator const std::shared_ptr<const GameplayRules>&() const noexcept { return ptr; }
+
+    friend bool operator==(const GameplayHandle&, const GameplayHandle&);
+};
+
 struct WorldSettings {
     std::string difficulty = "easy";
     std::int32_t viewDistance = 10;
@@ -35,7 +47,7 @@ struct WorldSettings {
 
     MobSettings mobs;
     WorldRules rules;
-    std::shared_ptr<const GameplayRules> gameplay;
+    GameplayHandle gameplay;
 
     [[nodiscard]] static WorldSettings vanilla() { return WorldSettings{}; }
 
