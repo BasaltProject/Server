@@ -66,7 +66,8 @@ bool ItemUseTimers::startEating(PlayerSession& session, const Identifier& item, 
         owner_->sendInventory();
         return false;
     }
-    if (!food->canAlwaysEat && session.food.foodLevel() >= player::FoodData::kMaxFood) {
+    // parity: only a `minecraft:food` component can refuse a full stomach; a bucket of milk or a bottle never does.
+    if (food->nutrition > 0 && !food->canAlwaysEat && session.food.foodLevel() >= player::FoodData::kMaxFood) {
         // parity: `ServerPlayerGameMode.useItem`.
         owner_->sendInventoryAll();
         owner_->syncHealth();
