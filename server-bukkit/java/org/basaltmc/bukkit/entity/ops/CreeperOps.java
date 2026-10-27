@@ -23,7 +23,7 @@ public interface CreeperOps extends Creeper, Cored {
     }
 
     default int getMaxFuseTicks() {
-        return kMaxFuse;
+        return core().nbtInt("Fuse", kMaxFuse);
     }
 
     default boolean isIgnited() {
@@ -46,7 +46,7 @@ public interface CreeperOps extends Creeper, Cored {
     }
 
     default void explode() {
-        setFuseTicks(kMaxFuse);
+        setFuseTicks(getMaxFuseTicks());
     }
 
     default int getExplosionRadius() {
