@@ -52,13 +52,17 @@ public final class DialogCallbacks {
             kHeld.remove(key);
             return true;
         }
-        int uses = held.uses.get();
-        if (uses != ClickCallback.UNLIMITED_USES) {
-            if (uses <= 0 || held.uses.decrementAndGet() <= 0) {
-                kHeld.remove(key);
-                if (uses <= 0) {
+        if (held.uses.get() != ClickCallback.UNLIMITED_USES) {
+            int current;
+            do {
+                current = held.uses.get();
+                if (current <= 0) {
+                    kHeld.remove(key);
                     return true;
                 }
+            } while (!held.uses.compareAndSet(current, current - 1));
+            if (current - 1 <= 0) {
+                kHeld.remove(key);
             }
         }
         held.callback.accept(new Response(payload), player);
