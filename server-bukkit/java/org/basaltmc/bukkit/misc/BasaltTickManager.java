@@ -7,7 +7,7 @@ import org.bukkit.entity.Entity;
 public final class BasaltTickManager implements ServerTickManager {
     @Override
     public boolean isRunningNormally() {
-        return !MiscNatives.tmFrozen() && !MiscNatives.tmSprinting() || MiscNatives.tmStepsOwed() > 0;
+        return !MiscNatives.tmFrozen() || MiscNatives.tmStepsOwed() > 0;
     }
 
     @Override
