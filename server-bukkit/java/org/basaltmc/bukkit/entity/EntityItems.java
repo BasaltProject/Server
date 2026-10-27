@@ -2,7 +2,6 @@ package org.basaltmc.bukkit.entity;
 
 import net.minecraft.nbt.CompoundTag;
 import org.basaltmc.bukkit.facade.NbtCodec;
-import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
 public final class EntityItems {
@@ -12,10 +11,7 @@ public final class EntityItems {
         if (stack == null || stack.getType().isAir() || stack.getAmount() <= 0) {
             return null;
         }
-        CompoundTag tag = new CompoundTag();
-        tag.putString("id", stack.getType().getKey().toString());
-        tag.putInt("count", stack.getAmount());
-        return tag;
+        return NbtCodec.fromBytes(org.basaltmc.bukkit.item.Nbt.writeNamed(org.basaltmc.bukkit.item.Convert.stack(stack)));
     }
 
     public static byte[] toNbt(ItemStack stack) {
@@ -24,14 +20,7 @@ public final class EntityItems {
     }
 
     public static ItemStack fromNbt(byte[] bytes) {
-        CompoundTag tag = bytes == null ? null : NbtCodec.fromBytes(bytes);
-        if (tag == null) {
-            return null;
-        }
-        Material material = Material.matchMaterial(tag.getStringOr("id", ""));
-        if (material == null || material.isAir()) {
-            return null;
-        }
-        return new ItemStack(material, Math.max(1, tag.getIntOr("count", 1)));
+        java.util.Map<String, Object> data = bytes == null ? null : org.basaltmc.bukkit.item.Nbt.readNamed(bytes);
+        return data == null ? null : org.basaltmc.bukkit.item.Convert.stack(data);
     }
 }
