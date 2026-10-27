@@ -92,7 +92,22 @@ public final class AdventureBars {
         };
     }
 
+    private static void dropOffline() {
+        java.util.Iterator<Map.Entry<BossBar, Mirror>> each = kMirrors.entrySet().iterator();
+        while (each.hasNext()) {
+            Map.Entry<BossBar, Mirror> entry = each.next();
+            Mirror mirror = entry.getValue();
+            mirror.viewers.removeIf(id -> org.bukkit.Bukkit.getPlayer(id) == null);
+            if (mirror.viewers.isEmpty() && mirror.id != null) {
+                each.remove();
+                entry.getKey().removeListener(mirror);
+                MiscNatives.bbRemove(mirror.id);
+            }
+        }
+    }
+
     public static synchronized java.util.List<BossBar> shownTo(UUID player) {
+        dropOffline();
         java.util.List<BossBar> out = new java.util.ArrayList<>();
         for (Map.Entry<BossBar, Mirror> entry : kMirrors.entrySet()) {
             if (entry.getValue().viewers.contains(player)) {
@@ -103,6 +118,7 @@ public final class AdventureBars {
     }
 
     public static synchronized void show(UUID player, BossBar bar) {
+        dropOffline();
         Mirror mirror = org.basaltmc.bukkit.facade.Memo.get(kMirrors, bar, Mirror::new);
         if (mirror.id != null && mirror.viewers.add(player)) {
             MiscNatives.bbAddPlayer(mirror.id, player.toString());
