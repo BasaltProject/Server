@@ -39,7 +39,8 @@ public final class BrigadierCommand extends Command implements PluginIdentifiabl
     }
 
     private static String input(String label, String[] args) {
-        return args.length == 0 ? label : label + " " + String.join(" ", args);
+        String root = label.substring(label.indexOf(':') + 1);
+        return args.length == 0 ? root : root + " " + String.join(" ", args);
     }
 
     @Override
