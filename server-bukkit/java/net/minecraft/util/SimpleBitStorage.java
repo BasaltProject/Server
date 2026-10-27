@@ -57,6 +57,7 @@ public class SimpleBitStorage implements BitStorage {
 
     @Override
     public int getAndSet(int index, int value) {
+        checkIndex(index);
         int cell = index / valuesPerLong;
         long held = data[cell];
         int shift = (index - cell * valuesPerLong) * bits;
@@ -67,6 +68,7 @@ public class SimpleBitStorage implements BitStorage {
 
     @Override
     public void set(int index, int value) {
+        checkIndex(index);
         int cell = index / valuesPerLong;
         long held = data[cell];
         int shift = (index - cell * valuesPerLong) * bits;
@@ -75,8 +77,15 @@ public class SimpleBitStorage implements BitStorage {
 
     @Override
     public int get(int index) {
+        checkIndex(index);
         int cell = index / valuesPerLong;
         return (int) (data[cell] >> (index - cell * valuesPerLong) * bits & mask);
+    }
+
+    private void checkIndex(int index) {
+        if (index < 0 || index >= size) {
+            throw new IndexOutOfBoundsException("index " + index + " size " + size);
+        }
     }
 
     public void fill(int value) {
@@ -86,6 +95,10 @@ public class SimpleBitStorage implements BitStorage {
             cell |= cell << offset;
             offset <<= 1;
         } while (offset < 64);
+        int used = valuesPerLong * bits;
+        if (used < 64) {
+            cell &= (1L << used) - 1L;
+        }
         java.util.Arrays.fill(data, cell);
     }
 
