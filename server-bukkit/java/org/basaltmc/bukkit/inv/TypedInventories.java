@@ -26,8 +26,8 @@ import org.bukkit.inventory.StonecutterInventory;
 public final class TypedInventories {
     private static final Map<String, Integer> kFurnace = Map.of("Result", 2, "Fuel", 1, "Smelting", 0);
     private static final Map<String, Integer> kBrewer = Map.of("Ingredient", 3, "Fuel", 4);
-    private static final Map<String, Integer> kEnchanting = Map.of("", 0, "Secondary", 1);
-    private static final Map<String, Integer> kBeacon = Map.of("", 0);
+    private static final Map<String, Integer> kEnchanting = Map.of("Item", 0, "Secondary", 1);
+    private static final Map<String, Integer> kBeacon = Map.of("Item", 0);
     private static final Map<String, Integer> kLectern = Map.of("Book", 0);
     private static final Map<String, Integer> kJukebox = Map.of("Record", 0);
     private static final Map<String, Integer> kAnvil = Map.of("FirstItem", 0, "SecondItem", 1, "Result", 2);
