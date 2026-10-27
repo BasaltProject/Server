@@ -310,8 +310,16 @@ public final class EntityCore {
         return property(name) instanceof Boolean value && value;
     }
 
+    private static final java.util.Set<String> kIdProperties = java.util.Set.of("vehicle", "leash_holder",
+        "conversion_countdown", "fuse", "target", "hook_hooked", "bolt_cause", "owner_id", "evoker_wololo",
+        "guardian_laser_target", "attached_to", "bullet_target", "frog_tongue_target", "llama_caravan_head",
+        "llama_caravan_tail", "creeper_igniter", "warden_angry_at");
+
     public int integer(String name) {
-        return property(name) instanceof Number value ? value.intValue() : 0;
+        if (property(name) instanceof Number value) {
+            return value.intValue();
+        }
+        return staged != null && kIdProperties.contains(name) ? -1 : 0;
     }
 
     public double real(String name) {
