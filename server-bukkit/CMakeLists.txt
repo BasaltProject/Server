@@ -61,7 +61,7 @@ if(BASALT_BUILD_TESTS)
 
     basalt_test(server-bukkit-shim-smoke-test
         SOURCES test/ShimSmokeTest.cpp
-        DEPENDS basalt::server-bukkit
+        DEPENDS basalt::server-bukkit basalt::wire-protocol
     )
     find_program(BASALT_TEST_JAVAC javac REQUIRED)
     set(BASALT_COMPAT_TEST_CLASSES "${CMAKE_CURRENT_BINARY_DIR}/compat-test-classes")

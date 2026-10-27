@@ -31,6 +31,14 @@ public class MutableComponent implements Component {
     }
 
     @Override
+    public net.kyori.adventure.text.Component asAdventure() {
+        net.kyori.adventure.text.Component result = translatable
+            ? net.kyori.adventure.text.Component.translatable(text) : net.kyori.adventure.text.Component.text(text);
+        for (Component sibling : siblings) result = result.append(sibling.asAdventure());
+        return result;
+    }
+
+    @Override
     public String getString() {
         StringBuilder out = new StringBuilder(text);
         for (Component sibling : siblings) {
