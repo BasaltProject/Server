@@ -186,6 +186,10 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                                             }));
 
     tickLoop_->start();
+    // Plugin enable runs on the global owner and may download libraries or migrate data.
+    // That startup work is not a stalled gameplay tick; arm the tick watchdog once it finishes.
+    enableBukkit();
+    runStartupCommands();
     if (config_->tuning.watchdogSeconds > 0) {
         serverWatchdog_ = std::make_unique<ServerWatchdog>(
             std::chrono::seconds{config_->tuning.watchdogSeconds}, [this] { return tickLoop_->ticksRun(); },
@@ -199,8 +203,6 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                 std::_Exit(1);
             });
     }
-    enableBukkit();
-    runStartupCommands();
     startQuery();
     const double elapsedSeconds = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
                                                           std::chrono::steady_clock::now() - startedAt)

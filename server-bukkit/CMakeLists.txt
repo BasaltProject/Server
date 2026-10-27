@@ -63,8 +63,20 @@ if(BASALT_BUILD_TESTS)
         SOURCES test/ShimSmokeTest.cpp
         DEPENDS basalt::server-bukkit
     )
+    find_program(BASALT_TEST_JAVAC javac REQUIRED)
+    set(BASALT_COMPAT_TEST_CLASSES "${CMAKE_CURRENT_BINARY_DIR}/compat-test-classes")
+    add_custom_target(server-bukkit-compat-test-classes
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${BASALT_COMPAT_TEST_CLASSES}"
+        COMMAND "${BASALT_TEST_JAVAC}" --release 25 -proc:none
+            -cp "${CMAKE_BINARY_DIR}/bukkit-runtime/basalt-bukkit.jar:${CMAKE_BINARY_DIR}/bukkit-runtime/lib/*"
+            -d "${BASALT_COMPAT_TEST_CLASSES}" "${CMAKE_CURRENT_SOURCE_DIR}/test/java/RuntimeCompatibilityTest.java"
+        COMMAND ${CMAKE_COMMAND} -E rm -f "${BASALT_COMPAT_TEST_CLASSES}/compatibility/MissingDependency.class"
+        DEPENDS basalt-bukkit-runtime
+        VERBATIM)
+    add_dependencies(server-bukkit-shim-smoke-test server-bukkit-compat-test-classes)
     target_compile_definitions(server-bukkit-shim-smoke-test PRIVATE
         BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/shim-smoke-test"
-        BASALT_TEST_RUNTIME_DIR="${CMAKE_BINARY_DIR}/bukkit-runtime")
+        BASALT_TEST_RUNTIME_DIR="${CMAKE_BINARY_DIR}/bukkit-runtime"
+        BASALT_COMPAT_TEST_CLASSES="${BASALT_COMPAT_TEST_CLASSES}")
     set_tests_properties(server-bukkit-shim-smoke-test PROPERTIES TIMEOUT 60)
 endif()
