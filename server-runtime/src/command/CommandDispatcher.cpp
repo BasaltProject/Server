@@ -316,6 +316,17 @@ std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::
 std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::string& input,
                                         std::int32_t& successes) const {
     StringReader reader{input};
+    // parity: a command block runs at its own permission level, which the commands above it refuse.
+    if (source.kind() == "command_block") {
+        const std::string name = lowered(firstWord(input));
+        for (const std::unique_ptr<CommandNode>& child : root_.children()) {
+            if (child->name() == name && child->requiredLevel > source.permissionLevel()) {
+                StringReader start{input};
+                reportSyntaxError(source, start.syntaxError(std::string{kUnknownCommand}), input);
+                return 0;
+            }
+        }
+    }
     const auto started = std::chrono::steady_clock::now();
     const Parsed<std::vector<Link>> links = parse(reader, root_, source, {});
     std::int32_t result = 0;

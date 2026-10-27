@@ -59,9 +59,11 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
     @Override
     public Class<?> loadClass(String name, boolean resolve, boolean checkGlobal, boolean checkLibraries)
             throws ClassNotFoundException {
+        ClassNotFoundException localFailure;
         try {
             return super.loadClass(name, resolve);
-        } catch (ClassNotFoundException ignored) {
+        } catch (ClassNotFoundException cause) {
+            localFailure = cause;
             // Falls through to the other plugins.
         }
         if (checkGlobal) {
@@ -70,7 +72,7 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
                 return found;
             }
         }
-        throw new ClassNotFoundException(name);
+        throw new ClassNotFoundException(name, localFailure);
     }
 
     @Override
