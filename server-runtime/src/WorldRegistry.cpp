@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <regex>
 #include <utility>
 
@@ -25,6 +26,15 @@ namespace {
 [[nodiscard]] bool isNormal(config::WorldType type) {
     return type == config::WorldType::Normal || type == config::WorldType::Amplified ||
            type == config::WorldType::LargeBiomes || type == config::WorldType::Flat;
+}
+
+// Current dynamic dimensions live under the primary save. Existing flat saves
+// and configured dimensions retain their locations; never migrate data implicitly.
+[[nodiscard]] std::string storageRoot(const config::WorldsConfig& config, const std::string& root,
+                                      const std::string& primary, const std::string& name) {
+    const bool configured = std::ranges::any_of(config.worlds(), [&name](const auto& world) { return world.name == name; });
+    if (configured || std::filesystem::exists(std::filesystem::path{root} / name)) return root;
+    return (std::filesystem::path{root} / primary / "dimensions" / "minecraft").string();
 }
 
 } // namespace
@@ -63,7 +73,12 @@ WorldRegistry::WorldRegistry(const config::BasaltConfig& config, const config::W
     }
 }
 
-WorldRegistry::~WorldRegistry() = default;
+WorldRegistry::~WorldRegistry() {
+    // Join world workers while their scheduler and generator dependencies are
+    // still alive, including worlds retired with retained plugin views.
+    retiredWorlds_.clear();
+    owned_.clear();
+}
 
 std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::WorldDeclaration& declaration,
                                                               world::WorldMetadata metadata) {
@@ -90,7 +105,8 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         built_.insert_or_assign(declaration.name, std::move(built));
     }
     std::unique_ptr<world::LoadedWorld> world = std::make_unique<world::LoadedWorld>(
-        declaration, std::move(settings), std::move(metadata), options_.worldsRoot, logger_, std::move(options));
+        declaration, std::move(settings), std::move(metadata),
+        storageRoot(*worldsConfig_, options_.worldsRoot, defaultName_, declaration.name), logger_, std::move(options));
     world->setEvents(options_.events);
     // parity: `SculkShriekerBlockEntity.tryGetPlayer`, which only the runtime can answer.
     world->state().setPlayerCheck([players = players_, holder = world.get()](const wire::common::Uuid& entity) {
@@ -151,25 +167,24 @@ world::LoadedWorld* WorldRegistry::createWorld(const std::string& name, config::
     if (!isUsableName(name)) {
         return nullptr;
     }
-    for (const std::unique_ptr<world::LoadedWorld>& world : owned_) {
-        if (world->name() != name) {
-            continue;
+    for (auto it = owned_.begin(); it != owned_.end(); ++it) {
+        if ((*it)->name() != name) continue;
+        if (!unloaded_.erase(name)) return nullptr;
+        retiredWorlds_.push_back(std::move(*it));
+        owned_.erase(it);
+        if (auto built = built_.find(name); built != built_.end()) {
+            retiredGenerators_.push_back(std::move(built->second));
+            built_.erase(built);
         }
-        if (!unloaded_.erase(name)) {
-            return nullptr;
-        }
-        logger_.info([&name] { return "Brought back world '" + name + "'."; });
-        if (hooks_.worldLoaded) {
-            scheduler_.global().schedule(0, [this, name] { hooks_.worldLoaded(name); });
-        }
-        return world.get();
+        break;
     }
     const config::WorldDeclaration declaration{
         .name = name, .dimension = dimension, .type = type, .seed = seed, .isDefault = false};
-    wire::io::fileIO::createDirectories(options_.worldsRoot + "/" + name);
+    const std::string root = storageRoot(*worldsConfig_, options_.worldsRoot, defaultName_, name);
+    wire::io::fileIO::createDirectories(root + "/" + name);
     const config::WorldSettings settings = worldsConfig_->settingsFor(declaration);
     world::WorldMetadata metadata = world::WorldMetadata::loadOrCreate(
-        options_.worldsRoot + "/" + name, seed.has_value() ? seed : std::optional{worldSeed()},
+        root + "/" + name, seed.has_value() ? seed : std::optional{worldSeed()},
         world::WorldMetadata::kDefaultSpawn, logger_, &settings.rules.gameRules);
     const std::int64_t madeWith = metadata.seed;
     owned_.push_back(buildWorld(declaration, std::move(metadata)));
@@ -204,11 +219,14 @@ bool WorldRegistry::unloadWorld(const std::string& name, const bool save) {
                                       [&](server::plugins::PluginEvent& event) { event.set("world", name); })) {
             return false;
         }
+        world->stopGenerating(5000, save);
         if (save) {
             world->saveDirty();
             world->flushRegions();
             world->saveMetadata();
         }
+        world->retire();
+        lastChunkSetVersion_.erase(name);
         unloaded_.insert(name);
         logger_.info([&name] { return "Unloaded world '" + name + "'."; });
         return true;

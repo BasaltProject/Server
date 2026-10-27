@@ -331,7 +331,7 @@ void LoadedWorld::relightSoon(std::int32_t chunkX, std::int32_t chunkZ, std::chr
 
 LoadedWorld::~LoadedWorld() {
     lightWorker_.request_stop();
-    lightWorker_.join();
+    if (lightWorker_.joinable()) lightWorker_.join();
 }
 
 void LoadedWorld::setAttributeOverride(const std::string& name, std::optional<double> value) {
@@ -417,6 +417,7 @@ bool LoadedWorld::tickTime(random::RandomSource& random) {
 }
 
 void LoadedWorld::saveMetadata() {
+    if (retired_.load()) return;
     const std::array<std::int32_t, 3> spawn =
         spawnOverride_.value_or(std::array<std::int32_t, 3>{metadata_.spawnX, metadata_.spawnY, metadata_.spawnZ});
     WorldMetadata saved = metadata_;

@@ -240,3 +240,18 @@ TEST_CASE("a region file that is not one reads as an unsaved chunk") {
 
     CHECK_FALSE(store.loadChunk(0, 0).has_value());
 }
+
+TEST_CASE("closed region storage cannot recreate a removed world") {
+    const std::string root = scratch("region-store-closed");
+    RegionStore store{"temporary", root};
+    std::vector<Chunk> chunks;
+    chunks.push_back(filled(0,0,64));
+    REQUIRE(save(store,chunks,1)>0);
+    store.close();
+    std::filesystem::remove_all(root + "/temporary");
+    chunks[0].setBlockStateId(0,65,0,stoneState());
+    CHECK(save(store,chunks,2)==0);
+    CHECK(store.flush()==0);
+    CHECK_FALSE(store.loadChunk(0,0).has_value());
+    CHECK_FALSE(std::filesystem::exists(root + "/temporary"));
+}

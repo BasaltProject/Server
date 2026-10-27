@@ -69,6 +69,9 @@ public:
 
     std::size_t flush();
 
+    /// Permanently fence disk I/O after unload; retained views cannot recreate deleted files.
+    void close();
+
 private:
     struct Entry {
         std::int64_t key = 0;
@@ -116,6 +119,7 @@ private:
 
     /// Serializes region staging and file writes; see the class comment for the lock order.
     std::mutex writeMutex_;
+    bool closed_ = false;
 
     /// Least recently used at the front, so eviction walks forwards.
     std::list<Entry> cached_;

@@ -337,7 +337,9 @@ public:
     std::size_t unloadUnreachable(const std::vector<std::pair<std::int32_t, std::int32_t>>& playerPositions,
                                   std::int32_t spawnRadiusChunks, std::int32_t retainMarginChunks);
 
-    void stopGenerating(std::int64_t drainTimeoutMillis);
+    void stopGenerating(std::int64_t drainTimeoutMillis, bool persist = true);
+
+    void retire();
 
     /// What was queued is cancelled rather than run.
     void closeOwner();
@@ -394,6 +396,7 @@ private:
     sched::Region* region_ = nullptr;
     std::string levelKey_;
     std::string worldRoot_;
+    std::atomic<bool> retired_{false};
     RegionStore regions_;
     PortalIndex portals_;
     /// Declared ahead of the queue whose workers step it, so it outlives them.
