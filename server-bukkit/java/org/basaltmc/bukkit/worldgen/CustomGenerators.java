@@ -24,6 +24,7 @@ public final class CustomGenerators {
         volatile ChunkGenerator generator;
         volatile BiomeProvider biomes;
         final List<BlockPopulator> populators = new java.util.concurrent.CopyOnWriteArrayList<>();
+        final List<BlockPopulator> installedDefaults = new java.util.ArrayList<>();
         final Object lock = new Object();
 
         Entry(BasaltWorld world) {
@@ -68,9 +69,12 @@ public final class CustomGenerators {
             entry.generator = null;
             return false;
         }
+        entry.populators.removeAll(entry.installedDefaults);
+        entry.installedDefaults.clear();
         List<BlockPopulator> defaults = generator.getDefaultPopulators(world);
         if (defaults != null) {
             entry.populators.addAll(defaults);
+            entry.installedDefaults.addAll(defaults);
         }
         return true;
     }
