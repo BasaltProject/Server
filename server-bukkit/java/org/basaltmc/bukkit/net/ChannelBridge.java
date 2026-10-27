@@ -232,7 +232,9 @@ public final class ChannelBridge {
                 Natives.log(1, "PacketTrace", "opened " + connection + " pipeline " + made.channel.pipeline().names()
                     + " server pipeline " + serverChannel.pipeline().names());
             }
-            connections.add(made.connection);
+            synchronized (connections) {
+                connections.add(made.connection);
+            }
         }
         return made;
     }
@@ -344,7 +346,9 @@ public final class ChannelBridge {
         if (link == null) {
             return;
         }
-        connections.remove(link.connection);
+        synchronized (connections) {
+            connections.remove(link.connection);
+        }
         link.channel.markClosedFromNative();
         link.channel.eventLoop().execute(() -> link.channel.unsafe().close(link.channel.unsafe().voidPromise()));
     }
