@@ -286,18 +286,26 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
         int[] order = new int[Math.min(idLimit, count)];
         int distinct = 0;
         int[] indices = new int[count];
-        for (int i = 0; i < count; i++) {
-            int id = ids[i];
-            int at = local[id];
-            if (at < 0) {
-                at = distinct;
-                local[id] = distinct;
-                order[distinct++] = id;
+        boolean clean = false;
+        try {
+            for (int i = 0; i < count; i++) {
+                int id = ids[i];
+                int at = local[id];
+                if (at < 0) {
+                    at = distinct;
+                    local[id] = distinct;
+                    order[distinct++] = id;
+                }
+                indices[i] = at;
             }
-            indices[i] = at;
-        }
-        for (int i = 0; i < distinct; i++) {
-            local[order[i]] = -1;
+            for (int i = 0; i < distinct; i++) {
+                local[order[i]] = -1;
+            }
+            clean = true;
+        } finally {
+            if (!clean) {
+                Arrays.fill(local, -1);
+            }
         }
         Configuration stored = strategy.getConfigurationForPaletteSize(distinct);
         if (stored.bitsInMemory() == 0) {
