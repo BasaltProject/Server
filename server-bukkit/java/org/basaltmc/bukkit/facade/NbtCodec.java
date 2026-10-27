@@ -54,6 +54,14 @@ public final class NbtCodec {
         }
     }
 
+    private static int length(DataInput in) throws IOException {
+        int length = in.readInt();
+        if (length < 0) {
+            throw new IOException("Negative NBT length " + length);
+        }
+        return length;
+    }
+
     public static Tag read(DataInput in, byte type) throws IOException {
         switch (type) {
             case Tag.TAG_END:
@@ -71,7 +79,7 @@ public final class NbtCodec {
             case Tag.TAG_DOUBLE:
                 return DoubleTag.valueOf(in.readDouble());
             case Tag.TAG_BYTE_ARRAY: {
-                byte[] data = new byte[in.readInt()];
+                byte[] data = new byte[length(in)];
                 in.readFully(data);
                 return new ByteArrayTag(data);
             }
@@ -79,7 +87,7 @@ public final class NbtCodec {
                 return StringTag.valueOf(in.readUTF());
             case Tag.TAG_LIST: {
                 byte elements = in.readByte();
-                int length = in.readInt();
+                int length = length(in);
                 ListTag list = new ListTag();
                 for (int i = 0; i < length; i++) {
                     list.add(read(in, elements));
@@ -95,14 +103,14 @@ public final class NbtCodec {
                 return compound;
             }
             case Tag.TAG_INT_ARRAY: {
-                int[] data = new int[in.readInt()];
+                int[] data = new int[length(in)];
                 for (int i = 0; i < data.length; i++) {
                     data[i] = in.readInt();
                 }
                 return new IntArrayTag(data);
             }
             case Tag.TAG_LONG_ARRAY: {
-                long[] data = new long[in.readInt()];
+                long[] data = new long[length(in)];
                 for (int i = 0; i < data.length; i++) {
                     data[i] = in.readLong();
                 }
