@@ -38,7 +38,7 @@ constexpr std::array kAll = {
     gameRules::kMaxCommandSequenceLength,
     gameRules::kMaxEntityCramming,
     gameRules::kMaxMinecartSpeed,
-    GameRule::integer("max_snow_accumulation_height", 1, 0, 8),
+    gameRules::kMaxSnowAccumulationHeight,
     GameRule::boolean("mob_drops", true),
     GameRule::boolean("mob_explosion_drop_decay", true),
     GameRule::boolean("mob_griefing", true),

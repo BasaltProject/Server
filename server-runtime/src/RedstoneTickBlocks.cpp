@@ -27,6 +27,7 @@
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
+#include <basalt/server/runtime/world/IceAndSnow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MiscGrowth.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
@@ -196,7 +197,13 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
     }
     const world::randomTicks::Context context = randomContext(world);
     random::RandomSource random = freshRandom();
-    const std::vector<world::BlockChange> changes = randomTicks_.tick(context, chunks, speed, random);
+    std::vector<world::BlockChange> changes;
+    if (!world.settings().rules.environment.disableIceAndSnow) {
+        changes = world::iceAndSnow::tick(world, chunks, speed, random);
+    }
+    for (world::BlockChange& change : randomTicks_.tick(context, chunks, speed, random)) {
+        changes.push_back(std::move(change));
+    }
     if (changes.empty()) {
         return;
     }
