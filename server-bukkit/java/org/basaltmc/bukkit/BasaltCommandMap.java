@@ -41,7 +41,7 @@ public final class BasaltCommandMap extends SimpleCommandMap {
     /** Empty opens the command to everyone and leaves the check to Bukkit's own permission test. */
     private String basaltPermission(Command command) {
         String permission = command.getPermission();
-        if (permission == null || permission.isEmpty()) {
+        if (permission == null || permission.isEmpty() || permission.indexOf(';') >= 0) {
             return "";
         }
         org.bukkit.permissions.Permission known = BasaltServer.instance().pluginManagerImpl().getPermission(permission);
