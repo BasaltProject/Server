@@ -138,6 +138,9 @@ public:
 
     /// parity: `SignedArgument`, a type whose text the client signs as a chat message.
     [[nodiscard]] virtual bool signable() const { return false; }
+
+    /// The argument still being completed may itself contain spaces.
+    [[nodiscard]] virtual bool consumesRemaining() const { return false; }
 };
 
 class CommandContext;

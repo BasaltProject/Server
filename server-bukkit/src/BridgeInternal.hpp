@@ -69,6 +69,8 @@ private:
 
     bool deliver(const std::string& event, std::int32_t priority, Snapshot& snapshot);
     bool runCommand(const std::string& name, plugins::PluginCommandCall& call);
+    std::vector<std::string> completeCommand(const std::string& name, plugins::PluginCommandCall& call,
+                                              std::string_view input);
     void reportJavaFailure(JNIEnv* env, std::string_view where);
 
     ShimHost* shim_;
@@ -82,6 +84,7 @@ private:
     jmethodID taskMethod_ = nullptr;
     jmethodID eventMethod_ = nullptr;
     jmethodID commandMethod_ = nullptr;
+    jmethodID completionMethod_ = nullptr;
     jmethodID channelMethod_ = nullptr;
     jmethodID listMethod_ = nullptr;
     std::mutex tasksMutex_;

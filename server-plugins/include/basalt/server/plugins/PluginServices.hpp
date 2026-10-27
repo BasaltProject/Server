@@ -78,6 +78,9 @@ public:
 
 class PluginCommands {
 public:
+    /// Return replacements for the current argument, including any retained
+    /// prefix when that argument consumes the rest of the command line.
+    using Completer = std::function<std::vector<std::string>(PluginCommandCall&, std::string_view)>;
     PluginCommands() = default;
     PluginCommands(const PluginCommands&) = delete;
     PluginCommands& operator=(const PluginCommands&) = delete;
@@ -87,6 +90,12 @@ public:
 
     virtual PluginHandle registerCommand(std::string_view pluginId, const PluginCommandSpec& spec,
                                          std::function<void(PluginCommandCall&)> run) = 0;
+
+    virtual PluginHandle registerCompletingCommand(std::string_view pluginId, const PluginCommandSpec& spec,
+                                                   std::function<void(PluginCommandCall&)> run, Completer complete) {
+        static_cast<void>(complete);
+        return registerCommand(pluginId, spec, std::move(run));
+    }
 
     virtual bool runAsConsole(std::string_view command) = 0;
 

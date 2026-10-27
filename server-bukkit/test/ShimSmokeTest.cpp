@@ -90,7 +90,7 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
     env->DeleteLocalRef(worldNatives);
     jclass regression = env->FindClass("compatibility/RuntimeCompatibilityTest");
     REQUIRE(regression != nullptr);
-    for (const char* name : {"publicReflection", "featureKeys", "sqlite", "registryTags", "loggingBackend"}) {
+    for (const char* name : {"publicReflection", "featureKeys", "sqlite", "registryTags", "failureText", "loggingBackend"}) {
         INFO(std::string{name});
         jmethodID method = env->GetStaticMethodID(regression, name, "()V");
         REQUIRE(method != nullptr);

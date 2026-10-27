@@ -258,6 +258,8 @@ public:
 
     [[nodiscard]] bool signable() const override { return asMessage_; }
 
+    [[nodiscard]] bool consumesRemaining() const override { return true; }
+
     [[nodiscard]] ArgumentParser wire() const override {
         if (asMessage_) {
             return ArgumentParser{parserId::kMessage};

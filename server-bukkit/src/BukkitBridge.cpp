@@ -204,10 +204,14 @@ std::expected<void, std::string> BukkitBridge::boot() {
     commandMethod_ = env->GetStaticMethodID(runtime_, "command",
                                             "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/"
                                             "String;DDDLjava/lang/String;Ljava/lang/String;)Z");
+    completionMethod_ = env->GetStaticMethodID(runtime_, "completeCommand",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;DDDLjava/lang/String;"
+        "Ljava/lang/String;)[Ljava/lang/String;");
     channelMethod_ = env->GetStaticMethodID(runtime_, "channelMessage", "(Ljava/lang/String;Ljava/lang/String;[B)V");
     listMethod_ = env->GetStaticMethodID(runtime_, "pluginList", "()[Ljava/lang/String;");
     if (channelMethod_ == nullptr || enableMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr ||
-        taskMethod_ == nullptr || eventMethod_ == nullptr || commandMethod_ == nullptr || listMethod_ == nullptr) {
+        taskMethod_ == nullptr || eventMethod_ == nullptr || commandMethod_ == nullptr || completionMethod_ == nullptr ||
+        listMethod_ == nullptr) {
         reportJavaFailure(env, "resolving BukkitRuntime entry points");
         return std::unexpected(std::string{"BukkitRuntime entry points not found"});
     }
@@ -287,9 +291,32 @@ bool BukkitBridge::shutdown() {
 }
 
 void BukkitBridge::reportJavaFailure(JNIEnv* env, std::string_view where) {
-    log_.error([where] { return "Java failure in " + std::string{where}; });
-    env->ExceptionDescribe();
+    jthrowable failure = env->ExceptionOccurred();
     env->ExceptionClear();
+    std::string trace;
+    if (failure != nullptr && runtime_ != nullptr) {
+        jmethodID describe = env->GetStaticMethodID(runtime_, "describeFailure", "(Ljava/lang/Throwable;)Ljava/lang/String;");
+        if (describe != nullptr) {
+            jstring written = static_cast<jstring>(env->CallStaticObjectMethod(runtime_, describe, failure));
+            if (env->ExceptionCheck() != JNI_TRUE && written != nullptr) {
+                trace = toStd(env, written);
+            }
+            if (written != nullptr) env->DeleteLocalRef(written);
+        }
+        // A formatting failure must not replace or leave pending the original.
+        if (env->ExceptionCheck() == JNI_TRUE) env->ExceptionClear();
+    }
+    log_.error([where, &trace] {
+        return "Java failure in " + std::string{where} + (trace.empty() ? "" : "\n" + trace);
+    });
+    if (failure != nullptr) {
+        if (trace.empty()) {
+            env->Throw(failure);
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(failure);
+    }
 }
 
 void BukkitBridge::runTask(std::int64_t id) {
@@ -493,6 +520,45 @@ bool BukkitBridge::runCommand(const std::string& name, plugins::PluginCommandCal
     return handled == JNI_TRUE;
 }
 
+std::vector<std::string> BukkitBridge::completeCommand(const std::string& name, plugins::PluginCommandCall& call,
+                                                      std::string_view input) {
+    if (stopping()) return {};
+    JNIEnv* env = shim_->env();
+    if (env == nullptr) return {};
+    jstring command = toJava(env, name);
+    jstring sender = toJava(env, call.source());
+    jstring args = toJava(env, input);
+    jstring kind = toJava(env, call.kind());
+    jstring world = toJava(env, call.world());
+    jstring caller = toJava(env, call.caller());
+    const std::array<double, 3> at = call.position();
+    plugins::PluginCommandCall* previous = gCurrentCall;
+    gCurrentCall = &call;
+    jobjectArray found = static_cast<jobjectArray>(env->CallStaticObjectMethod(runtime_, completionMethod_,
+        command, sender, kind, world, at[0], at[1], at[2], caller, args));
+    gCurrentCall = previous;
+    std::vector<std::string> result;
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        reportJavaFailure(env, "completion for " + name);
+    } else if (found != nullptr) {
+        // Native Brigadier replaces the greedy args node; Bukkit replaces only
+        // its final token. Retain the already typed argument prefix.
+        const std::size_t space = input.find_last_of(' ');
+        const std::string prefix{space == std::string_view::npos ? std::string_view{} : input.substr(0, space + 1)};
+        const jsize count = env->GetArrayLength(found);
+        for (jsize index = 0; index < count; ++index) {
+            jstring value = static_cast<jstring>(env->GetObjectArrayElement(found, index));
+            if (value != nullptr) {
+                result.push_back(prefix + toStd(env, value));
+                env->DeleteLocalRef(value);
+            }
+        }
+    }
+    if (found != nullptr) env->DeleteLocalRef(found);
+    for (jstring value : {command, sender, args, kind, world, caller}) env->DeleteLocalRef(value);
+    return result;
+}
+
 void BukkitBridge::registerCommand(const std::string& plugin, const std::string& name, const std::string& permission) {
     const std::string label = lowercase(name);
     auto spec = plugins::PluginCommandSpec::parse(label + " [args:text]");
@@ -501,9 +567,12 @@ void BukkitBridge::registerCommand(const std::string& plugin, const std::string&
         return;
     }
     spec->permission = permission;
-    commands_.emplace(plugin, services().commands().registerCommand(
+    commands_.emplace(plugin, services().commands().registerCompletingCommand(
                                   "bukkit." + lowercase(plugin), *spec,
-                                  [this, label](plugins::PluginCommandCall& call) { runCommand(label, call); }));
+                                  [this, label](plugins::PluginCommandCall& call) { runCommand(label, call); },
+                                  [this, label](plugins::PluginCommandCall& call, std::string_view input) {
+                                      return completeCommand(label, call, input);
+                                  }));
 }
 
 void BukkitBridge::unregisterCommands(const std::string& plugin) {
