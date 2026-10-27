@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -45,8 +46,32 @@ using Resistance = std::function<float(std::int32_t stateId, float resistance)>;
                                           double z, float power, random::RandomSource& random,
                                           const Spares& stops = {});
 
-/// parity: `ServerExplosion.hurtEntities` without the exposure ray cast.
-[[nodiscard]] float damageAt(double distance, float power, float radius);
+/// parity: `ExplosionDamageCalculator.getEntityDamageAmount`; `doubleRadius` is twice the blast radius.
+[[nodiscard]] float damageAt(double distance, float doubleRadius, float exposure = 1.0F);
+
+struct Box {
+    double minX = 0.0;
+    double minY = 0.0;
+    double minZ = 0.0;
+    double maxX = 0.0;
+    double maxY = 0.0;
+    double maxZ = 0.0;
+};
+
+/// parity: `ServerExplosion.getSeenPercent`.
+[[nodiscard]] float seenPercent(WorldState& world, double centerX, double centerY, double centerZ, const Box& box);
+
+/// What `seenPercent` found for each entity before the blast broke any block, which vanilla also measures first.
+void clearExposures();
+
+void recordExposure(std::int32_t entityId, float exposure);
+
+[[nodiscard]] float exposureOf(std::int32_t entityId);
+
+/// parity: `ServerExplosion.hurtEntities`: the push an entity at `entity` (its eye or, for primed TNT, its position).
+[[nodiscard]] std::array<double, 3> knockbackOf(double centerX, double centerY, double centerZ, double originX,
+                                                double originY, double originZ, double distance, float exposure,
+                                                double resistance);
 
 } // namespace explosions
 

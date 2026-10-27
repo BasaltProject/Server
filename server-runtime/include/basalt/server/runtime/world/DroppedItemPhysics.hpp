@@ -83,8 +83,8 @@ public:
 
     bool setItemCount(std::int32_t entityId, std::int32_t count);
 
-    /// Shulker boxes that were burnt, blown up or cacti-pricked away since the last call, for their contents to spill.
-    [[nodiscard]] std::vector<DroppedItem> takeDestroyed();
+    /// parity: `Entity.pushFromExplosion`, which adds to the item's motion.
+    bool pushItem(std::int32_t entityId, double dx, double dy, double dz);
 
     /// parity: `ItemEntity.tick`.
     [[nodiscard]] std::vector<std::int32_t> tickItems(const sched::Region* region = nullptr);
@@ -105,7 +105,6 @@ private:
     double mergeRange_ = kMergeRange;
     entity::entityCollision::BlockAt blockAt_;
     std::vector<DroppedItem> droppedItems_;
-    std::vector<DroppedItem> destroyed_;
     MergeGate mergeGate_;
     std::function<bool()> mergeListened_;
 };

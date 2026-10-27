@@ -363,6 +363,8 @@ public:
     /// parity: `ItemEntity.hurtServer`. Answers whether the stack is gone.
     bool hurtItem(std::int32_t entityId, std::int32_t amount);
 
+    bool pushItem(std::int32_t entityId, double dx, double dy, double dz);
+
     bool setItemCount(std::int32_t entityId, std::int32_t count);
 
     [[nodiscard]] std::vector<DroppedItem> takeDestroyedItems();
