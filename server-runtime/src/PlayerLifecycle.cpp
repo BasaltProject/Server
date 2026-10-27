@@ -230,7 +230,16 @@ void PlayerLifecycle::respawn() {
     if (session == nullptr) {
         return;
     }
-    // parity: `handleClientCommand`.
+    // parity: `handleClientCommand`, where the credits end by asking to respawn alive.
+    if (session->wonGame && session->health() > 0.0F) {
+        session->wonGame = false;
+        const auto found = owner_->options().worlds.find(session->creditsExitWorld);
+        if (found != owner_->options().worlds.end() && session->connection().switchWorld) {
+            static_cast<void>(session->connection().switchWorld(*found->second, session->creditsExit[0],
+                                                                session->creditsExit[1], session->creditsExit[2]));
+        }
+        return;
+    }
     if (session->health() > 0.0F) {
         return;
     }

@@ -65,6 +65,10 @@ item-frame-cursor-limit = 256
 # Ticks between the checks that keep a map in an item frame up to date. Vanilla is 10.
 item-frame-cursor-update-interval = 10
 
+[end]
+# NOT VANILLA. Leaving the End for the first time takes the player straight home, without the credits.
+disable-credits = false
+
 [leash]
 # How far a leashed mob may get from its holder, in blocks, before the lead snaps. Vanilla is 12.
 max-distance = 12.0
@@ -153,6 +157,9 @@ void readTuningRules(const TomlTable& table, TuningRules& rules) {
     if (const TomlTable* maps = table.table("maps"); maps != nullptr) {
         rules.mapMarkerLimit = whole(*maps, "item-frame-cursor-limit", rules.mapMarkerLimit, 0, 1 << 20);
         rules.mapFrameInterval = whole(*maps, "item-frame-cursor-update-interval", rules.mapFrameInterval, 1, 1 << 20);
+    }
+    if (const TomlTable* end = table.table("end"); end != nullptr) {
+        rules.disableEndCredits = end->boolean("disable-credits").value_or(rules.disableEndCredits);
     }
     if (const TomlTable* leash = table.table("leash"); leash != nullptr) {
         rules.leashSnapDistance =
