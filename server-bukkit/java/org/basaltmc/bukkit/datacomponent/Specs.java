@@ -67,7 +67,19 @@ final class Specs {
         Map.entry("provides_pottery_pattern", io.papermc.paper.block.pot.PotPatternType.class),
         Map.entry("map_post_processing", io.papermc.paper.item.MapPostProcessing.class));
 
+    private static final Map<String, String> kEnumToVanilla = Map.of("Rabbit.BLACK_AND_WHITE", "WHITE_SPLOTCHED",
+        "Rabbit.SALT_AND_PEPPER", "SALT", "Rabbit.THE_KILLER_BUNNY", "EVIL", "Parrot.RED", "RED_BLUE",
+        "Parrot.CYAN", "YELLOW_BLUE");
+    private static final Map<String, String> kEnumFromVanilla = Map.of("Rabbit.WHITE_SPLOTCHED", "BLACK_AND_WHITE",
+        "Rabbit.SALT", "SALT_AND_PEPPER", "Rabbit.EVIL", "THE_KILLER_BUNNY", "Parrot.RED_BLUE", "RED",
+        "Parrot.YELLOW_BLUE", "CYAN");
+
     private Specs() {}
+
+    private static String ownerOf(Class<?> type) {
+        Class<?> outer = type.getEnclosingClass();
+        return (outer == null ? type : outer).getSimpleName();
+    }
 
     static boolean has(String name) {
         return kSpecs.containsKey(name) || kVariants.containsKey(name) || isPlain(name);
@@ -97,6 +109,7 @@ final class Specs {
             String id = String.valueOf(nbt);
             if (variant.isEnum()) {
                 String bare = id.substring(id.indexOf(':') + 1).toUpperCase(Locale.ROOT);
+                bare = kEnumFromVanilla.getOrDefault(ownerOf(variant) + "." + bare, bare);
                 return Enum.valueOf((Class<Enum>) variant, bare);
             }
             return RegistryAccess.registryAccess().getRegistry((Class<Keyed>) variant).get(NamespacedKey.fromString(id));
@@ -141,7 +154,8 @@ final class Specs {
             return out;
         }
         if (value instanceof Enum<?> constant && !(value instanceof Keyed)) {
-            return constant.name().toLowerCase(Locale.ROOT);
+            String own = ownerOf(constant.getDeclaringClass()) + "." + constant.name();
+            return kEnumToVanilla.getOrDefault(own, constant.name()).toLowerCase(Locale.ROOT);
         }
         if (value instanceof Keyed keyed) {
             return keyed.getKey().toString();
