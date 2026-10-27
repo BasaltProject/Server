@@ -41,23 +41,24 @@ public final class BasaltLog4jFactory implements LoggerContextFactory {
 
         @Override
         public ExtendedLogger getLogger(String name, MessageFactory factory) {
-            return org.basaltmc.bukkit.facade.Memo.get(loggers, name, key -> new BasaltLog4jLogger(key,
-                LogTags.ofCaller(key.substring(key.lastIndexOf('.') + 1)), factory));
+            String tag = LogTags.ofCaller(name.substring(name.lastIndexOf('.') + 1));
+            return org.basaltmc.bukkit.facade.Memo.get(loggers, tag + "/" + name,
+                key -> new BasaltLog4jLogger(name, tag, factory));
         }
 
         @Override
         public boolean hasLogger(String name) {
-            return loggers.containsKey(name);
+            return loggers.keySet().stream().anyMatch(key -> key.endsWith("/" + name));
         }
 
         @Override
         public boolean hasLogger(String name, MessageFactory factory) {
-            return loggers.containsKey(name);
+            return loggers.keySet().stream().anyMatch(key -> key.endsWith("/" + name));
         }
 
         @Override
         public boolean hasLogger(String name, Class<? extends MessageFactory> factory) {
-            return loggers.containsKey(name);
+            return loggers.keySet().stream().anyMatch(key -> key.endsWith("/" + name));
         }
     }
 }
