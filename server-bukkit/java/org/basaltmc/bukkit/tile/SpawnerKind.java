@@ -190,8 +190,8 @@ public final class SpawnerKind implements TileKind {
             }
             case "resetTimer": {
                 int min = tile.integer("MinSpawnDelay", 200);
-                int max = Math.max(min, tile.integer("MaxSpawnDelay", 800));
-                tile.put("Delay", (short) (min + ThreadLocalRandom.current().nextInt(max - min + 1)));
+                int max = tile.integer("MaxSpawnDelay", 800);
+                tile.put("Delay", (short) (max <= min ? min : min + ThreadLocalRandom.current().nextInt(max - min)));
                 return null;
             }
             case "setSpawnedItem": {
