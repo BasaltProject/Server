@@ -74,7 +74,7 @@ public final class BasaltPathfinder implements Pathfinder {
 
     @Override
     public PathResult findPath(Location location, int range) {
-        if (location == null || !location.getWorld().equals(core.world)) {
+        if (location == null || !core.world.equals(location.getWorld())) {
             return null;
         }
         return new Result(location.clone(), core.test("can_reach", location.getX(), location.getY(), location.getZ()));
