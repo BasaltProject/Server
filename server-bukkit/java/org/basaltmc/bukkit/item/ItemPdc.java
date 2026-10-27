@@ -77,7 +77,16 @@ public final class ItemPdc implements PersistentDataContainer, PersistentDataAda
 
     private static Object store(Object primitive, Class<?> kind) {
         if (primitive instanceof PersistentDataContainer container) {
-            return Nbt.deepCopy(((ItemPdc) container).values(true) == null ? Nbt.compound() : ((ItemPdc) container).values(true));
+            if (!(container instanceof ItemPdc own)) {
+                try {
+                    Map<String, Object> read = Nbt.read(container.serializeToBytes());
+                    return read == null ? Nbt.compound() : read;
+                } catch (IOException failure) {
+                    throw new IllegalArgumentException("Could not read the container", failure);
+                }
+            }
+            Map<String, Object> inner = own.values(true);
+            return Nbt.deepCopy(inner == null ? Nbt.compound() : inner);
         }
         if (primitive instanceof PersistentDataContainer[] containers) {
             List<Object> out = new ArrayList<>();
@@ -253,6 +262,7 @@ public final class ItemPdc implements PersistentDataContainer, PersistentDataAda
                 into.put(entry.getKey(), Nbt.copy(entry.getValue()));
             }
         }
+        target.touched();
     }
 
     @Override
