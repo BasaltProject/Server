@@ -24,6 +24,7 @@ public final class Nbt {
     private static final int kCompound = 10;
     private static final int kIntArray = 11;
     private static final int kLongArray = 12;
+    private static final int kMaxDepth = 512;
 
     private Nbt() {}
 
@@ -312,7 +313,22 @@ public final class Nbt {
         return new String(encoded, java.nio.charset.StandardCharsets.UTF_8);
     }
 
+    private static int length(DataInputStream in, int unit) throws IOException {
+        int size = in.readInt();
+        if (size < 0 || (long) size * unit > in.available()) {
+            throw new IOException("bad NBT length " + size);
+        }
+        return size;
+    }
+
     private static Object readPayload(DataInputStream in, int type) throws IOException {
+        return readPayload(in, type, 0);
+    }
+
+    private static Object readPayload(DataInputStream in, int type, int depth) throws IOException {
+        if (depth > kMaxDepth) {
+            throw new IOException("NBT nested too deep");
+        }
         switch (type) {
             case kByte:
                 return in.readByte();
@@ -327,7 +343,7 @@ public final class Nbt {
             case kDouble:
                 return in.readDouble();
             case kByteArray: {
-                byte[] bytes = new byte[in.readInt()];
+                byte[] bytes = new byte[length(in, 1)];
                 in.readFully(bytes);
                 return bytes;
             }
@@ -335,10 +351,10 @@ public final class Nbt {
                 return readString(in);
             case kList: {
                 int elementType = in.readUnsignedByte();
-                int size = in.readInt();
-                List<Object> list = new ArrayList<>(Math.max(size, 0));
+                int size = length(in, elementType == kEnd ? 0 : 1);
+                List<Object> list = new ArrayList<>(size);
                 for (int at = 0; at < size; at++) {
-                    list.add(readPayload(in, elementType));
+                    list.add(readPayload(in, elementType, depth + 1));
                 }
                 return list;
             }
@@ -346,19 +362,19 @@ public final class Nbt {
                 Map<String, Object> map = new LinkedHashMap<>();
                 for (int next = in.readUnsignedByte(); next != kEnd; next = in.readUnsignedByte()) {
                     String key = readString(in);
-                    map.put(key, readPayload(in, next));
+                    map.put(key, readPayload(in, next, depth + 1));
                 }
                 return map;
             }
             case kIntArray: {
-                int[] ints = new int[in.readInt()];
+                int[] ints = new int[length(in, 4)];
                 for (int at = 0; at < ints.length; at++) {
                     ints[at] = in.readInt();
                 }
                 return ints;
             }
             case kLongArray: {
-                long[] longs = new long[in.readInt()];
+                long[] longs = new long[length(in, 8)];
                 for (int at = 0; at < longs.length; at++) {
                     longs[at] = in.readLong();
                 }
