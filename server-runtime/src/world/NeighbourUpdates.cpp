@@ -5,6 +5,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/config/WorldRules.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
@@ -53,6 +54,7 @@ std::int32_t chainedLimit() noexcept { return gChainedLimit.load(std::memory_ord
 void setChainedLimit(std::int32_t limit) noexcept {
     gChainedLimit.store(limit < 0 ? std::numeric_limits<std::int32_t>::max() : limit, std::memory_order_relaxed);
 }
+
 using namespace detail;
 
 std::optional<BlockChange> leafTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -173,7 +175,7 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
     // A column is more than one block, so it reports through the caller rather than as one state.
     scheduledBlocks::scheduleBubbleColumn(world, x, y, z, towards);
     // parity: `NoteBlock.updateShape` rewrites the instrument **only** when the news comes from above.
-    if (!towards.has_value() || registry::axisOf(*towards) == 1) {
+    if ((!towards.has_value() || registry::axisOf(*towards) == 1) && !world.rules().tuning.disableNoteBlockUpdates) {
         if (const std::optional<std::int32_t> tuned = noteBlocks::retune(world, x, y, z, *stateId); tuned.has_value()) {
             return tuned;
         }
@@ -205,7 +207,9 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
         }
     }
     // parity: `TripWireBlock.updateShape`.
-    if (const std::optional<std::int32_t> strung = tripwires::reshape(world, x, y, z, *stateId, towards);
+    if (const std::optional<std::int32_t> strung = world.rules().tuning.disableTripwireUpdates
+                                                       ? std::nullopt
+                                                       : tripwires::reshape(world, x, y, z, *stateId, towards);
         strung.has_value()) {
         return strung;
     }

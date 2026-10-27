@@ -20,8 +20,8 @@ enum class Mode : std::uint8_t { Impulse, Chain, Repeating };
 [[nodiscard]] std::optional<Mode> modeOf(std::string_view path);
 
 /// Returns how many times the command succeeded; parity: `BaseCommandBlock.performCommand` counts brigadier callbacks.
-using RunCommand =
-    std::function<std::int32_t(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& command)>;
+using RunCommand = std::function<std::int32_t(std::int32_t x, std::int32_t y, std::int32_t z,
+                                              const std::string& command, std::int32_t permissionLevel)>;
 
 /// parity: `CommandBlock.setPoweredAndUpdate`.
 void onSignal(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool powered);

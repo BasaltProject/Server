@@ -41,7 +41,6 @@ constexpr std::string_view kFilledMap = "minecraft:filled_map";
 constexpr std::string_view kTakeResultSound = "minecraft:ui.cartography_table.take_result";
 constexpr std::string_view kInvisibilityTag = "minecraft:map_invisibility_equipment";
 /// parity: `ServerEntity.sendChanges`, which looks at a framed map every tenth tick.
-constexpr std::int64_t kFrameInterval = 10;
 
 /// parity: the items `Items` registers as `MapItem`.
 constexpr std::array<std::string_view, 17> kMapItems{"minecraft:filled_map",
@@ -299,7 +298,7 @@ void MapSystem::tickPlayers(world::LoadedWorld& world) {
 }
 
 void MapSystem::tickFrames(world::LoadedWorld& world) {
-    if (world.gameTime() % kFrameInterval != 0) {
+    if (world.gameTime() % world.settings().rules.tuning.mapFrameInterval != 0) {
         return;
     }
     std::vector<entity::ServerEntity*> frames;
@@ -355,14 +354,14 @@ void MapSystem::frameLostMap(const wire::nbt::NbtCompound& components, const ent
     }
 }
 
-bool MapSystem::tooManyMarkers(const wire::nbt::NbtCompound& components) {
+bool MapSystem::tooManyMarkers(const wire::nbt::NbtCompound& components, const std::int32_t limit) {
     const std::optional<std::int32_t> id = mapIdOf(components);
     if (!id.has_value()) {
         return false;
     }
     const std::unique_lock<std::mutex> lock = storage_->lock();
     const maps::MapData* data = storage_->get(*id);
-    return data != nullptr && data->trackedCountOverLimit(maps::MapData::kTrackedDecorationLimit);
+    return data != nullptr && data->trackedCountOverLimit(limit);
 }
 
 void MapSystem::sweepFrames(world::LoadedWorld& world, const std::vector<entity::ServerEntity*>& frames) {

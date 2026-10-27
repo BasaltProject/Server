@@ -2,6 +2,8 @@
 
 #include <basalt/server/plugins/PluginApi.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
+#include <basalt/server/remote/RemoteHost.hpp>
+#include <basalt/server/remote/RemoteService.hpp>
 #include <basalt/server/runtime/AreaEffectCloudSystem.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
@@ -22,8 +24,6 @@
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
-#include <basalt/server/remote/RemoteHost.hpp>
-#include <basalt/server/remote/RemoteService.hpp>
 #include <basalt/server/runtime/PersistenceCoordinator.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
@@ -85,8 +85,6 @@ class BlockTests;
 
 class BasaltServer {
 public:
-    static constexpr std::int32_t kSpawnRadiusChunks = 1;
-
     struct Options {
         /// Null in a test that never breaks a block in survival.
         assets::ServerJarAssets* serverJar = nullptr;

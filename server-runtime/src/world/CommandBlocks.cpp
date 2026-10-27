@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/config/WorldRules.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 
 #include <algorithm>
@@ -145,7 +146,8 @@ void markExecuted(server::world::ChunkBlockEntity& entity, WorldState& world, st
     }
     entity->data().putInt(std::string{kSuccessKey}, 0);
     if (commandBlocksWork && !command.empty() && run) {
-        entity->data().putInt(std::string{kSuccessKey}, std::max(0, run(x, y, z, command)));
+        entity->data().putInt(std::string{kSuccessKey},
+                              std::max(0, run(x, y, z, command, world.rules().tuning.commandBlockPermissionLevel)));
     }
     // parity: `updateLastExecution` off leaves the mark at -1.
     markExecuted(*entity, world, x, z, gameTime);

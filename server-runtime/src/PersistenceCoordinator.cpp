@@ -14,10 +14,9 @@ namespace basalt::server::runtime {
 
 PersistenceCoordinator::PersistenceCoordinator(Hooks hooks, player::PlayerRegistry& players,
                                                storage::PlayerStore& store, command::CommandStorage& commandStorage,
-                                               const ServerMetrics& metrics, Options options,
-                                               wire::common::Logger logger)
+                                               const ServerMetrics& metrics, wire::common::Logger logger)
     : hooks_(std::move(hooks)), players_(&players), store_(&store), commandStorage_(&commandStorage),
-      metrics_(&metrics), options_(options), logger_(std::move(logger)) {}
+      metrics_(&metrics), logger_(std::move(logger)) {}
 
 void PersistenceCoordinator::persistPlayers() const {
     std::vector<storage::StoredPlayer> snapshots;

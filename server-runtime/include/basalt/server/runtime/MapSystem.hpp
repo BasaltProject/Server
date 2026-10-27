@@ -68,7 +68,8 @@ public:
 
     void frameLostMap(const wire::nbt::NbtCompound& components, const entity::ServerEntity& frame);
 
-    [[nodiscard]] bool tooManyMarkers(const wire::nbt::NbtCompound& components);
+    [[nodiscard]] bool tooManyMarkers(const wire::nbt::NbtCompound& components,
+                                      std::int32_t limit = world::maps::MapData::kTrackedDecorationLimit);
 
     void sendWhole(const player::PlayerSession& player, std::int32_t mapId);
 

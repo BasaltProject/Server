@@ -58,7 +58,9 @@ bool canBeLeashed(const ServerEntity& entity, bool monster) {
     return !monster;
 }
 
-double snapDistance(const ServerEntity& entity) { return entity.type().path() == "happy_ghast" ? 16.0 : kSnapDistance; }
+double snapDistance(const ServerEntity& entity, const double configured) {
+    return entity.type().path() == "happy_ghast" ? 16.0 : configured;
+}
 
 double elasticDistance(const ServerEntity& entity) {
     return entity.type().path() == "happy_ghast" ? 10.0 : kElasticDistance;

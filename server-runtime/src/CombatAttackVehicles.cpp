@@ -87,7 +87,7 @@ bool CombatHandler::useItemFrame(PlayerSession& session, ServerEntity& frame) {
     // parity: `ItemFrame.interact` refuses a map that already tracks more than 256 markers.
     if (hand.has_value() && !world::itemFrames::shownIn(frame).has_value() && owner_->options().maps != nullptr &&
         !(frame.sourceNbt.has_value() && frame.sourceNbt->getBoolean("Fixed")) &&
-        owner_->options().maps->tooManyMarkers(hand->components)) {
+        owner_->options().maps->tooManyMarkers(hand->components, world->settings().rules.tuning.mapMarkerLimit)) {
         return true;
     }
     const world::itemFrames::Touched touched = world::itemFrames::interact(frame, hand);

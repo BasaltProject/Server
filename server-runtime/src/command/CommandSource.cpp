@@ -65,8 +65,9 @@ bool PlayerCommandSource::hasPermission(std::optional<std::string_view> node) co
 }
 
 CommandBlockSource::CommandBlockSource(std::array<double, 3> at, std::string name, bool speaks,
-                                       wire::common::Logger logger, wire::text::LangTable lang)
-    : at_(at), name_(std::move(name)), speaks_(speaks), logger_(std::move(logger)), lang_(std::move(lang)) {}
+                                       wire::common::Logger logger, wire::text::LangTable lang, std::int32_t level)
+    : level_(level), at_(at), name_(std::move(name)), speaks_(speaks), logger_(std::move(logger)),
+      lang_(std::move(lang)) {}
 
 wire::text::Component CommandBlockSource::displayName() const { return wire::text::Component::text(name_); }
 

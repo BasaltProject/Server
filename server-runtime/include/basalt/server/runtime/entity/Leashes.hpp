@@ -24,7 +24,7 @@ inline constexpr double kKnotOffsetY = 0.375;
 /// parity: `canBeLeashed`, with `monster` the `Enemy` a mob refuses a lead for.
 [[nodiscard]] bool canBeLeashed(const ServerEntity& entity, bool monster);
 
-[[nodiscard]] double snapDistance(const ServerEntity& entity);
+[[nodiscard]] double snapDistance(const ServerEntity& entity, double configured = kSnapDistance);
 
 [[nodiscard]] double elasticDistance(const ServerEntity& entity);
 

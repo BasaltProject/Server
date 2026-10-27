@@ -40,13 +40,8 @@ public:
         std::function<void(const std::string& worldName)> worldSaved;
     };
 
-    struct Options {
-        std::int32_t spawnRadiusChunks = 0;
-        std::int32_t retainMarginChunks = 0;
-    };
-
     PersistenceCoordinator(Hooks hooks, player::PlayerRegistry& players, storage::PlayerStore& store,
-                           command::CommandStorage& commandStorage, const ServerMetrics& metrics, Options options,
+                           command::CommandStorage& commandStorage, const ServerMetrics& metrics,
                            wire::common::Logger logger = wire::common::Logger{"Save"});
 
     void persistPlayers() const;
@@ -61,7 +56,6 @@ private:
     storage::PlayerStore* store_;
     command::CommandStorage* commandStorage_;
     const ServerMetrics* metrics_;
-    Options options_;
     wire::common::Logger logger_;
 };
 

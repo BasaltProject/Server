@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/config/WorldRules.hpp>
 #include <basalt/server/runtime/world/Reshapes.hpp>
 
 #include <algorithm>
@@ -661,6 +662,9 @@ std::optional<std::int32_t> of(WorldState& world, std::int32_t x, std::int32_t y
         return chest(world, x, y, z, stateId, *block);
     }
     if (path == "chorus_plant") {
+        if (world.rules().tuning.disableChorusPlantUpdates) {
+            return std::nullopt;
+        }
         return chorusPlant(world, x, y, z, stateId, *block);
     }
     if (path == "campfire" || path == "soul_campfire") {
@@ -673,6 +677,9 @@ std::optional<std::int32_t> of(WorldState& world, std::int32_t x, std::int32_t y
         return dripstoneThickness(world, x, y, z, stateId, *block);
     }
     if (endsWith(path, "mushroom_block") || path == "mushroom_stem") {
+        if (world.rules().tuning.disableMushroomBlockUpdates) {
+            return std::nullopt;
+        }
         return hugeMushroom(world, x, y, z, stateId, *block);
     }
     if (path == "bell") {

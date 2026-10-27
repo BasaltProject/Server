@@ -62,7 +62,7 @@ void bamboo(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, s
     while (isBamboo(world, x, y - height, z)) {
         ++height;
     }
-    if (height >= world.rules().gameplay.bambooMaxHeight) {
+    if (height >= world.rules().tuning.bambooMaxHeight) {
         return;
     }
 
