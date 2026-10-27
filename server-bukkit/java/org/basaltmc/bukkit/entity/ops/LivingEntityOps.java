@@ -285,7 +285,7 @@ public interface LivingEntityOps extends LivingEntity, EntityOps, LivingExtraOps
 
     default org.bukkit.entity.Player getKiller() {
         String killer = core().text("last_hurt_by_player");
-        return killer == null ? null : org.bukkit.Bukkit.getPlayer(java.util.UUID.fromString(killer));
+        return killer == null || killer.isEmpty() ? null : org.bukkit.Bukkit.getPlayer(java.util.UUID.fromString(killer));
     }
 
     default org.bukkit.util.RayTraceResult rayTraceEntities(int maxDistance, boolean ignoreBlocks) {
