@@ -171,7 +171,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return Math.max(block, sky - skyDampen);
     }
     public int getSeaLevel() {
-        return 63;
+        return world.getSeaLevel();
     }
     public int getSectionIndex(int value) {
         return (value >> 4) - (getMinY() >> 4);
