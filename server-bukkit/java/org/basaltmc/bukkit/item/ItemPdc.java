@@ -255,7 +255,10 @@ public final class ItemPdc implements PersistentDataContainer, PersistentDataAda
         if (values == null) {
             return;
         }
-        ItemPdc target = (ItemPdc) other;
+        if (!(other instanceof ItemPdc target)) {
+            copyForeign(other, values, replace);
+            return;
+        }
         Map<String, Object> into = target.values(true);
         for (Map.Entry<String, Object> entry : values.entrySet()) {
             if (replace || !into.containsKey(entry.getKey())) {
@@ -263,6 +266,24 @@ public final class ItemPdc implements PersistentDataContainer, PersistentDataAda
             }
         }
         target.touched();
+    }
+
+    private static void copyForeign(PersistentDataContainer other, Map<String, Object> values, boolean replace) {
+        java.util.Set<String> present = new java.util.HashSet<>();
+        for (org.bukkit.NamespacedKey key : other.getKeys()) {
+            present.add(key.toString());
+        }
+        Map<String, Object> chosen = Nbt.compound();
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            if (replace || !present.contains(entry.getKey())) {
+                chosen.put(entry.getKey(), Nbt.copy(entry.getValue()));
+            }
+        }
+        try {
+            other.readFromBytes(Nbt.write(chosen), false);
+        } catch (IOException failure) {
+            throw new IllegalArgumentException("Could not copy the container", failure);
+        }
     }
 
     @Override
