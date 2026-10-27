@@ -190,7 +190,7 @@ public final class RecipeCodec {
                 int width = Nbt.integer(data, "width", 0);
                 int height = Nbt.integer(data, "height", 0);
                 List<Object> cells = Nbt.list(data.get("shape"));
-                if (cells == null || width <= 0 || height <= 0) {
+                if (cells == null || width <= 0 || height <= 0 || cells.size() < width * height) {
                     return null;
                 }
                 Map<Character, RecipeChoice> choices = new LinkedHashMap<>();
