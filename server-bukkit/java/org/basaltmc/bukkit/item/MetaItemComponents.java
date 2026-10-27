@@ -72,7 +72,7 @@ public abstract class MetaItemComponents extends MetaItemCore {
 
     @Override
     public void setCustomModelDataComponent(CustomModelDataComponent component) {
-        put(kModelData, component == null ? null : ((MetaModelData.ModelData) component).data);
+        put(kModelData, component == null ? null : Nbt.deepCopy(((MetaModelData.ModelData) component).data));
     }
 
     @Override
