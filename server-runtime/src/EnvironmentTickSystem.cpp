@@ -92,10 +92,10 @@ void EnvironmentTickSystem::tickPlayers(world::LoadedWorld& world) {
     vitals.naturalRegeneration = world.gameRules().get(world::gameRules::kNaturalHealthRegeneration);
     for (PlayerSession* player : players_->snapshot()) {
         if (player->worldName == world.name()) {
-            const config::HungerRules& hunger = world.settings().rules.gameplay.hunger;
+            const config::HungerRules& hunger = world.settings().rules.tuning.hunger;
             player->food.tuning = {hunger.sprintExhaustion,     hunger.swimExhaustion,   hunger.jumpExhaustion,
                                    hunger.sprintJumpExhaustion, hunger.combatExhaustion, hunger.regenExhaustion};
-            player->keepSprintOnAttack = world.settings().rules.gameplay.keepSprintOnAttack;
+            player->keepSprintOnAttack = world.settings().rules.tuning.keepSprintOnAttack;
             player::tickVitals(*player, vitals);
         }
     }

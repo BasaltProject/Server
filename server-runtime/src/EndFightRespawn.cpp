@@ -295,7 +295,7 @@ void EndFightSystem::rebuildSpike(world::LoadedWorld& world, const std::vector<P
     static_cast<void>(
         world.state().setBlockState(spike.centerX, spike.height, spike.centerZ, registry::blocks::bedrock().stateId));
     static_cast<void>(world::fires::igniteOnImpact(world.state(), spike.centerX, spike.height + 1, spike.centerZ,
-                                                   world.settings().rules.gameplay.fireTickDelay));
+                                                   world.settings().rules.tuning.fireTickDelay));
     syncArea(world, spike.centerX - kPillarClearRadius, spike.centerZ - kPillarClearRadius,
              spike.centerX + kPillarClearRadius, spike.centerZ + kPillarClearRadius);
 }
