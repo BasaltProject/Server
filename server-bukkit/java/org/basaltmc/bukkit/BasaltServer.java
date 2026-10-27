@@ -108,6 +108,20 @@ public class BasaltServer extends ServerTail {
         return world.entity(id);
     }
 
+    private synchronized void forgetUnloaded(String[] live) {
+        if (worlds.size() <= live.length) {
+            return;
+        }
+        java.util.Set<String> keep = new java.util.HashSet<>(java.util.Arrays.asList(live));
+        for (String gone : new ArrayList<>(worlds.keySet())) {
+            if (!keep.contains(gone)) {
+                worlds.remove(gone);
+                net.minecraft.server.level.ServerChunkCache.forget(gone);
+                org.basaltmc.bukkit.tile.Lids.forget(gone);
+            }
+        }
+    }
+
     synchronized BasaltWorld world(String name) {
         return org.basaltmc.bukkit.facade.Memo.get(worlds, name, BasaltWorld::new);
     }
@@ -264,9 +278,11 @@ public class BasaltServer extends ServerTail {
         if (!worldsReady) {
             return all;
         }
-        for (String name : Natives.worlds()) {
+        String[] names = Natives.worlds();
+        for (String name : names) {
             all.add(world(name));
         }
+        forgetUnloaded(names);
         return all;
     }
 

@@ -49,6 +49,10 @@ public class ServerChunkCache extends ChunkSource {
         kAll.add(this);
     }
 
+    public static void forget(String world) {
+        kAll.removeIf(cache -> world.equals(cache.world));
+    }
+
     public static void tickAll() {
         for (ServerChunkCache cache : kAll) {
             cache.tick();
