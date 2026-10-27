@@ -500,9 +500,7 @@ public abstract class PlayerMisc extends PlayerStats {
 
     @Override
     public void broadcastHurtAnimation(Collection<Player> players) {
-        for (Player viewer : players) {
-            viewer.sendHurtAnimation(0.0F);
-        }
+        PlayerCalls.call(key(), "hurt_animation", 0.0);
     }
 
     @Override
