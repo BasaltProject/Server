@@ -192,7 +192,7 @@ public final class Tooltips {
                     lines.add(Component.translatable("item.modifiers." + group).color(NamedTextColor.GRAY));
                     first = false;
                 }
-                if (kind.equals("override_text")) {
+                if (kind.equals("override")) {
                     lines.add(Texts.fromNbt(display.get("value")));
                     continue;
                 }
