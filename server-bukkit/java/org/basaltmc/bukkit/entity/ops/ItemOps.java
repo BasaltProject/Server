@@ -44,12 +44,16 @@ public interface ItemOps extends Item, Cored {
     }
 
     default UUID getThrower() {
-        String thrower = core().nbtText("Thrower");
-        return thrower == null ? null : UUID.fromString(thrower);
+        Object stored = EntityNbt.compound(core(), "").get("Thrower");
+        return stored instanceof int[] ? org.basaltmc.bukkit.item.Convert.uuidOf(stored) : null;
     }
 
     default void setThrower(UUID thrower) {
-        core().nbtSet("Thrower", "string", thrower == null ? "" : thrower.toString());
+        if (thrower == null) {
+            core().nbtRemove("Thrower");
+        } else {
+            core().nbtSet("Thrower", "uuid", thrower.toString());
+        }
     }
 
     default boolean isUnlimitedLifetime() {
