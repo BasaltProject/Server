@@ -276,7 +276,8 @@ public abstract class PlayerHud extends PlayerBase {
     }
 
     private static String category(SoundCategory category) {
-        return (category == null ? SoundCategory.MASTER : category).name().toLowerCase(java.util.Locale.ROOT);
+        String name = (category == null ? SoundCategory.MASTER : category).name().toLowerCase(java.util.Locale.ROOT);
+        return name.equals("blocks") ? "block" : name;
     }
 
     private static String category(net.kyori.adventure.sound.Sound.Source source) {
