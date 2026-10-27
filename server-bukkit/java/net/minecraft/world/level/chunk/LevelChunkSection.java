@@ -20,6 +20,7 @@ public class LevelChunkSection {
     private int lazyBiomeOffset;
     private PalettedContainerRO<Holder<Biome>> savedBiomes;
     private int savedEdits;
+    private volatile int savedStateEdits;
 
     public LevelChunkSection(PalettedContainer<BlockState> states, PalettedContainerRO<Holder<Biome>> biomes) {
         this.states = states;
@@ -149,6 +150,16 @@ public class LevelChunkSection {
 
     private int biomeEdits() {
         return biomes instanceof PalettedContainer<?> container ? container.edits() : 0;
+    }
+
+    public boolean statesEdited() {
+        PalettedContainer<BlockState> held = states;
+        return held != null && held.edits() != savedStateEdits;
+    }
+
+    public void markStatesSaved() {
+        PalettedContainer<BlockState> held = states;
+        savedStateEdits = held == null ? 0 : held.edits();
     }
 
     public synchronized void markBiomesSaved() {

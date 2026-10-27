@@ -80,7 +80,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         int[] biomeCells = null;
         for (int i = 0; i < sections.length; i++) {
             LevelChunkSection held = sections[i];
-            if (held != null && held != baseline[i]) {
+            if (held != null && (held != baseline[i] || held.statesEdited())) {
                 continue;
             }
             long hash = Chunks.hash(all, i << 12);
@@ -120,7 +120,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         int changed = 0;
         boolean anyBiomes = false;
         for (int i = 0; i < sections.length; i++) {
-            if (sections[i] != baseline[i]) {
+            if (blocksDirty(i)) {
                 changed++;
             }
             if (sections[i] != null && sections[i].biomesChanged(baseline[i])) {
@@ -135,7 +135,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
             int[] states = new int[changed << 12];
             int at = 0;
             for (int i = 0; i < sections.length; i++) {
-                if (sections[i] == baseline[i]) {
+                if (!blocksDirty(i)) {
                     continue;
                 }
                 ys[at] = minSection + i;
@@ -153,12 +153,18 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
             baseline[i] = sections[i];
             if (sections[i] != null) {
                 sections[i].markBiomesSaved();
+                sections[i].markStatesSaved();
             }
         }
         syncedVersion = WorldNatives.blockVersion(handle);
         unsaved = true;
         level.getChunkSource().noteChanged(locX, locZ);
         return true;
+    }
+
+    private boolean blocksDirty(int i) {
+        LevelChunkSection section = sections[i];
+        return section != null && (section != baseline[i] || section.statesEdited());
     }
 
     private void writeBiomes() {
@@ -252,7 +258,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         }
         synchronized (this) {
             LevelChunkSection section = sections[index];
-            if (section != null && section != baseline[index]) {
+            if (section != null && (section != baseline[index] || section.statesEdited())) {
                 return section.getBlockState(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15);
             }
         }
@@ -278,7 +284,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     }
 
     public Holder getNoiseBiome(int x, int y, int z) {
-        int index = (y >> 2 >> 2) - minSection;
+        int index = (y >> 2) - minSection;
         LevelChunkSection section = getSections()[Math.max(0, Math.min(index, sections.length - 1))];
         return section.getNoiseBiome(x & 3, y & 3, z & 3);
     }
@@ -341,7 +347,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     public boolean hasUnflushed() {
         synchronized (this) {
             for (int i = 0; i < sections.length; i++) {
-                if (sections[i] != baseline[i] || (sections[i] != null && sections[i].biomesChanged(baseline[i]))) {
+                if (blocksDirty(i) || (sections[i] != null && sections[i].biomesChanged(baseline[i]))) {
                     return true;
                 }
             }
