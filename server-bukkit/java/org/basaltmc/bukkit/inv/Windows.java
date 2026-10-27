@@ -84,6 +84,10 @@ public final class Windows {
         return views.get(uuid(player));
     }
 
+    public static synchronized void forget(String player) {
+        views.remove(player);
+    }
+
     public static synchronized void closed(HumanEntity player) {
         BasaltInventoryView view = views.remove(uuid(player));
         if (view != null && TypedInventories.unwrap(view.getTopInventory()) instanceof CustomInventory custom) {
