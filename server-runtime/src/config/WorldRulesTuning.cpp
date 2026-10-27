@@ -38,12 +38,40 @@ wither-spawn-radius = 0.0
 [chunks]
 # Chunks around the world spawn that stay loaded without a player. Vanilla keeps 1.
 keep-spawn-loaded-range = 1
+# Chunks the server snapshots in one go while it saves; each batch is a short turn on the tick thread, so a lower
+# number smooths the tick and makes a save take longer.
+autosave-batch-size = 8
 # Chunks beyond a player's view distance that stay loaded before the unloading sweep takes them.
 unload-margin = 4
 
 [combat]
 # NOT VANILLA. Hitting something with a knockback weapon does not stop the attacker from sprinting.
 keep-sprint-on-attack = false
+
+[block-updates]
+# NOT VANILLA. Stops those blocks from reshaping when a neighbour changes (a note block keeps its instrument).
+disable-noteblock-updates = false
+disable-tripwire-updates = false
+disable-chorus-plant-updates = false
+disable-mushroom-block-updates = false
+
+[explosions]
+# NOT VANILLA. The most primed TNT that may go off in one tick; the rest wait for the next tick. -1 is no limit.
+max-tnt-per-tick = -1
+
+[maps]
+# Markers a map may track before an item frame refuses to show it. Vanilla is 256.
+item-frame-cursor-limit = 256
+# Ticks between the checks that keep a map in an item frame up to date. Vanilla is 10.
+item-frame-cursor-update-interval = 10
+
+[leash]
+# How far a leashed mob may get from its holder, in blocks, before the lead snaps. Vanilla is 12.
+max-distance = 12.0
+
+[command-blocks]
+# Permission level the commands of command blocks and command block minecarts run at, 0 to 4. Vanilla is 2.
+permission-level = 2
 
 [collisions]
 # Whether players push each other. Vanilla is true; false is NOT VANILLA.
@@ -75,7 +103,7 @@ enable-player-collisions = true
 
 } // namespace
 
-std::string_view gameplayRulesTemplate() noexcept { return kGameplayTemplate; }
+std::string_view tuningRulesTemplate() noexcept { return kGameplayTemplate; }
 
 void readTuningRules(const TomlTable& table, TuningRules& rules) {
     if (const TomlTable* fire = table.table("fire"); fire != nullptr) {
@@ -103,10 +131,35 @@ void readTuningRules(const TomlTable& table, TuningRules& rules) {
     }
     if (const TomlTable* chunks = table.table("chunks"); chunks != nullptr) {
         rules.keepSpawnLoadedRange = whole(*chunks, "keep-spawn-loaded-range", rules.keepSpawnLoadedRange, 0, 32);
+        rules.autosaveChunksPerBatch = whole(*chunks, "autosave-batch-size", rules.autosaveChunksPerBatch, 1, 1024);
         rules.unloadMarginChunks = whole(*chunks, "unload-margin", rules.unloadMarginChunks, 0, 64);
     }
     if (const TomlTable* combat = table.table("combat"); combat != nullptr) {
         rules.keepSprintOnAttack = combat->boolean("keep-sprint-on-attack").value_or(rules.keepSprintOnAttack);
+    }
+    if (const TomlTable* updates = table.table("block-updates"); updates != nullptr) {
+        rules.disableNoteBlockUpdates =
+            updates->boolean("disable-noteblock-updates").value_or(rules.disableNoteBlockUpdates);
+        rules.disableTripwireUpdates =
+            updates->boolean("disable-tripwire-updates").value_or(rules.disableTripwireUpdates);
+        rules.disableChorusPlantUpdates =
+            updates->boolean("disable-chorus-plant-updates").value_or(rules.disableChorusPlantUpdates);
+        rules.disableMushroomBlockUpdates =
+            updates->boolean("disable-mushroom-block-updates").value_or(rules.disableMushroomBlockUpdates);
+    }
+    if (const TomlTable* explosions = table.table("explosions"); explosions != nullptr) {
+        rules.maxTntPerTick = whole(*explosions, "max-tnt-per-tick", rules.maxTntPerTick, -1, 1 << 20);
+    }
+    if (const TomlTable* maps = table.table("maps"); maps != nullptr) {
+        rules.mapMarkerLimit = whole(*maps, "item-frame-cursor-limit", rules.mapMarkerLimit, 0, 1 << 20);
+        rules.mapFrameInterval = whole(*maps, "item-frame-cursor-update-interval", rules.mapFrameInterval, 1, 1 << 20);
+    }
+    if (const TomlTable* leash = table.table("leash"); leash != nullptr) {
+        rules.leashSnapDistance =
+            std::clamp(numberOf(*leash, "max-distance").value_or(rules.leashSnapDistance), 2.0, 256.0);
+    }
+    if (const TomlTable* blocks = table.table("command-blocks"); blocks != nullptr) {
+        rules.commandBlockPermissionLevel = whole(*blocks, "permission-level", rules.commandBlockPermissionLevel, 0, 4);
     }
     if (const TomlTable* collisions = table.table("collisions"); collisions != nullptr) {
         rules.playerCollisions = collisions->boolean("enable-player-collisions").value_or(rules.playerCollisions);

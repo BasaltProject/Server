@@ -62,6 +62,10 @@ portal-create-radius = 16
 void-damage = true
 # NOT VANILLA. Rain can still fall but it never thunders, so there is no lightning and no skeleton traps.
 disable-thunder = false
+# NOT VANILLA. Explosions still hurt but never push anything: players, mobs, items and primed TNT stay put.
+disable-explosion-knockback = false
+# NOT VANILLA. Weather no longer freezes still water into ice or piles snow on the ground.
+disable-ice-and-snow = false
 # NOT VANILLA. Players at or above this height in the Nether take void damage, which keeps them off the roof.
 # 0 turns it off, as vanilla has it.
 nether-ceiling-void-damage-height = 0
@@ -164,6 +168,9 @@ void readEnvironment(const TomlTable& table, EnvironmentRules& environment) {
     environment.voidDamage = table.boolean("void-damage").value_or(environment.voidDamage);
     environment.netherCeilingVoidDamageHeight =
         whole(table, "nether-ceiling-void-damage-height", environment.netherCeilingVoidDamageHeight, 0, 4096);
+    environment.disableIceAndSnow = table.boolean("disable-ice-and-snow").value_or(environment.disableIceAndSnow);
+    environment.disableExplosionKnockback =
+        table.boolean("disable-explosion-knockback").value_or(environment.disableExplosionKnockback);
     environment.disableThunder = table.boolean("disable-thunder").value_or(environment.disableThunder);
     environment.fishingMinWaitTicks = whole(table, "fishing-min-wait-ticks", environment.fishingMinWaitTicks, 1, 72000);
     environment.fishingMaxWaitTicks =
@@ -282,7 +289,6 @@ WorldRules WorldRules::from(const TomlTable* table, const WorldRules& inherited)
         return inherited;
     }
     WorldRules rules = inherited;
-    rules.simulationDistance = whole(*table, "simulation-distance", inherited.simulationDistance, 2, 32);
     rules.generateStructures = table->boolean("generate-structures").value_or(inherited.generateStructures);
     rules.maxWorldSize = whole(*table, "max-world-size", inherited.maxWorldSize, 1, 29999984);
     if (const TomlTable* section = table->table("gamerules"); section != nullptr) {
@@ -339,7 +345,7 @@ std::string renderRulesTemplate(const std::string_view text, const bool forDefau
 }
 
 std::string worldRulesTemplate(const bool forDefaults) {
-    return renderRulesTemplate(kTemplate, forDefaults) + renderRulesTemplate(gameplayRulesTemplate(), forDefaults);
+    return renderRulesTemplate(kTemplate, forDefaults) + renderRulesTemplate(tuningRulesTemplate(), forDefaults);
 }
 
 } // namespace basalt::server::runtime::config

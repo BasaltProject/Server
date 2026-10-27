@@ -496,6 +496,7 @@ basalt_module(server-runtime-core
         src/world/Furnaces.cpp
         src/world/ArrowButtons.cpp
         src/world/Hoppers.cpp
+        src/world/IceAndSnow.cpp
         src/world/EndPortals.cpp
         src/world/BlockExperience.cpp
         src/world/BlockPatterns.cpp
