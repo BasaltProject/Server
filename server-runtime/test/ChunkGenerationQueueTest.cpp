@@ -5,6 +5,8 @@
 
 #include <doctest.h>
 
+#include "../src/PendingChunkBatch.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -36,6 +38,63 @@ namespace {
 }
 
 } // namespace
+
+TEST_CASE("streaming retains ungenerated chunks until a later batch can deliver them") {
+    namespace batch = basalt::server::runtime::pendingChunkBatch;
+    using basalt::server::world::ChunkPos;
+    std::atomic<std::int32_t> generated{0};
+    WorldState world = countingWorld(generated);
+    ChunkGenerationQueue queue{world, "overworld", 0};
+    std::vector<ChunkPos> pending{{7, -9}};
+    const auto readyChunk = [&](const ChunkPos& pos) -> Chunk* {
+        Chunk* chunk = world.chunkIfLoaded(pos.x, pos.z);
+        if (chunk == nullptr) {
+            queue.request(pos.x, pos.z, 0);
+        }
+        return chunk;
+    };
+
+    // Several outbound ticks can run before generation finishes, especially during fast flight.
+    for (int tick = 0; tick < 3; ++tick) {
+        CHECK(batch::takeReady(pending, 8, readyChunk).empty());
+        REQUIRE(pending.size() == 1);
+        CHECK(queue.pendingCount() == 1);
+    }
+    REQUIRE(queue.generateNext());
+    const std::vector<Chunk*> ready = batch::takeReady(pending, 8, readyChunk);
+    REQUIRE(ready.size() == 1);
+    CHECK(ready.front()->chunkX() == 7);
+    CHECK(ready.front()->chunkZ() == -9);
+    CHECK(pending.empty());
+    CHECK(batch::takeReady(pending, 8, readyChunk).empty());
+    CHECK(generated == 1);
+}
+
+TEST_CASE("a streaming batch retains neighbour waits and budget overflow without blocking ready chunks") {
+    namespace batch = basalt::server::runtime::pendingChunkBatch;
+    using basalt::server::world::ChunkPos;
+    Chunk first{0, 0};
+    Chunk second{1, 0};
+    Chunk third{2, 0};
+    std::vector<ChunkPos> pending{{0, 0}, {1, 0}, {2, 0}};
+    bool neighboursReady = false;
+    const auto readyChunk = [&](const ChunkPos& pos) -> Chunk* {
+        if (pos.x == 0) {
+            return neighboursReady ? &first : nullptr;
+        }
+        return pos.x == 1 ? &second : &third;
+    };
+    CHECK(batch::takeReady(pending, 0, readyChunk).empty());
+    CHECK(pending.size() == 3);
+    CHECK(batch::takeReady(pending, 1, readyChunk) == std::vector<Chunk*>{&second});
+    REQUIRE(pending.size() == 2);
+    CHECK(pending[0].x == 0);
+    CHECK(pending[1].x == 2);
+    neighboursReady = true;
+    CHECK(batch::takeReady(pending, 1, readyChunk) == std::vector<Chunk*>{&first});
+    CHECK(batch::takeReady(pending, 1, readyChunk) == std::vector<Chunk*>{&third});
+    CHECK(pending.empty());
+}
 
 TEST_CASE("a requested chunk turns up in the world without the caller waiting") {
     std::atomic<std::int32_t> generated{0};
