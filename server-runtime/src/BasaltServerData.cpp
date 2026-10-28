@@ -1,4 +1,5 @@
 #include <basalt/metamorph/datafix/DataFixer.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/datapack/RegistryValidation.hpp>
@@ -189,6 +190,14 @@ bool BasaltServer::reloadData(const std::vector<std::string>& selected) {
             advancementTriggers_->grantAutomatic(player->name(), player->uuid().toString());
         }
         resyncAfterReload();
+        static std::int64_t generation = 0;
+        if (plugins_ != nullptr) {
+            static_cast<void>(server::plugins::emit(
+                &plugins_->events(), &server::plugins::pluginEventTypes::serverDataReload(),
+                [count = ++generation](server::plugins::PluginEvent& event) {
+                    event.set(0, static_cast<std::int64_t>(count));
+                }));
+        }
         return true;
     } catch (const std::exception& error) {
         logger_.warn([&error] { return std::string{"Failed to execute reload: "} + error.what(); });
