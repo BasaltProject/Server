@@ -89,7 +89,7 @@ constexpr std::array<play::BossBarOverlay, 5> kOverlays{
     out.darkenSky = bar.darkenScreen;
     out.bossMusic = bar.playMusic;
     out.fog = bar.createFog;
-    out.progress = bar.progress();
+    out.progress = static_cast<double>(bar.progress());
     out.visible = bar.visible;
     return out;
 }

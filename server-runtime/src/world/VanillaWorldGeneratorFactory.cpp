@@ -41,6 +41,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
@@ -131,7 +132,7 @@ template <typename Generator, typename BoundsFn, typename PlaceFn, typename... B
         .place =
             [generator, place, bound...](server::world::Chunk& chunk, std::int64_t seed, std::int32_t startChunkX,
                                          std::int32_t startChunkZ) {
-                (generator->*place)(chunk, seed, startChunkX, startChunkZ, bound...);
+                std::invoke(place, generator, chunk, seed, startChunkX, startChunkZ, bound...);
             }};
 }
 
@@ -509,7 +510,10 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
                                                             built->ancientCities.get(), built->trialChambers.get()}) {
         answer.placers.push_back(
             makePlacer(Identifier::vanilla(jigsaw->name()), const_cast<terrain::JigsawStructureGenerator*>(jigsaw),
-                       &terrain::JigsawStructureGenerator::placeBoundsAt, &terrain::JigsawStructureGenerator::placeAt));
+                       &terrain::JigsawStructureGenerator::placeBoundsAt,
+                       [](terrain::JigsawStructureGenerator* generator, server::world::Chunk& chunk,
+                          const std::int64_t seed, const std::int32_t chunkX,
+                          const std::int32_t chunkZ) { generator->placeAt(chunk, chunkX, chunkZ, seed); }));
     }
     for (const terrain::RuinedPortalVariant& variant : ruinedPortalVariants::overworld(tags)) {
         if (variant.name == "ruined_portal_nether") {

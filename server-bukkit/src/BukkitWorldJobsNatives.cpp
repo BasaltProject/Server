@@ -71,10 +71,10 @@ jboolean JNICALL nativeHoldChunks(JNIEnv* env, jclass, jstring name, jstring tok
 void JNICALL nativeReleaseChunks(JNIEnv* env, jclass, jstring name, jstring token) {
     if (const auto world = worldOf(env, name); world != nullptr) {
         const std::string holder = toStd(env, token);
-        guarded<int>(0, [&] {
+        static_cast<void>(guarded<int>(0, [&] {
             world->releaseChunks(holder);
             return 0;
-        });
+        }));
     }
 }
 

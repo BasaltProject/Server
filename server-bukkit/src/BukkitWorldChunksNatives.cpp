@@ -167,10 +167,10 @@ void JNICALL nativeRelightChunks(JNIEnv* env, jclass, jstring name, jintArray ch
         return;
     }
     const std::vector<std::int32_t> pairs = ints(env, chunks);
-    guarded<int>(0, [&] {
+    static_cast<void>(guarded<int>(0, [&] {
         world->relightChunks(pairs);
         return 0;
-    });
+    }));
 }
 
 jboolean JNICALL nativeReadSections(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jboolean load,

@@ -27,7 +27,6 @@ namespace equipment = entity::mobEquipment;
 namespace {
 
 constexpr std::int32_t kPotionUseTicks = 32;
-constexpr std::int32_t kSheepBlue = 11;
 constexpr std::int32_t kSheepRed = 14;
 constexpr std::string_view kDrinkingModifier = "minecraft:drinking";
 

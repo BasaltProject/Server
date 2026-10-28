@@ -23,7 +23,6 @@ using wire::common::Identifier;
 using wire::protocol::play::Gamemode;
 
 /// parity: `ThrowableProjectileItem.use`.
-constexpr float kPearlPower = 1.5F;
 
 /// parity: what a player throws from, which is the eye rather than the feet.
 constexpr double kThrowEyeHeight = 1.62;

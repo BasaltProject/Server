@@ -325,8 +325,9 @@ std::optional<Value> state(Context& context, const Verb verb, const std::string_
     if (name == "previous_gamemode") {
         constexpr std::array<std::string_view, 4> kNames{"survival", "creative", "adventure", "spectator"};
         const std::int32_t held = extras.previousGamemode;
-        return held < 0 || held >= static_cast<std::int32_t>(kNames.size()) ? Value{}
-                                                                            : Value{std::string{kNames[held]}};
+        return held < 0 || held >= static_cast<std::int32_t>(kNames.size())
+                   ? Value{}
+                   : Value{std::string{kNames[static_cast<std::size_t>(held)]}};
     }
     if (name == "reset_attack_cooldown") {
         session.ticksSinceSwing = 0;

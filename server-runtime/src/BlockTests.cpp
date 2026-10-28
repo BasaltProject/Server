@@ -533,7 +533,7 @@ std::int32_t BlockTests::clearAll(world::LoadedWorld& world, const std::int32_t 
                 const std::array<std::int32_t, 3> at{(chunkX << 4) + entity.localX(), entity.y(),
                                                      (chunkZ << 4) + entity.localZ()};
                 const NbtCompound* data = entity.data().getCompound("data");
-                const auto size = data == nullptr ? std::vector<std::int32_t>{} : data->getIntArray("size");
+                const auto size = data == nullptr ? std::span<const std::int32_t>{} : data->getIntArray("size");
                 const std::string rotation = data == nullptr ? "none" : std::string{data->getString("rotation")};
                 const std::string testName = data == nullptr ? std::string{} : std::string{data->getString("test")};
                 const auto test = Identifier::parse(testName);
@@ -612,7 +612,7 @@ std::optional<std::string> BlockTests::save(world::LoadedWorld& world, const Fou
     const server::world::ChunkBlockEntity* entity =
         chunk == nullptr ? nullptr : chunk->blockEntityAt(block.at[0] & 15, block.at[1], block.at[2] & 15);
     const NbtCompound* data = entity == nullptr ? nullptr : entity->data().getCompound("data");
-    const auto size = data == nullptr ? std::vector<std::int32_t>{} : data->getIntArray("size");
+    const auto size = data == nullptr ? std::span<const std::int32_t>{} : data->getIntArray("size");
     if (size.size() != 3) {
         return "The test block holds no size";
     }

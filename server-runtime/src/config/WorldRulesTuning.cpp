@@ -90,7 +90,7 @@ enable-player-collisions = true
 }
 
 [[nodiscard]] float real(const TomlTable& table, std::string_view key, float fallback) {
-    return static_cast<float>(ruleErrors::real(table, key, fallback, 0.0, 1000.0));
+    return static_cast<float>(ruleErrors::real(table, key, static_cast<double>(fallback), 0.0, 1000.0));
 }
 
 } // namespace

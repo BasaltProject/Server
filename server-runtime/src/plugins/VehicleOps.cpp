@@ -59,9 +59,9 @@ void boatMember(Table& table, std::string_view name, T entity::boats::BoatState:
 void addVehicles(Table& table, Operations& /*operations*/) {
     cartMember(table, "cart_slow_when_empty", &entity::minecarts::CartState::slowWhenEmpty, true);
     cartMember(table, "cart_friction", &entity::minecarts::CartState::frictionState, std::int8_t{-1});
-    cartVector(table, "cart_flying_x", &entity::minecarts::CartState::flyingVelocityMod, 0, 0.95F);
-    cartVector(table, "cart_flying_y", &entity::minecarts::CartState::flyingVelocityMod, 1, 0.95F);
-    cartVector(table, "cart_flying_z", &entity::minecarts::CartState::flyingVelocityMod, 2, 0.95F);
+    cartVector(table, "cart_flying_x", &entity::minecarts::CartState::flyingVelocityMod, 0, static_cast<double>(0.95F));
+    cartVector(table, "cart_flying_y", &entity::minecarts::CartState::flyingVelocityMod, 1, static_cast<double>(0.95F));
+    cartVector(table, "cart_flying_z", &entity::minecarts::CartState::flyingVelocityMod, 2, static_cast<double>(0.95F));
     cartVector(table, "cart_derailed_x", &entity::minecarts::CartState::derailedVelocityMod, 0, 0.5);
     cartVector(table, "cart_derailed_y", &entity::minecarts::CartState::derailedVelocityMod, 1, 0.5);
     cartVector(table, "cart_derailed_z", &entity::minecarts::CartState::derailedVelocityMod, 2, 0.5);

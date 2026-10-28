@@ -67,7 +67,7 @@ template <typename Result, typename Body>
 [[nodiscard]] Result guarded(Result fallback, Body&& body) {
     const auto run = [&fallback, &body]() -> Result {
         try {
-            return body();
+            return static_cast<Result>(body());
         } catch (const std::exception& error) {
             BukkitBridge::current().log().warn([&error] { return std::string{"world call failed: "} + error.what(); });
             return fallback;

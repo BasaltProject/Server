@@ -73,18 +73,6 @@ struct Coordinate {
     return found;
 }
 
-[[nodiscard]] std::vector<std::string> jarsIn(const fs::path& directory) {
-    std::vector<std::string> jars;
-    std::error_code error;
-    for (const fs::directory_entry& entry : fs::directory_iterator(directory, error)) {
-        if (entry.path().extension() == ".jar") {
-            jars.push_back(fs::absolute(entry.path()).string());
-        }
-    }
-    std::ranges::sort(jars);
-    return jars;
-}
-
 [[nodiscard]] std::optional<std::string> download(const Coordinate& coordinate, const fs::path& target) {
     const std::string url = coordinate.url();
     const auto jar = wire::auth::httpsGet(url, kMaxJarBytes);

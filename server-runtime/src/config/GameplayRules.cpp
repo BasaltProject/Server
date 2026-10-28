@@ -16,7 +16,7 @@ using wire::common::toml::TomlTable;
 }
 
 [[nodiscard]] float decimal(const TomlTable& table, std::string_view key, float fallback, double least) {
-    return static_cast<float>(ruleErrors::real(table, key, fallback, least, 1.0E9));
+    return static_cast<float>(ruleErrors::real(table, key, static_cast<double>(fallback), least, 1.0E9));
 }
 
 [[nodiscard]] std::int32_t tristate(const TomlTable& table, std::string_view key, std::int32_t fallback) {

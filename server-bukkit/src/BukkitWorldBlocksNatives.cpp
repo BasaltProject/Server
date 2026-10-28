@@ -108,10 +108,10 @@ void JNICALL nativeResendChunks(JNIEnv* env, jclass, jstring name, jintArray chu
     }
     std::vector<std::int32_t> pairs(static_cast<std::size_t>(env->GetArrayLength(chunks)));
     env->GetIntArrayRegion(chunks, 0, static_cast<jsize>(pairs.size()), pairs.data());
-    guarded<int>(0, [&] {
+    static_cast<void>(guarded<int>(0, [&] {
         world->resendChunks(pairs);
         return 0;
-    });
+    }));
 }
 
 jstring JNICALL nativeBiome(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z) {

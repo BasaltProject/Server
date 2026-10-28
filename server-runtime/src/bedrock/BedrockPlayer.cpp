@@ -801,7 +801,7 @@ void BedrockPlayer::showMenu(const std::string& title, const std::map<std::int32
         const std::lock_guard<std::mutex> guard{formLock_};
         formId = nextFormId_++;
         openTitle_ = title;
-        form_ = OpenForm{formId, std::move(slots), std::move(onClick)};
+        form_ = OpenForm{formId, std::move(slots), std::move(onClick), nullptr};
     }
     wire::io::ByteBuffer body;
     wire::bedrock::writeModalFormRequest(
@@ -902,10 +902,11 @@ void BedrockPlayer::showDialog(const world::dialogs::Dialog& dialog) {
                 break;
             case world::dialogs::InputKind::NumberRange:
                 control.kind = Control::Kind::Slider;
-                control.min = std::min(input.start, input.end);
-                control.max = std::max(input.start, input.end);
-                control.step = input.step.value_or(0.0F);
-                control.initialNumber = input.initialNumber.value_or((input.start + input.end) / 2.0F);
+                control.min = static_cast<double>(std::min(input.start, input.end));
+                control.max = static_cast<double>(std::max(input.start, input.end));
+                control.step = static_cast<double>(input.step.value_or(0.0F));
+                control.initialNumber =
+                    static_cast<double>(input.initialNumber.value_or((input.start + input.end) / 2.0F));
                 break;
             case world::dialogs::InputKind::SingleOption:
                 control.kind = Control::Kind::Dropdown;

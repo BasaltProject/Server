@@ -249,6 +249,24 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                 return options_.blockTags != nullptr &&
                        world::realBlockTags::contains(*options_.blockTags, "minecraft:does_not_block_hoppers", block);
             },
+        .gatewayBeam =
+            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+                const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
+                if (!state.has_value() ||
+                    (options_.triggerGatewayCooldown && !options_.triggerGatewayCooldown(world, x, y, z))) {
+                    return;
+                }
+                for (PlayerSession* watcher : watchersOf(world)) {
+                    const double dx = watcher->x - x;
+                    const double dy = watcher->y - y;
+                    const double dz = watcher->z - z;
+                    if (watcher->worldName != world.name() || !watcher->connection().sendBlockEvent ||
+                        (dx * dx) + (dy * dy) + (dz * dz) >= kBlockEventRange * kBlockEventRange) {
+                        continue;
+                    }
+                    watcher->connection().sendBlockEvent(x, y, z, *state, world::endGateways::kBeamEvent, 0);
+                }
+            },
         .songLength = [this](const std::string& song) -> std::int64_t {
             return options_.jukeboxes == nullptr ? 0 : options_.jukeboxes->lengthOf(song);
         },
@@ -361,24 +379,6 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             [this, &world](wire::nbt::NbtCompound& data, const std::int32_t x, const std::int32_t y,
                            const std::int32_t z) {
                 return options_.tickConduit && options_.tickConduit(world, x, y, z, data);
-            },
-        .gatewayBeam =
-            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
-                const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
-                if (!state.has_value() ||
-                    (options_.triggerGatewayCooldown && !options_.triggerGatewayCooldown(world, x, y, z))) {
-                    return;
-                }
-                for (PlayerSession* watcher : watchersOf(world)) {
-                    const double dx = watcher->x - x;
-                    const double dy = watcher->y - y;
-                    const double dz = watcher->z - z;
-                    if (watcher->worldName != world.name() || !watcher->connection().sendBlockEvent ||
-                        (dx * dx) + (dy * dy) + (dz * dz) >= kBlockEventRange * kBlockEventRange) {
-                        continue;
-                    }
-                    watcher->connection().sendBlockEvent(x, y, z, *state, world::endGateways::kBeamEvent, 0);
-                }
             },
         .ticking = tickingChunks(world, region, 1),
         .spawnerTick = [this, &world](wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y,
