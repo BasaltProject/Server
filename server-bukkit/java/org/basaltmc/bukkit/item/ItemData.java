@@ -14,6 +14,10 @@ public final class ItemData {
         this.data = data;
     }
 
+    public static synchronized void invalidate() {
+        cache.clear();
+    }
+
     public static synchronized ItemData of(String id) {
         ItemData found = cache.get(id);
         if (found == null) {

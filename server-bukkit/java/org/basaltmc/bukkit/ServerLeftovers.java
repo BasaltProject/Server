@@ -101,10 +101,19 @@ public abstract class ServerLeftovers extends ServerExtras {
     @Override
     public void reloadData() {
         RestNatives.reloadData();
+        dropDataCaches();
+    }
+
+    private static void dropDataCaches() {
+        org.basaltmc.bukkit.item.TagSets.invalidate();
+        org.basaltmc.bukkit.item.ItemData.invalidate();
+        org.basaltmc.bukkit.item.ItemDefaults.invalidate();
+        BasaltTag.invalidate();
     }
 
     @Override
     public void updateResources() {
         RestNatives.reloadData();
+        dropDataCaches();
     }
 }

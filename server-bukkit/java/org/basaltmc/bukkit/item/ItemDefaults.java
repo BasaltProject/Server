@@ -17,6 +17,11 @@ public final class ItemDefaults {
 
     private ItemDefaults() {}
 
+    public static synchronized void invalidate() {
+        cache.clear();
+        rarities = null;
+    }
+
     public static synchronized Map<String, Object> of(String id) {
         Map<String, Object> found = cache.get(id);
         if (found == null) {

@@ -22,6 +22,10 @@ public final class BasaltTag<T extends Keyed> implements Tag<T> {
     }
 
     @SuppressWarnings("unchecked")
+    static synchronized void invalidate() {
+        cache.clear();
+    }
+
     static synchronized <T extends Keyed> Map<NamespacedKey, BasaltTag<T>> all(String registry, Class<T> type) {
         Map<NamespacedKey, BasaltTag<?>> found = cache.get(registry);
         if (found == null) {
