@@ -457,11 +457,18 @@ void ClientSession::enterPlay() {
         options_.playerStore == nullptr || !options_.playerStore->isOpen()
             ? std::nullopt
             : options_.playerStore->players().load(pendingProfile_->id.toString());
+    const auto heldWorlds = options_.worldsNow ? options_.worldsNow()
+        : std::map<std::string, std::shared_ptr<world::LoadedWorld>>{};
+    auto worlds = options_.worlds;
+    if (options_.worldsNow) {
+        worlds.clear();
+        for (const auto& [name, held] : heldWorlds) worlds.emplace(name, held.get());
+    }
     const auto requested = stored.has_value() ? std::optional{stored->world} : std::nullopt;
     world::LoadedWorld* world = options_.defaultWorld;
     if (requested.has_value()) {
-        const auto found = options_.worlds.find(*requested);
-        if (found != options_.worlds.end()) {
+        const auto found = worlds.find(*requested);
+        if (found != worlds.end()) {
             world = found->second;
         }
     }
@@ -525,8 +532,8 @@ void ClientSession::enterPlay() {
         player.uuid(), options_.enforceSecureProfile && !translatedClient(), options_.servicesKeys);
 
     std::vector<std::string> worldNames;
-    worldNames.reserve(options_.worlds.size());
-    for (const auto& [name, loaded] : options_.worlds) {
+    worldNames.reserve(worlds.size());
+    for (const auto& [name, loaded] : worlds) {
         worldNames.push_back(loaded->levelKey());
     }
     const bool online = options_.onlineMode != nullptr;

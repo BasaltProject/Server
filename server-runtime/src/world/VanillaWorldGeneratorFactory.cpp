@@ -183,7 +183,9 @@ VanillaWorldGeneratorFactory::~VanillaWorldGeneratorFactory() = default;
 
 VanillaWorldGeneratorFactory::CacheStats VanillaWorldGeneratorFactory::cacheStats() const {
     CacheStats stats;
-    for (const std::unique_ptr<Built>& built : built_) {
+    for (const auto& entry : built_) {
+        const auto built = entry.lock();
+        if (!built) continue;
         if (built->village != nullptr) {
             const auto [count, pieces] = built->village->assemblyStats();
             stats.assemblies += count;
@@ -233,7 +235,7 @@ VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration
 
 VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld(std::int64_t seed, bool spawnMobs,
                                                                                  std::string_view settings) {
-    auto built = std::make_unique<Built>();
+    auto built = std::make_shared<Built>();
     built->structures = structuresEnabled_;
     built->seed = seed;
     built->spawnMobs = spawnMobs;
@@ -555,12 +557,14 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
                                             router.erosion, router.depth, router.ridges});
         return std::pair{blockX >> 4, blockZ >> 4};
     };
-    built_.push_back(std::move(built));
+    answer.lifetime = built;
+    std::erase_if(built_, [](const auto& held) { return held.expired(); });
+    built_.push_back(built);
     return answer;
 }
 
 VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std::int64_t seed, bool spawnMobs) {
-    auto built = std::make_unique<Built>();
+    auto built = std::make_shared<Built>();
     built->structures = structuresEnabled_;
     built->seed = seed;
     built->spawnMobs = spawnMobs;
@@ -618,12 +622,14 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
         world.village->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), world.seed);
         world.strongholds->generateInto(chunk, world.seed);
     };
-    built_.push_back(std::move(built));
+    answer.lifetime = built;
+    std::erase_if(built_, [](const auto& held) { return held.expired(); });
+    built_.push_back(built);
     return answer;
 }
 
 VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(std::int64_t seed, bool spawnMobs) {
-    auto built = std::make_unique<Built>();
+    auto built = std::make_shared<Built>();
     built->structures = structuresEnabled_;
     built->seed = seed;
     built->spawnMobs = spawnMobs;
@@ -707,12 +713,14 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
     answer.placers.push_back(makePlacer(Identifier::vanilla("ruined_portal_nether"), built->netherStructures.get(),
                                         &terrain::NetherStructureGenerator::netherPortalBoundsAt,
                                         &terrain::NetherStructureGenerator::netherPortalPlaceAt));
-    built_.push_back(std::move(built));
+    answer.lifetime = built;
+    std::erase_if(built_, [](const auto& held) { return held.expired(); });
+    built_.push_back(built);
     return answer;
 }
 
 VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::int64_t seed) {
-    auto built = std::make_unique<Built>();
+    auto built = std::make_shared<Built>();
     built->structures = structuresEnabled_;
     built->seed = seed;
     built->templates = std::make_unique<StructureTemplates>(
@@ -753,7 +761,9 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::
     answer.placers.push_back(makePlacer(Identifier::vanilla("end_city"), built->endCities.get(),
                                         &terrain::EndCityStructureGenerator::placeBoundsAt,
                                         &terrain::EndCityStructureGenerator::placeAt));
-    built_.push_back(std::move(built));
+    answer.lifetime = built;
+    std::erase_if(built_, [](const auto& held) { return held.expired(); });
+    built_.push_back(built);
     return answer;
 }
 

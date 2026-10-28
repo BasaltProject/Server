@@ -214,7 +214,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.resourcePack = resourcePackOf(*config_);
     options.forwarding = config_->forwarding;
     options.playerRegistry = &playerRegistry_;
-    options.worlds = namedWorlds();
+    options.worldsNow = [this] { return worldRegistry_->worldsForLogin(); };
     options.defaultWorld = &worldRegistry_->defaultWorld();
     options.commands = wired_.dispatcher.get();
     options.defaultGamemode = defaultGamemode_;

@@ -62,7 +62,7 @@ using wire::common::Identifier;
 
 LoadedWorldRef::LoadedWorldRef(world::LoadedWorld& world, std::shared_ptr<const ModelHooks> hooks,
                                std::function<std::vector<player::PlayerSession*>()> players)
-    : world_(&world), shared_(std::move(hooks)), hooks_(*shared_), players_(std::move(players)),
+    : world_(world.keepAlive()), shared_(std::move(hooks)), hooks_(*shared_), players_(std::move(players)),
       env_(world, shared_, players_) {}
 
 server::plugins::PluginWorldEnv* LoadedWorldRef::env() { return &env_; }
@@ -307,6 +307,10 @@ std::int32_t LoadedWorldRef::chunkStatus(std::int32_t chunkX, std::int32_t chunk
 
 void LoadedWorldRef::requestChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate, std::int32_t priority,
                                   std::function<void(bool)> done) {
+    if (world_->retired()) {
+        done(false);
+        return;
+    }
     if (world_->state().isLoaded(chunkX, chunkZ)) {
         done(true);
         return;
@@ -319,12 +323,38 @@ void LoadedWorldRef::requestChunk(std::int32_t chunkX, std::int32_t chunkZ, bool
     const std::string token = "request:" + std::to_string(chunkX) + "," + std::to_string(chunkZ);
     world_->holdChunks(token, {world::ChunkGenerationQueue::pack(chunkX, chunkZ)});
     world_->generationQueue().request(chunkX, chunkZ, priority);
-    world::LoadedWorld* held = world_;
+    auto held = world_;
+
+    // The queued poll may be cancelled by unload before it can run again.
+    // Its final owner must resolve the future and release the chunk ticket too.
+    struct Completion {
+        std::shared_ptr<world::LoadedWorld> world;
+        std::string token;
+        std::function<void(bool)> done;
+
+        void finish(bool loaded) {
+            std::function<void(bool)> callback;
+            callback.swap(done);
+            if (!callback)
+                return;
+            world->releaseChunks(token);
+            callback(loaded);
+        }
+
+        ~Completion() {
+            try {
+                finish(false);
+            } catch (...) { /* Never throw from cancelled task destruction. */
+            }
+        }
+    };
+
+    auto completion = std::make_shared<Completion>();
+    completion->world = held;
+    completion->token = token;
+    completion->done = std::move(done);
     awaitChunk(held, chunkX, chunkZ, 0,
-               std::make_shared<std::function<void(bool)>>([held, token, done = std::move(done)](bool loaded) {
-                   done(loaded);
-                   held->releaseChunks(token);
-               }));
+               std::make_shared<std::function<void(bool)>>([completion](bool loaded) { completion->finish(loaded); }));
 }
 
 bool LoadedWorldRef::holdChunks(std::string_view token, std::span<const std::int32_t> chunks) {

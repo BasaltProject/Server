@@ -70,6 +70,7 @@ public:
 
     /// Workers finish their current chunk, so pair this with `awaitIdle`.
     void stop();
+    void joinWorkers();
 
     /// Shutdown saves what is in memory, so it must wait for the last chunk to land.
     void awaitIdle(std::int64_t timeoutMillis);

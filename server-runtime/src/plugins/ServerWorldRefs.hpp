@@ -57,7 +57,7 @@ public:
 
 protected:
     [[nodiscard]] entity::ServerEntity* entity() const;
-    world::LoadedWorld* world_;
+    std::shared_ptr<world::LoadedWorld> world_;
 
 private:
     [[nodiscard]] entityOps::Environment environment() const;
@@ -234,7 +234,7 @@ private:
     [[nodiscard]] server::world::ChunkHeight chunkHeight() const;
     [[nodiscard]] static std::int32_t biomeIndexOf(std::int32_t biomeId);
     [[nodiscard]] static std::optional<std::int32_t> biomeIdAt(std::int32_t index);
-    static void awaitChunk(world::LoadedWorld* world, std::int32_t chunkX, std::int32_t chunkZ, std::int32_t waited,
+    static void awaitChunk(std::shared_ptr<world::LoadedWorld> world, std::int32_t chunkX, std::int32_t chunkZ, std::int32_t waited,
                            std::shared_ptr<std::function<void(bool)>> done);
     void ensureChunk(std::int32_t chunkX, std::int32_t chunkZ);
     static constexpr std::size_t kLightBytes = 2048;
@@ -244,7 +244,7 @@ private:
                            std::span<const std::int32_t> chunks);
     [[nodiscard]] blockUpdates::Target updateTarget() const;
     void tell(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) const;
-    world::LoadedWorld* world_;
+    std::shared_ptr<world::LoadedWorld> world_;
     std::shared_ptr<const ModelHooks> shared_;
     const ModelHooks& hooks_;
     std::function<std::vector<player::PlayerSession*>()> players_;

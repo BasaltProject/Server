@@ -1,4 +1,5 @@
 #pragma once
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <basalt/server/plugins/PluginWorldEnv.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
@@ -15,7 +16,7 @@ class ServerWorldEnv final : public server::plugins::PluginWorldEnv {
 public:
     ServerWorldEnv(world::LoadedWorld& world, std::shared_ptr<const ModelHooks> hooks,
                    std::function<std::vector<player::PlayerSession*>()> players)
-        : world_(&world), hooks_(std::move(hooks)), players_(std::move(players)) {}
+        : world_(world.keepAlive()), hooks_(std::move(hooks)), players_(std::move(players)) {}
 
     void sound(std::string_view sound, std::string_view category, double x, double y, double z, float volume,
                float pitch, std::int64_t seed) override;
@@ -82,7 +83,7 @@ public:
 private:
     [[nodiscard]] std::vector<player::PlayerSession*> watchers() const;
 
-    world::LoadedWorld* world_;
+    std::shared_ptr<world::LoadedWorld> world_;
     std::shared_ptr<const ModelHooks> hooks_;
     std::function<std::vector<player::PlayerSession*>()> players_;
 };

@@ -418,6 +418,7 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
 void LoadedWorld::stopGenerating(std::int64_t drainTimeoutMillis, bool persist) {
     generationQueue_.stop();
     generationQueue_.awaitIdle(drainTimeoutMillis);
+    generationQueue_.joinWorkers();
     // A proto chunk a neighbour already wrote into cannot be made again from the seed alone.
     if (persist && protoChunks_ != nullptr) {
         protoChunks_->persistAll();
@@ -433,6 +434,25 @@ void LoadedWorld::retire() {
     regions_.close();
     lightWorker_.request_stop();
     if (lightWorker_.joinable()) lightWorker_.join();
+    std::vector<std::function<void(std::int32_t)>> cancelled;
+    {
+        const std::lock_guard lock{lightQueueMutex_};
+        for (auto& job : lightJobs_)
+            cancelled.push_back(std::move(job.second));
+        lightJobs_.clear();
+        lightLater_.clear();
+        lightQueue_.clear();
+        lightPending_.clear();
+    }
+    for (auto& done : cancelled) {
+        if (!done)
+            continue;
+        try {
+            done(0);
+        } catch (const std::exception& failure) {
+            logger_.error([&] { return "A light job cancellation failed: " + std::string{failure.what()}; });
+        }
+    }
 }
 
 void LoadedWorld::closeOwner() { owner().close(); }

@@ -255,15 +255,35 @@ bool LoadedWorldRef::writeBiomes(std::int32_t chunkX, std::int32_t chunkZ, std::
 }
 
 void LoadedWorldRef::lightJob(std::span<const std::int32_t> chunks, std::function<void(std::int32_t)> done) {
+    struct Completion {
+        std::function<void(std::int32_t)> done;
+
+        void finish(std::int32_t count) {
+            std::function<void(std::int32_t)> callback;
+            callback.swap(done);
+            if (callback)
+                callback(count);
+        }
+
+        ~Completion() {
+            try {
+                finish(0);
+            } catch (...) { /* Task destruction must not throw. */
+            }
+        }
+    };
+
+    auto completion = std::make_shared<Completion>();
+    completion->done = std::move(done);
     std::vector<std::int64_t> keys;
     for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
         keys.push_back(world::ChunkGenerationQueue::pack(chunks[at], chunks[at + 1]));
     }
     world_->relightAsync(std::move(keys), [world = world_, players = players_,
                                            pairs = std::vector<std::int32_t>(chunks.begin(), chunks.end()),
-                                           done = std::move(done)](std::int32_t relit) {
+                                           completion](std::int32_t relit) {
         showChunks(*world, players, pairs);
-        done(relit);
+        completion->finish(relit);
     });
 }
 

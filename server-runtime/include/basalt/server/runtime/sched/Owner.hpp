@@ -76,6 +76,7 @@ public:
     void advanceTick();
 
     void close();
+    void cancelPending();
 
     void drainInto(Owner& other);
 

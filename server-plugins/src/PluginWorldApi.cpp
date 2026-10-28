@@ -88,6 +88,19 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("unload");
+    wire::lua::pushHostFunction(lua, "worlds.delete", [server](LuaArgs& args) {
+        std::string name;
+        if (args.isTable(1)) {
+            args.pushField(1, "name");
+            name = args.checkString(-1);
+            args.pop(1);
+        } else {
+            name = args.checkString(1);
+        }
+        args.pushBoolean(server->services().worlds().erase(name));
+        return 1;
+    });
+    lua.setField("delete");
     wire::lua::pushHostFunction(lua, "worlds.all", [server, hooks](LuaArgs& args) {
         args.pushTable();
         std::int64_t position = 1;

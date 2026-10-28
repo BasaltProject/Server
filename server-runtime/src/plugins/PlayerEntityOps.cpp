@@ -71,7 +71,7 @@ constexpr std::string_view kMaxHealthId = "minecraft:max_health";
 class PlayerEntityRef final : public PluginEntityRef {
 public:
     PlayerEntityRef(world::LoadedWorld& world, std::int32_t entityId, SessionList sessions)
-        : world_(&world), entityId_(entityId), sessions_(std::move(sessions)) {}
+        : world_(world.keepAlive()), entityId_(entityId), sessions_(std::move(sessions)) {}
 
     [[nodiscard]] std::int32_t id() const override { return entityId_; }
 
@@ -469,7 +469,7 @@ private:
         return nullptr;
     }
 
-    world::LoadedWorld* world_;
+    std::shared_ptr<world::LoadedWorld> world_;
     std::int32_t entityId_;
     SessionList sessions_;
 };

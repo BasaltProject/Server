@@ -43,6 +43,10 @@ public:
         return false;
     }
 
+    /// Deletes only a known unloaded non-default world through managed storage.
+    /// Plugins pass a world name, never a filesystem path.
+    virtual bool erase(std::string_view name) { static_cast<void>(name); return false; }
+
     [[nodiscard]] virtual std::int32_t stateId(std::string_view text) const {
         static_cast<void>(text);
         return -1;
