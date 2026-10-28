@@ -51,7 +51,7 @@ constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  
                                                     registry::BlockFace::West,  registry::BlockFace::East};
 
 [[nodiscard]] play::SoundSource sourceOf(const std::string_view category) {
-    constexpr std::array<std::pair<std::string_view, play::SoundSource>, 13> kSources{{
+    constexpr std::array<std::pair<std::string_view, play::SoundSource>, 14> kSources{{
         {"master", play::SoundSource::Master},
         {"music", play::SoundSource::Music},
         {"record", play::SoundSource::Records},
@@ -65,6 +65,7 @@ constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  
         {"players", play::SoundSource::Players},
         {"ambient", play::SoundSource::Ambient},
         {"voice", play::SoundSource::Voice},
+        {"ui", play::SoundSource::Ui},
     }};
     for (const auto& [name, source] : kSources) {
         if (name == category) {

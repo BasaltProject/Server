@@ -80,9 +80,11 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
         const bool openSky = world::worldLight::skyLight(world.state(), blockX, blockY + 1, blockZ) >= kSkyLightMax;
         const std::optional<std::int32_t> here = world.state().blockState(blockX, blockY, blockZ);
         const bool inWater = world::fluids::of(here.value_or(0)) == world::Submersion::Water;
-        if (entity::sunBurn::shouldBurn(sensitive, day, light, openSky, inWater, random) &&
-            (!hooks_.combustAllowed || hooks_.combustAllowed(world, mob, entity::sunBurn::kFireTicks, "sunlight"))) {
-            mob.fireTicks = entity::sunBurn::kFireTicks;
+        if (entity::sunBurn::shouldBurn(sensitive, day, light, openSky, inWater, random)) {
+            std::int32_t fireTicks = entity::sunBurn::kFireTicks;
+            if (!hooks_.combustAllowed || hooks_.combustAllowed(world, mob, fireTicks, "sunlight")) {
+                mob.fireTicks = fireTicks;
+            }
         }
     }
     // The enderman's own teleport goal already hurts it in water.

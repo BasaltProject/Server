@@ -83,7 +83,7 @@ namespace basalt::server::runtime {
 
 struct MobActionHooks {
     entity::entityCombat::Hooks combat;
-    std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::int32_t fireTicks,
+    std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::int32_t& fireTicks,
                        std::string_view cause)>
         combustAllowed;
     std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob,

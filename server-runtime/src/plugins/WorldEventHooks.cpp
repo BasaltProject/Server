@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/plugins/WorldEventHooks.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
+#include <algorithm>
 #include <array>
 
 namespace basalt::server::runtime::plugins::worldEventHooks {
@@ -456,14 +457,24 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
         });
     };
     hooks.combustAllowed = [&sink, worldOf](const world::LoadedWorld& world, const entity::ServerEntity& mob,
-                                            std::int32_t fireTicks, std::string_view cause) {
-        return sink.allowed(&entityCombust, [&](PluginEvent& event) {
-            event.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
-            event.set("entity_type", mob.type().toString());
-            event.set("world", world.name());
-            event.set("ticks", static_cast<std::int64_t>(fireTicks));
-            event.set("cause", std::string{cause});
+                                            std::int32_t& fireTicks, std::string_view cause) {
+        const server::plugins::PluginEvent* event = sink.ask(&entityCombust, [&](PluginEvent& filled) {
+            filled.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
+            filled.set("entity_type", mob.type().toString());
+            filled.set("world", world.name());
+            filled.set("ticks", static_cast<std::int64_t>(fireTicks));
+            filled.set("cause", std::string{cause});
         });
+        if (event == nullptr) {
+            return true;
+        }
+        if (event->cancelled()) {
+            return false;
+        }
+        if (const auto* edited = std::get_if<std::int64_t>(&event->get("ticks")); edited != nullptr) {
+            fireTicks = static_cast<std::int32_t>(std::max<std::int64_t>(0, *edited));
+        }
+        return true;
     };
     hooks.tameAllowed = [&sink](const player::PlayerSession& who, const entity::ServerEntity& animal) {
         return sink.allowed(&entityTame, [&](PluginEvent& event) {

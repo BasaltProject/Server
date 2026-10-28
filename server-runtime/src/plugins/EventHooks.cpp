@@ -217,6 +217,8 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
             event.set("block", blockNameAt(owner, x, y, z));
             event.set("face", std::string{face});
             event.set("insta_break", instaBreak);
+            const std::optional<storage::StoredItemStack>& held = who.inventory.heldItem();
+            event.set("item", held.has_value() ? held->id : std::string{});
         });
     };
     hooks.itemDamageAllowed = [&sink](const player::PlayerSession& who, const std::string& item, std::int32_t amount,
