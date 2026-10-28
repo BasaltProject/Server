@@ -43,12 +43,6 @@ void ensureBee(ServerEntity& entity) {
     }
 }
 
-void ensureAllay(ServerEntity& entity) {
-    if (entity::allays::isAllay(entity.type())) {
-        static_cast<void>(entity::allays::stateOf(entity));
-    }
-}
-
 void ensureGolem(ServerEntity& entity) {
     if (entity::copperGolems::isCopperGolem(entity.type())) {
         random::RandomSource random = random::RandomSource::legacy(0);
