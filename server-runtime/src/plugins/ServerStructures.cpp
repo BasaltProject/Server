@@ -14,9 +14,21 @@ namespace {
 using wire::common::Identifier;
 using wire::nbt::NbtCompound;
 
+[[nodiscard]] bool portable(std::string_view text, bool allowSlash) {
+    const auto valid = [allowSlash](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' ||
+               (allowSlash && c == '/');
+    };
+    return !text.empty() && std::ranges::all_of(text, valid) && text.find("..") == std::string_view::npos &&
+           text.front() != '/' && text.find("//") == std::string_view::npos;
+}
+
 [[nodiscard]] std::optional<Identifier> parsed(std::string_view id) {
     std::expected<Identifier, wire::common::IdentifierError> result = Identifier::parse(id);
-    return result.has_value() ? std::optional{std::move(*result)} : std::nullopt;
+    if (!result.has_value() || !portable(result->namespaceName(), false) || !portable(result->path(), true)) {
+        return std::nullopt;
+    }
+    return std::optional{std::move(*result)};
 }
 
 [[nodiscard]] std::optional<NbtCompound> compoundOf(std::span<const std::uint8_t> bytes) {
