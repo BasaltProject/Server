@@ -87,8 +87,9 @@ jint JNICALL nativeSpawn(JNIEnv* env, jclass, jstring name, jstring type, jdoubl
     if (world == nullptr) {
         return -1;
     }
+    const std::string kind = toStd(env, type);
     const auto spawned =
-        guarded<std::shared_ptr<PluginEntityRef>>(nullptr, [&] { return world->spawn(toStd(env, type), x, y, z); });
+        guarded<std::shared_ptr<PluginEntityRef>>(nullptr, [&] { return world->spawn(kind, x, y, z); });
     return spawned == nullptr ? -1 : spawned->id();
 }
 
