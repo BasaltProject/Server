@@ -119,7 +119,7 @@ std::optional<std::array<std::int32_t, 3>> LoadedWorldRef::locateBiome(const std
     for (std::int32_t ring = 0; ring <= radius; ring += step) {
         for (std::int32_t dx = -ring; dx <= ring; dx += step) {
             for (std::int32_t dz = -ring; dz <= ring; dz += step) {
-                if (ring > 0 && dx * dx != ring * ring && dz * dz != ring * ring) {
+                if (ring > 0 && std::abs(dx) != ring && std::abs(dz) != ring) {
                     continue;
                 }
                 const std::string_view name = source->biomeAt(x + dx, y, z + dz);
