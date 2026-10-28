@@ -47,6 +47,13 @@ struct PluginInstance {
 };
 
 struct CommandEntry {
+    explicit CommandEntry(PluginCommandSpec commandSpec) : spec(std::move(commandSpec)) {}
+
+    CommandEntry(const CommandEntry&) = delete;
+    CommandEntry& operator=(const CommandEntry&) = delete;
+    CommandEntry(CommandEntry&&) noexcept = default;
+    CommandEntry& operator=(CommandEntry&&) noexcept = default;
+
     PluginCommandSpec spec;
     std::map<std::int32_t, wire::lua::LuaRef> handlers;
     std::int32_t nextLane = 0;

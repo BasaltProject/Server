@@ -542,7 +542,7 @@ void Chunk::markShapeUpdate(std::int32_t worldX, std::int32_t y, std::int32_t wo
         return;
     }
     const ChunkShapeUpdate mark{.x = worldX, .y = y, .z = worldZ};
-    if (std::ranges::find(shapeUpdates_, mark) == shapeUpdates_.end()) {
+    if (std::ranges::none_of(shapeUpdates_, [&mark](const ChunkShapeUpdate& held) { return held == mark; })) {
         shapeUpdates_.push_back(mark);
     }
 }

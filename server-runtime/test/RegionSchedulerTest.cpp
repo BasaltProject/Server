@@ -137,11 +137,11 @@ TEST_CASE("with regions off nothing is ever repartitioned") {
     Region& only = scheduler.regionFor("world");
     std::int32_t changes = 0;
 
-    std::vector<std::int64_t> far = chunksOfSection(0, 0);
+    std::vector<std::int64_t> distant = chunksOfSection(0, 0);
     for (const std::int64_t chunk : chunksOfSection(40, 40)) {
-        far.push_back(chunk);
+        distant.push_back(chunk);
     }
-    scheduler.repartition("world", far, [&changes](std::int32_t, std::int32_t) { ++changes; });
+    scheduler.repartition("world", distant, [&changes](std::int32_t, std::int32_t) { ++changes; });
 
     CHECK(scheduler.regionsOf("world").size() == 1);
     CHECK(only.sections().empty());

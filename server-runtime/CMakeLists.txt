@@ -28,7 +28,6 @@ basalt_module(server-runtime-core
         src/config/BasaltConfig.cpp
         src/config/CommandsConfig.cpp
         src/config/CompatibilityConfig.cpp
-        src/bukkit/BukkitRuntimeFiles.cpp
         src/bukkit/JavaPluginScan.cpp
         src/config/ConfigDirectory.cpp
         src/config/ConfigUpgrade.cpp
@@ -813,6 +812,7 @@ target_compile_definitions(server-runtime-core
 if(BASALT_BUKKIT_ACTIVE)
     target_link_libraries(server-runtime-core PUBLIC basalt::server-bukkit)
     target_compile_definitions(server-runtime-core PUBLIC BASALT_WITH_BUKKIT=1)
+    target_sources(server-runtime-core PRIVATE src/bukkit/BukkitRuntimeFiles.cpp)
 endif()
 
 basalt_test(server-runtime-entity-selector-test
