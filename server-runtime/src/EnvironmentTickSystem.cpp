@@ -76,13 +76,12 @@ constexpr double kBlockEventRange = 64.0;
 
 EnvironmentTickSystem::EnvironmentTickSystem(player::PlayerRegistry& players, const config::WorldsConfig& worldsConfig,
                                              Worlds worlds, ChunkSimulationView& chunkSimulation,
-                                             BlockChangeBroadcaster& broadcaster,
-                                             const command::CommandEnvironment& environment,
+                                             BlockChangeBroadcaster&, const command::CommandEnvironment& environment,
                                              NaturalSpawningSystem& spawning, Hooks hooks, Options options,
                                              wire::common::Logger logger)
     : players_(&players), worldsConfig_(&worldsConfig), worlds_(std::move(worlds)), chunkSimulation_(&chunkSimulation),
-      broadcaster_(&broadcaster), environment_(&environment), spawning_(&spawning), hooks_(std::move(hooks)),
-      options_(std::move(options)), logger_(std::move(logger)) {}
+      environment_(&environment), spawning_(&spawning), hooks_(std::move(hooks)), options_(std::move(options)),
+      logger_(std::move(logger)) {}
 
 void EnvironmentTickSystem::tickPlayers(world::LoadedWorld& world) {
     player::VitalsContext vitals;

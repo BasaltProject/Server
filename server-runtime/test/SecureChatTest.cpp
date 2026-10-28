@@ -70,7 +70,7 @@ basalt::wire::auth::ServicesKeySet services() {
     return basalt::wire::auth::ServicesKeySet::ofProfileKeys(std::move(keys));
 }
 
-play::RemoteChatSessionData session() {
+play::RemoteChatSessionData chatSession() {
     return play::RemoteChatSessionData{.sessionId = kSession,
                                        .expiresAt = kExpiresAt,
                                        .publicKey = hexBytes(kPlayerKey),
@@ -82,14 +82,14 @@ play::RemoteChatSessionData session() {
 TEST_CASE("a chat session is only taken with Mojang's signature over the player's own key") {
     const basalt::wire::auth::ServicesKeySet keys = services();
     SecureChat stranger{Uuid{1, 2}, true, &keys};
-    CHECK(stranger.updateSession(session()) == SecureChat::SessionResult::InvalidSignature);
+    CHECK(stranger.updateSession(chatSession()) == SecureChat::SessionResult::InvalidSignature);
     SecureChat keyless{kProfile, true, nullptr};
-    CHECK(keyless.updateSession(session()) == SecureChat::SessionResult::Ignored);
+    CHECK(keyless.updateSession(chatSession()) == SecureChat::SessionResult::Ignored);
 
     SecureChat chat{kProfile, true, &keys};
-    CHECK(chat.updateSession(session()) == SecureChat::SessionResult::Accepted);
-    CHECK(chat.updateSession(session()) == SecureChat::SessionResult::Unchanged);
-    play::RemoteChatSessionData older = session();
+    CHECK(chat.updateSession(chatSession()) == SecureChat::SessionResult::Accepted);
+    CHECK(chat.updateSession(chatSession()) == SecureChat::SessionResult::Unchanged);
+    play::RemoteChatSessionData older = chatSession();
     older.expiresAt -= 1;
     CHECK(chat.updateSession(older) == SecureChat::SessionResult::ExpiredKey);
 }
@@ -97,7 +97,7 @@ TEST_CASE("a chat session is only taken with Mojang's signature over the player'
 TEST_CASE("signed messages chain, acknowledge each other and break on the first bad link") {
     const basalt::wire::auth::ServicesKeySet keys = services();
     SecureChat chat{kProfile, true, &keys};
-    REQUIRE(chat.updateSession(session()) == SecureChat::SessionResult::Accepted);
+    REQUIRE(chat.updateSession(chatSession()) == SecureChat::SessionResult::Accepted);
     const std::int64_t now = 1700000002000;
 
     const auto first = chat.unpack(signatureOf(kFirstSignature),
