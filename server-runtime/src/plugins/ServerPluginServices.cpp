@@ -259,19 +259,21 @@ PluginHandle OwnerTasks::every(std::int32_t delayTicks, std::int32_t periodTicks
 
 command::CommandNode* DispatcherCommands::add(Entry& entry) {
     Entry* target = &entry;
+    DispatcherCommands* self = this;
     sched::Owner* owner = owner_;
-    return &dispatcher_->registerNode(entry.spec.name(), [target, owner](const command::CommandNodeBuilder& root) {
+    return &dispatcher_->registerNode(entry.spec.name(), [target, owner,
+                                                          self](const command::CommandNodeBuilder& root) {
         // An empty permission opens the command to everyone.
         if (!target->spec.permission.has_value() || !target->spec.permission->empty()) {
             root.permission(
                 target->spec.permission.value_or("basalt.plugin." + target->pluginId + "." + target->spec.name()));
         }
         const auto arguments = std::make_shared<std::function<void(const command::CommandNodeBuilder&, std::size_t)>>();
-        *arguments = [target, owner, arguments](const command::CommandNodeBuilder& builder, std::size_t index) {
+        *arguments = [target, owner, arguments, self](const command::CommandNodeBuilder& builder, std::size_t index) {
             // An optional argument makes the command runnable without it, so every node from it onwards executes.
             const bool runnable = index >= target->spec.arguments.size() || target->spec.arguments[index].optional;
             if (runnable) {
-                builder.executes([target, owner, index](const command::CommandContext& context) {
+                builder.executes([target, owner, index, self](const command::CommandContext& context) {
                     std::map<std::string, PluginCommandCall::Argument, std::less<>> values;
                     for (std::size_t at = 0; at < index && at < target->spec.arguments.size(); at++) {
                         const PluginCommandArgument& argument = target->spec.arguments[at];
@@ -297,12 +299,29 @@ command::CommandNode* DispatcherCommands::add(Entry& entry) {
                     if (const command::ExecutionSource* execution = source.asExecution(); execution != nullptr) {
                         origin.caller = std::string{execution->root().kind()} + ":" + execution->root().name();
                     }
-                    auto call = std::make_shared<DispatchedCall>(
-                        source.name(), source.player() == nullptr, std::move(values),
-                        [&source](const wire::text::Component& message) { source.sendSystemMessage(message); },
-                        std::move(origin));
+                    const bool inline_ = owner->isCurrent();
+                    std::function<void(const wire::text::Component&)> reply;
+                    if (inline_) {
+                        reply = [&source](const wire::text::Component& message) { source.sendSystemMessage(message); };
+                    } else if (source.player() != nullptr) {
+                        reply = [self, uuid = source.player()->uuid().toString()](const wire::text::Component& m) {
+                            if (self->playerReplier_) {
+                                self->playerReplier_(uuid, m);
+                            }
+                        };
+                    } else {
+                        reply = [self](const wire::text::Component& message) {
+                            if (const command::CommandSource* console = self->console_ ? self->console_() : nullptr;
+                                console != nullptr) {
+                                console->sendSystemMessage(message);
+                            }
+                        };
+                    }
+                    auto call =
+                        std::make_shared<DispatchedCall>(source.name(), source.player() == nullptr, std::move(values),
+                                                         std::move(reply), std::move(origin));
                     const std::function<void(PluginCommandCall&)> run = target->run;
-                    if (owner->isCurrent()) {
+                    if (inline_) {
                         run(*call);
                     } else {
                         static_cast<void>(owner->submit([run, call] { run(*call); }));
