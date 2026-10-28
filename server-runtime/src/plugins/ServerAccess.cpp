@@ -94,12 +94,25 @@ std::optional<PluginKnownPlayer> ServerAccess::spawnPoint(std::string_view uuid)
 }
 
 std::int64_t ServerAccess::statistic(std::string_view uuid, std::string_view key) {
+    for (const player::PlayerSession* session :
+         hooks_.sessions ? hooks_.sessions() : std::vector<player::PlayerSession*>{}) {
+        if (session->uuid().toString() == uuid) {
+            return session->stats.get(key);
+        }
+    }
     storage::PlayerStore* store = open();
     const std::optional<storage::StoredPlayer> stored = store == nullptr ? std::nullopt : store->players().load(uuid);
     return stored.has_value() ? stored->stats.get(key) : 0;
 }
 
 bool ServerAccess::setStatistic(std::string_view uuid, std::string_view key, std::int64_t value) {
+    for (player::PlayerSession* session : hooks_.sessions ? hooks_.sessions() : std::vector<player::PlayerSession*>{}) {
+        if (session->uuid().toString() == uuid) {
+            session->stats.reset(std::string{key});
+            session->stats.increment(std::string{key}, value);
+            return true;
+        }
+    }
     storage::PlayerStore* store = open();
     std::optional<storage::StoredPlayer> stored = store == nullptr ? std::nullopt : store->players().load(uuid);
     if (!stored.has_value()) {
