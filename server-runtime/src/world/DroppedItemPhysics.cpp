@@ -109,6 +109,16 @@ std::vector<DroppedItem> DroppedItemPhysics::items() const {
     return droppedItems_;
 }
 
+std::optional<DroppedItem> DroppedItemPhysics::itemById(std::int32_t entityId) const {
+    const WorldWriteLock lock{*mutex_};
+    for (const DroppedItem& item : droppedItems_) {
+        if (item.entityId == entityId) {
+            return item;
+        }
+    }
+    return std::nullopt;
+}
+
 std::vector<DroppedItem> DroppedItemPhysics::nearbyItems(double x, double y, double z, double radius) const {
     const WorldWriteLock lock{*mutex_};
     const double radiusSquared = radius * radius;
