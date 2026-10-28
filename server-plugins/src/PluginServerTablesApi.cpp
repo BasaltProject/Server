@@ -9,7 +9,7 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
 
     lua.pushTable();
     wire::lua::pushHostFunction(lua, "tick.rate", [control](LuaArgs& args) {
-        args.pushNumber(control().tickRate());
+        args.pushNumber(static_cast<double>(control().tickRate()));
         return 1;
     });
     lua.setField("rate");

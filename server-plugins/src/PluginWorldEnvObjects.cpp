@@ -270,7 +270,7 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                         args.setField("groups_spawned");
                         args.pushInteger(raid.totalGroups);
                         args.setField("total_groups");
-                        args.pushNumber(raid.totalHealth);
+                        args.pushNumber(static_cast<double>(raid.totalHealth));
                         args.setField("total_health");
                         args.pushTable();
                         for (std::size_t at = 0; at < raid.center.size(); ++at) {

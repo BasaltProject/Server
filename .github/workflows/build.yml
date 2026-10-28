@@ -31,6 +31,11 @@ jobs:
         with:
           submodules: true
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
       - name: Install the toolchain
         uses: lukka/get-cmake@latest
 
@@ -70,6 +75,11 @@ jobs:
           submodules: true
 
       - uses: lukka/get-cmake@latest
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
 
       - name: Select the compiler
         run: .github/scripts/select-compiler.sh
