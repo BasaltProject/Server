@@ -30,14 +30,12 @@ inline constexpr std::int32_t kMaxLength = 256;
 [[nodiscard]] wire::text::Component resolveComponent(const std::string& text, const CommandSource& source,
                                                      const CommandEnvironment& environment);
 
-/// parity: `ComponentUtils.updateForEntity`, a `score` or `selector` content turned into the text it names.
-/// `holder` is who a score name of `*` stands for.
+/// parity: `ComponentUtils.updateForEntity`; `holder` is who a score name of `*` stands for.
 [[nodiscard]] wire::text::Component resolveContents(const wire::text::Component& component, const CommandSource& source,
                                                     const CommandEnvironment& environment,
                                                     const CommandTarget* holder = nullptr);
 
-/// parity: `ComponentArgument.getResolvedComponent`; null when the argument was not given. The pointer stays valid
-/// until the next call on this thread.
+/// parity: `ComponentArgument.getResolvedComponent`; null when absent, valid until the next call on this thread.
 [[nodiscard]] const wire::text::Component* resolvedComponent(const CommandContext& context, std::string_view name);
 
 /// parity: `MessageArgument.resolveChatMessage`.

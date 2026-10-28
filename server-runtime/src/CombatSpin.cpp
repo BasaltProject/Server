@@ -24,7 +24,6 @@ void CombatHandler::spinAttack(PlayerSession& session, double toX, double toY, d
         return;
     }
     // parity: `LivingEntity.checkAutoSpinAttack` over the box swept from.
-    // the spin attack pose being six tenths of a block every way.
     constexpr double kHalf = 0.3;
     constexpr double kHeight = 0.6;
     const double minX = std::min(session.x, toX) - kHalf;

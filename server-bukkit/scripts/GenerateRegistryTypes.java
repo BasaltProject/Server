@@ -8,7 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.TreeMap;
 
-/** Writes RegistryTypes: which API type each Paper registry holds, read once from the API jar's own RegistryKey constants. */
+/** Writes RegistryTypes: the API type each Paper registry holds, read from the API jar's RegistryKey constants. */
 public final class GenerateRegistryTypes {
     public static void main(String[] args) throws IOException, IllegalAccessException {
         TreeMap<String, String> types = new TreeMap<>();

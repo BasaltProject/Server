@@ -166,7 +166,6 @@ void WitherSystem::placed(world::LoadedWorld& world, std::int32_t x, std::int32_
     state.random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     boss::makeInvulnerable(*wither, state);
     // parity: `WitherSkullBlock.checkSpawn` awards it before the wither is in the world.
-    // player within fifty blocks of where it is about to stand.
     world::summonAwards::award(options_.advancementTriggers, watchers, world.name(), *wither,
                                world::summonAwards::kWitherRange);
     static_cast<void>(world.state().spawnEntity(std::move(wither)));
@@ -572,7 +571,6 @@ void WitherSystem::skullLanded(world::LoadedWorld& world, const std::vector<Play
     }
     const bool griefing = world.gameRules().get(world::gameRules::kMobGriefing);
     // parity: `WitherSkull.getBlockExplosionResistance`.
-    // `0.8`: that is what lets a blue skull through obsidian.
     world::explosions::Resistance resistance;
     if (skull.dangerousSkull) {
         resistance = [this](std::int32_t stateId, float base) {

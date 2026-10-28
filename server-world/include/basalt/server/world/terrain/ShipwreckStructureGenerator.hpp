@@ -13,7 +13,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// heightmaps. parity: `ShipwreckStructure`. The height is the mean of the heightmap over the whole
+/// The shipwreck. parity: `ShipwreckStructure`, its height is the mean of the heightmap over the whole hull.
 class ShipwreckStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;

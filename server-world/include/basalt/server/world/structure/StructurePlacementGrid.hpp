@@ -49,7 +49,7 @@ public:
 
     [[nodiscard]] bool isPlacementChunk(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
-    /// roll, then the exclusion zone. parity: `StructurePlacement.isStructureChunk`, in that order.
+    /// The frequency roll, then the exclusion zone. parity:
     [[nodiscard]] bool isStructureChunk(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
     /// parity: `ChunkGenerator.getNearestGeneratedStructure` for a random spread set.

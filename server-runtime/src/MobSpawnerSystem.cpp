@@ -61,7 +61,6 @@ bool MobSpawnerSystem::tick(world::LoadedWorld& world, wire::nbt::NbtCompound& d
         for (std::int32_t count = 0; count < state.spawnCount; ++count) {
             const Attempt result = attempt(turn, next);
             // parity: an unknown type, an entity that would not load, a full cage or a refused add.
-            // all end the turn with a fresh delay, whatever the earlier attempts managed.
             if (result == Attempt::Abort) {
                 delay(turn);
                 spawned = false;

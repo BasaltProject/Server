@@ -786,9 +786,7 @@ void BedrockListener::onReady(Session& session) {
     }
     session.started = true;
 
-    // TEMPORARY, to find the one a real client refuses: `BASALT_BEDROCK_DROP=items` leaves that one
-    // out and sends the other four. One missing is a burst a client can still make sense of; five
-    // missing is not a test, which is what the last round of this measured by mistake.
+    // TEMPORARY: `BASALT_BEDROCK_DROP=items` leaves one packet out of the burst to find the one a client refuses.
     const char* const dropped = std::getenv("BASALT_BEDROCK_DROP");
     const std::string drop = dropped == nullptr ? std::string{} : std::string{dropped};
     const auto dropping = [&drop](const std::string_view what) { return drop.find(what) != std::string::npos; };
@@ -849,8 +847,7 @@ void BedrockListener::onReady(Session& session) {
 
     body.clear();
     if (!dropping("creative")) {
-        // TEMPORARY: `BASALT_BEDROCK_CREATIVE=n` offers only the first n items, which is how to ask
-        // a client which entry it refuses when the packet is otherwise well formed.
+        // TEMPORARY: `BASALT_BEDROCK_CREATIVE=n` offers only the first n items, to find the entry a client refuses.
         const char* const most = std::getenv("BASALT_BEDROCK_CREATIVE");
         const std::size_t offered = most == nullptr ? SIZE_MAX : static_cast<std::size_t>(std::atoll(most));
         wire::bedrock::writeCreativeContent(body, session.link->protocolVersion(), offered);

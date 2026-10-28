@@ -71,7 +71,7 @@ struct TemplatePlacement {
     bool ignoreAir = false;
     /// parity: `StructurePlaceSettings.setIgnoreEntities`.
     bool ignoreEntities = false;
-    /// the same stream. parity: `processBlockInfos` with no bounding box.
+    /// Processes the whole piece as one. parity: `processBlockInfos`
     bool wholePiece = false;
     std::optional<std::int32_t> gravityOffset;
     /// The palette to use in place of drawing one.

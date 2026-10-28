@@ -79,8 +79,7 @@ void ContainerMenuController::recomputeLoomResult() {
             offered.push_back(one.toString());
         }
     }
-    // parity: the pick follows the pattern it was on rather than its place, and a list of one picks.
-    // itself.
+    // parity: the pick follows the pattern it was on rather than its place.
     const std::string was = loomPattern_ >= 0 && static_cast<std::size_t>(loomPattern_) < loomPatterns_.size()
                                 ? loomPatterns_[static_cast<std::size_t>(loomPattern_)]
                                 : std::string{};
@@ -128,7 +127,6 @@ void ContainerMenuController::selectLoomPattern(const std::int32_t button) {
 
 void ContainerMenuController::takeLoomResult() {
     // parity: `LoomMenu.ResultSlot.onTake`.
-    // the loom is heard once per turn.
     const auto eat = [this](const std::int32_t slot) {
         std::optional<storage::StoredItemStack>& held = loomSlots_[static_cast<std::size_t>(slot)];
         if (held.has_value() && --held->count <= 0) {

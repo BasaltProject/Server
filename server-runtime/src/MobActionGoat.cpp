@@ -277,7 +277,6 @@ void MobActionSystem::goatRam(world::LoadedWorld& world, entity::ai::MobContext&
         return;
     }
     // parity: `PrepareRamNearestTarget`.
-    // ticks of lowered head, then the charge.
     const auto chooseStart = [&](std::int32_t targetId, const Vec& at) {
         state.reachedRamStart.reset();
         state.ramStart.reset();
@@ -371,7 +370,6 @@ void MobActionSystem::goatRam(world::LoadedWorld& world, entity::ai::MobContext&
 void MobActionSystem::goatRams(world::LoadedWorld& world, ServerEntity& goat, std::int32_t targetId, bool player,
                                const std::array<double, 3>& direction) {
     // parity: `RamTarget.tick`'s blow.
-    // halved through a shield.
     const float damage = static_cast<float>(goat.attributeWithModifiers("minecraft:attack_damage"));
     const double speedFactor =
         std::clamp(goat.attributeWithModifiers("minecraft:movement_speed") * 3.0 * 1.65, 0.2, 3.0);

@@ -11,7 +11,6 @@ namespace basalt::server::runtime::world {
 /// parity: `MerchantOffer`.
 namespace trades {
 
-/// One offer: what it takes, what it gives, and how its price moves.
 /// parity: `Villager.rewardTradeXp`.
 inline constexpr std::int32_t kTradeOrbBase = 3;
 

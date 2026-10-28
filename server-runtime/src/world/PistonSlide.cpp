@@ -65,7 +65,6 @@ using namespace internal;
     if (state == nullptr) {
         return std::nullopt;
     }
-    // 26.2 spelled the two fields `Name` and `Properties`.
     const bool legacy = state->contains("Name");
     const std::string_view name = state->getString(legacy ? "Name" : "id");
     if (name.empty()) {

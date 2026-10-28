@@ -72,7 +72,6 @@ constexpr std::array<std::int32_t, 10> kSizes{2477, 1237, 617, 307, 149, 73, 37,
 }
 
 /// parity: `ExperienceOrb.repairPlayerItems`.
-/// durability a point of experience, and whatever that leaves goes round again.
 std::int32_t repairWithXp(PlayerSession& player, std::int32_t amount, random::RandomSource& random, bool& repaired) {
     // parity: `EquipmentSlot.VALUES`: main hand, off hand, then feet up to the head.
     const std::array<std::int32_t, 6> slots{player::PlayerInventory::kHotbarStart + player.inventory.heldSlot(),

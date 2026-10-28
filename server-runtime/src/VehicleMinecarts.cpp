@@ -139,7 +139,6 @@ void VehicleSystem::tickMinecart(world::LoadedWorld& world, ServerEntity& cart) 
         }
     }
     // parity: `MinecartTNT.tick`.
-    // sets it off.
     if (path == "tnt_minecart") {
         const double speedSqr = (cart.velocityX * cart.velocityX) + (cart.velocityZ * cart.velocityZ);
         if (state.detonateSpeedSqr.has_value()) {
@@ -320,7 +319,6 @@ bool VehicleSystem::pushAndPickup(world::LoadedWorld& world, ServerEntity& cart,
 
 void VehicleSystem::insideBlocks(world::LoadedWorld& world, ServerEntity& cart) {
     // parity: `Entity.applyEffectsFromBlocks` over the box shrunk by a hundred-thousandth.
-    // blocks that do something to anything, not only to the living.
     const Aabb box = boxOf(cart).inflate(-static_cast<double>(1.0E-5F));
     bool fire = false;
     std::optional<float> fireDamage;

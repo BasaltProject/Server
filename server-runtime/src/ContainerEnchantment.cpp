@@ -90,7 +90,6 @@ void ContainerMenuController::rollEnchantmentOffers() {
         return;
     }
     // parity: `EnchantingTableBlock.isValidBookShelf`.
-    // and the table.
     const world::realBlockTags::TagMembers* tags = owner_->options().blockTags;
     const std::int32_t shelves = world::enchanting::bookshelvesAround(
         [world](const std::int32_t x, const std::int32_t y, const std::int32_t z) -> std::optional<Identifier> {

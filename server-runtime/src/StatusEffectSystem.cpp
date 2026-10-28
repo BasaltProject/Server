@@ -32,8 +32,7 @@ void StatusEffectSystem::tickEffects(world::LoadedWorld& world) const {
         if (player->worldName != world.name() || player->dead || player->effects.empty()) {
             continue;
         }
-        // Copied out first: an effect that expires erases its own entry, and applying one can add
-        // another, either of which would invalidate an iterator over the live map.
+        // Copied out first: expiring or applying an effect mutates the live map mid-iteration.
         std::vector<world::ActiveEffect> carried;
         carried.reserve(player->effects.size());
         for (const auto& [id, active] : player->effects) {

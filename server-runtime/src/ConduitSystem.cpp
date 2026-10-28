@@ -132,8 +132,7 @@ std::vector<PlayerSession*> ConduitSystem::watchersOf(const world::LoadedWorld& 
 bool ConduitSystem::tick(world::LoadedWorld& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                          wire::nbt::NbtCompound& data) {
     const std::int64_t gameTime = world.gameTime();
-    // parity: a block entity that was not ticked last turn is a new one, loaded or placed, and.
-    // starts inactive.
+    // parity: a block entity that was not ticked last turn is a new one.
     if (gameTime % conduits::kShapeInterval == 0) {
         std::erase_if(memory_, [gameTime](const auto& entry) { return entry.second.lastTick < gameTime - 1; });
     }

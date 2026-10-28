@@ -6,7 +6,7 @@ import java.lang.reflect.Proxy;
 import org.bukkit.Keyed;
 import org.bukkit.NamespacedKey;
 
-/** A registry entry of an interface type that only knows its key; anything else it is asked says so, once, in the log. */
+/** A registry entry of an interface type that only knows its key; anything else asked is reported once. */
 final class KeyedProxy implements InvocationHandler {
     private final Class<?> type;
     private final NamespacedKey key;

@@ -30,7 +30,6 @@ constexpr std::array<Slot, 8> kSlots{Slot::MainHand, Slot::OffHand, Slot::Feet, 
                                      Slot::Chest,    Slot::Head,    Slot::Body, Slot::Saddle};
 
 /// parity: the `can_be_sheared` equippables and their `shearing_sound`.
-/// llama carpets and the horse, wolf and nautilus armours.
 [[nodiscard]] std::optional<std::string_view> shearingSound(const Identifier& item) {
     const std::string_view path = item.path();
     if (path == "saddle") {
@@ -122,7 +121,6 @@ bool CombatHandler::shearEquipment(PlayerSession& session, ServerEntity& mob, st
             continue;
         }
         // parity: `shearItem`.
-        // rider's seat, then the trigger and the equippable's own sound.
         player::wearItemIn(owner_->blockInteraction().breakContext(), session, handSlot, 1);
         if (slot == Slot::Body || slot == Slot::Saddle) {
             equipMount(mob, slot, std::nullopt);

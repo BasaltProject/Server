@@ -29,11 +29,9 @@ using player::PlayerSession;
 using wire::protocol::play::Gamemode;
 
 /// parity: `PufferfishPuffGoal`'s box.
-/// by the three tenths the aura reaches past the skin.
 constexpr double kScareInflate = 2.0;
 constexpr double kAuraInflate = 0.3;
 /// parity: `Pufferfish.tick`.
-/// after the last scare, halfway there after sixty.
 constexpr std::int32_t kFullPuffAt = 40;
 constexpr std::int32_t kHalfDeflatedAfter = 60;
 constexpr std::int32_t kDeflatedAfter = 100;
@@ -42,7 +40,6 @@ constexpr float kStingPerPuff = 1.0F;
 /// parity: `Pufferfish.touch`, a second of poison per puff level.
 constexpr std::int32_t kPoisonPerPuff = 60;
 /// parity: `ClientboundGameEventPacket.PUFFER_FISH_STING` (9).
-/// gets.
 constexpr std::uint8_t kStingGameEvent = 9;
 
 [[nodiscard]] Aabb boxOf(const ServerEntity& entity) {
@@ -58,7 +55,6 @@ constexpr std::uint8_t kStingGameEvent = 9;
 }
 
 /// parity: `Pufferfish.SCARY_MOB`.
-/// is worth puffing up for.
 [[nodiscard]] bool scary(const ServerEntity& other, const world::realEntityTypeTags::TagMembers* tags) {
     return tags == nullptr ||
            !world::realEntityTypeTags::membersOf(*tags, wire::common::Identifier::vanilla("not_scary_for_pufferfish"))
@@ -93,7 +89,6 @@ void MobActionSystem::tickPufferfish(world::LoadedWorld& world, const std::vecto
         }
     }
     // parity: the PufferfishPuffGoal's start and stop, which decide whether the tick above counts.
-    // up or down. Invisible targets are not weighed, as `TargetingConditions` cannot see them.
     if (!fish.noAi) {
         const Aabb reach = boxOf(fish).inflate(kScareInflate);
         bool frightened = false;
@@ -164,7 +159,6 @@ void MobActionSystem::tickPufferfish(world::LoadedWorld& world, const std::vecto
                                 {.entity = other->uuid()});
     }
     // parity: `Player.touch`.
-    // and half a one up.
     const Aabb grown = boxOf(fish);
     for (PlayerSession* player : watchers) {
         if (player->dead || player->gamemode == Gamemode::Spectator) {

@@ -115,7 +115,6 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
     }
     state.pickupCooldown = std::max(state.pickupCooldown - 1, 0);
     // parity: `getItemDepositPosition`.
-    // else the liked player's eyes.
     std::optional<Vec> deposit;
     if (state.likedNoteblock.has_value()) {
         const bool here = state.noteblockDimension.empty() ||
@@ -136,7 +135,6 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
     }
     const std::optional<server::world::loot::ItemStack> hand = entity::copperGolems::mainHand(allay);
     // parity: `NearestItemSensor`.
-    // across and sixteen up or down that it can see.
     if (state.itemSensorTicks < 0) {
         state.itemSensorTicks = random.nextInt(20);
     }
@@ -241,7 +239,6 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
             }
         }
         // parity: the idle `RunOne`.
-        // of nothing.
         if (state.idleTicks > 0) {
             --state.idleTicks;
         } else {
@@ -420,8 +417,7 @@ void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay,
             }
             continue;
         }
-        // parity: the vibration user: deaf while one travels, sixteen blocks from its eyes, past no.
-        // wool, and only the liked note block once it has one.
+        // parity: the vibration user: deaf while one travels.
         const double dy = record.y - eyeY;
         const bool liked = !state.likedNoteblock.has_value() ||
                            (*state.likedNoteblock == pos &&

@@ -216,7 +216,6 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
     }
     context.killedByPlayer = context.attackingPlayer.has_value();
     // parity: `ATTACKING_ENTITY` and `DIRECT_ATTACKING_ENTITY` come off the killing blow's source.
-    // who is behind it, and what landed it, the arrow or the fireball rather than its shooter.
     const ServerEntity::Blame& blame = dead.lastBlame;
     const auto factsById = [&](std::int32_t entityId) -> std::optional<EntityFacts> {
         if (const PlayerSession* player = playerById(entityId); player != nullptr) {

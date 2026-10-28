@@ -17,7 +17,6 @@ using wire::protocol::play::Gamemode;
 namespace neutral = entity::neutralAnger;
 
 /// parity: `ZombifiedPiglin`'s constants.
-/// within a second, and a call to the others every four to six.
 constexpr std::int32_t kAngerMin = 20 * 20;
 constexpr std::int32_t kAngerMax = 39 * 20;
 constexpr std::int32_t kFirstSoundMax = 20;
@@ -101,7 +100,6 @@ void MobActionSystem::tickNeutralMob(world::LoadedWorld& world, ServerEntity& mo
         return;
     }
     // parity: `Enderman.setTarget`.
-    // without one.
     auto& speed = mob.attributeModifiers["minecraft:movement_speed"];
     if (mob.targetId.has_value()) {
         speed[std::string{kAttackingModifier}] =

@@ -6,7 +6,7 @@
 
 namespace basalt::server::world::structure {
 
-/// penthouse with the third. parity: `OceanMonumentWingRoom` and `OceanMonumentPenthouse`.
+/// The wing rooms and the penthouse. parity:
 namespace monumentWings {
 
 void wing(const MonumentBrush& brush, std::int32_t design);

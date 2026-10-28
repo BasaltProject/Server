@@ -354,7 +354,6 @@ private:
                       storage::StoredItemStack{.id = id, .count = wanted});
 }
 
-/// Buys one of the open merchant's offers and stages what it hands over.
 /// parity: `MerchantMenu.clickMenuButton`.
 [[nodiscard]] bool takeTrade(Reach& reach, const std::int32_t index, const std::int32_t times) {
     if (!reach.windows.trades.has_value() || index < 0 || times <= 0 ||

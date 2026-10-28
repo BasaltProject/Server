@@ -17,7 +17,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// Mineshafts, from which chunks start one to which blocks land in this chunk. parity: the set is
+/// Mineshafts: which chunks start one and which blocks land in this chunk. parity: `MineshaftStructure`.
 class MineshaftStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;
@@ -38,7 +38,7 @@ public:
 
     [[nodiscard]] const structure::StructurePlacementGrid& grid() const noexcept { return grid_; }
 
-    /// Which mineshaft, if any, starts at this chunk. parity: `ChunkGenerator` picks by weight from
+    /// Which mineshaft, if any, starts at this chunk. parity: `ChunkGenerator` picks by weight.
     [[nodiscard]] std::optional<structure::MineshaftType> typeAt(std::int64_t seed, std::int32_t chunkX,
                                                                  std::int32_t chunkZ) const;
 

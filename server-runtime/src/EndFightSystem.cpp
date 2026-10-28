@@ -221,8 +221,7 @@ dragons::DragonWorld EndFightSystem::worldFor(world::LoadedWorld& world, const s
             }
         }
         random::RandomSource spread = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
-        // parity: `assignDirectionalMovement`, the direction at the tenth of a block a tick every.
-        // hurting projectile starts with.
+        // parity: `assignDirectionalMovement`.
         ServerEntity& ball =
             entity::projectiles::spawn(world.state(), *kind, players_->allocateEntityId(), entry->protocolId, from.x,
                                        from.y, from.z, towards.x, towards.y, towards.z, kFireballSpeed, 0.0F, spread);
@@ -469,7 +468,6 @@ void EndFightSystem::tickDeath(world::LoadedWorld& world, ServerEntity& dragon, 
         }
     }
     // parity: `tickDeath`'s experience.
-    // eight percent every fifth tick from 150 and a fifth at the end.
     const world::DragonFight* fight = fightOf(world, dragon);
     const std::int32_t worth =
         fight != nullptr && !fight->previouslyKilled ? kFirstDragonExperience : kDragonExperience;

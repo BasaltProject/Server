@@ -158,7 +158,6 @@ void MobActionSystem::tickParrot(world::LoadedWorld& world, ServerEntity& parrot
     flapParrot(world, parrot);
     parrotListens(world, parrot);
     // parity: `Parrot.aiStep` rolls the level's own random.
-    // and not silenced.
     random::RandomSource random = freshRandom();
     if (random.nextInt(400) != 0 || parrot.dying || parrot.health <= 0.0 ||
         (parrot.sourceNbt.has_value() && silent(*parrot.sourceNbt))) {

@@ -32,8 +32,7 @@ namespace command {
 class CommandEnvironment;
 }
 
-/// parity: `BlockBasedTestInstance` run by `GameTestRunner`: a `test_instance_block`, its template with test blocks
-/// inside a ring of barriers, started and watched per tick.
+/// parity: `BlockBasedTestInstance` run by `GameTestRunner`.
 class BlockTests {
 public:
     struct Report {
@@ -64,8 +63,7 @@ public:
     /// Forgets every run without a report. parity: `/test stop`.
     void stopAll();
 
-    /// Empties the space of every test instance block within `radius` of a point and answers how many.
-    /// parity: `/test clearall`.
+    /// parity: `/test clearall`; answers how many test blocks were emptied.
     [[nodiscard]] std::int32_t clearAll(world::LoadedWorld& world, std::int32_t centerX, std::int32_t centerZ,
                                         std::int32_t radius);
 
@@ -95,8 +93,7 @@ public:
                       const wire::common::Identifier& test, const std::array<std::int32_t, 3>& size,
                       std::int32_t rotation, bool ignoreEntities);
 
-    /// Saves the space beside a test instance block as the test's template. parity: `saveTest`; `exportToFiles` is the
-    /// export that the production server keeps disabled.
+    /// parity: `saveTest`; `exportToFiles` is the export the production server keeps disabled.
     [[nodiscard]] std::optional<std::string> save(world::LoadedWorld& world, const Found& block, bool exportToFiles);
 
     /// Puts an empty test instance block of the given size at `blockAt`. parity: `/test create`.

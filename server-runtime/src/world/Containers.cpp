@@ -53,9 +53,7 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
             {"crafter", 9},
             // parity: `BrewingStandBlock.getAnalogOutputSignal`.
             {"brewing_stand", brewingStands::kSize},
-            // A jukebox holds one disc, and what a comparator reads off it is the song, not the slot.
             {"jukebox", 1},
-            // A lectern holds one book, and what a comparator reads off it is the page.
             {"lectern", 1},
             // parity: `ContainerSingleItem`, one stack and no screen.
             {"decorated_pot", decoratedPots::kSize},

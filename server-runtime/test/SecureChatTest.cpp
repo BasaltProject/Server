@@ -30,7 +30,6 @@ MessageSignature signatureOf(std::string_view hex) {
     return signature;
 }
 
-// Throwaway openssl keys; signatures cover payloads laid out by hand from `PlayerChatMessage.updateSignature`.
 constexpr Uuid kProfile{0x0123456789abcdefULL, 0x0fedcba987654321ULL};
 constexpr Uuid kSession{0x1111111111111111ULL, 0x2222222222222222ULL};
 constexpr std::int64_t kExpiresAt = 4102444800000;
@@ -115,7 +114,6 @@ TEST_CASE("signed messages chain, acknowledge each other and break on the first 
     play::LastSeenUpdate update;
     update.offset = 1;
     update.setAcknowledged(LastSeenValidator::kWindow - 1);
-    // Derived by folding the signature's Java array hash the way `computeChecksum` does.
     update.checksum = 114;
     const auto seen = chat.applyLastSeen(update);
     REQUIRE(seen.has_value());

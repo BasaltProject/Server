@@ -14,7 +14,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// The woodland mansion. parity: `WoodlandMansionStructure`. Ninety blocks across at its widest, so
+/// The woodland mansion. parity: `WoodlandMansionStructure`, ninety blocks across at its widest.
 class WoodlandMansionStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;

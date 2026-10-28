@@ -51,7 +51,6 @@ bool MapSystem::explore(world::LoadedWorld& world, wire::nbt::NbtCompound& compo
     double nearestDistance = std::numeric_limits<double>::max();
     const std::unique_lock<std::mutex> lock = storage_->lock();
     // parity: `ExplorationMapFunction.claimStructureAt`.
-    // first, so a cartographer never sells the map to its own village.
     if (request.skipExistingChunks) {
         const server::world::structure::StructureQueries structures{
             [&world](std::int32_t chunkX, std::int32_t chunkZ) -> const server::world::structure::ChunkStructures* {

@@ -14,6 +14,6 @@ struct BukkitRuntimeFiles {
     std::vector<std::string> libraries;
 };
 
-/// Unpacks the runtime compiled into the binary and fetches the libraries it lists, or says in one message what failed.
+/// Unpacks the embedded runtime and fetches the libraries it lists, or says in one message what failed.
 [[nodiscard]] std::expected<BukkitRuntimeFiles, std::string> locateRuntime(const wire::common::Logger& logger);
 } // namespace basalt::server::runtime::bukkit

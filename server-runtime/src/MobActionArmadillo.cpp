@@ -129,7 +129,6 @@ void MobActionSystem::tickArmadillo(world::LoadedWorld& world, entity::ai::MobCo
         }
     }
     // parity: `ARMADILLO_SCARE_DETECTED`.
-    // player running or riding, inside seven across and two up.
     if (armadillo.tickCount % 5 == 0) {
         if (!canStayRolledUp()) {
             state.danger.erase();

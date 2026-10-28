@@ -7,7 +7,7 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// their rarity filter. parity: the weighted provider is poppy 2, dandelion 1, so `nextInt(3) < 2`
+/// The default vegetation rarity filter. parity: the weighted
 namespace defaultVegetationDecoration {
 
 [[nodiscard]] const std::set<std::string, std::less<>>& placedIds();

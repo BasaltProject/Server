@@ -104,7 +104,6 @@ TEST_CASE("a region west of the origin is not the region north of it") {
     std::vector<Chunk> chunks;
     chunks.push_back(filled(-1, 0, 64));
     chunks.push_back(filled(-1, -1, 65));
-    // Packed without masking the low half, (-1,0) and (-1,-1) are the same key and one of the two is lost.
     CHECK(save(store, chunks, 1) == 2);
     CHECK(fileIO::exists(store.regionPath(-1, 0)));
     CHECK(fileIO::exists(store.regionPath(-1, -1)));
@@ -187,7 +186,6 @@ TEST_CASE("the cache keeps a few regions and lets the rest go") {
         chunks.push_back(filled(region * 32, 0, 64));
     }
     CHECK(save(store, chunks, 1) == 4);
-    // A region holding a staged write is never evicted: between flushes the cache runs past its ceiling.
     CHECK(store.cachedRegionCount() == 4);
 
     std::vector<Chunk> later;

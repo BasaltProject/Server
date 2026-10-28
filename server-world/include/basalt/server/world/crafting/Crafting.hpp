@@ -37,7 +37,7 @@ private:
     std::vector<std::optional<loot::ItemStack>> items_;
 };
 
-/// one. parity: `Ingredient`, whose `HolderSet<Item>` is resolved the same way at decode time rather
+/// An ingredient: item ids and tags. parity: `Ingredient`, resolved at decode time.
 struct Ingredient {
     std::set<std::string, std::less<>> items;
 
@@ -96,7 +96,7 @@ struct Recipe {
     Ingredient addition;
     std::optional<wire::common::Identifier> trimPattern;
 
-    /// the reagent in `ingredient`. parity: 26.3 `BrewingRecipe`, whose output is `result`.
+    /// Brewing: potions that turn into `result` with the reagent. parity: 26.3 `BrewingRecipe`.
     std::vector<std::string> potions;
 
     /// Transmute: a shapeless pair whose result keeps the input's components. parity: `TransmuteRecipe`.
@@ -112,7 +112,7 @@ struct Recipe {
 
     [[nodiscard]] bool matches(const CraftingInput& input) const;
 
-    /// What this recipe makes of `input`. parity: `Recipe.assemble`. Nearly every recipe answers with
+    /// What this recipe makes of `input`. parity: `Recipe.assemble`.
     [[nodiscard]] loot::ItemStack assemble(const CraftingInput& input) const;
 
     /// What each grid cell is left holding once this is crafted. parity: `Recipe.getRemainingItems`.
@@ -128,7 +128,7 @@ struct Recipe {
                                        const loot::ItemStack* additionStack) const;
 };
 
-/// The four questions a recipe asks the rest of the server, filled in by the caller. parity: vanilla
+/// The four questions a recipe asks the rest of the server, filled in by the caller.
 namespace hooks {
 
 using RemainderOf = std::function<std::optional<wire::common::Identifier>(const wire::common::Identifier&)>;

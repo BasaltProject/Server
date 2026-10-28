@@ -12,7 +12,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// The ocean monument. parity: `OceanMonumentStructure`. Its base is always at y 39 whatever the sea
+/// The ocean monument. parity: `OceanMonumentStructure`, its base is always at y 39.
 class OceanMonumentStructureGenerator {
 public:
     using NoiseBiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;

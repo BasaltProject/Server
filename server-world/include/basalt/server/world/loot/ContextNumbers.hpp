@@ -15,7 +15,7 @@ namespace basalt::server::world::loot {
 class LootCondition;
 class FloatProvider;
 
-/// Where a `score` provider reads its holder from. parity: `ScoreboardNameProvider`: one of the
+/// Where a `score` provider reads its holder from. parity: `ScoreboardNameProvider`.
 struct ScoreTarget {
     std::optional<EntityTarget> entity;
     std::string name;

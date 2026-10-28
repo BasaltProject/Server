@@ -365,7 +365,6 @@ void MobActionSystem::snifferRunning(world::LoadedWorld& world, entity::ai::MobC
         }
         idle();
         // parity: `Sniffing.stop`: only a sniff run to its end finds a spot, a walk of up to five.
-        // tries further out each time.
         if (timedOut) {
             for (std::int32_t index = 0; index < 5; ++index) {
                 const std::optional<kit::Vec> spot = kit::strollSpot(context, 10 + (2 * index), 3);
@@ -444,7 +443,6 @@ void MobActionSystem::snifferRunning(world::LoadedWorld& world, entity::ai::MobC
 void MobActionSystem::snifferDropsSeed(world::LoadedWorld& world, const ServerEntity& sniffer,
                                        const std::array<std::int32_t, 3>& head) {
     // parity: `dropSeed` over `dropFromGiftLootTable(SNIFFER_DIGGING)`.
-    // corner.
     const server::world::loot::LootTable* table =
         lootTables_->byId(wire::common::Identifier::vanilla("gameplay/sniffer_digging"));
     if (table == nullptr) {

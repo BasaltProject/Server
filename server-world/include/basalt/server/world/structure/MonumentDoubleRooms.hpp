@@ -5,7 +5,7 @@
 
 namespace basalt::server::world::structure {
 
-/// doorway per side that kept one. parity: `OceanMonumentDouble{X,XY,Y,YZ,Z}Room`.
+/// The double rooms, one doorway per side. parity:
 namespace monumentDoubleRooms {
 
 void doubleX(const MonumentBrush& brush, const MonumentRoom& west);

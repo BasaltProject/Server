@@ -186,7 +186,7 @@ void JNICALL nativePlayerSound(JNIEnv* env, jclass, jstring uuid, jstring sound,
     });
 }
 
-// An item crosses as strings: id, count, damage, name (null when none), lore joined by newlines, then `id=level` pairs.
+// An item crosses as strings: id, count, damage, name (null when none), newline-joined lore, `id=level` pairs.
 jobjectArray itemStrings(JNIEnv* env, const std::optional<PluginItem>& item) {
     if (!item.has_value()) {
         return nullptr;

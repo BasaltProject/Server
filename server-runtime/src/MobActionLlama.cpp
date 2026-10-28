@@ -21,7 +21,6 @@ using wire::protocol::play::SoundSource;
 namespace mth = wire::common::mth;
 
 /// parity: `Llama.spit`.
-/// `rangedAttackUncertainty`, from a tenth of a block under its eyes.
 constexpr double kSpitLift = static_cast<double>(0.2F);
 constexpr float kSpitPower = 1.5F;
 constexpr float kSpitUncertainty = 10.0F;
@@ -41,7 +40,6 @@ void MobActionSystem::llamaSpit(ServerEntity& llama, double targetX, double targ
         return;
     }
     // parity: `new LlamaSpit(level, llama)`.
-    // body's facing.
     const float reach = static_cast<float>(llama.width()) + 1.0F;
     const float body = llama.yaw * (static_cast<float>(std::numbers::pi) / 180.0F);
     const double x = llama.x - (static_cast<double>(reach) * 0.5 * static_cast<double>(mth::sin(body)));

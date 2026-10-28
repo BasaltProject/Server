@@ -145,8 +145,7 @@ std::int32_t ItemDamageEffects::process(const storage::StoredItemStack& stack, s
             if (!chance.has_value()) {
                 continue;
             }
-            // parity: `RemoveBinomial.process`, the per-point roll. Its normal approximation above.
-            // 128 points is left out because nothing here ever asks for that much wear at once.
+            // parity: `RemoveBinomial.process`, the per-point roll.
             std::int32_t dropped = 0;
             const std::int32_t rolls = static_cast<std::int32_t>(value);
             for (std::int32_t roll = 0; roll < rolls; roll++) {

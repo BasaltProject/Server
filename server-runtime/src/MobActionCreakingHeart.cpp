@@ -260,8 +260,7 @@ void MobActionSystem::removeCreakingProtector(world::LoadedWorld& world, const P
         if (breaker == nullptr) {
             tearDownCreaking(world, *creaking);
         } else {
-            // parity: `creakingDeathEffects`: it dies at the breaker's hand and twitches for its last.
-            // forty-five ticks before it comes apart.
+            // parity: `creakingDeathEffects`.
             creaking->lastBlame.causingId = breaker->entityId();
             entity::entityCombat::rememberPlayer(*creaking, breaker->uuid());
             entityEvent(*creaking, wire::protocol::play::EntityEventPacket::kLivingDeath);

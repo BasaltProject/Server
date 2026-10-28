@@ -45,7 +45,6 @@ bool RedstoneTickSystem::tickSpawner(world::LoadedWorld& world, wire::nbt::NbtCo
                 .x = pos[0], .y = pos[1], .z = pos[2], .block = std::string{kSpawnerBlock}, .first = eventId});
         },
         // parity: `SpawnerBlockEntity.setNextSpawnData`.
-        // entity; sent once the turn has written its data back.
         [&resend] { resend = true; });
     if (!resend) {
         return changed;
@@ -71,8 +70,7 @@ bool RedstoneTickSystem::runSpawnerEvent(world::LoadedWorld& world, const world:
     if (event.block != kSpawnerBlock) {
         return false;
     }
-    // parity: `doBlockEvent` drops an event whose square no longer holds a spawner, and.
-    // `SpawnerBlockEntity.triggerEvent` answers only its own event.
+    // parity: `doBlockEvent` and `SpawnerBlockEntity.triggerEvent`, an event answered only by a spawner's own.
     const std::optional<std::int32_t> stateId = world.state().blockState(event.x, event.y, event.z);
     const wire::common::Identifier* block =
         stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;

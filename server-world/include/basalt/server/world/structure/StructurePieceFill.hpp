@@ -38,7 +38,7 @@ public:
     void generateBox(std::int32_t x0, std::int32_t y0, std::int32_t z0, std::int32_t x1, std::int32_t y1,
                      std::int32_t z1, std::int32_t edge, std::int32_t fill, bool skipAir) const;
 
-    /// `generateBox` with a roll per cell. parity: the roll happens for every cell before the other
+    /// `generateBox` with a roll per cell. parity: `generateMaybeBox`, the roll runs for every cell.
     void generateMaybeBox(random::RandomSource& random, float probability, std::int32_t x0, std::int32_t y0,
                           std::int32_t z0, std::int32_t x1, std::int32_t y1, std::int32_t z1, std::int32_t edge,
                           std::int32_t fill, bool skipAir, bool onlyInside) const;

@@ -25,7 +25,7 @@ struct PluginStructurePlacement {
     std::int32_t palette = -1;
 };
 
-/// Structure templates as the game keeps them: the ones in the game data, those saved from a world, and in-memory ones.
+/// Structure templates: those in the game data, those saved from a world, and in-memory ones.
 class PluginStructures {
 public:
     PluginStructures() = default;

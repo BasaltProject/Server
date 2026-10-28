@@ -55,7 +55,6 @@ struct Fixture {
               config::WorldDeclaration{.name = "world", .type = config::WorldType::Flat, .isDefault = true},
               config::WorldSettings{}, WorldMetadata{}, root, basalt::wire::common::Logger{"Test"})) {
         world->state().getOrGenerateChunk(0, 0);
-        // A dispenser one above the ground, facing east, holding a brush.
         static_cast<void>(world->state().setBlockState(1, 1, 1, stateOf("dispenser", {{"facing", "east"}})));
         static_cast<void>(world->state().setBlockState(1, 0, 1, stateOf("bedrock")));
         static_cast<void>(world->state().setBlockState(2, 0, 1, stateOf("bedrock")));

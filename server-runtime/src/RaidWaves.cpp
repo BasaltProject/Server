@@ -175,7 +175,6 @@ entity::ServerEntity* RaidSystem::spawnRaider(world::LoadedWorld& world, Raid& r
     const std::optional<std::int32_t> raidId = world.raids().idOf(&raid);
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     // parity: `joinRaid` with a fresh raider.
-    // the raid's own buffs, all before it is added to the world.
     entity::ServerEntity* raider =
         spawning_->spawnEventRaider(world, Identifier::vanilla(std::string{type}), pos[0] + 0.5, pos[1] + 1.0,
                                     pos[2] + 0.5, random, [&](entity::ServerEntity& fresh) {

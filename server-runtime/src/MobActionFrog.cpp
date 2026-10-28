@@ -306,7 +306,6 @@ void MobActionSystem::tickFrog(world::LoadedWorld& world, entity::ai::MobContext
 
 void MobActionSystem::frogJumps(world::LoadedWorld& world, entity::ai::MobContext& context, FrogState& state) {
     // parity: `LongJumpToPreferredBlock(100..140, 2, 4)` in its activity.
-    // running on until it lands whatever the activity.
     if (state.activity != Activity::LongJump && !state.jump.midJump) {
         return;
     }
@@ -328,8 +327,7 @@ void MobActionSystem::frogJumps(world::LoadedWorld& world, entity::ai::MobContex
                                           .width = 4,
                                           .acceptable =
                                               [&](const kit::Block& target) {
-                                                  // parity: `FrogAi.isAcceptableLandingSpot`: dry all round, then a.
-                                                  // preferred block, a trapdoor, or whatever the default takes.
+                                                  // parity: `FrogAi.isAcceptableLandingSpot`.
                                                   const kit::Block below{target[0], target[1] - 1, target[2]};
                                                   if (fluidAt(context.world, target) != world::Submersion::None ||
                                                       fluidAt(context.world, below) != world::Submersion::None ||
@@ -376,7 +374,6 @@ void MobActionSystem::frogTongue(world::LoadedWorld& world, entity::ai::MobConte
             return;
         }
         // parity: `checkExtraStartConditions`.
-        // remembered as out of reach.
         if (!entity::ai::navigation::canReach(context.world, frog, target->x, target->y, target->z)) {
             frog.targetId.reset();
             if (std::ranges::find(state.unreachable, target->uuid()) == state.unreachable.end()) {
@@ -515,7 +512,6 @@ void MobActionSystem::tickTadpole(world::LoadedWorld& /*world*/, entity::ai::Mob
     const bool inWater = entity::ai::inWater(context.world, tadpole);
     tadpole.smoothSwimming = inWater;
     // parity: `TadpoleAi`.
-    // swim and a walk to what it looks at.
     if (!kit::panic(context, state.motion, state.panicTicks, 2.0F)) {
         kit::lookSometimes(context, state.look, state.lookTicker, 6.0, 30, 60, "player");
         static_cast<void>(kit::tempt(

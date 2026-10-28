@@ -429,8 +429,7 @@ public:
         static_cast<void>(ticks);
     }
 
-    /// Hands the chunks of a void world to `fill`: a block state id per block of each section, a biome id per 4x4x4
-    /// cell.
+    /// Hands the chunks of a void world to `fill`: a state id per block of each section, a biome id per 4x4x4 cell.
     using ChunkFill = std::function<void(std::int32_t chunkX, std::int32_t chunkZ, std::vector<std::int32_t>& blocks,
                                          std::vector<std::int32_t>& biomes)>;
 

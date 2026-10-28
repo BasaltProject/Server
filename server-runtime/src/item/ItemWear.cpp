@@ -66,7 +66,6 @@ std::optional<storage::StoredItemStack> hurt(const storage::StoredItemStack& sta
     const std::int32_t max = maxDamage(stack);
     const std::int32_t newDamage = std::clamp(damage(stack) + applied, 0, max);
     // parity: `ItemStack.isBroken` is `>= max`.
-    // breaks it rather than leaving a tool sitting at zero.
     if (newDamage >= max) {
         if (stack.count <= 1) {
             return std::nullopt;

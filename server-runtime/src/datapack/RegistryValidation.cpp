@@ -12,8 +12,7 @@
 namespace basalt::server::runtime::datapack {
 namespace {
 
-/// Every registry a pack's JSON elements are loaded into. parity: `RELOADABLE_REGISTRIES` and the
-/// data-driven part of `WORLD_REGISTRIES`.
+/// parity: `RELOADABLE_REGISTRIES` and the data-driven part of `WORLD_REGISTRIES`.
 constexpr std::array<std::string_view, 58> kRegistries{"loot_table",
                                                        "predicate",
                                                        "item_modifier",

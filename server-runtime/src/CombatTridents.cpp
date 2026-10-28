@@ -40,8 +40,7 @@ constexpr std::int32_t kPanicTicks = 40;
     return storage::StoredItemStack{.id = "minecraft:trident", .count = 1, .components = trident.heldItemComponents};
 }
 
-/// Channeling on the thrown stack. parity: the enchantment whose `post_attack` and `hit_block`
-/// summon the bolt.
+/// parity: Channeling on the thrown stack, whose `post_attack` and `hit_block` summon the bolt.
 [[nodiscard]] bool channels(const ServerEntity& trident) {
     return player::enchantmentLevel(stackOf(trident), Identifier::vanilla("channeling")) > 0;
 }

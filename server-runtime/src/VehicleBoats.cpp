@@ -43,7 +43,6 @@ void VehicleSystem::tickBoatBubbles(world::LoadedWorld& world, ServerEntity& boa
         ejectPassengers(world, boat);
     }
     // parity: `applyEffectsFromBlocks`.
-    // open water it is `onAboveBubbleColumn`, the boat's own; under something it is the default push.
     const Aabb box = boxOf(boat).inflate(-static_cast<double>(1.0E-5F));
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     for (std::int32_t pass = 0; pass < 2; ++pass) {
@@ -110,7 +109,6 @@ void VehicleSystem::tickBoatBubbles(world::LoadedWorld& world, ServerEntity& boa
 
 void VehicleSystem::boatPushes(world::LoadedWorld& world, ServerEntity& boat, bool driverIsPlayer) {
     // parity: the end of `AbstractBoat.tick`.
-    // up and down, a mob taken aboard while nobody steers it, anything else pushed away.
     const EntityPushSystem::Body self{.mob = &boat};
     const Aabb box = boxOf(boat);
     const Aabb reach{box.minX - 0.2, box.minY + 0.01, box.minZ - 0.2, box.maxX + 0.2, box.maxY - 0.01, box.maxZ + 0.2};

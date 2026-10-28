@@ -93,7 +93,6 @@ TEST_CASE("a task that drains its own owner does not take the turn it is standin
     Owner owner{"world"};
     owner.bindToCurrentThread();
 
-    // Saving drains the owner and `/stop` saves from a task on it; a retained turn buffer was swapped back and freed.
     std::int32_t first = 0;
     std::int32_t second = 0;
     std::thread{[&owner, &first, &second] {
@@ -333,7 +332,6 @@ TEST_CASE("strict mode says who touched what, and off it says nothing") {
 TEST_CASE("draining from a thread that does not own it is the caller's bug") {
     Owner owner{"world"};
     owner.bindToCurrentThread();
-    // Not a strict-mode check: two threads draining one owner corrupt the queue whatever the flag says.
     std::thread{[&owner] {
         CHECK_THROWS_AS(owner.runPending(), std::logic_error);
         CHECK_THROWS_AS(owner.runEndOfTick(), std::logic_error);

@@ -14,7 +14,7 @@ struct StoredProgress {
     std::map<std::string, std::map<std::string, std::int64_t, std::less<>>, std::less<>> obtained;
     std::set<std::string, std::less<>> recipes;
     std::set<std::string, std::less<>> highlighted;
-    /// open and filtering per RecipeBookType ordinal.
+    /// Per RecipeBookType ordinal: open and filtering flags.
     std::map<std::int32_t, std::pair<bool, bool>> bookSettings;
 };
 

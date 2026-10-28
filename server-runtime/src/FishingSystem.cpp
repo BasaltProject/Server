@@ -537,7 +537,6 @@ void FishingSystem::hookFirstHit(world::LoadedWorld& world, const std::vector<Pl
                                  const std::vector<ServerEntity*>& living, ServerEntity& hook,
                                  hooks::HookState& state) {
     // parity: `ProjectileUtil.getEntityHitResult`.
-    // by the default margin.
     const double toX = hook.x + hook.velocityX;
     const double toY = hook.y + hook.velocityY;
     const double toZ = hook.z + hook.velocityZ;

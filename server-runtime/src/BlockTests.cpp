@@ -151,8 +151,7 @@ void BlockTests::clearSpace(world::LoadedWorld& world, const StructureBoundingBo
 }
 
 void BlockTests::encase(world::LoadedWorld& world, const Layout& layout, const bool skyAccess, const bool barriers) {
-    // parity: `TestInstanceBlockEntity.processStructureBoundary`: a floor, four walls and, unless the sky is open, a
-    // roof.
+    // parity: `TestInstanceBlockEntity.processStructureBoundary`.
     const std::int32_t lowX = layout.structure.minX - 1;
     const std::int32_t lowY = layout.structure.minY - 1;
     const std::int32_t lowZ = layout.structure.minZ - 1;

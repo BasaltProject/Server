@@ -6,7 +6,7 @@
 
 namespace basalt::server::world::crafting {
 
-/// The recipes whose result is a function of what went in. parity: one class each in vanilla, all of
+/// The recipes whose result is a function of what went in. parity: one class each in vanilla.
 namespace specialCrafting {
 
 [[nodiscard]] std::optional<loot::ItemStack> assemble(const Recipe& recipe, const CraftingInput& input);

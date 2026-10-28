@@ -139,7 +139,6 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         return;
     }
     // parity: `ItemFrame.hurtServer`.
-    // frame or takes it off the wall.
     if (world::itemFrames::isFrame(target->type())) {
         breakFrame(*session, *target);
         return;
@@ -206,7 +205,6 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
             ? session->autoSpinDamage
             : static_cast<float>(player::playerAttributes::valueOf(*session, "minecraft:attack_damage", definitionOf));
     // parity: what the enchantments add rides on the swing but not on the critical, and is put back.
-    // on top after the charge and the critical have had the base to themselves.
     const world::realEntityTypeTags::TagMembers* entityTags = owner_->options().entityTypeTags;
     const world::weaponDamage::Victim victim{
         .type = target->type(), .inTag = [entityTags, target](const Identifier& tag) {
@@ -254,12 +252,10 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     const player::BreakContext blocks = owner_->blockInteraction().breakContext();
     const player::pvp::Context melee = meleeContext(blocks);
     // parity: `causeExtraKnockback`.
-    // a sprinting hit adds, along the attacker's facing; the 0.4 every hit is worth was inside it.
     player::pvp::knockMob(*session, *target,
                           player::pvp::knockbackOf(melee, *session, heldStack) +
                               (knockbackAttack ? static_cast<float>(kSprintKnockback) : 0.0F));
-    // parity: `isSweepAttack`: a sword, on the ground, walking, and a swing that is neither a.
-    // critical nor a sprinting one.
+    // parity: `isSweepAttack`.
     const bool sweep = fullStrength && !critical && !knockbackAttack && session->onGround &&
                        owner_->lastStepSquared < kSweepSpeedLimit * kSweepSpeedLimit && weapon.has_value() &&
                        weapon->path().ends_with(kSwordSuffix);
@@ -270,7 +266,6 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     broadcastDamageEvent(*target, damageType, session->entityId());
     broadcastMotion(*target);
     // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
-    // monster after whoever swung, the other sends an animal running.
     target->hurtBy = session->entityId();
     entity::entityCombat::rememberPlayer(*target, session->uuid(),
                                          world->state().gameplay().mechanics.mobLastHurtByPlayerTime);
