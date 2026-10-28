@@ -519,6 +519,14 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
             vehicle->vehicleId == entity.entityId()) {
             return false;
         }
+        std::int32_t depth = 0;
+        for (const ServerEntity* above = vehicle; above != nullptr && above->vehicleId.has_value() && depth < 64;
+             ++depth) {
+            if (*above->vehicleId == entity.entityId()) {
+                return false;
+            }
+            above = environment.world->state().entity(*above->vehicleId);
+        }
         if (entity.vehicleId.has_value()) {
             if (ServerEntity* old = environment.world->state().entity(*entity.vehicleId); old != nullptr) {
                 std::erase(old->passengerIds, entity.entityId());
