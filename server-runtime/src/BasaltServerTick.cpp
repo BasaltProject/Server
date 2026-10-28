@@ -97,16 +97,16 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
     tickScoreCriteria();
 
     // Decided between turns: with no region running, re-homing a session cannot put two threads in one player.
-    const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+    const auto worlds = worldRegistry_->worldsForTick();
     for (player::PlayerSession* player : playerRegistry_.snapshot()) {
         const auto found = worlds.find(player->worldName);
-        if (found == worlds.end()) {
+        if (found == worlds.end() || found->second->retired()) {
             continue;
         }
         if (player->connection().handOverToRegion) {
             player->connection().handOverToRegion(*found->second);
         }
-        if (player->connection().syncOpenWindow) {
+        if (!found->second->retired() && player->connection().syncOpenWindow) {
             player->connection().syncOpenWindow(*found->second);
         }
     }
@@ -117,7 +117,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
         },
         [this, &worlds, worldRuns](sched::Region& region) {
             const auto found = worlds.find(region.worldName());
-            if (found == worlds.end()) {
+            if (found == worlds.end() || found->second->retired()) {
                 return;
             }
             world::LoadedWorld& world = *found->second;
@@ -133,7 +133,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 static_cast<void>(region.owner().runPending(onTaskFailure));
             });
             // `/stop` and `/restart` wind the server down before returning, so the turn ends where the server did.
-            if (shuttingDown_.load()) {
+            if (shuttingDown_.load() || world.retired()) {
                 return;
             }
             const auto drainConsole = [this, &region, &onTaskFailure] {
@@ -144,7 +144,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             if (!worldRuns) {
                 // parity: `/tick unfreeze`.
                 drainConsole();
-                if (shuttingDown_.load()) {
+                if (shuttingDown_.load() || world.retired()) {
                     return;
                 }
                 tickDeaths(world, region);
@@ -155,6 +155,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             tickPrimedTnt(world);
 
             const auto step = [this, &world](std::string_view what, auto&& body) {
+                if (world.retired()) return;
                 try {
                     body();
                 } catch (const std::exception& error) {
@@ -208,7 +209,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 step("Raid tick", [this, &world] { raids_->tickRaids(world); });
                 // parity: `playerList.tick`.
                 drainConsole();
-                if (shuttingDown_.load()) {
+                if (shuttingDown_.load() || world.retired()) {
                     return;
                 }
                 step("Player tick", [this, &world] { environment_->tickPlayers(world); });

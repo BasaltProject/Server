@@ -69,6 +69,9 @@ public:
 
     [[nodiscard]] std::map<std::string, world::LoadedWorld*> worlds() const;
 
+    /// Keeps this turn's worlds alive if a plugin unloads one during queued work.
+    [[nodiscard]] std::map<std::string, std::shared_ptr<world::LoadedWorld>> worldsForTick() const;
+
     /// Short-lived login leases keep a snapshot valid until player registration.
     [[nodiscard]] std::map<std::string, std::shared_ptr<world::LoadedWorld>> worldsForLogin() const;
 

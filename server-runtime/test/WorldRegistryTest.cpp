@@ -278,3 +278,41 @@ TEST_CASE("login snapshots pin a live world only until player registration finis
     CHECK(weak.expired());
     CHECK_FALSE(registry.worldsForLogin().contains("temporary"));
 }
+
+TEST_CASE("tick snapshots survive unloads from global and region tasks without blocking unload") {
+    const config::BasaltConfig config;
+    const config::WorldsConfig worlds = pairedWorlds();
+    PlayerRegistry players;
+    WorldRegistry registry{config, worlds, nullptr, players, {}, {.worldsRoot = scratch("registry-tick-unload")}};
+    REQUIRE(registry.createWorld("temporary", config::WorldDimension::Overworld, config::WorldType::Flat, 1));
+    auto snapshot = registry.worldsForTick();
+    std::weak_ptr<LoadedWorld> weak = snapshot.at("temporary");
+    bool unloaded = false;
+    const auto unload = [&] { unloaded = registry.unloadWorld("temporary", false); };
+    SUBCASE("global tasks run after the world snapshot was taken") {
+        registry.scheduler().global().schedule(0, unload);
+    }
+    SUBCASE("a region task unloads its own world") {
+        registry.scheduler().regionFor("temporary").owner().schedule(0, unload);
+    }
+    int retiredTicks = 0;
+    registry.scheduler().tick({}, [&](auto& region) {
+        const auto found = snapshot.find(region.worldName());
+        if (found == snapshot.end() || found->second->retired()) return;
+        auto& world = *found->second;
+        region.owner().advanceTick();
+        region.owner().runPending({});
+        if (world.retired()) {
+            ++retiredTicks;
+            // This used to access a freed EntityRegistry mutex after unloading.
+            CHECK(world.state().entities().empty());
+        }
+    });
+    CHECK(unloaded);
+    CHECK_FALSE(registry.worlds().contains("temporary"));
+    CHECK(snapshot.at("temporary")->retired());
+    CHECK_FALSE(weak.expired());
+    CHECK(retiredTicks <= 1);
+    snapshot.clear();
+    CHECK(weak.expired());
+}
