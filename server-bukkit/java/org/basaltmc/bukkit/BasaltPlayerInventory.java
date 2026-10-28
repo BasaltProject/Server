@@ -102,9 +102,7 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
 
     @Override
     public void setArmorContents(ItemStack[] items) {
-        for (int i = 0; i < 4; i++) {
-            setItem(36 + i, i < items.length ? items[i] : null);
-        }
+        setEquipmentContents(items, 36, 4);
     }
 
     @Override
@@ -114,7 +112,16 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
 
     @Override
     public void setExtraContents(ItemStack[] items) {
-        setItem(40, items.length > 0 ? items[0] : null);
+        setEquipmentContents(items, 40, 1);
+    }
+
+    private void setEquipmentContents(ItemStack[] items, int first, int size) {
+        if (items != null && items.length > size) {
+            throw new IllegalArgumentException("Expected " + size + " equipment items or less");
+        }
+        for (int at = 0; at < size; ++at) {
+            setItem(first + at, items != null && at < items.length ? items[at] : null);
+        }
     }
 
     @Override

@@ -9,6 +9,26 @@ import java.sql.Statement;
 import net.minecraft.resources.ResourceKey;
 
 public final class RuntimeCompatibilityTest {
+    public static void nullableEquipment() throws Exception {
+        Class<?> type = Class.forName("org.basaltmc.bukkit.BasaltPlayerInventory");
+        java.lang.reflect.Constructor<?> constructor = type.getDeclaredConstructor(
+            Class.forName("org.basaltmc.bukkit.BasaltPlayer"), String.class);
+        constructor.setAccessible(true);
+        org.bukkit.inventory.PlayerInventory inventory = (org.bukkit.inventory.PlayerInventory)
+            constructor.newInstance(null, "00000000-0000-0000-0000-000000000001");
+        inventory.setArmorContents(null);
+        inventory.setExtraContents(null);
+        inventory.setArmorContents(new org.bukkit.inventory.ItemStack[2]);
+        try {
+            inventory.setArmorContents(new org.bukkit.inventory.ItemStack[5]);
+            throw new AssertionError("Oversized armor contents accepted");
+        } catch (IllegalArgumentException expected) { }
+        try {
+            inventory.setExtraContents(new org.bukkit.inventory.ItemStack[2]);
+            throw new AssertionError("Oversized extra contents accepted");
+        } catch (IllegalArgumentException expected) { }
+    }
+
     private static native boolean hostEnvironment();
     public static void javaOwnedEnvironments() throws Exception {
         java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
