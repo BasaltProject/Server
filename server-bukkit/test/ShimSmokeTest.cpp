@@ -2,6 +2,7 @@
 
 #include <basalt/server/bukkit/BukkitEmbedded.hpp>
 #include <basalt/server/bukkit/ShimHost.hpp>
+#include <basalt/server/bukkit/JniLocalFrame.hpp>
 
 #include <doctest.h>
 #include <basalt/wire/protocol/ProtocolBuffer.hpp>
@@ -105,6 +106,45 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
         }
         CHECK_FALSE(failed);
     }
+    // A long-lived attached host thread must survive more callbacks than fit
+    // in its interpreter stack, including nested frames and deleted references.
+    jclass objectClass = env->FindClass("java/lang/Object");
+    REQUIRE(objectClass != nullptr);
+    jmethodID objectCtor = env->GetMethodID(objectClass, "<init>", "()V");
+    REQUIRE(objectCtor != nullptr);
+    bool exhausted = false;
+    for (int callback = 0; callback < 100000; ++callback) {
+        JniLocalFrame frame{env};
+        REQUIRE(static_cast<bool>(frame));
+        jobject value = env->NewObject(objectClass, objectCtor);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            exhausted = true;
+            break;
+        }
+        env->DeleteLocalRef(value);
+        if (callback % 1000 == 0) {
+            JniLocalFrame nested{env};
+            REQUIRE(static_cast<bool>(nested));
+            jstring inner = env->NewStringUTF("nested callback");
+            REQUIRE(inner != nullptr);
+            // Rely on the inner frame for cleanup, preserving the outer class.
+        }
+    }
+    REQUIRE_FALSE(exhausted);
+    jclass failureClass = env->FindClass("java/lang/IllegalStateException");
+    REQUIRE(failureClass != nullptr);
+    {
+        JniLocalFrame frame{env};
+        REQUIRE(static_cast<bool>(frame));
+        REQUIRE(env->ThrowNew(failureClass, "callback failure") == JNI_OK);
+        CHECK(env->ExceptionCheck() == JNI_TRUE);
+    }
+    // Frame cleanup must preserve a pending exception for its caller to report.
+    CHECK(env->ExceptionCheck() == JNI_TRUE);
+    env->ExceptionClear();
+    env->DeleteLocalRef(failureClass);
+    env->DeleteLocalRef(objectClass);
     // Decode Java's real outbound frames with the native protocol implementation.
     jmethodID framesMethod = env->GetStaticMethodID(regression, "scoreboardPackets", "()[[B");
     REQUIRE(framesMethod != nullptr);

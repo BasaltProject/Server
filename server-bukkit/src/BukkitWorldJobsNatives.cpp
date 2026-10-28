@@ -29,6 +29,8 @@ void JNICALL nativeRequestChunk(JNIEnv* env, jclass, jstring name, jint chunkX, 
         if (callEnv == nullptr) {
             return;
         }
+        JniLocalFrame frame{callEnv};
+        if (!frame) return;
         jclass booleanClass = callEnv->FindClass("java/lang/Boolean");
         jmethodID valueOf = callEnv->GetStaticMethodID(booleanClass, "valueOf", "(Z)Ljava/lang/Boolean;");
         jobject value = callEnv->CallStaticObjectMethod(booleanClass, valueOf, loaded ? JNI_TRUE : JNI_FALSE);
@@ -92,6 +94,8 @@ void JNICALL nativeLightJob(JNIEnv* env, jclass, jstring name, jintArray chunks,
         if (callEnv == nullptr) {
             return;
         }
+        JniLocalFrame frame{callEnv};
+        if (!frame) return;
         jclass integerClass = callEnv->FindClass("java/lang/Integer");
         jmethodID valueOf = callEnv->GetStaticMethodID(integerClass, "valueOf", "(I)Ljava/lang/Integer;");
         jobject value = callEnv->CallStaticObjectMethod(integerClass, valueOf, relit);

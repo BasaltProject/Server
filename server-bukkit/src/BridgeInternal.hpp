@@ -2,6 +2,7 @@
 
 #include <basalt/server/bukkit/BukkitHost.hpp>
 #include <basalt/server/bukkit/ShimHost.hpp>
+#include <basalt/server/bukkit/JniLocalFrame.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
