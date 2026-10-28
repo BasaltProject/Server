@@ -420,8 +420,12 @@ final class ActorKinds {
         }
 
         private static Map<String, Object> reward(LootTable table, int weight) {
+            return reward(table.getKey().toString(), weight);
+        }
+
+        private static Map<String, Object> reward(String key, int weight) {
             Map<String, Object> entry = Nbt.compound();
-            entry.put("data", table.getKey().toString());
+            entry.put("data", key);
             entry.put("weight", weight);
             return entry;
         }
@@ -429,9 +433,8 @@ final class ActorKinds {
         private static List<Object> rewards(Map<String, Object> config) {
             List<Object> list = Nbt.list(config, "loot_tables_to_eject");
             if (list == null) {
-                list = new ArrayList<>(List.of(reward(Bukkit.getLootTable(NamespacedKey.minecraft(
-                    "spawners/trial_chamber/consumables")), 1), reward(Bukkit.getLootTable(NamespacedKey.minecraft(
-                    "spawners/trial_chamber/key")), 1)));
+                list = new ArrayList<>(List.of(reward("minecraft:spawners/trial_chamber/consumables", 1),
+                    reward("minecraft:spawners/trial_chamber/key", 1)));
             }
             return list;
         }
