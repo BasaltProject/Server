@@ -65,7 +65,11 @@ std::string TimingsReport::stamp() {
     // Local time, via `localtime_r` since this platform's standard library lacks C++20 `zoned_time`.
     const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm local{};
+#if defined(_WIN32)
+    localtime_s(&local, &now);
+#else
     localtime_r(&now, &local);
+#endif
     return std::format("{:04d}-{:02d}-{:02d}_{:02d}-{:02d}-{:02d}", local.tm_year + 1900, local.tm_mon + 1,
                        local.tm_mday, local.tm_hour, local.tm_min, local.tm_sec);
 }
