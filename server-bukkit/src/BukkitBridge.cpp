@@ -242,6 +242,9 @@ bool BukkitBridge::enable() {
 std::vector<BukkitHost::PluginState> BukkitBridge::javaPlugins() {
     std::vector<BukkitHost::PluginState> found;
     JNIEnv* env = shim_->env();
+    if (env == nullptr) {
+        return found;
+    }
     auto* rows = static_cast<jobjectArray>(env->CallStaticObjectMethod(runtime_, listMethod_));
     if (env->ExceptionCheck() == JNI_TRUE || rows == nullptr) {
         env->ExceptionClear();
@@ -268,7 +271,7 @@ bool BukkitBridge::shutdown() {
     stopping_.store(true);
     JNIEnv* env = shim_->env();
     bool clean = false;
-    if (env != nullptr && runtime_ != nullptr) {
+    if (env != nullptr && runtime_ != nullptr && shutdownMethod_ != nullptr) {
         clean = env->CallStaticBooleanMethod(runtime_, shutdownMethod_) == JNI_TRUE;
         if (env->ExceptionCheck() == JNI_TRUE) {
             reportJavaFailure(env, "BukkitRuntime.shutdown");
