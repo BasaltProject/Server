@@ -168,7 +168,13 @@ std::optional<std::string> ServerSettings::get(const std::string_view key) const
     if (key == "view_distance" || key == "simulation_distance") {
         const std::vector<world::LoadedWorld*> worlds =
             hooks_.worlds ? hooks_.worlds() : std::vector<world::LoadedWorld*>{};
-        return std::to_string(worlds.empty() ? 10 : worlds.front()->settings().viewDistance);
+        if (worlds.empty()) {
+            return std::string{"10"};
+        }
+        const world::LoadedWorld& first = *worlds.front();
+        return std::to_string(key == "view_distance"
+                                  ? first.settings().viewDistance
+                                  : first.tunables().simulationDistance.value_or(first.settings().simulationDistance));
     }
     if (key == "hide_online_players") {
         return boolText(hooks_.serverList && hooks_.serverList().defaultProfile().hidePlayerCount.value_or(false));
