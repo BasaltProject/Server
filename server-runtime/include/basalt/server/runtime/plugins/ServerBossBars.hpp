@@ -30,6 +30,7 @@ public:
     bool removePlayer(std::string_view id, std::string_view uuid) override;
     void clearPlayers(std::string_view id) override;
     [[nodiscard]] std::vector<std::string> players(std::string_view id) override;
+    void left(const std::string& uuid);
 
 private:
     struct Transient {
