@@ -151,6 +151,9 @@ public final class ChannelBridge {
                         byte[] whole = new byte[buffer.readableBytes()];
                         buffer.readBytes(whole);
                         int id = readVarInt(whole);
+                        if (id < 0) {
+                            return;
+                        }
                         int skip = varIntLength(id);
                         byte[] body = new byte[whole.length - skip];
                         System.arraycopy(whole, skip, body, 0, body.length);
@@ -189,6 +192,10 @@ public final class ChannelBridge {
                     byte[] whole = new byte[buffer.readableBytes()];
                     buffer.readBytes(whole);
                     int id = readVarInt(whole);
+                    if (id < 0) {
+                        promise.setSuccess();
+                        return;
+                    }
                     int skip = varIntLength(id);
                     byte[] body = new byte[whole.length - skip];
                     System.arraycopy(whole, skip, body, 0, body.length);
@@ -302,6 +309,9 @@ public final class ChannelBridge {
         }
         byte[] result = pending.result;
         int newId = readVarInt(result);
+        if (newId < 0) {
+            return null;
+        }
         int skip = varIntLength(newId);
         if (newId != id) {
             byte[] fresh = new byte[result.length - skip];
