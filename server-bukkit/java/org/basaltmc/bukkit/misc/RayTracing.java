@@ -101,6 +101,9 @@ public final class RayTracing {
         if (direction.lengthSquared() == 0.0) {
             throw new IllegalArgumentException("Direction's magnitude (" + direction.length() + ") must be greater than 0");
         }
+        if (!(maxDistance >= 0.0)) {
+            throw new IllegalArgumentException("maxDistance must be a number of at least 0");
+        }
         Vector dir = direction.clone().normalize();
         double max = Math.min(maxDistance, 1024.0);
         int x = (int) Math.floor(start.getX());
@@ -119,9 +122,16 @@ public final class RayTracing {
         double nextZ = dir.getZ() == 0 ? Double.MAX_VALUE
             : (dir.getZ() > 0 ? z + 1 - start.getZ() : start.getZ() - z) * deltaZ;
         double travelled = 0.0;
+        long loadedChunk = Long.MIN_VALUE;
+        boolean loaded = false;
         while (true) {
-            Block block = world.getBlockAt(x, y, z);
-            if (canCollide == null || canCollide.test(block)) {
+            long chunk = ((long) (x >> 4) << 32) | ((z >> 4) & 0xFFFFFFFFL);
+            if (chunk != loadedChunk) {
+                loadedChunk = chunk;
+                loaded = world.isChunkLoaded(x >> 4, z >> 4);
+            }
+            Block block = loaded ? world.getBlockAt(x, y, z) : null;
+            if (block != null && (canCollide == null || canCollide.test(block))) {
                 RayTraceResult hit = block(block, start, dir, max, fluids, ignorePassable);
                 if (hit != null) {
                     return hit;
