@@ -209,6 +209,9 @@ jboolean JNICALL nativeUseGeneratorWith(JNIEnv* env, jclass, jstring world, jint
                        if (all.size() < 2) {
                            return;
                        }
+                       if (all[0] < 0 || all[1] < 0) {
+                           return;
+                       }
                        const auto blockCount = static_cast<std::size_t>(all[0]);
                        const auto biomeCount = static_cast<std::size_t>(all[1]);
                        if (all.size() < 2 + blockCount + biomeCount) {
