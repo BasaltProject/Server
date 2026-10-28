@@ -323,7 +323,8 @@ void addActions(Operations& operations) {
         const bool follower = environment.world != nullptr && misc::isFollower(entity, [&environment](std::int32_t id) {
                                   return environment.world->state().entity(id);
                               });
-        facts.push_back(follower ? std::to_string(*held->schoolLeader) : "-1");
+        facts.push_back(
+            follower && held != nullptr && held->schoolLeader.has_value() ? std::to_string(*held->schoolLeader) : "-1");
         facts.push_back(std::to_string(held == nullptr ? 1 : held->schoolSize));
         facts.push_back(std::to_string(misc::maxSchoolSize(entity)));
         return facts;
