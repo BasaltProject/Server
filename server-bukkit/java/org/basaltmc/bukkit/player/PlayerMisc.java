@@ -588,18 +588,18 @@ public abstract class PlayerMisc extends PlayerStats {
 
     @Override
     public boolean hasData(io.papermc.paper.datacomponent.DataComponentType type) {
-        return false;
+        throw org.basaltmc.bukkit.Unsupported.hit("Player#hasData: players carry no data components here");
     }
 
     @Override
     public <T> T getData(io.papermc.paper.datacomponent.DataComponentType.Valued<T> type) {
-        return null;
+        throw org.basaltmc.bukkit.Unsupported.hit("Player#getData: players carry no data components here");
     }
 
     @Override
     public <T> T getDataOrDefault(io.papermc.paper.datacomponent.DataComponentType.Valued<? extends T> type,
             T fallback) {
-        return fallback;
+        throw org.basaltmc.bukkit.Unsupported.hit("Player#getDataOrDefault: players carry no data components here");
     }
 
     @Override
