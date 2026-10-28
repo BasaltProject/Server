@@ -91,7 +91,14 @@ public class EntityContainerInventory extends AbstractInventory {
 
     @Override
     public List<HumanEntity> getViewers() {
-        return new ArrayList<>();
+        List<HumanEntity> out = new ArrayList<>();
+        for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+            if (TypedInventories.unwrap(player.getOpenInventory().getTopInventory())
+                    instanceof EntityContainerInventory other && other.entityId() == entityId()) {
+                out.add(player);
+            }
+        }
+        return out;
     }
 
     @Override
