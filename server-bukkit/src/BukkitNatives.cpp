@@ -92,7 +92,7 @@ void JNICALL nativeListenChannel(JNIEnv* env, jclass, jstring channel) {
 
 jboolean JNICALL nativeChannelSend(JNIEnv* env, jclass, jstring uuid, jstring channel, jbyteArray payload) {
     const auto player = playerOf(env, uuid);
-    if (player == nullptr) {
+    if (player == nullptr || payload == nullptr) {
         return JNI_FALSE;
     }
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(env->GetArrayLength(payload)));
