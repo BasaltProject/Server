@@ -4,9 +4,9 @@
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/world/crafting/RecipeJson.hpp>
 
-#include <mutex>
 #include <algorithm>
 #include <cstdint>
+#include <mutex>
 
 namespace basalt::server::runtime::world {
 namespace {

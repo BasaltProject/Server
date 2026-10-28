@@ -155,7 +155,8 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             tickPrimedTnt(world);
 
             const auto step = [this, &world](std::string_view what, auto&& body) {
-                if (world.retired()) return;
+                if (world.retired())
+                    return;
                 try {
                     body();
                 } catch (const std::exception& error) {

@@ -32,8 +32,10 @@ namespace {
 // and configured dimensions retain their locations; never migrate data implicitly.
 [[nodiscard]] std::string storageRoot(const config::WorldsConfig& config, const std::string& root,
                                       const std::string& primary, const std::string& name) {
-    const bool configured = std::ranges::any_of(config.worlds(), [&name](const auto& world) { return world.name == name; });
-    if (configured || std::filesystem::exists(std::filesystem::path{root} / name)) return root;
+    const bool configured =
+        std::ranges::any_of(config.worlds(), [&name](const auto& world) { return world.name == name; });
+    if (configured || std::filesystem::exists(std::filesystem::path{root} / name))
+        return root;
     return (std::filesystem::path{root} / primary / "dimensions" / "minecraft").string();
 }
 
@@ -216,9 +218,9 @@ world::LoadedWorld* WorldRegistry::createWorld(const std::string& name, config::
     const std::string root = storageRoot(*worldsConfig_, options_.worldsRoot, defaultName_, name);
     wire::io::fileIO::createDirectories(root + "/" + name);
     const config::WorldSettings settings = worldsConfig_->settingsFor(declaration);
-    world::WorldMetadata metadata = world::WorldMetadata::loadOrCreate(
-        root + "/" + name, seed.has_value() ? seed : std::optional{worldSeed()},
-        world::WorldMetadata::kDefaultSpawn, logger_, &settings.rules.gameRules);
+    world::WorldMetadata metadata =
+        world::WorldMetadata::loadOrCreate(root + "/" + name, seed.has_value() ? seed : std::optional{worldSeed()},
+                                           world::WorldMetadata::kDefaultSpawn, logger_, &settings.rules.gameRules);
     const std::int64_t madeWith = metadata.seed;
     owned_.push_back(buildWorld(declaration, std::move(metadata)));
     world::LoadedWorld* made = owned_.back().get();

@@ -1,10 +1,10 @@
-#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 
 #include <algorithm>
 #include <array>

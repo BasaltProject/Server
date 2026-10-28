@@ -457,12 +457,13 @@ void ClientSession::enterPlay() {
         options_.playerStore == nullptr || !options_.playerStore->isOpen()
             ? std::nullopt
             : options_.playerStore->players().load(pendingProfile_->id.toString());
-    const auto heldWorlds = options_.worldsNow ? options_.worldsNow()
-        : std::map<std::string, std::shared_ptr<world::LoadedWorld>>{};
+    const auto heldWorlds =
+        options_.worldsNow ? options_.worldsNow() : std::map<std::string, std::shared_ptr<world::LoadedWorld>>{};
     auto worlds = options_.worlds;
     if (options_.worldsNow) {
         worlds.clear();
-        for (const auto& [name, held] : heldWorlds) worlds.emplace(name, held.get());
+        for (const auto& [name, held] : heldWorlds)
+            worlds.emplace(name, held.get());
     }
     const auto requested = stored.has_value() ? std::optional{stored->world} : std::nullopt;
     world::LoadedWorld* world = options_.defaultWorld;

@@ -317,7 +317,10 @@ std::optional<std::int32_t> LoadedWorldRef::biomeIdAt(std::int32_t index) {
 void LoadedWorldRef::awaitChunk(std::shared_ptr<world::LoadedWorld> world, std::int32_t chunkX, std::int32_t chunkZ,
                                 std::int32_t waited, std::shared_ptr<std::function<void(bool)>> done) {
     constexpr std::int32_t kGiveUpTicks = 1200;
-    if (world->retired()) { (*done)(false); return; }
+    if (world->retired()) {
+        (*done)(false);
+        return;
+    }
     if (world->state().isLoaded(chunkX, chunkZ)) {
         (*done)(true);
         return;
@@ -341,7 +344,8 @@ bool LoadedWorldRef::hasSkylight() const { return config::dimensionFacts(world_-
 void LoadedWorldRef::showChunks(world::LoadedWorld& world,
                                 const std::function<std::vector<player::PlayerSession*>()>& players,
                                 std::span<const std::int32_t> chunks) {
-    if (world.retired()) return;
+    if (world.retired())
+        return;
     if (!players || chunks.empty()) {
         return;
     }

@@ -377,7 +377,8 @@ jboolean JNICALL nativeUseGenerator(JNIEnv* env, jclass, jstring world) {
                                   return;
                               }
                               JniLocalFrame frame{callEnv};
-                              if (!frame) return;
+                              if (!frame)
+                                  return;
                               jstring who = toJava(callEnv, name);
                               auto* packed = static_cast<jintArray>(callEnv->CallStaticObjectMethod(
                                   static_cast<jclass>(holder->ref), fill, who, chunkX, chunkZ));

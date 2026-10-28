@@ -1,7 +1,7 @@
 #include "PistonSlide.hpp"
 
-#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockFluids.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>

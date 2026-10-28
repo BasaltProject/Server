@@ -189,7 +189,8 @@ bool RegionStore::ensureLoaded(std::int32_t regionX, std::int32_t regionZ) {
     bool missing = false;
     {
         const std::lock_guard<std::mutex> lock{mutex_};
-        if (closed_) return false;
+        if (closed_)
+            return false;
         missing = touch(regionKey) == nullptr;
     }
     if (missing) {
@@ -207,7 +208,8 @@ bool RegionStore::ensureLoaded(std::int32_t regionX, std::int32_t regionZ) {
             return false;
         }
         const std::lock_guard<std::mutex> lock{mutex_};
-        if (closed_) return false;
+        if (closed_)
+            return false;
         if (touch(regionKey) == nullptr) {
             store(regionKey, *std::move(read.region));
         }
@@ -311,7 +313,8 @@ std::size_t RegionStore::saveChunks(std::span<Chunk* const> allChunks, std::int3
         return 0;
     }
     const std::lock_guard<std::mutex> writeLock{writeMutex_};
-    if (closed_) return 0;
+    if (closed_)
+        return 0;
 
     std::map<std::int64_t, std::vector<Chunk*>> byRegion;
     for (Chunk* chunk : chunks) {
@@ -362,7 +365,8 @@ std::size_t RegionStore::saveSnapshots(std::vector<Snapshot> snapshots, std::int
         return 0;
     }
     const std::lock_guard<std::mutex> writeLock{writeMutex_};
-    if (closed_) return 0;
+    if (closed_)
+        return 0;
     std::map<std::int64_t, std::vector<const Snapshot*>> byRegion;
     for (const Snapshot& snapshot : snapshots) {
         byRegion[key(snapshot.chunkX >> 5, snapshot.chunkZ >> 5)].push_back(&snapshot);
@@ -396,7 +400,8 @@ std::size_t RegionStore::saveSnapshots(std::vector<Snapshot> snapshots, std::int
 
 std::size_t RegionStore::flush() {
     const std::lock_guard<std::mutex> writeLock{writeMutex_};
-    if (closed_) return 0;
+    if (closed_)
+        return 0;
     return flushDirty();
 }
 

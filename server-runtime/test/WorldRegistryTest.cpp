@@ -107,25 +107,27 @@ TEST_CASE("unloaded worlds fence old storage and reload from disk after deletion
     const config::WorldsConfig worlds = pairedWorlds();
     PlayerRegistry players;
     const auto root = scratch("registry-retire");
-    WorldRegistry registry{config, worlds, nullptr, players, {}, {.worldsRoot=root}};
-    auto* old = registry.createWorld("temporary",config::WorldDimension::Overworld,config::WorldType::Flat,7);
+    WorldRegistry registry{config, worlds, nullptr, players, {}, {.worldsRoot = root}};
+    auto* old = registry.createWorld("temporary", config::WorldDimension::Overworld, config::WorldType::Flat, 7);
     REQUIRE(old != nullptr);
     auto keepOld = old->keepAlive();
     old->clock().setTotalTicks(1234);
-    REQUIRE(registry.unloadWorld("temporary",true));
+    REQUIRE(registry.unloadWorld("temporary", true));
     CHECK_FALSE(registry.worlds().contains("temporary"));
-    auto* reloaded = registry.createWorld("temporary",config::WorldDimension::Overworld,config::WorldType::Flat,99);
+    auto* reloaded = registry.createWorld("temporary", config::WorldDimension::Overworld, config::WorldType::Flat, 99);
     REQUIRE(reloaded != nullptr);
     CHECK(reloaded != old);
     CHECK(reloaded->metadata().seed == 7);
     CHECK(reloaded->clock().totalTicks() == 1234);
     auto keepReloaded = reloaded->keepAlive();
     reloaded->clock().setTotalTicks(9999);
-    REQUIRE(registry.unloadWorld("temporary",false));
+    REQUIRE(registry.unloadWorld("temporary", false));
     std::filesystem::remove_all(reloaded->worldRoot());
-    reloaded->saveDirty(); reloaded->saveMetadata(); reloaded->flushRegions();
+    reloaded->saveDirty();
+    reloaded->saveMetadata();
+    reloaded->flushRegions();
     CHECK_FALSE(std::filesystem::exists(reloaded->worldRoot()));
-    auto* fresh = registry.createWorld("temporary",config::WorldDimension::Overworld,config::WorldType::Flat,99);
+    auto* fresh = registry.createWorld("temporary", config::WorldDimension::Overworld, config::WorldType::Flat, 99);
     REQUIRE(fresh != nullptr);
     CHECK(fresh->metadata().seed == 99);
     CHECK(fresh->clock().totalTicks() != 9999);
@@ -134,25 +136,30 @@ TEST_CASE("unloaded worlds fence old storage and reload from disk after deletion
 
 TEST_CASE("dynamic dimensions use modern storage while existing flat saves are retained") {
     const config::BasaltConfig config;
-    const config::WorldsConfig worlds=pairedWorlds();
+    const config::WorldsConfig worlds = pairedWorlds();
     PlayerRegistry players;
-    const auto root=scratch("registry-dimension-layout");
-    WorldRegistry registry{config,worlds,nullptr,players,{}, {.worldsRoot=root}};
-    auto* made=registry.createWorld("runtime",config::WorldDimension::Overworld,config::WorldType::Flat,5);
-    REQUIRE(made!=nullptr);
-    CHECK(made->worldRoot()==root+"/world/dimensions/minecraft/runtime");
-    const auto legacy=root+"/legacy";
-    const auto legacyMetadata = basalt::server::runtime::world::WorldMetadata::loadOrCreate(legacy,77,
-        basalt::server::runtime::world::WorldMetadata::kDefaultSpawn,basalt::wire::common::Logger{"test"});
+    const auto root = scratch("registry-dimension-layout");
+    WorldRegistry registry{config, worlds, nullptr, players, {}, {.worldsRoot = root}};
+    auto* made = registry.createWorld("runtime", config::WorldDimension::Overworld, config::WorldType::Flat, 5);
+    REQUIRE(made != nullptr);
+    CHECK(made->worldRoot() == root + "/world/dimensions/minecraft/runtime");
+    const auto legacy = root + "/legacy";
+    const auto legacyMetadata = basalt::server::runtime::world::WorldMetadata::loadOrCreate(
+        legacy, 77, basalt::server::runtime::world::WorldMetadata::kDefaultSpawn, basalt::wire::common::Logger{"test"});
     CHECK(legacyMetadata.seed == 77);
-    auto* old=registry.createWorld("legacy",config::WorldDimension::Overworld,config::WorldType::Flat,99);
-    REQUIRE(old!=nullptr);CHECK(old->worldRoot()==legacy);CHECK(old->metadata().seed==77);
-    const auto imported=root+"/world/dimensions/minecraft/imported";
-    const auto importedMetadata = basalt::server::runtime::world::WorldMetadata::loadOrCreate(imported,88,
-        basalt::server::runtime::world::WorldMetadata::kDefaultSpawn,basalt::wire::common::Logger{"test"});
+    auto* old = registry.createWorld("legacy", config::WorldDimension::Overworld, config::WorldType::Flat, 99);
+    REQUIRE(old != nullptr);
+    CHECK(old->worldRoot() == legacy);
+    CHECK(old->metadata().seed == 77);
+    const auto imported = root + "/world/dimensions/minecraft/imported";
+    const auto importedMetadata = basalt::server::runtime::world::WorldMetadata::loadOrCreate(
+        imported, 88, basalt::server::runtime::world::WorldMetadata::kDefaultSpawn,
+        basalt::wire::common::Logger{"test"});
     CHECK(importedMetadata.seed == 88);
-    auto* restored=registry.createWorld("imported",config::WorldDimension::Overworld,config::WorldType::Flat,99);
-    REQUIRE(restored!=nullptr);CHECK(restored->worldRoot()==imported);CHECK(restored->metadata().seed==88);
+    auto* restored = registry.createWorld("imported", config::WorldDimension::Overworld, config::WorldType::Flat, 99);
+    REQUIRE(restored != nullptr);
+    CHECK(restored->worldRoot() == imported);
+    CHECK(restored->metadata().seed == 88);
 }
 
 TEST_CASE("unloaded world memory is released when the last real plugin view is released") {
@@ -296,7 +303,8 @@ TEST_CASE("tick snapshots survive unloads from global and region tasks without b
     int retiredTicks = 0;
     registry.scheduler().tick({}, [&](auto& region) {
         const auto found = snapshot.find(region.worldName());
-        if (found == snapshot.end() || found->second->retired()) return;
+        if (found == snapshot.end() || found->second->retired())
+            return;
         auto& world = *found->second;
         region.owner().advanceTick();
         region.owner().runPending({});

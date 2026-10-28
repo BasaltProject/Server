@@ -1,13 +1,13 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/bukkit/BukkitEmbedded.hpp>
-#include <basalt/server/bukkit/ShimHost.hpp>
 #include <basalt/server/bukkit/JniLocalFrame.hpp>
+#include <basalt/server/bukkit/ShimHost.hpp>
+#include <basalt/wire/protocol/ProtocolBuffer.hpp>
+#include <basalt/wire/protocol/play/EntityData.hpp>
+#include <basalt/wire/protocol/play/UiPackets.hpp>
 
 #include <doctest.h>
-#include <basalt/wire/protocol/ProtocolBuffer.hpp>
-#include <basalt/wire/protocol/play/UiPackets.hpp>
-#include <basalt/wire/protocol/play/EntityData.hpp>
 
 #include <atomic>
 #include <filesystem>
@@ -22,15 +22,18 @@ namespace {
 std::atomic<int> forwardedLogCount{0};
 std::atomic<int> tagReadCount{0};
 std::vector<jint> equipmentSlots;
+
 void JNICALL clearEquipment(JNIEnv*, jclass, jstring, jint slot, jbyteArray item) {
     CHECK(item == nullptr);
     equipmentSlots.push_back(slot);
 }
+
 ShimHost* callbackHost = nullptr;
 
 jboolean JNICALL hostEnvironment(JNIEnv* env, jclass) {
     JavaVM* vm = nullptr;
-    if (env->GetJavaVM(&vm) != JNI_OK) return JNI_FALSE;
+    if (env->GetJavaVM(&vm) != JNI_OK)
+        return JNI_FALSE;
     JNIEnv* current = nullptr;
     if (vm->GetEnv(reinterpret_cast<void**>(&current), JNI_VERSION_1_8) != JNI_OK || current != env)
         return JNI_FALSE;
@@ -127,7 +130,9 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
     JNINativeMethod hostMethod{const_cast<char*>("hostEnvironment"), const_cast<char*>("()Z"),
                                reinterpret_cast<void*>(&hostEnvironment)};
     REQUIRE(env->RegisterNatives(regression, &hostMethod, 1) == JNI_OK);
-    for (const char* name : {"nullableEquipment", "javaOwnedEnvironments", "publicReflection", "reflectionDiamonds", "hashedArrayClones", "synchronizedReturns", "featureKeys", "sqlite", "registryTags", "failureText", "loggingBackend"}) {
+    for (const char* name :
+         {"nullableEquipment", "javaOwnedEnvironments", "publicReflection", "reflectionDiamonds", "hashedArrayClones",
+          "synchronizedReturns", "featureKeys", "sqlite", "registryTags", "failureText", "loggingBackend"}) {
         INFO(std::string{name});
         jmethodID method = env->GetStaticMethodID(regression, name, "()V");
         REQUIRE(method != nullptr);
@@ -182,7 +187,10 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
     jmethodID framesMethod = env->GetStaticMethodID(regression, "scoreboardPackets", "()[[B");
     REQUIRE(framesMethod != nullptr);
     auto frames = static_cast<jobjectArray>(env->CallStaticObjectMethod(regression, framesMethod));
-    if (env->ExceptionCheck()) { env->ExceptionDescribe(); env->ExceptionClear(); }
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
     REQUIRE(frames != nullptr);
     REQUIRE(env->GetArrayLength(frames) == 12);
     namespace play = basalt::wire::protocol::play;
@@ -196,51 +204,76 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
         const auto id = basalt::wire::protocol::varInt::read(buffer);
         if (i == 0 || i == 10) {
             CHECK(id == play::SetObjectivePacket::kId);
-            auto packet = play::SetObjectivePacket::read(buffer); REQUIRE(packet.has_value());
-            CHECK(packet->objectiveName == "compat"); CHECK(packet->method == (i == 0 ? 0 : 1));
-            if (i == 0) { REQUIRE(packet->displayName.has_value()); CHECK(packet->displayName->style().bold == true);
-                REQUIRE(packet->numberFormat.has_value()); CHECK(packet->numberFormat->typeId() == 0); }
+            auto packet = play::SetObjectivePacket::read(buffer);
+            REQUIRE(packet.has_value());
+            CHECK(packet->objectiveName == "compat");
+            CHECK(packet->method == (i == 0 ? 0 : 1));
+            if (i == 0) {
+                REQUIRE(packet->displayName.has_value());
+                CHECK(packet->displayName->style().bold == true);
+                REQUIRE(packet->numberFormat.has_value());
+                CHECK(packet->numberFormat->typeId() == 0);
+            }
         } else if (i == 1 || i == 11) {
             CHECK(id == play::SetDisplayObjectivePacket::kId);
-            auto packet = play::SetDisplayObjectivePacket::read(buffer); REQUIRE(packet.has_value());
-            CHECK(packet->slot == play::DisplaySlot::Sidebar); CHECK(packet->objectiveName == (i == 1 ? "compat" : ""));
+            auto packet = play::SetDisplayObjectivePacket::read(buffer);
+            REQUIRE(packet.has_value());
+            CHECK(packet->slot == play::DisplaySlot::Sidebar);
+            CHECK(packet->objectiveName == (i == 1 ? "compat" : ""));
         } else if (i == 2) {
             CHECK(id == play::SetScorePacket::kId);
-            auto packet = play::SetScorePacket::read(buffer); REQUIRE(packet.has_value());
-            CHECK(packet->score == -7); CHECK(packet->owner == "entry"); CHECK(packet->objectiveName == "compat");
-            REQUIRE(packet->display.has_value()); CHECK(packet->display->style().bold == true);
-            REQUIRE(packet->numberFormat.has_value()); CHECK(packet->numberFormat->typeId() == 2);
+            auto packet = play::SetScorePacket::read(buffer);
+            REQUIRE(packet.has_value());
+            CHECK(packet->score == -7);
+            CHECK(packet->owner == "entry");
+            CHECK(packet->objectiveName == "compat");
+            REQUIRE(packet->display.has_value());
+            CHECK(packet->display->style().bold == true);
+            REQUIRE(packet->numberFormat.has_value());
+            CHECK(packet->numberFormat->typeId() == 2);
         } else if (i == 8 || i == 9) {
             CHECK(id == play::ResetScorePacket::kId);
-            auto packet = play::ResetScorePacket::read(buffer); REQUIRE(packet.has_value());
-            CHECK(packet->owner == "entry"); CHECK(packet->objectiveName.has_value() == (i == 8));
+            auto packet = play::ResetScorePacket::read(buffer);
+            REQUIRE(packet.has_value());
+            CHECK(packet->owner == "entry");
+            CHECK(packet->objectiveName.has_value() == (i == 8));
         } else {
             CHECK(id == play::SetPlayerTeamPacket::kId);
-            auto packet = play::SetPlayerTeamPacket::read(buffer); REQUIRE(packet.has_value());
+            auto packet = play::SetPlayerTeamPacket::read(buffer);
+            REQUIRE(packet.has_value());
             CHECK(packet->teamName == "team");
             if (i == 3 || i == 4) {
-                REQUIRE(packet->parameters.has_value()); const auto& parameters = *packet->parameters;
+                REQUIRE(packet->parameters.has_value());
+                const auto& parameters = *packet->parameters;
                 CHECK(parameters.nameTagVisibility == play::NameTagVisibility::Never);
                 CHECK(parameters.collisionRule == play::CollisionRule::PushOtherTeams);
-                CHECK(parameters.color == play::TeamColor::Red); CHECK_FALSE(parameters.friendlyFire);
+                CHECK(parameters.color == play::TeamColor::Red);
+                CHECK_FALSE(parameters.friendlyFire);
                 CHECK(parameters.seeFriendlyInvisibles);
                 REQUIRE(parameters.prefix.as<Text>() != nullptr);
                 CHECK(parameters.prefix.as<Text>()->content == (i == 3 ? "prefix " : "changed"));
-            } else { CHECK_FALSE(packet->parameters.has_value()); }
+            } else {
+                CHECK_FALSE(packet->parameters.has_value());
+            }
             CHECK(packet->method == (i == 3 ? 0 : i == 4 ? 2 : i == 5 ? 3 : i == 6 ? 4 : 1));
             CHECK(packet->members.size() == (i == 3 || i == 5 || i == 6 ? 1 : 0));
         }
-        CHECK_FALSE(buffer.failed()); CHECK(buffer.readableBytes() == 0);
+        CHECK_FALSE(buffer.failed());
+        CHECK(buffer.readableBytes() == 0);
         env->DeleteLocalRef(frame);
     }
     env->DeleteLocalRef(frames);
     jmethodID metadataMethod = env->GetStaticMethodID(regression, "metadataPacket", "()[B");
     REQUIRE(metadataMethod != nullptr);
     auto metadata = static_cast<jbyteArray>(env->CallStaticObjectMethod(regression, metadataMethod));
-    if (env->ExceptionCheck()) { env->ExceptionDescribe(); env->ExceptionClear(); }
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
     REQUIRE(metadata != nullptr);
     std::vector<std::uint8_t> metadataBytes(static_cast<std::size_t>(env->GetArrayLength(metadata)));
-    env->GetByteArrayRegion(metadata,0,static_cast<jsize>(metadataBytes.size()),reinterpret_cast<jbyte*>(metadataBytes.data()));
+    env->GetByteArrayRegion(metadata, 0, static_cast<jsize>(metadataBytes.size()),
+                            reinterpret_cast<jbyte*>(metadataBytes.data()));
     auto metadataBuffer = basalt::wire::io::ByteBuffer::wrap(std::move(metadataBytes));
     CHECK(basalt::wire::protocol::varInt::read(metadataBuffer) == play::SetEntityDataPacket::kId);
     auto decodedMetadata = play::SetEntityDataPacket::read(metadataBuffer);
@@ -249,8 +282,10 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
     REQUIRE(decodedMetadata->entries.size() == 3);
     CHECK(std::get<play::SetEntityDataPacket::ByteValue>(decodedMetadata->entries[0].value).value == 75);
     CHECK(std::get<play::SetEntityDataPacket::IntValue>(decodedMetadata->entries[1].value).value == 123);
-    CHECK(std::get<play::SetEntityDataPacket::TextValue>(decodedMetadata->entries[2].value).value.as<Text>()->content == "name");
-    CHECK_FALSE(metadataBuffer.failed()); CHECK(metadataBuffer.readableBytes() == 0);
+    CHECK(std::get<play::SetEntityDataPacket::TextValue>(decodedMetadata->entries[2].value).value.as<Text>()->content ==
+          "name");
+    CHECK_FALSE(metadataBuffer.failed());
+    CHECK(metadataBuffer.readableBytes() == 0);
     env->DeleteLocalRef(metadata);
     env->DeleteLocalRef(regression);
     CHECK(forwardedLogCount.load() > 0);

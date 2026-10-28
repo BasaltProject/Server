@@ -185,7 +185,8 @@ VanillaWorldGeneratorFactory::CacheStats VanillaWorldGeneratorFactory::cacheStat
     CacheStats stats;
     for (const auto& entry : built_) {
         const auto built = entry.lock();
-        if (!built) continue;
+        if (!built)
+            continue;
         if (built->village != nullptr) {
             const auto [count, pieces] = built->village->assemblyStats();
             stats.assemblies += count;

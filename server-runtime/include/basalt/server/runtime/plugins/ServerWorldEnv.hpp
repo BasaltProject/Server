@@ -1,8 +1,7 @@
 #pragma once
-#include <basalt/server/runtime/world/LoadedWorld.hpp>
-
 #include <basalt/server/plugins/PluginWorldEnv.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <functional>
 #include <vector>

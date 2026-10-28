@@ -117,7 +117,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
     if (const wire::common::Identifier* soil = server::registry::blockStateDefinitions::blockOf(onState);
         soil != nullptr && soil->path() == "farmland" &&
         config::GameplayRules::resolve(world.state().gameplay().blocks.farmlandMobGriefingOverride,
-                                     world.gameRules().get(world::gameRules::kMobGriefing)) &&
+                                       world.gameRules().get(world::gameRules::kMobGriefing)) &&
         server::registry::entityAttributes::isLiving(mob.type())) {
         random::RandomSource random = freshRandom();
         const world::farmlandTrample::Faller faller{.fallDistance = fallen,
@@ -137,7 +137,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
         mob.type().path() != "bat" && mob.type().path() != "zombie" &&
         server::registry::entityAttributes::isLiving(mob.type()) &&
         config::GameplayRules::resolve(world.state().gameplay().blocks.turtleEggMobGriefingOverride,
-                                     world.gameRules().get(world::gameRules::kMobGriefing))) {
+                                       world.gameRules().get(world::gameRules::kMobGriefing))) {
         random::RandomSource random = freshRandom();
         if (const std::optional<world::BlockChange> cracked =
                 world::turtleEggs::trample(world.state(), at[0], at[1], at[2], 3, random);

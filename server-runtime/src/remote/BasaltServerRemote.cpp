@@ -56,9 +56,8 @@ void BasaltServer::startRemote(const std::chrono::steady_clock::time_point start
         } else {
             settings.api.token = token->token;
             if (token->created) {
-                log.info([] {
-                    return "Management API token generated and stored in " + std::string{kTokenPath} + ".";
-                });
+                log.info(
+                    [] { return "Management API token generated and stored in " + std::string{kTokenPath} + "."; });
             }
         }
     }

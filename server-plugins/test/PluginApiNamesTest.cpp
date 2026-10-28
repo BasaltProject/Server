@@ -1,7 +1,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <doctest.h>
 #include "../src/PluginFilePath.hpp"
+
+#include <doctest.h>
 
 #include <filesystem>
 #include <fstream>
@@ -31,9 +32,10 @@ TEST_CASE("every function the Lua API installs is listed in the Kiln API manifes
     }
     REQUIRE_FALSE(listed.empty());
 
-    static const std::set<std::string> kInternal{"cancel", "data.index", "data.newindex", "store.top",
-                                                 "store.index", "store.newindex"};
-    const std::regex call{R"re((?:pushHostFunction|installWaitingFunction)\(\s*[\w*.>-]+,\s*(\w+ \? )?("[\w.]+")( : ("[\w.]+"))?)re"};
+    static const std::set<std::string> kInternal{"cancel",    "data.index",  "data.newindex",
+                                                 "store.top", "store.index", "store.newindex"};
+    const std::regex call{
+        R"re((?:pushHostFunction|installWaitingFunction)\(\s*[\w*.>-]+,\s*(\w+ \? )?("[\w.]+")( : ("[\w.]+"))?)re"};
     std::set<std::string> missing;
     for (const auto& entry : std::filesystem::directory_iterator{root / "src"}) {
         const std::string source = slurp(entry.path());
@@ -66,8 +68,11 @@ TEST_CASE("Lua file paths reject symlink escapes and retain plugin-local access"
     fs::create_directory_symlink(scratch / "outside", scratch / "plugin" / "escape");
     fs::create_directory_symlink(scratch / "plugin" / "local", scratch / "plugin" / "inside");
     CHECK(pluginFilePath((scratch / "plugin").string(), "local/new/data.txt").has_value());
-    CHECK(pluginFilePath((scratch / "plugin").string(), "inside/file.txt") == fs::weakly_canonical(scratch / "plugin/local/file.txt").string());
-    for (const std::string& path : std::vector<std::string>{"../outside/file", "/etc/passwd", "escape/file", "escape/new/file", "C:/file", "local\\file", std::string("a\0b",3)}) {
+    CHECK(pluginFilePath((scratch / "plugin").string(), "inside/file.txt") ==
+          fs::weakly_canonical(scratch / "plugin/local/file.txt").string());
+    for (const std::string& path :
+         std::vector<std::string>{"../outside/file", "/etc/passwd", "escape/file", "escape/new/file", "C:/file",
+                                  "local\\file", std::string("a\0b", 3)}) {
         CHECK_FALSE(pluginFilePath((scratch / "plugin").string(), path).has_value());
     }
     fs::remove_all(scratch);
