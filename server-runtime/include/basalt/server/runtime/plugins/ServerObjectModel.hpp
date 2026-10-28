@@ -114,13 +114,14 @@ struct ModelHooks {
     std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> randomTick;
 };
 
-[[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef>
-playerRefFor(player::PlayerRegistry& registry, std::string uuid, std::string name, ModelHooks hooks);
+[[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef> playerRefFor(player::PlayerRegistry& registry,
+                                                                             std::string uuid, std::string name,
+                                                                             std::shared_ptr<const ModelHooks> hooks);
 
 class RegistryPlayers final : public server::plugins::PluginPlayers {
 public:
     RegistryPlayers(player::PlayerRegistry& registry, ModelHooks hooks)
-        : registry_(&registry), hooks_(std::move(hooks)) {}
+        : registry_(&registry), hooks_(std::make_shared<const ModelHooks>(std::move(hooks))) {}
 
     [[nodiscard]] std::vector<std::shared_ptr<server::plugins::PluginPlayerRef>> online() const override;
 
@@ -130,7 +131,7 @@ public:
 
 private:
     player::PlayerRegistry* registry_;
-    ModelHooks hooks_;
+    std::shared_ptr<const ModelHooks> hooks_;
 };
 
 class LoadedWorlds final : public server::plugins::PluginWorlds {
