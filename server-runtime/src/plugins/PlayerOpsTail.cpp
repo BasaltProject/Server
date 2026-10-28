@@ -443,7 +443,10 @@ std::optional<Value> tail(Context& context, const Verb verb, const std::string_v
     if (name == "delete_chat") {
         constexpr std::int32_t kDeleteChatId = 31;
         const std::string hex = asText(first);
-        if (!connection.sendPlayPacket || hex.size() != 512) {
+        const auto isHex = [](char c) {
+            return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        };
+        if (!connection.sendPlayPacket || hex.size() != 512 || !std::ranges::all_of(hex, isHex)) {
             return false;
         }
         connection.sendPlayPacket(kDeleteChatId, [&hex](wire::io::ByteBuffer& buffer) {
