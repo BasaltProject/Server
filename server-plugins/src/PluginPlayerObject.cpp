@@ -44,7 +44,7 @@ void bindPlayerOperations(PluginObject& object, const std::shared_ptr<PluginPlay
         }
         return PluginObject::Writer{[player, key = std::string{name}](wire::lua::LuaArgs& args, std::int32_t index) {
             if (!player->setProperty(key, entityValueAt(args, index))) {
-                static_cast<void>(args.fail("player cannot set " + key));
+                args.raise("player cannot set " + key);
             }
         }};
     };

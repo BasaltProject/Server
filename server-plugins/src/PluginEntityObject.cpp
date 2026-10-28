@@ -72,7 +72,7 @@ void bindEntityOperations(PluginObject& object, const std::shared_ptr<PluginEnti
         if (spec.writable) {
             object.writes(name, [entity, name](wire::lua::LuaArgs& args, std::int32_t index) {
                 if (!entity->setProperty(name, entityValueAt(args, index))) {
-                    static_cast<void>(args.fail("entity cannot set " + name));
+                    args.raise("entity cannot set " + name);
                 }
             });
         }
