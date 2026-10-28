@@ -130,8 +130,32 @@ final class ActorKinds {
             return key == null ? null : Bukkit.getLootTable(key);
         }
 
+        private static final java.util.Set<String> kHandled = java.util.Set.of(
+            "getActivationRange",
+            "setActivationRange",
+            "getDeactivationRange",
+            "setDeactivationRange", "getKeyItem",
+            "setKeyItem",
+            "getLootTable",
+            "setLootTable",
+            "getDisplayedLootTable",
+            "setDisplayedLootTable",
+            "getNextStateUpdateTime",
+            "setNextStateUpdateTime",
+            "getRewardedPlayers",
+            "addRewardedPlayer",
+            "removeRewardedPlayer",
+            "hasRewardedPlayer",
+            "getConnectedPlayers",
+            "hasConnectedPlayer",
+            "getDisplayedItem",
+            "setDisplayedItem");
+
         @Override
         public Object call(Tile tile, Method method, String name, Object[] args) {
+            if (!kHandled.contains(name)) {
+                return Tile.kNone;
+            }
             Map<String, Object> config = tile.mapOrCreate("config");
             Map<String, Object> server = tile.mapOrCreate("server_data");
             Map<String, Object> shared = tile.mapOrCreate("shared_data");
