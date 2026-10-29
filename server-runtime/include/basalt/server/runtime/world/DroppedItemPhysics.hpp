@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <mutex>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -102,8 +103,12 @@ private:
     void carryByFluid(DroppedItem& item) const;
 
     void moveItem(DroppedItem& item);
+    using Pair = std::pair<std::int32_t, std::int32_t>;
+
     void mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,
-                             std::vector<std::int32_t>& absorbed, std::unique_lock<WorldMutex>& lock);
+                             std::vector<std::int32_t>& absorbed, const std::set<Pair>& denied);
+
+    [[nodiscard]] std::vector<std::pair<DroppedItem, DroppedItem>> mergeCandidates() const;
 
     WorldMutex* mutex_;
     std::int32_t lifetimeTicks_ = kItemLifetimeTicks;
