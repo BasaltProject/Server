@@ -574,8 +574,6 @@ void MobActionSystem::finalizeConverted(world::LoadedWorld& world, const ServerE
 
 void MobActionSystem::villagerCured(world::LoadedWorld& world, const ServerEntity& zombie, ServerEntity& villager) {
     // parity: `dropPreservedEquipment` in `EquipmentSlot.VALUES` order.
-    // falls out, as the cured villager wears nothing, but what the curse of binding holds goes into
-    // the villager's own inventory at the slot's index.
     const wire::nbt::NbtCompound saved = entity::entityNbt::encode(zombie);
     const wire::nbt::NbtCompound* equipment = saved.getCompound("equipment");
     const wire::nbt::NbtCompound* chances = saved.getCompound("drop_chances");
