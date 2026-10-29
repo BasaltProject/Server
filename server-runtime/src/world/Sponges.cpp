@@ -111,7 +111,8 @@ void absorb(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, c
     std::vector<std::array<std::int32_t, 3>> frontier{{x, y, z}};
     std::int32_t absorbed = 0;
     std::vector<Drunk> drunk;
-    const std::int32_t maxAbsorbed = world.gameplay().blocks.spongeAbsorptionArea;
+    // parity: `SpongeBlock` hands `breadthFirstTraversal` its limit, and the sponge itself is the first node counted.
+    const std::int32_t maxAbsorbed = world.gameplay().blocks.spongeAbsorptionArea - 1;
     for (std::int32_t step = 1; step <= world.gameplay().blocks.spongeAbsorptionRadius; ++step) {
         std::vector<std::array<std::int32_t, 3>> next;
         for (const std::array<std::int32_t, 3>& position : frontier) {
