@@ -257,12 +257,18 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             "ender_pearl",    "experience_bottle", "splash_potion",   "lingering_potion", "fireball",
             "small_fireball", "dragon_fireball",   "wither_skull",    "wind_charge",      "breeze_wind_charge",
             "llama_spit",     "shulker_bullet",    "firework_rocket", "fishing_bobber"};
-        const auto known = launchWatermarks_.find(world.name());
-        std::int32_t newest = known == launchWatermarks_.end() ? 0 : known->second;
+        bool known = false;
+        std::int32_t newest = 0;
+        {
+            const std::scoped_lock lock{launchMutex_};
+            const auto found = launchWatermarks_.find(world.name());
+            known = found != launchWatermarks_.end();
+            newest = known ? found->second : 0;
+        }
         const std::int32_t previous = newest;
         for (entity::ServerEntity* candidate : living) {
             newest = std::max(newest, candidate->entityId());
-            if (known == launchWatermarks_.end() || candidate->entityId() <= previous ||
+            if (!known || candidate->entityId() <= previous ||
                 std::ranges::find(kProjectiles, candidate->type().path()) == kProjectiles.end()) {
                 continue;
             }
@@ -280,6 +286,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                 candidate->removed = true;
             }
         }
+        const std::scoped_lock lock{launchMutex_};
         launchWatermarks_.insert_or_assign(world.name(), newest);
     }
 
