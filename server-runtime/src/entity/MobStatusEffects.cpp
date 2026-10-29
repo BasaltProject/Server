@@ -175,8 +175,9 @@ Instant instantOf(const ServerEntity& mob, const Identifier& effect, std::int32_
         return {};
     }
     // parity: `HealOrHarmMobEffect`.
-    const auto heal = static_cast<float>(std::max(4 << amplifier, 0));
-    const auto harm = static_cast<float>(6 << amplifier);
+    const std::int32_t shift = amplifier & 31;
+    const auto heal = static_cast<float>(std::max(4 << shift, 0));
+    const auto harm = static_cast<float>(6 << shift);
     return healing != invertsHealAndHarm(mob) ? Instant{.heal = heal} : Instant{.damage = harm};
 }
 
