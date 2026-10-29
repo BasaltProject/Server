@@ -170,6 +170,7 @@ basalt_module(server-runtime-core
         src/BlockUseOn.cpp
         src/BlockUseOnBlocks.cpp
         src/plugins/EventHooks.cpp
+        src/plugins/EventHooksContainer.cpp
         src/plugins/EventSink.cpp
         src/plugins/HookEvents.cpp
         src/plugins/PlayerHookEvents.cpp
@@ -362,6 +363,7 @@ basalt_module(server-runtime-core
         src/WorldRegistry.cpp
         src/SubstituteLabels.cpp
         src/command/CommandDispatcher.cpp
+        src/command/CommandDispatcherTree.cpp
         src/command/CommandEnvironment.cpp
         src/command/ConsoleReader.cpp
         src/command/CommandTarget.cpp
