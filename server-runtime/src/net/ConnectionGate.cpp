@@ -73,8 +73,11 @@ bool ConnectionGate::throttleLogin(const std::string& address, std::int32_t thro
         return false;
     }
     const std::lock_guard<std::mutex> lock{mutex_};
-    for (auto it = lastLogin_.begin(); it != lastLogin_.end();) {
-        it = now - it->second > std::chrono::minutes(10) ? lastLogin_.erase(it) : std::next(it);
+    if (now - lastPrune_ >= std::chrono::minutes(1)) {
+        lastPrune_ = now;
+        for (auto it = lastLogin_.begin(); it != lastLogin_.end();) {
+            it = now - it->second > std::chrono::minutes(10) ? lastLogin_.erase(it) : std::next(it);
+        }
     }
     const auto found = lastLogin_.find(address);
     const bool throttled = found != lastLogin_.end() && now - found->second < std::chrono::milliseconds(throttleMs);
