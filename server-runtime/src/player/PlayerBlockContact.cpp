@@ -14,7 +14,6 @@ constexpr double kHeight = 1.8;
 constexpr double kSneakingHeight = 1.5;
 constexpr double kSlack = 1.0e-5;
 constexpr double kCactusInset = 1.0 / 16.0;
-constexpr double kFireHeight = 1.0 / 16.0;
 constexpr std::int32_t kIgniteTicks = 8 * 20;
 constexpr float kSoulFireDamage = 2.0F;
 
@@ -50,7 +49,7 @@ void tickBlockContact(PlayerSession& session, const entity::entityCollision::Blo
                 if (path == "cactus") {
                     cactus = cactus || (minX < x + 1 - kCactusInset && maxX > x + kCactusInset &&
                                         minZ < z + 1 - kCactusInset && maxZ > z + kCactusInset);
-                } else if ((path == "fire" || path == "soul_fire") && minY < y + kFireHeight) {
+                } else if (path == "fire" || path == "soul_fire") {
                     fireDamage = std::max(fireDamage, path == "fire" ? 1.0F : kSoulFireDamage);
                 }
             }
@@ -60,7 +59,8 @@ void tickBlockContact(PlayerSession& session, const entity::entityCollision::Blo
         hurt(1.0F, "cactus", wire::common::Identifier::vanilla("cactus"));
     }
     if (fireDamage > 0.0F) {
-        // parity: `BaseFireBlock.fireIgnite`.
+        // parity: `BaseFireBlock.entityInside` clears the freeze, then `fireIgnite` lights the player.
+        session.ticksFrozen = 0;
         session.fireTicks += session.fireTicks < 0 ? 1 : random.nextInt(1, 3);
         if (session.fireTicks >= 0) {
             session.fireTicks = std::max(session.fireTicks, kIgniteTicks);
