@@ -10,4 +10,10 @@ namespace basalt::server::runtime::net {
 /// What the socket reports for TCP_NODELAY, false when it cannot be read.
 [[nodiscard]] bool tcpNoDelay(std::int64_t handle) noexcept;
 
+/// Makes a blocking read give up after this long; zero removes the limit.
+[[nodiscard]] bool setReceiveTimeout(std::int64_t handle, std::int32_t millis) noexcept;
+
+/// Makes a blocking read give up after this long; zero removes the limit.
+bool setReceiveTimeout(std::int64_t handle, std::int32_t millis) noexcept;
+
 } // namespace basalt::server::runtime::net

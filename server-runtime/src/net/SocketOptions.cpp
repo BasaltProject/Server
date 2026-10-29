@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #endif
 
 namespace basalt::server::runtime::net {
@@ -28,6 +29,20 @@ bool setTcpNoDelay(std::int64_t handle, bool enabled) noexcept {
     const int flag = enabled ? 1 : 0;
     return handle >= 0 && ::setsockopt(static_cast<Handle>(handle), IPPROTO_TCP, TCP_NODELAY,
                                        reinterpret_cast<Value>(&flag), sizeof(flag)) == 0;
+}
+
+bool setReceiveTimeout(std::int64_t handle, std::int32_t millis) noexcept {
+#if defined(_WIN32)
+    const DWORD value = static_cast<DWORD>(millis);
+    return handle >= 0 && ::setsockopt(static_cast<Handle>(handle), SOL_SOCKET, SO_RCVTIMEO,
+                                       reinterpret_cast<const char*>(&value), sizeof(value)) == 0;
+#else
+    timeval value{};
+    value.tv_sec = millis / 1000;
+    value.tv_usec = (millis % 1000) * 1000;
+    return handle >= 0 &&
+           ::setsockopt(static_cast<Handle>(handle), SOL_SOCKET, SO_RCVTIMEO, &value, sizeof(value)) == 0;
+#endif
 }
 
 bool tcpNoDelay(std::int64_t handle) noexcept {
