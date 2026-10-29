@@ -151,7 +151,8 @@ void VanillaGameData::reload(const Jar& jar, const wire::common::Logger& logger)
                       world::LootRegistries::Jar{.entriesUnder = jar.entriesUnder, .readText = jar.readText},
                       enchantments, logger);
     lootTables.reload({.readText = jar.readText, .entriesUnder = jar.entriesUnder});
-    recipes = world::RealRecipes({.readText = jar.readText, .entriesUnder = jar.entriesUnder});
+    std::destroy_at(&recipes);
+    std::construct_at(&recipes, world::RealRecipes::Jar{.readText = jar.readText, .entriesUnder = jar.entriesUnder});
     potionTags = world::realPotionTags::load(readerOf<world::realPotionTags::JarReader>(jar), logger);
     useBrewingRecipes();
     advancements = world::RealAdvancements(
