@@ -59,14 +59,13 @@ std::vector<PickedArrow> pickupNearbyArrows(PlayerSession& session, world::World
         switch (candidate->arrowPickup) {
         case entity::ServerEntity::ArrowPickup::Disallowed:
             // parity: `ThrownTrident.tryPickup`.
-            eligible = trident && candidate->noPhysics && owned &&
-                       PlayerInventory{session.inventory}.add(itemOf(*candidate)) == 0;
+            eligible = trident && candidate->noPhysics && owned && session.inventory.hasRoomForOne(itemOf(*candidate));
             break;
         case entity::ServerEntity::ArrowPickup::CreativeOnly:
             eligible = creative;
             break;
         case entity::ServerEntity::ArrowPickup::Allowed:
-            eligible = creative || PlayerInventory{session.inventory}.add(itemOf(*candidate)) == 0;
+            eligible = creative || session.inventory.hasRoomForOne(itemOf(*candidate));
             break;
         }
         if (!eligible) {

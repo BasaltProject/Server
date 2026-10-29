@@ -73,6 +73,9 @@ public:
 
     [[nodiscard]] std::int32_t add(const storage::StoredItemStack& stack);
 
+    /// Whether `add` would take a single item of this stack, without touching anything.
+    [[nodiscard]] bool hasRoomForOne(const storage::StoredItemStack& stack) const;
+
     [[nodiscard]] std::int32_t countOf(std::string_view id) const;
 
     [[nodiscard]] std::int32_t take(std::string_view id, std::int32_t count);

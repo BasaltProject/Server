@@ -118,7 +118,16 @@ void measureExposures(world::LoadedWorld& world, const std::vector<player::Playe
                     boxAround(player->x, player->y, player->z, kPlayerWidth, playerHeightOf(player->pose))));
         }
     }
-    for (const entity::ServerEntity* entity : world.state().entities()) {
+    const auto chunkOf = [](double coordinate) { return static_cast<std::int32_t>(std::floor(coordinate)) >> 4; };
+    std::vector<entity::ServerEntity*> nearby;
+    for (std::int32_t chunkX = chunkOf(x - doubleRadius); chunkX <= chunkOf(x + doubleRadius); ++chunkX) {
+        for (std::int32_t chunkZ = chunkOf(z - doubleRadius); chunkZ <= chunkOf(z + doubleRadius); ++chunkZ) {
+            for (entity::ServerEntity* entity : world.state().entitiesIn(chunkX, chunkZ)) {
+                nearby.push_back(entity);
+            }
+        }
+    }
+    for (const entity::ServerEntity* entity : nearby) {
         if (entity->removed || !within(entity->x, entity->y, entity->z)) {
             continue;
         }
@@ -127,7 +136,7 @@ void measureExposures(world::LoadedWorld& world, const std::vector<player::Playe
             world::explosions::seenPercent(
                 world.state(), x, y, z, boxAround(entity->x, entity->y, entity->z, entity->width(), entity->height())));
     }
-    for (const world::DroppedItem& item : world.state().items()) {
+    for (const world::DroppedItem& item : world.state().nearbyItems(x, y, z, doubleRadius + 1.0)) {
         if (within(item.x, item.y, item.z)) {
             world::explosions::recordExposure(
                 item.entityId, world::explosions::seenPercent(world.state(), x, y, z,
@@ -223,7 +232,7 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     }
 
     // parity: `ServerExplosion.explode`.
-    for (const world::DroppedItem& item : world.state().items()) {
+    for (const world::DroppedItem& item : world.state().nearbyItems(x, y, z, doubleRadius + 1.0)) {
         const double distance =
             std::sqrt((item.x - x) * (item.x - x) + (item.y - y) * (item.y - y) + (item.z - z) * (item.z - z));
         if (distance / doubleRadius > 1.0) {
