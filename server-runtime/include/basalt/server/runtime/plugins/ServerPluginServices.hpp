@@ -14,7 +14,12 @@ namespace basalt::server::runtime::command {
 class CommandDispatcher;
 class CommandNode;
 class CommandSource;
+class SuggestionContext;
 } // namespace basalt::server::runtime::command
+
+namespace basalt::wire::protocol::play {
+struct CommandSuggestion;
+}
 
 namespace basalt::server::runtime::player {
 class PlayerRegistry;
@@ -49,6 +54,10 @@ public:
     registerCommand(std::string_view pluginId, const server::plugins::PluginCommandSpec& spec,
                     std::function<void(server::plugins::PluginCommandCall&)> run) override;
 
+    server::plugins::PluginHandle
+    registerCompletingCommand(std::string_view pluginId, const server::plugins::PluginCommandSpec& spec,
+                              std::function<void(server::plugins::PluginCommandCall&)> run, Completer complete) override;
+
     bool runAsConsole(std::string_view command) override;
 
     bool runAsPlayer(server::plugins::PluginPlayerRef& player, std::string_view command) override;
@@ -68,10 +77,13 @@ private:
         std::string pluginId;
         server::plugins::PluginCommandSpec spec;
         std::function<void(server::plugins::PluginCommandCall&)> run;
+        Completer complete;
         command::CommandNode* node = nullptr;
     };
 
     command::CommandNode* add(Entry& entry);
+    std::vector<wire::protocol::play::CommandSuggestion> suggest(const Entry& entry,
+                                                               const command::SuggestionContext& context);
 
     sched::Owner* owner_;
     command::CommandDispatcher* dispatcher_;

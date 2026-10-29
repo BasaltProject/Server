@@ -612,7 +612,7 @@ void CommandDispatcher::collect(StringReader& reader, const CommandNode& node, c
             collect(reader, *child, source, arguments, out);
             continue;
         }
-        if (typing) {
+        if (typing || child->type()->consumesRemaining()) {
             if (const SuggestionProvider provider = child->provider(); provider) {
                 for (CommandSuggestion& suggestion : provider(SuggestionContext{source, *this, rest, arguments})) {
                     out.emplace_back(start, std::move(suggestion));

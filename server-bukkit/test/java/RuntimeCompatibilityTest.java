@@ -40,6 +40,15 @@ public final class RuntimeCompatibilityTest {
     }
 
     public static void sqlite() throws Exception {
+        // A consumer may inspect and close a JAR before SLF4J/JDBC are first
+        // initialized. Later service discovery must reopen it, not reuse the
+        // closed handle retained by the resource cache.
+        java.net.URL service = RuntimeCompatibilityTest.class.getClassLoader()
+                .getResource("META-INF/services/org.slf4j.spi.SLF4JServiceProvider");
+        if (service == null || !(service.openConnection() instanceof java.net.JarURLConnection jarConnection)) {
+            throw new AssertionError("Shared logging provider resource is missing");
+        }
+        jarConnection.getJarFile().close();
         Class.forName("org.sqlite.JDBC");
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:");
                 Statement statement = connection.createStatement()) {
@@ -80,6 +89,17 @@ public final class RuntimeCompatibilityTest {
                 }
             }
             invalidate.invoke(null);
+        }
+    }
+
+    public static void failureText() {
+        Throwable failure = new IllegalStateException("outer probe", new IllegalArgumentException("nested probe"));
+        failure.addSuppressed(new RuntimeException("suppressed probe"));
+        String trace = org.basaltmc.bukkit.BukkitRuntime.describeFailure(failure);
+        if (!trace.contains("IllegalStateException: outer probe") || !trace.contains("Caused by:")
+                || !trace.contains("IllegalArgumentException: nested probe")
+                || !trace.contains("Suppressed:") || !trace.contains("RuntimeException: suppressed probe")) {
+            throw new AssertionError("Diagnostic trace lost exception context");
         }
     }
 

@@ -12,6 +12,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <chrono>
+#include <future>
 #include <memory>
 #include <utility>
 
@@ -335,7 +337,14 @@ command::CommandNode* DispatcherCommands::add(Entry& entry) {
             const PluginCommandArgument& argument = target->spec.arguments[index];
             static_cast<void>(builder.argument(
                 argument.name, typeOf(argument),
-                [arguments, index](const command::CommandNodeBuilder& next) { (*arguments)(next, index + 1); }));
+                [arguments, index, target, self](const command::CommandNodeBuilder& next) {
+                    if (target->complete && index + 1 == target->spec.arguments.size()) {
+                        next.suggestsFromServer([target, self](const command::SuggestionContext& context) {
+                            return self->suggest(*target, context);
+                        });
+                    }
+                    (*arguments)(next, index + 1);
+                }));
         };
         const auto literals = std::make_shared<std::function<void(const command::CommandNodeBuilder&, std::size_t)>>();
         *literals = [target, literals, arguments](const command::CommandNodeBuilder& builder, std::size_t index) {
@@ -353,8 +362,15 @@ command::CommandNode* DispatcherCommands::add(Entry& entry) {
 
 PluginHandle DispatcherCommands::registerCommand(std::string_view pluginId, const PluginCommandSpec& spec,
                                                  std::function<void(PluginCommandCall&)> run) {
+    return registerCompletingCommand(pluginId, spec, std::move(run), {});
+}
+
+PluginHandle DispatcherCommands::registerCompletingCommand(std::string_view pluginId, const PluginCommandSpec& spec,
+                                                           std::function<void(PluginCommandCall&)> run,
+                                                           Completer complete) {
     auto entry = std::make_unique<Entry>(
-        Entry{.pluginId = std::string{pluginId}, .spec = spec, .run = std::move(run), .node = nullptr});
+        Entry{.pluginId = std::string{pluginId}, .spec = spec, .run = std::move(run),
+              .complete = std::move(complete), .node = nullptr});
     Entry* target = entry.get();
     entries_.push_back(std::move(entry));
     target->node = add(*target);
@@ -365,6 +381,46 @@ PluginHandle DispatcherCommands::registerCommand(std::string_view pluginId, cons
         }
         std::erase_if(entries_, [target](const std::unique_ptr<Entry>& held) { return held.get() == target; });
     }};
+}
+
+std::vector<wire::protocol::play::CommandSuggestion>
+DispatcherCommands::suggest(const Entry& entry, const command::SuggestionContext& context) {
+    const command::CommandSource& source = context.source();
+    DispatchedCall::Origin origin{.kind = std::string{source.kind()}, .position = source.position()};
+    if (const world::LoadedWorld* at = command::worldIn(source, context.environment()); at != nullptr) {
+        origin.world = at->name();
+    }
+    if (const command::ExecutionSource* execution = source.asExecution(); execution != nullptr) {
+        origin.caller = std::string{execution->root().kind()} + ":" + execution->root().name();
+    }
+    auto call = std::make_shared<DispatchedCall>(source.name(), source.player() == nullptr,
+        std::map<std::string, PluginCommandCall::Argument, std::less<>>{},
+        std::function<void(const wire::text::Component&)>{}, std::move(origin));
+    auto collect = [complete = entry.complete, call, input = context.remaining()] {
+        return complete(*call, input);
+    };
+    std::vector<std::string> values;
+    if (owner_->isCurrent()) {
+        values = collect();
+    } else {
+        if (owner_->isClosed() || !sched::Owner::tickThreadRunning()) return {};
+        auto promise = std::make_shared<std::promise<std::vector<std::string>>>();
+        std::future<std::vector<std::string>> ready = promise->get_future();
+        const sched::TaskHandle task = owner_->submit([promise, collect] {
+            try { promise->set_value(collect()); }
+            catch (...) { promise->set_exception(std::current_exception()); }
+        });
+        // Completion must not indefinitely block a network thread at shutdown
+        // or when the owner is paused. Captures remain owned after a timeout.
+        if (ready.wait_for(std::chrono::milliseconds{500}) != std::future_status::ready) {
+            task.cancel();
+            return {};
+        }
+        values = ready.get();
+    }
+    std::vector<wire::protocol::play::CommandSuggestion> result;
+    for (std::string& value : values) result.push_back({.text = std::move(value)});
+    return result;
 }
 
 bool DispatcherCommands::runAsConsole(std::string_view command) {

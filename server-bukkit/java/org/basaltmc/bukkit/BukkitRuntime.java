@@ -14,6 +14,13 @@ public final class BukkitRuntime {
 
     private BukkitRuntime() {}
 
+    /** JNI failures must reach the server log, not only the native stderr. */
+    public static String describeFailure(Throwable failure) {
+        java.io.StringWriter text = new java.io.StringWriter();
+        failure.printStackTrace(new java.io.PrintWriter(text));
+        return text.toString();
+    }
+
     private static final class LogBridge extends Handler {
         @Override
         public void publish(LogRecord record) {
@@ -231,6 +238,15 @@ public final class BukkitRuntime {
         } finally {
             Blocks.end();
         }
+    }
+
+    public static String[] completeCommand(String label, String senderName, String kind, String world,
+        double x, double y, double z, String caller, String args) {
+        CommandSender sender = Senders.of(server, kind, senderName, world, x, y, z, caller);
+        if (sender == null) return new String[0];
+        String line = label + " " + (args == null ? "" : args);
+        java.util.List<String> matches = server.commandMapImpl().tabComplete(sender, line);
+        return matches == null ? new String[0] : matches.toArray(new String[0]);
     }
 
     public static boolean command(String label, String senderName, String kind, String world, double x, double y,

@@ -974,6 +974,7 @@ basalt_test(server-runtime-game-rules-test
 basalt_test(server-runtime-command-dispatcher-test
     SOURCES
         test/CommandDispatcherTest.cpp
+        test/PluginCommandCompletionTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
