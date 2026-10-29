@@ -40,7 +40,6 @@ constexpr std::string_view kEmptyMap = "minecraft:map";
 constexpr std::string_view kFilledMap = "minecraft:filled_map";
 constexpr std::string_view kTakeResultSound = "minecraft:ui.cartography_table.take_result";
 constexpr std::string_view kInvisibilityTag = "minecraft:map_invisibility_equipment";
-/// parity: `ServerEntity.sendChanges`, which looks at a framed map every tenth tick.
 
 /// parity: the items `Items` registers as `MapItem`.
 constexpr std::array<std::string_view, 17> kMapItems{"minecraft:filled_map",
