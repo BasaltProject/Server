@@ -30,12 +30,21 @@ public final class BasaltTag<T extends Keyed> implements Tag<T> {
         Map<NamespacedKey, BasaltTag<?>> found = cache.get(registry);
         if (found == null) {
             found = new HashMap<>();
+            // Members commonly occur in many tags. Resolve each registry id
+            // once per snapshot, rather than repeating Bukkit name conversion.
+            Map<String, Keyed> resolved = new HashMap<>();
             String[] flat = WorldNatives.tags(registry);
             for (int i = 0; i + 1 < flat.length; i += 2) {
                 Set<Keyed> members = new HashSet<>();
                 if (!flat[i + 1].isEmpty()) {
                     for (String id : flat[i + 1].split("\\|")) {
-                        Keyed member = member(registry, id);
+                        Keyed member;
+                        if (resolved.containsKey(id)) {
+                            member = resolved.get(id);
+                        } else {
+                            member = member(registry, id);
+                            resolved.put(id, member);
+                        }
                         if (member != null) {
                             members.add(member);
                         }
