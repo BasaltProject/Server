@@ -18,6 +18,7 @@ constexpr std::size_t kFullStatLength = 15;
 constexpr std::int64_t kChallengeLifetimeMillis = 30'000;
 constexpr int kPollMillis = 500;
 constexpr std::size_t kMaxDatagram = 1460;
+constexpr std::size_t kMaxChallenges = 4096;
 
 void writeString(std::vector<std::uint8_t>& out, std::string_view text) {
     out.insert(out.end(), text.begin(), text.end());
@@ -86,6 +87,9 @@ std::vector<std::uint8_t> QueryServer::answer(std::span<const std::uint8_t> requ
     }
     if (request[2] == kTypeHandshake) {
         if (request.size() < 7) {
+            return {};
+        }
+        if (challenges_.size() >= kMaxChallenges && !challenges_.contains(peer)) {
             return {};
         }
         static thread_local std::mt19937 random{std::random_device{}()};
