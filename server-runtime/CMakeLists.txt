@@ -66,6 +66,7 @@ basalt_module(server-runtime-core
         src/entity/PrimedTnt.cpp
         src/entity/Projectiles.cpp
         src/entity/EntityNbt.cpp
+        src/entity/EntityNbtEncode.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobOverrides.cpp
         src/entity/MobRules.cpp
