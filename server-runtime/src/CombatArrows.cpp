@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/SulfurCubes.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
@@ -245,6 +246,10 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         }
         markWitherFriend(world, mob, arrow.ownerId);
         entity::entityCombat::blame(mob, arrow.ownerId, arrow.entityId(), arrow.type());
+        // parity: `SulfurCube.hurtServer` lights its fuse for a burning arrow like for any fire.
+        if (arrow.fireTicks > 0 && entity::sulfurCubes::isSulfurCube(mob)) {
+            entity::sulfurCubes::primeOnHit(mob, "on_fire");
+        }
         const entity::entityCombat::Result result =
             entity::entityCombat::hurt(mob, static_cast<float>(damage), fromX, fromZ, hooks_, "projectile",
                                        std::nullopt, firedByPlayer(watchers, arrow));
@@ -255,9 +260,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         }
         emitVibration(world, "entity_damage", mob.x, mob.y, mob.z, mob.uuid());
         if (const std::array<double, 2> push = punchPush(arrow); push[0] != 0.0 || push[1] != 0.0) {
-            const std::optional<double> resistance = server::registry::entityAttributes::baseValue(
-                mob.type(), server::registry::entityAttributes::kKnockbackResistance);
-            const double kept = std::max(0.0, 1.0 - resistance.value_or(0.0));
+            const double kept = std::max(0.0, 1.0 - mob.attributeWithModifiers("minecraft:knockback_resistance"));
             mob.velocityX += push[0] * kept;
             mob.velocityY += kPunchLift;
             mob.velocityZ += push[1] * kept;
