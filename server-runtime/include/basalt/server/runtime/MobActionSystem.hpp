@@ -324,7 +324,8 @@ public:
 
     bool convertMob(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                     entity::ServerEntity& mob, const entity::mobConversions::Conversion& conversion,
-                    const std::function<void(wire::nbt::NbtCompound& converted)>& finish);
+                    const std::function<void(wire::nbt::NbtCompound& converted)>& finish,
+                    std::int32_t* spawnedId = nullptr);
 
     bool startCure(world::LoadedWorld& world, entity::ServerEntity& mob, const wire::common::Uuid& player);
 

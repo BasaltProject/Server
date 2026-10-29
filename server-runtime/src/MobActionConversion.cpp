@@ -214,7 +214,8 @@ bool MobActionSystem::startCure(world::LoadedWorld& world, ServerEntity& mob, co
 
 bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                  ServerEntity& mob, const entity::mobConversions::Conversion& conversion,
-                                 const std::function<void(wire::nbt::NbtCompound& converted)>& finish) {
+                                 const std::function<void(wire::nbt::NbtCompound& converted)>& finish,
+                                 std::int32_t* spawnedId) {
     const server::registry::EntityTypeEntry* entry = server::registry::entityTypes::of(conversion.into);
     if (entry == nullptr || mob.removed) {
         return false;
@@ -257,6 +258,9 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
     // parity: `SINGLE` discards the old mob; it neither dies nor drops anything.
     mob.removed = true;
     ServerEntity& spawned = world.state().spawnEntity(std::move(converted));
+    if (spawnedId != nullptr) {
+        *spawnedId = spawned.entityId();
+    }
     if (conversion.finalize == conversions::Conversion::Finalize::CuredVillager) {
         villagerCured(world, mob, spawned);
     }

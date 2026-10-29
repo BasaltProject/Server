@@ -2,6 +2,7 @@
 
 #include "EntityOpsValues.hpp"
 
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
@@ -62,6 +63,11 @@ entity::ai::GoalSelector* selectorOf(ServerEntity& entity, bool create) {
     }
     if (entity.goals == nullptr) {
         entity.goals = entity::ai::mobGoals::forType(entity.type());
+        if (entity.goals != nullptr && entity.tuning != nullptr && entity.tuning->disabledGoals.has_value()) {
+            for (const std::string& goal : *entity.tuning->disabledGoals) {
+                entity.goals->remove(goal);
+            }
+        }
         if (entity.goals == nullptr && create) {
             entity.goals = std::make_shared<entity::ai::GoalSelector>();
         }
