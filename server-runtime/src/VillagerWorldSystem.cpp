@@ -677,7 +677,7 @@ std::int32_t VillagerWorldSystem::takeItem(ServerEntity& mob, std::int32_t itemI
     const std::int32_t taken = std::min(count, removed->count);
     if (taken < removed->count) {
         removed->count -= taken;
-        static_cast<void>(world_->state().spawnItem(*removed));
+        static_cast<void>(world_->state().restoreItem(*removed));
     }
     const wire::protocol::play::TakeItemEntityPacket packet{
         .collectedEntityId = itemId, .collectorEntityId = mob.entityId(), .pickupItemCount = taken};

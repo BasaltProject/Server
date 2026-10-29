@@ -233,8 +233,14 @@ DroppedItem& WorldState::spawnItem(DroppedItem dropped) {
     DroppedItem& spawned = itemPhysics_.spawnItem(std::move(dropped));
     if (!allowed) {
         spawned.health = 0;
+        spawned.components = wire::nbt::NbtCompound{};
     }
     return spawned;
+}
+
+DroppedItem& WorldState::restoreItem(DroppedItem dropped) {
+    mine("A dropped item");
+    return itemPhysics_.spawnItem(std::move(dropped));
 }
 
 std::vector<DroppedItem> WorldState::items() const { return itemPhysics_.items(); }

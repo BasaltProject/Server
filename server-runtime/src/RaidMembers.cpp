@@ -466,7 +466,7 @@ void RaidSystem::takeBanner(world::LoadedWorld& world, ServerEntity& raider, std
         return;
     }
     if (!entity::raiderEquipment::isOminousBanner(banner->item, banner->count, banner->components)) {
-        static_cast<void>(world.state().spawnItem(*banner));
+        static_cast<void>(world.state().restoreItem(*banner));
         return;
     }
     const wire::protocol::play::TakeItemEntityPacket packet{

@@ -31,14 +31,14 @@ std::vector<PickedItem> pickupNearbyItems(
             continue;
         }
         if (allowed && !allowed(session, removed->item.toString(), removed->count, removed->entityId)) {
-            static_cast<void>(world.spawnItem(*removed));
+            static_cast<void>(world.restoreItem(*removed));
             continue;
         }
         const std::int32_t leftover = session.inventory.add(storage::StoredItemStack{
             .id = removed->item.toString(), .count = removed->count, .components = removed->components});
         const std::int32_t picked = removed->count - leftover;
         if (picked <= 0) {
-            static_cast<void>(world.spawnItem(*removed));
+            static_cast<void>(world.restoreItem(*removed));
             continue;
         }
         // parity: `ItemEntity.playerTouch` counts the whole stack it touched.
@@ -46,7 +46,7 @@ std::vector<PickedItem> pickupNearbyItems(
         PickedItem row{.item = *removed, .picked = picked, .leftover = leftover};
         if (leftover > 0) {
             removed->count = leftover;
-            static_cast<void>(world.spawnItem(*removed));
+            static_cast<void>(world.restoreItem(*removed));
         }
         taken.push_back(std::move(row));
     }
