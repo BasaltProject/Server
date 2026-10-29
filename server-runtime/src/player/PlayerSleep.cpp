@@ -2,12 +2,14 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/NeutralAnger.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
@@ -125,10 +127,22 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
     // parity: `Player.startSleepInBed`, a monster within eight by five by eight blocks of the bed keeps you up.
     if (!force && player.gamemode != wire::protocol::play::Gamemode::Creative &&
         !world.state().gameplay().player.sleepIgnoreNearbyMobs) {
-        for (const entity::ServerEntity* other : world.state().entities()) {
-            if (!other->removed && entity::mobs::categoryOf(other->type()) == "monster" &&
-                std::abs(other->x - (head[0] + 0.5)) < 8.0 && std::abs(other->y - head[1]) < 5.0 &&
-                std::abs(other->z - (head[2] + 0.5)) < 8.0) {
+        for (entity::ServerEntity* other : world.state().entities()) {
+            const std::string_view path = other->type().path();
+            // parity: `Monster.isPreventingPlayerRest`, which the monster-category mobs outside `Monster` lack.
+            if (other->removed || entity::mobs::categoryOf(other->type()) != "monster" || path == "slime" ||
+                path == "magma_cube" || path == "ghast" || path == "phantom" || path == "hoglin" || path == "shulker" ||
+                path == "ender_dragon") {
+                continue;
+            }
+            if (path == "zombified_piglin" &&
+                !entity::neutralAnger::isAngryAtPlayer(*other, player.uuid(), true, world.gameTime(),
+                                                       world.gameRules().get(world::gameRules::kUniversalAnger))) {
+                continue;
+            }
+            if (std::abs(other->x - (head[0] + 0.5)) < 8.0 + (other->width() / 2.0) && other->y < head[1] + 5.0 &&
+                other->y + other->height() > head[1] - 5.0 &&
+                std::abs(other->z - (head[2] + 0.5)) < 8.0 + (other->width() / 2.0)) {
                 refuse(player, world::translationKeyOf(world::BedProblem::NotSafe));
                 return world::BedProblem::NotSafe;
             }

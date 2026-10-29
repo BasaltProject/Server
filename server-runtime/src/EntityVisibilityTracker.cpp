@@ -393,6 +393,8 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             sentSourceVersion_.erase(entityId);
             lastPassengers_.erase(entityId);
             lastLeashHolders_.erase(entityId);
+            lastMobEquipment_.erase(entityId);
+            lastDisplayText_.erase(entityId);
         }
     }
     if (!gone.empty()) {

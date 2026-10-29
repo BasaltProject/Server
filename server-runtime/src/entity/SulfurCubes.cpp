@@ -61,7 +61,7 @@ void primeOnHit(ServerEntity& cube, std::string_view cause) {
         return;
     }
     const bool fire = fireCause(cause);
-    if (!fire && cause != "explosion") {
+    if (!fire && cause != "explosion" && cause != "player_explosion") {
         return;
     }
     random::RandomSource random = random::RandomSource::legacy((static_cast<std::int64_t>(cube.entityId()) * 31) +
