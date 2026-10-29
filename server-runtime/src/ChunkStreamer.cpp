@@ -13,6 +13,8 @@
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
+#include "PendingChunkBatch.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -446,26 +448,19 @@ std::int32_t ChunkStreamer::flushReadyChunks(std::int32_t limit) {
         std::ranges::sort(pendingChunks_, [this](const ChunkPos& left, const ChunkPos& right) {
             return squaredDistanceToCenter(left.x, left.z) < squaredDistanceToCenter(right.x, right.z);
         });
-        std::vector<ChunkPos> left;
-        for (const ChunkPos& pos : pendingChunks_) {
-            if (static_cast<std::int32_t>(ready.size()) >= limit) {
-                left.push_back(pos);
-                continue;
-            }
+        ready = pendingChunkBatch::takeReady(pendingChunks_, limit, [this](const ChunkPos& pos) -> Chunk* {
             Chunk* chunk = owner_->world().chunkIfLoaded(pos.x, pos.z);
             if (chunk == nullptr) {
-                // Unloaded before it was sent: ask again, the tracker thinks the client has it and nothing else would.
+                // Still generating, or evicted before delivery: retry without forgetting the pending send.
                 owner_->generationQueue().request(pos.x, pos.z,
                                                   static_cast<std::int32_t>(squaredDistanceToCenter(pos.x, pos.z)));
-                continue;
+                return nullptr;
             }
             if (!neighboursLoaded(pos.x, pos.z)) {
-                left.push_back(pos);
-                continue;
+                return nullptr;
             }
-            ready.push_back(chunk);
-        }
-        pendingChunks_ = std::move(left);
+            return chunk;
+        });
     }
     if (ready.empty()) {
         return 0;
