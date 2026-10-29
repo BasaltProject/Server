@@ -1,3 +1,5 @@
+#include "RuleErrors.hpp"
+
 #include <basalt/server/runtime/config/WorldRules.hpp>
 
 #include <algorithm>
@@ -82,27 +84,13 @@ permission-level = 2
 enable-player-collisions = true
 )";
 
-[[nodiscard]] std::optional<double> numberOf(const TomlTable& table, std::string_view key) {
-    const TomlValue* value = table.find(key);
-    if (value == nullptr) {
-        return std::nullopt;
-    }
-    if (const auto* real = value->get<double>(); real != nullptr) {
-        return *real;
-    }
-    if (const auto* whole = value->get<std::int64_t>(); whole != nullptr) {
-        return static_cast<double>(*whole);
-    }
-    return std::nullopt;
-}
-
 [[nodiscard]] std::int32_t whole(const TomlTable& table, std::string_view key, std::int32_t fallback,
                                  std::int64_t least, std::int64_t most) {
-    return static_cast<std::int32_t>(std::clamp(table.integer(key).value_or(fallback), least, most));
+    return ruleErrors::whole(table, key, fallback, least, most);
 }
 
 [[nodiscard]] float real(const TomlTable& table, std::string_view key, float fallback) {
-    return static_cast<float>(std::clamp(numberOf(table, key).value_or(fallback), 0.0, 1000.0));
+    return static_cast<float>(ruleErrors::real(table, key, fallback, 0.0, 1000.0));
 }
 
 } // namespace
@@ -129,9 +117,9 @@ void readTuningRules(const TomlTable& table, TuningRules& rules) {
     }
     if (const TomlTable* sounds = table.table("sounds"); sounds != nullptr) {
         rules.dragonDeathSoundRadius =
-            std::max(numberOf(*sounds, "dragon-death-radius").value_or(rules.dragonDeathSoundRadius), 0.0);
+            ruleErrors::real(*sounds, "dragon-death-radius", rules.dragonDeathSoundRadius, 0.0, 1.0E7);
         rules.witherSpawnSoundRadius =
-            std::max(numberOf(*sounds, "wither-spawn-radius").value_or(rules.witherSpawnSoundRadius), 0.0);
+            ruleErrors::real(*sounds, "wither-spawn-radius", rules.witherSpawnSoundRadius, 0.0, 1.0E7);
     }
     if (const TomlTable* chunks = table.table("chunks"); chunks != nullptr) {
         rules.keepSpawnLoadedRange = whole(*chunks, "keep-spawn-loaded-range", rules.keepSpawnLoadedRange, 0, 32);
@@ -139,17 +127,17 @@ void readTuningRules(const TomlTable& table, TuningRules& rules) {
         rules.unloadMarginChunks = whole(*chunks, "unload-margin", rules.unloadMarginChunks, 0, 64);
     }
     if (const TomlTable* combat = table.table("combat"); combat != nullptr) {
-        rules.keepSprintOnAttack = combat->boolean("keep-sprint-on-attack").value_or(rules.keepSprintOnAttack);
+        rules.keepSprintOnAttack = ruleErrors::flag(combat, "keep-sprint-on-attack", rules.keepSprintOnAttack);
     }
     if (const TomlTable* updates = table.table("block-updates"); updates != nullptr) {
         rules.disableNoteBlockUpdates =
-            updates->boolean("disable-noteblock-updates").value_or(rules.disableNoteBlockUpdates);
+            ruleErrors::flag(updates, "disable-noteblock-updates", rules.disableNoteBlockUpdates);
         rules.disableTripwireUpdates =
-            updates->boolean("disable-tripwire-updates").value_or(rules.disableTripwireUpdates);
+            ruleErrors::flag(updates, "disable-tripwire-updates", rules.disableTripwireUpdates);
         rules.disableChorusPlantUpdates =
-            updates->boolean("disable-chorus-plant-updates").value_or(rules.disableChorusPlantUpdates);
+            ruleErrors::flag(updates, "disable-chorus-plant-updates", rules.disableChorusPlantUpdates);
         rules.disableMushroomBlockUpdates =
-            updates->boolean("disable-mushroom-block-updates").value_or(rules.disableMushroomBlockUpdates);
+            ruleErrors::flag(updates, "disable-mushroom-block-updates", rules.disableMushroomBlockUpdates);
     }
     if (const TomlTable* explosions = table.table("explosions"); explosions != nullptr) {
         rules.maxTntPerTick = whole(*explosions, "max-tnt-per-tick", rules.maxTntPerTick, -1, 1 << 20);
@@ -159,17 +147,16 @@ void readTuningRules(const TomlTable& table, TuningRules& rules) {
         rules.mapFrameInterval = whole(*maps, "item-frame-cursor-update-interval", rules.mapFrameInterval, 1, 1 << 20);
     }
     if (const TomlTable* end = table.table("end"); end != nullptr) {
-        rules.disableEndCredits = end->boolean("disable-credits").value_or(rules.disableEndCredits);
+        rules.disableEndCredits = ruleErrors::flag(end, "disable-credits", rules.disableEndCredits);
     }
     if (const TomlTable* leash = table.table("leash"); leash != nullptr) {
-        rules.leashSnapDistance =
-            std::clamp(numberOf(*leash, "max-distance").value_or(rules.leashSnapDistance), 2.0, 256.0);
+        rules.leashSnapDistance = ruleErrors::real(*leash, "max-distance", rules.leashSnapDistance, 2.0, 256.0);
     }
     if (const TomlTable* blocks = table.table("command-blocks"); blocks != nullptr) {
         rules.commandBlockPermissionLevel = whole(*blocks, "permission-level", rules.commandBlockPermissionLevel, 0, 4);
     }
     if (const TomlTable* collisions = table.table("collisions"); collisions != nullptr) {
-        rules.playerCollisions = collisions->boolean("enable-player-collisions").value_or(rules.playerCollisions);
+        rules.playerCollisions = ruleErrors::flag(collisions, "enable-player-collisions", rules.playerCollisions);
     }
 }
 

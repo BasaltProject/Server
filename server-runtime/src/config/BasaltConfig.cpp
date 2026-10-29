@@ -300,10 +300,19 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
             std::string{server->string("resource-pack-prompt").value_or(defaults.resourcePackPrompt)};
         config.gamemode = std::string{server->string("gamemode").value_or(defaults.gamemode)};
         config.whitelist = server->boolean("whitelist").value_or(defaults.whitelist);
-        config.pauseWhenEmptySeconds = static_cast<std::int32_t>(std::max<std::int64_t>(
-            server->integer("pause-when-empty-seconds").value_or(defaults.pauseWhenEmptySeconds), 0));
-        config.spawnProtection = static_cast<std::int32_t>(
-            std::max<std::int64_t>(server->integer("spawn-protection").value_or(defaults.spawnProtection), 0));
+        for (const auto& [key, target] :
+             {std::pair<const char*, std::int32_t*>{"pause-when-empty-seconds", &config.pauseWhenEmptySeconds},
+              std::pair<const char*, std::int32_t*>{"spawn-protection", &config.spawnProtection}}) {
+            if (server->find(key) == nullptr) {
+                continue;
+            }
+            const std::optional<std::int64_t> value = server->integer(key);
+            if (!value.has_value() || *value < 0 || *value > (1 << 30)) {
+                return std::unexpected(std::string{path} + ": " + key +
+                                       " in [server] must be a whole number from 0 to 1073741824");
+            }
+            *target = static_cast<std::int32_t>(*value);
+        }
     }
 
     if (const TomlTable* network = root.table("network"); network != nullptr) {
