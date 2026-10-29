@@ -51,6 +51,14 @@ bool WorldBorder::contains(double x, double z) const {
            z >= clampedBound(centerZ_ - half) && z < clampedBound(centerZ_ + half);
 }
 
+std::array<std::int32_t, 2> WorldBorder::clampColumn(double x, double z) const {
+    const double half = size_ / 2.0;
+    constexpr double kEdge = static_cast<double>(1.0E-5F);
+    const double clampedX = std::clamp(x, clampedBound(centerX_ - half), clampedBound(centerX_ + half) - kEdge);
+    const double clampedZ = std::clamp(z, clampedBound(centerZ_ - half), clampedBound(centerZ_ + half) - kEdge);
+    return {static_cast<std::int32_t>(std::floor(clampedX)), static_cast<std::int32_t>(std::floor(clampedZ))};
+}
+
 float WorldBorder::damageAt(double x, double z) const {
     const double outside = distanceOutside(x, z) - damageBuffer;
     if (outside <= 0.0) {

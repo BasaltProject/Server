@@ -222,7 +222,8 @@ void reindex(LoadedWorld& world, const std::vector<std::array<std::int32_t, 3>>&
         return std::nullopt;
     }
     const auto [stepX, stepZ] = step(axis);
-    const std::array<std::int32_t, 3> spot{x - stepX, std::clamp(y, lowest, highest), z - stepZ};
+    const std::array<std::int32_t, 2> column = world.border().clampColumn(x - stepX, z - stepZ);
+    const std::array<std::int32_t, 3> spot{column[0], std::clamp(y, lowest, highest), column[1]};
     const std::int32_t clockX = -stepZ;
     const std::int32_t clockZ = stepX;
     for (std::int32_t box = -1; box < 2; box++) {
