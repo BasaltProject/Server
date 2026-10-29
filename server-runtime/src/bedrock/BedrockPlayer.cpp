@@ -1427,7 +1427,7 @@ void BedrockPlayer::sendColumn(const std::int32_t chunkX, const std::int32_t chu
     if (!context_.sendChunks || !columns_.contains({chunkX, chunkZ})) {
         return;
     }
-    context_.sendChunks({{chunkX, chunkZ}}, protocol_,
+    context_.sendChunks(session_.get(), {{chunkX, chunkZ}}, protocol_,
                         [mailbox = mailbox_](std::vector<std::uint8_t> column) {
                             mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelChunk),
                                           std::move(column));
@@ -1489,7 +1489,7 @@ bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {
         return true;
     }
     context_.sendChunks(
-        std::move(wanted), protocol_,
+        session_.get(), std::move(wanted), protocol_,
         [mailbox = mailbox_](std::vector<std::uint8_t> column) {
             mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelChunk), std::move(column));
         },

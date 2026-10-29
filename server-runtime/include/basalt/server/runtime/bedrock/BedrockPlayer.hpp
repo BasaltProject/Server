@@ -82,7 +82,8 @@ public:
 
         std::function<void(const player::PlayerSession&, std::string)> runCommand;
 
-        std::function<void(std::vector<std::pair<std::int32_t, std::int32_t>> columns, int protocol,
+        std::function<void(const player::PlayerSession* viewer,
+                           std::vector<std::pair<std::int32_t, std::int32_t>> columns, int protocol,
                            std::function<void(std::vector<std::uint8_t>)> send, std::function<void()> done)>
             sendChunks;
 
