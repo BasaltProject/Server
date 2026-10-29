@@ -63,8 +63,10 @@ namespace temperature = server::world::terrain::biomeTemperature;
     return airOrSnow && blockSurvival::isSupported(world.state(), x, y, z, snowDefault);
 }
 
-void precipitate(LoadedWorld& world, std::int32_t x, std::int32_t z, std::int32_t maxHeight,
-                 std::vector<BlockChange>& changes) {
+} // namespace
+
+void precipitate(LoadedWorld& world, std::int32_t x, std::int32_t z, std::vector<BlockChange>& changes) {
+    const std::int32_t maxHeight = world.gameRules().number(*gameRules::byId("max_snow_accumulation_height"));
     const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
     if (chunk == nullptr) {
         return;
@@ -104,24 +106,6 @@ void precipitate(LoadedWorld& world, std::int32_t x, std::int32_t z, std::int32_
     if (world.state().setBlockState(x, top, z, next)) {
         changes.push_back(BlockChange{.x = x, .y = top, .z = z, .stateId = next});
     }
-}
-
-} // namespace
-
-std::vector<BlockChange> tick(LoadedWorld& world, std::span<const std::array<std::int32_t, 2>> chunks,
-                              const std::int32_t speed, random::RandomSource& random) {
-    std::vector<BlockChange> changes;
-    const std::int32_t maxHeight = world.gameRules().number(*gameRules::byId("max_snow_accumulation_height"));
-    for (const std::array<std::int32_t, 2>& position : chunks) {
-        for (std::int32_t step = 0; step < speed; step++) {
-            if (random.nextInt(48) != 0) {
-                continue;
-            }
-            precipitate(world, (position[0] << 4) + random.nextInt(16), (position[1] << 4) + random.nextInt(16),
-                        maxHeight, changes);
-        }
-    }
-    return changes;
 }
 
 } // namespace basalt::server::runtime::world::iceAndSnow

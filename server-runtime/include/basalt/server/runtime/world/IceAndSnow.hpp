@@ -15,9 +15,8 @@ class LoadedWorld;
 /// parity: `ServerLevel.tickPrecipitation`, which freezes still water and piles snow on cold ground.
 namespace iceAndSnow {
 
-/// The first half of `ServerLevel.tickChunk`: `speed` rolls of one in forty-eight per chunk.
-[[nodiscard]] std::vector<BlockChange> tick(LoadedWorld& world, std::span<const std::array<std::int32_t, 2>> chunks,
-                                            std::int32_t speed, random::RandomSource& random);
+/// One roll that hit: the column at (x, z) freezes its top water and, in rain, gains a layer of snow.
+void precipitate(LoadedWorld& world, std::int32_t x, std::int32_t z, std::vector<BlockChange>& changes);
 
 } // namespace iceAndSnow
 

@@ -55,6 +55,7 @@ constexpr std::int32_t kSurvivalLight = 8;
 
 /// parity: `BeetrootBlock.randomTick`'s `nextInt(3) != 0`, and torchflower's own.
 constexpr std::int32_t kSlowCropOdds = 3;
+constexpr std::int32_t kPrecipitationOdds = 48;
 constexpr std::int32_t kNetherWartMaxAge = 3;
 constexpr std::int32_t kNetherWartOdds = 10;
 constexpr std::int32_t kStalkMaxAge = 15;
@@ -619,6 +620,14 @@ std::vector<BlockChange> RandomTicks::tick(const randomTicks::Context& context,
         }
         const std::int32_t minX = position[0] << 4;
         const std::int32_t minZ = position[1] << 4;
+        if (context.precipitate) {
+            for (std::int32_t step = 0; step < speed; step++) {
+                if (random.nextInt(kPrecipitationOdds) == 0) {
+                    const std::int32_t walk = nextWalk(walkState);
+                    context.precipitate(minX + (walk & 15), minZ + ((walk >> 8) & 15), changes);
+                }
+            }
+        }
         for (std::size_t index = 0; index < chunk->sectionCount(); index++) {
             // parity: `LevelChunkSection.isRandomlyTicking`. Skipping the sections that hold nothing.
             if (!chunk->section(index).mayContain(registry::blockSupport::ticksRandomly)) {
