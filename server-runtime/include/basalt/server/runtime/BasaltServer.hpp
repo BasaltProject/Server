@@ -368,7 +368,11 @@ private:
     std::atomic<bool> shuttingDown_{false};
     std::atomic<bool> shutdownComplete_{false};
     std::atomic<bool> restarting_{false};
-    std::vector<std::jthread> connections_;
+    struct ConnectionThread {
+        std::shared_ptr<std::atomic<bool>> finished;
+        std::jthread thread;
+    };
+    std::vector<ConnectionThread> connections_;
     std::jthread watchdog_;
 };
 

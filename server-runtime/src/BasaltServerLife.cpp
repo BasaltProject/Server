@@ -232,9 +232,13 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         if (!accepted.has_value()) {
             break;
         }
-        connections_.emplace_back(
-            [this, connection = std::move(*accepted)]() mutable { serveConnection(std::move(connection)); });
-        std::erase_if(connections_, [](const std::jthread& thread) { return !thread.joinable(); });
+        auto finished = std::make_shared<std::atomic<bool>>(false);
+        connections_.push_back(ConnectionThread{
+            finished, std::jthread{[this, finished, connection = std::move(*accepted)]() mutable {
+                serveConnection(std::move(connection));
+                finished->store(true);
+            }}});
+        std::erase_if(connections_, [](const ConnectionThread& entry) { return entry.finished->load(); });
     }
 
     awaitShutdown();
