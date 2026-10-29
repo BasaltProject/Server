@@ -1211,7 +1211,20 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         *spawning_, std::move(environmentHooks),
         EnvironmentTickSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                        .advancementTriggers = advancementTriggers_.get(),
-                                       .difficulty = [this] { return difficulty_; }},
+                                       .difficulty = [this] { return difficulty_; },
+                                       .respawnPoint = [this](const player::PlayerSession& who)
+                                           -> std::optional<std::pair<std::string, std::array<double, 3>>> {
+                                           if (playerStore_ == nullptr || !playerStore_->isOpen()) {
+                                               return std::nullopt;
+                                           }
+                                           const std::optional<storage::StoredSpawnPoint> point =
+                                               playerStore_->access().spawnPointOf(who.uuid().toString());
+                                           if (!point.has_value()) {
+                                               return std::nullopt;
+                                           }
+                                           return std::pair{point->world,
+                                                            std::array<double, 3>{point->x, point->y, point->z}};
+                                       }},
         logger_);
     MobActionSystem::Hooks mobHooks;
     plugins::worldEventHooks::mobs(mobHooks, eventSink_, [this](const entity::ServerEntity& mob) {

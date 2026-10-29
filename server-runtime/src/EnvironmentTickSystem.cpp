@@ -592,7 +592,24 @@ void EnvironmentTickSystem::travelThroughEndPortal(world::LoadedWorld& world, Pl
     const world::endPortals::Exit exit =
         world::endPortals::exitFor(target->state(), world.declaration().dimension == config::WorldDimension::End,
                                    target->metadata().spawnX, target->metadata().spawnY, target->metadata().spawnZ);
-    if (hooks_.portalAllowed && !hooks_.portalAllowed(player, world, *target, exit.x, exit.y, exit.z, "end")) {
+    double exitX = exit.x;
+    double exitY = exit.y;
+    double exitZ = exit.z;
+    // parity: `EndPortalBlock.getPortalDestination` sends a player leaving the End to their respawn point.
+    if (world.declaration().dimension == config::WorldDimension::End && options_.respawnPoint) {
+        if (const auto point = options_.respawnPoint(player); point.has_value()) {
+            for (world::LoadedWorld* candidate : worlds_()) {
+                if (candidate != nullptr && candidate->name() == point->first) {
+                    target = candidate;
+                    exitX = point->second[0];
+                    exitY = point->second[1];
+                    exitZ = point->second[2];
+                    break;
+                }
+            }
+        }
+    }
+    if (hooks_.portalAllowed && !hooks_.portalAllowed(player, world, *target, exitX, exitY, exitZ, "end")) {
         return;
     }
     player.portalTicks = 0;
@@ -604,7 +621,7 @@ void EnvironmentTickSystem::travelThroughEndPortal(world::LoadedWorld& world, Pl
         player.wonGame = true;
         player.seenCredits = true;
         player.creditsExitWorld = target->name();
-        player.creditsExit = {exit.x, exit.y, exit.z};
+        player.creditsExit = {exitX, exitY, exitZ};
         player.connection().sendPlayPacket(
             wire::protocol::play::GameEventPacket::kId, [](wire::io::ByteBuffer& buffer) {
                 wire::protocol::play::GameEventPacket{.event = kWinGame, .param = 0.0F}.write(buffer);
@@ -612,7 +629,7 @@ void EnvironmentTickSystem::travelThroughEndPortal(world::LoadedWorld& world, Pl
         return;
     }
     if (player.connection().switchWorld) {
-        static_cast<void>(player.connection().switchWorld(*target, exit.x, exit.y, exit.z));
+        static_cast<void>(player.connection().switchWorld(*target, exitX, exitY, exitZ));
     }
 }
 

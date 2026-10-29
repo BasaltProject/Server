@@ -60,6 +60,9 @@ public:
         std::function<std::int64_t()> nextSeed;
         world::AdvancementTriggers* advancementTriggers = nullptr;
         std::function<std::string()> difficulty;
+        /// The world and spot a player respawns at when they have set one; nothing when the world spawn applies.
+        std::function<std::optional<std::pair<std::string, std::array<double, 3>>>(const player::PlayerSession&)>
+            respawnPoint;
     };
 
     using Worlds = std::function<std::vector<world::LoadedWorld*>()>;
