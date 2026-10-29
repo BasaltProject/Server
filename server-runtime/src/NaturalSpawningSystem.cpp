@@ -284,7 +284,9 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
     std::map<MobCategory, std::int32_t> counts;
     for (const MobCategory category : kCappedCategories) {
         const auto slot = static_cast<std::size_t>(category);
-        caps[category] = limits[slot] * static_cast<std::int32_t>(chunks.size()) / world::naturalSpawner::kCapChunks;
+        caps[category] = static_cast<std::int32_t>(static_cast<std::int64_t>(limits[slot]) *
+                                                   static_cast<std::int64_t>(chunks.size()) /
+                                                   world::naturalSpawner::kCapChunks);
         counts[category] = 0;
         const std::int32_t vanillaInterval = entity::mobCategoryFacts(category).persistent ? 400 : 1;
         const std::int32_t every =

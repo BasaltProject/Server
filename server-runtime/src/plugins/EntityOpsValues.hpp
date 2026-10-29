@@ -2,6 +2,8 @@
 
 #include <basalt/server/plugins/PluginEntityOps.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -29,7 +31,7 @@ using Arguments = std::vector<Value>;
         return *whole;
     }
     if (const auto* real = std::get_if<double>(&value); real != nullptr) {
-        return static_cast<std::int64_t>(*real);
+        return std::isfinite(*real) ? static_cast<std::int64_t>(std::clamp(*real, -9.0e18, 9.0e18)) : fallback;
     }
     if (const auto* flag = std::get_if<bool>(&value); flag != nullptr) {
         return *flag ? 1 : 0;
