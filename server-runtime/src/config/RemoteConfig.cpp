@@ -51,7 +51,9 @@ std::expected<remote::RemoteSettings, std::string> fromToml(const TomlTable& roo
     const TomlTable* network = root.table("network");
     if (const TomlTable* rcon = network == nullptr ? nullptr : network->table("rcon"); rcon != nullptr) {
         if (auto known = onlyKnown(*rcon, "rcon",
-                                   {"enabled", "bind", "port", "password", "max-failures", "lockout-seconds"}, path);
+                                   {"enabled", "bind", "port", "password", "max-failures", "lockout-seconds",
+                                    "max-connections-per-address"},
+                                   path);
             !known.has_value()) {
             return std::unexpected(known.error());
         }
@@ -62,13 +64,14 @@ std::expected<remote::RemoteSettings, std::string> fromToml(const TomlTable& roo
         BASALT_TRY_NUMBER(out.port, *rcon, "port", 1, 65535, "rcon")
         BASALT_TRY_NUMBER(out.maxFailures, *rcon, "max-failures", 1, 1000, "rcon")
         BASALT_TRY_NUMBER(out.lockoutSeconds, *rcon, "lockout-seconds", 1, 86400, "rcon")
+        BASALT_TRY_NUMBER(out.maxConnectionsPerAddress, *rcon, "max-connections-per-address", 1, 16, "rcon")
     }
     if (const TomlTable* api = network == nullptr ? nullptr : network->table("api"); api != nullptr) {
-        if (auto known =
-                onlyKnown(*api, "api",
-                          {"enabled", "bind", "port", "tls", "tls-cert", "tls-key", "max-failures", "lockout-seconds",
-                           "requests-per-minute", "max-connections", "max-body-bytes", "idle-seconds"},
-                          path);
+        if (auto known = onlyKnown(*api, "api",
+                                   {"enabled", "bind", "port", "tls", "tls-cert", "tls-key", "max-failures",
+                                    "lockout-seconds", "requests-per-minute", "max-connections", "max-body-bytes",
+                                    "idle-seconds", "max-connections-per-address"},
+                                   path);
             !known.has_value()) {
             return std::unexpected(known.error());
         }
@@ -85,6 +88,7 @@ std::expected<remote::RemoteSettings, std::string> fromToml(const TomlTable& roo
         BASALT_TRY_NUMBER(out.maxConnections, *api, "max-connections", 1, 4096, "api")
         BASALT_TRY_NUMBER(out.maxBodyBytes, *api, "max-body-bytes", 1, 16777216, "api")
         BASALT_TRY_NUMBER(out.idleSeconds, *api, "idle-seconds", 1, 86400, "api")
+        BASALT_TRY_NUMBER(out.maxConnectionsPerAddress, *api, "max-connections-per-address", 1, 4096, "api")
         if (out.enabled && out.tls && (out.certPath.empty() || out.keyPath.empty())) {
             return std::unexpected(std::string{path} + ": tls = true in [network.api] needs tls-cert and tls-key");
         }

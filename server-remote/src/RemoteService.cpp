@@ -92,7 +92,7 @@ struct Completion {
 
 } // namespace
 
-struct RemoteService::Impl {
+struct RemoteService::Impl : std::enable_shared_from_this<Impl> {
     RemoteSettings settings;
     RemoteHost& host;
     wire::common::Logger logger;
@@ -125,14 +125,15 @@ struct RemoteService::Impl {
         static_cast<void>(loop.wake());
     }
 
-    [[nodiscard]] std::size_t countOf(Kind a, Kind b) const {
+    [[nodiscard]] std::size_t countOf(Kind a, Kind b, const std::string* peer = nullptr) const {
         std::size_t count = 0;
         for (const auto& [id, connection] : connections) {
-            count += connection.kind == a || connection.kind == b ? 1 : 0;
+            count += (connection.kind == a || connection.kind == b) && (peer == nullptr || connection.peer == *peer);
         }
         return count;
     }
 
+    void dispatch(std::uint64_t id, bool endBusy, std::string failure, std::function<std::string(RemoteHost&)> work);
     void run(std::stop_token stop);
     void accept(wire::io::TcpListener& listener, bool api);
     void close(std::uint64_t id);
@@ -165,7 +166,11 @@ void RemoteService::Impl::accept(wire::io::TcpListener& listener, bool api) {
         AttemptTracker& tracker = api ? apiTracker : rconTracker;
         const std::size_t limit = api ? static_cast<std::size_t>(settings.api.maxConnections) : kMaxRconConnections;
         const std::size_t open = api ? countOf(Kind::Http, Kind::WebSocket) : countOf(Kind::Rcon, Kind::Rcon);
-        if (open >= limit || (!api && tracker.lockedFor(peer, Clock::now()) > 0)) {
+        const std::size_t perAddress = static_cast<std::size_t>(api ? settings.api.maxConnectionsPerAddress
+                                                                    : settings.rcon.maxConnectionsPerAddress);
+        const std::size_t sameAddress =
+            api ? countOf(Kind::Http, Kind::WebSocket, &peer) : countOf(Kind::Rcon, Kind::Rcon, &peer);
+        if (open >= limit || sameAddress >= perAddress || (!api && tracker.lockedFor(peer, Clock::now()) > 0)) {
             continue;
         }
         Connection connection;
@@ -262,9 +267,37 @@ void RemoteService::Impl::runCommand(Connection& connection, Origin origin, std:
         return std::string{"Remote command from "} + peer + " (" + (origin == Origin::Rcon ? "rcon" : "api") +
                "): " + command;
     });
-    host.runOnServerThread([this, id, origin, endBusy, peer, command = std::move(command), render = std::move(render)] {
-        CommandResult result = host.executeCommand(origin, peer, command);
-        post(Completion{id, render(std::move(result)), endBusy, false});
+    std::string failure = render(CommandResult{true, "the server could not run the command"});
+    dispatch(id, endBusy, std::move(failure),
+             [origin, peer, command = std::move(command), render = std::move(render)](RemoteHost& target) {
+                 return render(target.executeCommand(origin, peer, command));
+             });
+}
+
+void RemoteService::Impl::dispatch(std::uint64_t id, bool endBusy, std::string failure,
+                                   std::function<std::string(RemoteHost&)> work) {
+    struct Pending {
+        std::weak_ptr<Impl> service;
+        std::uint64_t id;
+        bool endBusy;
+        std::string failure;
+        bool ran = false;
+
+        ~Pending() {
+            if (!ran) {
+                if (const std::shared_ptr<Impl> alive = service.lock()) {
+                    alive->post(Completion{id, std::move(failure), endBusy, false});
+                }
+            }
+        }
+    };
+
+    auto pending = std::make_shared<Pending>(Pending{weak_from_this(), id, endBusy, std::move(failure)});
+    host.runOnServerThread([pending, work = std::move(work)] {
+        pending->ran = true;
+        if (const std::shared_ptr<Impl> alive = pending->service.lock()) {
+            alive->post(Completion{pending->id, work(alive->host), pending->endBusy, false});
+        }
     });
 }
 
@@ -360,10 +393,9 @@ void RemoteService::Impl::handleRequest(Connection& connection, http::Request& r
     const auto listing = [&](std::string (RemoteHost::*fetch)()) {
         connection.busy = true;
         const std::uint64_t id = connection.id;
-        host.runOnServerThread([this, id, fetch] {
-            std::string body = (host.*fetch)();
-            post(Completion{id, http::response(200, "application/json", body, true), true, false});
-        });
+        dispatch(
+            id, true, http::response(503, "application/json", errorJson("the server is not running"), true),
+            [fetch](RemoteHost& target) { return http::response(200, "application/json", (target.*fetch)(), true); });
     };
     if (request.path == "/v1/status" || request.path == "/v1/players" || request.path == "/v1/plugins") {
         if (!get) {
@@ -678,7 +710,7 @@ void RemoteService::Impl::run(std::stop_token stop) {
 }
 
 RemoteService::RemoteService(RemoteSettings settings, RemoteHost& host, wire::common::Logger logger)
-    : impl_(std::make_unique<Impl>(std::move(settings), host, std::move(logger))) {}
+    : impl_(std::make_shared<Impl>(std::move(settings), host, std::move(logger))) {}
 
 RemoteService::~RemoteService() { stop(); }
 
