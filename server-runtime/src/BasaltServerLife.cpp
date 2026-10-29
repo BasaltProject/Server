@@ -1074,8 +1074,8 @@ void BasaltServer::startBedrockListener() {
                 // parity: `Animal.mobInteract`: love for a grown one, a faster childhood for a calf.
                 const std::optional<world::TriggerItem> used = world::triggerFacts::itemOf(held);
                 const bool waiting = found->second->state().gameplay().mechanics.animalBreedingCooldownSeconds > 0 &&
-                                     world::breedingCooldowns::active(session->uuid().toString(), target->type(),
-                                                                      found->second->gameTime());
+                                     world::breedingCooldowns::active(found->second->name(), session->uuid().toString(),
+                                                                      target->type(), found->second->gameTime());
                 if (entity::breeding::canFallInLove(*target) && !waiting) {
                     entity::breeding::feed(*target, session->uuid().toString());
                 } else if (entity::breeding::canAgeUp(*target)) {
