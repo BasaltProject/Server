@@ -54,6 +54,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <utility>
 
 namespace basalt::server::runtime::plugins::worldModel {
@@ -181,7 +182,9 @@ std::vector<std::shared_ptr<PluginEntityRef>> LoadedWorldRef::entitiesIn(std::in
 
 void LoadedWorldRef::save() { world_->saveDirty(); }
 
-std::string LoadedWorldRef::folder() const { return world_->name(); }
+std::string LoadedWorldRef::folder() const {
+    return std::filesystem::absolute(world_->worldRoot()).lexically_normal().string();
+}
 
 std::vector<std::shared_ptr<PluginEntityRef>> LoadedWorldRef::entities() const {
     std::vector<std::shared_ptr<PluginEntityRef>> refs;

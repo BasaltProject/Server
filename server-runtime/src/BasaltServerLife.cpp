@@ -349,6 +349,10 @@ void BasaltServer::shutdown() {
     serverWatchdog_.reset();
     query_.reset();
     tickLoop_->stop();
+    // The joined tick thread no longer owns the plugin lifecycle. Disable
+    // callbacks are synchronous on this thread and must still be able to use
+    // the server API (for example, unloading a temporary world).
+    worldRegistry_->scheduler().global().bindToCurrentThread();
     static_cast<void>(server::plugins::emit(
         &plugins_->events(), &server::plugins::pluginEventTypes::serverStop(),
         [&players](server::plugins::PluginEvent& event) { event.set(0, static_cast<std::int32_t>(players.size())); }));

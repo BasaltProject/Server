@@ -230,7 +230,7 @@ public abstract class WorldGeo extends WorldExtras {
 
     @Override
     public Path getWorldPath() {
-        return BasaltServer.instance().getWorldContainer().toPath().resolve(getName());
+        return getWorldFolder().toPath();
     }
 
     @Override

@@ -77,7 +77,7 @@ public:
     world::LoadedWorld* createWorld(const std::string& name, config::WorldDimension dimension, config::WorldType type,
                                     std::optional<std::int64_t> seed);
 
-    /// Takes a world nobody stands in out of play; it stays in memory and `createWorld` brings it back.
+    /// Takes an empty world out of play and closes storage; a later create reloads it from disk.
     bool unloadWorld(const std::string& name, bool save);
 
     [[nodiscard]] std::map<std::string, std::int64_t>& lastChunkSetVersion() noexcept { return lastChunkSetVersion_; }
@@ -97,7 +97,10 @@ private:
     wire::common::Logger logger_;
 
     std::map<std::string, world::WorldMetadata> metadata_;
+    // Keep stale native/plugin views safe without permitting further disk writes.
+    std::vector<world::VanillaWorldGeneratorFactory::Generators> retiredGenerators_;
     std::vector<std::unique_ptr<world::LoadedWorld>> owned_;
+    std::vector<std::unique_ptr<world::LoadedWorld>> retiredWorlds_;
     std::set<std::string> unloaded_;
     std::map<std::string, world::VanillaWorldGeneratorFactory::Generators> built_;
     std::map<std::string, std::int64_t> lastChunkSetVersion_;

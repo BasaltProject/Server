@@ -287,6 +287,7 @@ void LoadedWorld::writeSnapshots(std::vector<RegionStore::Snapshot> snapshots) {
 }
 
 void LoadedWorld::saveDirty() {
+    if (retired_.load()) return;
     const std::vector<std::pair<std::int32_t, std::int32_t>> positions =
         sched::onOwner<std::vector<std::pair<std::int32_t, std::int32_t>>>(owner(), [this] {
             std::vector<Chunk*> chunks = state_.dirtyChunks();
@@ -414,17 +415,24 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
     });
 }
 
-void LoadedWorld::stopGenerating(std::int64_t drainTimeoutMillis) {
+void LoadedWorld::stopGenerating(std::int64_t drainTimeoutMillis, bool persist) {
     generationQueue_.stop();
     generationQueue_.awaitIdle(drainTimeoutMillis);
     // A proto chunk a neighbour already wrote into cannot be made again from the seed alone.
-    if (protoChunks_ != nullptr) {
+    if (persist && protoChunks_ != nullptr) {
         protoChunks_->persistAll();
     }
     static_cast<void>(owner().runPending([this](const std::exception& failure) {
         logger_.error(
             [&] { return "A task for world '" + declaration_.name + "' failed while stopping: " + failure.what(); });
     }));
+}
+
+void LoadedWorld::retire() {
+    retired_.store(true);
+    regions_.close();
+    lightWorker_.request_stop();
+    if (lightWorker_.joinable()) lightWorker_.join();
 }
 
 void LoadedWorld::closeOwner() { owner().close(); }

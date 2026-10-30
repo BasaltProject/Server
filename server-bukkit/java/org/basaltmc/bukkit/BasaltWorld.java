@@ -41,6 +41,7 @@ public final class BasaltWorld extends WorldEntities {
 
     private final String name;
     private final UUID id;
+    private final File folder;
     private World.Environment environment;
     private int minHeight = Integer.MIN_VALUE;
     private int maxHeight = Integer.MIN_VALUE;
@@ -48,6 +49,11 @@ public final class BasaltWorld extends WorldEntities {
     BasaltWorld(String name) {
         this.name = name;
         this.id = UUID.nameUUIDFromBytes(("basalt-world:" + name).getBytes(StandardCharsets.UTF_8));
+        String[] storage = WorldNatives.worldStrings(name);
+        if (storage == null || storage.length < 2 || storage[1].isEmpty()) {
+            throw new IllegalStateException("No storage path for world " + name);
+        }
+        this.folder = new File(storage[1]);
     }
 
     private long number(int index) {
@@ -193,7 +199,9 @@ public final class BasaltWorld extends WorldEntities {
 
     @Override
     public File getWorldFolder() {
-        return new File(BasaltServer.instance().getWorldContainer(), text(1));
+        // The path remains valid metadata after unload; never fall back to the
+        // process directory when the live native world is no longer present.
+        return folder;
     }
 
     @Override

@@ -406,7 +406,8 @@ public class BasaltServer extends ServerTail {
 
     @Override
     public File getWorldContainer() {
-        return new File(root, "worlds");
+        java.util.List<org.bukkit.World> worlds = getWorlds();
+        return worlds.isEmpty() ? new File(root, "worlds") : worlds.get(0).getWorldFolder().getParentFile();
     }
 
     @Override
