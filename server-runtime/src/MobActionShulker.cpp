@@ -60,7 +60,6 @@ void MobActionSystem::shulkerPeek(ServerEntity& shulker, std::int32_t amount) {
     shulkers::ShulkerState& state = shulkers::stateOf(shulker);
     world::LoadedWorld* world = worldOf(shulker);
     // parity: `setRawPeekAmount`.
-    // call, even one that does not change the lid.
     auto& armor = shulker.attributeModifiers[std::string{entity::attribute::kArmor}];
     armor.erase(std::string{kCoveredModifier});
     if (amount == 0) {
@@ -128,7 +127,6 @@ void MobActionSystem::tickShulker(world::LoadedWorld& world, const std::vector<P
     shulkers::ShulkerState& state = shulkers::stateOf(shulker);
     const std::span<ServerEntity* const> others{living};
     // parity: what `Shulker.hurtServer` does once a hit lands.
-    // in four, and one struck by a bullet with its lid open splits.
     if (shulker.health < state.healthSeen && state.struckBy.has_value()) {
         const std::string struck = *std::exchange(state.struckBy, std::nullopt);
         if (shulker.health < shulker.attribute("minecraft:max_health") * 0.5 && random.nextInt(4) == 0) {

@@ -11,7 +11,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// The swamp hut, vanilla's one-piece scattered structure. parity: `SwampHutStructure`. The piece is
+/// The swamp hut, vanilla's one-piece scattered structure. parity: `SwampHutStructure`.
 class SwampHutStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;

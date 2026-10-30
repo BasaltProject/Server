@@ -9,8 +9,7 @@
 
 namespace basalt::server::runtime::world::potionEffects {
 
-/// parity: `PotionContents.forEachEffect`.
-/// its duration scaled and floored, never below a tick.
+/// parity: `PotionContents.forEachEffect`, duration scaled and floored to a tick.
 [[nodiscard]] std::vector<ActiveEffect> of(const wire::nbt::NbtCompound& potionContents, float durationScale);
 
 /// Every potion in registry order. parity: `Potions`, water first.

@@ -96,7 +96,7 @@ const std::set<std::string, std::less<>>& mossReplaceablePaths() {
     return DecorationPos{.x = x, .y = belowY, .z = z};
 }
 
-/// The bucket iteration order of vanilla's `HashSet<BlockPos>`, which is observable here because the
+/// The bucket iteration order of vanilla's `HashSet<BlockPos>`, which is observable here.
 
 void placeVegetation(Chunk& chunk, random::RandomSource& random, random::RandomSource& mossyCarpetRandom,
                      const DecorationPos& ground) {

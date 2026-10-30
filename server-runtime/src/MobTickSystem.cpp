@@ -217,7 +217,6 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         return;
     }
     // parity: `SnowGolem.aiStep` is the living entity's own turn.
-    // even where nothing is driving it.
     if (entity.type().path() == "snow_golem") {
         actions_->trailSnow(world, entity);
     }
@@ -310,7 +309,6 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         }
     }
     // parity: `Pufferfish.tick` and `aiStep`.
-    // the travel they belong to.
     if (entity.type().path() == "pufferfish") {
         actions_->tickPufferfish(world, watchers, entity, living);
     }

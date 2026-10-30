@@ -68,7 +68,7 @@ struct CappedRules {
     std::vector<StructureProcessorRule> delegate;
     std::int32_t limit = 0;
 
-    /// `limit` actual conversions. parity: `finalizeProcessing`, which counts only the blocks the
+    /// Picks the candidates to convert, up to `limit`. parity: `finalizeProcessing`.
     [[nodiscard]] std::map<std::int32_t, StructureProcessorRule>
     choose(const std::vector<std::int32_t>& candidates, std::int64_t worldSeed, StructurePos position) const;
 };

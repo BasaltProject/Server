@@ -42,8 +42,7 @@ constexpr std::int32_t kDragonSpawnY = 128;
 constexpr double kGatewayDistance = 96.0;
 constexpr std::int32_t kGatewayY = 75;
 constexpr std::int32_t kArenaChunks = 8;
-/// parity: `TicketType.DRAGON`'s radius, `addTicketWithRadius(..., 9)`: the nineteen by.
-/// nineteen chunks around the exit portal stay loaded and ticking while the fight has players.
+/// parity: `TicketType.DRAGON`'s radius, `addTicketWithRadius(..., 9)`.
 constexpr std::int32_t kDragonTicketRadius = 9;
 /// parity: `LevelEvent.ANIMATION_END_GATEWAY_SPAWN`.
 constexpr std::int32_t kGatewaySpawnEvent = 3000;
@@ -89,7 +88,6 @@ void EndFightSystem::tickFight(world::LoadedWorld& world, const std::vector<Play
         return;
     }
     // parity: `TicketType.DRAGON`, re-added every tick while somebody fights and taken back.
-    // when the arena empties: the chunks the fight looks at stay loaded and ticking.
     if (!fight->dragonTicketHeld) {
         fight->dragonTicketHeld = true;
         for (std::int32_t chunkX = -kDragonTicketRadius; chunkX <= kDragonTicketRadius; ++chunkX) {

@@ -57,7 +57,6 @@ constexpr float kTurnShare = 0.2F;
 }
 
 /// parity: `findBlocksIn(getBoundingBox()).filterState(isAir).noneMatched()`.
-/// touches is something other than air.
 [[nodiscard]] bool buried(world::WorldState& world, const ServerEntity& spit) {
     const double half = spit.width() / 2.0;
     for (std::int32_t x = mth::floor(spit.x - half); x <= mth::floor(spit.x + half); ++x) {
@@ -118,7 +117,6 @@ constexpr float kTurnShare = 0.2F;
 }
 
 /// parity: `Projectile.isOutsideOwnerCollisionRange`.
-/// grown by a block meets nobody of the owner's party.
 [[nodiscard]] bool outsideParty(world::WorldState& world, const std::vector<PlayerSession*>& watchers,
                                 const ServerEntity& spit, const std::vector<std::int32_t>& party) {
     const entity::Aabb reach = entity::Aabb::of(spit.x, spit.y, spit.z, spit.width(), spit.height())
@@ -229,14 +227,12 @@ void CombatSystem::tickLlamaSpit(world::LoadedWorld& world, const std::vector<Pl
     const double horizontal = std::sqrt((spit.velocityX * spit.velocityX) + (spit.velocityZ * spit.velocityZ));
     spit.pitch = lerpRotation(pitchBefore, static_cast<float>(std::atan2(spit.velocityY, horizontal) * kDegrees));
     spit.yaw = lerpRotation(yawBefore, static_cast<float>(std::atan2(spit.velocityX, spit.velocityZ) * kDegrees));
-    // parity: gone once every square its box touches is solid, or in water, both judged where it.
-    // stood when the tick began.
+    // parity: gone once every square its box touches is solid, or in water.
     if (buried(world.state(), spit) || wet) {
         spit.removed = true;
         return;
     }
-    // parity: the drag is taken off the movement it started with, so a deflection's reversal is.
-    // lost again.
+    // parity: the drag is taken off the movement it started with.
     spit.velocityX = moveX * kind.drag;
     spit.velocityY = moveY * kind.drag;
     spit.velocityZ = moveZ * kind.drag;

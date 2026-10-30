@@ -6,7 +6,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// The order a chunk's structure references come back in. parity: vanilla keeps them in a
+/// The order a chunk's structure references come back in. parity: vanilla's hash set iteration.
 [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>>
 vanillaStructureReferenceChunkOrder(const std::vector<std::pair<std::int32_t, std::int32_t>>& references);
 

@@ -37,7 +37,6 @@ TEST_CASE("the criteria a `/scoreboard objectives add` accepts, and what they me
     CHECK(criteria[27] == "killedByTeam.black");
     CHECK(criteria.back() == "killedByTeam.white");
 
-    // `trigger` is writable and gated by the score's lock, so it is not one of the six the server writes.
     for (const std::string& criterion : {"health", "food", "air", "armor", "xp", "level"}) {
         CAPTURE(criterion);
         CHECK(Objective::isReadOnly(criterion));
@@ -249,7 +248,6 @@ TEST_CASE("a team starts with vanilla's own defaults and answers them as packet 
     red->seeFriendlyInvisibles = false;
     CHECK(red->parameters().options() == 0);
 
-    // The visibility on the wire is the name tag's, not the death message's, which never leaves the server.
     red->prefix = Component::text("[");
     red->suffix = Component::text("]");
     red->nameTagVisibility = play::NameTagVisibility::HideForOtherTeams;
@@ -282,7 +280,6 @@ TEST_CASE("a member belongs to one team, and joining another takes them out of t
     CHECK(blue->members == std::vector<std::string>{"Steve"});
     CHECK(teams.teamOf("Steve") == blue);
 
-    // Joining the team already on, or adding twice, is not a duplicate: vanilla's members are a set.
     CHECK(teams.join(*blue, "Steve") == blue);
     CHECK(blue->members == std::vector<std::string>{"Steve"});
     CHECK_FALSE(blue->addMember("Steve"));

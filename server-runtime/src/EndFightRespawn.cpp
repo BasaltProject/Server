@@ -103,7 +103,6 @@ void EndFightSystem::tryRespawn(world::LoadedWorld& world) {
         }
     }
     // parity: `respawnDragon` first takes the lit portal apart.
-    // to end stone, then builds it again unlit.
     const std::int32_t originY = (*fight->exitPortalLocation)[1];
     const std::int32_t bedrock = registry::blocks::bedrock().stateId;
     const registry::BlockState* portal = registry::blocks::named("end_portal");
@@ -279,7 +278,6 @@ void EndFightSystem::rebuildSpike(world::LoadedWorld& world, const std::vector<P
                             static_cast<void>(world.state().setBlockState(x, y, z, stateId));
                         });
     // parity: `EndSpikeConfiguration(true, [spike], summoning point)`.
-    // where the dragon will appear.
     const registry::EntityTypeEntry* entry =
         registry::entityTypes::of(wire::common::Identifier::vanilla("end_crystal"));
     if (entry != nullptr) {

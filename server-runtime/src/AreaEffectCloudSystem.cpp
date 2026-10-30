@@ -245,8 +245,7 @@ void AreaEffectCloudSystem::fireballLanded(world::LoadedWorld& world, const std:
     clouds::Cloud settings = clouds::dragonBreath(
         kFireballCloudRadius, kFireballCloudDuration,
         (kFireballCloudMaxRadius - kFireballCloudRadius) / static_cast<float>(kFireballCloudDuration), 1);
-    // parity: the living things in the fireball's box grown by four, two and four; the first within.
-    // four blocks carries the cloud.
+    // parity: the living things in the fireball's box grown by four, two and four.
     const Box reach{fireball.x - 4.5, fireball.y - 2.0, fireball.z - 4.5,
                     fireball.x + 4.5, fireball.y + 3.0, fireball.z + 4.5};
     double x = fireball.x;

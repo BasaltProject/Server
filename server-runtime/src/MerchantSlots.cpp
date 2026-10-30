@@ -212,8 +212,7 @@ void VillagerTradeController::takeResult() {
 }
 
 void VillagerTradeController::quickMoveResult(PlayerSession& session) {
-    // parity: `AbstractContainerMenu.doClick`'s quick move keeps taking the result while the same.
-    // item comes back and the whole of it fits.
+    // parity: `AbstractContainerMenu.doClick`'s quick move.
     while (slots_[kResult].has_value() && mayTakeResult()) {
         const StoredItemStack result = *slots_[kResult];
         if (session.inventory.add(result) > 0) {

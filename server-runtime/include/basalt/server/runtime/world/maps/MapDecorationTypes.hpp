@@ -6,7 +6,6 @@
 
 namespace basalt::server::runtime::world::maps {
 
-/// One `map_decoration_type`.
 struct MapDecorationType {
     std::string_view name;
     bool showOnItemFrame = false;

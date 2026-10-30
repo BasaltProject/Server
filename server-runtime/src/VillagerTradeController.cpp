@@ -50,7 +50,6 @@ void VillagerTradeController::openTrades(entity::ServerEntity& villager, bool ma
         return;
     }
     // parity: `Villager.mobInteract`.
-    // already trading or asleep does nothing, and the rest open with this buyer's prices.
     entity::villager::VillagerWorld& villagers = owner_->options().mobs->villagersIn(*world);
     bool talked = false;
     const bool trading = entity::villager::villagerBrain::startTrading(villager, villagers, session->entityId(),
@@ -228,7 +227,6 @@ void VillagerTradeController::menuClosed() {
         }
     }
     // parity: `MerchantMenu.removed`.
-    // player who is dead.
     if (session != nullptr) {
         for (const std::int32_t payment : {kPaymentA, kPaymentB}) {
             std::optional<storage::StoredItemStack>& held = slots_[static_cast<std::size_t>(payment)];

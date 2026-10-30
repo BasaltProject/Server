@@ -919,9 +919,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             context_.logger.warn([] { return "Leaving out of the Bedrock join: commandtree"; });
             return;
         }
-        // TEMPORARY: six of the names a server operator is offered carry a hyphen, and Bedrock has
-        // no native command that does. The thirteen a plain player gets have none, which is the
-        // difference between the tree that worked and the tree that did not.
+        // TEMPORARY: operator command names carry hyphens and Bedrock has no native command that does.
         const char* const drop = std::getenv("BASALT_BEDROCK_DROP");
         const bool withoutHyphens = drop != nullptr && std::string_view{drop}.find("hyphens") != std::string_view::npos;
         std::vector<wire::bedrock::CommandInfo> commands;
@@ -934,8 +932,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (withoutHyphens) {
             context_.logger.warn([] { return "Leaving out of the Bedrock command tree: hyphenated names"; });
         }
-        // TEMPORARY: `BASALT_BEDROCK_COMMANDS=n` offers only the first n, which is how to ask a
-        // client which entry it cannot take when the packet is otherwise well formed.
+        // TEMPORARY: `BASALT_BEDROCK_COMMANDS=n` offers only the first n, to find the entry a client refuses.
         if (const char* const most = std::getenv("BASALT_BEDROCK_COMMANDS"); most != nullptr) {
             const auto kept = static_cast<std::size_t>(std::atoll(most));
             if (commands.size() > kept) {

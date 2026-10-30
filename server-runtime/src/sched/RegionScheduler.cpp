@@ -10,7 +10,6 @@
 namespace basalt::server::runtime::sched {
 namespace {
 
-/// The chunk a world coordinate is in.
 /// parity: `SectionPos.blockToSectionCoord(Mth.floor(x))`.
 [[nodiscard]] std::int32_t floorToChunk(double value) { return wire::common::mth::floor(value) >> 4; }
 

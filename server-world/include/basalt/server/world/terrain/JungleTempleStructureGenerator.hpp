@@ -12,7 +12,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// The jungle temple. parity: `JungleTempleStructure`, one piece twelve by fifteen, so the chunks it
+/// The jungle temple. parity: `JungleTempleStructure`, one piece twelve by fifteen.
 class JungleTempleStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;

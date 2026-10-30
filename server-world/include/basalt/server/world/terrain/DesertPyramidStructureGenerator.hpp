@@ -11,7 +11,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// The desert pyramid. parity: `DesertPyramidStructure`, one piece 21 blocks square, so every chunk
+/// The desert pyramid. parity: `DesertPyramidStructure`, one piece 21 blocks square.
 class DesertPyramidStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;

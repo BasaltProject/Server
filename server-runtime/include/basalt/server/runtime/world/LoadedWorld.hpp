@@ -182,7 +182,6 @@ public:
 
     [[nodiscard]] const WorldWeather& weather() const noexcept { return weather_; }
 
-    /// How much the sky is dimmed right now, as it stood when this turn began.
     /// parity: `Level.getSkyDarken`.
     [[nodiscard]] std::int32_t skyDarken() const noexcept { return skyDarken_; }
 

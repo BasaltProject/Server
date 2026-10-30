@@ -78,7 +78,6 @@ constexpr std::int32_t kLungeGraceTicks = 10;
 std::vector<spear::Candidate> CombatHandler::spearTargets(const PlayerSession& session, world::LoadedWorld& world) {
     std::vector<spear::Candidate> candidates;
     // parity: `PiercingWeapon.canHitEntity`.
-    // rides the same vehicle.
     const auto sameVehicle = [&session](const std::optional<std::int32_t>& vehicle) {
         return session.vehicleId.has_value() && vehicle == session.vehicleId;
     };
@@ -291,7 +290,6 @@ bool CombatHandler::stab(PlayerSession& session, world::LoadedWorld& world, std:
             return entityTags != nullptr && world::realEntityTypeTags::membersOf(*entityTags, tag).contains(victimType);
         }};
     // parity: `Player.stabAttack`.
-    // while a charge in that hand is not.
     float magic = world::weaponDamage::of(weapon, base, definitionOf, &target) - base;
     if (strength.has_value()) {
         magic *= *strength;

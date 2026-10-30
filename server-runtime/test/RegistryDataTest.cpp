@@ -36,14 +36,12 @@ TEST_CASE("the tag table goes out in a fixed order, each registry's names sorted
         CHECK(std::ranges::is_sorted(tags));
         CHECK(std::ranges::adjacent_find(tags) == tags.end());
     }
-    // Pinned, not sorted: the order is the order they go out on the wire.
     CHECK(order == "minecraft:banner_pattern,minecraft:block,minecraft:damage_type,minecraft:dialog,"
                    "minecraft:enchantment,minecraft:entity_type,minecraft:fluid,minecraft:game_event,"
                    "minecraft:instrument,minecraft:item,minecraft:painting_variant,"
                    "minecraft:point_of_interest_type,minecraft:potion,minecraft:timeline,"
                    "minecraft:worldgen/biome");
 
-    // Sending tags for a registry the client has no `RegistryAccess` entry for crashed it outright.
     CHECK(vanillaTagData::tagsOf("minecraft:worldgen/world_preset").empty());
     CHECK(vanillaTagData::tagsOf("").empty());
 }
@@ -80,7 +78,6 @@ TEST_CASE("the variant registries are the lists the frozen kotlin source spells 
         CHECK(expected.values.back() == expected.last);
     }
 
-    // Bootstrap order matters: indices go out as holder ids, and a client with fewer entries drops the connection.
     CHECK(vanillaRegistryData::catVariants()[10] == "all_black");
     CHECK(vanillaRegistryData::bannerPatterns()[0] == "base");
 
@@ -142,7 +139,6 @@ TEST_CASE("a variant's own entry is built the way the codec reads it") {
         return written == nullptr ? std::string{"-"} : *written;
     };
 
-    // The default wolf's files are `wolf`, not `wolf_pale`: the one name that is not the id with a prefix.
     const nbt::NbtCompound pale = vanillaRegistryData::wolfVariant("pale");
     CHECK(text(*pale.find("assets")->get<nbt::NbtCompound>(), "wild") == "minecraft:entity/wolf/wolf");
     CHECK(text(*pale.find("baby_assets")->get<nbt::NbtCompound>(), "angry") == "minecraft:entity/wolf/wolf_angry_baby");

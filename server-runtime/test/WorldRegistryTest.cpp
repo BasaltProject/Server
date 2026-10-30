@@ -78,13 +78,11 @@ TEST_CASE("a world made at runtime is a world like any other, and its name has t
     CHECK(made->metadata().seed == 7);
     CHECK(registry.worlds().size() == 3);
 
-    // A taken name and a name that is not a folder name are refused: a half-existing world is worse than none.
     CHECK(registry.createWorld("arena", config::WorldDimension::Overworld, config::WorldType::Flat, 7) == nullptr);
     CHECK(registry.createWorld("../escape", config::WorldDimension::Overworld, config::WorldType::Flat, 7) == nullptr);
     CHECK(registry.createWorld("", config::WorldDimension::Overworld, config::WorldType::Flat, 7) == nullptr);
     CHECK(registry.worlds().size() == 3);
 
-    // The event is scheduled rather than fired, so a plugin's own handler is not re-entered.
     CHECK(loaded.empty());
 }
 

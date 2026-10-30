@@ -39,7 +39,6 @@ using piglins::PiglinState;
 [[nodiscard]] bool isBaby(const ServerEntity& mob) { return mob.age < 0; }
 
 /// parity: `Mob.getEquipmentSlotForItem`.
-/// components per item.
 [[nodiscard]] equipment::Slot slotFor(const ItemStack& stack) {
     const std::string_view path = stack.item.path();
     if (path.ends_with("_helmet") || path == "carved_pumpkin" || path.ends_with("_skull") || path.ends_with("_head") ||

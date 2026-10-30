@@ -134,8 +134,7 @@ public:
     /// Asks for the chunk's light to be computed off-thread, when its 3x3 stands.
     void requestLight(std::int32_t chunkX, std::int32_t chunkZ);
 
-    /// Called, with the world's lock held, for a chunk whose 3x3 has just become complete or whose light went stale,
-    /// with `delayed` set.
+    /// Called with the world's lock held for a chunk whose 3x3 just completed or whose light went stale.
     void setOnNeighbourhoodComplete(std::function<void(std::int32_t, std::int32_t, bool)> handler) {
         onNeighbourhoodComplete_ = std::move(handler);
     }

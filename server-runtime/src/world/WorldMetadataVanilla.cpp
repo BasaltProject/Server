@@ -115,8 +115,7 @@ std::optional<WorldMetadata> WorldMetadata::fromVanilla(const std::string& world
     } else if (level != nullptr && level->contains("BorderSize")) {
         metadata.worldBorder = metamorph::datafix::worldBorderOfLegacy(*level);
     }
-    // parity: `ForcedChunkToTicketFix` and `ChunkTicketUnpackPosFix`, the forced chunks of 1.14 to 26.1 are `Forced`
-    // keys.
+    // parity: `ForcedChunkToTicketFix` and `ChunkTicketUnpackPosFix`: forced chunks of 1.14 to 26.1 are `Forced` keys.
     if (const std::optional<NbtCompound> tickets = saved(worldRoot, "chunk_tickets", "overworld");
         tickets.has_value()) {
         if (const NbtList* entries = tickets->getList("tickets"); entries != nullptr) {

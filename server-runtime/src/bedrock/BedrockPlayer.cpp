@@ -767,7 +767,6 @@ void BedrockPlayer::move(const double x, const double y, const double z, const f
                    std::to_string(z);
         });
     }
-    // How far they have dropped without landing.
     // parity: `resetFallDistance`.
     fallDistance_ = std::min(fallDistance_, session_->fallDistance);
     if (session_->onGround) {
@@ -1453,8 +1452,7 @@ bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {
     if (session_ == nullptr || !context_.sendChunks) {
         return false;
     }
-    // TEMPORARY: a join with no world at all. A client that stays in a void read everything else
-    // happily, and then the columns are the only thing left to blame.
+    // TEMPORARY: a join with no world at all, to tell whether the columns are what a client refuses.
     if (const char* const drop = std::getenv("BASALT_BEDROCK_DROP");
         drop != nullptr && std::string_view{drop}.find("chunks") != std::string_view::npos) {
         context_.logger.warn([] { return "Leaving out of the Bedrock join: chunks"; });

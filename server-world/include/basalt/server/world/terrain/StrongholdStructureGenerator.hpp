@@ -18,7 +18,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// The stronghold. parity: `StrongholdStructure`. Unlike every other structure here it is not spread
+/// The stronghold. parity: `StrongholdStructure`, placed in concentric rings and not random-spread.
 class StrongholdStructureGenerator {
 public:
     using NoiseBiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;

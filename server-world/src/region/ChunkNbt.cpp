@@ -590,7 +590,7 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
         upgraded.putInt("DataVersion", kDataVersion);
         return read(upgraded, bounds);
     }
-    // parity: `ChunkHeightAndBiomeFix` saves an old full chunk as empty with `below_zero_retrogen`, and the game then
+    // parity: `ChunkHeightAndBiomeFix` saves an old full chunk as empty with `below_zero_retrogen`.
     // generates only the layers under zero; the terrain above is the old one.
     const bool retrogen =
         tag.getString("Status") == "minecraft:empty" && tag.getCompound("below_zero_retrogen") != nullptr;

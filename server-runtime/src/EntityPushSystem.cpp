@@ -386,7 +386,6 @@ void EntityPushSystem::push(world::LoadedWorld& world, const Body& target, const
         return;
     }
     // parity: `AbstractBoat.push`.
-    // from level with its bottom or lower.
     if (target.mob != nullptr && entity::boats::isBoat(target.mob->type())) {
         const Aabb mine = boxOf(target);
         const Aabb theirs = boxOf(pusher);

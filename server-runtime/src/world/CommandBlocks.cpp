@@ -34,7 +34,6 @@ constexpr std::int32_t kDelay = 1;
     return instance;
 }
 
-/// The block each mode is: there is no property for it, the three are three blocks.
 [[nodiscard]] const wire::common::Identifier& blockOfMode(Mode mode) {
     static const wire::common::Identifier chain = wire::common::Identifier::vanilla("chain_command_block");
     static const wire::common::Identifier repeating = wire::common::Identifier::vanilla("repeating_command_block");

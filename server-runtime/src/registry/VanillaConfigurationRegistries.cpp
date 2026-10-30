@@ -39,8 +39,7 @@ using wire::protocol::configuration::RegistryEntry;
     return packet;
 }
 
-/// A registry whose entries the client reads from its own copy of the vanilla pack.
-/// parity: `RegistrySynchronization.packRegistry`.
+/// parity: `RegistrySynchronization.packRegistry`, entries the client reads from its own vanilla pack.
 [[nodiscard]] RegistryDataPacket known(std::string registryId, std::initializer_list<std::string_view> paths) {
     RegistryDataPacket packet{.registryId = std::move(registryId), .entries = {}};
     for (const std::string_view path : paths) {

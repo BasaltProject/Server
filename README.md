@@ -23,25 +23,29 @@
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-green">
 </p>
 
-> ⚠️ **Early development.** You can connect a client and play with a good part of
-> the game, but plenty is missing or wrong. Not ready for any server, public or
-> private.
+> ⚠️ **Early development.** Most of vanilla's gameplay is in place and Java plugins
+> run, but some systems are still incomplete and the server has seen little
+> long-term use. Back up your worlds, and expect rough edges before trusting it
+> with a public server.
 
 ## Overview
 
 Basalt Server is a complete reimplementation of the Minecraft server, written
 entirely in **C++23** and shipped as a native binary for each platform.
-The native core requires no external JVM. Future Java plugin compatibility will
-use Shim, a JVM implemented in C++, once that project is complete.
+The native core requires no external JVM.
 
-It speaks Java Edition's protocol and uses its world format, so that is the client
-it serves today. Older Java clients and Bedrock clients are planned, translated at
-the edge, and neither is implemented yet.
+It speaks Java Edition's protocol and uses its world format. Older Java clients and
+Bedrock clients are served through translation layers at the edge, which are still
+maturing.
 
-Bukkit compatibility is planned as a dedicated Server module after Shim is
-complete. Server will implement the Bukkit APIs and plugin lifecycle; Shim only
-provides Java bytecode execution. The former external JVM bridge design has
-been discarded. This compatibility is not available yet.
+Bukkit, Spigot and Paper plugins also run. Server implements those APIs and the
+plugin lifecycle in its own module, and [Shim](https://github.com/BasaltProject/Shim),
+a JVM implemented in C++ (a fork of Avian aimed at Java 25), executes the bytecode
+inside the server process. Shim is built into the binary, so no Java installation
+is needed, and it only starts when a jar is present in `plugins-bukkit/`.
+Large plugins such as FastAsyncWorldEdit and PacketEvents are part of the test
+suite. Native Lua plugins remain the first-class path and the one the API is
+designed around.
 
 Two goals drive every decision:
 
@@ -59,9 +63,10 @@ Two goals drive every decision:
 | Target version | Minecraft 26.3 (protocol 777) |
 | Distribution | Native binaries per platform |
 | World storage | Linear regions by default; Anvil worlds are read and converted on load |
-| Plugin API | Lua, `.bspkg` packages |
+| Plugin API | Lua, `.bspkg` packages; Bukkit, Spigot and Paper jars through Shim |
 | Message model | Adventure-style immutable components; no legacy `§` formatting |
 | Configuration | A `config/` folder, one TOML file per domain |
+| Remote management | REST and WebSocket API with token auth; RCON only for compatibility, off by default |
 | License | GPL-3.0 |
 
 ## Why native
@@ -69,10 +74,11 @@ Two goals drive every decision:
 A Minecraft server spends its life moving bytes, ticking a world and waiting.
 None of that needs a virtual machine.
 
-The binary starts immediately: no VM boot, no class loading, no warm-up. There is
-no heap to size and no collector to hide behind. Deployment is one binary and a
-config folder, with no runtime to install or match. Tick 1 and tick 1,000,000 cost
-the same.
+The core starts without a VM boot, class loading or warm-up. There is no heap to
+size and no collector to hide behind. Deployment is one binary and a config folder,
+with no runtime to install or match. Tick 1 and tick 1,000,000 cost the same. The
+embedded Java runtime only comes up when Bukkit-style jars are present, and a server
+without them never pays for it.
 
 ## Plugins
 
@@ -101,16 +107,20 @@ comments and vanilla defaults on first start:
 
 ```
 config/
-  server.toml        network, logging, performance
-  worlds.toml        world defaults, inherited by worlds/<name>/settings.toml
+  server.toml        network, remote API, plugins, performance, logging
+  worlds.toml        worlds to load and the defaults every world inherits
   groups.toml        permission groups
+  limits.toml        per-connection packet and spam limits
   server_list.toml   what the server list shows
   commands.toml      per-command settings
+  messages.toml      server messages
+  tab_list.toml      scoreboard.toml  boss_bar.toml  animations.toml
 ```
 
 Anything that makes the server behave differently from vanilla is opt-in and
-labelled as such in the generated comments. A `server.properties` found on first
-start is imported once.
+labelled as such in the generated comments. World rules, mob settings and gameplay options
+are set per world, inheriting from the defaults in `worlds.toml` and overridable in
+`worlds/<name>/`. A `server.properties` found on first start is imported once.
 
 ## Game assets and the EULA
 
@@ -161,14 +171,6 @@ A build made outside the CI has no build number, so it is `.0-dev`.
 The tests run with `ctest --preset debug`, and `--preset asan` builds the same
 tree under the address and undefined sanitizers, which is what the CI does on
 every push.
-
-## Related repositories
-
-| Repository | What it is |
-|---|---|
-| [Wire](https://github.com/BasaltProject/Wire) | The network layer this repository builds on, shared with the proxy |
-| [Proxy](https://github.com/BasaltProject/Proxy) | The proxy component |
-| [Website](https://github.com/BasaltProject/Website) | The project site, at [basaltmc.org](https://basaltmc.org) |
 
 ## License
 

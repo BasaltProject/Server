@@ -7,7 +7,6 @@
 namespace basalt::server::runtime::world::mobEffects {
 namespace {
 
-/// The registry in its own order, so the index is the protocol id.
 constexpr auto kNames =
     std::to_array<std::string_view>({"speed",           "slowness",       "haste",          "mining_fatigue",
                                      "strength",        "instant_health", "instant_damage", "jump_boost",

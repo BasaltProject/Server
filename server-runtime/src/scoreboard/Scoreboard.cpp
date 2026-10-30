@@ -272,8 +272,7 @@ void Scoreboard::resetScore(std::string_view holder, std::optional<std::string_v
     }
     const std::string_view wanted = *objectiveName;
     std::erase_if(at->scores, [wanted](const std::pair<std::string, Score>& score) { return score.first == wanted; });
-    // parity: a holder with nothing left stops being tracked, rather than staying on as an empty.
-    // row that `/scoreboard players list` would still print.
+    // parity: a holder with no scores left stops being tracked, so `/scoreboard players list` skips it.
     if (at->scores.empty()) {
         holders_.erase(at);
     }

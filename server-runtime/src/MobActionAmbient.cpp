@@ -33,8 +33,6 @@ namespace mth = wire::common::mth;
 using namespace std::string_view_literals;
 
 /// parity: `Parrot.MOB_SOUND_MAP`'s sounds.
-/// hash map whose order depends on object identities, so no order is the jar's. The happy ghast's
-/// is the empty one.
 constexpr std::array kImitations{"blaze"sv,
                                  "bogged"sv,
                                  "breeze"sv,

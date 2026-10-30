@@ -21,7 +21,7 @@ namespace basalt::server::world::loot {
 struct ComponentEdit;
 struct SlotSource;
 
-/// A post-processing step applied to a generated stack. parity: `LootItemFunction`, every one of
+/// A post-processing step applied to a generated stack. parity: `LootItemFunction`.
 class LootFunction {
 public:
     enum class Kind : std::uint8_t {
@@ -178,11 +178,11 @@ struct LootPool {
                   const LootContext& context = {}) const;
 };
 
-/// moment it is produced. parity: `LootTable.getRandomItemsRaw`, which decorates the per-pool output
+/// A loot table: pools rolled into stacks. parity: `LootTable.getRandomItemsRaw`.
 struct LootTable {
     std::vector<LootPool> pools;
     std::vector<LootFunction> functions;
-    /// The named stream this table rolls on. parity: `LootTable.randomSequence`, which is what makes
+    /// The named stream this table rolls on. parity: `LootTable.randomSequence`.
     std::optional<wire::common::Identifier> randomSequence;
 
     /// parity: `LootTable.getRandomItemsRaw`, which is also what a nested entry runs.

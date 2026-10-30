@@ -40,8 +40,7 @@ using server::world::light::SectionLight;
 
     Chunk::SharedLight cached = sky ? chunk->cachedSkyLight() : chunk->cachedBlockLight();
     if (cached == nullptr) {
-        // parity: a chunk is not lit, and so not ticking, until its neighbours stand; guessing before then only
-        // computes the same chunk again at every neighbour that arrives.
+        // parity: a chunk is not lit until its neighbours stand; guessing earlier recomputes it per neighbour.
         for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
             for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
                 if (world.chunkIfLoaded((x >> 4) + offsetX, (z >> 4) + offsetZ) == nullptr) {

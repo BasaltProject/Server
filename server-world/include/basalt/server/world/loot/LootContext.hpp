@@ -73,7 +73,7 @@ struct ExplorationMapRequest {
     bool skipExistingChunks = true;
 };
 
-/// What a roll knows about where it came from. parity: `LootContextParams`, the parts this server
+/// What a roll knows about where it came from. parity: `LootContextParams`.
 struct LootContext {
     /// parity: `BLOCK_STATE`, the properties of the block behind the roll.
     std::map<std::string, std::string> blockState;
@@ -144,7 +144,7 @@ struct LootContext {
         resolveText;
 };
 
-/// else the name its facts carry. parity: `LootContext.getOptionalParameter(...).getScoreboardName`.
+/// The holder name of an entity target. parity:
 [[nodiscard]] std::optional<std::string> scoreHolderOf(const LootContext& context, EntityTarget target);
 
 /// parity: `LevelBasedValue`, the two shapes the loot tables use.

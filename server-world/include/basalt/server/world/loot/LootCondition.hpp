@@ -34,7 +34,7 @@ struct FloatRange {
     [[nodiscard]] bool test(random::RandomSource& random, const LootContext& context, float value) const;
 };
 
-/// A predicate gating a pool, an entry, a function or a provider. parity: `LootItemCondition` and
+/// A predicate gating a pool, an entry, a function or a provider. parity: `LootItemCondition`.
 class LootCondition {
 public:
     enum class Kind : std::uint8_t {

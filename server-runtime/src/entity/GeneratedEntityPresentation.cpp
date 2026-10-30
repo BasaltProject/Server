@@ -352,8 +352,7 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
         entries.push_back(
             Entry{.index = kAirSupplyDataIndex, .value = SetEntityDataPacket::IntValue{.value = data.getShort("Air")}});
     }
-    // Read as a number so older saves still count; zero makes the client play the death animation.
-    // parity: `LivingEntity.DATA_HEALTH_ID`.
+    // parity: `LivingEntity.DATA_HEALTH_ID`, zero makes the client play the death animation.
     if (data.contains("Health") && server::registry::entityAttributes::isLiving(typeId)) {
         entries.push_back(Entry{.index = 9,
                                 .value = SetEntityDataPacket::FloatValue{

@@ -82,7 +82,6 @@ bool VehicleSystem::typeIn(const Identifier& damageType, std::string_view tag) c
 
 bool VehicleSystem::ignitesTnt(const Hit& hit) const {
     // parity: `MinecartTNT.damageSourceIgnitesTnt`.
-    // when it is fire or an explosion.
     if (hit.burningProjectile || hit.burningArrow) {
         return true;
     }
@@ -146,7 +145,6 @@ void VehicleSystem::ejectPassengers(world::LoadedWorld& world, ServerEntity& veh
 
 bool VehicleSystem::board(world::LoadedWorld& world, ServerEntity& vehicle, ServerEntity& mob) {
     // parity: `Entity.startRiding`.
-    // way round, and `canRide`'s boarding cooldown.
     const std::int32_t room = entity::boats::isBoat(vehicle.type()) ? entity::boats::maxPassengers(vehicle.type()) : 1;
     if (mob.vehicleId == vehicle.entityId() || static_cast<std::int32_t>(vehicle.passengerIds.size()) >= room ||
         mob.boardingCooldown > 0 || vehicle.vehicleId == mob.entityId()) {
@@ -265,7 +263,6 @@ void VehicleSystem::destroy(world::LoadedWorld& world, ServerEntity& vehicle, co
         }
     }
     // parity: `AbstractChestBoat.remove` and `AbstractMinecartContainer.remove` spill what is inside.
-    // whatever the rules say, a creative player's discard included.
     const std::string_view path = vehicle.type().path();
     const bool container =
         entity::boats::hasChest(vehicle.type()) || path == "chest_minecart" || path == "hopper_minecart";
@@ -343,7 +340,6 @@ void VehicleSystem::program(world::LoadedWorld& world, ServerEntity& cart, const
         cart.sourceNbt = wire::nbt::NbtCompound{};
     }
     // parity: `handleSetCommandMinecart`.
-    // it stops being tracked.
     cart.sourceNbt->putString("Command", command);
     cart.sourceNbt->putBoolean("TrackOutput", trackOutput);
     if (!trackOutput) {
@@ -354,7 +350,6 @@ void VehicleSystem::program(world::LoadedWorld& world, ServerEntity& cart, const
 bool VehicleSystem::touchesFluid(world::LoadedWorld& world, double x, double y, double z, double width, double height,
                                  bool lava) {
     // parity: `updateFluidHeightAndDoFluidPushing`.
-    // surface reaches its bottom.
     constexpr double kDeflate = 0.001;
     const double half = (width / 2.0) - kDeflate;
     const double minY = y + kDeflate;

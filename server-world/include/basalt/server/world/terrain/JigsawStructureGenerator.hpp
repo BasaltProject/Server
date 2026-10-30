@@ -21,7 +21,7 @@
 
 namespace basalt::server::world::terrain {
 
-/// Where a start sits and what the assembly calls its heightmap. parity: the `start_height` of a
+/// Where a start sits and what the assembly calls its heightmap. parity: jigsaw `start_height`.
 enum class JigsawHeightSource : std::uint8_t {
     Surface,
     Fixed,
@@ -63,7 +63,7 @@ struct JigsawStructureSettings {
     std::size_t cacheCapacity = 32;
 };
 
-/// the pillager outpost, the trail ruins, the ancient city and the trial chamber.
+/// The jigsaw structures: pillager outpost, trail ruins, ancient city and trial chamber.
 class JigsawStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;

@@ -31,8 +31,7 @@ bool SessionOutbox::offer(Frame frame) {
         return false;
     }
     if (pending_ + static_cast<std::int64_t>(frame.size()) > limitBytes_) {
-        // Dropping frames would desynchronize the client anyway, so the honest answer is to stop
-        // queueing and let the connection be closed.
+        // Dropping frames would desynchronize the client, so stop queueing and let the connection close.
         overflowed_ = true;
         return true;
     }

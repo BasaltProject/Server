@@ -47,8 +47,7 @@ constexpr double kLevelEventRange = 64.0;
 /// parity: `Entity.thunderHit`'s five points and eight seconds.
 constexpr float kLightningDamage = 5.0F;
 constexpr std::int32_t kLightningFireTicks = 160;
-/// parity: `MushroomCow.DATA_TYPE` after `AgeableMob`'s two.
-/// its swell direction.
+/// parity: `MushroomCow.DATA_TYPE`.
 constexpr std::uint8_t kMooshroomTypeIndex = 18;
 constexpr std::uint8_t kCreeperPoweredIndex = 17;
 /// parity: `LevelEvent.SOUND_ZOMBIE_INFECTED`.
@@ -144,7 +143,6 @@ bool MobActionSystem::tickConversion(world::LoadedWorld& world, const std::vecto
 
 std::int32_t MobActionSystem::cureProgress(world::LoadedWorld& world, const ServerEntity& mob) {
     // parity: `ZombieVillager.getConversionProgress`.
-    // and beds around it, and each one found may add a tick.
     random::RandomSource random = freshRandom();
     std::int32_t amount = 1;
     if (random.nextFloat() >= 0.01F) {
@@ -283,7 +281,6 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
 
 bool MobActionSystem::infectVillager(world::LoadedWorld& world, const ServerEntity& zombie, ServerEntity& villager) {
     // parity: `Zombie.killedEntity`.
-    // normal, never on easy.
     static constexpr std::array kZombies{"zombie", "husk", "drowned", "zombie_villager", "zombified_piglin"};
     const std::string_view difficulty = world.difficulty();
     if (villager.type().path() != "villager" || std::ranges::find(kZombies, zombie.type().path()) == kZombies.end() ||
@@ -431,7 +428,6 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
         return;
     }
     // parity: `Entity.thunderHit`.
-    // and five points. A turtle takes everything. Not burning is vanilla's minus one, our zero.
     mob.fireTicks = mob.fireTicks <= 0 ? kLightningFireTicks : mob.fireTicks + 1;
     const float damage = path == "turtle" ? std::numeric_limits<float>::max() : kLightningDamage;
     const entity::entityCombat::Result result =
@@ -455,7 +451,6 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
 void MobActionSystem::carryOver(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                 ServerEntity& from, ServerEntity& to) {
     // parity: `ConversionType.SINGLE`.
-    // off, and the new one takes the old one's seat.
     for (std::size_t index = 0; index < from.passengerIds.size(); ++index) {
         const std::int32_t passengerId = from.passengerIds[index];
         ServerEntity* passenger = world.state().entity(passengerId);
@@ -523,7 +518,6 @@ void MobActionSystem::finalizeConverted(world::LoadedWorld& world, const ServerE
             world::mobVariantSpawnFinalizer::beforeCommon("frog", context, group, data, bx, by, bz, random));
     }
     // parity: `ZombieVillager.finalizeSpawn` under `Zombie.finalizeSpawn(CONVERSION)`.
-    // no gear, but the doors, the reinforcements and a leader's bonus all rolled.
     const server::world::Chunk* chunk = world.state().chunkIfLoaded(bx >> 4, bz >> 4);
     const float special = world::mobLocalDifficulty::specialMultiplier(
         world.difficulty(), world.gameTime(), chunk == nullptr ? 0 : chunk->inhabitedTime(),

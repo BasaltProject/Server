@@ -57,7 +57,6 @@ void MobActionSystem::tickAxolotl(world::LoadedWorld& world, entity::ai::MobCont
     const bool inWater = isWaterAt(context.world, axolotl.x, axolotl.y, axolotl.z);
     axolotl.smoothSwimming = inWater;
     // parity: `Axolotl.hurtServer`.
-    // enough to kill.
     if (axolotl.hurtBy.has_value()) {
         const std::int32_t attacker = *std::exchange(axolotl.hurtBy, std::nullopt);
         state.hurtByEntity = attacker;
@@ -227,7 +226,6 @@ void MobActionSystem::tickAxolotl(world::LoadedWorld& world, entity::ai::MobCont
 
 void MobActionSystem::axolotlSupports(PlayerSession& player, std::int32_t axolotlId) {
     // parity: `applySupportingEffects`.
-    // mining fatigue lifted.
     const wire::common::Identifier regeneration = wire::common::Identifier::vanilla("regeneration");
     const auto existing = player.effects.find(regeneration);
     if (existing == player.effects.end() || existing->second.remainingTicks <= 2399) {

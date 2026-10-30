@@ -78,7 +78,6 @@ void MobActionSystem::tickBreeze(world::LoadedWorld& world, entity::ai::MobConte
         }
     }
     // parity: `StopAttackingIfTargetInvalid`.
-    // hundred ticks let go.
     std::optional<kit::Vec> targetAt;
     if (breeze.targetId.has_value()) {
         targetAt = kit::positionOf(context, *breeze.targetId, false);

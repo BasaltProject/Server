@@ -66,7 +66,6 @@ void ContainerMenuController::recomputeGrindstoneResult() {
 
 void ContainerMenuController::takeGrindstoneResult(PlayerSession& session) {
     // parity: `GrindstoneMenu.ResultSlot.onTake`.
-    // block as orbs and the stone grinds. Whoever took it gets nothing directly.
     static_cast<void>(session);
     const std::int32_t half = (grindstoneWorth_ + 1) / 2;
     const double roll = options_.nextDouble ? options_.nextDouble() : 0.0;

@@ -87,7 +87,7 @@ struct AdvancementCriterion {
     CriterionCondition condition;
 };
 
-/// AND-of-OR criterion groups. parity: `AdvancementRequirements.test`: every group must have at least
+/// AND-of-OR criterion groups. parity: `AdvancementRequirements.test`, every group needs one criterion.
 struct AdvancementRequirements {
     std::vector<std::vector<std::string>> groups;
 
@@ -121,7 +121,7 @@ struct AdvancementDisplay {
     bool hidden = false;
 };
 
-/// One advancement definition. parity: vanilla's `Advancement` record. The criteria keep the order
+/// One advancement definition. parity: vanilla's `Advancement` record.
 struct Advancement {
     std::optional<wire::common::Identifier> parent;
     std::vector<std::pair<std::string, AdvancementCriterion>> criteria;

@@ -83,10 +83,8 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
     const bool fierce = world.difficulty() == "normal" || world.difficulty() == "hard";
     std::vector<world::BlockChange> changes;
     // parity: `life == 2` does everything to the blocks.
-    // on normal and hard, and it is heard as fourteen.
     if (bolt.boltLife == 2) {
-        // parity: `getStrikePosition`, which nudges down by a millionth so a bolt standing on a.
-        // whole number hits the block under its feet and not the air it is in.
+        // parity: `getStrikePosition`.
         world::lightning::strike(world.state(), mth::floor(bolt.x), mth::floor(bolt.y - 1.0e-6), mth::floor(bolt.z),
                                  false, random, changes);
         if (fierce && !bolt.boltVisualOnly &&

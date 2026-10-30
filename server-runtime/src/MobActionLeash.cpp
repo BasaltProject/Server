@@ -200,7 +200,6 @@ ServerEntity* MobActionSystem::knotAt(world::LoadedWorld& world, const std::arra
 
 void MobActionSystem::tickLeash(world::LoadedWorld& world, ServerEntity& leashed) {
     // parity: `restoreLeashFromSave`.
-    // lead dropped once it has waited long enough.
     if (!leashed.leashHolderId.has_value() &&
         (leashed.leashHolderUuid.has_value() || leashed.leashKnotAt.has_value())) {
         std::optional<std::int32_t> found;

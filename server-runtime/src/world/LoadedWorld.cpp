@@ -406,8 +406,7 @@ void LoadedWorld::updateSkyBrightness() {
 }
 
 bool LoadedWorld::tickTime(random::RandomSource& random) {
-    // parity: `MinecraftServer.tickChildren` moves the day clock before any level ticks.
-    // parity: Purpur's day and night lengths, a tick of either phase being a twelve-thousandth of the cycle.
+    // parity: `MinecraftServer.tickChildren` moves the day clock first; Purpur's day and night lengths.
     const config::GameplayRules::Mechanics& cycle = state_.gameplay().mechanics;
     const float phaseTicks = static_cast<float>(beds::isNight(clock_.totalTicks()) ? cycle.daylightNighttimeTicks
                                                                                    : cycle.daylightDaytimeTicks);

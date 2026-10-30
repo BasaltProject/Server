@@ -65,7 +65,7 @@ constexpr std::array<StumpVine, 4> kStumpVines{
     return isValidTreePos(chunk, x, y, z) && isOverSolidGround(chunk, x, y, z);
 }
 
-/// The bucket iteration order of vanilla's `HashSet<BlockPos>`, which the mushroom shuffle starts
+/// The bucket iteration order of vanilla's `HashSet<BlockPos>`, which the mushroom shuffle starts from.
 
 void decorateStumpVines(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z) {
     for (const StumpVine& vine : kStumpVines) {

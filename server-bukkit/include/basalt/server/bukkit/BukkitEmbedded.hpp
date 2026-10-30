@@ -5,7 +5,7 @@
 #include <string_view>
 
 namespace basalt::server::bukkit {
-/// The Shim machine and the Java half, compiled into the binary. Every piece is empty when the build could not make it.
+/// The Shim machine and the Java half compiled into the binary; empty when the build could not make them.
 struct EmbeddedRuntime {
     std::span<const std::uint8_t> libjvm;
     std::span<const std::uint8_t> bootClasspath;

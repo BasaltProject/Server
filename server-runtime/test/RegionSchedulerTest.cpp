@@ -42,7 +42,6 @@ TEST_CASE("the grid is sixteen chunks a side and a section packs into one number
     CHECK(regionMap::sectionOf(0) == 0);
     CHECK(regionMap::sectionOf(15) == 0);
     CHECK(regionMap::sectionOf(16) == 1);
-    // A shift, not a division: chunk -1 belongs to section -1, not to section 0.
     CHECK(regionMap::sectionOf(-1) == -1);
     CHECK(regionMap::sectionOf(-16) == -1);
     CHECK(regionMap::sectionOf(-17) == -2);
@@ -63,7 +62,6 @@ TEST_CASE("sections that touch are one group, diagonals included") {
 
     CHECK(sizesOf(regionMap::components({regionMap::sectionKey(0, 0)})) == std::vector<std::size_t>{1});
 
-    // Edge-sharing and corner-sharing sections are both one group: what is in one can reach into the other in a tick.
     CHECK(sizesOf(regionMap::components({regionMap::sectionKey(0, 0), regionMap::sectionKey(1, 0)})) ==
           std::vector<std::size_t>{2});
     CHECK(sizesOf(regionMap::components({regionMap::sectionKey(0, 0), regionMap::sectionKey(1, 1)})) ==
@@ -72,7 +70,6 @@ TEST_CASE("sections that touch are one group, diagonals included") {
     CHECK(sizesOf(regionMap::components({regionMap::sectionKey(0, 0), regionMap::sectionKey(2, 0)})) ==
           std::vector<std::size_t>{1, 1});
 
-    // A staircase says all eight directions are walked: a missing direction leaves a section behind.
     CHECK(sizesOf(regionMap::components({regionMap::sectionKey(0, 0), regionMap::sectionKey(1, 1),
                                          regionMap::sectionKey(0, 2)})) == std::vector<std::size_t>{3});
     CHECK(sizesOf(regionMap::components({regionMap::sectionKey(0, 0), regionMap::sectionKey(1, 1),
@@ -146,7 +143,6 @@ TEST_CASE("with regions off nothing is ever repartitioned") {
     }
     scheduler.repartition("world", far, [&changes](std::int32_t, std::int32_t) { ++changes; });
 
-    // Two far-apart groups are still one region: this is the vanilla order of tick, and the default.
     CHECK(scheduler.regionsOf("world").size() == 1);
     CHECK(only.sections().empty());
     CHECK(changes == 0);
@@ -252,7 +248,6 @@ TEST_CASE("the survivor of a merge is whoever already owns most of the group") {
     CHECK(scheduler.regionsOf("world")[1]->sections().size() == 2);
     CHECK(scheduler.regionsOf("world")[2]->sections().size() == 1);
 
-    // The second region has more of the group than the first (one section), so it keeps it and fewer tasks move.
     std::vector<std::int64_t> joined;
     for (std::int32_t section = 42; section <= 82; ++section) {
         for (const std::int64_t chunk : chunksOfSection(section, 0)) {
@@ -327,7 +322,6 @@ TEST_CASE("a chunk nobody owns is answered by a region rather than by a new one"
     scheduler.repartition("world", islands);
     REQUIRE(scheduler.regionsOf("world").size() == 2);
 
-    // A chunk that is not loaded belongs to whoever asks first: making a region for it would leave one nothing ticks.
     Region& answer = scheduler.regionFor("world", 9000 * 16, 9000 * 16);
     CHECK(&answer == scheduler.regionsOf("world")[0]);
     CHECK(scheduler.regionsOf("world").size() == 2);
@@ -343,7 +337,6 @@ TEST_CASE("a turn runs the global owner around the regions") {
     scheduler.global().scheduleAtEnd([&ran] { ran.emplace_back("global end"); });
     scheduler.tick(rethrowOnFailure(), [&ran](Region& region) { ran.push_back(region.worldName()); });
 
-    // Loaded order, not sorted: "nether" is before "world" alphabetically and after it on a server.
     CHECK(ran == std::vector<std::string>{"global", "world", "nether", "global end"});
 
     for (const Region* region : scheduler.regions()) {
@@ -380,7 +373,6 @@ TEST_CASE("with several worker threads every region still finishes before the ne
         CHECK(insideAtOnce.load() == 0);
     }
     CHECK(ticked.load() == 100);
-    // Not asserted as a number: how many actually overlap is up to the machine.
     CHECK(mostAtOnce.load() >= 1);
     scheduler.close();
 }

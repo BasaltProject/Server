@@ -806,8 +806,7 @@ void BasaltServer::startBedrockListener() {
                 if (found == worlds.end() || found->second == nullptr) {
                     return;
                 }
-                // TEMPORARY: whether the world agreed, which is what tells a refused break from a
-                // break that never arrived.
+                // TEMPORARY: whether the world agreed tells a refused break from one that never arrived.
                 const bool broke = player::breakBlockFor(*session, *found->second, x, y, z, breakContext());
                 logger_.debug([broke, x, y, z] {
                     return std::string{"break at "} + std::to_string(x) + ", " + std::to_string(y) + ", " +
@@ -1818,8 +1817,7 @@ void BasaltServer::startBedrockListener() {
                     placing.placed = [this](world::LoadedWorld& at, std::int32_t x, std::int32_t y, std::int32_t z) {
                         withers_->placed(at, x, y, z);
                     };
-                    // TEMPORARY: whether the world took it, which is what tells a refused placement
-                    // from one that never reached here.
+                    // TEMPORARY: whether the world took it tells a refused placement from one that never arrived.
                     const bool placed =
                         player::placeBlockFor(*session, *found->second, hit, *item, slot, *held, placing);
                     logger_.debug([placed, &hit, &held] {

@@ -230,8 +230,7 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
             environment->syncChunks(*where, box.minX, box.minZ, box.maxX, box.maxZ);
         };
     };
-    // parity: `RetryOptions` from the command and the flaky tries of the test itself, as `ReportGameListener` counts
-    // them.
+    // parity: `RetryOptions` and the flaky tries of the test itself, as `ReportGameListener` counts them.
     using Begin = std::function<std::optional<std::string>(BlockTests::Reporter)>;
     const auto withRetries = [this, reporterFor](const CommandContext& context, const world::TestInstance& instance,
                                                  Begin begin) -> std::optional<std::string> {

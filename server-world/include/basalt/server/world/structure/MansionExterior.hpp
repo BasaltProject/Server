@@ -35,7 +35,7 @@ public:
     void turn(std::vector<MansionPiece>& pieces, MansionPlacement& data) const;
     void innerTurn(MansionPlacement& data) const;
 
-    /// set out. parity: `traverseOuterWalls`, whose loop is a do-while, so a one-cell house still
+    /// Walks the outer walls. parity: `traverseOuterWalls`, a do-while, so a one-cell house still runs once.
     void traverseOuterWalls(std::vector<MansionPiece>& pieces, MansionPlacement& data, const SimpleGrid& grid,
                             StructureDirection heading, std::int32_t startGridX, std::int32_t startGridY,
                             std::int32_t endX, std::int32_t endY) const;
