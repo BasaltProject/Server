@@ -18,6 +18,7 @@ public class CraftPlayer extends BasaltPlayer {
         if (handle == null) {
             Connection connection = new Connection(ChannelBridge.channelOf(getUniqueId()));
             handle = new ServerPlayer(new ServerGamePacketListenerImpl(connection));
+            handle.bindPlayer(this);
         }
         return handle;
     }

@@ -9,7 +9,4 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
         super(connection);
     }
 
-    public void send(Packet<?> packet) {
-        throw Unsupported.hit("net.minecraft.server.network.ServerGamePacketListenerImpl.send");
-    }
 }

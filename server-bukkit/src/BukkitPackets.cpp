@@ -58,6 +58,11 @@ public:
         return found == endpoints_.end() ? nullptr : found->second.lock();
     }
 
+    void rememberEndpoint(const std::shared_ptr<PacketEndpoint>& endpoint) {
+        const std::lock_guard<std::mutex> guard{mutex_};
+        endpoints_.insert_or_assign(endpoint->connectionId(), endpoint);
+    }
+
 private:
     void onPacket(PluginPacket& packet) {
         if (packet.endpoint == nullptr) {
@@ -192,7 +197,25 @@ jlong JNICALL nativeConnectionOf(JNIEnv* env, jclass, jstring uuid) {
         return 0;
     }
     const std::shared_ptr<PacketEndpoint> endpoint = BukkitBridge::current().services().packets().endpointOf(*player);
-    return endpoint == nullptr ? 0 : static_cast<jlong>(endpoint->connectionId());
+    if (endpoint == nullptr) {
+        return 0;
+    }
+    // A plugin may first request a channel after login, before any packet has
+    // traversed the lazy tap. Retain the real endpoint before opening its peer,
+    // so even the first outbound write has somewhere to go.
+    tap().rememberEndpoint(endpoint);
+    jclass bridge = env->FindClass("org/basaltmc/bukkit/net/ChannelBridge");
+    if (bridge != nullptr) {
+        jmethodID open = env->GetStaticMethodID(bridge, "ensureOpen", "(JLjava/lang/String;I)V");
+        if (open != nullptr) {
+            jstring address = toJava(env, endpoint->address());
+            env->CallStaticVoidMethod(bridge, open, static_cast<jlong>(endpoint->connectionId()), address,
+                                      static_cast<jint>(endpoint->port()));
+            env->DeleteLocalRef(address);
+        }
+        env->DeleteLocalRef(bridge);
+    }
+    return static_cast<jlong>(endpoint->connectionId());
 }
 } // namespace
 

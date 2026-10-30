@@ -16,6 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import net.minecraft.network.Connection;
@@ -64,6 +65,7 @@ public final class ChannelBridge {
     }
 
     public static void shutdown() {
+        for (Long connection : new ArrayList<>(links.keySet())) closed(connection);
         synchronized (guard) {
             if (group != null) {
                 group.shutdownGracefully(0, 1, java.util.concurrent.TimeUnit.SECONDS).awaitUninterruptibly(3000);
@@ -95,6 +97,7 @@ public final class ChannelBridge {
     }
 
     public static BasaltChannel channelOf(UUID player) {
+        start();
         long id = Natives.packetConnectionOf(player.toString());
         Link link = id == 0 ? null : links.get(id);
         if (kTrace) {
@@ -211,6 +214,10 @@ public final class ChannelBridge {
     private static Link open(long connection, String address, int port) {
         Link made;
         synchronized (guard) {
+            Link existing = links.get(connection);
+            if (existing != null) {
+                return existing;
+            }
             if (serverChannel == null) {
                 return null;
             }
@@ -222,7 +229,7 @@ public final class ChannelBridge {
             fresh.channel.pipeline().addLast("splitter", new ChannelInboundHandlerAdapter());
             fresh.channel.pipeline().addLast("decoder", new FromWire(fresh));
             fresh.channel.pipeline().addLast("prepender", new ToWire(fresh));
-            fresh.channel.pipeline().addLast("encoder", new ChannelOutboundHandlerAdapter());
+            fresh.channel.pipeline().addLast("encoder", new WirePacketEncoder());
             links.put(connection, made);
             try {
                 // Like netty's acceptor: the server pipeline sees the child first, then the child registers.
@@ -244,6 +251,11 @@ public final class ChannelBridge {
             }
         }
         return made;
+    }
+
+    /** Attach an already logged-in connection when the channel API is first used. */
+    public static void ensureOpen(long connection, String address, int port) {
+        open(connection, address, port);
     }
 
     private static byte[] patchHandshake(byte[] body) {
@@ -343,7 +355,7 @@ public final class ChannelBridge {
         }
         link.channel.eventLoop().execute(() -> {
             try {
-                link.channel.writeAndFlush(frame(id, body));
+                link.channel.writeAndFlush(PacketCodec.fromNative(id, body));
             } catch (Throwable t) {
                 Natives.log(2, "Bukkit", "A packet listener failed on an outbound packet: " + t);
             }
@@ -360,7 +372,15 @@ public final class ChannelBridge {
             connections.remove(link.connection);
         }
         link.channel.markClosedFromNative();
-        link.channel.eventLoop().execute(() -> link.channel.unsafe().close(link.channel.unsafe().voidPromise()));
+        EventLoop loop = link.channel.eventLoop();
+        try {
+            loop.execute(() -> link.channel.unsafe().close(link.channel.unsafe().voidPromise()));
+        } catch (RejectedExecutionException failure) {
+            if (!loop.isShuttingDown()) throw failure;
+            // A native close can race the final event-loop termination. The
+            // peer has already been detached; do not queue onto a dead loop.
+            link.channel.unsafe().closeForcibly();
+        }
     }
 
     static void closedByPlugin(long connection) {

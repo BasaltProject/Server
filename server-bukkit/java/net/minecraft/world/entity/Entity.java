@@ -29,6 +29,29 @@ import org.bukkit.event.entity.CreatureSpawnEvent;
 
 public class Entity implements Nameable, EntityAccess, ScoreHolder, SyncedDataHolder, DataComponentGetter, ItemOwner,
     SlotProvider, DebugValueSource, TypedInstance {
+    public static final net.minecraft.network.syncher.EntityDataAccessor<Byte> DATA_SHARED_FLAGS_ID =
+        net.minecraft.network.syncher.EntityDataSerializers.BYTE.createAccessor(0);
+    private final net.minecraft.network.syncher.SynchedEntityData entityData = new net.minecraft.network.syncher.SynchedEntityData(this);
+    private org.bukkit.entity.Entity boundEntity;
+    private byte unboundFlags;
+    public void bindBukkitEntity(org.bukkit.entity.Entity entity) { boundEntity=entity; }
+    public net.minecraft.network.syncher.SynchedEntityData getEntityData(){return entityData;}
+    public byte sharedFlags(){
+        org.bukkit.entity.Entity entity=boundEntity;
+        if(entity==null && isBound())entity=(org.bukkit.entity.Entity)getBukkitEntity();
+        if(entity==null)return unboundFlags;
+        int flags=(entity.getFireTicks()>0||entity.isVisualFire()?1:0)|(entity.isInvisible()?32:0)|(entity.isGlowing()?64:0);
+        if(entity instanceof org.bukkit.entity.LivingEntity living){if(living.isSwimming())flags|=16;if(living.isGliding())flags|=128;}
+        if(entity instanceof org.bukkit.entity.Player player){if(player.isSneaking())flags|=2;if(player.isSprinting())flags|=8;}
+        return (byte)flags;
+    }
+    public void sharedFlags(byte flags){
+        unboundFlags=flags;
+        org.bukkit.entity.Entity entity=boundEntity;if(entity==null && isBound())entity=(org.bukkit.entity.Entity)getBukkitEntity();
+        if(entity!=null){entity.setGlowing((flags&64)!=0);entity.setInvisible((flags&32)!=0);entity.setVisualFire((flags&1)!=0);
+            if(entity instanceof org.bukkit.entity.Player player){player.setSneaking((flags&2)!=0);player.setSprinting((flags&8)!=0);}
+            if(entity instanceof org.bukkit.entity.LivingEntity living){living.setSwimming((flags&16)!=0);living.setGliding((flags&128)!=0);}}
+    }
     public boolean generation = false;
     public CreatureSpawnEvent.SpawnReason spawnReason;
 
