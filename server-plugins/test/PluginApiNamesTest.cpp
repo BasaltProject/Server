@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <doctest.h>
+#include "../src/PluginFilePath.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -8,6 +9,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace {
 [[nodiscard]] std::string slurp(const std::filesystem::path& path) {
@@ -52,4 +54,21 @@ TEST_CASE("every function the Lua API installs is listed in the Kiln API manifes
         report += name + " ";
     }
     CHECK_MESSAGE(missing.empty(), "add to Kiln api/server.api and DevTools, then mirror it here: " << report);
+}
+
+TEST_CASE("Lua file paths reject symlink escapes and retain plugin-local access") {
+    namespace fs = std::filesystem;
+    using basalt::server::plugins::pluginApi::pluginFilePath;
+    const fs::path scratch = fs::temp_directory_path() / "basalt-plugin-path-test";
+    fs::remove_all(scratch);
+    fs::create_directories(scratch / "plugin" / "local");
+    fs::create_directories(scratch / "outside");
+    fs::create_directory_symlink(scratch / "outside", scratch / "plugin" / "escape");
+    fs::create_directory_symlink(scratch / "plugin" / "local", scratch / "plugin" / "inside");
+    CHECK(pluginFilePath((scratch / "plugin").string(), "local/new/data.txt").has_value());
+    CHECK(pluginFilePath((scratch / "plugin").string(), "inside/file.txt") == fs::weakly_canonical(scratch / "plugin/local/file.txt").string());
+    for (const std::string& path : std::vector<std::string>{"../outside/file", "/etc/passwd", "escape/file", "escape/new/file", "C:/file", "local\\file", std::string("a\0b",3)}) {
+        CHECK_FALSE(pluginFilePath((scratch / "plugin").string(), path).has_value());
+    }
+    fs::remove_all(scratch);
 }

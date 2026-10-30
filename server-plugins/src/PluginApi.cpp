@@ -1,4 +1,5 @@
 #include "PluginApiShared.hpp"
+#include "PluginFilePath.hpp"
 
 namespace basalt::server::plugins::pluginApi {
 namespace {
@@ -41,20 +42,22 @@ void installIdentity(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugi
     lua.setGlobal("config");
 }
 
-[[nodiscard]] std::string insideFolder(LuaArgs& args, std::int32_t index) {
+[[nodiscard]] std::string insideFolder(LuaArgs& args, std::int32_t index, std::string_view folder) {
     std::string path = args.checkString(index);
-    if (path.starts_with('/') || path.find('\\') != std::string::npos || path.find("..") != std::string::npos) {
+    const auto live = pluginFilePath(folder, path);
+    if (!live.has_value()) {
         args.raise("'" + path + "' is outside the plugin folder");
     }
-    return path;
+    return *live;
 }
 
 void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
     LoadedPlugin* target = &plugin;
     lua.pushTable();
     wire::lua::pushHostFunction(lua, "files.read", [target](LuaArgs& args) {
-        const std::string path = insideFolder(args, 1);
-        std::optional<std::string> text = wire::io::fileIO::readText(target->folder + "/" + path);
+        const std::string path = args.checkString(1);
+        const std::string live = insideFolder(args, 1, target->folder);
+        std::optional<std::string> text = wire::io::fileIO::readText(live);
         if (!text.has_value()) {
             text = target->pkg->readText(std::string{wire::plugins::packageLayout::kResources} + path);
         }
@@ -67,8 +70,9 @@ void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
     });
     lua.setField("read");
     wire::lua::pushHostFunction(lua, "files.exists", [target](LuaArgs& args) {
-        const std::string path = insideFolder(args, 1);
-        args.pushBoolean(wire::io::fileIO::exists(target->folder + "/" + path) ||
+        const std::string path = args.checkString(1);
+        const std::string live = insideFolder(args, 1, target->folder);
+        args.pushBoolean(wire::io::fileIO::exists(live) ||
                          target->pkg->exists(std::string{wire::plugins::packageLayout::kResources} + path));
         return 1;
     });
@@ -87,9 +91,9 @@ void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
     });
     lua.setField("list");
     wire::lua::pushHostFunction(lua, "files.write", [target](LuaArgs& args) {
-        const std::string path = insideFolder(args, 1);
+        const std::string path = args.checkString(1);
+        const std::string live = insideFolder(args, 1, target->folder);
         const std::string text = args.checkString(2);
-        const std::string live = target->folder + "/" + path;
         const std::size_t slash = live.rfind('/');
         if (slash != std::string::npos) {
             wire::io::fileIO::createDirectories(live.substr(0, slash));
