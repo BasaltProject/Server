@@ -89,12 +89,13 @@ public:
     ~LoadedWorld();
 
     [[nodiscard]] std::shared_ptr<LoadedWorld> keepAlive() {
-        if (auto held = weak_from_this().lock()) return held;
+        if (auto held = weak_from_this().lock())
+            return held;
         // Stack-owned test/embedded worlds retain their caller-managed lifetime.
         return std::shared_ptr<LoadedWorld>{std::shared_ptr<LoadedWorld>{}, this};
     }
-    [[nodiscard]] bool retired() const noexcept { return retired_.load(); }
 
+    [[nodiscard]] bool retired() const noexcept { return retired_.load(); }
 
     [[nodiscard]] const config::WorldDeclaration& declaration() const noexcept { return declaration_; }
 

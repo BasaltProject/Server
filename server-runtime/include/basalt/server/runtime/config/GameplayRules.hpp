@@ -147,7 +147,8 @@ struct GameplayRules {
         return forced == 0 ? rule : forced == 1;
     }
 
-    [[nodiscard]] static GameplayRules from(const wire::common::toml::TomlTable* gameplay, const GameplayRules& inherited);
+    [[nodiscard]] static GameplayRules from(const wire::common::toml::TomlTable* gameplay,
+                                            const GameplayRules& inherited);
 
     friend bool operator==(const GameplayRules&, const GameplayRules&) = default;
 };

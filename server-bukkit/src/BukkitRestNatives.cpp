@@ -178,7 +178,8 @@ jboolean JNICALL nativeUseGeneratorWith(JNIEnv* env, jclass, jstring world, jint
                            return;
                        }
                        JniLocalFrame frame{callEnv};
-                       if (!frame) return;
+                       if (!frame)
+                           return;
                        jintArray base = nullptr;
                        if (!blocks.empty()) {
                            std::vector<jint> given;

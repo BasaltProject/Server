@@ -9,13 +9,13 @@
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/common/timings/Timings.hpp>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
-#include <optional>
-#include <atomic>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>

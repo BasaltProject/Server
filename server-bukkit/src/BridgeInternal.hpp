@@ -1,8 +1,8 @@
 #pragma once
 
 #include <basalt/server/bukkit/BukkitHost.hpp>
-#include <basalt/server/bukkit/ShimHost.hpp>
 #include <basalt/server/bukkit/JniLocalFrame.hpp>
+#include <basalt/server/bukkit/ShimHost.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
@@ -71,7 +71,7 @@ private:
     bool deliver(const std::string& event, std::int32_t priority, Snapshot& snapshot);
     bool runCommand(const std::string& name, plugins::PluginCommandCall& call);
     std::vector<std::string> completeCommand(const std::string& name, plugins::PluginCommandCall& call,
-                                              std::string_view input);
+                                             std::string_view input);
     void reportJavaFailure(JNIEnv* env, std::string_view where);
 
     ShimHost* shim_;

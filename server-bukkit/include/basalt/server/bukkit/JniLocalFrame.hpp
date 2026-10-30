@@ -10,10 +10,17 @@ class JniLocalFrame {
 public:
     explicit JniLocalFrame(JNIEnv* env, jint capacity = 64)
         : env_(env), valid_(env != nullptr && env->PushLocalFrame(capacity) == JNI_OK) {}
-    ~JniLocalFrame() { if (valid_) env_->PopLocalFrame(nullptr); }
+
+    ~JniLocalFrame() {
+        if (valid_)
+            env_->PopLocalFrame(nullptr);
+    }
+
     JniLocalFrame(const JniLocalFrame&) = delete;
     JniLocalFrame& operator=(const JniLocalFrame&) = delete;
+
     explicit operator bool() const noexcept { return valid_; }
+
 private:
     JNIEnv* env_;
     bool valid_;

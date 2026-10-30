@@ -134,7 +134,8 @@ std::expected<void, std::string> BukkitBridge::boot() {
         return std::unexpected(std::string{"cannot attach to the VM"});
     }
     JniLocalFrame frame{env};
-    if (!frame) return std::unexpected(std::string{"cannot allocate a JNI local frame"});
+    if (!frame)
+        return std::unexpected(std::string{"cannot allocate a JNI local frame"});
     gBoxes.booleanClass = globalClass(env, "java/lang/Boolean");
     gBoxes.longClass = globalClass(env, "java/lang/Long");
     gBoxes.doubleClass = globalClass(env, "java/lang/Double");
@@ -206,14 +207,15 @@ std::expected<void, std::string> BukkitBridge::boot() {
     commandMethod_ = env->GetStaticMethodID(runtime_, "command",
                                             "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/"
                                             "String;DDDLjava/lang/String;Ljava/lang/String;)Z");
-    completionMethod_ = env->GetStaticMethodID(runtime_, "completeCommand",
+    completionMethod_ = env->GetStaticMethodID(
+        runtime_, "completeCommand",
         "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;DDDLjava/lang/String;"
         "Ljava/lang/String;)[Ljava/lang/String;");
     channelMethod_ = env->GetStaticMethodID(runtime_, "channelMessage", "(Ljava/lang/String;Ljava/lang/String;[B)V");
     listMethod_ = env->GetStaticMethodID(runtime_, "pluginList", "()[Ljava/lang/String;");
     if (channelMethod_ == nullptr || enableMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr ||
-        taskMethod_ == nullptr || eventMethod_ == nullptr || commandMethod_ == nullptr || completionMethod_ == nullptr ||
-        listMethod_ == nullptr) {
+        taskMethod_ == nullptr || eventMethod_ == nullptr || commandMethod_ == nullptr ||
+        completionMethod_ == nullptr || listMethod_ == nullptr) {
         reportJavaFailure(env, "resolving BukkitRuntime entry points");
         return std::unexpected(std::string{"BukkitRuntime entry points not found"});
     }
@@ -236,7 +238,9 @@ bool BukkitBridge::enable() {
         return false;
     }
     JniLocalFrame frame{env};
-    if (!frame) { return false; }
+    if (!frame) {
+        return false;
+    }
     jstring plugins = toJava(env, options_.pluginsFolder);
     const jboolean ok = env->CallStaticBooleanMethod(runtime_, enableMethod_, plugins);
     env->DeleteLocalRef(plugins);
@@ -254,7 +258,9 @@ std::vector<BukkitHost::PluginState> BukkitBridge::javaPlugins() {
         return found;
     }
     JniLocalFrame frame{env};
-    if (!frame) { return found; }
+    if (!frame) {
+        return found;
+    }
     auto* rows = static_cast<jobjectArray>(env->CallStaticObjectMethod(runtime_, listMethod_));
     if (env->ExceptionCheck() == JNI_TRUE || rows == nullptr) {
         env->ExceptionClear();
@@ -283,7 +289,8 @@ bool BukkitBridge::shutdown() {
     bool clean = false;
     if (env != nullptr && runtime_ != nullptr && shutdownMethod_ != nullptr) {
         JniLocalFrame frame{env};
-        if (!frame) return false;
+        if (!frame)
+            return false;
         clean = env->CallStaticBooleanMethod(runtime_, shutdownMethod_) == JNI_TRUE;
         if (env->ExceptionCheck() == JNI_TRUE) {
             reportJavaFailure(env, "BukkitRuntime.shutdown");
@@ -303,20 +310,22 @@ void BukkitBridge::reportJavaFailure(JNIEnv* env, std::string_view where) {
     env->ExceptionClear();
     std::string trace;
     if (failure != nullptr && runtime_ != nullptr) {
-        jmethodID describe = env->GetStaticMethodID(runtime_, "describeFailure", "(Ljava/lang/Throwable;)Ljava/lang/String;");
+        jmethodID describe =
+            env->GetStaticMethodID(runtime_, "describeFailure", "(Ljava/lang/Throwable;)Ljava/lang/String;");
         if (describe != nullptr) {
             jstring written = static_cast<jstring>(env->CallStaticObjectMethod(runtime_, describe, failure));
             if (env->ExceptionCheck() != JNI_TRUE && written != nullptr) {
                 trace = toStd(env, written);
             }
-            if (written != nullptr) env->DeleteLocalRef(written);
+            if (written != nullptr)
+                env->DeleteLocalRef(written);
         }
         // A formatting failure must not replace or leave pending the original.
-        if (env->ExceptionCheck() == JNI_TRUE) env->ExceptionClear();
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
     }
-    log_.error([where, &trace] {
-        return "Java failure in " + std::string{where} + (trace.empty() ? "" : "\n" + trace);
-    });
+    log_.error(
+        [where, &trace] { return "Java failure in " + std::string{where} + (trace.empty() ? "" : "\n" + trace); });
     if (failure != nullptr) {
         if (trace.empty()) {
             env->Throw(failure);
@@ -333,7 +342,9 @@ void BukkitBridge::runTask(std::int64_t id) {
         return;
     }
     JniLocalFrame frame{env};
-    if (!frame) { return; }
+    if (!frame) {
+        return;
+    }
     env->CallStaticVoidMethod(runtime_, taskMethod_, static_cast<jlong>(id));
     if (env->ExceptionCheck() == JNI_TRUE) {
         reportJavaFailure(env, "a scheduled task");
@@ -379,7 +390,9 @@ bool BukkitBridge::deliver(const std::string& event, std::int32_t priority, Snap
         return false;
     }
     JniLocalFrame frame{env};
-    if (!frame) { return snapshot.cancelled; }
+    if (!frame) {
+        return snapshot.cancelled;
+    }
     const std::vector<std::string>& names = snapshot.type->fields();
     jclass objectClass = env->FindClass("java/lang/Object");
     jobjectArray fields = env->NewObjectArray(static_cast<jsize>(names.size()), objectClass, nullptr);
@@ -508,7 +521,9 @@ bool BukkitBridge::runCommand(const std::string& name, plugins::PluginCommandCal
         return false;
     }
     JniLocalFrame frame{env};
-    if (!frame) { return false; }
+    if (!frame) {
+        return false;
+    }
     const plugins::PluginCommandCall::Argument raw = call.argument("args");
     const std::string* line = std::get_if<std::string>(&raw);
     jstring command = toJava(env, name);
@@ -535,12 +550,16 @@ bool BukkitBridge::runCommand(const std::string& name, plugins::PluginCommandCal
 }
 
 std::vector<std::string> BukkitBridge::completeCommand(const std::string& name, plugins::PluginCommandCall& call,
-                                                      std::string_view input) {
-    if (stopping()) return {};
+                                                       std::string_view input) {
+    if (stopping())
+        return {};
     JNIEnv* env = shim_->env();
-    if (env == nullptr) return {};
+    if (env == nullptr)
+        return {};
     JniLocalFrame frame{env};
-    if (!frame) { return {}; }
+    if (!frame) {
+        return {};
+    }
     jstring command = toJava(env, name);
     jstring sender = toJava(env, call.source());
     jstring args = toJava(env, input);
@@ -550,8 +569,8 @@ std::vector<std::string> BukkitBridge::completeCommand(const std::string& name, 
     const std::array<double, 3> at = call.position();
     plugins::PluginCommandCall* previous = gCurrentCall;
     gCurrentCall = &call;
-    jobjectArray found = static_cast<jobjectArray>(env->CallStaticObjectMethod(runtime_, completionMethod_,
-        command, sender, kind, world, at[0], at[1], at[2], caller, args));
+    jobjectArray found = static_cast<jobjectArray>(env->CallStaticObjectMethod(
+        runtime_, completionMethod_, command, sender, kind, world, at[0], at[1], at[2], caller, args));
     gCurrentCall = previous;
     std::vector<std::string> result;
     if (env->ExceptionCheck() == JNI_TRUE) {
@@ -570,8 +589,10 @@ std::vector<std::string> BukkitBridge::completeCommand(const std::string& name, 
             }
         }
     }
-    if (found != nullptr) env->DeleteLocalRef(found);
-    for (jstring value : {command, sender, args, kind, world, caller}) env->DeleteLocalRef(value);
+    if (found != nullptr)
+        env->DeleteLocalRef(found);
+    for (jstring value : {command, sender, args, kind, world, caller})
+        env->DeleteLocalRef(value);
     return result;
 }
 
@@ -612,7 +633,8 @@ void BukkitBridge::listenChannel(const std::string& channel) {
             return;
         }
         JniLocalFrame frame{env};
-        if (!frame) return;
+        if (!frame)
+            return;
         jbyteArray payload = env->NewByteArray(static_cast<jsize>(bytes.size()));
         env->SetByteArrayRegion(payload, 0, static_cast<jsize>(bytes.size()),
                                 reinterpret_cast<const jbyte*>(bytes.data()));

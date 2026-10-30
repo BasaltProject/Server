@@ -1,5 +1,5 @@
-#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSigns.hpp>

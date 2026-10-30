@@ -39,9 +39,10 @@ public:
             env->ExceptionClear();
             return;
         }
-        listener_ = bridge_->plugins().packets().addNative(
-            plugins::PacketScope{}, kLastPriority, false, [this](PluginPacket& packet) { onPacket(packet); });
-        closer_ = bridge_->plugins().packets().addCloseListener([this](std::uint64_t connection) { onClosed(connection); });
+        listener_ = bridge_->plugins().packets().addNative(plugins::PacketScope{}, kLastPriority, false,
+                                                           [this](PluginPacket& packet) { onPacket(packet); });
+        closer_ =
+            bridge_->plugins().packets().addCloseListener([this](std::uint64_t connection) { onClosed(connection); });
         started_ = true;
     }
 
@@ -79,7 +80,8 @@ private:
             return;
         }
         JniLocalFrame frame{env};
-        if (!frame) return;
+        if (!frame)
+            return;
         const jsize size = static_cast<jsize>(packet.bytes.size());
         jbyteArray body = env->NewByteArray(size);
         env->SetByteArrayRegion(body, 0, size, reinterpret_cast<const jbyte*>(packet.bytes.data()));
@@ -88,9 +90,9 @@ private:
             const bool first = packet.address.phase == plugins::PacketPhase::Handshake;
             jstring address = first ? toJava(env, packet.endpoint->address()) : nullptr;
             const jint port = first ? static_cast<jint>(packet.endpoint->port()) : 0;
-            jobject result = env->CallStaticObjectMethod(bridge_class_, inbound_, static_cast<jlong>(packet.connection),
-                                                         phase, static_cast<jint>(packet.address.id), body, address,
-                                                         port);
+            jobject result =
+                env->CallStaticObjectMethod(bridge_class_, inbound_, static_cast<jlong>(packet.connection), phase,
+                                            static_cast<jint>(packet.address.id), body, address, port);
             if (env->ExceptionCheck() == JNI_TRUE) {
                 bridge_->reportFailure(env, "a serverbound packet listener");
             } else if (result == nullptr) {
@@ -109,9 +111,9 @@ private:
                 env->DeleteLocalRef(address);
             }
         } else {
-            const jboolean taken = env->CallStaticBooleanMethod(bridge_class_, outbound_,
-                                                                static_cast<jlong>(packet.connection), phase,
-                                                                static_cast<jint>(packet.address.id), body);
+            const jboolean taken =
+                env->CallStaticBooleanMethod(bridge_class_, outbound_, static_cast<jlong>(packet.connection), phase,
+                                             static_cast<jint>(packet.address.id), body);
             if (env->ExceptionCheck() == JNI_TRUE) {
                 bridge_->reportFailure(env, "a clientbound packet listener");
             } else if (taken == JNI_TRUE) {
@@ -136,7 +138,8 @@ private:
             return;
         }
         JniLocalFrame frame{env};
-        if (!frame) return;
+        if (!frame)
+            return;
         env->CallStaticVoidMethod(bridge_class_, closed_, static_cast<jlong>(connection));
         if (env->ExceptionCheck() == JNI_TRUE) {
             bridge_->reportFailure(env, "closing a channel");

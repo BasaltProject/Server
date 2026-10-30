@@ -13,7 +13,7 @@ namespace basalt::server::runtime::pendingChunkBatch {
 // including chunks still generating, evicted from the generation queue, or awaiting neighbours.
 template <typename ReadyChunk>
 [[nodiscard]] std::vector<server::world::Chunk*> takeReady(std::vector<server::world::ChunkPos>& pending,
-                                                          std::int32_t limit, ReadyChunk&& readyChunk) {
+                                                           std::int32_t limit, ReadyChunk&& readyChunk) {
     std::vector<server::world::Chunk*> ready;
     std::vector<server::world::ChunkPos> left;
     for (const server::world::ChunkPos& pos : pending) {

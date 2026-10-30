@@ -28,8 +28,10 @@ public:
     Lease() : packet_(tScratch.depth < tScratch.packets.size() ? &tScratch.packets[tScratch.depth] : &spare_) {
         tScratch.depth++;
     }
+
     Lease(const Lease&) = delete;
     Lease& operator=(const Lease&) = delete;
+
     ~Lease() { tScratch.depth--; }
 
     [[nodiscard]] PluginPacket& packet() noexcept { return *packet_; }
@@ -93,8 +95,10 @@ private:
                 owner.inFlight_.fetch_add(1);
             }
         }
+
         Pin(const Pin&) = delete;
         Pin& operator=(const Pin&) = delete;
+
         ~Pin() {
             if (session != nullptr) {
                 owner_->inFlight_.fetch_sub(1);

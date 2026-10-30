@@ -1,3 +1,5 @@
+#include "PendingChunkBatch.hpp"
+
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
@@ -12,8 +14,6 @@
 #include <basalt/server/world/light/LightWindow.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
-
-#include "PendingChunkBatch.hpp"
 
 #include <algorithm>
 #include <cmath>

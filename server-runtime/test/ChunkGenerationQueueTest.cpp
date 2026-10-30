@@ -1,11 +1,11 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include "../src/PendingChunkBatch.hpp"
+
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/wire/io/Platform.hpp>
 
 #include <doctest.h>
-
-#include "../src/PendingChunkBatch.hpp"
 
 #include <algorithm>
 #include <atomic>

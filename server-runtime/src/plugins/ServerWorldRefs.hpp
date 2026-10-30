@@ -234,8 +234,8 @@ private:
     [[nodiscard]] server::world::ChunkHeight chunkHeight() const;
     [[nodiscard]] static std::int32_t biomeIndexOf(std::int32_t biomeId);
     [[nodiscard]] static std::optional<std::int32_t> biomeIdAt(std::int32_t index);
-    static void awaitChunk(std::shared_ptr<world::LoadedWorld> world, std::int32_t chunkX, std::int32_t chunkZ, std::int32_t waited,
-                           std::shared_ptr<std::function<void(bool)>> done);
+    static void awaitChunk(std::shared_ptr<world::LoadedWorld> world, std::int32_t chunkX, std::int32_t chunkZ,
+                           std::int32_t waited, std::shared_ptr<std::function<void(bool)>> done);
     void ensureChunk(std::int32_t chunkX, std::int32_t chunkZ);
     static constexpr std::size_t kLightBytes = 2048;
     [[nodiscard]] bool hasSkylight() const;

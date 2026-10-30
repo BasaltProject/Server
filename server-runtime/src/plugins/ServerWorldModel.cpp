@@ -72,7 +72,8 @@ std::vector<std::shared_ptr<PluginWorldRef>> LoadedWorlds::all() const {
     auto worlds = hooks_->allWorlds();
     if (hooks_->defaultWorldName) {
         const std::string primary = hooks_->defaultWorldName();
-        std::stable_partition(worlds.begin(), worlds.end(), [&primary](const auto* world) { return world->name() == primary; });
+        std::stable_partition(worlds.begin(), worlds.end(),
+                              [&primary](const auto* world) { return world->name() == primary; });
     }
     for (world::LoadedWorld* world : worlds) {
         refs.push_back(std::make_shared<LoadedWorldRef>(*world, hooks_, players_));

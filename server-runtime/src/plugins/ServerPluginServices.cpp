@@ -11,8 +11,8 @@
 #include <basalt/wire/text/MiniMessage.hpp>
 
 #include <algorithm>
-#include <cstdint>
 #include <chrono>
+#include <cstdint>
 #include <future>
 #include <memory>
 #include <utility>
@@ -368,9 +368,11 @@ PluginHandle DispatcherCommands::registerCommand(std::string_view pluginId, cons
 PluginHandle DispatcherCommands::registerCompletingCommand(std::string_view pluginId, const PluginCommandSpec& spec,
                                                            std::function<void(PluginCommandCall&)> run,
                                                            Completer complete) {
-    auto entry = std::make_unique<Entry>(
-        Entry{.pluginId = std::string{pluginId}, .spec = spec, .run = std::move(run),
-              .complete = std::move(complete), .node = nullptr});
+    auto entry = std::make_unique<Entry>(Entry{.pluginId = std::string{pluginId},
+                                               .spec = spec,
+                                               .run = std::move(run),
+                                               .complete = std::move(complete),
+                                               .node = nullptr});
     Entry* target = entry.get();
     entries_.push_back(std::move(entry));
     target->node = add(*target);
@@ -393,22 +395,24 @@ DispatcherCommands::suggest(const Entry& entry, const command::SuggestionContext
     if (const command::ExecutionSource* execution = source.asExecution(); execution != nullptr) {
         origin.caller = std::string{execution->root().kind()} + ":" + execution->root().name();
     }
-    auto call = std::make_shared<DispatchedCall>(source.name(), source.player() == nullptr,
-        std::map<std::string, PluginCommandCall::Argument, std::less<>>{},
+    auto call = std::make_shared<DispatchedCall>(
+        source.name(), source.player() == nullptr, std::map<std::string, PluginCommandCall::Argument, std::less<>>{},
         std::function<void(const wire::text::Component&)>{}, std::move(origin));
-    auto collect = [complete = entry.complete, call, input = context.remaining()] {
-        return complete(*call, input);
-    };
+    auto collect = [complete = entry.complete, call, input = context.remaining()] { return complete(*call, input); };
     std::vector<std::string> values;
     if (owner_->isCurrent()) {
         values = collect();
     } else {
-        if (owner_->isClosed() || !sched::Owner::tickThreadRunning()) return {};
+        if (owner_->isClosed() || !sched::Owner::tickThreadRunning())
+            return {};
         auto promise = std::make_shared<std::promise<std::vector<std::string>>>();
         std::future<std::vector<std::string>> ready = promise->get_future();
         const sched::TaskHandle task = owner_->submit([promise, collect] {
-            try { promise->set_value(collect()); }
-            catch (...) { promise->set_exception(std::current_exception()); }
+            try {
+                promise->set_value(collect());
+            } catch (...) {
+                promise->set_exception(std::current_exception());
+            }
         });
         // Completion must not indefinitely block a network thread at shutdown
         // or when the owner is paused. Captures remain owned after a timeout.
@@ -419,7 +423,8 @@ DispatcherCommands::suggest(const Entry& entry, const command::SuggestionContext
         values = ready.get();
     }
     std::vector<wire::protocol::play::CommandSuggestion> result;
-    for (std::string& value : values) result.push_back({.text = std::move(value)});
+    for (std::string& value : values)
+        result.push_back({.text = std::move(value)});
     return result;
 }
 

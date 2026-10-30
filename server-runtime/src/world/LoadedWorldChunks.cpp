@@ -287,7 +287,8 @@ void LoadedWorld::writeSnapshots(std::vector<RegionStore::Snapshot> snapshots) {
 }
 
 void LoadedWorld::saveDirty() {
-    if (retired_.load()) return;
+    if (retired_.load())
+        return;
     const std::vector<std::pair<std::int32_t, std::int32_t>> positions =
         sched::onOwner<std::vector<std::pair<std::int32_t, std::int32_t>>>(owner(), [this] {
             std::vector<Chunk*> chunks = state_.dirtyChunks();
@@ -433,7 +434,8 @@ void LoadedWorld::retire() {
     retired_.store(true);
     regions_.close();
     lightWorker_.request_stop();
-    if (lightWorker_.joinable()) lightWorker_.join();
+    if (lightWorker_.joinable())
+        lightWorker_.join();
     std::vector<std::function<void(std::int32_t)>> cancelled;
     {
         const std::lock_guard lock{lightQueueMutex_};

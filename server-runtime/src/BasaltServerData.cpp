@@ -192,11 +192,11 @@ bool BasaltServer::reloadData(const std::vector<std::string>& selected) {
         resyncAfterReload();
         static std::int64_t generation = 0;
         if (plugins_ != nullptr) {
-            static_cast<void>(server::plugins::emit(
-                &plugins_->events(), &server::plugins::pluginEventTypes::serverDataReload(),
-                [count = ++generation](server::plugins::PluginEvent& event) {
-                    event.set(0, static_cast<std::int64_t>(count));
-                }));
+            static_cast<void>(server::plugins::emit(&plugins_->events(),
+                                                    &server::plugins::pluginEventTypes::serverDataReload(),
+                                                    [count = ++generation](server::plugins::PluginEvent& event) {
+                                                        event.set(0, static_cast<std::int64_t>(count));
+                                                    }));
         }
         return true;
     } catch (const std::exception& error) {

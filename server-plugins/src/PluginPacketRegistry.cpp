@@ -34,8 +34,7 @@ void PluginPacketRegistry::count(const PacketScope& scope, std::int32_t delta) {
         oddIds_.fetch_add(delta);
         return;
     }
-    perId_[phaseSlot(scope.direction, scope.phase) * kCountedIds + static_cast<std::size_t>(scope.id)].fetch_add(
-        delta);
+    perId_[phaseSlot(scope.direction, scope.phase) * kCountedIds + static_cast<std::size_t>(scope.id)].fetch_add(delta);
 }
 
 PluginHandle PluginPacketRegistry::insert(std::shared_ptr<Listener> listener) {
@@ -44,13 +43,13 @@ PluginHandle PluginPacketRegistry::insert(std::shared_ptr<Listener> listener) {
     count(listener->scope, 1);
     auto next = std::make_shared<Snapshot>(*listeners_);
     next->push_back(std::move(listener));
-    std::ranges::stable_sort(*next, [](const std::shared_ptr<const Listener>& left,
-                                       const std::shared_ptr<const Listener>& right) {
-        if (left->observer != right->observer) {
-            return !left->observer;
-        }
-        return left->priority < right->priority;
-    });
+    std::ranges::stable_sort(
+        *next, [](const std::shared_ptr<const Listener>& left, const std::shared_ptr<const Listener>& right) {
+            if (left->observer != right->observer) {
+                return !left->observer;
+            }
+            return left->priority < right->priority;
+        });
     listeners_ = std::move(next);
     return PluginHandle{[this, id] { remove(id); }};
 }

@@ -74,7 +74,10 @@ ChunkGenerationQueue::~ChunkGenerationQueue() {
     joinWorkers();
 }
 
-void ChunkGenerationQueue::joinWorkers() { stop(); workers_.clear(); }
+void ChunkGenerationQueue::joinWorkers() {
+    stop();
+    workers_.clear();
+}
 
 void ChunkGenerationQueue::runWorker() {
     // The tick comes first: with every core generating, a late tick costs players more than a late chunk.
