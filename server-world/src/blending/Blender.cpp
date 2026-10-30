@@ -12,7 +12,6 @@ namespace basalt::server::world::blending {
 namespace {
 
 constexpr std::int32_t kHeightBlendingRangeCells = 27;
-constexpr std::int32_t kHeightBlendingRangeChunks = 7;
 
 [[nodiscard]] float length(float x, float y) {
     return static_cast<float>(std::sqrt(static_cast<double>(x * x + y * y)));

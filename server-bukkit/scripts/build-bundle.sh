@@ -40,7 +40,10 @@ if [ "$stale" = 1 ]; then
         mv "$work/bukkit-api.part" "$work/bukkit-api.jar"
         touch "$work/bukkit-api.fetched"
     fi
-    "$here/build-java.sh" "$work" >"$work/java.log" 2>&1 || skip "the Java half did not compile (see $work/java.log)"
+    if ! "$here/build-java.sh" "$work" >"$work/java.log" 2>&1; then
+        tail -n 40 "$work/java.log" >&2
+        skip "the Java half did not compile (see $work/java.log)"
+    fi
 fi
 
 cp "$work/basalt-bukkit.jar" "$dest/"
