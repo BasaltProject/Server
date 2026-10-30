@@ -78,6 +78,8 @@ private:
         if (env == nullptr) {
             return;
         }
+        JniLocalFrame frame{env};
+        if (!frame) return;
         const jsize size = static_cast<jsize>(packet.bytes.size());
         jbyteArray body = env->NewByteArray(size);
         env->SetByteArrayRegion(body, 0, size, reinterpret_cast<const jbyte*>(packet.bytes.data()));
@@ -133,6 +135,8 @@ private:
         if (env == nullptr) {
             return;
         }
+        JniLocalFrame frame{env};
+        if (!frame) return;
         env->CallStaticVoidMethod(bridge_class_, closed_, static_cast<jlong>(connection));
         if (env->ExceptionCheck() == JNI_TRUE) {
             bridge_->reportFailure(env, "closing a channel");
