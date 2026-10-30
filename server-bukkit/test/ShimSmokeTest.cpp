@@ -10,12 +10,12 @@
 #include <doctest.h>
 
 #include <atomic>
+#include <csignal>
+#include <execinfo.h>
 #include <filesystem>
 #include <fstream>
 #include <span>
 #include <string>
-#include <csignal>
-#include <execinfo.h>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
