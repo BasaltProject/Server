@@ -159,6 +159,17 @@ std::map<std::string, world::LoadedWorld*> WorldRegistry::worlds() const {
     return all;
 }
 
+std::map<std::string, std::shared_ptr<world::LoadedWorld>> WorldRegistry::worldsForTick() const {
+    const std::lock_guard lock{worldsMutex_};
+    std::map<std::string, std::shared_ptr<world::LoadedWorld>> snapshot;
+    for (const auto& world : owned_) {
+        if (!unloading_.contains(world->name()) && !unloaded_.contains(world->name())) {
+            snapshot.emplace(world->name(), world);
+        }
+    }
+    return snapshot;
+}
+
 std::map<std::string, std::shared_ptr<world::LoadedWorld>> WorldRegistry::worldsForLogin() const {
     const std::lock_guard lock{worldsMutex_};
     std::map<std::string, std::shared_ptr<world::LoadedWorld>> snapshot;
