@@ -519,6 +519,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         return made;
     };
     model.unloadWorld = [this](const std::string& name, bool save) { return worldRegistry_->unloadWorld(name, save); };
+    model.deleteWorld = [this](const std::string& name) { return worldRegistry_->deleteWorld(name); };
     model.environment = [this]() -> const command::CommandEnvironment& { return *wired_.environment; };
     model.tags = [this](std::string_view registry) {
         const world::realBlockTags::TagMembers* source = registry == "blocks"         ? &vanillaData_.blockTags

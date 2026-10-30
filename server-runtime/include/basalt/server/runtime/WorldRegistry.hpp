@@ -14,6 +14,8 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <atomic>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -67,11 +69,14 @@ public:
 
     [[nodiscard]] std::map<std::string, world::LoadedWorld*> worlds() const;
 
+    /// Short-lived login leases keep a snapshot valid until player registration.
+    [[nodiscard]] std::map<std::string, std::shared_ptr<world::LoadedWorld>> worldsForLogin() const;
+
     [[nodiscard]] world::LoadedWorld& defaultWorld() const;
 
     [[nodiscard]] std::int64_t worldSeed() const;
 
-    [[nodiscard]] sched::RegionScheduler& scheduler() noexcept { return scheduler_; }
+    [[nodiscard]] sched::RegionScheduler& scheduler() noexcept { return *scheduler_; }
 
     /// Null if the name is taken or unusable.
     world::LoadedWorld* createWorld(const std::string& name, config::WorldDimension dimension, config::WorldType type,
@@ -80,13 +85,16 @@ public:
     /// Takes an empty world out of play and closes storage; a later create reloads it from disk.
     bool unloadWorld(const std::string& name, bool save);
 
+    /// Only a registered, unloaded non-default world inside managed storage. Never a raw path.
+    bool deleteWorld(const std::string& name);
+
     [[nodiscard]] std::map<std::string, std::int64_t>& lastChunkSetVersion() noexcept { return lastChunkSetVersion_; }
 
     /// The tab list, scoreboard, boss bar and server list read their file on every use; the command tree does not.
     void onConfigsReloaded();
 
 private:
-    [[nodiscard]] std::unique_ptr<world::LoadedWorld> buildWorld(const config::WorldDeclaration& declaration,
+    [[nodiscard]] std::shared_ptr<world::LoadedWorld> buildWorld(const config::WorldDeclaration& declaration,
                                                                  world::WorldMetadata metadata);
 
     const config::WorldsConfig* worldsConfig_;
@@ -96,16 +104,16 @@ private:
     Options options_;
     wire::common::Logger logger_;
 
+    mutable std::recursive_mutex worldsMutex_;
+    mutable std::map<std::string, std::shared_ptr<std::atomic<std::size_t>>> loginPins_;
     std::map<std::string, world::WorldMetadata> metadata_;
-    // Keep stale native/plugin views safe without permitting further disk writes.
-    std::vector<world::VanillaWorldGeneratorFactory::Generators> retiredGenerators_;
-    std::vector<std::unique_ptr<world::LoadedWorld>> owned_;
-    std::vector<std::unique_ptr<world::LoadedWorld>> retiredWorlds_;
+    std::vector<std::shared_ptr<world::LoadedWorld>> owned_;
+    std::map<std::string, std::string> storagePaths_;
     std::set<std::string> unloaded_;
-    std::map<std::string, world::VanillaWorldGeneratorFactory::Generators> built_;
+    std::set<std::string> unloading_;
     std::map<std::string, std::int64_t> lastChunkSetVersion_;
     std::string defaultName_;
-    sched::RegionScheduler scheduler_;
+    std::shared_ptr<sched::RegionScheduler> scheduler_;
 };
 
 } // namespace basalt::server::runtime

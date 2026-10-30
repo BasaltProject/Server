@@ -201,6 +201,7 @@ public:
         wire::auth::forwarding::ProxyForwarding forwarding{};
         player::PlayerRegistry* playerRegistry = nullptr;
         std::map<std::string, world::LoadedWorld*, std::less<>> worlds;
+        std::function<std::map<std::string, std::shared_ptr<world::LoadedWorld>>()> worldsNow;
         world::LoadedWorld* defaultWorld = nullptr;
         command::CommandDispatcher* commands = nullptr;
         wire::protocol::play::Gamemode defaultGamemode = wire::protocol::play::Gamemode::Survival;

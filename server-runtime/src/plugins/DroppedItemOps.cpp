@@ -84,7 +84,7 @@ void apply(DroppedItem& item, const NbtCompound& patch) {
 
 class DroppedItemRef final : public PluginEntityRef {
 public:
-    DroppedItemRef(world::LoadedWorld& world, std::int32_t entityId) : world_(&world), entityId_(entityId) {}
+    DroppedItemRef(world::LoadedWorld& world, std::int32_t entityId) : world_(world.keepAlive()), entityId_(entityId) {}
 
     [[nodiscard]] std::int32_t id() const override { return entityId_; }
 
@@ -267,7 +267,7 @@ private:
         return true;
     }
 
-    world::LoadedWorld* world_;
+    std::shared_ptr<world::LoadedWorld> world_;
     std::int32_t entityId_;
 };
 

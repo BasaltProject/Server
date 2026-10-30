@@ -67,6 +67,7 @@ struct ModelHooks {
                                       std::optional<std::int64_t> seed)>
         makeWorld;
     std::function<bool(const std::string& name, bool save)> unloadWorld;
+    std::function<bool(const std::string& name)> deleteWorld;
     std::function<const command::CommandEnvironment&()> environment;
     std::function<std::vector<std::string>(std::string_view registry)> tags;
     std::function<BlockChangeBroadcaster*()> blocks;
@@ -151,6 +152,7 @@ public:
                                                                           std::optional<std::int64_t> seed) override;
 
     bool unload(std::string_view name, bool save) override;
+    bool erase(std::string_view name) override;
 
     [[nodiscard]] std::int32_t stateId(std::string_view text) const override;
     [[nodiscard]] std::string stateText(std::int32_t stateId) const override;

@@ -314,15 +314,22 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
 void LoadedWorld::relightAsync(std::vector<std::int64_t> keys, std::function<void(std::int32_t)> done) {
     {
         const std::lock_guard<std::mutex> lock{lightQueueMutex_};
-        lightJobs_.emplace_back(std::move(keys), std::move(done));
+        if (!retired_.load()) {
+            lightJobs_.emplace_back(std::move(keys), std::move(done));
+            lightWake_.notify_one();
+            return;
+        }
     }
-    lightWake_.notify_one();
+    if (done)
+        done(0);
 }
 
 void LoadedWorld::relightSoon(std::int32_t chunkX, std::int32_t chunkZ, std::chrono::milliseconds quiet,
                               std::function<void()> then) {
     {
         const std::lock_guard<std::mutex> lock{lightQueueMutex_};
+        if (retired_.load())
+            return;
         lightLater_.insert_or_assign(ChunkGenerationQueue::pack(chunkX, chunkZ),
                                      std::pair{std::chrono::steady_clock::now() + quiet, std::move(then)});
     }

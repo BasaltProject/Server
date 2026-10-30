@@ -342,3 +342,32 @@ TEST_CASE("draining from a thread that does not own it is the caller's bug") {
     Owner unclaimed{"unclaimed"};
     std::thread{[&unclaimed] { CHECK(unclaimed.runPending() == 0); }}.join();
 }
+
+TEST_CASE("cancelling pending tasks releases captures outside the owner mutex and permits reuse") {
+    Owner owner{"temporary-world"};
+
+    struct Reenter {
+        Owner* owner;
+        bool* released;
+
+        ~Reenter() {
+            static_cast<void>(owner->pending());
+            *released = true;
+        }
+    };
+
+    bool released = false;
+    auto captured = std::make_shared<Reenter>();
+    captured->owner = &owner;
+    captured->released = &released;
+    auto pending = owner.schedule(1200, [captured] {});
+    captured.reset();
+    owner.cancelPending();
+    CHECK(released);
+    CHECK(pending.isCancelled());
+    CHECK(owner.pending() == 0);
+    CHECK_FALSE(owner.isClosed());
+    bool ran = false;
+    owner.submit([&ran] { ran = true; });
+    CHECK(ran);
+}

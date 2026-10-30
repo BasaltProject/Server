@@ -109,6 +109,10 @@ bool LoadedWorlds::unload(std::string_view name, bool save) {
     return hooks_->unloadWorld && hooks_->unloadWorld(std::string{name}, save);
 }
 
+bool LoadedWorlds::erase(std::string_view name) {
+    return hooks_->deleteWorld && hooks_->deleteWorld(std::string{name});
+}
+
 std::int32_t LoadedWorlds::stateId(std::string_view text) const {
     return LoadedWorldRef::parseState(text).value_or(-1);
 }

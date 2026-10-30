@@ -36,6 +36,7 @@ public:
 
     /// The pipeline is unset when the jar cannot supply what the dimension needs.
     struct Generators {
+        std::shared_ptr<void> lifetime;
         /// The loading, finishing and saving hooks are the world's.
         server::world::terrain::ProtoChunks::Hooks pipeline;
         /// parity: `ChunkGenerator.spawnOriginalMobs`, run once the chunk is full.
@@ -81,8 +82,8 @@ private:
     Jar jar_;
     wire::common::Logger logger_;
     bool structuresEnabled_ = true;
-    /// One entry per world built, kept alive for the process: a chunk function closes over its own.
-    std::vector<std::unique_ptr<Built>> built_;
+    /// Statistics do not keep unloaded worlds and generation caches alive.
+    std::vector<std::weak_ptr<Built>> built_;
 };
 
 } // namespace basalt::server::runtime::world

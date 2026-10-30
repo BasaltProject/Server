@@ -73,7 +73,7 @@ struct LoadedWorldOptions {
 };
 
 /// The player list, the database and the command dispatcher are shared, not per world.
-class LoadedWorld {
+class LoadedWorld : public std::enable_shared_from_this<LoadedWorld> {
 public:
     static constexpr std::int32_t kDefaultSpawnHeight = 64;
 
@@ -87,6 +87,14 @@ public:
     LoadedWorld(LoadedWorld&&) = delete;
     LoadedWorld& operator=(LoadedWorld&&) = delete;
     ~LoadedWorld();
+
+    [[nodiscard]] std::shared_ptr<LoadedWorld> keepAlive() {
+        if (auto held = weak_from_this().lock()) return held;
+        // Stack-owned test/embedded worlds retain their caller-managed lifetime.
+        return std::shared_ptr<LoadedWorld>{std::shared_ptr<LoadedWorld>{}, this};
+    }
+    [[nodiscard]] bool retired() const noexcept { return retired_.load(); }
+
 
     [[nodiscard]] const config::WorldDeclaration& declaration() const noexcept { return declaration_; }
 

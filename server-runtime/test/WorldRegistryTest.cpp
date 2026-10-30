@@ -2,11 +2,13 @@
 
 #include <basalt/server/runtime/WorldRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 
 #include <doctest.h>
 
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -110,6 +112,7 @@ TEST_CASE("unloaded worlds fence old storage and reload from disk after deletion
     WorldRegistry registry{config, worlds, nullptr, players, {}, {.worldsRoot=root}};
     auto* old = registry.createWorld("temporary",config::WorldDimension::Overworld,config::WorldType::Flat,7);
     REQUIRE(old != nullptr);
+    auto keepOld = old->keepAlive();
     old->clock().setTotalTicks(1234);
     REQUIRE(registry.unloadWorld("temporary",true));
     CHECK_FALSE(registry.worlds().contains("temporary"));
@@ -118,6 +121,7 @@ TEST_CASE("unloaded worlds fence old storage and reload from disk after deletion
     CHECK(reloaded != old);
     CHECK(reloaded->metadata().seed == 7);
     CHECK(reloaded->clock().totalTicks() == 1234);
+    auto keepReloaded = reloaded->keepAlive();
     reloaded->clock().setTotalTicks(9999);
     REQUIRE(registry.unloadWorld("temporary",false));
     std::filesystem::remove_all(reloaded->worldRoot());
@@ -151,4 +155,126 @@ TEST_CASE("dynamic dimensions use modern storage while existing flat saves are r
     CHECK(importedMetadata.seed == 88);
     auto* restored=registry.createWorld("imported",config::WorldDimension::Overworld,config::WorldType::Flat,99);
     REQUIRE(restored!=nullptr);CHECK(restored->worldRoot()==imported);CHECK(restored->metadata().seed==88);
+}
+
+TEST_CASE("unloaded world memory is released when the last real plugin view is released") {
+    const config::BasaltConfig config;
+    const auto worlds = pairedWorlds();
+    PlayerRegistry players;
+    WorldRegistry registry{config, worlds, nullptr, players, {}, {.worldsRoot = scratch("registry-lifetimes")}};
+    auto* world = registry.createWorld("temporary", config::WorldDimension::Overworld, config::WorldType::Flat, 7);
+    REQUIRE(world != nullptr);
+    std::weak_ptr<LoadedWorld> weak = world->keepAlive();
+    namespace model = basalt::server::runtime::plugins;
+    model::ModelHooks hooks;
+    hooks.worldFor = [&registry](const std::string& name) {
+        const auto all = registry.worlds();
+        const auto found = all.find(name);
+        return found == all.end() ? nullptr : found->second;
+    };
+    model::LoadedWorlds api{hooks, [] { return std::vector<basalt::server::runtime::player::PlayerSession*>{}; }};
+    auto view = api.byName("temporary");
+    REQUIRE(view != nullptr);
+    world->owner().schedule(1200, [held = world->keepAlive()] {});
+    int completions = 0;
+    view->requestChunk(8000, 8000, true, 0, [&completions](bool) { ++completions; });
+    int lightCompletions = 0;
+    const std::array<std::int32_t, 2> lightChunk{8000, 8000};
+    view->lightJob(lightChunk, [&lightCompletions](std::int32_t) { ++lightCompletions; });
+    REQUIRE(registry.unloadWorld("temporary", false));
+    CHECK(completions == 1);
+    CHECK(lightCompletions == 1);
+    int relit = -1;
+    view->lightJob({}, [&relit](std::int32_t count) { relit = count; });
+    CHECK(relit == 0);
+    CHECK_FALSE(weak.expired());
+    CHECK(view->name() == "temporary");
+    CHECK(view->env() != nullptr);
+    view.reset();
+    CHECK(completions == 1);
+    CHECK(lightCompletions == 1);
+    CHECK(weak.expired());
+    for (int i = 0; i < 8; ++i) {
+        auto* next = registry.createWorld("temporary", config::WorldDimension::Overworld, config::WorldType::Flat, 7);
+        REQUIRE(next != nullptr);
+        weak = next->keepAlive();
+        REQUIRE(registry.unloadWorld("temporary", false));
+        CHECK(weak.expired());
+    }
+}
+
+TEST_CASE("managed deletion rejects loaded default unknown and escaped world paths") {
+    namespace fs = std::filesystem;
+    const config::BasaltConfig config;
+    const auto worlds = pairedWorlds();
+    PlayerRegistry players;
+    const auto root = scratch("registry-delete");
+    WorldRegistry registry{config, worlds, nullptr, players, {}, {.worldsRoot = root}};
+    for (const std::string& denied : {"world", "world_nether", "missing", "../outside", "/tmp", ""}) {
+        CHECK_FALSE(registry.deleteWorld(denied));
+    }
+    auto* world = registry.createWorld("temporary", config::WorldDimension::Overworld, config::WorldType::Flat, 7);
+    REQUIRE(world != nullptr);
+    const fs::path folder = world->worldRoot();
+    REQUIRE(fs::exists(folder));
+    CHECK_FALSE(registry.deleteWorld("temporary"));
+    REQUIRE(registry.unloadWorld("temporary", true));
+    const fs::path moved = folder.string() + "-backup";
+    fs::rename(folder, moved);
+    const fs::path outside = fs::absolute(scratch("registry-delete-outside"));
+    fs::create_directories(outside);
+    std::ofstream{outside / "keep"} << "protected";
+    fs::create_directory_symlink(outside, folder);
+    CHECK_FALSE(registry.deleteWorld("temporary"));
+    CHECK(fs::exists(outside / "keep"));
+    fs::remove(folder);
+    // Even a same-root alias of an active world is not a deletion target.
+    fs::create_directory_symlink(fs::absolute(registry.defaultWorld().worldRoot()), folder);
+    CHECK_FALSE(registry.deleteWorld("temporary"));
+    fs::remove(folder);
+    fs::rename(moved, folder);
+    fs::create_directory_symlink(outside, folder / "external-link");
+    REQUIRE(registry.deleteWorld("temporary"));
+    CHECK(fs::exists(outside / "keep"));
+    CHECK_FALSE(fs::exists(folder));
+    CHECK(fs::exists(registry.defaultWorld().worldRoot()));
+    CHECK_FALSE(registry.deleteWorld("temporary"));
+    REQUIRE(registry.createWorld("temporary", config::WorldDimension::Overworld, config::WorldType::Flat, 99) !=
+            nullptr);
+    CHECK(registry.worlds().at("temporary")->metadata().seed == 99);
+}
+
+TEST_CASE("generator factory statistics do not retain released generation bundles") {
+    using Factory = basalt::server::runtime::world::VanillaWorldGeneratorFactory;
+    Factory factory{
+        {.readText = [](std::string_view) -> std::optional<std::string> { return std::nullopt; },
+         .readEntry = [](std::string_view) -> std::optional<std::vector<std::uint8_t>> { return std::nullopt; },
+         .dataIds = [](std::string_view,
+                       std::string_view) { return std::vector<basalt::wire::common::Identifier>{}; }}};
+    const config::WorldDeclaration declaration{.name = "flat", .type = config::WorldType::Flat};
+    auto bundle = factory.create(declaration, {}, false);
+    REQUIRE(bundle.lifetime != nullptr);
+    std::weak_ptr<void> lifetime = bundle.lifetime;
+    static_cast<void>(factory.cacheStats());
+    CHECK_FALSE(lifetime.expired());
+    bundle = {};
+    CHECK(lifetime.expired());
+    CHECK(factory.cacheStats().templates == 0);
+}
+
+TEST_CASE("login snapshots pin a live world only until player registration finishes") {
+    const config::BasaltConfig config;
+    const auto worlds = pairedWorlds();
+    PlayerRegistry players;
+    WorldRegistry registry{config, worlds, nullptr, players, {}, {.worldsRoot = scratch("registry-login-leases")}};
+    auto* world = registry.createWorld("temporary", config::WorldDimension::Overworld, config::WorldType::Flat, 7);
+    REQUIRE(world != nullptr);
+    std::weak_ptr<LoadedWorld> weak = world->keepAlive();
+    auto snapshot = registry.worldsForLogin();
+    REQUIRE(snapshot.at("temporary").get() == world);
+    CHECK_FALSE(registry.unloadWorld("temporary", false));
+    snapshot.clear();
+    REQUIRE(registry.unloadWorld("temporary", false));
+    CHECK(weak.expired());
+    CHECK_FALSE(registry.worldsForLogin().contains("temporary"));
 }

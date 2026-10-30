@@ -127,23 +127,29 @@ void Owner::advanceTick() {
 
 void Owner::close() {
     closed_.store(true);
-    const std::lock_guard<std::mutex> lock{mutex_};
-    for (const ScheduledTask& task : incoming_) {
-        task.handle.cancel();
+    cancelPending();
+}
+
+void Owner::cancelPending() {
+    decltype(incoming_) incoming;
+    decltype(atEnd_) atEnd;
+    decltype(console_) console;
+    decltype(delayed_) delayed;
+    {
+        const std::lock_guard lock{mutex_};
+        incoming.swap(incoming_);
+        atEnd.swap(atEnd_);
+        console.swap(console_);
+        delayed.swap(delayed_);
     }
-    for (const ScheduledTask& task : atEnd_) {
+    for (const auto& task : incoming)
         task.handle.cancel();
-    }
-    for (const ScheduledTask& task : console_) {
+    for (const auto& task : atEnd)
         task.handle.cancel();
-    }
-    for (const ScheduledTask& task : delayed_) {
+    for (const auto& task : console)
         task.handle.cancel();
-    }
-    incoming_.clear();
-    atEnd_.clear();
-    console_.clear();
-    delayed_.clear();
+    for (const auto& task : delayed)
+        task.handle.cancel();
 }
 
 void Owner::drainInto(Owner& other) {

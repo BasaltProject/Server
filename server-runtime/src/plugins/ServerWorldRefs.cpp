@@ -69,7 +69,7 @@ const Identifier& textDisplay() {
 WorldEntityRef::WorldEntityRef(world::LoadedWorld& world, std::int32_t entityId, std::string type,
                                std::shared_ptr<const ModelHooks> hooks,
                                std::function<std::vector<player::PlayerSession*>()> players)
-    : world_(&world), hooks_(std::move(hooks)), players_(std::move(players)), entityId_(entityId),
+    : world_(world.keepAlive()), hooks_(std::move(hooks)), players_(std::move(players)), entityId_(entityId),
       type_(std::move(type)) {}
 
 std::int32_t WorldEntityRef::id() const { return entityId_; }
@@ -212,7 +212,7 @@ entity::ServerEntity* WorldEntityRef::entity() const {
 }
 
 entityOps::Environment WorldEntityRef::environment() const {
-    return entityOps::Environment{.hooks = hooks_.get(), .world = world_, .players = players_};
+    return entityOps::Environment{.hooks = hooks_.get(), .world = world_.get(), .players = players_};
 }
 
 HologramRef::HologramRef(world::LoadedWorld& world, std::int32_t entityId, std::string type)
