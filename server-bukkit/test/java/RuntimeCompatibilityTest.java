@@ -9,9 +9,122 @@ import java.sql.Statement;
 import net.minecraft.resources.ResourceKey;
 
 public final class RuntimeCompatibilityTest {
+    private static native boolean hostEnvironment();
+    public static void javaOwnedEnvironments() throws Exception {
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        for (int round = 0; round < 8; ++round) {
+            Thread[] workers = new Thread[8];
+            for (int i = 0; i < workers.length; ++i) {
+                workers[i] = new Thread(() -> {
+                    try {
+                        for (int j = 0; j < 50; ++j)
+                            if (!hostEnvironment()) throw new AssertionError("Lost Java-owned JNI environment");
+                    } catch (Throwable e) { failure.compareAndSet(null, e); }
+                });
+                workers[i].start();
+            }
+            for (Thread worker : workers) worker.join();
+            System.gc();
+        }
+        if (failure.get() != null) throw new AssertionError(failure.get());
+    }
+
     public static final class OptionalIntegration {
         private MissingDependency optionalImplementation() { return null; }
         public static String available() { return "available"; }
+    }
+
+    public interface ReflectionRoot { default String echo() { return "ok"; } }
+    public interface ReflectionD0 extends ReflectionRoot { }
+    public interface ReflectionL1 extends ReflectionD0 { }
+    public interface ReflectionR1 extends ReflectionD0 { }
+    public interface ReflectionD1 extends ReflectionL1, ReflectionR1 { }
+    public interface ReflectionL2 extends ReflectionD1 { }
+    public interface ReflectionR2 extends ReflectionD1 { }
+    public interface ReflectionD2 extends ReflectionL2, ReflectionR2 { }
+    public interface ReflectionL3 extends ReflectionD2 { }
+    public interface ReflectionR3 extends ReflectionD2 { }
+    public interface ReflectionD3 extends ReflectionL3, ReflectionR3 { }
+    public interface ReflectionL4 extends ReflectionD3 { }
+    public interface ReflectionR4 extends ReflectionD3 { }
+    public interface ReflectionD4 extends ReflectionL4, ReflectionR4 { }
+    public interface ReflectionL5 extends ReflectionD4 { }
+    public interface ReflectionR5 extends ReflectionD4 { }
+    public interface ReflectionD5 extends ReflectionL5, ReflectionR5 { }
+    public interface ReflectionL6 extends ReflectionD5 { }
+    public interface ReflectionR6 extends ReflectionD5 { }
+    public interface ReflectionD6 extends ReflectionL6, ReflectionR6 { }
+    public interface ReflectionL7 extends ReflectionD6 { }
+    public interface ReflectionR7 extends ReflectionD6 { }
+    public interface ReflectionD7 extends ReflectionL7, ReflectionR7 { }
+    public interface ReflectionL8 extends ReflectionD7 { }
+    public interface ReflectionR8 extends ReflectionD7 { }
+    public interface ReflectionD8 extends ReflectionL8, ReflectionR8 { }
+    public interface ReflectionL9 extends ReflectionD8 { }
+    public interface ReflectionR9 extends ReflectionD8 { }
+    public interface ReflectionD9 extends ReflectionL9, ReflectionR9 { }
+    public interface ReflectionL10 extends ReflectionD9 { }
+    public interface ReflectionR10 extends ReflectionD9 { }
+    public interface ReflectionD10 extends ReflectionL10, ReflectionR10 { }
+    public interface ReflectionL11 extends ReflectionD10 { }
+    public interface ReflectionR11 extends ReflectionD10 { }
+    public interface ReflectionD11 extends ReflectionL11, ReflectionR11 { }
+    public interface ReflectionL12 extends ReflectionD11 { }
+    public interface ReflectionR12 extends ReflectionD11 { }
+    public interface ReflectionD12 extends ReflectionL12, ReflectionR12 { }
+    public static void reflectionDiamonds() throws Exception {
+        if (ReflectionD12.class.getMethods().length != 1) throw new AssertionError("Repeated inherited methods");
+        if (ReflectionD12.class.getMethod("echo").getDeclaringClass() != ReflectionRoot.class) throw new AssertionError("Wrong interface owner");
+    }
+
+    public static void hashedArrayClones() {
+        for (int round = 0; round < 12; ++round) {
+            Object marker = new Object();
+            Object[] source = {marker, "retained"};
+            int sourceHash = System.identityHashCode(source);
+            int[] primitive = {round, 17, 31};
+            int primitiveHash = System.identityHashCode(primitive);
+            System.gc();
+            Object[][] copies = new Object[32][];
+            int[][] values = new int[32][];
+            int[] hashes = new int[32];
+            for (int i = 0; i < copies.length; ++i) {
+                copies[i] = source.clone();
+                values[i] = primitive.clone();
+                hashes[i] = System.identityHashCode(copies[i]);
+            }
+            System.gc();
+            if (sourceHash != System.identityHashCode(source) || primitiveHash != System.identityHashCode(primitive)) throw new AssertionError("Source identity changed");
+            for (int i = 0; i < copies.length; ++i) {
+                if (copies[i] == source || copies[i][0] != marker || !"retained".equals(copies[i][1])) throw new AssertionError("Reference clone corrupted");
+                if (values[i] == primitive || values[i][0] != round || values[i][2] != 31) throw new AssertionError("Primitive clone corrupted");
+                if (hashes[i] != System.identityHashCode(copies[i])) throw new AssertionError("Clone identity changed");
+            }
+        }
+    }
+
+    static final class ReturnMarker { final int value; ReturnMarker(int value) { this.value = value; } }
+    static final class ReturnSource {
+        synchronized Object[] value(int n) { return new Object[] {new ReturnMarker(n), "live"}; }
+    }
+    public static void synchronizedReturns() throws Exception {
+        ReturnSource source = new ReturnSource();
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        Thread[] workers = new Thread[4];
+        for (int t = 0; t < workers.length; ++t) {
+            workers[t] = new Thread(() -> {
+                try {
+                    for (int i = 0; i < 5000; ++i) {
+                        Object[] value = source.value(i);
+                        if (value.length != 2 || !(value[0] instanceof ReturnMarker) || ((ReturnMarker) value[0]).value != i || !"live".equals(value[1])) throw new AssertionError("Corrupt synchronized return");
+                    }
+                } catch (Throwable error) { failure.set(error); }
+            });
+            workers[t].start();
+        }
+        for (int i = 0; i < 40; ++i) { System.gc(); Thread.sleep(1); }
+        for (Thread worker : workers) worker.join();
+        if (failure.get() != null) throw new AssertionError(failure.get());
     }
 
     public static void publicReflection() throws Exception {

@@ -21,6 +21,16 @@ using namespace basalt::server::bukkit;
 namespace {
 std::atomic<int> forwardedLogCount{0};
 std::atomic<int> tagReadCount{0};
+ShimHost* callbackHost = nullptr;
+
+jboolean JNICALL hostEnvironment(JNIEnv* env, jclass) {
+    JavaVM* vm = nullptr;
+    if (env->GetJavaVM(&vm) != JNI_OK) return JNI_FALSE;
+    JNIEnv* current = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&current), JNI_VERSION_1_8) != JNI_OK || current != env)
+        return JNI_FALSE;
+    return callbackHost->env() == env ? JNI_TRUE : JNI_FALSE;
+}
 
 void JNICALL receiveLog(JNIEnv*, jclass, jint, jstring, jstring) { ++forwardedLogCount; }
 
@@ -94,7 +104,19 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
     env->DeleteLocalRef(worldNatives);
     jclass regression = env->FindClass("compatibility/RuntimeCompatibilityTest");
     REQUIRE(regression != nullptr);
-    for (const char* name : {"publicReflection", "featureKeys", "sqlite", "registryTags", "failureText", "loggingBackend"}) {
+    JavaVM* vm = nullptr;
+    REQUIRE(env->GetJavaVM(&vm) == JNI_OK);
+    JNIEnv* current = nullptr;
+    CHECK(vm->GetEnv(reinterpret_cast<void**>(&current), JNI_VERSION_1_8) == JNI_OK);
+    CHECK(current == env);
+    CHECK(env->GetVersion() >= JNI_VERSION_1_8);
+    CHECK(vm->GetEnv(reinterpret_cast<void**>(&current), 0x7fffffff) == JNI_EVERSION);
+    CHECK(current == nullptr);
+    callbackHost = host->get();
+    JNINativeMethod hostMethod{const_cast<char*>("hostEnvironment"), const_cast<char*>("()Z"),
+                               reinterpret_cast<void*>(&hostEnvironment)};
+    REQUIRE(env->RegisterNatives(regression, &hostMethod, 1) == JNI_OK);
+    for (const char* name : {"javaOwnedEnvironments", "publicReflection", "reflectionDiamonds", "hashedArrayClones", "synchronizedReturns", "featureKeys", "sqlite", "registryTags", "failureText", "loggingBackend"}) {
         INFO(std::string{name});
         jmethodID method = env->GetStaticMethodID(regression, name, "()V");
         REQUIRE(method != nullptr);

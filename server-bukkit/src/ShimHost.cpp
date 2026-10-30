@@ -96,8 +96,13 @@ JNIEnv* ShimHost::env() const {
     if (gDestroyed.load()) {
         return nullptr;
     }
-    if (vm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_8) == JNI_OK) {
+    const jint status = vm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_8);
+    if (status == JNI_OK) {
         return env;
+    }
+    // Only detached native threads become ours to detach at thread exit.
+    if (status != JNI_EDETACHED) {
+        return nullptr;
     }
     if (vm_->AttachCurrentThreadAsDaemon(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
         return nullptr;
