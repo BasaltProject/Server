@@ -21,6 +21,11 @@ using namespace basalt::server::bukkit;
 namespace {
 std::atomic<int> forwardedLogCount{0};
 std::atomic<int> tagReadCount{0};
+std::vector<jint> equipmentSlots;
+void JNICALL clearEquipment(JNIEnv*, jclass, jstring, jint slot, jbyteArray item) {
+    CHECK(item == nullptr);
+    equipmentSlots.push_back(slot);
+}
 ShimHost* callbackHost = nullptr;
 
 jboolean JNICALL hostEnvironment(JNIEnv* env, jclass) {
@@ -102,6 +107,12 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
                                reinterpret_cast<void*>(&readTags)};
     REQUIRE(env->RegisterNatives(worldNatives, &tagsMethod, 1) == JNI_OK);
     env->DeleteLocalRef(worldNatives);
+    jclass inventoryNatives = env->FindClass("org/basaltmc/bukkit/InventoryNatives");
+    REQUIRE(inventoryNatives != nullptr);
+    JNINativeMethod equipmentMethod{const_cast<char*>("setPlayerItem"), const_cast<char*>("(Ljava/lang/String;I[B)V"),
+                                    reinterpret_cast<void*>(&clearEquipment)};
+    REQUIRE(env->RegisterNatives(inventoryNatives, &equipmentMethod, 1) == JNI_OK);
+    env->DeleteLocalRef(inventoryNatives);
     jclass regression = env->FindClass("compatibility/RuntimeCompatibilityTest");
     REQUIRE(regression != nullptr);
     JavaVM* vm = nullptr;
@@ -116,7 +127,7 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
     JNINativeMethod hostMethod{const_cast<char*>("hostEnvironment"), const_cast<char*>("()Z"),
                                reinterpret_cast<void*>(&hostEnvironment)};
     REQUIRE(env->RegisterNatives(regression, &hostMethod, 1) == JNI_OK);
-    for (const char* name : {"javaOwnedEnvironments", "publicReflection", "reflectionDiamonds", "hashedArrayClones", "synchronizedReturns", "featureKeys", "sqlite", "registryTags", "failureText", "loggingBackend"}) {
+    for (const char* name : {"nullableEquipment", "javaOwnedEnvironments", "publicReflection", "reflectionDiamonds", "hashedArrayClones", "synchronizedReturns", "featureKeys", "sqlite", "registryTags", "failureText", "loggingBackend"}) {
         INFO(std::string{name});
         jmethodID method = env->GetStaticMethodID(regression, name, "()V");
         REQUIRE(method != nullptr);
@@ -244,6 +255,7 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
     env->DeleteLocalRef(regression);
     CHECK(forwardedLogCount.load() > 0);
     CHECK(tagReadCount.load() == 2);
+    CHECK(equipmentSlots == std::vector<jint>{39, 38, 37, 36, 40, 39, 38, 37, 36});
     (*host)->beginShutdown();
     (*host)->destroy();
 }
