@@ -271,7 +271,8 @@ command::CommandNode* DispatcherCommands::add(Entry& entry) {
                 target->spec.permission.value_or("basalt.plugin." + target->pluginId + "." + target->spec.name()));
         }
         const auto arguments = std::make_shared<std::function<void(const command::CommandNodeBuilder&, std::size_t)>>();
-        *arguments = [target, owner, arguments, self](const command::CommandNodeBuilder& builder, std::size_t index) {
+        *arguments = [target, owner, again = std::weak_ptr{arguments}, self](const command::CommandNodeBuilder& builder,
+                                                                             std::size_t index) {
             // An optional argument makes the command runnable without it, so every node from it onwards executes.
             const bool runnable = index >= target->spec.arguments.size() || target->spec.arguments[index].optional;
             if (runnable) {
@@ -336,22 +337,22 @@ command::CommandNode* DispatcherCommands::add(Entry& entry) {
             }
             const PluginCommandArgument& argument = target->spec.arguments[index];
             static_cast<void>(builder.argument(
-                argument.name, typeOf(argument),
-                [arguments, index, target, self](const command::CommandNodeBuilder& next) {
+                argument.name, typeOf(argument), [again, index, target, self](const command::CommandNodeBuilder& next) {
                     if (target->complete && index + 1 == target->spec.arguments.size()) {
                         next.suggestsFromServer([target, self](const command::SuggestionContext& context) {
                             return self->suggest(*target, context);
                         });
                     }
-                    (*arguments)(next, index + 1);
+                    (*again.lock())(next, index + 1);
                 }));
         };
         const auto literals = std::make_shared<std::function<void(const command::CommandNodeBuilder&, std::size_t)>>();
-        *literals = [target, literals, arguments](const command::CommandNodeBuilder& builder, std::size_t index) {
+        *literals = [target, again = std::weak_ptr{literals}, arguments](const command::CommandNodeBuilder& builder,
+                                                                         std::size_t index) {
             if (index < target->spec.literals.size()) {
                 static_cast<void>(builder.literal(
                     target->spec.literals[index],
-                    [literals, index](const command::CommandNodeBuilder& next) { (*literals)(next, index + 1); }));
+                    [again, index](const command::CommandNodeBuilder& next) { (*again.lock())(next, index + 1); }));
                 return;
             }
             (*arguments)(builder, 0);

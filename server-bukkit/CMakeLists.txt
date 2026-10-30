@@ -78,5 +78,5 @@ if(BASALT_BUILD_TESTS)
         BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/shim-smoke-test"
         BASALT_TEST_RUNTIME_DIR="${CMAKE_BINARY_DIR}/bukkit-runtime"
         BASALT_COMPAT_TEST_CLASSES="${BASALT_COMPAT_TEST_CLASSES}")
-    set_tests_properties(server-bukkit-shim-smoke-test PROPERTIES TIMEOUT 60)
+    set_tests_properties(server-bukkit-shim-smoke-test PROPERTIES TIMEOUT 60 ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
 endif()

@@ -30,11 +30,16 @@ struct ViewAccess {
         return static_cast<PluginEventView*>(lua_touserdata(state, lua_upvalueindex(1)));
     }
 
-    static void check(lua_State* state, PluginEventView& view) {
+    // Lua errors longjmp past destructors: a body returns -1 with the message pushed and raise() throws it.
+    static int raise(lua_State* state, int result) { return result < 0 ? lua_error(state) : result; }
+
+    [[nodiscard]] static bool check(lua_State* state, PluginEventView& view) {
         if (view.generation_ != view.event_->generation() || !view.event_->live()) {
-            luaL_error(state, "this %s event is over: it cannot be read or changed after the handler returns",
-                       view.event_->type().name().c_str());
+            lua_pushfstring(state, "this %s event is over: it cannot be read or changed after the handler returns",
+                            view.event_->type().name().c_str());
+            return false;
         }
+        return true;
     }
 
     static void pushValue(wire::lua::LuaArgs& lua, const PluginEventValue& value) {
@@ -73,12 +78,17 @@ struct ViewAccess {
         return lua.toText(index);
     }
 
-    static int cancel(lua_State* state) {
+    static int cancel(lua_State* state) { return raise(state, cancelBody(state)); }
+
+    static int cancelBody(lua_State* state) {
         PluginEventView& view = *of(state);
-        check(state, view);
+        if (!check(state, view)) {
+            return -1;
+        }
         if (!view.event_->type().cancellable()) {
-            return luaL_error(state, "a %s event cannot be cancelled: it is telling you, not asking",
-                              view.event_->type().name().c_str());
+            lua_pushfstring(state, "a %s event cannot be cancelled: it is telling you, not asking",
+                            view.event_->type().name().c_str());
+            return -1;
         }
         wire::lua::LuaArgs lua{state};
         std::int32_t first = 1;
@@ -96,7 +106,9 @@ struct ViewAccess {
         return 0;
     }
 
-    static int index(lua_State* state) {
+    static int index(lua_State* state) { return raise(state, indexBody(state)); }
+
+    static int indexBody(lua_State* state) {
         PluginEventView& view = *of(state);
         wire::lua::LuaArgs lua{state};
         const std::string key = lua.checkString(2);
@@ -109,11 +121,15 @@ struct ViewAccess {
             return 1;
         }
         if (key == "cancelled") {
-            check(state, view);
+            if (!check(state, view)) {
+                return -1;
+            }
             lua.pushBoolean(view.event_->cancelled());
             return 1;
         }
-        check(state, view);
+        if (!check(state, view)) {
+            return -1;
+        }
         if (view.objects_ && view.objects_(lua, key)) {
             return 1;
         }
@@ -130,16 +146,22 @@ struct ViewAccess {
             if (carries(type, "x")) {
                 extras += " (and 'pos')";
             }
-            return luaL_error(state, "a %s event has no '%s'; it has %s%s", type.name().c_str(), key.c_str(),
-                              joined(type.fields(), ", ").c_str(), extras.c_str());
+            const std::string fields = joined(type.fields(), ", ");
+            lua_pushfstring(state, "a %s event has no '%s'; it has %s%s", type.name().c_str(), key.c_str(),
+                            fields.c_str(), extras.c_str());
+            return -1;
         }
         pushValue(lua, view.event_->get(at));
         return 1;
     }
 
-    static int newIndex(lua_State* state) {
+    static int newIndex(lua_State* state) { return raise(state, newIndexBody(state)); }
+
+    static int newIndexBody(lua_State* state) {
         PluginEventView& view = *of(state);
-        check(state, view);
+        if (!check(state, view)) {
+            return -1;
+        }
         wire::lua::LuaArgs lua{state};
         const std::string key = lua.checkString(2);
         const PluginEventType& type = view.event_->type();
@@ -151,8 +173,9 @@ struct ViewAccess {
                 }
             }
             const std::string names = allowed.empty() ? "nothing" : joined(allowed, ", ");
-            return luaL_error(state, "'%s' cannot be changed on a %s event; it lets you change %s", key.c_str(),
-                              type.name().c_str(), names.c_str());
+            lua_pushfstring(state, "'%s' cannot be changed on a %s event; it lets you change %s", key.c_str(),
+                            type.name().c_str(), names.c_str());
+            return -1;
         }
         view.event_->set(key, valueOf(lua, 3));
         return 0;
