@@ -41,7 +41,10 @@ if [ "$ext" != darwin ] && [ ! -f /usr/include/zlib.h ]; then
 fi
 # Its rules only work inside the source tree, whose build/ folder is ignored by that repo.
 run_make() { make -C "$src" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)" use-clang=true "process=$process" "${flags[@]}" "$@"; }
-{ run_make build; } >"$out/shim-make.log" 2>&1 || skip "the Shim build failed (see $out/shim-make.log)"
+if ! { run_make build; } >"$out/shim-make.log" 2>&1; then
+    tail -n 60 "$out/shim-make.log" >&2
+    skip "the Shim build failed (see $out/shim-make.log)"
+fi
 built="$(dirname "$(ls -t "$src"/build/*/"$lib" 2>/dev/null | head -1)")"
 [ -f "$built/$lib" ] && [ -f "$built/classpath.jar" ] || skip "the Shim build left no $lib or classpath.jar (see $out/shim-make.log)"
 cp "$built/$lib" "$built/classpath.jar" "$out/"
