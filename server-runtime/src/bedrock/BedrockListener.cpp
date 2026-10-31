@@ -370,8 +370,8 @@ std::shared_ptr<BedrockListener::Carried> BedrockListener::carry(const Identity&
     session->login.authenticated = who.authenticated;
     session->login.skinId = who.skinId;
     session->login.skinGeometry = who.resourcePatch;
-    session->login.skinWidth = who.skinWidth;
-    session->login.skinHeight = who.skinHeight;
+    session->login.skinWidth = static_cast<std::uint32_t>(who.skinWidth);
+    session->login.skinHeight = static_cast<std::uint32_t>(who.skinHeight);
     session->login.skinPixels = who.skinPixels;
     logger_.info([this, &who] {
         return prefixedName(who.gamertag) + " is joining from Bedrock through a proxy" +

@@ -86,12 +86,12 @@ jbyteArray JNICALL nativePlayerItem(JNIEnv* env, jclass, jstring uuid, jint slot
 void JNICALL nativeSetPlayerItem(JNIEnv* env, jclass, jstring uuid, jint slot, jbyteArray item) {
     const std::string who = toStd(env, uuid);
     const std::optional<PluginItem> built = item == nullptr ? std::nullopt : decode(bytesOf(env, item));
-    onServerThread<bool>(false, [&] {
+    static_cast<void>(onServerThread<bool>(false, [&] {
         if (const auto player = BukkitBridge::current().services().players().byUuid(who); player != nullptr) {
             player->inventory().set(slot, built);
         }
         return true;
-    });
+    }));
 }
 
 [[nodiscard]] plugins::PluginWindow* windowOf(const std::string& uuid) {
@@ -149,12 +149,12 @@ jint JNICALL nativeWindowOpen(JNIEnv* env, jclass, jstring uuid, jstring kind, j
 
 void JNICALL nativeWindowClose(JNIEnv* env, jclass, jstring uuid) {
     const std::string who = toStd(env, uuid);
-    onServerThread<bool>(false, [&] {
+    static_cast<void>(onServerThread<bool>(false, [&] {
         if (plugins::PluginWindow* window = windowOf(who); window != nullptr) {
             window->closeWindow();
         }
         return true;
-    });
+    }));
 }
 
 jobjectArray JNICALL nativeWindowInfo(JNIEnv* env, jclass, jstring uuid) {
@@ -199,12 +199,12 @@ jbyteArray JNICALL nativeWindowItem(JNIEnv* env, jclass, jstring uuid, jint slot
 void JNICALL nativeSetWindowItem(JNIEnv* env, jclass, jstring uuid, jint slot, jbyteArray item) {
     const std::string who = toStd(env, uuid);
     const std::optional<PluginItem> built = item == nullptr ? std::nullopt : decode(bytesOf(env, item));
-    onServerThread<bool>(false, [&] {
+    static_cast<void>(onServerThread<bool>(false, [&] {
         if (plugins::PluginWindow* window = windowOf(who); window != nullptr) {
             window->setWindowItem(slot, built);
         }
         return true;
-    });
+    }));
 }
 
 jbyteArray JNICALL nativeCursorItem(JNIEnv* env, jclass, jstring uuid) {
@@ -221,32 +221,32 @@ jbyteArray JNICALL nativeCursorItem(JNIEnv* env, jclass, jstring uuid) {
 void JNICALL nativeSetCursorItem(JNIEnv* env, jclass, jstring uuid, jbyteArray item) {
     const std::string who = toStd(env, uuid);
     const std::optional<PluginItem> built = item == nullptr ? std::nullopt : decode(bytesOf(env, item));
-    onServerThread<bool>(false, [&] {
+    static_cast<void>(onServerThread<bool>(false, [&] {
         if (plugins::PluginWindow* window = windowOf(who); window != nullptr) {
             window->setCursorItem(built);
         }
         return true;
-    });
+    }));
 }
 
 void JNICALL nativeWindowResync(JNIEnv* env, jclass, jstring uuid) {
     const std::string who = toStd(env, uuid);
-    onServerThread<bool>(false, [&] {
+    static_cast<void>(onServerThread<bool>(false, [&] {
         if (plugins::PluginWindow* window = windowOf(who); window != nullptr) {
             window->resyncWindow();
         }
         return true;
-    });
+    }));
 }
 
 void JNICALL nativeSetHeldSlot(JNIEnv* env, jclass, jstring uuid, jint slot) {
     const std::string who = toStd(env, uuid);
-    onServerThread<bool>(false, [&] {
+    static_cast<void>(onServerThread<bool>(false, [&] {
         if (const auto player = BukkitBridge::current().services().players().byUuid(who); player != nullptr) {
             player->inventory().setHeldSlot(slot);
         }
         return true;
-    });
+    }));
 }
 
 jbyteArray JNICALL nativeItemData(JNIEnv* env, jclass, jstring id) {
@@ -310,24 +310,24 @@ jboolean JNICALL nativeRemoveRecipe(JNIEnv* env, jclass, jstring id) {
 }
 
 void JNICALL nativeClearRecipes(JNIEnv*, jclass) {
-    onServerThread<bool>(false, [] {
+    static_cast<void>(onServerThread<bool>(false, [] {
         inventories().clearRecipes();
         return true;
-    });
+    }));
 }
 
 void JNICALL nativeResetRecipes(JNIEnv*, jclass) {
-    onServerThread<bool>(false, [] {
+    static_cast<void>(onServerThread<bool>(false, [] {
         inventories().resetRecipes();
         return true;
-    });
+    }));
 }
 
 void JNICALL nativeResetBrewing(JNIEnv*, jclass) {
-    onServerThread<bool>(false, [] {
+    static_cast<void>(onServerThread<bool>(false, [] {
         inventories().resetBrewingRecipes();
         return true;
-    });
+    }));
 }
 
 jbyteArray JNICALL nativeMobEffects(JNIEnv* env, jclass) {

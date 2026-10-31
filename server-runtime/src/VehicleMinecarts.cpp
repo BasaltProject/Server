@@ -85,8 +85,8 @@ void VehicleSystem::tickMinecart(world::LoadedWorld& world, ServerEntity& cart) 
     carts::Env env;
     env.experimental = experimental;
     env.maxMinecartSpeed = world.gameRules().get(world::gameRules::kMaxMinecartSpeed);
-    env.legacyMaxSpeed = world.state().gameplay().items.minecartMaxSpeed;
-    env.poweredRailBoost = world.state().gameplay().items.poweredRailBoostModifier;
+    env.legacyMaxSpeed = static_cast<double>(world.state().gameplay().items.minecartMaxSpeed);
+    env.poweredRailBoost = static_cast<double>(world.state().gameplay().items.poweredRailBoostModifier);
     if (!cart.passengerIds.empty()) {
         for (const PlayerSession* player : watchersOf(world)) {
             if (player->entityId() == cart.passengerIds.front()) {

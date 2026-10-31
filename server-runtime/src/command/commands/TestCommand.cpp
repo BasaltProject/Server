@@ -232,8 +232,8 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
     };
     // parity: `RetryOptions` and the flaky tries of the test itself, as `ReportGameListener` counts them.
     using Begin = std::function<std::optional<std::string>(BlockTests::Reporter)>;
-    const auto withRetries = [this, reporterFor](const CommandContext& context, const world::TestInstance& instance,
-                                                 Begin begin) -> std::optional<std::string> {
+    const auto withRetries = [reporterFor](const CommandContext& context, const world::TestInstance& instance,
+                                           Begin begin) -> std::optional<std::string> {
         struct Tally {
             std::int32_t made = 0;
             std::int32_t ok = 0;

@@ -115,10 +115,10 @@ jobjectArray JNICALL nativeGameRules(JNIEnv* env, jclass, jstring name) {
 
 void JNICALL nativeSaveWorld(JNIEnv* env, jclass, jstring name) {
     if (const auto world = worldOf(env, name); world != nullptr) {
-        guarded<int>(0, [&] {
+        static_cast<void>(guarded<int>(0, [&] {
             world->save();
             return 0;
-        });
+        }));
     }
 }
 } // namespace

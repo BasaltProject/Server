@@ -178,8 +178,9 @@ namespace {
         return 0;
     }
     at += 3 + kName.size();
-    return static_cast<std::int32_t>((static_cast<std::uint32_t>(blob[at]) << 24) | (blob[at + 1] << 16) |
-                                     (blob[at + 2] << 8) | blob[at + 3]);
+    return static_cast<std::int32_t>((static_cast<std::uint32_t>(blob[at]) << 24) |
+                                     (static_cast<std::uint32_t>(blob[at + 1]) << 16) |
+                                     (static_cast<std::uint32_t>(blob[at + 2]) << 8) | blob[at + 3]);
 }
 
 } // namespace

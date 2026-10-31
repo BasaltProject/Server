@@ -12,7 +12,7 @@ Darwin)
     brew install llvm
     llvm="$(brew --prefix llvm)"
     libs="-L$llvm/lib/c++ -Wl,-rpath,$llvm/lib/c++"
-    echo "BASALT_CMAKE_ARGS=-DCMAKE_C_COMPILER=$llvm/bin/clang -DCMAKE_CXX_COMPILER=$llvm/bin/clang++ \"-DCMAKE_EXE_LINKER_FLAGS=$libs\"" >>"$GITHUB_ENV"
+    echo "BASALT_CMAKE_ARGS=-DCMAKE_C_COMPILER=$llvm/bin/clang -DCMAKE_CXX_COMPILER=$llvm/bin/clang++ \"-DCMAKE_EXE_LINKER_FLAGS=$libs\" -DCMAKE_CXX_FLAGS=-D_LIBCPP_DISABLE_AVAILABILITY" >>"$GITHUB_ENV"
     ;;
 *)
     echo "BASALT_CMAKE_ARGS=" >>"$GITHUB_ENV"

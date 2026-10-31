@@ -65,7 +65,8 @@ struct CartState {
     std::optional<double> maxSpeedOverride;
     /// `-1` for the default friction, `0` for none at all, `1` for the vanilla one.
     std::int8_t frictionState = -1;
-    std::array<double, 3> flyingVelocityMod{0.95F, 0.95F, 0.95F};
+    std::array<double, 3> flyingVelocityMod{static_cast<double>(0.95F), static_cast<double>(0.95F),
+                                            static_cast<double>(0.95F)};
     std::array<double, 3> derailedVelocityMod{0.5, 0.5, 0.5};
 };
 

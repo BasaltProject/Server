@@ -84,11 +84,11 @@ std::expected<ProxyForwarding, std::string> fromToml(const TomlTable& root, std:
         .tokens = std::move(tokens),
         .propertyName = std::string{table->string("property-name").value_or(ProxyForwarding::kSafeNetProperty)},
     };
-    for (const std::string& written : table->stringList("trusted-keys")) {
-        const auto key = parsePublicKey(written);
+    for (const std::string& hex : table->stringList("trusted-keys")) {
+        const auto key = parsePublicKey(hex);
         if (!key.has_value()) {
             return std::unexpected(std::string{path} + ": trusted-keys entries must be 64 hex characters, not \"" +
-                                   written + "\"");
+                                   hex + "\"");
         }
         forwarding.trustedKeys.push_back(*key);
     }

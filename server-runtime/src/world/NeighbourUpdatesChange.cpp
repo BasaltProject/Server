@@ -453,7 +453,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             ++reacted;
         }
         if (current.face < 6) {
-            const BlockFace face = kUpdateOrder[current.face];
+            const BlockFace face = kUpdateOrder[static_cast<std::size_t>(current.face)];
             ++current.face;
             // parity: the six squares this notice reaches each run their `neighborChanged`, and a.
             const std::int32_t nx = current.at[0] + registry::stepX(face);
@@ -467,7 +467,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             reshapeOnly(context, nx, ny, nz, broken, reshaped);
             if (*diode) {
                 for (std::int32_t index = 5; index >= 0; --index) {
-                    const BlockFace also = kUpdateOrder[index];
+                    const BlockFace also = kUpdateOrder[static_cast<std::size_t>(index)];
                     reacting.push_back(
                         {{nx + registry::stepX(also), ny + registry::stepY(also), nz + registry::stepZ(also)},
                          std::nullopt,

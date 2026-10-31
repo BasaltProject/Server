@@ -42,10 +42,6 @@ template <typename T>
                     }};
 }
 
-[[nodiscard]] MobActionSystem* mobSystem(const Environment& environment) {
-    return environment.hooks != nullptr && environment.hooks->mobSystem ? environment.hooks->mobSystem() : nullptr;
-}
-
 template <typename Packet>
 void sendTo(const Environment& environment, const std::vector<std::string>& only, std::int32_t packetId,
             const Packet& packet) {
