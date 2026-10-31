@@ -74,9 +74,9 @@ Two goals drive every decision:
 A Minecraft server spends its life moving bytes, ticking a world and waiting.
 None of that needs a virtual machine.
 
-The core starts without a VM boot, class loading or warm-up. There is no heap to
-size and no collector to hide behind. Deployment is one binary and a config folder,
-with no runtime to install or match. Tick 1 and tick 1,000,000 cost the same. The
+The core starts without a VM boot, class loading or warm-up. There is no JVM heap to
+size and no garbage collector that can pause the tick. Deployment is one binary and a config folder,
+with no runtime to install or match. The
 embedded Java runtime only comes up when Bukkit-style jars are present, and a server
 without them never pays for it.
 
