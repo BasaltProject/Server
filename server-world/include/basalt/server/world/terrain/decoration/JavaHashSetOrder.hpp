@@ -22,7 +22,8 @@ public:
 
     bool add(const Pos& position) {
         std::vector<Pos>& bucket = buckets_[bucketOf(position)];
-        if (std::find(bucket.begin(), bucket.end(), position) != bucket.end()) {
+        if (std::find_if(bucket.begin(), bucket.end(), [&position](const Pos& held) { return held == position; }) !=
+            bucket.end()) {
             return false;
         }
         bucket.push_back(position);
@@ -35,7 +36,8 @@ public:
 
     bool remove(const Pos& position) {
         std::vector<Pos>& bucket = buckets_[bucketOf(position)];
-        const auto found = std::find(bucket.begin(), bucket.end(), position);
+        const auto found =
+            std::find_if(bucket.begin(), bucket.end(), [&position](const Pos& held) { return held == position; });
         if (found == bucket.end()) {
             return false;
         }
@@ -46,7 +48,8 @@ public:
 
     [[nodiscard]] bool contains(const Pos& position) const {
         const std::vector<Pos>& bucket = buckets_[bucketOf(position)];
-        return std::find(bucket.begin(), bucket.end(), position) != bucket.end();
+        return std::find_if(bucket.begin(), bucket.end(), [&position](const Pos& held) { return held == position; }) !=
+               bucket.end();
     }
 
     [[nodiscard]] bool empty() const noexcept { return size_ == 0; }

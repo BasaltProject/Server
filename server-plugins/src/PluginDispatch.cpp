@@ -95,7 +95,7 @@ void PluginCommandDispatch::registerCommand(LoadedPlugin& plugin, PluginInstance
         existing->handlers.insert_or_assign(instance.lane, std::move(handler));
         return;
     }
-    CommandEntry entry{.spec = spec};
+    CommandEntry entry(spec);
     entry.handlers.emplace(instance.lane, std::move(handler));
     plugin.commands.emplace_back(key, std::move(entry));
     LoadedPlugin* target = &plugin;
