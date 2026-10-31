@@ -42,6 +42,7 @@ jobs:
       - name: Install ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
+          max-size: 1200M
           key: ${{ matrix.target }}
 
       - name: Select the compiler
@@ -50,7 +51,7 @@ jobs:
 
       - name: Configure
         shell: bash
-        run: eval cmake --preset release "-DBASALT_VERSION=26.3.${{ github.run_number }}" $BASALT_CMAKE_ARGS
+        run: eval cmake --preset release -DCMAKE_BUILD_TYPE=Release "-DBASALT_VERSION=26.3.${{ github.run_number }}" $BASALT_CMAKE_ARGS
 
       - name: Build
         shell: bash
@@ -80,6 +81,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
+
+      - name: Install ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          max-size: 800M
+          key: sanitize
 
       - name: Select the compiler
         run: .github/scripts/select-compiler.sh
