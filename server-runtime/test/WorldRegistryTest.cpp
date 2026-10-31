@@ -142,14 +142,15 @@ TEST_CASE("dynamic dimensions use modern storage while existing flat saves are r
     WorldRegistry registry{config, worlds, nullptr, players, {}, {.worldsRoot = root}};
     auto* made = registry.createWorld("runtime", config::WorldDimension::Overworld, config::WorldType::Flat, 5);
     REQUIRE(made != nullptr);
-    CHECK(made->worldRoot() == root + "/world/dimensions/minecraft/runtime");
+    CHECK(std::filesystem::path{made->worldRoot()} ==
+          std::filesystem::path{root + "/world/dimensions/minecraft/runtime"});
     const auto legacy = root + "/legacy";
     const auto legacyMetadata = basalt::server::runtime::world::WorldMetadata::loadOrCreate(
         legacy, 77, basalt::server::runtime::world::WorldMetadata::kDefaultSpawn, basalt::wire::common::Logger{"test"});
     CHECK(legacyMetadata.seed == 77);
     auto* old = registry.createWorld("legacy", config::WorldDimension::Overworld, config::WorldType::Flat, 99);
     REQUIRE(old != nullptr);
-    CHECK(old->worldRoot() == legacy);
+    CHECK(std::filesystem::path{old->worldRoot()} == std::filesystem::path{legacy});
     CHECK(old->metadata().seed == 77);
     const auto imported = root + "/world/dimensions/minecraft/imported";
     const auto importedMetadata = basalt::server::runtime::world::WorldMetadata::loadOrCreate(
@@ -158,7 +159,7 @@ TEST_CASE("dynamic dimensions use modern storage while existing flat saves are r
     CHECK(importedMetadata.seed == 88);
     auto* restored = registry.createWorld("imported", config::WorldDimension::Overworld, config::WorldType::Flat, 99);
     REQUIRE(restored != nullptr);
-    CHECK(restored->worldRoot() == imported);
+    CHECK(std::filesystem::path{restored->worldRoot()} == std::filesystem::path{imported});
     CHECK(restored->metadata().seed == 88);
 }
 
