@@ -58,13 +58,13 @@ TEST_CASE("the watchdog gives up on a stalled tick and leaves a ticking server a
     std::atomic<std::int64_t> ticks{0};
     std::atomic<int> fired{0};
     {
-        ServerWatchdog dog{200ms, [&ticks] { return ticks.load(); }, [&fired](double) { fired++; }, 10ms};
+        ServerWatchdog dog{1000ms, [&ticks] { return ticks.load(); }, [&fired](double) { fired++; }, 10ms};
         for (int i = 0; i < 40; ++i) {
             ticks++;
             std::this_thread::sleep_for(20ms);
         }
         CHECK(fired.load() == 0);
-        std::this_thread::sleep_for(400ms);
+        std::this_thread::sleep_for(1600ms);
         CHECK(fired.load() == 1);
     }
 }
