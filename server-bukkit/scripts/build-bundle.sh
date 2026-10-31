@@ -34,8 +34,8 @@ if [ "$stale" = 1 ]; then
     if [ ! -s "$work/bukkit-api.jar" ]; then
         IFS=: read -r _ artifact version <"$here/api.txt"
         url="https://repo.papermc.io/repository/maven-public/io/papermc/paper/$artifact/$version/$artifact-$version.jar"
-        curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url" -o "$work/bukkit-api.part" || skip "could not download $url"
-        [ "$(curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url.sha1" | cut -c1-40)" = "$(sha1_of "$work/bukkit-api.part" | cut -c1-40)" ] \
+        curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 180 "$url" -o "$work/bukkit-api.part" || skip "could not download $url"
+        [ "$(curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 180 "$url.sha1" | cut -c1-40)" = "$(sha1_of "$work/bukkit-api.part" | cut -c1-40)" ] \
             || skip "the SHA-1 of $url does not match"
         mv "$work/bukkit-api.part" "$work/bukkit-api.jar"
         touch "$work/bukkit-api.fetched"
