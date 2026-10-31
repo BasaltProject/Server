@@ -179,6 +179,12 @@ The tests run with `ctest --preset debug`, and `--preset asan` builds the same
 tree under the address and undefined sanitizers, which is what the CI does on
 every push.
 
+## Contributing and community
+
+Please read the [contribution guide](CONTRIBUTING.md) and
+[Code of Conduct](.github/CODE_OF_CONDUCT.md) before participating.
+Report suspected vulnerabilities privately using the [security policy](SECURITY.md).
+
 ## License
 
 Basalt Server is distributed under the [GNU General Public License v3.0](LICENSE).
