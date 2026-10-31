@@ -14,8 +14,8 @@ while read -r coord; do
     [ "$group" = "com.mojang" ] && base="https://libraries.minecraft.net"
     url="$base/${group//.//}/$artifact/$version/$artifact-$version.jar"
     echo "fetch $artifact-$version"
-    if curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url" -o "$jar.part" \
-        && [ "$(curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url.sha1" | cut -c1-40)" = "$(sha1_of "$jar.part" | cut -c1-40)" ]; then
+    if curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 180 "$url" -o "$jar.part" \
+        && [ "$(curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 180 "$url.sha1" | cut -c1-40)" = "$(sha1_of "$jar.part" | cut -c1-40)" ]; then
         mv "$jar.part" "$jar"
     else
         echo "FAILED $url" >&2
