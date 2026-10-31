@@ -12,12 +12,14 @@
 #endif
 
 namespace basalt::server::runtime {
+#ifdef BASALT_WITH_BUKKIT
 namespace {
 [[nodiscard]] std::string lowered(std::string text) {
     std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return text;
 }
 } // namespace
+#endif
 
 void BasaltServer::startBukkit() {
     if (!config_->pluginsEnabled) {

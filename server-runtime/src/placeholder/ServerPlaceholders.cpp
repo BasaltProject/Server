@@ -104,7 +104,11 @@ std::string localTime(std::string_view pattern, std::int64_t epochMillis) {
     // Through `localtime_r`, since this platform's standard library lacks `zoned_time`.
     const auto now = static_cast<std::time_t>(epochMillis / kMillisPerSecond);
     std::tm local{};
+#if defined(_WIN32)
+    localtime_s(&local, &now);
+#else
     localtime_r(&now, &local);
+#endif
     std::string result{pattern};
     const auto replaceAll = [&result](std::string_view token, const std::string& value) {
         for (std::size_t at = result.find(token); at != std::string::npos; at = result.find(token, at + value.size())) {
