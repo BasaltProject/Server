@@ -18,6 +18,9 @@ for tool in make clang clang++ javac jar; do
 done
 ext="$(uname -s | tr A-Z a-z)"
 [ "$ext" = darwin ] && lib=libjvm.dylib || lib=libjvm.so
+if [ "$ext" = darwin ] && [ "${BASALT_SHIM_ARCH:-}" = x86_64 ] && [ "$(uname -m)" = arm64 ]; then
+    exec arch -x86_64 "$0" "$@"
+fi
 process=compile
 # Apple Silicon forbids the legacy JIT's writable/executable memory mapping.
 # Use Shim's interpreter rather than weakening the host's memory protections.
