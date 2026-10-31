@@ -10,13 +10,10 @@
 #include <doctest.h>
 
 #include <atomic>
-#include <csignal>
-#include <execinfo.h>
 #include <filesystem>
 #include <fstream>
 #include <span>
 #include <string>
-#include <unistd.h>
 
 namespace fs = std::filesystem;
 using namespace basalt::server::bukkit;
@@ -83,12 +80,6 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
         }
     }
     options.classpath.push_back(BASALT_COMPAT_TEST_CLASSES);
-    signal(SIGABRT, [](int) {
-        void* f[64];
-        int n = backtrace(f, 64);
-        backtrace_symbols_fd(f, n, 2);
-        _exit(134);
-    });
     auto host = ShimHost::create(options);
     REQUIRE_MESSAGE(host.has_value(), (host.has_value() ? "" : host.error()));
     JNIEnv* env = (*host)->env();
