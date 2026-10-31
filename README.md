@@ -100,6 +100,13 @@ The Lua runtime is the official Lua 5.5.1, built from source into the binary, so
 it is the same runtime everywhere Basalt runs with nothing to install alongside
 it.
 
+## Download and documentation
+
+Binaries for Linux, macOS and Windows are on the [releases page](https://github.com/BasaltProject/Server/releases):
+a stable release every Monday when there is something new, and a moving **Nightly** prerelease that follows `main`.
+Each asset is the executable itself, with a `SHA256SUMS` file beside them. The full documentation for operators and
+plugin authors is at [basaltmc.org/docs](https://basaltmc.org/docs/server/introduction).
+
 ## Configuration
 
 Configuration lives in **`config/`**, one TOML file per domain, generated with
