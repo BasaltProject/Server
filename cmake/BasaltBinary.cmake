@@ -9,7 +9,12 @@ function(basalt_name_binary TARGET)
         set(_platform "Linux")
     endif()
 
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
+    set(_processor "${CMAKE_SYSTEM_PROCESSOR}")
+    if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+        set(_processor "${CMAKE_OSX_ARCHITECTURES}")
+    endif()
+
+    if(_processor MATCHES "^(aarch64|arm64|ARM64)$")
         set(_arch "arm64")
     else()
         set(_arch "x64")
