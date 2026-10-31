@@ -130,7 +130,6 @@ private:
     const config::WorldsConfig* worldsConfig_;
     Worlds worlds_;
     ChunkSimulationView* chunkSimulation_;
-    BlockChangeBroadcaster* broadcaster_;
     const command::CommandEnvironment* environment_;
     NaturalSpawningSystem* spawning_;
     Hooks hooks_;
