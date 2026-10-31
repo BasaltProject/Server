@@ -29,13 +29,13 @@ fi
 if [ "$stale" = 1 ]; then
     "$here/fetch-deps.sh" "$work" >"$work/fetch.log" 2>&1
     while IFS=: read -r _ artifact version; do
-        [ -s "$work/lib/$artifact-$version.jar" ] || skip "could not download $artifact-$version (see $work/fetch.log)"
+        [ -s "$work/lib/$artifact-$version.jar" ] || { tail -n 20 "$work/fetch.log" >&2; skip "could not download $artifact-$version (see $work/fetch.log)"; }
     done <"$here/deps.txt"
     if [ ! -s "$work/bukkit-api.jar" ]; then
         IFS=: read -r _ artifact version <"$here/api.txt"
         url="https://repo.papermc.io/repository/maven-public/io/papermc/paper/$artifact/$version/$artifact-$version.jar"
-        curl -fsSL "$url" -o "$work/bukkit-api.part" || skip "could not download $url"
-        [ "$(curl -fsSL "$url.sha1" | cut -c1-40)" = "$(sha1_of "$work/bukkit-api.part" | cut -c1-40)" ] \
+        curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url" -o "$work/bukkit-api.part" || skip "could not download $url"
+        [ "$(curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url.sha1" | cut -c1-40)" = "$(sha1_of "$work/bukkit-api.part" | cut -c1-40)" ] \
             || skip "the SHA-1 of $url does not match"
         mv "$work/bukkit-api.part" "$work/bukkit-api.jar"
         touch "$work/bukkit-api.fetched"
