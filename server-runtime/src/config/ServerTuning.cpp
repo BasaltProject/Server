@@ -157,6 +157,7 @@ std::expected<ServerTuning, std::string> ServerTuning::fromToml(const TomlTable&
         }
         tuning.chunkSendRate = *chunkRate;
         tuning.timingsUrl = std::string{performance->string("timings-url").value_or(tuning.timingsUrl)};
+        tuning.timingsCaFile = std::string{performance->string("timings-ca-file").value_or(tuning.timingsCaFile)};
     }
     if (const TomlTable* logging = root.table("logging"); logging != nullptr) {
         if (auto checked = booleans(*logging, {"log-ips"}, path); !checked.has_value()) {

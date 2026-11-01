@@ -350,6 +350,10 @@ chunk-send-rate = 0
 # reports on this machine, in .basalt/timings, and upload nothing.
 timings-url = "https://basaltmc.org"
 
+# A PEM file with the certificate authority that signed the viewer's certificate, for a viewer you host yourself
+# behind a private CA. Empty uses the system's trust store, which is right for basaltmc.org.
+timings-ca-file = ""
+
 # Count noise evaluations, biome lookups and per-phase timings while generating
 # chunks, then log a report once the startup chunks are ready. Diagnostics only:
 # it also forces startup generation onto a single thread so the counts are exact,

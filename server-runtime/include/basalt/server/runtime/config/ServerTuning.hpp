@@ -42,6 +42,7 @@ struct ServerTuning {
     std::int32_t watchdogSeconds = 60;
     std::int32_t chunkSendRate = 0;
     std::string timingsUrl = "https://basaltmc.org";
+    std::string timingsCaFile;
 
     bool logIps = true;
 

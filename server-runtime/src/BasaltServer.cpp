@@ -457,6 +457,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.saveControl = saveControl_.get();
     wiring.timingsReport = timingsReport_.get();
     wiring.timingsHooks.viewerUrl = config.tuning.timingsUrl;
+    wiring.timingsHooks.caFile = config.tuning.timingsCaFile;
     wiring.timingsHooks.postToTick = [this](std::function<void()> task) {
         static_cast<void>(worldRegistry_->defaultWorld().owner().submit(std::move(task)));
     };
