@@ -330,6 +330,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                       : std::string{"Server resumed"};
                     });
                 }
+                thread_local const wire::common::Timings* named = nullptr;
+                if (named != &timings_) {
+                    timings_.nameThread("Server thread");
+                    named = &timings_;
+                }
                 const auto began = std::chrono::steady_clock::now();
                 tickWorlds(worldRuns);
                 eventSink_.notify(
@@ -396,6 +401,24 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     sources.onlinePlayers = [this] { return static_cast<std::int32_t>(playerRegistry_.snapshot().size()); };
     sources.maxPlayers = [this] { return config_->maxPlayers; };
+    sources.worldCount = [this] { return static_cast<std::int32_t>(worldRegistry_->worlds().size()); };
+    sources.cpuPercent = [this] { return cpuMeter_.percent(); };
+    sources.residentBytes = [this]() -> std::optional<std::int64_t> {
+        const std::optional<std::uint64_t> bytes = metrics_.residentBytes();
+        return bytes.has_value() ? std::optional{static_cast<std::int64_t>(*bytes)} : std::nullopt;
+    };
+    sources.worlds = [this] {
+        std::vector<timings::WorldFacts> facts;
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            std::int32_t players = 0;
+            for (const player::PlayerSession* player : playerRegistry_.snapshot()) {
+                players += player->worldName == world->name() ? 1 : 0;
+            }
+            facts.push_back({name, static_cast<std::int32_t>(world->state().loadedChunkCount()),
+                             static_cast<std::int32_t>(world->state().entities().size()), players});
+        }
+        return facts;
+    };
     sources.loadedChunks = [this] {
         std::int32_t total = 0;
         for (const auto& [name, world] : worldRegistry_->worlds()) {
@@ -433,6 +456,22 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.stopwatches = stopwatches_.get();
     wiring.saveControl = saveControl_.get();
     wiring.timingsReport = timingsReport_.get();
+    wiring.timingsHooks.viewerUrl = config.tuning.timingsUrl;
+    wiring.timingsHooks.postToTick = [this](std::function<void()> task) {
+        static_cast<void>(worldRegistry_->defaultWorld().owner().submit(std::move(task)));
+    };
+    wiring.timingsHooks.tell = [this](const std::string& requester, const wire::text::Component& message) {
+        if (requester.empty()) {
+            logger_.info([&] { return wire::text::resolvePlainText(message, options_.lang); });
+            return;
+        }
+        for (player::PlayerSession* player : playerRegistry_.snapshot()) {
+            if (player->uuid().toString() == requester) {
+                player->sendSystemMessage(message);
+                return;
+            }
+        }
+    };
     wiring.timings = &timings_;
     wiring.tickDurations = &tickLoop_->durations();
     wiring.tickLoop = tickLoop_.get();

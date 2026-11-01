@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/command/CommandStorage.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
 #include <basalt/server/runtime/command/commands/DataPackCommand.hpp>
+#include <basalt/server/runtime/command/commands/TimingsCommand.hpp>
 #include <basalt/server/runtime/command/commands/FunctionCommands.hpp>
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
 #include <basalt/server/runtime/command/commands/StopwatchCommand.hpp>
@@ -54,6 +55,7 @@ struct CommandWiring {
     command::commands::Stopwatches* stopwatches = nullptr;
     command::commands::SaveControl* saveControl = nullptr;
     timings::TimingsReport* timingsReport = nullptr;
+    command::commands::TimingsHooks timingsHooks;
     wire::common::Timings* timings = nullptr;
     wire::common::TickDurations* tickDurations = nullptr;
     TickLoop* tickLoop = nullptr;

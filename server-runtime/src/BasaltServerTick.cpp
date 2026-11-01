@@ -61,6 +61,7 @@ namespace basalt::server::runtime {
 using namespace basaltServerTick;
 
 void BasaltServer::tickWorlds(const bool worldRuns) {
+    const wire::common::ScopedTiming wholeTick{timings_, "tick"};
     server::plugins::PluginEventBus* bus = plugins_ == nullptr ? nullptr : &plugins_->events();
     static_cast<void>(
         server::plugins::emit(bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::serverTick(),
@@ -69,32 +70,42 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
     // Functions first, so one that changes the world does it before this tick's own work reads it.
     // parity: `tickChildren`.
     if (worldRuns) {
+        const wire::common::ScopedTiming functions{timings_, "tick.functions"};
         tickFunctions();
     }
-    flushAdvancements();
+    {
+        const wire::common::ScopedTiming advancements{timings_, "tick.advancements"};
+        flushAdvancements();
+    }
 
     // Regions are worked out at the tick boundary: a chunk changing hands mid-tick is what this model cannot survive.
-    for (const auto& [name, world] : worldRegistry_->worlds()) {
-        // Only when the world's chunks moved: walking every loaded chunk on a quiet tick is pure cost.
-        const std::int64_t version = world->state().chunkSetVersion();
-        std::map<std::string, std::int64_t>& seen = worldRegistry_->lastChunkSetVersion();
-        const auto last = seen.find(world->name());
-        if (last != seen.end() && last->second == version) {
-            continue;
-        }
-        seen[world->name()] = version;
-        worldRegistry_->scheduler().repartition(
-            world->name(), world->state().loadedChunkKeys(), [this, world](std::int32_t merged, std::int32_t split) {
-                logger_.debug([world, merged, split] {
-                    return "World '" + world->name() + "': " + std::to_string(merged) + " region(s) merged, " +
-                           std::to_string(split) + " split";
+    {
+        const wire::common::ScopedTiming repartitioning{timings_, "tick.repartition"};
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            // Only when the world's chunks moved: walking every loaded chunk on a quiet tick is pure cost.
+            const std::int64_t version = world->state().chunkSetVersion();
+            std::map<std::string, std::int64_t>& seen = worldRegistry_->lastChunkSetVersion();
+            const auto last = seen.find(world->name());
+            if (last != seen.end() && last->second == version) {
+                continue;
+            }
+            seen[world->name()] = version;
+            worldRegistry_->scheduler().repartition(
+                world->name(), world->state().loadedChunkKeys(), [this, world](std::int32_t merged, std::int32_t split) {
+                    logger_.debug([world, merged, split] {
+                        return "World '" + world->name() + "': " + std::to_string(merged) + " region(s) merged, " +
+                               std::to_string(split) + " split";
+                    });
                 });
-            });
+        }
     }
 
     // Between turns, so nothing this thread handed out is still being walked when a departed player is released.
     playerRegistry_.collect();
-    tickScoreCriteria();
+    {
+        const wire::common::ScopedTiming criteria{timings_, "tick.score_criteria"};
+        tickScoreCriteria();
+    }
 
     // Decided between turns: with no region running, re-homing a session cannot put two threads in one player.
     const auto worlds = worldRegistry_->worldsForTick();
@@ -116,6 +127,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             logger_.error([&failure] { return std::string{"A tick task failed: "} + failure.what(); });
         },
         [this, &worlds, worldRuns](sched::Region& region) {
+            const wire::common::ScopedTiming regionTick{timings_, "region.", region.worldName()};
             const auto found = worlds.find(region.worldName());
             if (found == worlds.end() || found->second->retired()) {
                 return;
@@ -157,6 +169,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             const auto step = [this, &world](std::string_view what, auto&& body) {
                 if (world.retired())
                     return;
+                const wire::common::ScopedTiming timing{timings_, "world.", what};
                 try {
                     body();
                 } catch (const std::exception& error) {

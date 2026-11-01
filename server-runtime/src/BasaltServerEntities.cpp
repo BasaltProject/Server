@@ -376,6 +376,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         if (entity->removed || MobTickSystem::hasActiveVehicle(world, *entity)) {
             continue;
         }
+        const wire::common::ScopedTiming perType{timings_, "entity.", entity->type().path()};
         // parity: `Mob.aiStep`.
         if (entity->dying && !entity::enderDragon::isDragon(entity->type())) {
             // parity: a dying wither is still there, and so is its bar, until the body goes.
