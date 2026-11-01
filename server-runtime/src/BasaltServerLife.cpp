@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/LoadingServer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
@@ -129,7 +130,8 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
     logger_.info([this] {
         return "Player database ready: " + std::to_string(playerStore_->players().count()) + " player(s) known.";
     });
-    if (config_->javaEnabled) {
+    const bool listenerHeld = options_.loading != nullptr && options_.loading->holdsListener();
+    if (config_->javaEnabled && !listenerHeld) {
         const auto address =
             wire::io::TcpAddress::literal(config_->javaBind, static_cast<std::uint16_t>(config_->port));
         if (!address)
@@ -204,6 +206,12 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
             });
     }
     startQuery();
+    if (listenerHeld) {
+        std::optional<wire::io::TcpListener> handed = options_.loading->release();
+        if (handed.has_value() && accepting_.load()) {
+            listener_ = std::move(*handed);
+        }
+    }
     const double elapsedSeconds = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
                                                           std::chrono::steady_clock::now() - startedAt)
                                                           .count()) /
@@ -228,6 +236,9 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         return line + ".";
     });
     config::forwardingConfig::announce(config_->forwarding, config_->onlineMode, config_->port, logger_);
+    if (options_.onReady) {
+        options_.onReady();
+    }
 
     while (accepting_.load() && listener_.has_value()) {
         std::expected<wire::io::TcpConnection, wire::io::SocketError> accepted = listener_->accept();

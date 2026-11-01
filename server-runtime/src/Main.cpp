@@ -5,10 +5,12 @@
 #include <basalt/server/assets/VersionMetadata.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
+#include <basalt/server/runtime/LoadingServer.hpp>
 #include <basalt/server/runtime/command/ConsoleReader.hpp>
 #include <basalt/server/runtime/config/BasaltConfig.hpp>
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
+#include <basalt/server/runtime/config/MessagesConfig.hpp>
 #include <basalt/server/runtime/config/ServerListConfig.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/datapack/DataPacks.hpp>
@@ -105,7 +107,19 @@ template <typename T>
 /// parity: `--safeMode`.
 bool gSafeMode = false;
 
-[[nodiscard]] std::unique_ptr<Instance> buildServer() {
+[[nodiscard]] std::unique_ptr<LoadingServer> startLoadingServer(const config::BasaltConfig& boot) {
+    const wire::common::Logger logger{"Loading"};
+    const std::expected<config::ServerListConfig, std::string> serverList =
+        config::ServerListConfig::load(config::ConfigDirectory{}, config::BasaltConfig::legacyMotd(), logger);
+    const std::expected<config::MessagesConfig, std::string> messages =
+        config::MessagesConfig::load(config::ConfigDirectory{});
+    if (!serverList.has_value() || !messages.has_value()) {
+        return nullptr;
+    }
+    return LoadingServer::start(boot, *serverList, *messages, logger);
+}
+
+[[nodiscard]] std::unique_ptr<Instance> buildServer(LoadingServer* loading) {
     const wire::common::Logger configLogger{"Config"};
     // Read on every start, so a restart picks up an edited server.toml.
     auto instance = std::make_unique<Instance>(Instance{
@@ -224,6 +238,8 @@ bool gSafeMode = false;
         options.servicesKeys = instance->servicesKeys.get();
     }
     options.lang = server::assets::langAssets::loadCachedOrEmpty(dataRoot);
+    options.loading = loading;
+    options.onReady = [] { command::consoleReader::markReady(); };
 
     instance->server =
         std::make_unique<BasaltServer>(instance->config, instance->worlds, *instance->live, std::move(options));
@@ -291,8 +307,10 @@ int main(int argc, char** argv) {
         const std::chrono::steady_clock::time_point instanceStartedAt =
             first ? startedAt : std::chrono::steady_clock::now();
         first = false;
+        command::consoleReader::beginStartup();
+        std::unique_ptr<LoadingServer> loading = startLoadingServer(*boot);
         try {
-            running = buildServer();
+            running = buildServer(loading.get());
             live.store(running->server->commands(), std::memory_order_release);
             running->server->start(instanceStartedAt);
         } catch (const std::exception& failure) {

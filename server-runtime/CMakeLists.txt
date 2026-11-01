@@ -12,6 +12,7 @@ basalt_module(server-runtime-core
     SOURCES
         src/BuildInfo.cpp
         src/Connection.cpp
+        src/LoadingServer.cpp
         src/LoginHandler.cpp
         src/bedrock/BedrockBlockEntities.cpp
         src/bedrock/BedrockChunks.cpp

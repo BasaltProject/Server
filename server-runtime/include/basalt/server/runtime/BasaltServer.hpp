@@ -82,6 +82,7 @@
 
 namespace basalt::server::runtime {
 class BlockTests;
+class LoadingServer;
 
 class BasaltServer {
 public:
@@ -100,6 +101,8 @@ public:
         std::string playersDatabasePath = "players.db";
         std::string worldsRoot = "worlds";
         wire::text::LangTable lang;
+        LoadingServer* loading = nullptr;
+        std::function<void()> onReady;
     };
 
     BasaltServer(const config::BasaltConfig& config, const config::WorldsConfig& worldsConfig,

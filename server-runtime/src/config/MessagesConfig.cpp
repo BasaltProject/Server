@@ -6,7 +6,7 @@
 namespace basalt::server::runtime::config {
 namespace {
 
-constexpr std::array<std::string_view, 12> kKnownKeys{"server-full",
+constexpr std::array<std::string_view, 13> kKnownKeys{"server-full",
                                                       "not-whitelisted",
                                                       "banned",
                                                       "banned-ip",
@@ -17,6 +17,7 @@ constexpr std::array<std::string_view, 12> kKnownKeys{"server-full",
                                                       "transfers-disabled",
                                                       "connection-throttled",
                                                       "server-closed",
+                                                      "server-loading",
                                                       "outdated-client"};
 
 } // namespace

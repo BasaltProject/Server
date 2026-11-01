@@ -36,5 +36,8 @@ connection-throttled = ""
 # What players are told when the server stops. Default: "Server closed" in red.
 server-closed = ""
 
+# A login while the server is still starting. Default: "The server is still starting" and a request to wait.
+server-loading = ""
+
 # A client whose version this server does not speak. Written once for every refusal reason.
 outdated-client = ""

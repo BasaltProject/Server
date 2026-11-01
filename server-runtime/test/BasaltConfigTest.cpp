@@ -375,7 +375,7 @@ TEST_CASE("default MOTDs advertise support through Minecraft 26.3") {
     const ConfigDirectory directory{scratch("motd-current-version-default")};
     const auto config = ServerListConfig::load(directory);
     REQUIRE(config.has_value());
-    REQUIRE(config->profiles().size() == 3);
+    REQUIRE(config->profiles().size() == 4);
     for (const auto& profile : config->profiles()) {
         REQUIRE(profile.motd.has_value());
         REQUIRE(profile.motd->size() == 2);
@@ -391,7 +391,7 @@ TEST_CASE("updated defaults still import a custom legacy MOTD without replacing 
     REQUIRE(config.has_value());
     for (const auto& profile : config->profiles()) {
         REQUIRE(profile.motd.has_value());
-        if (profile.header.name == "maintenance") {
+        if (profile.header.name == "maintenance" || profile.header.name == "loading") {
             CHECK(profile.motd->front().find("BASALT SERVER") != std::string::npos);
         } else {
             CHECK(*profile.motd == std::vector<std::string>{"My server", "Welcome"});
