@@ -459,6 +459,8 @@ bool PlayerLifecycle::switchWorld(world::LoadedWorld& target, double x, double y
     owner_->uiState().syncHealth();
     owner_->uiState().syncExperience();
     owner_->playerUi().worldChanged();
+    // The respawn replaces the client's inventory; keeping entity data does not keep its slots.
+    owner_->sendInventoryAll();
 
     owner_->chunkStreamer().resetForWorldSwitch(x, z, target.settings().viewDistance);
     dimensionTriggers(*session, *previous, target, left);
