@@ -24,7 +24,13 @@ void applyPackRegistries(std::vector<wire::protocol::configuration::RegistryData
         }
         for (const auto& [id, name] : datapack::dataFiles(entriesUnder, directory)) {
             const std::optional<std::string> pack = resources.packOf(name);
-            if (!pack.has_value() || std::ranges::contains(builtInPacks, *pack)) {
+            const std::string key = id.toString();
+            const auto existing =
+                std::ranges::find(packet.entries, key, &wire::protocol::configuration::RegistryEntry::key);
+            // Entries without a payload can only be resolved by a client with the same known pack.
+            // Keep their full definitions too: older clients (or clients declining that pack) need them.
+            if (!pack.has_value() || (std::ranges::contains(builtInPacks, *pack) &&
+                                      (existing == packet.entries.end() || existing->value.has_value()))) {
                 continue;
             }
             const std::optional<std::string> text = resources.readText(name);
@@ -38,9 +44,6 @@ void applyPackRegistries(std::vector<wire::protocol::configuration::RegistryData
                 logger.error([&] { return "Failed to parse " + id.toString() + " from pack " + *pack; });
                 continue;
             }
-            const std::string key = id.toString();
-            const auto existing =
-                std::ranges::find(packet.entries, key, &wire::protocol::configuration::RegistryEntry::key);
             if (existing != packet.entries.end()) {
                 existing->value = *tag;
             } else {
