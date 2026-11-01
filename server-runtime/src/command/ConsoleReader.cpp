@@ -48,6 +48,9 @@ std::function<CommandDispatcher*()> currentDispatcher;
 std::mutex queueMutex;
 bool starting = false;
 std::vector<std::string> queued;
+std::size_t panelLines = 0;
+
+constexpr std::size_t kMaxPanelCommandLength = 80;
 
 [[nodiscard]] int readByteOrStop() {
     while (running.load()) {
@@ -56,6 +59,51 @@ std::vector<std::string> queued;
         }
     }
     return -1;
+}
+
+[[nodiscard]] std::string paint(std::string_view code, const std::string& text) {
+    return wire::common::logOutput::useColor() ? "\033[" + std::string{code} + "m" + text + "\033[0m" : text;
+}
+
+[[nodiscard]] std::vector<std::string> panelOf(const std::vector<std::string>& pending) {
+    std::vector<std::string> lines;
+    if (pending.empty()) {
+        return lines;
+    }
+    lines.push_back(paint("1;33", " Waiting for the server to start") +
+                    paint("90", " (" + std::to_string(pending.size()) + " queued)"));
+    for (std::size_t index = 0; index < pending.size(); index++) {
+        std::string command = pending[index];
+        if (command.size() > kMaxPanelCommandLength) {
+            command = command.substr(0, kMaxPanelCommandLength) + "...";
+        }
+        lines.push_back("   " + paint("90", std::to_string(index + 1) + ".") + " " + paint("36", command));
+    }
+    return lines;
+}
+
+/// Caller holds `promptMutex`; leaves the cursor at the start of the line the panel began on.
+void eraseAbovePrompt() {
+    std::fputs("\r", stdout);
+    if (panelLines > 0) {
+        std::fputs(("\033[" + std::to_string(panelLines) + "A").c_str(), stdout);
+    }
+    std::fputs("\033[J", stdout);
+    panelLines = 0;
+}
+
+/// Caller holds `promptMutex`.
+void drawPanel() {
+    std::vector<std::string> pending;
+    {
+        const std::lock_guard lock{queueMutex};
+        pending = queued;
+    }
+    const std::vector<std::string> lines = panelOf(pending);
+    for (const std::string& line : lines) {
+        std::fputs((line + "\r\n").c_str(), stdout);
+    }
+    panelLines = lines.size();
 }
 
 [[nodiscard]] std::optional<std::string> readEditedLine(const std::vector<std::string>& history) {
@@ -74,7 +122,11 @@ std::vector<std::string> queued;
 
     {
         const std::lock_guard lock{promptMutex};
-        redrawPrompt = redraw;
+        drawPanel();
+        redrawPrompt = [redraw] {
+            drawPanel();
+            redraw();
+        };
         redraw();
     }
     while (true) {
@@ -93,6 +145,8 @@ std::vector<std::string> queued;
         }
         if (byte == kCarriageReturn || byte == kNewline) {
             redrawPrompt = nullptr;
+            eraseAbovePrompt();
+            redraw();
             std::fputs("\r\n", stdout);
             wire::io::flushConsole();
             return line;
@@ -156,6 +210,16 @@ std::vector<std::string> queued;
     }
     queued.push_back(command);
     return true;
+}
+
+void refreshPanel() {
+    const std::lock_guard lock{promptMutex};
+    if (!redrawPrompt) {
+        return;
+    }
+    eraseAbovePrompt();
+    redrawPrompt();
+    wire::io::flushConsole();
 }
 
 void runCommand(const std::function<CommandDispatcher*()>& current, const std::string& command) {
@@ -238,7 +302,10 @@ void readLoop(const std::function<CommandDispatcher*()>& current, bool editing, 
             history.erase(history.begin());
         }
         if (queueIfStarting(command)) {
-            std::cout << "The server is still starting, '" << command << "' is queued and will run when it is up.\n";
+            if (!editing) {
+                std::cout << "The server is still starting, '" << command
+                          << "' is queued and will run when it is up.\n";
+            }
             continue;
         }
         runCommand(current, command);
@@ -259,7 +326,7 @@ void start(std::function<CommandDispatcher*()> current) {
             // Log lines and the prompt share one terminal.
             wire::common::logOutput::setAroundConsoleLine([](const std::function<void()>& write) {
                 const std::lock_guard lock{promptMutex};
-                std::fputs("\r\033[K", stdout);
+                eraseAbovePrompt();
                 write();
                 if (redrawPrompt) {
                     redrawPrompt();
@@ -285,6 +352,7 @@ void markReady() {
         starting = false;
         pending.swap(queued);
     }
+    refreshPanel();
     if (!currentDispatcher) {
         return;
     }
