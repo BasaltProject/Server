@@ -49,6 +49,7 @@ TEST_CASE("the report is valid json with the call tree of what ran") {
     REQUIRE(parsed.has_value());
     const wire::common::JsonObject& root = objectOf(*parsed);
     CHECK(*member(root, "format").get<std::string>() == "basalt-timings");
+    CHECK(*member(root, "type").get<std::string>() == "server");
     CHECK(*member(root, "version").get<std::int64_t>() == 3);
     CHECK(*member(objectOf(member(root, "metadata")), "user").get<std::string>() == "Alice");
     CHECK(member(objectOf(member(root, "metrics")), "tps").get<std::vector<wire::common::JsonValue>>() != nullptr);

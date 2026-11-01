@@ -297,6 +297,8 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
     JsonWriter json;
     json.beginObject();
     json.member("format", "basalt-timings");
+    // What produced the report, so the viewer can tell a server from a proxy once the proxy writes them too.
+    json.member("type", "server");
     json.member("version", kReportVersion);
 
     json.key("metadata");
