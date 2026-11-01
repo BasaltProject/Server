@@ -471,6 +471,7 @@ basalt_module(server-runtime-core
         src/scoreboard/TeamNameTags.cpp
         src/scoreboard/Teams.cpp
         src/ui/PlayerUi.cpp
+        src/timings/SystemFacts.cpp
         src/timings/TimingsReport.cpp
         src/timings/TimingsUpload.cpp
         src/world/ChorusFlowerGrowth.cpp

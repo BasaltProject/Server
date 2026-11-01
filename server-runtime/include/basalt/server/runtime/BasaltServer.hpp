@@ -216,6 +216,7 @@ private:
     plugins::NpcRegistry npcs_;
     ServerMetrics metrics_;
     CpuMeter cpuMeter_;
+    timings::SystemCpuMeter systemCpu_;
     [[nodiscard]] player::DamageContext damageContext();
 
     [[nodiscard]] player::BreakContext breakContext();
