@@ -11,6 +11,14 @@
 
 namespace basalt::server::runtime::timings {
 
+struct WorldFacts {
+    std::string name;
+    std::int32_t loadedChunks = 0;
+    std::int32_t entities = 0;
+    std::int32_t players = 0;
+};
+
+/// Every source is optional: one left empty is reported as absent instead of failing the whole report.
 struct ReportSources {
     std::string versionName;
     std::int32_t protocolVersion = 0;
@@ -29,6 +37,7 @@ struct ReportSources {
     std::function<std::optional<double>()> cpuPercent;
     std::function<std::optional<std::int64_t>()> liveHeapBytes;
     std::function<std::optional<std::int64_t>()> residentBytes;
+    std::function<std::vector<WorldFacts>()> worlds;
 };
 
 class TimingsReport {
@@ -44,7 +53,13 @@ public:
 
     [[nodiscard]] std::string write(std::int64_t nowNanos) const;
 
+    /// Saves a report already built, so what is uploaded and what is kept on disk are the same document.
+    [[nodiscard]] std::string save(std::string_view json) const;
+
     [[nodiscard]] std::string json(std::int64_t nowNanos) const;
+
+    /// What a viewer needs to tell a report from another: the time it covers and what ran in it.
+    [[nodiscard]] bool hasProfile() const;
 
     [[nodiscard]] static std::string stamp();
 

@@ -345,6 +345,11 @@ watchdog-seconds = 60
 # the price of slower loading. NO VANILLA below 1280.
 chunk-send-rate = 0
 
+# Where /timings uploads a finished profile so you get a link to read it in a browser. The report goes to that
+# site and nowhere else, and only when you ask with /timings stop or /timings report. Leave it empty to keep
+# reports on this machine, in .basalt/timings, and upload nothing.
+timings-url = "https://basaltmc.org"
+
 # Count noise evaluations, biome lookups and per-phase timings while generating
 # chunks, then log a report once the startup chunks are ready. Diagnostics only:
 # it also forces startup generation onto a single thread so the counts are exact,

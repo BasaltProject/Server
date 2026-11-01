@@ -472,6 +472,7 @@ basalt_module(server-runtime-core
         src/scoreboard/Teams.cpp
         src/ui/PlayerUi.cpp
         src/timings/TimingsReport.cpp
+        src/timings/TimingsUpload.cpp
         src/world/ChorusFlowerGrowth.cpp
         src/world/Paintings.cpp
         src/world/SummonAwards.cpp
@@ -1067,6 +1068,12 @@ basalt_test(server-runtime-region-test
 basalt_test(server-runtime-sched-test
     SOURCES
         test/SchedulerTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-timings-report-test
+    SOURCES
+        test/TimingsReportTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
