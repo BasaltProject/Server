@@ -17,6 +17,8 @@ namespace basalt::server::runtime::command::commands {
 struct TimingsHooks {
     /// Base address of the report viewer. Empty keeps reports on disk and uploads nothing.
     std::string viewerUrl;
+    /// A file with the CA to trust for the viewer, for one behind a private authority. Empty means the system's.
+    std::string caFile;
     /// Hands a task to the tick thread, the only one allowed to touch players.
     std::function<void(std::function<void()>)> postToTick;
     /// Delivers a message to whoever asked: the player with that uuid, or the console when it is empty.

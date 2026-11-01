@@ -23,7 +23,8 @@ namespace {
 
 } // namespace
 
-std::expected<UploadedReport, std::string> uploadReport(std::string_view baseUrl, std::string_view json) {
+std::expected<UploadedReport, std::string> uploadReport(std::string_view baseUrl, std::string_view json,
+                                                        std::string_view trustPem) {
     const std::string base = trimmed(baseUrl);
     if (!base.starts_with("https://")) {
         return std::unexpected{"the timings viewer address must start with https://"};
@@ -31,7 +32,8 @@ std::expected<UploadedReport, std::string> uploadReport(std::string_view baseUrl
     const std::span<const std::uint8_t> body{reinterpret_cast<const std::uint8_t*>(json.data()), json.size()};
     // The client appends one CRLF after these, so the last header carries its own to leave the blank line.
     const auto reply = wire::auth::httpsPut(base + "/api/timings", body,
-                                            "Content-Type: application/json\r\nAccept: application/json\r\n");
+                                            "Content-Type: application/json\r\nAccept: application/json\r\n",
+                                            wire::auth::HttpsOptions{.trustPem = trustPem});
     if (!reply.has_value()) {
         return std::unexpected{reply.error().message};
     }

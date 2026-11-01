@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/command/commands/TimingsCommand.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/timings/TimingsUpload.hpp>
+#include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/text/ClickEvent.hpp>
 
 #include <algorithm>
@@ -36,9 +37,7 @@ constexpr std::int32_t kMaxTimeoutSeconds = 24 * 60 * 60;
            std::string(static_cast<std::size_t>(digits) - fraction.size(), '0') + fraction;
 }
 
-[[nodiscard]] Component line(std::vector<Component> parts) {
-    return Component::join(Component::empty(), parts);
-}
+[[nodiscard]] Component line(std::vector<Component> parts) { return Component::join(Component::empty(), parts); }
 
 [[nodiscard]] Component tpsOf(double value) {
     const auto color = value >= 19.0 ? kGreen : (value >= 15.0 ? kYellow : kRed);
@@ -146,7 +145,9 @@ void TimingsCommand::finish(const std::string& requester, bool stopMeasuring) co
     tell(Component::text("Uploading the report...", kGray));
     const std::scoped_lock lock{workersMutex_};
     workers_.emplace_back([this, requester, json, path] {
-        const auto uploaded = timings::uploadReport(hooks_.viewerUrl, json);
+        const std::string trust =
+            hooks_.caFile.empty() ? std::string{} : wire::io::fileIO::readText(hooks_.caFile).value_or("");
+        const auto uploaded = timings::uploadReport(hooks_.viewerUrl, json, trust);
         hooks_.postToTick([this, requester, uploaded, path] {
             if (!hooks_.tell) {
                 return;
@@ -154,9 +155,9 @@ void TimingsCommand::finish(const std::string& requester, bool stopMeasuring) co
             if (uploaded.has_value()) {
                 hooks_.tell(requester, line({Component::text("Report: ", kGreen), linkTo(uploaded->url)}));
             } else {
-                hooks_.tell(requester, line({Component::text("Could not upload (" + uploaded.error() + "), saved to ",
-                                                             kRed),
-                                             Component::text(path, kWhite)}));
+                hooks_.tell(requester,
+                            line({Component::text("Could not upload (" + uploaded.error() + "), saved to ", kRed),
+                                  Component::text(path, kWhite)}));
                 return;
             }
             hooks_.tell(requester, Component::text("Also saved to " + path, kGray));
@@ -174,12 +175,12 @@ void TimingsCommand::build(const CommandNodeBuilder& root) const {
                                        rate(60), Component::text(", ", kGray), rate(300)}));
         const wire::common::DurationSummary ten = tickDurations_->summary(now, 10);
         const wire::common::DurationSummary minute = tickDurations_->summary(now, 60);
-        source.sendSystemMessage(line({Component::text("MSPT 10s/1m (mean, 95%, max): ", kGray), millisOf(ten.meanMillis),
-                                       Component::text("/", kGray), millisOf(ten.percentile95Millis),
-                                       Component::text("/", kGray), millisOf(ten.maxMillis),
-                                       Component::text("  ", kGray), millisOf(minute.meanMillis),
-                                       Component::text("/", kGray), millisOf(minute.percentile95Millis),
-                                       Component::text("/", kGray), millisOf(minute.maxMillis)}));
+        source.sendSystemMessage(
+            line({Component::text("MSPT 10s/1m (mean, 95%, max): ", kGray), millisOf(ten.meanMillis),
+                  Component::text("/", kGray), millisOf(ten.percentile95Millis), Component::text("/", kGray),
+                  millisOf(ten.maxMillis), Component::text("  ", kGray), millisOf(minute.meanMillis),
+                  Component::text("/", kGray), millisOf(minute.percentile95Millis), Component::text("/", kGray),
+                  millisOf(minute.maxMillis)}));
         if (timings_->enabled()) {
             source.sendSystemMessage(Component::text(
                 "Profiling for " + spanOf(timings_->windowNanos(now) / wire::common::TickDurations::kNanosPerSecond) +
@@ -198,13 +199,14 @@ void TimingsCommand::build(const CommandNodeBuilder& root) const {
             return 1;
         });
         begin.literal("timeout", [this](const CommandNodeBuilder& timeout) {
-            timeout.argument("seconds", integerArgument(1, kMaxTimeoutSeconds), [this](const CommandNodeBuilder& seconds) {
-                seconds.executes([this](const CommandContext& context) -> Parsed<std::int32_t> {
-                    const auto* value = context.get<std::int32_t>("seconds");
-                    start(context, value == nullptr ? 0 : *value);
-                    return 1;
-                });
-            });
+            timeout.argument("seconds", integerArgument(1, kMaxTimeoutSeconds),
+                             [this](const CommandNodeBuilder& seconds) {
+                                 seconds.executes([this](const CommandContext& context) -> Parsed<std::int32_t> {
+                                     const auto* value = context.get<std::int32_t>("seconds");
+                                     start(context, value == nullptr ? 0 : *value);
+                                     return 1;
+                                 });
+                             });
         });
     });
 
