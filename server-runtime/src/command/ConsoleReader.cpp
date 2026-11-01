@@ -44,6 +44,11 @@ std::jthread reader;
 std::function<void()> redrawPrompt;
 std::mutex promptMutex;
 
+std::function<CommandDispatcher*()> currentDispatcher;
+std::mutex queueMutex;
+bool starting = false;
+std::vector<std::string> queued;
+
 [[nodiscard]] int readByteOrStop() {
     while (running.load()) {
         if (wire::io::terminal::waitForInput(kPoll)) {
@@ -144,6 +149,59 @@ std::mutex promptMutex;
     return current();
 }
 
+[[nodiscard]] bool queueIfStarting(const std::string& command) {
+    const std::lock_guard lock{queueMutex};
+    if (!starting) {
+        return false;
+    }
+    queued.push_back(command);
+    return true;
+}
+
+void runCommand(const std::function<CommandDispatcher*()>& current, const std::string& command) {
+    CommandDispatcher* dispatcher = awaitDispatcher(current);
+    if (dispatcher == nullptr) {
+        std::cout << "No server is running, so '" << command << "' was not run.\n";
+        return;
+    }
+    // A command from the console reaches the world, so it runs on whoever owns it rather than on this thread.
+    const CommandEnvironment& environment = dispatcher->environment();
+    const auto named = environment.options().worlds.find(environment.options().defaultWorldName);
+    world::LoadedWorld* defaultWorld = named == environment.options().worlds.end() ? nullptr : named->second;
+    auto source = std::make_shared<ConsoleCommandSource>(
+        wire::common::Logger{"Console"}, environment.lang(), [defaultWorld]() -> std::array<double, 3> {
+            return defaultWorld == nullptr ? std::array<double, 3>{0.0, 0.0, 0.0} : defaultWorld->spawn();
+        });
+    const std::function<void()> run = [dispatcher, source, command, &environment] {
+        std::string line = command;
+        server::plugins::PluginEventBus* bus = environment.pluginEvents();
+        const server::plugins::PluginEvent* asked =
+            server::plugins::emit(bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::serverCommand(),
+                                  [&line](server::plugins::PluginEvent& event) {
+                                      event.set(0, std::string{"console"});
+                                      event.set(1, line);
+                                  });
+        if (asked != nullptr && asked->cancelled()) {
+            const std::optional<std::string> why = asked->cancelMessage();
+            if (why.has_value()) {
+                std::cout << *why << "\n";
+            }
+            return;
+        }
+        if (asked != nullptr) {
+            if (const auto* edited = std::get_if<std::string>(&asked->get("command")); edited != nullptr) {
+                line = *edited;
+            }
+        }
+        static_cast<void>(dispatcher->execute(*source, line));
+    };
+    if (defaultWorld == nullptr) {
+        run();
+    } else {
+        static_cast<void>(defaultWorld->owner().submitConsole(run));
+    }
+}
+
 void readLoop(const std::function<CommandDispatcher*()>& current, bool editing, std::stop_token stop) {
     wire::io::ConsoleInput input{65536};
     std::vector<std::string> history;
@@ -179,47 +237,11 @@ void readLoop(const std::function<CommandDispatcher*()>& current, bool editing, 
         if (history.size() > kMaxHistory) {
             history.erase(history.begin());
         }
-        CommandDispatcher* dispatcher = awaitDispatcher(current);
-        if (dispatcher == nullptr) {
-            std::cout << "No server is running, so '" << command << "' was not run.\n";
+        if (queueIfStarting(command)) {
+            std::cout << "The server is still starting, '" << command << "' is queued and will run when it is up.\n";
             continue;
         }
-        // A command from the console reaches the world, so it runs on whoever owns it rather than on this thread.
-        const CommandEnvironment& environment = dispatcher->environment();
-        const auto named = environment.options().worlds.find(environment.options().defaultWorldName);
-        world::LoadedWorld* defaultWorld = named == environment.options().worlds.end() ? nullptr : named->second;
-        auto source = std::make_shared<ConsoleCommandSource>(
-            wire::common::Logger{"Console"}, environment.lang(), [defaultWorld]() -> std::array<double, 3> {
-                return defaultWorld == nullptr ? std::array<double, 3>{0.0, 0.0, 0.0} : defaultWorld->spawn();
-            });
-        const std::function<void()> run = [dispatcher, source, command, &environment] {
-            std::string line = command;
-            server::plugins::PluginEventBus* bus = environment.pluginEvents();
-            const server::plugins::PluginEvent* asked = server::plugins::emit(
-                bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::serverCommand(),
-                [&line](server::plugins::PluginEvent& event) {
-                    event.set(0, std::string{"console"});
-                    event.set(1, line);
-                });
-            if (asked != nullptr && asked->cancelled()) {
-                const std::optional<std::string> why = asked->cancelMessage();
-                if (why.has_value()) {
-                    std::cout << *why << "\n";
-                }
-                return;
-            }
-            if (asked != nullptr) {
-                if (const auto* edited = std::get_if<std::string>(&asked->get("command")); edited != nullptr) {
-                    line = *edited;
-                }
-            }
-            static_cast<void>(dispatcher->execute(*source, line));
-        };
-        if (defaultWorld == nullptr) {
-            run();
-        } else {
-            static_cast<void>(defaultWorld->owner().submitConsole(run));
-        }
+        runCommand(current, command);
     }
 }
 
@@ -230,6 +252,7 @@ void start(std::function<CommandDispatcher*()> current) {
     if (!running.compare_exchange_strong(expected, true)) {
         return;
     }
+    currentDispatcher = current;
     reader = std::jthread([current = std::move(current)](std::stop_token stop) {
         const bool editing = wire::io::terminal::enableRawMode();
         if (editing) {
@@ -248,6 +271,27 @@ void start(std::function<CommandDispatcher*()> current) {
         wire::common::logOutput::setAroundConsoleLine({});
         wire::io::terminal::restoreMode();
     });
+}
+
+void beginStartup() {
+    const std::lock_guard lock{queueMutex};
+    starting = true;
+}
+
+void markReady() {
+    std::vector<std::string> pending;
+    {
+        const std::lock_guard lock{queueMutex};
+        starting = false;
+        pending.swap(queued);
+    }
+    if (!currentDispatcher) {
+        return;
+    }
+    for (const std::string& command : pending) {
+        wire::common::Logger{"Console"}.info([&command] { return "Running queued command: " + command; });
+        runCommand(currentDispatcher, command);
+    }
 }
 
 void stop() {
