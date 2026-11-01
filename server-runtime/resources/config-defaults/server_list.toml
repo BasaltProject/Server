@@ -75,6 +75,18 @@ hide-player-count = true
 version-name = "Maintenance"
 version-protocol = -1
 
+[profiles.loading]
+# Shown while the server is still starting, before it can take players. Never chosen by `active` or [when]: it is
+# used on its own for as long as the start lasts, and a login in that time is turned away with the message
+# `server-loading` in messages.toml.
+motd = [
+    "              <bold><gray>BASALT SERVER</gray></bold> <dark_gray>[1.8-26.3]</dark_gray>",
+    "         <red>The server is loading, please wait</red>",
+]
+hide-player-count = true
+version-name = "Loading"
+version-protocol = -1
+
 # Other keys a profile takes:
 #   priority = 0              higher wins between profiles that both apply
 #   max-players = 80          what the list shows, not how many can actually join
