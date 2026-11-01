@@ -10,6 +10,7 @@
 #include <atomic>
 #include <cstdio>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -41,6 +42,7 @@ std::atomic<bool> running{false};
 std::jthread reader;
 
 std::function<void()> redrawPrompt;
+std::mutex promptMutex;
 
 [[nodiscard]] int readByteOrStop() {
     while (running.load()) {
@@ -65,10 +67,21 @@ std::function<void()> redrawPrompt;
         wire::io::flushConsole();
     };
 
-    redrawPrompt = redraw;
-    redraw();
+    {
+        const std::lock_guard lock{promptMutex};
+        redrawPrompt = redraw;
+        redraw();
+    }
     while (true) {
         const int byte = readByteOrStop();
+        int arrow = -1;
+        if (byte == kEscape) {
+            if (wire::io::terminal::readByte() != kBracket) {
+                continue;
+            }
+            arrow = wire::io::terminal::readByte();
+        }
+        const std::lock_guard lock{promptMutex};
         if (byte == -1) {
             redrawPrompt = nullptr;
             return std::nullopt;
@@ -88,10 +101,6 @@ std::function<void()> redrawPrompt;
             continue;
         }
         if (byte == kEscape) {
-            if (wire::io::terminal::readByte() != kBracket) {
-                continue;
-            }
-            const int arrow = wire::io::terminal::readByte();
             if (arrow == kUp && historyIndex > 0) {
                 if (historyIndex == history.size()) {
                     draft = line;
@@ -226,6 +235,7 @@ void start(std::function<CommandDispatcher*()> current) {
         if (editing) {
             // Log lines and the prompt share one terminal.
             wire::common::logOutput::setAroundConsoleLine([](const std::function<void()>& write) {
+                const std::lock_guard lock{promptMutex};
                 std::fputs("\r\033[K", stdout);
                 write();
                 if (redrawPrompt) {
