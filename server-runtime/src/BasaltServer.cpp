@@ -337,6 +337,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 }
                 const auto began = std::chrono::steady_clock::now();
                 tickWorlds(worldRuns);
+                if (timingsReport_ != nullptr) {
+                    timingsReport_->sampleIfDue(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                                    std::chrono::steady_clock::now() - serverClock_)
+                                                    .count());
+                }
                 eventSink_.notify(
                     &server::plugins::pluginEventTypes::serverTickEnd, [&](server::plugins::PluginEvent& event) {
                         const double took =
@@ -407,17 +412,71 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         const std::optional<std::uint64_t> bytes = metrics_.residentBytes();
         return bytes.has_value() ? std::optional{static_cast<std::int64_t>(*bytes)} : std::nullopt;
     };
+    sources.buildVersion = std::string{buildInfo::kVersion};
+    sources.systemCpuPercent = [this] { return systemCpu_.percent(); };
     sources.worlds = [this] {
         std::vector<timings::WorldFacts> facts;
+        const std::vector<player::PlayerSession*> online = playerRegistry_.snapshot();
         for (const auto& [name, world] : worldRegistry_->worlds()) {
-            std::int32_t players = 0;
-            for (const player::PlayerSession* player : playerRegistry_.snapshot()) {
-                players += player->worldName == world->name() ? 1 : 0;
+            timings::WorldFacts entry;
+            entry.name = name;
+            entry.loadedChunks = static_cast<std::int32_t>(world->state().loadedChunkCount());
+            entry.blockEntities = world->state().chunkMemory().blockEntities;
+            for (const entity::ServerEntity* one : world->state().entities()) {
+                entry.entities += 1;
+                entry.entityCounts[one->type().path()] += 1;
             }
-            facts.push_back({name, static_cast<std::int32_t>(world->state().loadedChunkCount()),
-                             static_cast<std::int32_t>(world->state().entities().size()), players});
+            for (const player::PlayerSession* player : online) {
+                entry.players += player->worldName == world->name() ? 1 : 0;
+            }
+            facts.push_back(std::move(entry));
         }
         return facts;
+    };
+    sources.live = [this] {
+        timings::LiveFacts live;
+        live.players = static_cast<std::int32_t>(playerRegistry_.count());
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            live.chunks += static_cast<std::int32_t>(world->state().loadedChunkCount());
+            live.entities += static_cast<std::int32_t>(world->state().entities().size());
+        }
+        live.cpuProcessPercentOfOneCore = cpuMeter_.percent();
+        live.cpuSystemPercent = systemCpu_.percent();
+        const std::optional<std::uint64_t> resident = metrics_.residentBytes();
+        if (resident.has_value()) {
+            live.residentBytes = static_cast<std::int64_t>(*resident);
+        }
+        return live;
+    };
+    sources.plugins = [this] {
+        std::vector<timings::PluginFacts> found;
+        if (plugins_ != nullptr) {
+            for (const server::plugins::PluginStatus& status : plugins_->statuses()) {
+                found.push_back({status.id, status.name, status.version, status.errors, status.disabled});
+            }
+        }
+        return found;
+    };
+    sources.configuration = [this] {
+        const auto flag = [](bool on) { return std::string{on ? "true" : "false"}; };
+        const world::LoadedWorld& main = worldRegistry_->defaultWorld();
+        return std::vector<std::pair<std::string, std::string>>{
+            {"max-players", std::to_string(config_->maxPlayers)},
+            {"online-mode", flag(config_->onlineMode)},
+            {"gamemode", config_->gamemode},
+            {"difficulty", main.difficulty()},
+            {"view-distance", std::to_string(main.settings().viewDistance)},
+            {"whitelist", flag(config_->whitelist)},
+            {"java-port", std::to_string(config_->port)},
+            {"bedrock-enabled", flag(config_->bedrockEnabled)},
+            {"pause-when-empty-seconds", std::to_string(config_->pauseWhenEmptySeconds)},
+            {"regional", flag(config_->regional)},
+            {"region-threads", std::to_string(config_->regionThreads)},
+            {"plugins-enabled", flag(config_->pluginsEnabled)},
+            {"plugin-lanes", std::to_string(config_->pluginLanes)},
+            {"compression-threshold", std::to_string(config_->tuning.compressionThreshold)},
+            {"watchdog-seconds", std::to_string(config_->tuning.watchdogSeconds)},
+        };
     };
     sources.loadedChunks = [this] {
         std::int32_t total = 0;

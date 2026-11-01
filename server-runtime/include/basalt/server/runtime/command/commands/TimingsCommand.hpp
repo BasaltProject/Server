@@ -53,6 +53,7 @@ private:
     mutable std::mutex workersMutex_;
     mutable std::vector<std::jthread> workers_;
     mutable std::jthread timer_;
+    mutable std::string startedBy_;
 };
 
 } // namespace basalt::server::runtime::command::commands

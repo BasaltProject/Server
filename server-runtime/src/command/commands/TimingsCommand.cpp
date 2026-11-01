@@ -88,6 +88,7 @@ void TimingsCommand::start(const CommandContext& context, std::int32_t timeoutSe
     const bool restarted = timings_->enabled();
     timings_->reset(now);
     timings_->setEnabled(true);
+    startedBy_ = context.source().name();
 
     timer_.request_stop();
     if (timeoutSeconds > 0) {
@@ -120,7 +121,7 @@ void TimingsCommand::finish(const std::string& requester, bool stopMeasuring) co
         timings_->setEnabled(false);
         timer_.request_stop();
     }
-    const std::string json = report_->json(now);
+    const std::string json = report_->json(now, startedBy_);
     const std::string path = report_->save(json);
     const std::int64_t seconds = timings_->windowNanos(now) / wire::common::TickDurations::kNanosPerSecond;
     const timings::TimingsReport& report = *report_;
