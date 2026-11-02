@@ -171,6 +171,7 @@ That leaves a release binary in `build/release/bin/`, named for what it is:
 build/release/bin/BasaltServer-26.3.0-dev-macOS-arm64
 build/release/bin/BasaltServer-26.3.14-Linux-x64
 build/release/bin/BasaltServer-26.3.14-Windows-x64.exe
+build/release/bin/BasaltServer-26.3.14-Windows-arm64.exe
 ```
 
 A build made outside the CI has no build number, so it is `.0-dev`.
