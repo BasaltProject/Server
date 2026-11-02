@@ -49,6 +49,22 @@ Darwin)
     lipo -archs "$cxx" | grep -q "$arch"
     echo "BASALT_CMAKE_ARGS=-DCMAKE_C_COMPILER=$llvm/bin/clang -DCMAKE_CXX_COMPILER=$llvm/bin/clang++ -DCMAKE_OSX_DEPLOYMENT_TARGET=$target \"-DCMAKE_CXX_STANDARD_LIBRARIES=-lc++ $cxx\" -DCMAKE_CXX_FLAGS=-D_LIBCPP_DISABLE_AVAILABILITY $cross" >>"$GITHUB_ENV"
     ;;
+MINGW* | MSYS* | CYGWIN*)
+    args=""
+    if [ "${PROCESSOR_ARCHITECTURE:-}" = ARM64 ] || [ "${PROCESSOR_ARCHITEW6432:-}" = ARM64 ]; then
+        # An emulated x64 Clang targets x64 unless told otherwise.
+        if ! command -v clang >/dev/null; then
+            choco install llvm --no-progress -y
+            echo "C:\\Program Files\\LLVM\\bin" >>"$GITHUB_PATH"
+            export PATH="/c/Program Files/LLVM/bin:$PATH"
+        fi
+        if ! command -v ninja >/dev/null; then
+            choco install ninja --no-progress -y
+        fi
+        args="-DCMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc"
+    fi
+    echo "BASALT_CMAKE_ARGS=$args" >>"$GITHUB_ENV"
+    ;;
 *)
     echo "BASALT_CMAKE_ARGS=" >>"$GITHUB_ENV"
     ;;

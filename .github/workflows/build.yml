@@ -71,6 +71,8 @@ jobs:
             target: macOS-arm64
           - os: windows-2025
             target: Windows-x64
+          - os: windows-11-arm
+            target: Windows-arm64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     steps:
