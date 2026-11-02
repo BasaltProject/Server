@@ -40,7 +40,17 @@ constexpr std::int32_t kLocateCells = 100;
 
 [[nodiscard]] std::int32_t rounded(double value) { return static_cast<std::int32_t>(std::llround(value)); }
 
-[[nodiscard]] std::string at(std::int32_t x, std::int32_t z) { return std::to_string(x) + ", ~, " + std::to_string(z); }
+/// parity: `ComponentUtils.wrapInSquareBrackets` over a green `chat.coordinates` that suggests `/tp @s x ~ z`.
+[[nodiscard]] Component at(std::int32_t x, std::int32_t z) {
+    const std::string coordinates = std::to_string(x) + " ~ " + std::to_string(z);
+    return Component::translatable(
+        "chat.square_brackets",
+        {Component::translatable("chat.coordinates", {Component::text(std::to_string(x)), Component::text("~"),
+                                                      Component::text(std::to_string(z))})
+             .color(wire::text::kGreen)
+             .clickEvent(wire::text::ClickEvent::suggestCommand("/tp @s " + coordinates))
+             .hoverEvent(wire::text::HoverEvent::showText(Component::translatable("chat.coordinates.tooltip")))});
+}
 
 [[nodiscard]] std::int32_t horizontalDistance(std::int32_t x, std::int32_t z, std::int32_t fromX, std::int32_t fromZ) {
     const auto dx = static_cast<double>(x - fromX);
@@ -103,10 +113,9 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                                 continue;
                             }
                             const std::int32_t distance = horizontalDistance(x, z, startX, startZ);
-                            context.success(
-                                Component::translatable("commands.locate.biome.success",
-                                                        {Component::text(wanted->toString()), Component::text(at(x, z)),
-                                                         Component::text(std::to_string(distance))}));
+                            context.success(Component::translatable("commands.locate.biome.success",
+                                                                    {Component::text(wanted->toString()), at(x, z),
+                                                                     Component::text(std::to_string(distance))}));
                             return distance;
                         }
                     }
@@ -192,10 +201,9 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                         z = found->chunkZ * 16;
                     }
                     const std::int32_t distance = horizontalDistance(x, z, startX, startZ);
-                    context.success(
-                        Component::translatable("commands.locate.structure.success",
-                                                {Component::text(wanted->toString()), Component::text(at(x, z)),
-                                                 Component::text(std::to_string(distance))}));
+                    context.success(Component::translatable(
+                        "commands.locate.structure.success",
+                        {Component::text(wanted->toString()), at(x, z), Component::text(std::to_string(distance))}));
                     return distance;
                 });
             });
@@ -233,10 +241,9 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                     const auto dx = static_cast<float>(found->x - from.x);
                     const auto dz = static_cast<float>(found->z - from.z);
                     const auto distance = static_cast<std::int32_t>(std::floor(std::sqrt((dx * dx) + (dz * dz))));
-                    context.success(Component::translatable("commands.locate.poi.success",
-                                                            {Component::text(wanted->toString()),
-                                                             Component::text(at(found->x, found->z)),
-                                                             Component::text(std::to_string(distance))}));
+                    context.success(Component::translatable(
+                        "commands.locate.poi.success", {Component::text(wanted->toString()), at(found->x, found->z),
+                                                        Component::text(std::to_string(distance))}));
                     return distance;
                 });
             });
