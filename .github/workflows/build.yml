@@ -82,6 +82,7 @@ jobs:
           ref: ${{ inputs.ref }}
 
       - uses: actions/setup-java@v4
+        if: matrix.target != 'Windows-arm64'
         with:
           distribution: temurin
           java-version: "25"
