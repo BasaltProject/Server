@@ -233,7 +233,8 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
         add(std::make_shared<cmd::PerfCommand>(timings, report, nowNanos));
         add(std::make_shared<cmd::JfrCommand>(timings));
         if (wiring.tickDurations != nullptr) {
-            add(std::make_shared<cmd::TimingsCommand>(timings, *wiring.tickDurations, report, nowNanos, wiring.timingsHooks));
+            add(std::make_shared<cmd::TimingsCommand>(timings, *wiring.tickDurations, report, nowNanos,
+                                                      wiring.timingsHooks));
             if (tickLoop != nullptr) {
                 add(std::make_shared<cmd::TickCommand>(*tickLoop, *wiring.tickDurations, nowNanos));
             }

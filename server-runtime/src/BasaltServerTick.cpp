@@ -90,13 +90,13 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 continue;
             }
             seen[world->name()] = version;
-            worldRegistry_->scheduler().repartition(
-                world->name(), world->state().loadedChunkKeys(), [this, world](std::int32_t merged, std::int32_t split) {
-                    logger_.debug([world, merged, split] {
-                        return "World '" + world->name() + "': " + std::to_string(merged) + " region(s) merged, " +
-                               std::to_string(split) + " split";
-                    });
+            const auto logRepartition = [this, world](std::int32_t merged, std::int32_t split) {
+                logger_.debug([world, merged, split] {
+                    return "World '" + world->name() + "': " + std::to_string(merged) + " region(s) merged, " +
+                           std::to_string(split) + " split";
                 });
+            };
+            worldRegistry_->scheduler().repartition(world->name(), world->state().loadedChunkKeys(), logRepartition);
         }
     }
 

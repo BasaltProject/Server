@@ -5,10 +5,10 @@
 #include <basalt/server/runtime/command/CommandStorage.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
 #include <basalt/server/runtime/command/commands/DataPackCommand.hpp>
-#include <basalt/server/runtime/command/commands/TimingsCommand.hpp>
 #include <basalt/server/runtime/command/commands/FunctionCommands.hpp>
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
 #include <basalt/server/runtime/command/commands/StopwatchCommand.hpp>
+#include <basalt/server/runtime/command/commands/TimingsCommand.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/common/timings/TickDurations.hpp>
 #include <basalt/wire/multiversion/ProtocolGate.hpp>
