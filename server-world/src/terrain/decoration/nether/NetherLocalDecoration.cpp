@@ -95,12 +95,12 @@ void placePillar(Chunk& chunk, random::RandomSource& random, std::int32_t origin
     const std::int32_t basalt = stateIdOf("basalt");
     const std::int32_t foot = placeColumnDown(chunk, random, originX, originY, originZ, 1.0F, basalt);
     placeBase(chunk, random, originX, foot - 1, originZ, basalt);
-    for (const auto [dx, dz] : kSides) {
+    for (const auto& [dx, dz] : kSides) {
         if (random.nextFloat() < 0.5F) {
             setBlock(chunk, originX + dx, foot, originZ + dz, basalt);
         }
     }
-    for (const auto [dx, dz] : kSides) {
+    for (const auto& [dx, dz] : kSides) {
         static_cast<void>(placeColumnDown(chunk, random, originX + dx, originY, originZ + dz, 0.9F, basalt));
     }
 }
