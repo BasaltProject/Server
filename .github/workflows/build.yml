@@ -424,14 +424,11 @@ jobs:
         with:
           submodules: true
 
-      - name: Install the pinned formatter
-        run: pipx install clang-format==19.1.7
-
       - name: Check formatting
         run: |
           find server-* wire/wire-* -name '*.hpp' -o -name '*.cpp' \
             | grep -v third_party \
-            | xargs "$HOME/.local/bin/clang-format" --dry-run --Werror
+            | xargs pipx run --spec clang-format==19.1.7 clang-format --dry-run --Werror
 
   nightly:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
