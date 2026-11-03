@@ -328,10 +328,8 @@ jobs:
       - uses: hendrikmuhs/ccache-action@v1
         with:
           max-size: 1200M
-          key: FreeBSD-arm64-cross-clang21
+          key: FreeBSD-arm64-cross-clang19
       - name: Select the cross-compiler
-        env:
-          BASALT_LLVM_VERSION: '21'
         run: .github/scripts/select-compiler.sh
       - name: Extract the FreeBSD arm64 sysroot
         run: .github/scripts/setup-freebsd-sysroot.sh
@@ -340,7 +338,7 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
         run: |
           root="$PWD/build/freebsd-sysroot"
-          cmake --preset freebsd -DCMAKE_C_COMPILER=clang-21 -DCMAKE_CXX_COMPILER=clang++-21 \
+          cmake --preset freebsd -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 \
             -DCMAKE_SYSTEM_NAME=FreeBSD -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
             -DCMAKE_C_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
             -DCMAKE_CXX_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
@@ -426,14 +424,14 @@ jobs:
         with:
           submodules: true
 
-      - name: Select the compiler
-        run: .github/scripts/select-compiler.sh
+      - name: Install the pinned formatter
+        run: pipx install clang-format==19.1.7
 
       - name: Check formatting
         run: |
           find server-* wire/wire-* -name '*.hpp' -o -name '*.cpp' \
             | grep -v third_party \
-            | xargs clang-format-19 --dry-run --Werror
+            | xargs "$HOME/.local/bin/clang-format" --dry-run --Werror
 
   nightly:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
