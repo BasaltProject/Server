@@ -64,6 +64,13 @@ if(BASALT_BUILD_TESTS)
         DEPENDS basalt::server-bukkit basalt::wire-protocol
     )
     find_program(BASALT_TEST_JAVAC javac REQUIRED)
+    find_program(BASALT_TEST_JAVA java REQUIRED)
+    set(BASALT_PATH_TEST_CLASSES "${CMAKE_CURRENT_BINARY_DIR}/path-test-classes")
+    add_test(NAME server-bukkit-path-translator-test
+        COMMAND ${CMAKE_COMMAND}
+            "-DJAVAC=${BASALT_TEST_JAVAC}" "-DJAVA=${BASALT_TEST_JAVA}"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}" "-DOUT=${BASALT_PATH_TEST_CLASSES}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/test/PathTranslatorTest.cmake")
     set(BASALT_COMPAT_TEST_CLASSES "${CMAKE_CURRENT_BINARY_DIR}/compat-test-classes")
     add_custom_target(server-bukkit-compat-test-classes
         COMMAND ${CMAKE_COMMAND} -E make_directory "${BASALT_COMPAT_TEST_CLASSES}"

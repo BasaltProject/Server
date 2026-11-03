@@ -53,7 +53,11 @@ public final class BasaltWorld extends WorldEntities {
         if (storage == null || storage.length < 2 || storage[1].isEmpty()) {
             throw new IllegalStateException("No storage path for world " + name);
         }
-        this.folder = new File(storage[1]);
+        File real = new File(storage[1]);
+        String dimension = storage[0];
+        org.basaltmc.bukkit.fs.PathMapping.registerWorld(name, real, dimension.endsWith("nether") ? "NETHER"
+            : dimension.endsWith("end") ? "THE_END" : "NORMAL");
+        this.folder = org.basaltmc.bukkit.fs.PathMapping.worldFolder(name, real);
     }
 
     private long number(int index) {
