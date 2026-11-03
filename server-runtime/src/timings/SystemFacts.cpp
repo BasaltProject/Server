@@ -11,6 +11,11 @@
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #endif
+#if defined(__FreeBSD__)
+#include <sys/dkstat.h>
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#endif
 #if defined(__linux__)
 #include <sys/utsname.h>
 #endif
@@ -18,7 +23,7 @@
 namespace basalt::server::runtime::timings {
 namespace {
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__FreeBSD__)
 [[nodiscard]] std::optional<std::string> sysctlString(const char* name) {
     std::size_t size = 0;
     if (sysctlbyname(name, nullptr, &size, nullptr, 0) != 0 || size == 0) {
@@ -88,8 +93,17 @@ SystemFacts readSystemFacts(const std::string& diskPath) {
         facts.swapTotal = static_cast<std::int64_t>(swap.xsu_total);
         facts.swapUsed = static_cast<std::int64_t>(swap.xsu_used);
     }
+#elif defined(__FreeBSD__)
+    facts.osName = "FreeBSD";
+    facts.osVersion = sysctlString("kern.osrelease").value_or("");
+    facts.cpuModel = sysctlString("hw.model").value_or("");
+    facts.memoryTotal = sysctlInt("hw.physmem");
 #elif defined(__linux__)
+#if defined(__ANDROID__)
+    facts.osName = "Android";
+#else
     facts.osName = "Linux";
+#endif
     utsname name{};
     if (uname(&name) == 0) {
         facts.osVersion = name.release;
@@ -147,6 +161,16 @@ std::optional<double> SystemCpuMeter::percent() {
         total += load.cpu_ticks[state];
     }
     busy = total - load.cpu_ticks[CPU_STATE_IDLE];
+#elif defined(__FreeBSD__)
+    long ticks[CPUSTATES]{};
+    std::size_t size = sizeof(ticks);
+    if (sysctlbyname("kern.cp_time", ticks, &size, nullptr, 0) != 0 || size != sizeof(ticks)) {
+        return std::nullopt;
+    }
+    for (const long tick : ticks) {
+        total += static_cast<std::uint64_t>(tick);
+    }
+    busy = total - static_cast<std::uint64_t>(ticks[CP_IDLE]);
 #elif defined(__linux__)
     std::ifstream stat{"/proc/stat"};
     std::string label;

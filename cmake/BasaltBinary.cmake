@@ -1,10 +1,16 @@
 # Names the final executable the way it is downloaded: BasaltServer-<version>-<platform>-<arch>.
 
 function(basalt_name_binary TARGET)
-    if(APPLE)
+    if(ANDROID)
+        set(_platform "Android")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        set(_platform "FreeBSD")
+    elseif(APPLE)
         set(_platform "macOS")
     elseif(WIN32)
         set(_platform "Windows")
+    elseif(BASALT_LINUX_MUSL)
+        set(_platform "Linux-musl")
     else()
         set(_platform "Linux")
     endif()
@@ -16,8 +22,10 @@ function(basalt_name_binary TARGET)
 
     if(_processor MATCHES "^(aarch64|arm64|ARM64)$")
         set(_arch "arm64")
-    else()
+    elseif(_processor MATCHES "^(x86_64|amd64|AMD64|x64)$")
         set(_arch "x64")
+    else()
+        message(FATAL_ERROR "Unsupported release architecture: ${_processor}")
     endif()
 
     set_target_properties(${TARGET} PROPERTIES
