@@ -1100,6 +1100,12 @@ set_target_properties(basalt-server PROPERTIES
 )
 basalt_name_binary(basalt-server)
 
+if(ANDROID)
+    # The NDK adds debug information even in Release; do not ship hundreds of MB
+    # of DWARF with the standalone download. Keep the symbol table for diagnostics.
+    target_link_options(basalt-server PRIVATE $<$<CONFIG:Release>:-Wl,--strip-debug>)
+endif()
+
 if(UNIX)
     basalt_test(server-runtime-console-test
         SOURCES test/ConsoleReaderTest.cpp

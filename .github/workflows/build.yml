@@ -234,9 +234,14 @@ jobs:
           docker run --rm -e VERSION -v "$PWD:/src" -w /src alpine:3.22 sh -ec '
             apk add --no-cache cmake ninja clang20 lld20 libc++-dev libc++-static llvm-libunwind-dev llvm-libunwind-static gcc g++ musl-dev linux-headers file binutils
             cmake --preset linux-musl -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
-              -DCMAKE_CXX_FLAGS=-stdlib=libc++ "-DBASALT_VERSION=$VERSION"
+              -DCMAKE_CXX_FLAGS=-stdlib=libc++ "-DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ -fuse-ld=lld" \
+              "-DCMAKE_CXX_STANDARD_LIBRARIES=-lc++ -lc++abi -lunwind" \
+              -DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_CXX_STANDARD_LIBRARIES \
+              "-DBASALT_VERSION=$VERSION"
+            cmake --build --preset linux-musl --target wire-common-test wire-io-test --parallel 4
+            ctest --preset linux-musl -R "^(wire-common-test|wire-io-test)$" --timeout 120
             cmake --build --preset linux-musl --parallel 4
-            ctest --preset linux-musl
+            ctest --preset linux-musl --timeout 300
             for binary in build/linux-musl/bin/*; do
               file "$binary"
               if readelf -l "$binary" | grep -q INTERP; then exit 1; fi
@@ -289,10 +294,13 @@ jobs:
             cmake --preset freebsd -DCMAKE_C_COMPILER=clang19 -DCMAKE_CXX_COMPILER=clang++19 \
               "-DCMAKE_CXX_FLAGS=-nostdinc++ -isystem $prefix/include/c++/v1" \
               -DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ \
+              -DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_CXX_STANDARD_LIBRARIES \
               "-DCMAKE_CXX_STANDARD_LIBRARIES=$prefix/lib/libc++.a $prefix/lib/libc++abi.a -lpthread" \
               "-DBASALT_VERSION=$VERSION"
+            cmake --build --preset freebsd --target wire-common-test wire-io-test --parallel 4
+            ctest --preset freebsd -R '^(wire-common-test|wire-io-test)$' --timeout 120
             cmake --build --preset freebsd --parallel 4
-            ctest --preset freebsd
+            ctest --preset freebsd --timeout 300
             for binary in build/freebsd/bin/*; do
                 file "$binary"
                 ldd "$binary"
