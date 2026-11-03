@@ -227,12 +227,17 @@ jobs:
         with:
           submodules: true
           ref: ${{ inputs.ref }}
+      - uses: actions/cache@v4
+        with:
+          path: build/musl-ccache
+          key: ccache-${{ matrix.target }}-clang20-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.target }}-clang20-
       - name: Build and test on Alpine
         env:
           VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          docker run --rm -e VERSION -v "$PWD:/src" -w /src alpine:3.22 sh -ec '
-            apk add --no-cache cmake ninja clang20 lld20 libc++-dev libc++-static llvm-libunwind-dev llvm-libunwind-static gcc g++ musl-dev linux-headers file binutils
+          docker run --rm -e VERSION -e CCACHE_DIR=/src/build/musl-ccache -e CCACHE_MAXSIZE=1200M -v "$PWD:/src" -w /src alpine:3.22 sh -ec '
+            apk add --no-cache ccache cmake ninja clang20 lld20 libc++-dev libc++-static llvm-libunwind-dev llvm-libunwind-static gcc g++ musl-dev linux-headers file binutils
             cmake --preset linux-musl -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
               -DCMAKE_CXX_FLAGS=-stdlib=libc++ "-DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ -fuse-ld=lld" \
               "-DCMAKE_CXX_STANDARD_LIBRARIES=-lc++ -lc++abi -lunwind" \
@@ -263,12 +268,12 @@ jobs:
         include:
           - arch: x86_64
             target: FreeBSD-x64
-          - arch: aarch64
-            target: FreeBSD-arm64
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
       VERSION: ${{ needs.plan.outputs.version }}
+      CCACHE_DIR: ${{ github.workspace }}/build/freebsd-ccache
+      CCACHE_MAXSIZE: 1200M
     steps:
       - uses: actions/checkout@v4
         with:
@@ -276,26 +281,24 @@ jobs:
           ref: ${{ inputs.ref }}
       - uses: actions/cache@v4
         with:
-          path: build/freebsd-libcxx
-          key: freebsd-14.5-${{ matrix.arch }}-libcxx-${{ hashFiles('.github/scripts/build-freebsd-libcxx.sh') }}
+          path: build/freebsd-ccache
+          key: ccache-${{ matrix.target }}-clang21-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.target }}-clang21-
       - name: Build and test on FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
           release: '14.5'
           arch: ${{ matrix.arch }}
-          envs: VERSION
+          envs: VERSION CCACHE_DIR CCACHE_MAXSIZE
           cpu: 4
           mem: 8192
-          prepare: pkg install -y cmake ninja llvm19 git
+          prepare: pkg install -y ccache cmake ninja
           run: |
             set -eu
-            .github/scripts/build-freebsd-libcxx.sh
-            prefix="$PWD/build/freebsd-libcxx"
-            cmake --preset freebsd -DCMAKE_C_COMPILER=clang19 -DCMAKE_CXX_COMPILER=clang++19 \
-              "-DCMAKE_CXX_FLAGS=-nostdinc++ -isystem $prefix/include/c++/v1" \
+            cmake --preset freebsd \
               -DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ \
               -DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_CXX_STANDARD_LIBRARIES \
-              "-DCMAKE_CXX_STANDARD_LIBRARIES=$prefix/lib/libc++.a $prefix/lib/libc++abi.a -lpthread" \
+              "-DCMAKE_CXX_STANDARD_LIBRARIES=/usr/lib/libc++.a /usr/lib/libcxxrt.a -lpthread" \
               "-DBASALT_VERSION=$VERSION"
             cmake --build --preset freebsd --target wire-common-test wire-io-test --parallel 4
             ctest --preset freebsd -R '^(wire-common-test|wire-io-test)$' --timeout 120
@@ -309,6 +312,74 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: basalt-server-${{ matrix.target }}
+          path: build/freebsd/bin/
+          if-no-files-found: error
+
+  freebsd-arm64:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          ref: ${{ inputs.ref }}
+      - uses: lukka/get-cmake@latest
+      - uses: hendrikmuhs/ccache-action@v1
+        with:
+          max-size: 1200M
+          key: FreeBSD-arm64-cross-clang21
+      - name: Select the cross-compiler
+        env:
+          BASALT_LLVM_VERSION: '21'
+        run: .github/scripts/select-compiler.sh
+      - name: Extract the FreeBSD arm64 sysroot
+        run: .github/scripts/setup-freebsd-sysroot.sh
+      - name: Configure for FreeBSD arm64
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          root="$PWD/build/freebsd-sysroot"
+          cmake --preset freebsd -DCMAKE_C_COMPILER=clang-21 -DCMAKE_CXX_COMPILER=clang++-21 \
+            -DCMAKE_SYSTEM_NAME=FreeBSD -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+            -DCMAKE_C_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
+            -DCMAKE_CXX_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
+            "-DCMAKE_SYSROOT=$root" \
+            "-DCMAKE_CXX_FLAGS=-nostdinc++ -isystem $root/usr/include/c++/v1" \
+            "-DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ -fuse-ld=lld" \
+            "-DCMAKE_CXX_STANDARD_LIBRARIES=$root/usr/lib/libc++.a $root/usr/lib/libcxxrt.a -lpthread" \
+            -DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_CXX_STANDARD_LIBRARIES \
+            -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+            -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+            -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY "-DBASALT_VERSION=$VERSION"
+      - name: Cross-build the executable and all tests
+        run: |
+          cmake --build --preset freebsd --target wire-common-test wire-io-test --parallel 4
+          cmake --build --preset freebsd --parallel 4
+          for binary in build/freebsd/bin/*; do
+              readelf -h "$binary" | grep -F AArch64
+              readelf -l "$binary" | grep -F /libexec/ld-elf.so.1
+              if readelf -d "$binary" | grep NEEDED | grep -E 'libc\+\+|libcxxrt'; then exit 1; fi
+          done
+      - name: Run all tests and the executable on FreeBSD arm64
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.5'
+          arch: aarch64
+          cpu: 4
+          mem: 8192
+          prepare: pkg install -y cmake
+          run: |
+            set -eu
+            ctest --preset freebsd --timeout 300
+            for binary in build/freebsd/bin/*; do
+                file "$binary"
+                ldd "$binary"
+                .github/scripts/smoke-binary.sh "$binary"
+            done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: basalt-server-FreeBSD-arm64
           path: build/freebsd/bin/
           if-no-files-found: error
 
@@ -366,7 +437,7 @@ jobs:
 
   nightly:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    needs: [plan, build, android, musl, freebsd]
+    needs: [plan, build, android, musl, freebsd, freebsd-arm64]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
