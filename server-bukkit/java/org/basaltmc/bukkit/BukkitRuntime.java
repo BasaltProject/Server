@@ -131,6 +131,9 @@ public final class BukkitRuntime {
             watchForThreadDumps();
             File folder = new File(pluginsFolder);
             folder.mkdirs();
+            boolean mapped = org.basaltmc.bukkit.fs.PathMapping.install(new File(".").getAbsoluteFile());
+            Natives.log(1, "Bukkit", mapped ? "Plugin file access is translated to the Basalt layout"
+                : "This VM has no path hook: plugin file access is not translated");
             server = new org.bukkit.craftbukkit.CraftServer(new File(".").getAbsoluteFile(), folder);
             Bukkit.setServer(server);
             org.basaltmc.bukkit.misc.Serializables.register();
