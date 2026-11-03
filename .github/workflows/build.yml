@@ -303,7 +303,7 @@ jobs:
             cmake --build --preset freebsd --target wire-common-test wire-io-test --parallel 4
             ctest --preset freebsd -R '^(wire-common-test|wire-io-test)$' --timeout 120
             cmake --build --preset freebsd --parallel 4
-            ctest --preset freebsd --timeout 300
+            BASALT_TEST_SYSTEM_HTTPS_URL=https://piston-meta.mojang.com/mc/game/version_manifest_v2.json ctest --preset freebsd --timeout 300
             for binary in build/freebsd/bin/*; do
                 file "$binary"
                 ldd "$binary"
@@ -371,7 +371,7 @@ jobs:
           prepare: pkg install -y cmake
           run: |
             set -eu
-            ctest --preset freebsd --timeout 300
+            BASALT_TEST_SYSTEM_HTTPS_URL=https://piston-meta.mojang.com/mc/game/version_manifest_v2.json ctest --preset freebsd --timeout 300
             for binary in build/freebsd/bin/*; do
                 file "$binary"
                 ldd "$binary"
