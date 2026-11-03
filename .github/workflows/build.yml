@@ -180,7 +180,7 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
         run: cmake --preset "${{ matrix.preset }}" "-DBASALT_VERSION=$VERSION"
       - name: Build the executable and platform tests
-        run: cmake --build "build/${{ matrix.preset }}" --target basalt-server wire-common-test wire-io-test server-random-test --parallel 4
+        run: cmake --build "build/${{ matrix.preset }}" --target basalt-server wire-common-test wire-io-test wire-auth-test server-random-test --parallel 4
       - name: Check the Android executable
         env:
           MACHINE: ${{ matrix.machine }}
