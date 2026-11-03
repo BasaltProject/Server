@@ -3,20 +3,18 @@ set -euo pipefail
 
 case "$(uname -s)" in
 Linux)
-    version="${BASALT_LLVM_VERSION:-19}"
     echo 'Acquire::http::Timeout "30"; Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/99basalt >/dev/null
-    wget -qO /tmp/llvm.sh --tries=3 --timeout=30 https://apt.llvm.org/llvm.sh
     installed=0
     for attempt in 1 2 3; do
-        if sudo timeout 300 bash /tmp/llvm.sh "$version"; then
+        if sudo timeout 300 apt-get update &&
+            sudo timeout 300 apt-get install -y clang-19 clang-tools-19 lld-19 libclang-rt-19-dev; then
             installed=1
             break
         fi
         sudo apt-get clean
     done
     [ "$installed" = 1 ]
-    sudo timeout 300 apt-get install -y "clang-format-$version"
-    echo "BASALT_CMAKE_ARGS=-DCMAKE_C_COMPILER=clang-$version -DCMAKE_CXX_COMPILER=clang++-$version" >>"$GITHUB_ENV"
+    echo "BASALT_CMAKE_ARGS=-DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19" >>"$GITHUB_ENV"
     ;;
 Darwin)
     brew install llvm
