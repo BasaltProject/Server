@@ -17,7 +17,7 @@
   <img alt="Minecraft" src="https://img.shields.io/badge/Minecraft-26.3-62B47A?logo=minecraft&logoColor=white">
   <img alt="Protocol" src="https://img.shields.io/badge/protocol-777-62B47A">
   <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white">
-  <img alt="Platforms" src="https://img.shields.io/badge/platforms-macOS_%7C_Linux_%7C_Windows-00599C">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-macOS_%7C_Linux_%7C_Windows_%7C_Android_%7C_FreeBSD-00599C">
   <img alt="Build" src="https://img.shields.io/badge/build-CMake-064F8C?logo=cmake&logoColor=white">
   <img alt="Plugins" src="https://img.shields.io/badge/plugins-Lua-000080?logo=lua&logoColor=white">
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-green">
@@ -102,7 +102,7 @@ it.
 
 ## Download and documentation
 
-Binaries for Linux, macOS and Windows are on the [releases page](https://github.com/BasaltProject/Server/releases):
+Binaries for Linux (glibc and musl), macOS, Windows, Android and FreeBSD are on the [releases page](https://github.com/BasaltProject/Server/releases):
 a stable release every Monday when there is something new, and a moving **Nightly** prerelease that follows `main`.
 Each asset is the executable itself, with a `SHA256SUMS` file beside them. The full documentation for operators and
 plugin authors is at [basaltmc.org/docs](https://basaltmc.org/docs/server/introduction).
