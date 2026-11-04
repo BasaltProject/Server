@@ -452,6 +452,10 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
             world.state().blockState(blockX, static_cast<std::int32_t>(std::floor(eyeY)), blockZ);
         const std::int32_t air = player->airSupply;
         const std::int32_t fire = player->fireTicks;
+        // parity: `Player.setRemainingFireTicks` holds an invulnerable player's fire to one tick.
+        if (player->invulnerable()) {
+            player->fireTicks = std::min(player->fireTicks, 1);
+        }
 
         const bool drowns =
             !player->invulnerable() && eyes.has_value() && world::fluids::of(*eyes) == world::Submersion::Water;
