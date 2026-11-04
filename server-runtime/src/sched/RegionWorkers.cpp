@@ -1,6 +1,7 @@
 #include "RegionWorkers.hpp"
 
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
+#include <basalt/wire/common/timings/NativeSampler.hpp>
 
 #include <cstdint>
 #include <stdexcept>
@@ -25,6 +26,7 @@ RegionWorkers::~RegionWorkers() {
 }
 
 void RegionWorkers::workerLoop() {
+    wire::common::nameCurrentThread("Region worker");
     while (true) {
         Region* region = nullptr;
         const std::function<void(Region&)>* work = nullptr;

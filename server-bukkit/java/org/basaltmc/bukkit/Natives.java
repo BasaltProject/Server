@@ -9,6 +9,9 @@ public final class Natives {
     public static native void scheduleAfter(long id, int delay);
     public static native void scheduleEvery(long id, int delay, int period);
     public static native void cancelTask(long id);
+    public static native void recordTime(String plugin, long nanos);
+    public static native boolean profiling();
+    public static native void recordSection(String name, long nanos);
     public static native boolean subscribe(String event, int priority);
     public static native String[] eventFields(String event);
     public static native void registerCommand(String plugin, String name, String permission);

@@ -115,3 +115,33 @@ TEST_CASE("the time series gets one point a second while profiling and restarts 
     report.sampleIfDue(5 * kSecond);
     CHECK(points(5 * kSecond) == 0);
 }
+
+TEST_CASE("sampled threads join the native ones and each plugin says what it runs on") {
+    wire::common::Timings timings;
+    wire::common::TickDurations ticks;
+    timings.setEnabled(true);
+    timings.nameThread("Server thread");
+    timings.of("tick").time([] {});
+
+    ReportSources sources;
+    sources.plugins = [] { return std::vector<PluginFacts>{{"arena", "Arena", "1.0", 0, false, "bukkit"}}; };
+    sources.sampledThreads = [] {
+        return std::vector<std::string>{
+            R"({"name":"Java worker","total_millis":5.0,"root":{"name":"root","calls":0,"total_millis":5.0,)"
+            R"("self_millis":0,"max_millis":0,"children":[]}})"};
+    };
+    const TimingsReport report{timings, ticks, sources};
+    const auto parsed = wire::common::parseJson(report.json(5'000'000'000));
+    REQUIRE(parsed.has_value());
+    const wire::common::JsonObject& root = objectOf(*parsed);
+
+    const auto* threads = member(root, "threads").get<std::vector<wire::common::JsonValue>>();
+    REQUIRE(threads != nullptr);
+    REQUIRE(threads->size() == 2);
+    CHECK(*member(objectOf((*threads)[1]), "name").get<std::string>() == "Java worker");
+
+    const auto* plugins = member(root, "plugins").get<std::vector<wire::common::JsonValue>>();
+    REQUIRE(plugins != nullptr);
+    REQUIRE(plugins->size() == 1);
+    CHECK(*member(objectOf(plugins->front()), "type").get<std::string>() == "bukkit");
+}

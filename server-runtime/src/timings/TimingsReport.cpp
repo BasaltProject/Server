@@ -42,6 +42,9 @@ public:
 
     void value(bool flag) { scalar(flag ? "true" : "false"); }
 
+    /// Text that is already JSON, such as a thread another runtime wrote.
+    void raw(const std::string& json) { scalar(json); }
+
     void value(std::int64_t number) { scalar(std::to_string(number)); }
 
     void value(std::int32_t number) { scalar(std::to_string(number)); }
@@ -417,6 +420,7 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
             json.member("version", plugin.version);
             json.member("errors", plugin.errors);
             json.member("disabled", plugin.disabled);
+            json.member("type", plugin.kind);
             json.endObject();
         }
     }
@@ -499,6 +503,11 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
         json.key("root");
         writeNode(json, thread.root, withWindows);
         json.endObject();
+    }
+    if (sources_.sampledThreads) {
+        for (const std::string& thread : sources_.sampledThreads()) {
+            json.raw(thread);
+        }
     }
     json.endArray();
 

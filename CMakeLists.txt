@@ -32,6 +32,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# The native sampler follows frame pointers; Linux compilers drop them by default, and macOS keeps them.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_compile_options(-fno-omit-frame-pointer)
+endif()
+
 # No RTTI: nothing in the server needs it and it grows the binary.
 add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 

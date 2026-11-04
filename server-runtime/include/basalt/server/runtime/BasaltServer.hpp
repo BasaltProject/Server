@@ -67,6 +67,7 @@
 #include <basalt/server/runtime/world/maps/MapStorage.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
 #include <basalt/wire/auth/SignatureValidator.hpp>
+#include <basalt/wire/common/timings/NativeSampler.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 
@@ -136,6 +137,7 @@ private:
 
     void startBukkit();
     void enableBukkit();
+    [[nodiscard]] std::vector<std::string> javaProfile() const;
 
     void tickEntities(world::LoadedWorld& world, const sched::Region& region);
 
@@ -276,6 +278,7 @@ private:
     ChunkSimulationView chunkSimulation_;
     std::unique_ptr<world::SpawnEquipmentFinalizer> spawnEquipment_;
     wire::common::Timings timings_;
+    wire::common::NativeSampler nativeSampler_{timings_};
     std::chrono::steady_clock::time_point serverClock_ = std::chrono::steady_clock::now();
 
     std::unique_ptr<storage::PlayerStore> playerStore_;

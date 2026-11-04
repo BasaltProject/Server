@@ -31,6 +31,8 @@ struct PluginFacts {
     std::string version;
     std::int32_t errors = 0;
     bool disabled = false;
+    /// "lua" or "bukkit": what the plugin runs on, so a viewer can tell them apart.
+    std::string kind = "lua";
 };
 
 /// What is true right now, sampled once a second while the profiler runs.
@@ -70,6 +72,8 @@ struct ReportSources {
     std::function<std::vector<PluginFacts>()> plugins;
     std::function<std::vector<std::pair<std::string, std::string>>()> configuration;
     std::function<LiveFacts()> live;
+    /// Threads sampled outside the server's own sections, such as Java ones; each is one finished JSON object.
+    std::function<std::vector<std::string>()> sampledThreads;
 };
 
 class TimingsReport {

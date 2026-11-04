@@ -4,6 +4,7 @@
 #include <basalt/wire/lua/LuaCall.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <mutex>
 #include <utility>
@@ -146,12 +147,36 @@ bool PluginHost::ask(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, std::str
     });
 }
 
+namespace {
+/// Counts the time a plugin holds the interpreter, on every way out, so no entry point goes unmeasured.
+class PluginTurnTimer {
+public:
+    PluginTurnTimer(const PluginHost& host, const std::string& pluginId)
+        : host_(&host), pluginId_(&pluginId), startedAt_(std::chrono::steady_clock::now()) {}
+
+    PluginTurnTimer(const PluginTurnTimer&) = delete;
+    PluginTurnTimer& operator=(const PluginTurnTimer&) = delete;
+
+    ~PluginTurnTimer() {
+        host_->recordTime(*pluginId_, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                          std::chrono::steady_clock::now() - startedAt_)
+                                          .count());
+    }
+
+private:
+    const PluginHost* host_;
+    const std::string* pluginId_;
+    std::chrono::steady_clock::time_point startedAt_;
+};
+} // namespace
+
 void PluginHost::enter(LoadedPlugin& plugin, PluginInstance& instance, const wire::lua::LuaRef& fn,
                        std::string_view why, const std::function<std::int32_t(wire::lua::LuaArgs&)>& pushArguments) {
     if (plugin.disabled || !fn.valid()) {
         return;
     }
     const std::lock_guard<std::recursive_mutex> turn{luaMutex_};
+    const PluginTurnTimer timer{*this, plugin.manifest.id};
     instance.sandbox->refill();
     wire::lua::LuaArgs lua{instance.sandbox->state()};
     fn.push(lua);
@@ -192,6 +217,7 @@ void PluginHost::resuming(LoadedPlugin& plugin, const std::function<void()>& res
         return;
     }
     const std::lock_guard<std::recursive_mutex> turn{luaMutex_};
+    const PluginTurnTimer timer{*this, plugin.manifest.id};
     resume();
     plugin.strikes = 0;
 }

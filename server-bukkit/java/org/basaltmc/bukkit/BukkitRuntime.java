@@ -129,6 +129,7 @@ public final class BukkitRuntime {
         try {
             routeLogging();
             watchForThreadDumps();
+            Sampler.start();
             File folder = new File(pluginsFolder);
             folder.mkdirs();
             boolean mapped = org.basaltmc.bukkit.fs.PathMapping.install(new File(".").getAbsoluteFile());
@@ -174,6 +175,11 @@ public final class BukkitRuntime {
             Natives.log(3, "Bukkit", "Enable failed: " + t);
             return false;
         }
+    }
+
+    /** The stacks sampled while the profiler ran, one JSON object per thread. */
+    public static String[] profile() {
+        return Sampler.report();
     }
 
     public static String[] pluginList() {
@@ -250,7 +256,18 @@ public final class BukkitRuntime {
         CommandSender sender = Senders.of(server, kind, senderName, world, x, y, z, caller);
         if (sender == null) return new String[0];
         String line = label + " " + (args == null ? "" : args);
-        java.util.List<String> matches = server.commandMapImpl().tabComplete(sender, line);
+        org.bukkit.command.Command known = server.getCommandMap().getCommand(label.toLowerCase(java.util.Locale.ROOT));
+        String owner = known instanceof org.bukkit.command.PluginIdentifiableCommand pluginCommand
+            ? pluginCommand.getPlugin().getName() : null;
+        long started = System.nanoTime();
+        java.util.List<String> matches;
+        try {
+            matches = server.commandMapImpl().tabComplete(sender, line);
+        } finally {
+            if (owner != null) {
+                Natives.recordTime(owner, System.nanoTime() - started);
+            }
+        }
         return matches == null ? new String[0] : matches.toArray(new String[0]);
     }
 
@@ -261,10 +278,17 @@ public final class BukkitRuntime {
             return false;
         }
         String line = args == null || args.isEmpty() ? label : label + " " + args;
+        org.bukkit.command.Command known = server.getCommandMap().getCommand(label.toLowerCase(java.util.Locale.ROOT));
+        String owner = known instanceof org.bukkit.command.PluginIdentifiableCommand pluginCommand
+            ? pluginCommand.getPlugin().getName() : null;
         Blocks.begin();
+        long started = System.nanoTime();
         try {
             return server.dispatchCommand(sender, line);
         } finally {
+            if (owner != null) {
+                Natives.recordTime(owner, System.nanoTime() - started);
+            }
             Blocks.end();
         }
     }

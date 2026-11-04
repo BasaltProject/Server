@@ -49,6 +49,9 @@ public:
     /// What the Java plugin manager holds right now.
     [[nodiscard]] std::vector<PluginState> plugins() const;
 
+    /// What sampling Java stacks found while the profiler ran: one JSON object per thread, in the report's own shape.
+    [[nodiscard]] std::vector<std::string> sampledThreads() const;
+
     void stop();
 
 private:

@@ -2,6 +2,7 @@
 #include <basalt/wire/bedrock/BedrockMaps.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/bedrock/BedrockTypes.hpp>
+#include <basalt/wire/common/timings/NativeSampler.hpp>
 
 #include <chrono>
 #include <cstdlib>
@@ -326,6 +327,7 @@ std::uint16_t BedrockListener::port() const noexcept { return server_ ? server_-
 std::size_t BedrockListener::sessionCount() const { return sessions_.size(); }
 
 void BedrockListener::run() {
+    wire::common::nameCurrentThread("Bedrock listener");
     while (running_.load()) {
         // Before the poll: it flushes what is queued now, so another thread's line goes out this turn.
         const bool open = accepting_.load();

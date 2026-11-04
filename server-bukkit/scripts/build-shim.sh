@@ -27,7 +27,7 @@ process=compile
 if [ "$ext" = darwin ] && [ "$(uname -m)" = arm64 ]; then
     process=interpret
 fi
-configuration="$ext:$(uname -m):$process"
+configuration="$ext:$(uname -m):$process:fp"
 if [ -f "$out/$lib" ] && [ -f "$out/classpath.jar" ] \
     && [ "$(cat "$out/build-configuration.txt" 2>/dev/null)" = "$configuration" ] \
     && [ -z "$(find "$src" -newer "$out/$lib" -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.java' -o -name '*.mk' \) -print -quit)" ]; then
@@ -35,13 +35,18 @@ if [ -f "$out/$lib" ] && [ -f "$out/classpath.jar" ] \
 fi
 mkdir -p "$out"
 flags=()
+# The profiler walks native stacks through the frame pointer, and the Java machine is part of them.
+cflags=""
+[ "$ext" != darwin ] && cflags="-fno-omit-frame-pointer"
 if [ "$ext" != darwin ] && [ ! -f /usr/include/zlib.h ]; then
     mkdir -p "$out/zlib-stub"
     for candidate in /usr/lib/x86_64-linux-gnu/libz.so.1 /usr/lib/aarch64-linux-gnu/libz.so.1 /usr/lib64/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1; do
         [ -e "$candidate" ] && ln -sf "$candidate" "$out/zlib-stub/libz.so" && break
     done
-    flags+=("extra-cflags=-I$zlib" "extra-lflags=-L$out/zlib-stub")
+    cflags="$cflags -I$zlib"
+    flags+=("extra-lflags=-L$out/zlib-stub")
 fi
+[ -n "$cflags" ] && flags+=("extra-cflags=$cflags")
 # Its rules only work inside the source tree, whose build/ folder is ignored by that repo.
 run_make() { make -C "$src" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)" use-clang=true "process=$process" "${flags[@]}" "$@"; }
 if ! { run_make build; } >"$out/shim-make.log" 2>&1; then

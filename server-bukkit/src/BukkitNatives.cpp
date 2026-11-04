@@ -1,7 +1,9 @@
 #include "AsyncGuard.hpp"
 #include "BridgeInternal.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cctype>
 
 namespace basalt::server::bukkit {
 namespace {
@@ -69,6 +71,20 @@ void JNICALL nativeEvery(JNIEnv*, jclass, jlong id, jint delay, jint period) {
 }
 
 void JNICALL nativeCancel(JNIEnv*, jclass, jlong id) { BukkitBridge::current().cancelTask(id); }
+
+void JNICALL nativeRecordTime(JNIEnv* env, jclass, jstring plugin, jlong nanos) {
+    std::string id = toStd(env, plugin);
+    std::ranges::transform(id, id.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    BukkitBridge::current().plugins().recordTime("bukkit." + id, nanos);
+}
+
+void JNICALL nativeRecordSection(JNIEnv* env, jclass, jstring name, jlong nanos) {
+    BukkitBridge::current().profiler().of(toStd(env, name)).record(nanos);
+}
+
+jboolean JNICALL nativeProfiling(JNIEnv*, jclass) {
+    return BukkitBridge::current().profiler().enabled() ? JNI_TRUE : JNI_FALSE;
+}
 
 jboolean JNICALL nativeSubscribe(JNIEnv* env, jclass, jstring event, jint priority) {
     return BukkitBridge::current().subscribe(toStd(env, event), priority) ? JNI_TRUE : JNI_FALSE;
@@ -271,6 +287,12 @@ void registerNatives(JNIEnv* env, jclass natives) {
                         reinterpret_cast<void*>(&nativeEvery)},
         JNINativeMethod{const_cast<char*>("cancelTask"), const_cast<char*>("(J)V"),
                         reinterpret_cast<void*>(&nativeCancel)},
+        JNINativeMethod{const_cast<char*>("recordTime"), const_cast<char*>("(Ljava/lang/String;J)V"),
+                        reinterpret_cast<void*>(&nativeRecordTime)},
+        JNINativeMethod{const_cast<char*>("profiling"), const_cast<char*>("()Z"),
+                        reinterpret_cast<void*>(&nativeProfiling)},
+        JNINativeMethod{const_cast<char*>("recordSection"), const_cast<char*>("(Ljava/lang/String;J)V"),
+                        reinterpret_cast<void*>(&nativeRecordSection)},
         JNINativeMethod{const_cast<char*>("subscribe"), const_cast<char*>("(Ljava/lang/String;I)Z"),
                         reinterpret_cast<void*>(&nativeSubscribe)},
         JNINativeMethod{const_cast<char*>("eventFields"), const_cast<char*>("(Ljava/lang/String;)[Ljava/lang/String;"),
