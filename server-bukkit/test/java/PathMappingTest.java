@@ -20,7 +20,7 @@ public final class PathMappingTest {
 
         File level = new File(PathMapping.worldFolder("main", null), "level.dat");
         Files.writeString(level.toPath(), "x");
-        expect(new File(root, ".bukkit-shadow/worlds/main/level.dat").isFile(), "level.dat lands in the shadow");
+        expect(new File(root, ".basalt/bukkit/shadow/worlds/main/level.dat").isFile(), "level.dat lands in the shadow");
         expect(!new File(root, "worlds/main/level.dat").exists(), "level.dat never reaches the native world");
 
         Files.createDirectories(new File(root, "main/region").toPath());
@@ -28,7 +28,7 @@ public final class PathMappingTest {
         expect(new File(root, "worlds/main/region/r.0.0.mca").isFile(), "region reaches the native world");
 
         Files.writeString(new File("server.properties").toPath(), "a=b");
-        expect(new File(root, ".bukkit-shadow/root/server.properties").isFile(), "root file goes to the shadow");
+        expect(new File(root, ".basalt/bukkit/shadow/root/server.properties").isFile(), "root file goes to the shadow");
         expect(new File("server.properties").isFile(), "and the plugin reads it back");
 
         new File("plugins/Foo").mkdirs();
@@ -45,7 +45,7 @@ public final class PathMappingTest {
         expect(!new File("/etc/passwd").exists(), "outside the server nothing exists");
         expect(!new File(root, "../escape").mkdir(), "dotdot is refused");
         File temp = File.createTempFile("plug", ".tmp");
-        expect(temp.getPath().contains(".bukkit-shadow"), "temp files live in the shadow");
+        expect(temp.getPath().contains(".basalt/bukkit/shadow"), "temp files live in the shadow");
         System.out.println("PathMappingTest done");
     }
 }
