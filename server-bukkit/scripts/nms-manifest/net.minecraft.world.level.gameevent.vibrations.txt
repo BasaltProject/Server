@@ -1,0 +1,92 @@
+//// VibrationInfo.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.phys.Vec3;
+public record VibrationInfo(Holder<GameEvent> gameEvent, float distance, Vec3 pos, UUID uuid, UUID projectileOwnerUuid, Entity entity) {
+    public static final Codec<VibrationInfo> CODEC;
+    public VibrationInfo(Holder<GameEvent> gameEvent, float distance, Vec3 pos, UUID uuid, UUID projectileOwnerUuid);
+    public VibrationInfo(Holder<GameEvent> gameEvent, float distance, Vec3 pos, Entity entity);
+    public Optional<Entity> getEntity(ServerLevel level);
+    public Optional<Entity> getProjectileOwner(ServerLevel level);
+}
+//// VibrationSelector.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+public class VibrationSelector {
+    public static final Codec<VibrationSelector> CODEC;
+    public VibrationSelector(Optional<VibrationInfo> currentVibration, long tick);
+    public VibrationSelector();
+    public void addCandidate(VibrationInfo newVibration, long tickTime);
+    public Optional<VibrationInfo> chosenCandidate(long time);
+    public void startOver();
+    static record VibrationEvent(VibrationInfo event, long tick) {
+    }
+}
+//// VibrationSystem.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.ToIntFunction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.gameevent.GameEventListener;
+import net.minecraft.world.level.gameevent.PositionSource;
+import net.minecraft.world.phys.Vec3;
+public interface VibrationSystem {
+    List<ResourceKey<GameEvent>> RESONANCE_EVENTS;
+    int NO_VIBRATION_FREQUENCY;
+    ToIntFunction<ResourceKey<GameEvent>> VIBRATION_FREQUENCY_FOR_EVENT;
+    Data getVibrationData();
+    User getVibrationUser();
+    static int getGameEventFrequency(Holder<GameEvent> event);
+    static int getGameEventFrequency(ResourceKey<GameEvent> event);
+    static ResourceKey<GameEvent> getResonanceEventByFrequency(int vibrationFrequency);
+    static int getRedstoneStrengthForDistance(float distance, int listenerRadius);
+    public static final class Data {
+        public static final Codec<Data> CODEC;
+        public static final String NBT_TAG_KEY = "listener";
+        private Data(VibrationInfo currentVibration, VibrationSelector selectionStrategy, int travelTimeInTicks, boolean reloadVibrationParticle);
+        public Data();
+        public VibrationSelector getSelectionStrategy();
+        public VibrationInfo getCurrentVibration();
+        public void setCurrentVibration(VibrationInfo currentVibration);
+        public int getTravelTimeInTicks();
+        public void setTravelTimeInTicks(int travelTimeInTicks);
+        public void decrementTravelTime();
+        public boolean shouldReloadVibrationParticle();
+        public void setReloadVibrationParticle(boolean reloadVibrationParticle);
+    }
+    public static class Listener implements GameEventListener {
+        public Listener(VibrationSystem system);
+        public PositionSource getListenerSource();
+        public int getListenerRadius();
+        public boolean handleGameEvent(ServerLevel level, Holder<GameEvent> event, GameEvent.Context context, Vec3 sourcePosition);
+        public void forceScheduleVibration(ServerLevel level, Holder<GameEvent> event, GameEvent.Context context, Vec3 origin);
+        public static float distanceBetweenInBlocks(BlockPos origin, BlockPos dest);
+    }
+    public interface Ticker {
+        static void tick(Level level, Data data, User user);
+    }
+    public interface User {
+        int getListenerRadius();
+        PositionSource getPositionSource();
+        boolean canReceiveVibration(ServerLevel level, BlockPos pos, Holder<GameEvent> event, GameEvent.Context context);
+        void onReceiveVibration(ServerLevel level, BlockPos pos, Holder<GameEvent> event, Entity sourceEntity, Entity projectileOwner, float receivingDistance);
+        default TagKey<GameEvent> getListenableEvents();
+        default boolean canTriggerAvoidVibration();
+        default boolean requiresAdjacentChunksToBeTicking();
+        default int calculateTravelTimeInTicks(float distanceToDestination);
+        default boolean isValidVibration(Holder<GameEvent> event, GameEvent.Context context);
+        default void onDataChanged();
+    }
+}

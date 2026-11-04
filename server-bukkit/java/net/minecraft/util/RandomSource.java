@@ -1,19 +1,51 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.util;
 
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
+import net.minecraft.world.level.levelgen.LegacyRandomSource;
+import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+import net.minecraft.world.level.levelgen.RandomSupport;
+import net.minecraft.world.level.levelgen.SingleThreadedRandomSource;
+import net.minecraft.world.level.levelgen.ThreadSafeLegacyRandomSource;
 
 public interface RandomSource {
+    @Deprecated
+    double GAUSSIAN_SPREAD_FACTOR = 2.297;
+
     static RandomSource create() {
-        return new Sequence(new Random());
+        return create(RandomSupport.generateUniqueSeed());
+    }
+
+    @Deprecated
+    static RandomSource createThreadSafe() {
+        return new ThreadSafeLegacyRandomSource(RandomSupport.generateUniqueSeed());
     }
 
     static RandomSource create(long seed) {
-        return new Sequence(new Random(seed));
+        return new LegacyRandomSource(seed);
     }
+
+    static RandomSource createThreadLocalInstance() {
+        return new SingleThreadedRandomSource(ThreadLocalRandom.current().nextLong());
+    }
+
+    static RandomSource createThreadLocalInstance(long seed) {
+        return new SingleThreadedRandomSource(seed);
+    }
+
+    RandomSource fork();
+
+    PositionalRandomFactory forkPositional();
+
+    void setSeed(long seed);
 
     int nextInt();
 
     int nextInt(int bound);
+
+    default int nextIntBetweenInclusive(int min, int maxInclusive) {
+        return nextInt(maxInclusive - min + 1) + min;
+    }
 
     long nextLong();
 
@@ -25,46 +57,24 @@ public interface RandomSource {
 
     double nextGaussian();
 
-    final class Sequence implements RandomSource {
-        private final Random random;
+    default double triangle(double mean, double spread) {
+        return mean + spread * (nextDouble() - nextDouble());
+    }
 
-        private Sequence(Random random) {
-            this.random = random;
-        }
+    default float triangle(float mean, float spread) {
+        return mean + spread * (nextFloat() - nextFloat());
+    }
 
-        @Override
-        public int nextInt() {
-            return random.nextInt();
+    default void consumeCount(int rounds) {
+        for (int i = 0; i < rounds; i++) {
+            nextInt();
         }
+    }
 
-        @Override
-        public int nextInt(int bound) {
-            return random.nextInt(bound);
+    default int nextInt(int origin, int bound) {
+        if (origin >= bound) {
+            throw new IllegalArgumentException("bound - origin is non positive");
         }
-
-        @Override
-        public long nextLong() {
-            return random.nextLong();
-        }
-
-        @Override
-        public boolean nextBoolean() {
-            return random.nextBoolean();
-        }
-
-        @Override
-        public float nextFloat() {
-            return random.nextFloat();
-        }
-
-        @Override
-        public double nextDouble() {
-            return random.nextDouble();
-        }
-
-        @Override
-        public double nextGaussian() {
-            return random.nextGaussian();
-        }
+        return origin + nextInt(bound - origin);
     }
 }

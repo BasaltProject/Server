@@ -1,0 +1,2053 @@
+//// ARGB.java
+import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
+import org.joml.Vector4f;
+import org.joml.Vector4fc;
+public class ARGB {
+    public static float srgbToLinearChannel(int srgb);
+    public static int linearToSrgbChannel(float linear);
+    public static int meanLinear(int srgb1, int srgb2, int srgb3, int srgb4);
+    public static int alpha(int color);
+    public static int red(int color);
+    public static int green(int color);
+    public static int blue(int color);
+    public static int color(int alpha, int red, int green, int blue);
+    public static int color(int red, int green, int blue);
+    public static int color(Vec3 vec);
+    public static int multiply(int lhs, int rhs);
+    public static Vector3fc multiply(Vector3fc lhs, Vector3fc rhs);
+    public static Vector4fc multiply(Vector4fc lhs, Vector4fc rhs);
+    public static int addRgb(int lhs, int rhs);
+    public static Vector3fc addRgb(Vector3fc lhs, Vector3fc rhs);
+    public static Vector4fc addRgb(Vector4fc lhs, Vector3fc rhs);
+    public static Integer subtractRgb(Integer lhs, Integer rhs);
+    public static Vector3fc subtractRgb(Vector3fc lhs, Vector3fc rhs);
+    public static Vector4fc subtractRgb(Vector4fc lhs, Vector3fc rhs);
+    public static int multiplyAlpha(int color, float alphaMultiplier);
+    public static int scaleRGB(int color, float scale);
+    public static int scaleRGB(int color, float scaleR, float scaleG, float scaleB);
+    public static Vector3fc scaleRGB(Vector3fc color, float scale);
+    public static Vector4fc scaleRGB(Vector4fc color, float scale);
+    public static Vector3fc scaleRGB(Vector3fc color, float scaleR, float scaleG, float scaleB);
+    public static Vector4fc scaleRGB(Vector4fc color, float scaleR, float scaleG, float scaleB);
+    public static int scaleRGB(int color, int scale);
+    public static int greyscale(int color);
+    public static Vector3fc greyscale(Vector3fc color);
+    public static Vector4fc greyscale(Vector4fc color);
+    public static int alphaBlend(int destination, int source);
+    public static Vector3fc alphaBlend(Vector3fc destination, Vector4fc source);
+    public static Vector4fc alphaBlend(Vector4fc destination, Vector4fc source);
+    public static int srgbLerp(float alpha, int p0, int p1);
+    public static Vector3fc srgbLerp(float alpha, Vector3fc p0, Vector3fc p1);
+    public static Vector4fc srgbLerp(float alpha, Vector4fc p0, Vector4fc p1);
+    public static int linearLerp(float alpha, int p0, int p1);
+    public static int opaque(int color);
+    public static int transparent(int color);
+    public static int color(int alpha, int rgb);
+    public static int color(float alpha, int rgb);
+    public static int white(float alpha);
+    public static int white(int alpha);
+    public static int black(float alpha);
+    public static int black(int alpha);
+    public static int gray(float brightness);
+    public static int colorFromFloat(float alpha, float red, float green, float blue);
+    public static int colorFromVector3f(Vector3fc color);
+    public static int colorFromVector4f(Vector4fc color);
+    public static Vector3f vector3fFromRGB24(int color);
+    public static Vector4f vector4fFromARGB32(int color);
+    public static Vector4f setVector4fFromARGB32(Vector4f dest, int color);
+    public static int average(int lhs, int rhs);
+    public static int as8BitChannel(float value);
+    public static float alphaFloat(int color);
+    public static float redFloat(int color);
+    public static float greenFloat(int color);
+    public static float blueFloat(int color);
+    public static int toABGR(int color);
+    public static int fromABGR(int color);
+    public static int setBrightness(int color, float brightness);
+}
+//// AbortableIterationConsumer.java
+import java.util.function.Consumer;
+public interface AbortableIterationConsumer<T> {
+    Continuation accept(T entry);
+    static <T> AbortableIterationConsumer<T> forConsumer(Consumer<T> consumer);
+}
+//// AbstractListBuilder.java
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.ListBuilder;
+import java.util.function.UnaryOperator;
+public abstract class AbstractListBuilder<T, B> implements ListBuilder<T> {
+    protected DataResult<B> builder;
+    protected AbstractListBuilder(DynamicOps<T> ops);
+    public DynamicOps<T> ops();
+    protected abstract B initBuilder();
+    protected abstract B append(B builder, T value);
+    protected abstract DataResult<T> build(B builder, T prefix);
+    public ListBuilder<T> add(T value);
+    public ListBuilder<T> add(DataResult<T> value);
+    public ListBuilder<T> withErrorsFrom(DataResult<?> result);
+    public ListBuilder<T> mapError(UnaryOperator<String> onError);
+    public DataResult<T> build(T prefix);
+}
+//// ArrayListDeque.java
+import java.util.AbstractList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
+public class ArrayListDeque<T> extends AbstractList<T> implements ListAndDeque<T> {
+    public ArrayListDeque();
+    public ArrayListDeque(int capacity);
+    public int size();
+    public int capacity();
+    public T get(int index);
+    public T set(int index, T element);
+    public void add(int index, T element);
+    public T remove(int index);
+    public boolean removeIf(Predicate<? super T> filter);
+    public void replaceAll(UnaryOperator<T> operator);
+    public void forEach(Consumer<? super T> action);
+    public void addFirst(T value);
+    public void addLast(T value);
+    public boolean offerFirst(T value);
+    public boolean offerLast(T value);
+    public T removeFirst();
+    public T removeLast();
+    public ListAndDeque<T> reversed();
+    public T pollFirst();
+    public T pollLast();
+    public T getFirst();
+    public T getLast();
+    public T peekFirst();
+    public T peekLast();
+    public boolean removeFirstOccurrence(Object o);
+    public boolean removeLastOccurrence(Object o);
+    public Iterator<T> descendingIterator();
+    class DescendingIterator implements Iterator<T> {
+        public DescendingIterator();
+        public boolean hasNext();
+        public T next();
+        public void remove();
+    }
+    class ReversedView extends AbstractList<T> implements ListAndDeque<T> {
+        public ReversedView(ArrayListDeque<T> source);
+        public ListAndDeque<T> reversed();
+        public T getFirst();
+        public T getLast();
+        public void addFirst(T t);
+        public void addLast(T t);
+        public boolean offerFirst(T t);
+        public boolean offerLast(T t);
+        public T pollFirst();
+        public T pollLast();
+        public T peekFirst();
+        public T peekLast();
+        public T removeFirst();
+        public T removeLast();
+        public boolean removeFirstOccurrence(Object o);
+        public boolean removeLastOccurrence(Object o);
+        public Iterator<T> descendingIterator();
+        public int size();
+        public boolean isEmpty();
+        public boolean contains(Object o);
+        public T get(int index);
+        public T set(int index, T element);
+        public void add(int index, T element);
+        public T remove(int index);
+        public int indexOf(Object o);
+        public int lastIndexOf(Object o);
+        public List<T> subList(int fromIndex, int toIndex);
+        public Iterator<T> iterator();
+        public void clear();
+    }
+}
+//// BinaryAnimator.java
+public class BinaryAnimator {
+    public BinaryAnimator(int animationLength, EasingType easing);
+    public BinaryAnimator(int animationLength);
+    public void tick(boolean active);
+    public float getFactor(float partialTicks);
+}
+//// BitStorage.java
+import java.util.function.IntConsumer;
+public interface BitStorage {
+    int getAndSet(int index, int value);
+    void set(int index, int value);
+    void fill(int value);
+    int get(int index);
+    long[] getRaw();
+    int getSize();
+    int getBits();
+    void getAll(IntConsumer output);
+    void unpack(int[] output);
+    BitStorage copy();
+}
+//// BlockUtil.java
+import com.mojang.datafixers.util.Pair;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.Block;
+public class BlockUtil {
+    public static final int MAX_POSITION_DIFFERENCE_PACKING_RADIUS = 127;
+    public static FoundRectangle getLargestRectangleAround(BlockPos center, Direction.Axis axis1, int limit1, Direction.Axis axis2, int limit2, Predicate<BlockPos> test);
+    static Pair<IntBounds, Integer> getMaxRectangleLocation(int[] columns);
+    public static Optional<BlockPos> getTopConnectedBlock(BlockGetter level, BlockPos pos, Block bodyBlock, Direction growthDirection, Block headBlock);
+    public static int clampedPackDifferenceInPosition(BlockPos pos, BlockPos testPos, int xRadius, int yRadius, int zRadius);
+    public static int packDifferenceInPosition(BlockPos pos, BlockPos testPos, int xRadius, int yRadius, int zRadius);
+    public static BlockPos unpackDifferenceInPosition(BlockPos pos, int packedDiff, int xRadius, int yRadius, int zRadius);
+    public static class IntBounds {
+        public final int min;
+        public final int max;
+        public IntBounds(int min, int max);
+        public String toString();
+    }
+    public static class FoundRectangle {
+        public final BlockPos minCorner;
+        public final int axis1Size;
+        public final int axis2Size;
+        public FoundRectangle(BlockPos minCorner, int axis1Size, int axis2Size);
+    }
+}
+//// BoundedFloatFunction.java
+import java.util.function.Function;
+public interface BoundedFloatFunction<C> {
+    BoundedFloatFunction<Float> IDENTITY;
+    float apply(C c);
+    Interval range();
+    static <C> BoundedFloatFunction<C> constant(float value);
+    default <C2> BoundedFloatFunction<C2> comap(Function<C2, C> function);
+}
+//// Brightness.java
+import com.mojang.serialization.Codec;
+public record Brightness(int block, int sky) {
+    public static final Codec<Integer> LIGHT_VALUE_CODEC;
+    public static final Codec<Brightness> CODEC;
+    public static final Brightness FULL_BRIGHT;
+    public int pack();
+    public static Brightness unpack(int packed);
+}
+//// ByIdMap.java
+import java.util.function.IntFunction;
+import java.util.function.ToIntFunction;
+public class ByIdMap {
+    public static <T> IntFunction<T> sparse(ToIntFunction<T> idGetter, T[] values, T _default);
+    public static <T> IntFunction<T> continuous(ToIntFunction<T> idGetter, T[] values, OutOfBoundsStrategy strategy);
+    public static enum OutOfBoundsStrategy {
+        ZERO, WRAP, CLAMP;
+    }
+}
+//// ClassInstanceMultiMap.java
+import java.util.AbstractCollection;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
+    public ClassInstanceMultiMap(Class<T> baseClass);
+    public boolean add(T instance);
+    public boolean remove(Object object);
+    public boolean contains(Object o);
+    public <S> Collection<S> find(Class<S> index);
+    public Iterator<T> iterator();
+    public List<T> getAllInstances();
+    public int size();
+}
+//// ClassTreeIdRegistry.java
+public class ClassTreeIdRegistry {
+    public static final int NO_ID_VALUE = -1;
+    public int getLastIdFor(Class<?> clazz);
+    public int getCount(Class<?> clazz);
+    public int define(Class<?> clazz);
+}
+//// ColorRGBA.java
+import com.mojang.serialization.Codec;
+public record ColorRGBA(int rgba) {
+    public static final Codec<ColorRGBA> CODEC;
+    public String toString();
+}
+//// CommonColors.java
+public class CommonColors {
+    public static final int WHITE = -1;
+    public static final int BLACK = -16777216;
+    public static final int GRAY = -8355712;
+    public static final int DARK_GRAY = -12566464;
+    public static final int LIGHT_GRAY = -6250336;
+    public static final int LIGHTER_GRAY = -4539718;
+    public static final int RED = -65536;
+    public static final int SOFT_RED = -2142128;
+    public static final int GREEN = -16711936;
+    public static final int BLUE = -16776961;
+    public static final int YELLOW = -256;
+    public static final int SOFT_YELLOW = -171;
+    public static final int DARK_PURPLE = -11534256;
+    public static final int HIGH_CONTRAST_DIAMOND = -11010079;
+    public static final int COSMOS_PINK = -13108;
+    public static final int TEXT_GRAY = -2039584;
+}
+//// CommonLinks.java
+import java.net.URI;
+import java.util.UUID;
+public class CommonLinks {
+    public static final URI GDPR;
+    public static final URI EULA;
+    public static final URI PRIVACY_STATEMENT;
+    public static final URI ATTRIBUTION;
+    public static final URI LICENSES;
+    public static final URI BUY_MINECRAFT_JAVA;
+    public static final URI ACCOUNT_SETTINGS;
+    public static final URI SNAPSHOT_FEEDBACK;
+    public static final URI RELEASE_FEEDBACK;
+    public static final URI SNAPSHOT_BUGS_FEEDBACK;
+    public static final URI GENERAL_HELP;
+    public static final URI ACCESSIBILITY_HELP;
+    public static final URI REPORTING_HELP;
+    public static final URI SUSPENSION_HELP;
+    public static final URI BLOCKING_HELP;
+    public static final URI SYMLINK_HELP;
+    public static final URI PRIVACY_AND_ONLINE_SETTINGS;
+    public static final URI START_REALMS_TRIAL;
+    public static final URI BUY_REALMS;
+    public static final URI REALMS_TERMS;
+    public static final URI REALMS_CONTENT_CREATION;
+    public static final URI EXTEND_REALMS_LINK;
+    public static final String INTENTIONAL_GAME_DESIGN_BUG_ID = "MCPE-28723";
+    public static final URI INTENTIONAL_GAME_DESIGN_BUG;
+    public static URI extendRealms(String subscriptionId, UUID profileId, ExtensionReference reference);
+    public static enum ExtensionReference {
+        NONE, EXPIRED_TRIAL, EXPIRED_REALM;
+    }
+}
+//// CompilableString.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import java.util.function.Function;
+public class CompilableString<T> {
+    private CompilableString(String source, T compiled);
+    public static <T> Codec<CompilableString<T>> codec(Function<String, DataResult<T>> compiler);
+    public String source();
+    public T compiled();
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+    public static abstract class CommandParserHelper<T> implements Function<String, DataResult<T>> {
+        public final DataResult<T> apply(String contents);
+        protected abstract T parse(StringReader reader) throws CommandSyntaxException;
+        protected abstract String errorMessage(String original, CommandSyntaxException exception);
+    }
+}
+//// Continuation.java
+public enum Continuation {
+    CONTINUE, ABORT;
+    public boolean shouldAbort();
+    public static Continuation abortIf(boolean abortIf);
+    public static Continuation continueIf(boolean continueIf);
+}
+//// CrudeIncrementalIntIdentityHashBiMap.java
+import java.util.Iterator;
+import net.minecraft.core.IdMap;
+public class CrudeIncrementalIntIdentityHashBiMap<K> implements IdMap<K> {
+    private CrudeIncrementalIntIdentityHashBiMap(int capacity);
+    private CrudeIncrementalIntIdentityHashBiMap(K[] keys, int[] values, K[] byId, int nextId, int size);
+    public static <A> CrudeIncrementalIntIdentityHashBiMap<A> create(int initialCapacity);
+    public int getId(K thing);
+    public K byId(int id);
+    public boolean contains(K key);
+    public boolean contains(int id);
+    public int add(K key);
+    public void addMapping(K key, int id);
+    public Iterator<K> iterator();
+    public void clear();
+    public int size();
+    public CrudeIncrementalIntIdentityHashBiMap<K> copy();
+}
+//// Crypt.java
+import com.mojang.serialization.Codec;
+import java.security.Key;
+import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.util.Base64;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import net.minecraft.network.FriendlyByteBuf;
+public class Crypt {
+    public static final String SIGNING_ALGORITHM = "SHA256withRSA";
+    public static final int SIGNATURE_BYTES = 256;
+    public static final String RSA_PUBLIC_KEY_HEADER = "-----BEGIN RSA PUBLIC KEY-----";
+    public static final String MIME_LINE_SEPARATOR;
+    public static final Base64.Encoder MIME_ENCODER;
+    public static final Codec<PublicKey> PUBLIC_KEY_CODEC;
+    public static final Codec<PrivateKey> PRIVATE_KEY_CODEC;
+    public static SecretKey generateSecretKey() throws CryptException;
+    public static KeyPair generateKeyPair() throws CryptException;
+    public static byte[] digestData(String serverId, PublicKey publicKey, SecretKey sharedKey) throws CryptException;
+    public static PrivateKey stringToPemRsaPrivateKey(String rsaString) throws CryptException;
+    public static PublicKey stringToRsaPublicKey(String rsaString) throws CryptException;
+    public static String rsaPublicKeyToString(PublicKey publicKey);
+    public static String pemRsaPrivateKeyToString(PrivateKey privateKey);
+    public static PublicKey byteToPublicKey(byte[] keyData) throws CryptException;
+    public static SecretKey decryptByteToSecretKey(PrivateKey privateKey, byte[] keyData) throws CryptException;
+    public static byte[] encryptUsingKey(Key key, byte[] input) throws CryptException;
+    public static byte[] decryptUsingKey(Key key, byte[] input) throws CryptException;
+    public static Cipher getCipher(int opMode, Key key) throws CryptException;
+    public static class SaltSupplier {
+        public static long getLong();
+    }
+    public static record SaltSignaturePair(long salt, byte[] signature) {
+        public static final SaltSignaturePair EMPTY;
+        public SaltSignaturePair(FriendlyByteBuf input);
+        public boolean isValid();
+        public static void write(FriendlyByteBuf output, SaltSignaturePair saltSignaturePair);
+        public byte[] saltAsBytes();
+    }
+    interface ByteArrayToKeyFunction<T extends Key> {
+        T apply(byte[] input) throws CryptException;
+    }
+}
+//// CryptException.java
+public class CryptException extends Exception {
+    public CryptException(Throwable cause);
+}
+//// CsvOutput.java
+import java.io.IOException;
+import java.io.Writer;
+import java.util.List;
+public class CsvOutput {
+    private CsvOutput(Writer output, List<String> headers) throws IOException;
+    public static Builder builder();
+    public void writeRow(Object... values) throws IOException;
+    public static class Builder {
+        public Builder addColumn(String header);
+        public CsvOutput build(Writer writer) throws IOException;
+    }
+}
+//// DelegateDataOutput.java
+import java.io.DataOutput;
+import java.io.IOException;
+public class DelegateDataOutput implements DataOutput {
+    public DelegateDataOutput(DataOutput parent);
+    public void write(int b) throws IOException;
+    public void write(byte[] b) throws IOException;
+    public void write(byte[] b, int off, int len) throws IOException;
+    public void writeBoolean(boolean v) throws IOException;
+    public void writeByte(int v) throws IOException;
+    public void writeShort(int v) throws IOException;
+    public void writeChar(int v) throws IOException;
+    public void writeInt(int v) throws IOException;
+    public void writeLong(long v) throws IOException;
+    public void writeFloat(float v) throws IOException;
+    public void writeDouble(double v) throws IOException;
+    public void writeBytes(String s) throws IOException;
+    public void writeChars(String s) throws IOException;
+    public void writeUTF(String s) throws IOException;
+}
+//// DependencySorter.java
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+public class DependencySorter<K, V extends DependencySorter.Entry<K>> {
+    public DependencySorter<K, V> addEntry(K id, V value);
+    public void orderByDependencies(BiConsumer<K, V> output);
+    public interface Entry<K> {
+        void visitRequiredDependencies(Consumer<K> output);
+        void visitOptionalDependencies(Consumer<K> output);
+    }
+}
+//// DirectoryLock.java
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.file.Path;
+public class DirectoryLock implements AutoCloseable {
+    public static final String LOCK_FILE = "session.lock";
+    public static DirectoryLock create(Path dir) throws IOException;
+    private DirectoryLock(FileChannel lockFile, FileLock lock);
+    public void close() throws IOException;
+    public boolean isValid();
+    public static boolean isLocked(Path dir) throws IOException;
+    public static class LockException extends IOException {
+        private LockException(Path path, String message);
+        public static LockException alreadyLocked(Path path);
+    }
+}
+//// DummyFileAttributes.java
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+public abstract class DummyFileAttributes implements BasicFileAttributes {
+    public static final BasicFileAttributes DIRECTORY;
+    public static final BasicFileAttributes FILE;
+    public FileTime lastModifiedTime();
+    public FileTime lastAccessTime();
+    public FileTime creationTime();
+    public boolean isSymbolicLink();
+    public boolean isOther();
+    public long size();
+    public Object fileKey();
+}
+//// Ease.java
+public class Ease {
+    public static float inBack(float x);
+    public static float inBounce(float x);
+    public static float inCubic(float x);
+    public static float inElastic(float x);
+    public static float inExpo(float x);
+    public static float inQuart(float x);
+    public static float inQuint(float x);
+    public static float inSine(float x);
+    public static float inOutBounce(float x);
+    public static float inOutCirc(float x);
+    public static float inOutCubic(float x);
+    public static float inOutQuad(float x);
+    public static float inOutQuart(float x);
+    public static float inOutQuint(float x);
+    public static float outBounce(float x);
+    public static float outElastic(float x);
+    public static float outExpo(float x);
+    public static float outQuad(float x);
+    public static float outQuint(float x);
+    public static float outSine(float x);
+    public static float inOutSine(float x);
+    public static float outBack(float x);
+    public static float outQuart(float x);
+    public static float outCubic(float x);
+    public static float inOutExpo(float x);
+    public static float inQuad(float x);
+    public static float outCirc(float x);
+    public static float inOutElastic(float x);
+    public static float inCirc(float x);
+    public static float inOutBack(float x);
+}
+//// EasingType.java
+import com.mojang.serialization.Codec;
+public interface EasingType {
+    ExtraCodecs.LateBoundIdMapper<String, EasingType> SIMPLE_REGISTRY;
+    Codec<EasingType> CODEC;
+    EasingType CONSTANT;
+    EasingType LINEAR;
+    EasingType IN_BACK;
+    EasingType IN_BOUNCE;
+    EasingType IN_CIRC;
+    EasingType IN_CUBIC;
+    EasingType IN_ELASTIC;
+    EasingType IN_EXPO;
+    EasingType IN_QUAD;
+    EasingType IN_QUART;
+    EasingType IN_QUINT;
+    EasingType IN_SINE;
+    EasingType IN_OUT_BACK;
+    EasingType IN_OUT_BOUNCE;
+    EasingType IN_OUT_CIRC;
+    EasingType IN_OUT_CUBIC;
+    EasingType IN_OUT_ELASTIC;
+    EasingType IN_OUT_EXPO;
+    EasingType IN_OUT_QUAD;
+    EasingType IN_OUT_QUART;
+    EasingType IN_OUT_QUINT;
+    EasingType IN_OUT_SINE;
+    EasingType OUT_BACK;
+    EasingType OUT_BOUNCE;
+    EasingType OUT_CIRC;
+    EasingType OUT_CUBIC;
+    EasingType OUT_ELASTIC;
+    EasingType OUT_EXPO;
+    EasingType OUT_QUAD;
+    EasingType OUT_QUART;
+    EasingType OUT_QUINT;
+    EasingType OUT_SINE;
+    static EasingType registerSimple(String id, EasingType easing);
+    static EasingType cubicBezier(float x1, float y1, float x2, float y2);
+    static EasingType symmetricCubicBezier(float x1, float y1);
+    float apply(float x);
+    public static final class CubicBezier implements EasingType {
+        public static final Codec<CubicBezier> CODEC;
+        public CubicBezier(CubicBezierControls controls);
+        public float apply(float x);
+        public boolean equals(Object obj);
+        public int hashCode();
+        public String toString();
+        static record CubicCurve(float a, float b, float c) {
+            public float sample(float t);
+            public float sampleGradient(float t);
+        }
+    }
+    public static record CubicBezierControls(float x1, float y1, float x2, float y2) {
+        public static final Codec<CubicBezierControls> CODEC;
+    }
+}
+//// EncoderCache.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+public class EncoderCache {
+    public EncoderCache(int maximumSize);
+    public <A> Codec<A> wrap(Codec<A> codec);
+    static record Key<A, T>(Codec<A> codec, A value, DynamicOps<T> ops) {
+        public DataResult<T> resolve();
+        public boolean equals(Object obj);
+        public int hashCode();
+    }
+}
+//// ExceptionCollector.java
+public class ExceptionCollector<T extends Throwable> {
+    public void add(T throwable);
+    public void throwIfPresent() throws T;
+}
+//// ExtraCodecs.java
+import com.google.gson.JsonElement;
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.PropertyMap;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.Lifecycle;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.MapLike;
+import com.mojang.serialization.codecs.BaseMapCodec;
+import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
+import java.net.URI;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAccessor;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.ToIntFunction;
+import java.util.regex.Pattern;
+import net.minecraft.core.HolderSet;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.Identifier;
+import org.joml.AxisAngle4f;
+import org.joml.Matrix4fc;
+import org.joml.Quaternionfc;
+import org.joml.Vector2fc;
+import org.joml.Vector3fc;
+import org.joml.Vector3ic;
+import org.joml.Vector4fc;
+public class ExtraCodecs {
+    public static final Codec<JsonElement> JSON;
+    public static final Codec<Object> JAVA;
+    public static final Codec<Tag> NBT;
+    public static final Codec<Vector2fc> VECTOR2F;
+    public static final Codec<Vector3fc> VECTOR3F;
+    public static final Codec<Vector3ic> VECTOR3I;
+    public static final Codec<Vector4fc> VECTOR4F;
+    public static final Codec<Quaternionfc> QUATERNIONF_COMPONENTS;
+    public static final Codec<AxisAngle4f> AXISANGLE4F;
+    public static final Codec<Quaternionfc> QUATERNIONF;
+    public static final Codec<Matrix4fc> MATRIX4F;
+    public static final Codec<Integer> RGB_COLOR_CODEC;
+    public static final Codec<Integer> ARGB_COLOR_CODEC;
+    public static final Codec<Vector3fc> RGB_COLOR_VEC3_CODEC;
+    public static final Codec<Vector4fc> ARGB_COLOR_VEC4_CODEC;
+    public static final Codec<Integer> STRING_RGB_COLOR;
+    public static final Codec<Integer> STRING_ARGB_COLOR;
+    public static final Codec<Vector3fc> STRING_RGB_VEC3_COLOR;
+    public static final Codec<Vector4fc> STRING_ARGB_VEC4_COLOR;
+    public static final Codec<Integer> UNSIGNED_BYTE;
+    public static final Codec<Integer> NON_NEGATIVE_INT;
+    public static final Codec<Integer> POSITIVE_INT;
+    public static final Codec<Long> NON_NEGATIVE_LONG;
+    public static final Codec<Long> POSITIVE_LONG;
+    public static final Codec<Float> NON_NEGATIVE_FLOAT;
+    public static final Codec<Float> POSITIVE_FLOAT;
+    public static final Codec<Pattern> PATTERN;
+    public static final Codec<Instant> INSTANT_ISO8601;
+    public static final Codec<byte[]> BASE64_STRING;
+    public static final Codec<String> ESCAPED_STRING;
+    public static final Codec<TagOrElementLocation> TAG_OR_ELEMENT_ID;
+    public static final Function<Optional<Long>, OptionalLong> toOptionalLong;
+    public static final Function<OptionalLong, Optional<Long>> fromOptionalLong;
+    public static final Codec<BitSet> BIT_SET;
+    public static final int MAX_PROPERTY_NAME_LENGTH = 64;
+    public static final int MAX_PROPERTY_VALUE_LENGTH = 32767;
+    public static final int MAX_PROPERTY_SIGNATURE_LENGTH = 1024;
+    public static final int MAX_PROPERTIES = 16;
+    public static final Codec<PropertyMap> PROPERTY_MAP;
+    public static final Codec<String> PLAYER_NAME;
+    public static final Codec<GameProfile> AUTHLIB_GAME_PROFILE;
+    public static final MapCodec<GameProfile> STORED_GAME_PROFILE;
+    public static final Codec<String> NON_EMPTY_STRING;
+    public static final Codec<Integer> CODEPOINT;
+    public static final Codec<String> RESOURCE_PATH_CODEC;
+    public static final Codec<URI> UNTRUSTED_URI;
+    public static final Codec<String> CHAT_STRING;
+    public static <T> Codec<T> converter(DynamicOps<T> ops);
+    public static <P, I> Codec<I> intervalCodec(Codec<P> pointCodec, String lowerBoundName, String upperBoundName, BiFunction<P, P, DataResult<I>> makeInterval, Function<I, P> getMin, Function<I, P> getMax);
+    public static <A> Codec.ResultFunction<A> orElsePartial(A value);
+    public static <E> Codec<E> idResolverCodec(ToIntFunction<E> toInt, IntFunction< E> fromInt, int unknownId);
+    public static <I, E> Codec<E> idResolverCodec(Codec<I> value, Function<I, E> fromId, Function<E, I> toId);
+    public static <E> Codec<E> orCompressed(Codec<E> normal, Codec<E> compressed);
+    public static <E> MapCodec<E> orCompressed(MapCodec<E> normal, MapCodec<E> compressed);
+    public static <E> Codec<E> overrideLifecycle(Codec<E> codec, Function<E, Lifecycle> decodeLifecycle, Function<E, Lifecycle> encodeLifecycle);
+    public static <E> Codec<E> overrideLifecycle(Codec<E> codec, Function<E, Lifecycle> lifecycleGetter);
+    public static <K, V> StrictUnboundedMapCodec<K, V> strictUnboundedMap(Codec<K> keyCodec, Codec<V> elementCodec);
+    public static <E> Codec<List<E>> compactListCodec(Codec<E> elementCodec);
+    public static <E> Codec<List<E>> compactListCodec(Codec<E> elementCodec, Codec<List<E>> listCodec);
+    public static Codec<Integer> intRange(int minInclusive, int maxInclusive);
+    public static Codec<Long> longRange(int minInclusive, int maxInclusive);
+    public static Codec<Float> floatRange(float minInclusive, float maxInclusive);
+    public static <T> Codec<List<T>> nonEmptyList(Codec<List<T>> listCodec);
+    public static <T> Codec<HolderSet<T>> nonEmptyHolderSet(Codec<HolderSet<T>> listCodec);
+    public static <M extends Map<?, ?>> Codec<M> nonEmptyMap(Codec<M> mapCodec);
+    public static <E> MapCodec<E> retrieveContext(Function<DynamicOps<?>, DataResult<E>> getter);
+    public static <E, L extends Collection<E>, T> Function<L, DataResult<L>> ensureHomogenous(Function<E, T> typeGetter);
+    public static <A> Codec<A> catchDecoderException(Codec<A> codec);
+    public static Codec<TemporalAccessor> temporalCodec(DateTimeFormatter formatter);
+    public static MapCodec<OptionalLong> asOptionalLong(MapCodec<Optional<Long>> fieldCodec);
+    public static <K, V> Codec<Map<K, V>> sizeLimitedMap(Codec<Map<K, V>> codec, int maxSizeInclusive);
+    public static <T> Codec<Object2BooleanMap<T>> object2BooleanMap(Codec<T> keyCodec);
+    public static <K, V> MapCodec<V> dispatchOptionalValue(String typeKey, String valueKey, Codec<K> typeCodec, Function<? super V, ? extends K> typeGetter, Function<? super K, ? extends Codec<? extends V>> valueCodec);
+    public static <A> Codec<Optional<A>> optionalEmptyMap(Codec<A> codec);
+    public static <E extends Enum<E>> Codec<E> legacyEnum(Function<String, E> valueOf);
+    public static Codec<Path> pathCodec(Function<String, Path> pathFactory);
+    public static Codec<Path> relativeNormalizedSubPathCodec(Function<String, Path> pathFactory);
+    public static Codec<Path> guardedPathCodec(Path baseFolder);
+    public static <A> MapCodec<A> optionalAlwaysPresentFieldOf(Codec<A> elementCodec, String name, A defaultValue, boolean lenient);
+    public static <A> MapCodec<A> optionalAlwaysPresentFieldOf(Codec<A> elementCodec, String name, A defaultValue);
+    public static record StrictUnboundedMapCodec<K, V>(Codec<K> keyCodec, Codec<V> elementCodec) implements BaseMapCodec<K, V>, Codec<Map<K, V>> {
+        public <T> DataResult<Map<K, V>> decode(DynamicOps<T> ops, MapLike<T> input);
+        public <T> DataResult<Pair<Map<K, V>, T>> decode(DynamicOps<T> ops, T input);
+        public <T> DataResult<T> encode(Map<K, V> input, DynamicOps<T> ops, T prefix);
+        public String toString();
+    }
+    public static record TagOrElementLocation(Identifier id, boolean tag) {
+        public String toString();
+    }
+    public static class LateBoundIdMapper<I, V> {
+        public Codec<V> codec(Codec<I> idCodec);
+        public LateBoundIdMapper<I, V> put(I id, V value);
+        public Set<V> values();
+    }
+}
+//// FastBufferedInputStream.java
+import java.io.IOException;
+import java.io.InputStream;
+public class FastBufferedInputStream extends InputStream {
+    public FastBufferedInputStream(InputStream in);
+    public FastBufferedInputStream(InputStream in, int bufferSize);
+    public int read() throws IOException;
+    public int read(byte[] output, int offset, int length) throws IOException;
+    public long skip(long count) throws IOException;
+    public int available() throws IOException;
+    public void close() throws IOException;
+}
+//// FileSystemUtil.java
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Path;
+public class FileSystemUtil {
+    public static Path safeGetPath(URI probeUri) throws IOException;
+}
+//// FileUtil.java
+import com.mojang.serialization.DataResult;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+public class FileUtil {
+    public static String sanitizeName(String baseName);
+    public static String findAvailableName(Path baseDir, String baseName, String suffix) throws IOException;
+    public static boolean isPathPortable(Path path);
+    public static boolean isPathPartPortable(String name);
+    public static String getFullResourcePath(String filename);
+    public static String normalizeResourcePath(String filename);
+    public static DataResult<List<String>> decomposePath(String path);
+    public static Path resolvePath(Path root, List<String> segments);
+    public static boolean isValidPathSegment(String segment);
+    public static void validatePath(String... path);
+    public static void createDirectoriesSafe(Path dir) throws IOException;
+    public static boolean isEmptyPath(Path path);
+}
+//// FileZipper.java
+import java.io.Closeable;
+import java.io.File;
+import java.nio.file.Path;
+public class FileZipper implements Closeable {
+    public FileZipper(Path outputFile);
+    public void add(Path destinationRelativePath, String content);
+    public void add(Path destinationRelativePath, File file);
+    public void add(Path path);
+    public void close();
+}
+//// FormattedCharSequence.java
+import it.unimi.dsi.fastutil.ints.Int2IntFunction;
+import java.util.List;
+import net.minecraft.network.chat.Style;
+public interface FormattedCharSequence {
+    FormattedCharSequence EMPTY;
+    boolean accept(FormattedCharSink output);
+    static FormattedCharSequence codepoint(int codepoint, Style style);
+    static FormattedCharSequence forward(String plainText, Style style);
+    static FormattedCharSequence forward(String plainText, Style style, Int2IntFunction modifier);
+    static FormattedCharSequence backward(String plainText, Style style);
+    static FormattedCharSequence backward(String plainText, Style style, Int2IntFunction modifier);
+    static FormattedCharSink decorateOutput(FormattedCharSink output, Int2IntFunction modifier);
+    static FormattedCharSequence composite();
+    static FormattedCharSequence composite(FormattedCharSequence part);
+    static FormattedCharSequence composite(FormattedCharSequence first, FormattedCharSequence second);
+    static FormattedCharSequence composite(FormattedCharSequence... parts);
+    static FormattedCharSequence composite(List<FormattedCharSequence> parts);
+    static FormattedCharSequence fromPair(FormattedCharSequence first, FormattedCharSequence second);
+    static FormattedCharSequence fromList(List<FormattedCharSequence> partCopy);
+}
+//// FormattedCharSink.java
+import net.minecraft.network.chat.Style;
+public interface FormattedCharSink {
+    boolean accept(int position, Style style, int codepoint);
+}
+//// FutureChain.java
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
+public class FutureChain implements TaskChainer, AutoCloseable {
+    public FutureChain(Executor executor);
+    public <T> void append(CompletableFuture<T> preparation, Consumer<T> chainedTask);
+    public void close();
+}
+//// Graph.java
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
+public final class Graph {
+    private Graph();
+    public static <T> boolean depthFirstSearch(Map<T, Set<T>> edges, Set<T> discovered, Set<T> currentlyVisiting, Consumer<T> reverseTopologicalOrder, T current);
+}
+//// GsonHelper.java
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonWriter;
+import java.io.IOException;
+import java.io.Reader;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Comparator;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.Item;
+public class GsonHelper {
+    public static boolean isStringValue(JsonObject node, String name);
+    public static boolean isStringValue(JsonElement node);
+    public static boolean isNumberValue(JsonObject node, String name);
+    public static boolean isNumberValue(JsonElement node);
+    public static boolean isBooleanValue(JsonObject node, String name);
+    public static boolean isBooleanValue(JsonElement node);
+    public static boolean isArrayNode(JsonObject node, String name);
+    public static boolean isObjectNode(JsonObject node, String name);
+    public static boolean isValidPrimitive(JsonObject node, String name);
+    public static boolean isValidNode(JsonObject node, String name);
+    public static JsonElement getNonNull(JsonObject object, String name);
+    public static String convertToString(JsonElement element, String name);
+    public static String getAsString(JsonObject object, String name);
+    public static String getAsString(JsonObject object, String name, String def);
+    public static Holder<Item> convertToItem(JsonElement element, String name);
+    public static Holder<Item> getAsItem(JsonObject object, String name);
+    public static Holder<Item> getAsItem(JsonObject object, String name, Holder<Item> def);
+    public static boolean convertToBoolean(JsonElement element, String name);
+    public static boolean getAsBoolean(JsonObject object, String name);
+    public static boolean getAsBoolean(JsonObject object, String name, boolean def);
+    public static double convertToDouble(JsonElement element, String name);
+    public static double getAsDouble(JsonObject object, String name);
+    public static double getAsDouble(JsonObject object, String name, double def);
+    public static float convertToFloat(JsonElement element, String name);
+    public static float getAsFloat(JsonObject object, String name);
+    public static float getAsFloat(JsonObject object, String name, float def);
+    public static long convertToLong(JsonElement element, String name);
+    public static long getAsLong(JsonObject object, String name);
+    public static long getAsLong(JsonObject object, String name, long def);
+    public static int convertToInt(JsonElement element, String name);
+    public static int getAsInt(JsonObject object, String name);
+    public static int getAsInt(JsonObject object, String name, int def);
+    public static byte convertToByte(JsonElement element, String name);
+    public static byte getAsByte(JsonObject object, String name);
+    public static byte getAsByte(JsonObject object, String name, byte def);
+    public static char convertToCharacter(JsonElement element, String name);
+    public static char getAsCharacter(JsonObject object, String name);
+    public static char getAsCharacter(JsonObject object, String name, char def);
+    public static BigDecimal convertToBigDecimal(JsonElement element, String name);
+    public static BigDecimal getAsBigDecimal(JsonObject object, String name);
+    public static BigDecimal getAsBigDecimal(JsonObject object, String name, BigDecimal def);
+    public static BigInteger convertToBigInteger(JsonElement element, String name);
+    public static BigInteger getAsBigInteger(JsonObject object, String name);
+    public static BigInteger getAsBigInteger(JsonObject object, String name, BigInteger def);
+    public static short convertToShort(JsonElement element, String name);
+    public static short getAsShort(JsonObject object, String name);
+    public static short getAsShort(JsonObject object, String name, short def);
+    public static JsonObject convertToJsonObject(JsonElement element, String name);
+    public static JsonObject getAsJsonObject(JsonObject object, String name);
+    public static JsonObject getAsJsonObject(JsonObject object, String name, JsonObject def);
+    public static JsonArray convertToJsonArray(JsonElement element, String name);
+    public static JsonArray getAsJsonArray(JsonObject object, String name);
+    public static JsonArray getAsJsonArray(JsonObject object, String name, JsonArray def);
+    public static <T> T convertToObject(JsonElement element, String name, JsonDeserializationContext context, Class<? extends T> clazz);
+    public static <T> T getAsObject(JsonObject object, String name, JsonDeserializationContext context, Class<? extends T> clazz);
+    public static <T> T getAsObject(JsonObject object, String name, T def, JsonDeserializationContext context, Class<? extends T> clazz);
+    public static String getType(JsonElement element);
+    public static <T> T fromJson(Gson gson, Reader reader, Class<T> type);
+    public static <T> T fromNullableJson(Gson gson, Reader reader, TypeToken<T> type);
+    public static <T> T fromJson(Gson gson, Reader reader, TypeToken<T> type);
+    public static <T> T fromNullableJson(Gson gson, String string, TypeToken<T> type);
+    public static <T> T fromJson(Gson gson, String string, Class<T> type);
+    public static JsonObject parse(String string);
+    public static JsonObject parse(Reader reader);
+    public static JsonArray parseArray(String string);
+    public static JsonArray parseArray(Reader reader);
+    public static String toStableString(JsonElement jsonElement);
+    public static void writeValue(JsonWriter out, JsonElement value, Comparator<String> keyComparator) throws IOException;
+    public static boolean encodesLongerThan(JsonElement element, int limit);
+    static class CountedAppendable implements Appendable {
+        public CountedAppendable(int limit);
+        public Appendable append(CharSequence csq);
+        public Appendable append(CharSequence csq, int start, int end);
+        public Appendable append(char c);
+    }
+}
+//// HashOps.java
+import com.google.common.hash.HashCode;
+import com.google.common.hash.HashFunction;
+import com.google.common.hash.Hasher;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.ListBuilder;
+import com.mojang.serialization.MapLike;
+import com.mojang.serialization.RecordBuilder;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+public class HashOps implements DynamicOps<HashCode> {
+    public static final byte[] EMPTY_MAP_PAYLOAD;
+    public static final byte[] EMPTY_LIST_PAYLOAD;
+    public static final HashOps CRC32C_INSTANCE;
+    public HashOps(HashFunction hashFunction);
+    public HashCode empty();
+    public HashCode emptyMap();
+    public HashCode emptyList();
+    public HashCode createNumeric(Number value);
+    public HashCode createByte(byte value);
+    public HashCode createShort(short value);
+    public HashCode createInt(int value);
+    public HashCode createLong(long value);
+    public HashCode createFloat(float value);
+    public HashCode createDouble(double value);
+    public HashCode createString(String value);
+    public HashCode createBoolean(boolean value);
+    public HashCode createMap(Stream<Pair<HashCode, HashCode>> map);
+    public HashCode createMap(Map<HashCode, HashCode> map);
+    public HashCode createList(Stream<HashCode> input);
+    public HashCode createByteList(ByteBuffer input);
+    public HashCode createIntList(IntStream input);
+    public HashCode createLongList(LongStream input);
+    public HashCode remove(HashCode input, String key);
+    public RecordBuilder<HashCode> mapBuilder();
+    public ListBuilder<HashCode> listBuilder();
+    public String toString();
+    public <U> U convertTo(DynamicOps<U> outOps, HashCode input);
+    public Number getNumberValue(HashCode input, Number defaultValue);
+    public HashCode set(HashCode input, String key, HashCode value);
+    public HashCode update(HashCode input, String key, Function<HashCode, HashCode> function);
+    public HashCode updateGeneric(HashCode input, HashCode key, Function<HashCode, HashCode> function);
+    public DataResult<HashCode> get(HashCode input, String key);
+    public DataResult<HashCode> getGeneric(HashCode input, HashCode key);
+    public DataResult<Number> getNumberValue(HashCode input);
+    public DataResult<Boolean> getBooleanValue(HashCode input);
+    public DataResult<String> getStringValue(HashCode input);
+    public DataResult<HashCode> mergeToList(HashCode prefix, HashCode value);
+    public DataResult<HashCode> mergeToList(HashCode prefix, List<HashCode> values);
+    public DataResult<HashCode> mergeToMap(HashCode prefix, HashCode key, HashCode value);
+    public DataResult<HashCode> mergeToMap(HashCode prefix, Map<HashCode, HashCode> values);
+    public DataResult<HashCode> mergeToMap(HashCode prefix, MapLike<HashCode> values);
+    public DataResult<Stream<Pair<HashCode, HashCode>>> getMapValues(HashCode input);
+    public DataResult<Consumer<BiConsumer<HashCode, HashCode>>> getMapEntries(HashCode input);
+    public DataResult<Stream<HashCode>> getStream(HashCode input);
+    public DataResult<Consumer<Consumer<HashCode>>> getList(HashCode input);
+    public DataResult<MapLike<HashCode>> getMap(HashCode input);
+    public DataResult<ByteBuffer> getByteBuffer(HashCode input);
+    public DataResult<IntStream> getIntStream(HashCode input);
+    public DataResult<LongStream> getLongStream(HashCode input);
+    final class MapHashBuilder extends RecordBuilder.AbstractUniversalBuilder<HashCode, List<Pair<HashCode, HashCode>>> {
+        public MapHashBuilder();
+        protected List<Pair<HashCode, HashCode>> initBuilder();
+        protected List<Pair<HashCode, HashCode>> append(HashCode key, HashCode value, List<Pair<HashCode, HashCode>> builder);
+        protected DataResult<HashCode> build(List<Pair<HashCode, HashCode>> builder, HashCode prefix);
+    }
+    class ListHashBuilder extends AbstractListBuilder<HashCode, Hasher> {
+        public ListHashBuilder();
+        protected Hasher initBuilder();
+        protected Hasher append(Hasher hasher, HashCode value);
+        protected DataResult<HashCode> build(Hasher hasher, HashCode prefix);
+    }
+}
+//// HttpUtil.java
+import com.google.common.hash.HashCode;
+import com.google.common.hash.HashFunction;
+import java.net.Proxy;
+import java.net.URL;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.OptionalLong;
+public class HttpUtil {
+    private HttpUtil();
+    public static Path downloadFile(Path targetDir, URL url, Map<String, String> headers, HashFunction hashFunction, HashCode requestedHash, int maxSize, Proxy proxy, DownloadProgressListener listener);
+    public static int getAvailablePort();
+    public static boolean isPortAvailable(int port);
+    public interface DownloadProgressListener {
+        void requestStart();
+        void downloadStart(OptionalLong sizeBytes);
+        void downloadedBytes(long bytesSoFar);
+        void requestFinished(boolean success);
+    }
+}
+//// IdentifierPattern.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+import net.minecraft.resources.Identifier;
+public class IdentifierPattern {
+    public static final Codec<IdentifierPattern> CODEC;
+    private IdentifierPattern(Optional<Pattern> namespacePattern, Optional<Pattern> pathPattern);
+    public Predicate<String> namespacePredicate();
+    public Predicate<String> pathPredicate();
+    public Predicate<Identifier> locationPredicate();
+}
+//// InclusiveRange.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import java.util.function.Function;
+public record InclusiveRange<T extends Comparable<T>>(T minInclusive, T maxInclusive) {
+    public static final Codec<InclusiveRange<Integer>> INT;
+    public InclusiveRange(T value);
+    public static <T extends Comparable<T>> Codec<InclusiveRange<T>> codec(Codec<T> elementCodec);
+    public static <T extends Comparable<T>> Codec<InclusiveRange<T>> codec(Codec<T> elementCodec, T minAllowedInclusive, T maxAllowedInclusive);
+    public static <T extends Comparable<T>> DataResult<InclusiveRange<T>> create(T minInclusive, T maxInclusive);
+    public <S extends Comparable<S>> InclusiveRange<S> map(Function<? super T, ? extends S> mapper);
+    public boolean isValueInRange(T value);
+    public boolean contains(InclusiveRange<T> subRange);
+    public String toString();
+}
+//// Interval.java
+import it.unimi.dsi.fastutil.floats.FloatUnaryOperator;
+import java.util.List;
+public final class Interval {
+    public static final Interval NaI;
+    public static final Interval INFINITE;
+    private Interval(float min, float max);
+    public static Interval of(float min, float max);
+    public static Interval ofSymmetric(float range);
+    public static Interval ofExact(float value);
+    public static Interval encapsulating(List<Interval> intervals);
+    public static Interval encapsulating(Interval... intervals);
+    public static Interval encapsulating(float first, float second);
+    public static Interval add(Interval left, Interval right);
+    public static Interval sub(Interval left, Interval right);
+    public static Interval mul(Interval left, Interval right);
+    public static Interval reciprocal(Interval input);
+    public static Interval div(Interval left, Interval right);
+    public static Interval min(Interval left, Interval right);
+    public static Interval max(Interval left, Interval right);
+    public static Interval clamp(Interval input, float min, float max);
+    public static Interval abs(Interval input);
+    public static Interval square(Interval input);
+    public static Interval pow(Interval base, Interval exponent);
+    public static Interval log(Interval input);
+    public static Interval mapMonotonic(Interval input, FloatUnaryOperator monotonicOp);
+    public static Interval lerp(Interval alpha, Interval first, Interval second);
+    public static Interval lerp(Interval alpha, float first, float second);
+    public static Interval sign(Interval input);
+    public boolean contains(float value);
+    public boolean intersects(Interval other);
+    public boolean isNaI();
+    public float min();
+    public float max();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+}
+//// Keyframe.java
+import com.mojang.serialization.Codec;
+public record Keyframe<T>(int ticks, T value) {
+    public static <T> Codec<Keyframe<T>> codec(Codec<T> valueCodec);
+}
+//// KeyframeTrack.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.world.attribute.LerpFunction;
+public record KeyframeTrack<T>(List<Keyframe<T>> keyframes, EasingType easingType) {
+    public static <T> MapCodec<KeyframeTrack<T>> mapCodec(Codec<T> valueCodec);
+    public static DataResult<KeyframeTrack<?>> validatePeriod(KeyframeTrack<?> track, int periodTicks);
+    public KeyframeTrackSampler<T> bakeSampler(Optional<Integer> periodTicks, LerpFunction<T> lerp);
+    public static class Builder<T> {
+        public Builder();
+        public Builder<T> addKeyframe(int ticks, T value);
+        public Builder<T> setEasing(EasingType easing);
+        public KeyframeTrack<T> build();
+    }
+}
+//// KeyframeTrackSampler.java
+import java.util.Optional;
+import net.minecraft.world.attribute.LerpFunction;
+public class KeyframeTrackSampler<T> {
+    KeyframeTrackSampler(KeyframeTrack<T> track, Optional<Integer> periodTicks, LerpFunction<T> lerp);
+    public T sample(long ticks);
+    static record Segment<T>(EasingType easing, T fromValue, int fromTicks, T toValue, int toTicks) {
+        public Segment(KeyframeTrack<T> track, Keyframe<T> from, int fromTicks, Keyframe<T> to, int toTicks);
+    }
+}
+//// LenientJsonParser.java
+import com.google.gson.JsonElement;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
+import java.io.Reader;
+public class LenientJsonParser {
+    public static JsonElement parse(Reader reader) throws JsonIOException, JsonSyntaxException;
+    public static JsonElement parse(String json) throws JsonSyntaxException;
+}
+//// LightCoordsUtil.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.BlockAndLightGetter;
+import net.minecraft.world.level.block.state.BlockState;
+public class LightCoordsUtil {
+    public static final int FULL_BRIGHT = 15728880;
+    public static final int FULL_SKY = 15728640;
+    public static int pack(int block, int sky);
+    public static int block(int packed);
+    public static int sky(int packed);
+    public static int withBlock(int coords, int block);
+    public static int smoothPack(int block, int sky);
+    public static int smoothBlock(int packed);
+    public static int smoothSky(int packed);
+    public static int addSmoothBlockEmission(int lightCoords, float blockLightEmission);
+    public static int max(int coords1, int coords2);
+    public static int lightCoordsWithEmission(int lightCoords, int emission);
+    public static int smoothBlend(int neighbor1, int neighbor2, int neighbor3, int center);
+    public static int smoothWeightedBlend(int coords1, int coords2, int coords3, int coords4, float weight1, float weight2, float weight3, float weight4);
+    public static int getLightCoords(BlockAndLightGetter level, BlockPos pos);
+    public static int getLightCoords(BrightnessGetter brightnessGetter, BlockAndLightGetter level, BlockState state, BlockPos pos);
+    public interface BrightnessGetter {
+        BrightnessGetter DEFAULT;
+        int packedBrightness(BlockAndLightGetter level, BlockPos pos);
+    }
+}
+//// LinearCongruentialGenerator.java
+public class LinearCongruentialGenerator {
+    public static long next(long rval, long c);
+}
+//// ListAndDeque.java
+import java.io.Serializable;
+import java.util.Deque;
+import java.util.List;
+import java.util.RandomAccess;
+public interface ListAndDeque<T> extends List<T>, RandomAccess, Cloneable, Serializable, Deque<T> {
+    ListAndDeque<T> reversed();
+    T getFirst();
+    T getLast();
+    void addFirst(T t);
+    void addLast(T t);
+    T removeFirst();
+    T removeLast();
+    default boolean offer(T value);
+    default T remove();
+    default T poll();
+    default T element();
+    default T peek();
+    default void push(T value);
+    default T pop();
+}
+//// MemoryReserve.java
+public class MemoryReserve {
+    public static void allocate();
+    public static void release();
+}
+//// ModCheck.java
+import java.util.function.Supplier;
+public record ModCheck(Confidence confidence, String description) {
+    public static ModCheck identify(String expectedBrand, Supplier<String> actualBrand, String component, Class<?> canaryClass);
+    public boolean shouldReportAsModified();
+    public ModCheck merge(ModCheck other);
+    public String fullDescription();
+    public static enum Confidence {
+        PROBABLY_NOT, VERY_LIKELY, DEFINITELY;
+    }
+}
+//// Mth.java
+import java.util.UUID;
+import java.util.function.IntPredicate;
+import java.util.stream.IntStream;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import org.apache.commons.lang3.math.Fraction;
+import org.joml.Quaternionf;
+import org.joml.Vector3fc;
+public class Mth {
+    public static final float PI;
+    public static final float HALF_PI;
+    public static final float TWO_PI;
+    public static final float DEG_TO_RAD;
+    public static final float RAD_TO_DEG;
+    public static final float EPSILON = 1e-05F;
+    public static final float SQRT_OF_TWO;
+    public static final Vector3fc Y_AXIS;
+    public static final Vector3fc X_AXIS;
+    public static final Vector3fc Z_AXIS;
+    public static float sin(double i);
+    public static float cos(double i);
+    public static float sqrt(float x);
+    public static int floor(float v);
+    public static int floor(double v);
+    public static long lfloor(double v);
+    public static float abs(float v);
+    public static int abs(int v);
+    public static int ceil(float v);
+    public static int ceil(double v);
+    public static long ceilLong(double v);
+    public static int clamp(int value, int min, int max);
+    public static long clamp(long value, long min, long max);
+    public static float clamp(float value, float min, float max);
+    public static double clamp(double value, double min, double max);
+    public static double clampedLerp(double factor, double min, double max);
+    public static float clampedLerp(float factor, float min, float max);
+    public static int absMax(int a, int b);
+    public static float absMax(float a, float b);
+    public static double absMax(double a, double b);
+    public static int chessboardDistance(int x0, int z0, int x1, int z1);
+    public static int floorDiv(int a, int b);
+    public static int nextInt(RandomSource random, int minInclusive, int maxInclusive);
+    public static float nextFloat(RandomSource random, float min, float max);
+    public static double nextDouble(RandomSource random, double min, double max);
+    public static boolean equal(float a, float b);
+    public static boolean equal(double a, double b);
+    public static int positiveModulo(int input, int mod);
+    public static float positiveModulo(float input, float mod);
+    public static double positiveModulo(double input, double mod);
+    public static boolean isMultipleOf(int dividend, int divisor);
+    public static byte packDegrees(float angle);
+    public static float unpackDegrees(byte rot);
+    public static int wrapDegrees(int angle);
+    public static float wrapDegrees(long angle);
+    public static float wrapDegrees(float angle);
+    public static double wrapDegrees(double angle);
+    public static float wrapDegrees90(float angle);
+    public static float degreesDifference(float fromAngle, float toAngle);
+    public static float degreesDifferenceAbs(float angleA, float angleB);
+    public static float rotateIfNecessary(float baseAngle, float targetAngle, float maxAngleDiff);
+    public static float approach(float current, float target, float increment);
+    public static float approachDegrees(float current, float target, float increment);
+    public static int getInt(String input, int def);
+    public static int smallestEncompassingPowerOfTwo(int input);
+    public static int smallestSquareSide(int itemCount);
+    public static boolean isPowerOfTwo(int input);
+    public static boolean isPowerOfTwo(long input);
+    public static int ceillog2(int input);
+    public static int log2(int input);
+    public static float frac(float num);
+    public static double frac(double num);
+    public static long getSeed(Vec3i vec);
+    public static long getSeed(int x, int y, int z);
+    public static UUID createInsecureUUID(RandomSource random);
+    public static double inverseLerp(double value, double min, double max);
+    public static float inverseLerp(float value, float min, float max);
+    public static boolean rayIntersectsAABB(Vec3 rayStart, Vec3 rayDir, AABB aabb);
+    public static double atan2(double y, double x);
+    public static float invSqrt(float x);
+    public static double invSqrt(double x);
+    public static double fastInvSqrt(double x);
+    public static float fastInvCubeRoot(float x);
+    public static int hsvToRgb(float hue, float saturation, float value);
+    public static int hsvToArgb(float hue, float saturation, float value, int alpha);
+    public static int murmurHash3Mixer(int hash);
+    public static int binarySearch(int from, int to, IntPredicate condition);
+    public static int lerpInt(float alpha1, int p0, int p1);
+    public static int lerpDiscrete(float alpha1, int p0, int p1);
+    public static float lerp(float alpha1, float p0, float p1);
+    public static float lerp2(float alpha1, float alpha2, float x00, float x10, float x01, float x11);
+    public static float lerp3(float alpha1, float alpha2, float alpha3, float x000, float x100, float x010, float x110, float x001, float x101, float x011, float x111);
+    public static Vec3 lerp(double alpha, Vec3 p1, Vec3 p2);
+    public static double lerp(double alpha1, double p0, double p1);
+    public static double lerp2(double alpha1, double alpha2, double x00, double x10, double x01, double x11);
+    public static double lerp3(double alpha1, double alpha2, double alpha3, double x000, double x100, double x010, double x110, double x001, double x101, double x011, double x111);
+    public static float catmullrom(float alpha, float p0, float p1, float p2, float p3);
+    public static float smoothstep(float x);
+    public static float smoothstepDerivative(float x);
+    public static int sign(double number);
+    public static float rotLerp(float a, float from, float to);
+    public static double rotLerp(double a, double from, double to);
+    public static float rotLerpRad(float a, float from, float to);
+    public static float triangleWave(float index, float period);
+    public static float square(float x);
+    public static float cube(float x);
+    public static double square(double x);
+    public static int square(int x);
+    public static long square(long x);
+    public static double clampedMap(double value, double fromMin, double fromMax, double toMin, double toMax);
+    public static float clampedMap(float value, float fromMin, float fromMax, float toMin, float toMax);
+    public static double map(double value, double fromMin, double fromMax, double toMin, double toMax);
+    public static float map(float value, float fromMin, float fromMax, float toMin, float toMax);
+    public static double wobble(double coord);
+    public static int roundToward(int input, int multiple);
+    public static long roundToward(long input, long multiple);
+    public static int positiveCeilDiv(int input, int divisor);
+    public static long positiveCeilDiv(long input, long divisor);
+    public static int randomBetweenInclusive(RandomSource random, int min, int maxInclusive);
+    public static float randomBetween(RandomSource random, float min, float maxExclusive);
+    public static float normal(RandomSource random, float mean, float deviation);
+    public static double lengthSquared(double x, double y);
+    public static float lengthSquared(float x, float y);
+    public static double length(double x, double y);
+    public static float length(float x, float y);
+    public static double lengthSquared(double x, double y, double z);
+    public static double length(double x, double y, double z);
+    public static float length(float x, float y, float z);
+    public static float lengthSquared(float x, float y, float z);
+    public static int quantize(double value, int quantizeResolution);
+    public static IntStream outFromOrigin(int origin, int lowerBound, int upperBound);
+    public static IntStream outFromOrigin(int origin, int lowerBound, int upperBound, int stepSize);
+    public static Quaternionf rotationAroundAxis(Vector3fc axis, Quaternionf rotation, Quaternionf result);
+    public static int mulAndTruncate(Fraction fraction, int factor);
+}
+//// NativeModuleLister.java
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.CrashReportCategory;
+public class NativeModuleLister {
+    public static List<NativeModuleInfo> listModules();
+    public static Optional<NativeModuleVersion> tryGetModuleVersion(String path);
+    public static void addCrashSection(CrashReportCategory category);
+    public static record NativeModuleVersion(String description, String version, String company) {
+        public String toString();
+    }
+    public static record NativeModuleInfo(String name, Optional<NativeModuleVersion> version) {
+        public String toString();
+    }
+}
+//// NullOps.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.ListBuilder;
+import com.mojang.serialization.MapLike;
+import com.mojang.serialization.RecordBuilder;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+public class NullOps implements DynamicOps<Unit> {
+    public static final NullOps INSTANCE;
+    private NullOps();
+    public <U> U convertTo(DynamicOps<U> outOps, Unit input);
+    public Unit empty();
+    public Unit emptyMap();
+    public Unit emptyList();
+    public Unit createNumeric(Number value);
+    public Unit createByte(byte value);
+    public Unit createShort(short value);
+    public Unit createInt(int value);
+    public Unit createLong(long value);
+    public Unit createFloat(float value);
+    public Unit createDouble(double value);
+    public Unit createBoolean(boolean value);
+    public Unit createString(String value);
+    public DataResult<Number> getNumberValue(Unit input);
+    public DataResult<Boolean> getBooleanValue(Unit input);
+    public DataResult<String> getStringValue(Unit input);
+    public DataResult<Unit> mergeToList(Unit input, Unit value);
+    public DataResult<Unit> mergeToList(Unit input, List<Unit> values);
+    public DataResult<Unit> mergeToMap(Unit input, Unit key, Unit value);
+    public DataResult<Unit> mergeToMap(Unit input, Map<Unit, Unit> values);
+    public DataResult<Unit> mergeToMap(Unit input, MapLike<Unit> values);
+    public DataResult<Stream<Pair<Unit, Unit>>> getMapValues(Unit input);
+    public DataResult<Consumer<BiConsumer<Unit, Unit>>> getMapEntries(Unit input);
+    public DataResult<MapLike<Unit>> getMap(Unit input);
+    public DataResult<Stream<Unit>> getStream(Unit input);
+    public DataResult<Consumer<Consumer<Unit>>> getList(Unit input);
+    public DataResult<ByteBuffer> getByteBuffer(Unit input);
+    public DataResult<IntStream> getIntStream(Unit input);
+    public DataResult<LongStream> getLongStream(Unit input);
+    public Unit createMap(Stream<Pair<Unit, Unit>> map);
+    public Unit createMap(Map<Unit, Unit> map);
+    public Unit createList(Stream<Unit> input);
+    public Unit createByteList(ByteBuffer input);
+    public Unit createIntList(IntStream input);
+    public Unit createLongList(LongStream input);
+    public Unit remove(Unit input, String key);
+    public RecordBuilder<Unit> mapBuilder();
+    public ListBuilder<Unit> listBuilder();
+    public String toString();
+    static final class NullMapBuilder extends RecordBuilder.AbstractUniversalBuilder<Unit, Unit> {
+        public NullMapBuilder(DynamicOps<Unit> ops);
+        protected Unit initBuilder();
+        protected Unit append(Unit key, Unit value, Unit builder);
+        protected DataResult<Unit> build(Unit builder, Unit prefix);
+    }
+    static final class NullListBuilder extends AbstractListBuilder<Unit, Unit> {
+        public NullListBuilder(DynamicOps<Unit> ops);
+        protected Unit initBuilder();
+        protected Unit append(Unit builder, Unit value);
+        protected DataResult<Unit> build(Unit builder, Unit prefix);
+    }
+}
+//// ParticleUtils.java
+import java.util.function.Supplier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.phys.Vec3;
+public class ParticleUtils {
+    public static void spawnParticlesOnBlockFaces(Level level, BlockPos pos, ParticleOptions particle, IntProvider particlesPerFaceRange);
+    public static void spawnParticlesOnBlockFace(Level level, BlockPos pos, ParticleOptions particle, IntProvider particlesPerFaceRange, Direction face, Supplier<Vec3> speedSupplier, double stepFactor);
+    public static void spawnParticlesAlongAxis(Direction.Axis attachedAxis, Level level, BlockPos pos, double radius, ParticleOptions particle, UniformInt sparkCount);
+    public static void spawnParticleOnFace(Level level, BlockPos pos, Direction face, ParticleOptions particle, Vec3 speed, double stepFactor);
+    public static void spawnParticleBelow(Level level, BlockPos pos, RandomSource random, ParticleOptions particle);
+    public static void spawnParticleInBlock(LevelAccessor level, BlockPos pos, int count, ParticleOptions particle);
+    public static void spawnParticles(LevelAccessor level, BlockPos pos, int count, double spreadWidth, double spreadHeight, boolean allowFloatingParticles, ParticleOptions particle);
+    public static void spawnSmashAttackParticles(LevelAccessor level, BlockPos pos, int count);
+}
+//// PlaceholderLookupProvider.java
+import com.mojang.serialization.DynamicOps;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.RegistryOps;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+public class PlaceholderLookupProvider implements HolderGetter.Provider {
+    public PlaceholderLookupProvider(HolderLookup.Provider context);
+    public <T> Optional<? extends HolderGetter<T>> lookup(ResourceKey<? extends Registry<? extends T>> key);
+    public <V> RegistryOps<V> createSerializationContext(DynamicOps<V> parent);
+    public RegistryContextSwapper createSwapper();
+    public boolean hasRegisteredPlaceholders();
+    class UniversalLookup implements HolderGetter<Object> {
+        private UniversalLookup();
+        public Optional<Holder.Reference<Object>> get(ResourceKey<Object> id);
+        public Holder.Reference<Object> getOrThrow(ResourceKey<Object> id);
+        public Optional<HolderSet.Named<Object>> get(TagKey<Object> id);
+        public HolderSet.Named<Object> getOrThrow(TagKey<Object> id);
+        public <T> HolderGetter<T> castAsLookup();
+    }
+}
+//// PngInfo.java
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+public record PngInfo(int width, int height, byte bitDepth, byte colorType) {
+    public static PngInfo fromStream(InputStream inputStream) throws IOException;
+    public static PngInfo fromBytes(byte[] bytes) throws IOException;
+    public static void validateHeader(ByteBuffer buffer) throws IOException;
+}
+//// Prediction.java
+public enum Prediction {
+    PREDICTED, SERVER_ONLY;
+}
+//// ProblemReporter.java
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import org.slf4j.Logger;
+public interface ProblemReporter {
+    ProblemReporter DISCARDING;
+    ProblemReporter forChild(PathElement path);
+    void report(Problem problem);
+    public interface Problem {
+        String description();
+        default boolean isFatal();
+    }
+    public static record RootFieldPathElement(String name) implements PathElement {
+        public String get();
+    }
+    public static record RootElementPathElement(ResourceKey<?> id) implements PathElement {
+        public String get();
+    }
+    public static record FieldPathElement(String name) implements PathElement {
+        public String get();
+    }
+    public static record IndexedFieldPathElement(String name, int index) implements PathElement {
+        public String get();
+    }
+    public static record IndexedPathElement(int index) implements PathElement {
+        public String get();
+    }
+    public static record MapEntryPathElement(String name, String key) implements PathElement {
+        public String get();
+    }
+    public static record ElementReferencePathElement(ResourceKey<?> id) implements PathElement {
+        public String get();
+    }
+    public static record CollectionReferencePathElement(TagKey<?> id) implements PathElement {
+        public String get();
+    }
+    public static class Collector implements ProblemReporter {
+        public static final PathElement EMPTY_ROOT;
+        public Collector();
+        public Collector(PathElement root);
+        private Collector(Collector parent, PathElement path);
+        public ProblemReporter forChild(PathElement path);
+        public void report(Problem problem);
+        public boolean isEmpty();
+        public boolean hasFatalProblems();
+        public void forEach(BiConsumer<String, Problem> output);
+        public String getReport();
+        public String getTreeReport();
+        static record Entry(Collector source, Problem problem) {
+        }
+        static record ProblemTreeNode(PathElement element, List<Problem> problems, Map<PathElement, ProblemTreeNode> children) {
+            public ProblemTreeNode(PathElement pathElement);
+            public ProblemTreeNode child(PathElement id);
+            public List<String> getLines();
+        }
+    }
+    public static class ScopedCollector extends Collector implements AutoCloseable {
+        public ScopedCollector(Logger logger);
+        public ScopedCollector(PathElement root, Logger logger);
+        public void close();
+    }
+    public interface PathElement {
+        String get();
+    }
+}
+//// ProgressListener.java
+import net.minecraft.network.chat.Component;
+public interface ProgressListener {
+    void progressStartNoAbort(Component string);
+    void progressStart(Component string);
+    void progressStage(Component string);
+    void progressStagePercentage(int i);
+    void stop();
+}
+//// RandomSource.java
+import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+public interface RandomSource {
+    double GAUSSIAN_SPREAD_FACTOR;
+    static RandomSource create();
+    static RandomSource createThreadSafe();
+    static RandomSource create(long seed);
+    static RandomSource createThreadLocalInstance();
+    static RandomSource createThreadLocalInstance(long seed);
+    RandomSource fork();
+    PositionalRandomFactory forkPositional();
+    void setSeed(long seed);
+    int nextInt();
+    int nextInt(int bound);
+    default int nextIntBetweenInclusive(int min, int maxInclusive);
+    long nextLong();
+    boolean nextBoolean();
+    float nextFloat();
+    double nextDouble();
+    double nextGaussian();
+    default double triangle(double mean, double spread);
+    default float triangle(float mean, float spread);
+    default void consumeCount(int rounds);
+    default int nextInt(int origin, int bound);
+}
+//// RegistryContextSwapper.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import net.minecraft.core.HolderLookup;
+public interface RegistryContextSwapper {
+    <T> DataResult<T> swapTo(Codec<T> codec, T value, HolderLookup.Provider newContext);
+}
+//// SegmentedAnglePrecision.java
+import net.minecraft.core.Direction;
+public class SegmentedAnglePrecision {
+    public SegmentedAnglePrecision(int bitPrecision);
+    public boolean isSameAxis(int binaryAngleA, int binaryAngleB);
+    public int fromDirection(Direction direction);
+    public int fromDegreesWithTurns(float degrees);
+    public int fromDegrees(float degrees);
+    public float toDegreesWithTurns(int binaryAngle);
+    public float toDegrees(int binaryAngle);
+    public int normalize(int binaryAngle);
+    public int getMask();
+}
+//// SequencedPriorityIterator.java
+import com.google.common.collect.AbstractIterator;
+public final class SequencedPriorityIterator<T> extends AbstractIterator<T> {
+    public void add(T data, int priority);
+    protected T computeNext();
+}
+//// SignatureUpdater.java
+import java.security.SignatureException;
+public interface SignatureUpdater {
+    void update(Output output) throws SignatureException;
+    public interface Output {
+        void update(byte[] payload) throws SignatureException;
+    }
+}
+//// SignatureValidator.java
+import com.mojang.authlib.services.ServicesKeySet;
+import com.mojang.authlib.services.ServicesKeyType;
+import java.security.PublicKey;
+import org.slf4j.Logger;
+public interface SignatureValidator {
+    SignatureValidator NO_VALIDATION;
+    Logger LOGGER;
+    boolean validate(SignatureUpdater updater, byte[] signature);
+    default boolean validate(byte[] payload, byte[] signature);
+    static SignatureValidator from(PublicKey publicKey, String algorithm);
+    static SignatureValidator from(ServicesKeySet keySet, ServicesKeyType type);
+}
+//// Signer.java
+import java.security.PrivateKey;
+import org.slf4j.Logger;
+public interface Signer {
+    Logger LOGGER;
+    byte[] sign(SignatureUpdater updater);
+    default byte[] sign(byte[] payload);
+    static Signer from(PrivateKey privateKey, String algorithm);
+}
+//// SimpleBitStorage.java
+import java.util.function.IntConsumer;
+public class SimpleBitStorage implements BitStorage {
+    public SimpleBitStorage(int bits, int size, int[] values);
+    public SimpleBitStorage(int bits, int size);
+    public SimpleBitStorage(int bits, int size, long [] data);
+    public int getAndSet(int index, int value);
+    public void set(int index, int value);
+    public void fill(int value);
+    public int get(int index);
+    public long[] getRaw();
+    public int getSize();
+    public int getBits();
+    public void getAll(IntConsumer output);
+    public void unpack(int[] output);
+    public BitStorage copy();
+    public static class InitializationException extends RuntimeException {
+        private InitializationException(String message);
+    }
+}
+//// SingleKeyCache.java
+import java.util.function.Function;
+public class SingleKeyCache<K, V> {
+    public SingleKeyCache(Function<K, V> computeValue);
+    public V getValue(K cacheKey);
+}
+//// SmoothDouble.java
+public class SmoothDouble {
+    public double getNewDeltaValue(double targetDelta, double time);
+    public void reset();
+}
+//// SortedArraySet.java
+import java.util.AbstractSet;
+import java.util.Comparator;
+import java.util.Iterator;
+public class SortedArraySet<T> extends AbstractSet<T> {
+    private SortedArraySet(int initialCapacity, Comparator<T> comparator);
+    public static <T extends Comparable<T>> SortedArraySet<T> create();
+    public static <T extends Comparable<T>> SortedArraySet<T> create(int initialCapacity);
+    public static <T> SortedArraySet<T> create(Comparator<T> comparator);
+    public static <T> SortedArraySet<T> create(Comparator<T> comparator, int initialCapacity);
+    public boolean add(T t);
+    public T addOrGet(T t);
+    public boolean remove(Object o);
+    public T get(T t);
+    public T first();
+    public T last();
+    public boolean contains(Object o);
+    public Iterator<T> iterator();
+    public int size();
+    public Object[] toArray();
+    public <U> U[] toArray(U[] a);
+    public void clear();
+    public boolean equals(Object o);
+    class ArrayIterator implements Iterator<T> {
+        private ArrayIterator();
+        public boolean hasNext();
+        public T next();
+        public void remove();
+    }
+}
+//// SpawnUtil.java
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.block.state.BlockState;
+public class SpawnUtil {
+    public static <T extends Mob> Optional<T> trySpawnMob(EntityType<T> entityType, EntitySpawnReason spawnReason, ServerLevel level, BlockPos start, int spawnAttempts, int spawnRangeXZ, int spawnRangeY, Strategy strategy, boolean checkCollisions);
+    public interface Strategy {
+        Strategy LEGACY_IRON_GOLEM;
+        Strategy ON_TOP_OF_COLLIDER;
+        Strategy ON_TOP_OF_COLLIDER_NO_LEAVES;
+        boolean canSpawnOn(ServerLevel level, BlockPos pos, BlockState blockState, BlockPos abovePos, BlockState aboveState);
+    }
+}
+//// SpecialDates.java
+import java.time.MonthDay;
+import java.util.List;
+public class SpecialDates {
+    public static final MonthDay HALLOWEEN;
+    public static final List<MonthDay> CHRISTMAS_RANGE;
+    public static final MonthDay CHRISTMAS;
+    public static final MonthDay NEW_YEAR;
+    public static MonthDay dayNow();
+    public static boolean isHalloween();
+    public static boolean isExtendedChristmas();
+}
+//// StaticCache2D.java
+import java.util.function.Consumer;
+public class StaticCache2D<T extends Object> {
+    public static <T> StaticCache2D<T> create(int centerX, int centerZ, int range, Initializer<T> initializer);
+    private StaticCache2D(int minX, int minZ, int sizeX, int sizeZ, Initializer<T> initializer);
+    public <U extends Object> StaticCache2D<U> map(MappingFunction<T, U> function);
+    public void forEach(Consumer<T> consumer);
+    public T get(int x, int z);
+    public boolean contains(int x, int z);
+    public String toString();
+    public interface Initializer<T extends Object> {
+        T get(int x, int z);
+    }
+    public interface MappingFunction<T extends Object, U extends Object> {
+        U apply(T value, int x, int z);
+    }
+}
+//// StrictJsonParser.java
+import com.google.gson.JsonElement;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
+import java.io.Reader;
+public class StrictJsonParser {
+    public static JsonElement parse(Reader reader) throws JsonIOException, JsonSyntaxException;
+    public static JsonElement parse(String json) throws JsonSyntaxException;
+}
+//// StringDecomposer.java
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
+public class StringDecomposer {
+    public static boolean iterate(String string, Style style, FormattedCharSink output);
+    public static boolean iterateBackwards(String string, Style style, FormattedCharSink output);
+    public static boolean iterateFormatted(String string, Style style, FormattedCharSink output);
+    public static boolean iterateFormatted(String string, int offset, Style style, FormattedCharSink output);
+    public static boolean iterateFormatted(String string, int offset, Style currentStyle, Style resetStyle, FormattedCharSink output);
+    public static boolean iterateFormatted(FormattedText component, Style rootStyle, FormattedCharSink output);
+    public static String filterBrokenSurrogates(String input);
+    public static String getPlainText(FormattedText input);
+}
+//// StringRepresentable.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.Keyable;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
+public interface StringRepresentable {
+    int PRE_BUILT_MAP_THRESHOLD;
+    String getSerializedName();
+    static <E extends Enum<E> & StringRepresentable> EnumCodec<E> fromEnum(Supplier<E[]> values);
+    static <E extends Enum<E> & StringRepresentable> EnumCodec<E> fromEnumWithMapping(Supplier<E[]> values, Function<String, String> converter);
+    static <T extends StringRepresentable> Codec<T> fromValues(Supplier<T[]> values);
+    static <T extends StringRepresentable> Function<String, T> createNameLookup(T[] valueArray);
+    static <T> Function<String, T> createNameLookup(T[] valueArray, Function<T, String> converter);
+    static Keyable keys(StringRepresentable[] values);
+    public static class StringRepresentableCodec<S extends StringRepresentable> implements Codec<S> {
+        public StringRepresentableCodec(S[] valueArray, Function<String, S> nameResolver, ToIntFunction<S> idResolver);
+        public <T> DataResult<Pair<S, T>> decode(DynamicOps<T> ops, T input);
+        public <T> DataResult<T> encode(S input, DynamicOps<T> ops, T prefix);
+    }
+    public static class EnumCodec<E extends Enum<E> & StringRepresentable> extends StringRepresentableCodec<E> {
+        public EnumCodec(E[] valueArray, Function<String, E> nameResolver);
+        public E byName(String name);
+        public E byName(String name, E _default);
+        public E byName(String name, Supplier<? extends E> defaultSupplier);
+    }
+}
+//// StringUtil.java
+public class StringUtil {
+    public static String formatTickDuration(int ticks, float tickrate);
+    public static String stripColor(String input);
+    public static boolean isNullOrEmpty(String s);
+    public static String truncateStringIfNecessary(String s, int maxLength, boolean addDotDotDotIfTruncated);
+    public static int lineCount(String s);
+    public static boolean endsWithNewLine(String s);
+    public static String trimChatMessage(String message);
+    public static boolean isAllowedChatCharacter(int ch);
+    public static boolean isValidPlayerName(String name);
+    public static String filterText(String input);
+    public static String filterText(String input, boolean multiline);
+    public static boolean isWhitespace(int codepoint);
+    public static boolean isBlank(String string);
+}
+//// TaskChainer.java
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
+import org.slf4j.Logger;
+public interface TaskChainer {
+    Logger LOGGER;
+    static TaskChainer immediate(Executor executor);
+    default void append(Runnable task);
+    <T> void append(CompletableFuture<T> preparation, Consumer<T> chainedTask);
+}
+//// ThreadingDetector.java
+import net.minecraft.ReportedException;
+public class ThreadingDetector {
+    public ThreadingDetector(String name);
+    public void checkAndLock();
+    public void checkAndUnlock();
+    public static ReportedException makeThreadingException(String name, Thread threadThatFailedToAcquire);
+}
+//// TickThrottler.java
+public class TickThrottler {
+    public TickThrottler(int incrementStep, int threshold);
+    public void increment();
+    public void tick();
+    public boolean isUnderThreshold();
+}
+//// TimeSource.java
+import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
+public interface TimeSource {
+    long get(TimeUnit timeUnit);
+    static NanoTimeSource constant(long value);
+    public interface NanoTimeSource extends LongSupplier, TimeSource {
+        default long get(TimeUnit timeUnit);
+    }
+}
+//// TimeUtil.java
+import net.minecraft.util.valueproviders.UniformInt;
+public class TimeUtil {
+    public static final long NANOSECONDS_PER_SECOND;
+    public static final long NANOSECONDS_PER_MILLISECOND;
+    public static final long MILLISECONDS_PER_SECOND;
+    public static final long SECONDS_PER_HOUR;
+    public static final int SECONDS_PER_MINUTE;
+    public static UniformInt rangeOfSeconds(int minInclusive, int maxInclusive);
+}
+//// ToFloatFunction.java
+public interface ToFloatFunction<T> {
+    float applyAsFloat(T value);
+}
+//// TriState.java
+import com.mojang.serialization.Codec;
+public enum TriState implements StringRepresentable {
+    TRUE, FALSE, DEFAULT;
+    public static final Codec<TriState> CODEC;
+    public static TriState from(boolean value);
+    public boolean toBoolean(boolean defaultValue);
+    public String getSerializedName();
+}
+//// Unit.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public enum Unit {
+    INSTANCE;
+    public static final Codec<Unit> CODEC;
+    public static final StreamCodec<ByteBuf, Unit> STREAM_CODEC;
+}
+//// Util.java
+import com.google.common.base.Ticker;
+import com.google.common.escape.Escaper;
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.types.Type;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.Dynamic;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.io.IOException;
+import java.lang.management.ThreadInfo;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.CopyOption;
+import java.nio.file.Path;
+import java.nio.file.spi.FileSystemProvider;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collector;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+import net.minecraft.CharPredicate;
+import net.minecraft.TracingExecutor;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.state.properties.Property;
+public class Util {
+    public static final int LINEAR_LOOKUP_THRESHOLD = 8;
+    public static final long NANOS_PER_MILLI = 1000000L;
+    public static final long MILLIS_PER_SECOND = 1000L;
+    public static final Ticker TICKER;
+    public static final UUID NIL_UUID;
+    public static final FileSystemProvider ZIP_FILE_SYSTEM_PROVIDER;
+    public static final Escaper CONTROL_CHARACTER_ESCAPER;
+    public static <K, V> Collector<Map.Entry<? extends K, ? extends V>, ?, Map<K, V>> toMap();
+    public static <T> Collector<T, ?, List<T>> toMutableList();
+    public static <T extends Comparable<T>> String getPropertyName(Property<T> key, Object value);
+    public static String makeDescriptionId(String prefix, Identifier location);
+    public static TimeSource.NanoTimeSource timeSource();
+    public static void setTimeSource(TimeSource.NanoTimeSource timeSource);
+    public static void shutdownTimeSource();
+    public static long getMillis();
+    public static long getNanos();
+    public static long getEpochMillis();
+    public static long toMillis(double seconds);
+    public static String getFilenameFormattedDateTime();
+    public static int maxAllowedExecutorThreads();
+    public static TracingExecutor backgroundExecutor();
+    public static TracingExecutor ioPool();
+    public static TracingExecutor nonCriticalIoPool();
+    public static void shutdownExecutors();
+    public static void throwAsRuntime(Throwable throwable);
+    public static Type<?> fetchChoiceType(DSL.TypeReference reference, String name);
+    public static void runNamed(Runnable runnable, String name);
+    public static <T> String getRegisteredName(Registry<T> registry, T entry);
+    public static <T> Predicate<T> allOf();
+    public static <T> Predicate<T> allOf(Predicate<? super T> condition);
+    public static <T> Predicate<T> allOf(Predicate<? super T> condition1, Predicate<? super T> condition2);
+    public static <T> Predicate<T> allOf(Predicate<? super T> condition1, Predicate<? super T> condition2, Predicate<? super T> condition3);
+    public static <T> Predicate<T> allOf(Predicate<? super T> condition1, Predicate<? super T> condition2, Predicate<? super T> condition3, Predicate<? super T> condition4);
+    public static <T> Predicate<T> allOf(Predicate<? super T> condition1, Predicate<? super T> condition2, Predicate<? super T> condition3, Predicate<? super T> condition4, Predicate<? super T> condition5);
+    public static <T> Predicate<T> allOf(Predicate<? super T>... conditions);
+    public static <T> Predicate<T> allOf(List<? extends Predicate<? super T>> conditions);
+    public static <T> Predicate<T> anyOf();
+    public static <T> Predicate<T> anyOf(Predicate<? super T> condition1);
+    public static <T> Predicate<T> anyOf(Predicate<? super T> condition1, Predicate<? super T> condition2);
+    public static <T> Predicate<T> anyOf(Predicate<? super T> condition1, Predicate<? super T> condition2, Predicate<? super T> condition3);
+    public static <T> Predicate<T> anyOf(Predicate<? super T> condition1, Predicate<? super T> condition2, Predicate<? super T> condition3, Predicate<? super T> condition4);
+    public static <T> Predicate<T> anyOf(Predicate<? super T> condition1, Predicate<? super T> condition2, Predicate<? super T> condition3, Predicate<? super T> condition4, Predicate<? super T> condition5);
+    public static <T> Predicate<T> anyOf(Predicate<? super T>... conditions);
+    public static <T> Predicate<T> anyOf(List<? extends Predicate<? super T>> conditions);
+    public static <T> boolean isSymmetrical(int width, int height, List<T> ingredients);
+    public static int growByHalf(int currentSize, int minimalNewSize);
+    public static DateTimeFormatter localizedDateFormatter(FormatStyle formatStyle);
+    public static ThreadInfo[] dumpThreadInfo();
+    public static OS getPlatform();
+    public static boolean isAarch64();
+    public static boolean isAppleSiliconMac(String renderer);
+    public static URI parseAndValidateUntrustedUri(String uri) throws URISyntaxException;
+    public static <T> T findNextInIterable(Iterable<T> collection, T current);
+    public static <T> T findPreviousInIterable(Iterable<T> collection, T current);
+    public static <T> T make(Supplier<T> factory);
+    public static <T> T make(T t, Consumer<? super T> consumer);
+    public static <K extends Enum<K>, V> Map<K, V> makeEnumMap(Class<K> keyType, Function<K, V> function);
+    public static <K, V1, V2> Map<K, V2> mapValues(Map<K, V1> map, Function<? super V1, V2> valueMapper);
+    public static <K, V1, V2> Map<K, V2> mapValuesLazy(Map<K, V1> map, com.google.common.base.Function<V1, V2> valueMapper);
+    public static <T extends Enum<T>> Set<T> allOfEnumExcept(T value);
+    public static <V extends Object> CompletableFuture<List<V>> sequence(List<? extends CompletableFuture<V>> futures);
+    public static <V extends Object> CompletableFuture<List<V>> sequenceFailFast(List<? extends CompletableFuture<? extends V>> futures);
+    public static <V extends Object> CompletableFuture<List<V>> sequenceFailFastAndCancel(List<? extends CompletableFuture<? extends V>> futures);
+    public static <T> Optional<T> ifElse(Optional<T> input, Consumer<T> onTrue, Runnable onFalse);
+    public static <T> Supplier<T> name(Supplier<T> task, Supplier<String> nameGetter);
+    public static Runnable name(Runnable task, Supplier<String> nameGetter);
+    public static void logAndPauseIfInIde(String message);
+    public static void logAndPauseIfInIde(String message, Throwable throwable);
+    public static <T extends Throwable> T pauseInIde(T t);
+    public static void setPause(Consumer<String> pauseFunction);
+    public static String describeError(Throwable err);
+    public static <T> T getRandom(T[] array, RandomSource random);
+    public static int getRandom(int[] array, RandomSource random);
+    public static <T> T getRandom(List<T> list, RandomSource random);
+    public static <T> Optional<T> getRandomSafe(List<T> list, RandomSource random);
+    public static boolean safeMoveFile(Path fromPath, Path toPath, CopyOption... options);
+    public static void safeReplaceFile(Path targetPath, Path newPath, Path backupPath);
+    public static boolean safeReplaceOrMoveFile(Path targetPath, Path newPath, Path backupPath, boolean noRollback);
+    public static int offsetByCodepoints(String input, int pos, int offset);
+    public static Consumer<String> prefix(String prefix, Consumer<String> consumer);
+    public static DataResult<int[]> fixedSize(IntStream stream, int size);
+    public static DataResult<long[]> fixedSize(LongStream stream, int size);
+    public static <T> DataResult<List<T>> fixedSize(List<T> list, int size);
+    public static void startTimerHackThread();
+    public static void copyBetweenDirs(Path sourceDir, Path targetDir, Path sourcePath) throws IOException;
+    public static String sanitizeName(String value, CharPredicate isAllowedChar);
+    public static <K, V> SingleKeyCache<K, V> singleKeyCache(Function<K, V> computeValueFunction);
+    public static <T, R> Function<T, R> memoize(Function<T, R> function);
+    public static <T, U, R> BiFunction<T, U, R> memoize(BiFunction<T, U, R> function);
+    public static <T> List<T> toShuffledList(Stream<T> stream, RandomSource random);
+    public static IntArrayList toShuffledList(IntStream stream, RandomSource random);
+    public static <T> List<T> shuffledCopy(T[] array, RandomSource random);
+    public static <T> List<T> shuffledCopy(ObjectArrayList<T> list, RandomSource random);
+    public static <T> void shuffle(List<T> list, RandomSource random);
+    public static <T> CompletableFuture<T> blockUntilDone(Function<Executor, CompletableFuture<T>> task);
+    public static <T> T blockUntilDone(Function<Executor, T> task, Predicate<T> completionCheck);
+    public static <T> ToIntFunction<T> createIndexLookup(List<T> values);
+    public static <T> ToIntFunction<T> createIndexIdentityLookup(List<T> values);
+    public static <A, B> Typed<B> writeAndReadTypedOrThrow(Typed<A> typed, Type<B> newType, UnaryOperator<Dynamic<?>> function);
+    public static <T> Typed<T> readTypedOrThrow(Type<T> type, Dynamic<?> dynamic);
+    public static <T> Typed<T> readTypedOrThrow(Type<T> type, Dynamic<?> dynamic, boolean acceptPartial);
+    public static <T> List<T> copyAndAdd(List<T> list, T element);
+    public static <T> List<T> copyAndAdd(List<T> list, T... elements);
+    public static <T> List<T> copyAndAdd(T element, List<T> list);
+    public static <T> List<T> join(Collection<T> first, Collection<T> second);
+    public static <T> List<T> join(Collection<T>... collections);
+    public static <K, V> Map<K, V> copyAndPut(Map<K, V> map, K key, V value);
+    public static enum OS {
+        LINUX, SOLARIS, WINDOWS, OSX, UNKNOWN;
+        public String telemetryName();
+    }
+}
+//// VisibleForDebug.java
+public @interface VisibleForDebug {
+}
+//// ZeroBitStorage.java
+import java.util.function.IntConsumer;
+public class ZeroBitStorage implements BitStorage {
+    public static final long[] RAW;
+    public ZeroBitStorage(int size);
+    public int getAndSet(int index, int value);
+    public void set(int index, int value);
+    public void fill(int value);
+    public int get(int index);
+    public long[] getRaw();
+    public int getSize();
+    public int getBits();
+    public void getAll(IntConsumer output);
+    public void unpack(int[] output);
+    public BitStorage copy();
+}

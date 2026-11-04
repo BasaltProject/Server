@@ -1,0 +1,2512 @@
+//// AbstractArrowPickupFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class AbstractArrowPickupFix extends DataFix {
+    public AbstractArrowPickupFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// AbstractPoiSectionFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.stream.Stream;
+public abstract class AbstractPoiSectionFix extends DataFix {
+    public AbstractPoiSectionFix(Schema outputSchema, String name);
+    protected TypeRewriteRule makeRule();
+    protected abstract <T> Stream<Dynamic<T>> processRecords(Stream<Dynamic<T>> records);
+}
+//// AbstractUUIDFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.Optional;
+import java.util.function.Function;
+public abstract class AbstractUUIDFix extends DataFix {
+    protected final DSL.TypeReference typeReference;
+    public AbstractUUIDFix(Schema outputSchema, DSL.TypeReference typeReference);
+    protected Typed<?> updateNamedChoice(Typed<?> input, String name, Function<Dynamic<?>, Dynamic<?>> function);
+    protected static Optional<Dynamic<?>> replaceUUIDString(Dynamic<?> tag, String oldKey, String newKey);
+    protected static Optional<Dynamic<?>> replaceUUIDMLTag(Dynamic<?> tag, String oldKey, String newKey);
+    protected static Optional<Dynamic<?>> replaceUUIDLeastMost(Dynamic<?> tag, String oldKey, String newKey);
+    protected static Optional<Dynamic<?>> createUUIDFromString(Dynamic<?> tag, String oldKey);
+    protected static Optional<Dynamic<?>> createUUIDFromML(Dynamic<?> tag);
+    protected static Optional<Dynamic<?>> createUUIDFromLongs(Dynamic<?> tag, String mostKey, String leastKey);
+    protected static Optional<Dynamic<?>> createUUIDTag(Dynamic<?> tag, long mostSignificantBits, long leastSignificantBits);
+}
+//// AddFieldFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.function.Function;
+public class AddFieldFix extends DataFix {
+    public AddFieldFix(Schema outputSchema, DSL.TypeReference type, String fieldName, Function<Dynamic<?>, Dynamic<?>> fieldGenerator, String... path);
+    protected TypeRewriteRule makeRule();
+}
+//// AddFlagIfNotPresentFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class AddFlagIfNotPresentFix extends DataFix {
+    public AddFlagIfNotPresentFix(Schema outputSchema, DSL.TypeReference typeReference, String flagKey, boolean flagValue);
+    protected TypeRewriteRule makeRule();
+}
+//// AddNewChoices.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class AddNewChoices extends DataFix {
+    public AddNewChoices(Schema outputSchema, String name, DSL.TypeReference type);
+    public TypeRewriteRule makeRule();
+}
+//// AdvancementsFix.java
+import com.mojang.datafixers.schemas.Schema;
+public class AdvancementsFix extends AdvancementsRenameFix {
+    public AdvancementsFix(Schema outputSchema, boolean changesType);
+}
+//// AdvancementsRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.Function;
+public class AdvancementsRenameFix extends DataFix {
+    public AdvancementsRenameFix(Schema outputSchema, boolean changesType, String name, Function<String, String> renamer);
+    protected TypeRewriteRule makeRule();
+}
+//// AreaEffectCloudDurationScaleFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class AreaEffectCloudDurationScaleFix extends NamedEntityFix {
+    public AreaEffectCloudDurationScaleFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// AreaEffectCloudPotionFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class AreaEffectCloudPotionFix extends NamedEntityFix {
+    public AreaEffectCloudPotionFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// AttributeIdPrefixFix.java
+import com.mojang.datafixers.schemas.Schema;
+public class AttributeIdPrefixFix extends AttributesRenameFix {
+    public AttributeIdPrefixFix(Schema outputSchema);
+}
+//// AttributeModifierIdFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.UUID;
+public class AttributeModifierIdFix extends DataFix {
+    public AttributeModifierIdFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+    public static UUID uuidFromIntArray(int[] intArray);
+}
+//// AttributesRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.UnaryOperator;
+public class AttributesRenameFix extends DataFix {
+    public AttributesRenameFix(Schema outputSchema, String name, UnaryOperator<String> renames);
+    public AttributesRenameFix(Schema outputSchema, String name, UnaryOperator<String> renames, boolean oldDataComponentFormat);
+    protected TypeRewriteRule makeRule();
+}
+//// AttributesRenameLegacy.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.UnaryOperator;
+public class AttributesRenameLegacy extends DataFix {
+    public AttributesRenameLegacy(Schema outputSchema, String name, UnaryOperator<String> renames);
+    protected TypeRewriteRule makeRule();
+}
+//// BannerEntityCustomNameToOverrideComponentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BannerEntityCustomNameToOverrideComponentFix extends DataFix {
+    public BannerEntityCustomNameToOverrideComponentFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// BannerPatternFormatFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class BannerPatternFormatFix extends NamedEntityFix {
+    public BannerPatternFormatFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// BedItemColorFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BedItemColorFix extends DataFix {
+    public BedItemColorFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// BeehiveFieldRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BeehiveFieldRenameFix extends DataFix {
+    public BeehiveFieldRenameFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// BiomeFix.java
+import java.util.Map;
+public class BiomeFix {
+    public static final Map<String, String> BIOMES;
+}
+//// BitStorageAlignFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BitStorageAlignFix extends DataFix {
+    public BitStorageAlignFix(Schema schema);
+    protected TypeRewriteRule makeRule();
+    public static long[] addPadding(int size, int bits, long[] data);
+}
+//// BlendingDataFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BlendingDataFix extends DataFix {
+    public BlendingDataFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// BlendingDataNoValueHeightFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BlendingDataNoValueHeightFix extends DataFix {
+    public BlendingDataNoValueHeightFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// BlendingDataRemoveFromNetherEndFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BlendingDataRemoveFromNetherEndFix extends DataFix {
+    public BlendingDataRemoveFromNetherEndFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// BlockEntityBannerColorFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class BlockEntityBannerColorFix extends NamedEntityFix {
+    public BlockEntityBannerColorFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// BlockEntityBlockStateFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class BlockEntityBlockStateFix extends NamedEntityFix {
+    public BlockEntityBlockStateFix(Schema outputSchema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// BlockEntityCustomNameToComponentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class BlockEntityCustomNameToComponentFix extends DataFix {
+    public BlockEntityCustomNameToComponentFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+    public static <T> Dynamic<T> fixTagCustomName(Dynamic<T> tag);
+}
+//// BlockEntityFurnaceBurnTimeFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class BlockEntityFurnaceBurnTimeFix extends NamedEntityFix {
+    public BlockEntityFurnaceBurnTimeFix(Schema outputSchema, String entityType);
+    public Dynamic<?> fixBurnTime(Dynamic<?> data);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// BlockEntityIdFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Map;
+public class BlockEntityIdFix extends DataFix {
+    public static final Map<String, String> ID_MAP;
+    public BlockEntityIdFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// BlockEntityJukeboxFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class BlockEntityJukeboxFix extends NamedEntityFix {
+    public BlockEntityJukeboxFix(Schema outputSchema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// BlockEntityKeepPacked.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class BlockEntityKeepPacked extends NamedEntityFix {
+    public BlockEntityKeepPacked(Schema schema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// BlockEntityRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.UnaryOperator;
+public class BlockEntityRenameFix extends DataFix {
+    private BlockEntityRenameFix(Schema outputSchema, String name, UnaryOperator<String> nameChangeLookup);
+    public TypeRewriteRule makeRule();
+    public static DataFix create(Schema outputSchema, String name, UnaryOperator<String> nameChangeLookup);
+}
+//// BlockEntityShulkerBoxColorFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class BlockEntityShulkerBoxColorFix extends NamedEntityFix {
+    public BlockEntityShulkerBoxColorFix(Schema outputSchema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// BlockEntitySignDoubleSidedEditableTextFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.List;
+public class BlockEntitySignDoubleSidedEditableTextFix extends NamedEntityWriteReadFix {
+    public static final List<String> FIELDS_TO_DROP;
+    public static final String FILTERED_CORRECT = "_filtered_correct";
+    public BlockEntitySignDoubleSidedEditableTextFix(Schema outputSchema, String name, String entityName);
+    protected <T> Dynamic<T> fix(Dynamic<T> input);
+}
+//// BlockEntityUUIDFix.java
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BlockEntityUUIDFix extends AbstractUUIDFix {
+    public BlockEntityUUIDFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// BlockNameFlatteningFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BlockNameFlatteningFix extends DataFix {
+    public BlockNameFlatteningFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// BlockPosFormatAndRenamesFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BlockPosFormatAndRenamesFix extends DataFix {
+    public BlockPosFormatAndRenamesFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// BlockStateData.java
+import com.mojang.serialization.Dynamic;
+public class BlockStateData {
+    static final String FILTER_ME = "%%FILTER_ME%%";
+    public static Dynamic<?> upgradeBlockStateTag(Dynamic<?> oldTag);
+    public static String upgradeBlock(String oldName);
+    public static String upgradeBlock(int id);
+    public static Dynamic<?> getTag(int id);
+}
+//// BlockStateFieldNamesFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BlockStateFieldNamesFix extends DataFix {
+    public BlockStateFieldNamesFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// BlockStateStructureTemplateFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BlockStateStructureTemplateFix extends DataFix {
+    public BlockStateStructureTemplateFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// BoatSplitFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class BoatSplitFix extends DataFix {
+    public BoatSplitFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// CatTypeFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class CatTypeFix extends NamedEntityFix {
+    public CatTypeFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// CauldronRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class CauldronRenameFix extends DataFix {
+    public CauldronRenameFix(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// CavesAndCliffsRenames.java
+import com.google.common.collect.ImmutableMap;
+public final class CavesAndCliffsRenames {
+    public static final ImmutableMap<String, String> RENAMES;
+    private CavesAndCliffsRenames();
+}
+//// ChestedHorsesInventoryZeroIndexingFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChestedHorsesInventoryZeroIndexingFix extends DataFix {
+    public ChestedHorsesInventoryZeroIndexingFix(Schema v3807);
+    protected TypeRewriteRule makeRule();
+}
+//// ChunkBedBlockEntityInjecterFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkBedBlockEntityInjecterFix extends DataFix {
+    public ChunkBedBlockEntityInjecterFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// ChunkBiomeFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkBiomeFix extends DataFix {
+    public ChunkBiomeFix(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// ChunkDeleteIgnoredLightDataFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkDeleteIgnoredLightDataFix extends DataFix {
+    public ChunkDeleteIgnoredLightDataFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ChunkDeleteLightFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkDeleteLightFix extends DataFix {
+    public ChunkDeleteLightFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ChunkHeightAndBiomeFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkHeightAndBiomeFix extends DataFix {
+    public static final String DATAFIXER_CONTEXT_TAG = "__context";
+    public static final int BLOCKS_PER_SECTION = 4096;
+    public static final String DEFAULT_BIOME = "minecraft:plains";
+    public ChunkHeightAndBiomeFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+    public static int ceillog2(int input);
+}
+//// ChunkLightRemoveFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkLightRemoveFix extends DataFix {
+    public ChunkLightRemoveFix(Schema schema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// ChunkPalettedStorageFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import net.minecraft.util.CrudeIncrementalIntIdentityHashBiMap;
+public class ChunkPalettedStorageFix extends DataFix {
+    public ChunkPalettedStorageFix(Schema outputSchema, boolean changesType);
+    public static String getName(Dynamic<?> state);
+    public static String getProperty(Dynamic<?> state, String property);
+    public static int idFor(CrudeIncrementalIntIdentityHashBiMap<Dynamic<?>> states, Dynamic<?> state);
+    public TypeRewriteRule makeRule();
+    public static int getSideMask(boolean west, boolean east, boolean north, boolean south);
+    static class MappingConstants {
+    }
+    static class Section {
+        public final int y;
+        public Section(Dynamic<?> section);
+        public Dynamic<?> getBlock(int pos);
+        public void setBlock(int idx, Dynamic<?> blockState);
+        public int upgrade(int sides);
+        public Dynamic<?> write();
+    }
+    static final class UpgradeChunk {
+        public UpgradeChunk(Dynamic<?> level);
+        public static int relative(int pos, Direction direction);
+        public Dynamic<?> getBlock(int pos);
+        public Dynamic<?> write();
+    }
+    static class DataLayer {
+        public DataLayer();
+        public DataLayer(byte[] data);
+        public int get(int x, int y, int z);
+    }
+    public static enum Direction {
+        DOWN, UP, NORTH, SOUTH, WEST, EAST;
+        public AxisDirection getAxisDirection();
+        public Axis getAxis();
+        public static enum Axis {
+            X, Y, Z;
+        }
+        public static enum AxisDirection {
+            POSITIVE, NEGATIVE;
+            public int getStep();
+        }
+    }
+}
+//// ChunkProtoTickListFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.List;
+public class ChunkProtoTickListFix extends DataFix {
+    public ChunkProtoTickListFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+    public static final class PoorMansPalettedContainer {
+        public PoorMansPalettedContainer(List<? extends Dynamic<?>> palette, long[] data);
+        public Dynamic<?> get(int x, int y, int z);
+        public List<? extends Dynamic<?>> palette();
+        public long[] data();
+    }
+}
+//// ChunkRenamesFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkRenamesFix extends DataFix {
+    public ChunkRenamesFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ChunkStatusFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkStatusFix extends DataFix {
+    public ChunkStatusFix(Schema schema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// ChunkStatusFix2.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkStatusFix2 extends DataFix {
+    public ChunkStatusFix2(Schema schema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// ChunkStructuresTemplateRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkStructuresTemplateRenameFix extends DataFix {
+    public ChunkStructuresTemplateRenameFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// ChunkTicketUnpackPosFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkTicketUnpackPosFix extends DataFix {
+    public ChunkTicketUnpackPosFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ChunkToProtochunkFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ChunkToProtochunkFix extends DataFix {
+    public ChunkToProtochunkFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// ColorlessShulkerEntityFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class ColorlessShulkerEntityFix extends NamedEntityFix {
+    public ColorlessShulkerEntityFix(Schema outputSchema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// ContainerBlockEntityLockPredicateFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ContainerBlockEntityLockPredicateFix extends DataFix {
+    public ContainerBlockEntityLockPredicateFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// CopperGolemWeatherStateFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class CopperGolemWeatherStateFix extends NamedEntityFix {
+    public CopperGolemWeatherStateFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// CriteriaRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.UnaryOperator;
+public class CriteriaRenameFix extends DataFix {
+    public CriteriaRenameFix(Schema outputSchema, String name, String advancementId, UnaryOperator<String> conversions);
+    protected TypeRewriteRule makeRule();
+}
+//// CustomModelDataExpandFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class CustomModelDataExpandFix extends DataFix {
+    public CustomModelDataExpandFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// DataComponentRemainderFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public abstract class DataComponentRemainderFix extends DataFix {
+    public DataComponentRemainderFix(Schema outputSchema, String name, String componentId);
+    public DataComponentRemainderFix(Schema outputSchema, String name, String componentId, String newComponentId);
+    public final TypeRewriteRule makeRule();
+    protected abstract <T> Dynamic<T> fixComponent(Dynamic<T> input);
+}
+//// DayTimeToClockFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class DayTimeToClockFix extends DataFix {
+    public DayTimeToClockFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// DebugProfileLookingAtSplitFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class DebugProfileLookingAtSplitFix extends DataFix {
+    public DebugProfileLookingAtSplitFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// DebugProfileOverlayReferenceFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class DebugProfileOverlayReferenceFix extends DataFix {
+    public DebugProfileOverlayReferenceFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// DebugProfileRenameEntryFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class DebugProfileRenameEntryFix extends DataFix {
+    public DebugProfileRenameEntryFix(Schema outputSchema, String oldName, String newName);
+    protected TypeRewriteRule makeRule();
+}
+//// DecoratedPotFieldRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class DecoratedPotFieldRenameFix extends DataFix {
+    public DecoratedPotFieldRenameFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// DropChancesFormatFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class DropChancesFormatFix extends DataFix {
+    public DropChancesFormatFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// DropInvalidSignDataFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class DropInvalidSignDataFix extends DataFix {
+    public DropInvalidSignDataFix(Schema outputSchema, String entityName);
+    public TypeRewriteRule makeRule();
+}
+//// DyeItemRenameFix.java
+import java.util.Map;
+public class DyeItemRenameFix {
+    public static final Map<String, String> RENAMED_IDS;
+}
+//// EffectDurationFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EffectDurationFix extends DataFix {
+    public EffectDurationFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// EmptyItemInHotbarFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EmptyItemInHotbarFix extends DataFix {
+    public EmptyItemInHotbarFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// EmptyItemInVillagerTradeFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EmptyItemInVillagerTradeFix extends DataFix {
+    public EmptyItemInVillagerTradeFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// EntityArmorStandSilentFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityArmorStandSilentFix extends NamedEntityFix {
+    public EntityArmorStandSilentFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityAttributeBaseValueFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.DoubleUnaryOperator;
+public class EntityAttributeBaseValueFix extends NamedEntityFix {
+    public EntityAttributeBaseValueFix(Schema outputSchema, String name, String entityName, String attributeId, DoubleUnaryOperator valueFixer);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityBlockStateFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityBlockStateFix extends DataFix {
+    public EntityBlockStateFix(Schema outputSchema, boolean changesType);
+    public static int getBlockId(String name);
+    public TypeRewriteRule makeRule();
+}
+//// EntityBrushableBlockFieldsRenameFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityBrushableBlockFieldsRenameFix extends NamedEntityFix {
+    public EntityBrushableBlockFieldsRenameFix(Schema outputSchema);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityCatSplitFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Dynamic;
+public class EntityCatSplitFix extends SimpleEntityRenameFix {
+    public EntityCatSplitFix(Schema outputSchema, boolean changesType);
+    protected Pair<String, Dynamic<?>> getNewNameAndTag(String name, Dynamic<?> tag);
+}
+//// EntityCodSalmonFix.java
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Map;
+public class EntityCodSalmonFix extends SimplestEntityRenameFix {
+    public static final Map<String, String> RENAMED_IDS;
+    public static final Map<String, String> RENAMED_EGG_IDS;
+    public EntityCodSalmonFix(Schema schema, boolean changesType);
+    protected String rename(String name);
+}
+//// EntityCustomNameToComponentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityCustomNameToComponentFix extends DataFix {
+    public EntityCustomNameToComponentFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// EntityElderGuardianSplitFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Dynamic;
+public class EntityElderGuardianSplitFix extends SimpleEntityRenameFix {
+    public EntityElderGuardianSplitFix(Schema outputSchema, boolean changesType);
+    protected Pair<String, Dynamic<?>> getNewNameAndTag(String name, Dynamic<?> tag);
+}
+//// EntityEquipmentToArmorAndHandFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityEquipmentToArmorAndHandFix extends DataFix {
+    public EntityEquipmentToArmorAndHandFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// EntityFallDistanceFloatToDoubleFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityFallDistanceFloatToDoubleFix extends DataFix {
+    public EntityFallDistanceFloatToDoubleFix(Schema outputSchema, DSL.TypeReference type);
+    protected TypeRewriteRule makeRule();
+}
+//// EntityFieldsRenameFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.Map;
+public class EntityFieldsRenameFix extends NamedEntityFix {
+    public EntityFieldsRenameFix(Schema outputSchema, String name, String entityType, Map<String, String> renames);
+    public Dynamic<?> fixTag(Dynamic<?> data);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityGoatMissingStateFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityGoatMissingStateFix extends NamedEntityFix {
+    public EntityGoatMissingStateFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityHealthFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityHealthFix extends DataFix {
+    public EntityHealthFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    public TypeRewriteRule makeRule();
+}
+//// EntityHorseSaddleFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityHorseSaddleFix extends NamedEntityFix {
+    public EntityHorseSaddleFix(Schema outputSchema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityHorseSplitFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+public class EntityHorseSplitFix extends EntityRenameFix {
+    public EntityHorseSplitFix(Schema outputSchema, boolean changesType);
+    protected Pair<String, Typed<?>> fix(String name, Typed<?> entity);
+}
+//// EntityIdFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityIdFix extends DataFix {
+    public EntityIdFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// EntityItemFrameDirectionFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityItemFrameDirectionFix extends NamedEntityFix {
+    public EntityItemFrameDirectionFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityMinecartIdentifiersFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+public class EntityMinecartIdentifiersFix extends EntityRenameFix {
+    public EntityMinecartIdentifiersFix(Schema outputSchema);
+    protected Pair<String, Typed<?>> fix(String name, Typed<?> entity);
+}
+//// EntityPaintingItemFrameDirectionFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityPaintingItemFrameDirectionFix extends DataFix {
+    public EntityPaintingItemFrameDirectionFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// EntityPaintingMotiveFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityPaintingMotiveFix extends NamedEntityFix {
+    public EntityPaintingMotiveFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityProjectileOwnerFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityProjectileOwnerFix extends DataFix {
+    public EntityProjectileOwnerFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// EntityPufferfishRenameFix.java
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Map;
+public class EntityPufferfishRenameFix extends SimplestEntityRenameFix {
+    public static final Map<String, String> RENAMED_IDS;
+    public EntityPufferfishRenameFix(Schema outputSchema, boolean changesType);
+    protected String rename(String name);
+}
+//// EntityRavagerRenameFix.java
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Map;
+public class EntityRavagerRenameFix extends SimplestEntityRenameFix {
+    public static final Map<String, String> RENAMED_IDS;
+    public EntityRavagerRenameFix(Schema outputSchema, boolean changesType);
+    protected String rename(String name);
+}
+//// EntityRedundantChanceTagsFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityRedundantChanceTagsFix extends DataFix {
+    public EntityRedundantChanceTagsFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// EntityRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+public abstract class EntityRenameFix extends DataFix {
+    protected final String name;
+    public EntityRenameFix(String name, Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+    protected abstract Pair<String, Typed<?>> fix(String name, Typed<?> entity);
+}
+//// EntityRidingToPassengersFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityRidingToPassengersFix extends DataFix {
+    public EntityRidingToPassengersFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// EntitySalmonSizeFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class EntitySalmonSizeFix extends NamedEntityFix {
+    public EntitySalmonSizeFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityShulkerColorFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityShulkerColorFix extends NamedEntityFix {
+    public EntityShulkerColorFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityShulkerRotationFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityShulkerRotationFix extends NamedEntityFix {
+    public EntityShulkerRotationFix(Schema outputSchema);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntitySkeletonSplitFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Dynamic;
+public class EntitySkeletonSplitFix extends SimpleEntityRenameFix {
+    public EntitySkeletonSplitFix(Schema outputSchema, boolean changesType);
+    protected Pair<String, Dynamic<?>> getNewNameAndTag(String name, Dynamic<?> tag);
+}
+//// EntitySpawnerItemVariantComponentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.function.Function;
+public class EntitySpawnerItemVariantComponentFix extends DataFix {
+    public EntitySpawnerItemVariantComponentFix(Schema outputSchema);
+    public final TypeRewriteRule makeRule();
+    interface Fixer extends Function<Typed<?>, Typed<?>> {
+        default Typed<?> apply(Typed<?> components);
+        default <T> Dynamic<T> fixRemainder(Dynamic<T> remainder);
+        <T> Dynamic<T> fixRemainder(Dynamic<T> remainder, Dynamic<T> bucketData);
+    }
+}
+//// EntityStringUuidFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EntityStringUuidFix extends DataFix {
+    public EntityStringUuidFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// EntityTheRenameningFix.java
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Map;
+public class EntityTheRenameningFix extends SimplestEntityRenameFix {
+    public static final Map<String, String> RENAMED_IDS;
+    public static final Map<String, String> RENAMED_BLOCKS;
+    public static final Map<String, String> RENAMED_ITEMS;
+    public EntityTheRenameningFix(Schema schema, boolean changesType);
+    protected String rename(String name);
+}
+//// EntityTippedArrowFix.java
+import com.mojang.datafixers.schemas.Schema;
+public class EntityTippedArrowFix extends SimplestEntityRenameFix {
+    public EntityTippedArrowFix(Schema outputSchema, boolean changesType);
+    protected String rename(String name);
+}
+//// EntityUUIDFix.java
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityUUIDFix extends AbstractUUIDFix {
+    public EntityUUIDFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+    public static Dynamic<?> updateLivingEntity(Dynamic<?> tag);
+    public static Dynamic<?> updateEntityUUID(Dynamic<?> tag);
+}
+//// EntityVariantFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.IntFunction;
+public class EntityVariantFix extends NamedEntityFix {
+    public EntityVariantFix(Schema outputSchema, String name, DSL.TypeReference type, String entityName, String fieldName, IntFunction<String> idConversions);
+    protected Typed<?> fix(Typed<?> typed);
+}
+//// EntityWolfColorFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityWolfColorFix extends NamedEntityFix {
+    public EntityWolfColorFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityZombieSplitFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+public class EntityZombieSplitFix extends EntityRenameFix {
+    public EntityZombieSplitFix(Schema outputSchema);
+    protected Pair<String, Typed<?>> fix(String name, Typed<?> entity);
+}
+//// EntityZombieVillagerTypeFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class EntityZombieVillagerTypeFix extends NamedEntityFix {
+    public EntityZombieVillagerTypeFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// EntityZombifiedPiglinRenameFix.java
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Map;
+public class EntityZombifiedPiglinRenameFix extends SimplestEntityRenameFix {
+    public static final Map<String, String> RENAMED_IDS;
+    public EntityZombifiedPiglinRenameFix(Schema outputSchema);
+    protected String rename(String name);
+}
+//// EquipmentFormatFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EquipmentFormatFix extends DataFix {
+    public EquipmentFormatFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// EquippableAssetRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class EquippableAssetRenameFix extends DataFix {
+    public EquippableAssetRenameFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ExplorerMapItemFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ExplorerMapItemFix extends DataFix {
+    public ExplorerMapItemFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// FeatureFlagRemoveFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Set;
+public class FeatureFlagRemoveFix extends DataFix {
+    public FeatureFlagRemoveFix(Schema outputSchema, String name, Set<String> flagsToRemove);
+    protected TypeRewriteRule makeRule();
+}
+//// FilteredBooksFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class FilteredBooksFix extends ItemStackTagFix {
+    public FilteredBooksFix(Schema outputSchema);
+    protected Typed<?> fixItemStackTag(Typed<?> tag);
+}
+//// FilteredSignsFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class FilteredSignsFix extends NamedEntityWriteReadFix {
+    public FilteredSignsFix(Schema outputSchema);
+    protected <T> Dynamic<T> fix(Dynamic<T> input);
+}
+//// FireResistantToDamageResistantComponentFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class FireResistantToDamageResistantComponentFix extends DataComponentRemainderFix {
+    public FireResistantToDamageResistantComponentFix(Schema outputSchema);
+    protected <T> Dynamic<T> fixComponent(Dynamic<T> input);
+}
+//// FixProjectileStoredItem.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.Type;
+public class FixProjectileStoredItem extends DataFix {
+    public FixProjectileStoredItem(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+    interface SubFixer<F> {
+        Typed<F> fix(Typed<?> input, Type<F> outputType);
+    }
+}
+//// FixWolfHealth.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class FixWolfHealth extends NamedEntityFix {
+    public FixWolfHealth(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// FoodToConsumableFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class FoodToConsumableFix extends DataFix {
+    public FoodToConsumableFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ForcePoiRebuild.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ForcePoiRebuild extends DataFix {
+    public ForcePoiRebuild(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// ForcedChunkToTicketFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ForcedChunkToTicketFix extends DataFix {
+    public ForcedChunkToTicketFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// FurnaceRecipeFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class FurnaceRecipeFix extends DataFix {
+    public FurnaceRecipeFix(Schema schema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// GameRuleRegistryFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class GameRuleRegistryFix extends DataFix {
+    public GameRuleRegistryFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// GoatHornIdFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class GoatHornIdFix extends ItemStackTagRemainderFix {
+    public GoatHornIdFix(Schema outputSchema);
+    protected <T> Dynamic<T> fixItemStackTag(Dynamic<T> tag);
+}
+//// GossipUUIDFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class GossipUUIDFix extends NamedEntityFix {
+    public GossipUUIDFix(Schema outputSchema, String entityName);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// HeightmapRenamingFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class HeightmapRenamingFix extends DataFix {
+    public HeightmapRenamingFix(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// HorseBodyArmorItemFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class HorseBodyArmorItemFix extends NamedEntityWriteReadFix {
+    public HorseBodyArmorItemFix(Schema outputSchema, String entityName, String previousBodyArmorTag, boolean clearArmorItems);
+    protected <T> Dynamic<T> fix(Dynamic<T> input);
+}
+//// IglooMetadataRemovalFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class IglooMetadataRemovalFix extends DataFix {
+    public IglooMetadataRemovalFix(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// InlineBlockPosFormatFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class InlineBlockPosFormatFix extends DataFix {
+    public InlineBlockPosFormatFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// InvalidBlockEntityLockFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class InvalidBlockEntityLockFix extends DataFix {
+    public InvalidBlockEntityLockFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// InvalidLockComponentFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class InvalidLockComponentFix extends DataComponentRemainderFix {
+    public InvalidLockComponentFix(Schema outputSchema);
+    protected <T> Dynamic<T> fixComponent(Dynamic<T> input);
+    public static <T> Dynamic<T> fixLock(Dynamic<T> input);
+}
+//// ItemBannerColorFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemBannerColorFix extends DataFix {
+    public ItemBannerColorFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// ItemCustomNameToComponentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemCustomNameToComponentFix extends DataFix {
+    public ItemCustomNameToComponentFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// ItemIdFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemIdFix extends DataFix {
+    public ItemIdFix(Schema outputSchema, boolean changesType);
+    public static String getItem(int id);
+    public TypeRewriteRule makeRule();
+}
+//// ItemLoreFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemLoreFix extends DataFix {
+    public ItemLoreFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ItemPotionFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemPotionFix extends DataFix {
+    public static final String DEFAULT = "minecraft:water";
+    public ItemPotionFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// ItemRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.Function;
+public abstract class ItemRenameFix extends DataFix {
+    public ItemRenameFix(Schema outputSchema, String name);
+    public TypeRewriteRule makeRule();
+    protected abstract String fixItem(String item);
+    public static DataFix create(Schema outputSchema, String name, Function<String, String> fixItem);
+}
+//// ItemShulkerBoxColorFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemShulkerBoxColorFix extends DataFix {
+    public static final String[] NAMES_BY_COLOR;
+    public ItemShulkerBoxColorFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// ItemSpawnEggFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemSpawnEggFix extends DataFix {
+    public ItemSpawnEggFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// ItemStackComponentizationFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.OptionalDynamic;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.UnaryOperator;
+public class ItemStackComponentizationFix extends DataFix {
+    public ItemStackComponentizationFix(Schema outputSchema);
+    public static Dynamic<?> fixProfile(Dynamic<?> dynamic);
+    protected TypeRewriteRule makeRule();
+    static class ItemStackData {
+        private ItemStackData(String item, int count, Dynamic<?> remainder);
+        public static Optional<ItemStackData> read(Dynamic<?> dynamic);
+        public OptionalDynamic<?> removeTag(String key);
+        public void setComponent(String type, Dynamic<?> value);
+        public void setComponent(String type, OptionalDynamic<?> optionalValue);
+        public Dynamic<?> moveTagInto(String fromKey, Dynamic<?> target, String toKey);
+        public void moveTagToComponent(String key, String type, Dynamic<?> defaultValue);
+        public void moveTagToComponent(String key, String type);
+        public void fixSubTag(String key, boolean dontFixWhenFieldIsMissing, UnaryOperator<Dynamic<?>> function);
+        public Dynamic<?> write();
+        public boolean is(String id);
+        public boolean is(Set<String> ids);
+        public boolean hasComponent(String id);
+    }
+}
+//// ItemStackCustomNameToOverrideComponentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemStackCustomNameToOverrideComponentFix extends DataFix {
+    public ItemStackCustomNameToOverrideComponentFix(Schema outputSchema);
+    public final TypeRewriteRule makeRule();
+}
+//// ItemStackEnchantmentNamesFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemStackEnchantmentNamesFix extends DataFix {
+    public ItemStackEnchantmentNamesFix(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// ItemStackMapIdFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemStackMapIdFix extends DataFix {
+    public ItemStackMapIdFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// ItemStackSpawnEggFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemStackSpawnEggFix extends DataFix {
+    public ItemStackSpawnEggFix(Schema outputSchema, boolean changesType, String itemType);
+    public TypeRewriteRule makeRule();
+}
+//// ItemStackTagFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.Type;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
+public abstract class ItemStackTagFix extends DataFix {
+    public ItemStackTagFix(Schema outputSchema, String name, Predicate<String> idFilter);
+    public final TypeRewriteRule makeRule();
+    public static UnaryOperator<Typed<?>> createFixer(Type<?> itemStackType, Predicate<String> idFilter, UnaryOperator<Typed<?>> fixer);
+    protected abstract Typed<?> fixItemStackTag(Typed<?> tag);
+}
+//// ItemStackTagRemainderFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.function.Predicate;
+public abstract class ItemStackTagRemainderFix extends ItemStackTagFix {
+    public ItemStackTagRemainderFix(Schema outputSchema, String name, Predicate<String> idFilter);
+    protected abstract <T> Dynamic<T> fixItemStackTag(Dynamic<T> tag);
+    protected final Typed<?> fixItemStackTag(Typed<?> tag);
+}
+//// ItemStackTheFlatteningFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemStackTheFlatteningFix extends DataFix {
+    public ItemStackTheFlatteningFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+    public static String updateItem(String name, int data);
+}
+//// ItemStackUUIDFix.java
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemStackUUIDFix extends AbstractUUIDFix {
+    public ItemStackUUIDFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// ItemWaterPotionFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ItemWaterPotionFix extends DataFix {
+    public ItemWaterPotionFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// JigsawPropertiesFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class JigsawPropertiesFix extends NamedEntityFix {
+    public JigsawPropertiesFix(Schema schema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// JukeboxTicksSinceSongStartedFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class JukeboxTicksSinceSongStartedFix extends NamedEntityFix {
+    public JukeboxTicksSinceSongStartedFix(Schema outputSchema);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// LeavesFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.OpticFinder;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Dynamic;
+import java.util.List;
+import net.minecraft.util.datafix.PackedBitStorage;
+public class LeavesFix extends DataFix {
+    public LeavesFix(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+    public static int getIndex(int x, int y, int z);
+    public static int getSideMask(boolean west, boolean east, boolean north, boolean south);
+    public static abstract class Section {
+        protected static final String BLOCK_STATES_TAG = "BlockStates";
+        protected static final String NAME_TAG = "Name";
+        protected static final String PROPERTIES_TAG = "Properties";
+        protected final OpticFinder<List<Pair<String, Dynamic<?>>>> paletteFinder;
+        protected final List<Dynamic<?>> palette;
+        protected final int index;
+        protected PackedBitStorage storage;
+        public Section(Typed<?> section, Schema inputSchema);
+        protected void readStorage(Dynamic<?> tag);
+        public Typed<?> write(Typed<?> section);
+        public boolean isSkippable();
+        public int getBlock(int pos);
+        protected static int getStateId(String blockName, boolean persistent, int distance);
+        public int getIndex();
+        protected abstract boolean skippable();
+    }
+    public static final class LeavesSection extends Section {
+        public LeavesSection(Typed<?> section, Schema inputSchema);
+        protected boolean skippable();
+        public boolean isLog(int block);
+        public boolean isLeaf(int block);
+    }
+}
+//// LegacyAbstractBlockPropertyFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public abstract class LegacyAbstractBlockPropertyFix extends DataFix {
+    public LegacyAbstractBlockPropertyFix(Schema outputSchema, String name);
+    protected TypeRewriteRule makeRule();
+    protected abstract boolean shouldFix(String blockId);
+    protected abstract <T> Dynamic<T> fixProperties(String blockId, Dynamic<T> properties);
+}
+//// LegacyBlockPropertyRenameAndFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.function.UnaryOperator;
+public class LegacyBlockPropertyRenameAndFix extends LegacyAbstractBlockPropertyFix {
+    public LegacyBlockPropertyRenameAndFix(Schema outputSchema, String name, String blockId, String oldPropertyName, String newPropertyName, UnaryOperator<String> valueFixer);
+    protected boolean shouldFix(String blockId);
+    protected <T> Dynamic<T> fixProperties(String blockId, Dynamic<T> properties);
+}
+//// LegacyBlockRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.Function;
+public abstract class LegacyBlockRenameFix extends DataFix {
+    public LegacyBlockRenameFix(Schema outputSchema, String name);
+    public TypeRewriteRule makeRule();
+    protected abstract String renameBlock(String block);
+    public static DataFix create(Schema outputSchema, String name, Function<String, String> renamer);
+}
+//// LegacyDimensionIdFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LegacyDimensionIdFix extends DataFix {
+    public LegacyDimensionIdFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// LegacyDragonFightFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LegacyDragonFightFix extends DataFix {
+    public LegacyDragonFightFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// LegacyHoverEventFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LegacyHoverEventFix extends DataFix {
+    public LegacyHoverEventFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// LegacyJigsawRotationFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class LegacyJigsawRotationFix extends LegacyAbstractBlockPropertyFix {
+    public LegacyJigsawRotationFix(Schema outputSchema);
+    protected boolean shouldFix(String blockId);
+    protected <T> Dynamic<T> fixProperties(String blockId, Dynamic<T> properties);
+}
+//// LegacyWorldBorderFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LegacyWorldBorderFix extends DataFix {
+    public LegacyWorldBorderFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// LevelDatDifficultyFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LevelDatDifficultyFix extends DataFix {
+    public LevelDatDifficultyFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// LevelDatToSavedDataPreparationFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LevelDatToSavedDataPreparationFix extends DataFix {
+    public LevelDatToSavedDataPreparationFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// LevelDataGeneratorOptionsFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LevelDataGeneratorOptionsFix extends DataFix {
+    public static final String GENERATOR_OPTIONS = "generatorOptions";
+    public LevelDataGeneratorOptionsFix(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// LevelFlatGeneratorInfoFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LevelFlatGeneratorInfoFix extends DataFix {
+    static final String DEFAULT = "minecraft:bedrock,2*minecraft:dirt,minecraft:grass_block;1;village";
+    public LevelFlatGeneratorInfoFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+    String fixString(String generatorOptions);
+}
+//// LevelLegacyWorldGenSettingsFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LevelLegacyWorldGenSettingsFix extends DataFix {
+    public LevelLegacyWorldGenSettingsFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// LevelUUIDFix.java
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class LevelUUIDFix extends AbstractUUIDFix {
+    public LevelUUIDFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// LockComponentPredicateFix.java
+import com.google.common.escape.Escaper;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class LockComponentPredicateFix extends DataComponentRemainderFix {
+    public static final Escaper ESCAPER;
+    public LockComponentPredicateFix(Schema outputSchema);
+    protected <T> Dynamic<T> fixComponent(Dynamic<T> input);
+    public static <T> Dynamic<T> fixLock(Dynamic<T> input);
+}
+//// LodestoneCompassComponentFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class LodestoneCompassComponentFix extends DataComponentRemainderFix {
+    public LodestoneCompassComponentFix(Schema outputSchema);
+    protected <T> Dynamic<T> fixComponent(Dynamic<T> input);
+}
+//// MapBannerBlockPosFormatFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class MapBannerBlockPosFormatFix extends DataFix {
+    public MapBannerBlockPosFormatFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// MapColorComponentRemovalFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class MapColorComponentRemovalFix extends DataComponentRemainderFix {
+    public MapColorComponentRemovalFix(Schema outputSchema);
+    protected <T> Dynamic<T> fixComponent(Dynamic<T> input);
+}
+//// MapIdFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class MapIdFix extends DataFix {
+    public MapIdFix(Schema schema);
+    protected TypeRewriteRule makeRule();
+}
+//// MemoryExpiryDataFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class MemoryExpiryDataFix extends NamedEntityFix {
+    public MemoryExpiryDataFix(Schema schema, String entityType);
+    protected Typed<?> fix(Typed<?> entity);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+}
+//// MergeTerrainChunkStatusFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class MergeTerrainChunkStatusFix extends DataFix {
+    public MergeTerrainChunkStatusFix(Schema schema);
+    protected TypeRewriteRule makeRule();
+    static record FixedAndStatuses(Typed<?> fixed, String oldStatus, String oldTargetStatus) {
+    }
+}
+//// MissingDimensionFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.Type;
+import com.mojang.datafixers.util.Either;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.datafixers.util.Unit;
+import com.mojang.serialization.Dynamic;
+import java.util.List;
+public class MissingDimensionFix extends DataFix {
+    public MissingDimensionFix(Schema schema, boolean changesType);
+    protected static <A> Type<Pair<A, Dynamic<?>>> fields(String name, Type<A> type);
+    protected static <A> Type<Pair<Either<A, Unit>, Dynamic<?>>> optionalFields(String name, Type<A> type);
+    protected static <A1, A2> Type<Pair<Either<A1, Unit>, Pair<Either<A2, Unit>, Dynamic<?>>>> optionalFields(String name1, Type<A1> type1, String name2, Type<A2> type2);
+    protected TypeRewriteRule makeRule();
+    protected static Type<? extends Pair<? extends Either<? extends Pair<? extends Either<?, Unit>, ? extends Pair<? extends Either<? extends List<? extends Pair<? extends Either<?, Unit>, Dynamic<?>>>, Unit>, Dynamic<?>>>, Unit>, Dynamic<?>>> flatType(Schema schema);
+}
+//// MobEffectIdFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class MobEffectIdFix extends DataFix {
+    public MobEffectIdFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// MobSpawnerEntityIdentifiersFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class MobSpawnerEntityIdentifiersFix extends DataFix {
+    public MobSpawnerEntityIdentifiersFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// NamedEntityConvertUncheckedFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class NamedEntityConvertUncheckedFix extends NamedEntityFix {
+    public NamedEntityConvertUncheckedFix(Schema outputSchema, String name, DSL.TypeReference type, String entityName);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// NamedEntityFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public abstract class NamedEntityFix extends DataFix {
+    protected final String entityName;
+    protected final DSL.TypeReference type;
+    public NamedEntityFix(Schema outputSchema, boolean changesType, String name, DSL.TypeReference type, String entityName);
+    public TypeRewriteRule makeRule();
+    protected abstract Typed<?> fix(Typed<?> entity);
+}
+//// NamedEntityWriteReadFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public abstract class NamedEntityWriteReadFix extends DataFix {
+    public NamedEntityWriteReadFix(Schema outputSchema, boolean changesType, String name, DSL.TypeReference type, String entityName);
+    public TypeRewriteRule makeRule();
+    protected abstract <T> Dynamic<T> fix(Dynamic<T> input);
+}
+//// NamespacedTypeRenameFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.UnaryOperator;
+public class NamespacedTypeRenameFix extends DataFix {
+    public NamespacedTypeRenameFix(Schema outputSchema, String name, DSL.TypeReference type, UnaryOperator<String> renamer);
+    protected TypeRewriteRule makeRule();
+}
+//// NewVillageFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class NewVillageFix extends DataFix {
+    public NewVillageFix(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// ObjectiveRenderTypeFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ObjectiveRenderTypeFix extends DataFix {
+    public ObjectiveRenderTypeFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// OminousBannerBlockEntityRenameFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class OminousBannerBlockEntityRenameFix extends NamedEntityFix {
+    public OminousBannerBlockEntityRenameFix(Schema outputSchema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// OminousBannerRarityFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OminousBannerRarityFix extends DataFix {
+    public OminousBannerRarityFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// OminousBannerRenameFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class OminousBannerRenameFix extends ItemStackTagFix {
+    public OminousBannerRenameFix(Schema outputSchema);
+    protected Typed<?> fixItemStackTag(Typed<?> tag);
+}
+//// OptionsAccessibilityOnboardFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsAccessibilityOnboardFix extends DataFix {
+    public OptionsAccessibilityOnboardFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// OptionsAddTextBackgroundFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsAddTextBackgroundFix extends DataFix {
+    public OptionsAddTextBackgroundFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsAmbientOcclusionFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsAmbientOcclusionFix extends DataFix {
+    public OptionsAmbientOcclusionFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsFancyGraphicsToGraphicsModeFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsFancyGraphicsToGraphicsModeFix extends DataFix {
+    public OptionsFancyGraphicsToGraphicsModeFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsForceDefaultGraphicsApiFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsForceDefaultGraphicsApiFix extends DataFix {
+    public OptionsForceDefaultGraphicsApiFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsForceVBOFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsForceVBOFix extends DataFix {
+    public OptionsForceVBOFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsGraphicsModeSplitFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsGraphicsModeSplitFix extends DataFix {
+    public OptionsGraphicsModeSplitFix(Schema outputSchema, String newFieldName, String valueIfFast, String valueIfFancy, String valueIfFabulous);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsKeyLwjgl3Fix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsKeyLwjgl3Fix extends DataFix {
+    public static final String KEY_UNKNOWN = "key.unknown";
+    public OptionsKeyLwjgl3Fix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsKeyTranslationFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsKeyTranslationFix extends DataFix {
+    public OptionsKeyTranslationFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsLowerCaseLanguageFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsLowerCaseLanguageFix extends DataFix {
+    public OptionsLowerCaseLanguageFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsMenuBlurrinessFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsMenuBlurrinessFix extends DataFix {
+    public OptionsMenuBlurrinessFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsMusicToastFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsMusicToastFix extends DataFix {
+    public OptionsMusicToastFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsProgrammerArtFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsProgrammerArtFix extends DataFix {
+    public OptionsProgrammerArtFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsRenameFieldFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsRenameFieldFix extends DataFix {
+    public OptionsRenameFieldFix(Schema outputSchema, boolean changesType, String fixName, String fieldFrom, String fieldTo);
+    public TypeRewriteRule makeRule();
+}
+//// OptionsSetGraphicsPresetToCustomFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OptionsSetGraphicsPresetToCustomFix extends DataFix {
+    public OptionsSetGraphicsPresetToCustomFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+}
+//// OverreachingTickFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class OverreachingTickFix extends DataFix {
+    public OverreachingTickFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ParticleUnflatteningFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ParticleUnflatteningFix extends DataFix {
+    public ParticleUnflatteningFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// PlayerEquipmentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class PlayerEquipmentFix extends DataFix {
+    public PlayerEquipmentFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// PlayerHeadBlockProfileFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class PlayerHeadBlockProfileFix extends NamedEntityFix {
+    public PlayerHeadBlockProfileFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// PlayerRespawnDataFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class PlayerRespawnDataFix extends DataFix {
+    public PlayerRespawnDataFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// PlayerUUIDFix.java
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class PlayerUUIDFix extends AbstractUUIDFix {
+    public PlayerUUIDFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// PoiTypeRemoveFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+public class PoiTypeRemoveFix extends AbstractPoiSectionFix {
+    public PoiTypeRemoveFix(Schema outputSchema, String name, Predicate<String> typesToRemove);
+    protected <T> Stream<Dynamic<T>> processRecords(Stream<Dynamic<T>> records);
+}
+//// PoiTypeRenameFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import java.util.function.Function;
+import java.util.stream.Stream;
+public class PoiTypeRenameFix extends AbstractPoiSectionFix {
+    public PoiTypeRenameFix(Schema outputSchema, String name, Function<String, String> renamer);
+    protected <T> Stream<Dynamic<T>> processRecords(Stream<Dynamic<T>> stream);
+}
+//// PotDecorationsBlockEntityUnflatteningFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class PotDecorationsBlockEntityUnflatteningFix extends NamedEntityFix {
+    public PotDecorationsBlockEntityUnflatteningFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// PotDecorationsComponentUnflatteningFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class PotDecorationsComponentUnflatteningFix extends DataFix {
+    public PotDecorationsComponentUnflatteningFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+    public static <T> Dynamic<T> unpackList(Dynamic<T> original);
+}
+//// PrimedTntBlockStateFixer.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class PrimedTntBlockStateFixer extends NamedEntityWriteReadFix {
+    public PrimedTntBlockStateFixer(Schema outputSchema);
+    protected <T> Dynamic<T> fix(Dynamic<T> input);
+}
+//// ProjectileStoredWeaponFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ProjectileStoredWeaponFix extends DataFix {
+    public ProjectileStoredWeaponFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// RaidRenamesDataFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class RaidRenamesDataFix extends DataFix {
+    public RaidRenamesDataFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// RandomSequenceSettingsFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class RandomSequenceSettingsFix extends DataFix {
+    public RandomSequenceSettingsFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// RecipesFix.java
+import java.util.Map;
+public class RecipesFix {
+    public static final Map<String, String> RECIPES;
+}
+//// RecipesRenameningFix.java
+import java.util.Map;
+public class RecipesRenameningFix {
+    public static final Map<String, String> RECIPES;
+}
+//// RedstoneWireConnectionsFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class RedstoneWireConnectionsFix extends DataFix {
+    public RedstoneWireConnectionsFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// References.java
+import com.mojang.datafixers.DSL;
+public class References {
+    public static final DSL.TypeReference LEVEL;
+    public static final DSL.TypeReference LIGHTWEIGHT_LEVEL;
+    public static final DSL.TypeReference PLAYER;
+    public static final DSL.TypeReference CHUNK;
+    public static final DSL.TypeReference HOTBAR;
+    public static final DSL.TypeReference OPTIONS;
+    public static final DSL.TypeReference STRUCTURE;
+    public static final DSL.TypeReference STATS;
+    public static final DSL.TypeReference SAVED_DATA_COMMAND_STORAGE;
+    public static final DSL.TypeReference SAVED_DATA_CUSTOM_BOSS_EVENTS;
+    public static final DSL.TypeReference SAVED_DATA_ENDER_DRAGON_FIGHT;
+    public static final DSL.TypeReference SAVED_DATA_GAME_RULES;
+    public static final DSL.TypeReference SAVED_DATA_TICKETS;
+    public static final DSL.TypeReference SAVED_DATA_MAP_DATA;
+    public static final DSL.TypeReference SAVED_DATA_MAP_INDEX;
+    public static final DSL.TypeReference SAVED_DATA_RAIDS;
+    public static final DSL.TypeReference SAVED_DATA_RANDOM_SEQUENCES;
+    public static final DSL.TypeReference SAVED_DATA_SCHEDULED_EVENTS;
+    public static final DSL.TypeReference SAVED_DATA_SCOREBOARD;
+    public static final DSL.TypeReference SAVED_DATA_STOPWATCHES;
+    public static final DSL.TypeReference SAVED_DATA_STRUCTURE_FEATURE_INDICES;
+    public static final DSL.TypeReference SAVED_DATA_WANDERING_TRADER;
+    public static final DSL.TypeReference SAVED_DATA_WEATHER;
+    public static final DSL.TypeReference SAVED_DATA_WORLD_BORDER;
+    public static final DSL.TypeReference SAVED_DATA_WORLD_CLOCKS;
+    public static final DSL.TypeReference SAVED_DATA_WORLD_GEN_SETTINGS;
+    public static final DSL.TypeReference ADVANCEMENTS;
+    public static final DSL.TypeReference POI_CHUNK;
+    public static final DSL.TypeReference ENTITY_CHUNK;
+    public static final DSL.TypeReference DEBUG_PROFILE;
+    public static final DSL.TypeReference BLOCK_ENTITY;
+    public static final DSL.TypeReference ITEM_STACK;
+    public static final DSL.TypeReference BLOCK_STATE;
+    public static final DSL.TypeReference FLAT_BLOCK_STATE;
+    public static final DSL.TypeReference DATA_COMPONENTS;
+    public static final DSL.TypeReference VILLAGER_TRADE;
+    public static final DSL.TypeReference PARTICLE;
+    public static final DSL.TypeReference TEXT_COMPONENT;
+    public static final DSL.TypeReference ENTITY_EQUIPMENT;
+    public static final DSL.TypeReference ENTITY_NAME;
+    public static final DSL.TypeReference ENTITY_TREE;
+    public static final DSL.TypeReference ENTITY;
+    public static final DSL.TypeReference BLOCK_NAME;
+    public static final DSL.TypeReference ITEM_NAME;
+    public static final DSL.TypeReference GAME_EVENT_NAME;
+    public static final DSL.TypeReference UNTAGGED_SPAWNER;
+    public static final DSL.TypeReference STRUCTURE_FEATURE;
+    public static final DSL.TypeReference OBJECTIVE;
+    public static final DSL.TypeReference TEAM;
+    public static final DSL.TypeReference RECIPE;
+    public static final DSL.TypeReference BIOME;
+    public static final DSL.TypeReference MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST;
+    public static final DSL.TypeReference WORLD_GEN_SETTINGS;
+    public static DSL.TypeReference reference(String id);
+}
+//// RemapChunkStatusFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.function.UnaryOperator;
+public class RemapChunkStatusFix extends DataFix {
+    public RemapChunkStatusFix(Schema schema, String name, UnaryOperator<String> mapper);
+    protected TypeRewriteRule makeRule();
+}
+//// RemoveBlockEntityTagFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Set;
+public class RemoveBlockEntityTagFix extends DataFix {
+    public RemoveBlockEntityTagFix(Schema outputSchema, Set<String> blockEntityIdsToDrop);
+    public RemoveBlockEntityTagFix(Schema outputSchema, boolean useLegacyDataStructure, Set<String> blockEntityIdsToDrop);
+    public TypeRewriteRule makeRule();
+}
+//// RemoveBlockTransformerComponentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class RemoveBlockTransformerComponentFix extends DataFix {
+    public RemoveBlockTransformerComponentFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// RemoveEmptyItemInBrushableBlockFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class RemoveEmptyItemInBrushableBlockFix extends NamedEntityWriteReadFix {
+    public RemoveEmptyItemInBrushableBlockFix(Schema outputSchema);
+    protected <T> Dynamic<T> fix(Dynamic<T> input);
+}
+//// RemoveGolemGossipFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class RemoveGolemGossipFix extends NamedEntityFix {
+    public RemoveGolemGossipFix(Schema outputSchema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// RenameEnchantmentsFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Map;
+public class RenameEnchantmentsFix extends DataFix {
+    public RenameEnchantmentsFix(Schema outputSchema, String name, Map<String, String> renames);
+    protected TypeRewriteRule makeRule();
+}
+//// RenameNameplateToNameTagFix.java
+import com.mojang.datafixers.schemas.Schema;
+public class RenameNameplateToNameTagFix extends AttributesRenameFix {
+    public RenameNameplateToNameTagFix(Schema outputSchema);
+}
+//// RenamedCoralFansFix.java
+import java.util.Map;
+public class RenamedCoralFansFix {
+    public static final Map<String, String> RENAMED_IDS;
+}
+//// RenamedCoralFix.java
+import java.util.Map;
+public class RenamedCoralFix {
+    public static final Map<String, String> RENAMED_IDS;
+}
+//// ReorganizePoi.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ReorganizePoi extends DataFix {
+    public ReorganizePoi(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// SaddleEquipmentSlotFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class SaddleEquipmentSlotFix extends DataFix {
+    public SaddleEquipmentSlotFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// SavedDataFeaturePoolElementFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class SavedDataFeaturePoolElementFix extends DataFix {
+    public SavedDataFeaturePoolElementFix(Schema outputSchema);
+    public TypeRewriteRule makeRule();
+    protected static Dynamic<?> fixFeature(Dynamic<?> value);
+}
+//// SavedDataUUIDFix.java
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class SavedDataUUIDFix extends AbstractUUIDFix {
+    public SavedDataUUIDFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ScoreboardDisplayNameFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ScoreboardDisplayNameFix extends DataFix {
+    public ScoreboardDisplayNameFix(Schema outputSchema, String name, DSL.TypeReference type);
+    protected TypeRewriteRule makeRule();
+}
+//// ScoreboardDisplaySlotFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class ScoreboardDisplaySlotFix extends DataFix {
+    public ScoreboardDisplaySlotFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// SignTextStrictJsonFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class SignTextStrictJsonFix extends NamedEntityFix {
+    public SignTextStrictJsonFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// SignsOpFlagFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class SignsOpFlagFix extends DataFix {
+    public SignsOpFlagFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// SimpleEntityRenameFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Dynamic;
+public abstract class SimpleEntityRenameFix extends EntityRenameFix {
+    public SimpleEntityRenameFix(String name, Schema outputSchema, boolean changesType);
+    protected Pair<String, Typed<?>> fix(String name, Typed<?> entity);
+    protected abstract Pair<String, Dynamic<?>> getNewNameAndTag(String name, Dynamic<?> tag);
+}
+//// SimplestEntityRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public abstract class SimplestEntityRenameFix extends DataFix {
+    public SimplestEntityRenameFix(String name, Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+    protected abstract String rename(String name);
+}
+//// SpawnerDataFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class SpawnerDataFix extends DataFix {
+    public SpawnerDataFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// StatsCounterFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class StatsCounterFix extends DataFix {
+    public StatsCounterFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+    static record StatType(String type, String typeKey) {
+    }
+}
+//// StatsRenameFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Map;
+public class StatsRenameFix extends DataFix {
+    public StatsRenameFix(Schema outputSchema, String name, Map<String, String> renames);
+    protected TypeRewriteRule makeRule();
+}
+//// StonecutterRecipeRenameFix.java
+import com.google.common.collect.ImmutableMap;
+public class StonecutterRecipeRenameFix {
+    public static final ImmutableMap<String, String> RECIPE_RENAMES;
+    public static final ImmutableMap<String, String> ADVANCEMENT_RENAMES;
+}
+//// StriderGravityFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class StriderGravityFix extends NamedEntityFix {
+    public StriderGravityFix(Schema outputSchema, boolean changesType);
+    public Dynamic<?> fixTag(Dynamic<?> input);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// StructureReferenceCountFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class StructureReferenceCountFix extends DataFix {
+    public StructureReferenceCountFix(Schema outputSchema, boolean changesType);
+    protected TypeRewriteRule makeRule();
+}
+//// StructureSettingsFlattenFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class StructureSettingsFlattenFix extends DataFix {
+    public StructureSettingsFlattenFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// StructuresBecomeConfiguredFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.List;
+import java.util.Map;
+public class StructuresBecomeConfiguredFix extends DataFix {
+    public StructuresBecomeConfiguredFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+    static record Conversion(Map<String, String> biomeMapping, String fallback) {
+        public static Conversion trivial(String result);
+        public static Conversion biomeMapped(Map<List<String>, String> mapping, String fallback);
+    }
+}
+//// SwingAnimationComponentSplitFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class SwingAnimationComponentSplitFix extends DataFix {
+    public SwingAnimationComponentSplitFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// TextComponentHoverAndClickEventFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class TextComponentHoverAndClickEventFix extends DataFix {
+    public TextComponentHoverAndClickEventFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// TextComponentStringifiedFlagsFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class TextComponentStringifiedFlagsFix extends DataFix {
+    public TextComponentStringifiedFlagsFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// ThrownPotionSplitFix.java
+import com.mojang.datafixers.OpticFinder;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+public class ThrownPotionSplitFix extends EntityRenameFix {
+    public ThrownPotionSplitFix(Schema outputSchema);
+    protected Pair<String, Typed<?>> fix(String name, Typed<?> entity);
+    static record ItemIdFinder(OpticFinder<?> itemFinder, OpticFinder<Pair<String, String>> itemIdFinder) {
+        public String getItemId(Typed<?> entity);
+    }
+}
+//// TippedArrowPotionToItemFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class TippedArrowPotionToItemFix extends NamedEntityWriteReadFix {
+    public TippedArrowPotionToItemFix(Schema outputSchema);
+    protected <T> Dynamic<T> fix(Dynamic<T> input);
+}
+//// TooltipDisplayComponentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class TooltipDisplayComponentFix extends DataFix {
+    public TooltipDisplayComponentFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// TrappedChestBlockEntityFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class TrappedChestBlockEntityFix extends DataFix {
+    public TrappedChestBlockEntityFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+    public static final class TrappedChestSection extends LeavesFix.Section {
+        public TrappedChestSection(Typed<?> section, Schema inputSchema);
+        protected boolean skippable();
+        public boolean isTrappedChest(int block);
+    }
+}
+//// TrialSpawnerConfigFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class TrialSpawnerConfigFix extends NamedEntityWriteReadFix {
+    public TrialSpawnerConfigFix(Schema outputSchema);
+    protected <T> Dynamic<T> fix(Dynamic<T> input);
+}
+//// TrialSpawnerConfigInRegistryFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Dynamic;
+import java.util.Map;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.Identifier;
+public class TrialSpawnerConfigInRegistryFix extends NamedEntityFix {
+    public TrialSpawnerConfigInRegistryFix(Schema outputSchema);
+    public Dynamic<?> fixTag(Dynamic<Tag> input);
+    protected Typed<?> fix(Typed<?> entity);
+    static final class VanillaTrialChambers {
+        public static final Map<Pair<Dynamic<Tag>, Dynamic<Tag>>, Identifier> CONFIGS_TO_KEY;
+    }
+}
+//// TridentAnimationFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+public class TridentAnimationFix extends DataComponentRemainderFix {
+    public TridentAnimationFix(Schema outputSchema);
+    protected <T> Dynamic<T> fixComponent(Dynamic<T> input);
+}
+//// UnfilledBuriedTreasureMapFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class UnfilledBuriedTreasureMapFix extends DataFix {
+    public UnfilledBuriedTreasureMapFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// UnflattenTextComponentFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class UnflattenTextComponentFix extends DataFix {
+    public UnflattenTextComponentFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// VariantRenameFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+import java.util.Map;
+public class VariantRenameFix extends NamedEntityFix {
+    public VariantRenameFix(Schema outputSchema, String name, DSL.TypeReference type, String entityName, Map<String, String> renames);
+    protected Typed<?> fix(Typed<?> typed);
+}
+//// VillagerDataFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class VillagerDataFix extends NamedEntityFix {
+    public VillagerDataFix(Schema schema, String entityType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// VillagerFollowRangeFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class VillagerFollowRangeFix extends NamedEntityFix {
+    public VillagerFollowRangeFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// VillagerRebuildLevelAndXpFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class VillagerRebuildLevelAndXpFix extends DataFix {
+    public static int getMinXpPerLevel(int level);
+    public VillagerRebuildLevelAndXpFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// VillagerSetCanPickUpLootFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class VillagerSetCanPickUpLootFix extends NamedEntityFix {
+    public VillagerSetCanPickUpLootFix(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// VillagerSetVillagerDataFinalized.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class VillagerSetVillagerDataFinalized extends NamedEntityFix {
+    public VillagerSetVillagerDataFinalized(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// VillagerTradeFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class VillagerTradeFix extends DataFix {
+    public VillagerTradeFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// WallPropertyFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class WallPropertyFix extends DataFix {
+    public WallPropertyFix(Schema outputSchema, boolean changesType);
+    public TypeRewriteRule makeRule();
+}
+//// WeaponSmithChestLootTableFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class WeaponSmithChestLootTableFix extends NamedEntityFix {
+    public WeaponSmithChestLootTableFix(Schema outputSchema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// WorldBorderWarningTimeFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class WorldBorderWarningTimeFix extends DataFix {
+    public WorldBorderWarningTimeFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// WorldGenSettingsDisallowOldCustomWorldsFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class WorldGenSettingsDisallowOldCustomWorldsFix extends DataFix {
+    public WorldGenSettingsDisallowOldCustomWorldsFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// WorldGenSettingsFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.DynamicOps;
+public class WorldGenSettingsFix extends DataFix {
+    public WorldGenSettingsFix(Schema parent);
+    protected TypeRewriteRule makeRule();
+    protected static <T> Dynamic<T> defaultOverworld(Dynamic<T> input, long seed);
+    protected static <T> T vanillaLevels(Dynamic<T> input, long seed, Dynamic<T> overworldGenerator, boolean caves);
+    static final class StructureFeatureConfiguration {
+        public static final Codec<StructureFeatureConfiguration> CODEC;
+        public StructureFeatureConfiguration(int spacing, int separation, int salt);
+        public <T> Dynamic<T> serialize(DynamicOps<T> ops);
+    }
+}
+//// WorldGenSettingsHeightAndBiomeFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class WorldGenSettingsHeightAndBiomeFix extends DataFix {
+    public static final String WAS_PREVIOUSLY_INCREASED_KEY = "has_increased_height_already";
+    public WorldGenSettingsHeightAndBiomeFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// WorldSpawnDataFix.java
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class WorldSpawnDataFix extends DataFix {
+    public WorldSpawnDataFix(Schema outputSchema);
+    protected TypeRewriteRule makeRule();
+}
+//// WriteAndReadFix.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
+import com.mojang.datafixers.schemas.Schema;
+public class WriteAndReadFix extends DataFix {
+    public WriteAndReadFix(Schema outputSchema, String name, DSL.TypeReference type);
+    protected TypeRewriteRule makeRule();
+}
+//// WrittenBookPagesStrictJsonFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class WrittenBookPagesStrictJsonFix extends ItemStackTagFix {
+    public WrittenBookPagesStrictJsonFix(Schema outputSchema);
+    protected Typed<?> fixItemStackTag(Typed<?> tag);
+}
+//// ZombieVillagerRebuildXpFix.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class ZombieVillagerRebuildXpFix extends NamedEntityFix {
+    public ZombieVillagerRebuildXpFix(Schema outputSchema, boolean changesType);
+    protected Typed<?> fix(Typed<?> entity);
+}
+//// ZombieVillagerSetVillagerDataFinalized.java
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.schemas.Schema;
+public class ZombieVillagerSetVillagerDataFinalized extends NamedEntityFix {
+    public ZombieVillagerSetVillagerDataFinalized(Schema outputSchema);
+    protected Typed<?> fix(Typed<?> entity);
+}

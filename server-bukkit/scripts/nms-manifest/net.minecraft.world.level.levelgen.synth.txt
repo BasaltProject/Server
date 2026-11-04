@@ -1,0 +1,181 @@
+//// BlendedNoise.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Interval;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+public record BlendedNoise(double xzScale, double yScale, double xzFactor, double yFactor, double smearScaleMultiplier) implements DensityFunction {
+    public static final MapCodec<BlendedNoise> CODEC;
+    public static final Identifier NOISE_SEED;
+    public FbmSet createFbmSet(RandomSource random);
+    public static NoiseStack createFbm(RandomSource random, int firstOctave, double smearScaleY, double valueFactor);
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensitySampler compileSampler(RandomSource random);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<BlendedNoise> codec();
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public static record FbmSet(NoiseStack minLimitNoise, NoiseStack maxLimitNoise, NoiseStack mainNoise) {
+        public void parityConfigString(StringBuilder sb);
+    }
+}
+//// GradientNoise.java
+import net.minecraft.util.RandomSource;
+public abstract class GradientNoise implements Noise {
+    protected static final Gradient[] GRADIENT;
+    protected final byte[] perms;
+    protected final double offsetX;
+    protected final double offsetY;
+    protected final double offsetZ;
+    protected GradientNoise(RandomSource random);
+    protected GradientNoise(RandomSource random, double noiseOffsetScale);
+    protected int permute(int x);
+    protected Gradient permuteToGrad(int x);
+    protected static float gradDot(int hash, float x, float y, float z);
+    protected static double wrap(double x);
+    protected static record Gradient(int x, int y, int z) {
+        public double dot(double x, double y, double z);
+        public float dot(float x, float y, float z);
+        public float dotXz(float x, float z);
+    }
+}
+//// LegacyFbmInitializer.java
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+import net.minecraft.util.RandomSource;
+public class LegacyFbmInitializer {
+    public static NoiseStack createForLegacyNetherBiome(RandomSource random, int firstOctave, DoubleList amplitudes);
+}
+//// Noise.java
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+public interface Noise {
+    Interval range();
+    float get(double x, double y);
+    float get(double x, double y, double z);
+    default void addToVolume(DensityBuffer buffer, DensityVolume volume, double xzScale, double yScale, float amplitude);
+}
+//// NoiseStack.java
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+public class NoiseStack implements Noise {
+    protected final Layer[] layers;
+    private NoiseStack(Layer[] layers);
+    public static Builder builder();
+    public Interval range();
+    public float get(double x, double y, double z);
+    public float get(double x, double y);
+    public void addToVolume(DensityBuffer buffer, DensityVolume volume, double xzScale, double yScale, float amplitude);
+    public Noise getLayer(int index);
+    public static class Builder {
+        private Builder();
+        public Builder add(Noise noise, double frequency, float amplitude);
+        public Builder addStack(NoiseStack stack, double frequency, float amplitude);
+        public NoiseStack build();
+    }
+    static class Perlin extends NoiseStack {
+        private Perlin(Layer[] layers);
+        public float get(double x, double y, double z);
+        public void addToVolume(DensityBuffer buffer, DensityVolume volume, double xzScale, double yScale, float amplitude);
+    }
+    static class SmearedPerlin extends NoiseStack {
+        private SmearedPerlin(Layer[] layers);
+        public float get(double x, double y, double z);
+        public void addToVolume(DensityBuffer buffer, DensityVolume volume, double xzScale, double yScale, float amplitude);
+    }
+    protected static record Layer(Noise noise, double frequency, float amplitude) {
+    }
+}
+//// NoiseUtils.java
+public class NoiseUtils {
+    public static double biasTowardsExtreme(double noise, double factor);
+    public static void parityNoiseOctaveConfigString(StringBuilder sb, double xo, double yo, double zo, byte[] p);
+    public static void parityNoiseOctaveConfigString(StringBuilder sb, double xo, double yo, double zo, int[] p);
+}
+//// NormalNoise.java
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+import net.minecraft.core.Holder;
+import net.minecraft.util.Interval;
+import net.minecraft.util.RandomSource;
+public final class NormalNoise {
+    public static final double TARGET_DEVIATION = 0.3333333333333333;
+    public static final Codec<NormalNoise> DIRECT_CODEC;
+    public static final Codec<Holder<NormalNoise>> CODEC;
+    private NormalNoise(Parameters parameters);
+    public static Builder builder();
+    public static NormalNoise createParity(int firstOctave, DoubleList amplitudes);
+    public static NormalNoise createParity(int firstOctave, double... amplitudes);
+    public Noise create(RandomSource random);
+    public Noise createForLegacyNetherBiome(RandomSource random);
+    public Interval range();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+    public void parityConfigString(StringBuilder sb, RandomSource random);
+    static record OctaveInfo(int octaveIndex, double frequency, double amplitude) {
+        public String seed();
+        public double absAmplitude();
+    }
+    public static class Builder {
+        private Builder();
+        public Builder setBaseAmplitude(double baseAmplitude);
+        public Builder setBaseOctave(int baseOctave);
+        public Builder setOctaveCount(int octaveCount);
+        public Builder setNormalize(boolean normalize);
+        public Builder setLegacyNormalization();
+        public Builder setAmplitudeModifier(int index, double value);
+        public NormalNoise build();
+    }
+    static record Parameters(double baseAmplitude, int baseOctave, int octaveCount, Normalization normalize, DoubleList amplitudeModifiers) {
+        public static final Codec<Parameters> CODEC;
+    }
+    public static enum Normalization {
+        DISABLED, ENABLED, LEGACY;
+        public static final Codec<Normalization> CODEC;
+    }
+}
+//// PerlinNoise.java
+import net.minecraft.util.Interval;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+public class PerlinNoise extends GradientNoise {
+    public static final Interval RANGE;
+    public static final double STANDARD_DEVIATION = 0.2702247831245211;
+    public PerlinNoise(RandomSource random);
+    public Interval range();
+    public float get(double x, double y);
+    public float get(double _x, double _y, double _z);
+    public float noiseWithDerivative(double _x, double _y, double _z, float[] derivativeOut);
+    protected float sampleAndLerp(int x, int y, int z, float relativeX, float relativeY, float relativeZ, float originalRelativeY);
+    public void addToVolume(DensityBuffer buffer, DensityVolume volume, double xzScale, double yScale, float amplitude);
+    public void parityConfigString(StringBuilder sb);
+}
+//// SimplexNoise.java
+import net.minecraft.util.Interval;
+import net.minecraft.util.RandomSource;
+public class SimplexNoise extends GradientNoise {
+    public static final Interval RANGE;
+    public static final double STANDARD_DEVIATION = 0.42544;
+    public SimplexNoise(RandomSource random);
+    public SimplexNoise(RandomSource random, boolean discardNoiseOffset);
+    public Interval range();
+    public float get(double _xin, double _yin);
+    public float get(double _xin, double _yin, double _zin);
+}
+//// SmearedPerlinNoise.java
+import net.minecraft.util.Interval;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+public class SmearedPerlinNoise extends PerlinNoise {
+    public SmearedPerlinNoise(RandomSource random, double fudgeYScale);
+    public static Interval range(double fudgeYScale);
+    public Interval range();
+    public float get(double _x, double _y, double _z);
+    public void addToVolume(DensityBuffer buffer, DensityVolume volume, double xzScale, double yScale, float amplitude);
+}

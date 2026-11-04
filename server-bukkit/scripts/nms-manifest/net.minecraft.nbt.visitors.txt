@@ -1,0 +1,103 @@
+//// CollectFields.java
+import net.minecraft.nbt.StreamTagVisitor;
+import net.minecraft.nbt.TagType;
+public class CollectFields extends CollectToTag {
+    public CollectFields(FieldSelector... wantedFields);
+    public StreamTagVisitor.ValueResult visitRootEntry(TagType<?> type);
+    public StreamTagVisitor.EntryResult visitEntry(TagType<?> type);
+    public StreamTagVisitor.EntryResult visitEntry(TagType<?> type, String id);
+    public StreamTagVisitor.ValueResult visitContainerEnd();
+    public int getMissingFieldCount();
+}
+//// CollectToTag.java
+import net.minecraft.nbt.StreamTagVisitor;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.TagType;
+public class CollectToTag implements StreamTagVisitor {
+    public CollectToTag();
+    public Tag getResult();
+    protected int depth();
+    public StreamTagVisitor.ValueResult visitEnd();
+    public StreamTagVisitor.ValueResult visit(String value);
+    public StreamTagVisitor.ValueResult visit(byte value);
+    public StreamTagVisitor.ValueResult visit(short value);
+    public StreamTagVisitor.ValueResult visit(int value);
+    public StreamTagVisitor.ValueResult visit(long value);
+    public StreamTagVisitor.ValueResult visit(float value);
+    public StreamTagVisitor.ValueResult visit(double value);
+    public StreamTagVisitor.ValueResult visit(byte[] value);
+    public StreamTagVisitor.ValueResult visit(int[] value);
+    public StreamTagVisitor.ValueResult visit(long[] value);
+    public StreamTagVisitor.ValueResult visitList(TagType<?> elementType, int size);
+    public StreamTagVisitor.EntryResult visitElement(TagType<?> type, int index);
+    public StreamTagVisitor.EntryResult visitEntry(TagType<?> type);
+    public StreamTagVisitor.EntryResult visitEntry(TagType<?> type, String id);
+    public StreamTagVisitor.ValueResult visitContainerEnd();
+    public StreamTagVisitor.ValueResult visitRootEntry(TagType<?> type);
+    interface ContainerBuilder {
+        default void acceptKey(String id);
+        void acceptValue(Tag tag);
+        Tag build();
+    }
+    static class RootBuilder implements ContainerBuilder {
+        public void acceptValue(Tag tag);
+        public Tag build();
+    }
+    static class CompoundBuilder implements ContainerBuilder {
+        public void acceptKey(String id);
+        public void acceptValue(Tag tag);
+        public Tag build();
+    }
+    static class ListBuilder implements ContainerBuilder {
+        public void acceptValue(Tag tag);
+        public Tag build();
+    }
+}
+//// FieldSelector.java
+import java.util.List;
+import net.minecraft.nbt.TagType;
+public record FieldSelector(List<String> path, TagType<?> type, String name) {
+    public FieldSelector(TagType<?> type, String name);
+    public FieldSelector(String parent, TagType<?> type, String name);
+    public FieldSelector(String grandparent, String parent, TagType<?> type, String name);
+}
+//// FieldTree.java
+import java.util.Map;
+import net.minecraft.nbt.TagType;
+public record FieldTree(int depth, Map<String, TagType<?>> selectedFields, Map<String, FieldTree> fieldsToRecurse) {
+    private FieldTree(int depth);
+    public static FieldTree createRoot();
+    public void addEntry(FieldSelector field);
+    public boolean isSelected(TagType<?> type, String id);
+}
+//// SkipAll.java
+import net.minecraft.nbt.StreamTagVisitor;
+import net.minecraft.nbt.TagType;
+public interface SkipAll extends StreamTagVisitor {
+    SkipAll INSTANCE;
+    default StreamTagVisitor.ValueResult visitEnd();
+    default StreamTagVisitor.ValueResult visit(String value);
+    default StreamTagVisitor.ValueResult visit(byte value);
+    default StreamTagVisitor.ValueResult visit(short value);
+    default StreamTagVisitor.ValueResult visit(int value);
+    default StreamTagVisitor.ValueResult visit(long value);
+    default StreamTagVisitor.ValueResult visit(float value);
+    default StreamTagVisitor.ValueResult visit(double value);
+    default StreamTagVisitor.ValueResult visit(byte[] value);
+    default StreamTagVisitor.ValueResult visit(int[] value);
+    default StreamTagVisitor.ValueResult visit(long[] value);
+    default StreamTagVisitor.ValueResult visitList(TagType<?> elementType, int size);
+    default StreamTagVisitor.EntryResult visitElement(TagType<?> type, int index);
+    default StreamTagVisitor.EntryResult visitEntry(TagType<?> type);
+    default StreamTagVisitor.EntryResult visitEntry(TagType<?> type, String id);
+    default StreamTagVisitor.ValueResult visitContainerEnd();
+    default StreamTagVisitor.ValueResult visitRootEntry(TagType<?> type);
+}
+//// SkipFields.java
+import net.minecraft.nbt.StreamTagVisitor;
+import net.minecraft.nbt.TagType;
+public class SkipFields extends CollectToTag {
+    public SkipFields(FieldSelector... wantedFields);
+    public StreamTagVisitor.EntryResult visitEntry(TagType<?> type, String id);
+    public StreamTagVisitor.ValueResult visitContainerEnd();
+}

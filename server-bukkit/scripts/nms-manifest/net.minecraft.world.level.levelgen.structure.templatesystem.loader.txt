@@ -1,0 +1,61 @@
+//// DirectoryTemplateSource.java
+import com.mojang.datafixers.DataFixer;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.stream.Stream;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.FileToIdConverter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+public class DirectoryTemplateSource extends TemplateSource {
+    public DirectoryTemplateSource(DataFixer fixerUpper, HolderGetter<Block> blockLookup, Path sourceDir, PackType packType, FileToIdConverter fileToIdConverter, boolean loadAsText);
+    public DirectoryTemplateSource(DataFixer fixerUpper, HolderGetter<Block> blockLookup, Path sourceDir, FileToIdConverter fileToIdConverter, boolean loadAsText);
+    public Optional<StructureTemplate> load(Identifier id);
+    public Stream<Identifier> list();
+}
+//// ResourceManagerTemplateSource.java
+import com.mojang.datafixers.DataFixer;
+import java.util.Optional;
+import java.util.stream.Stream;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.FileToIdConverter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+public class ResourceManagerTemplateSource extends TemplateSource {
+    public ResourceManagerTemplateSource(DataFixer fixerUpper, HolderGetter<Block> blockLookup, ResourceManager resourceManager, FileToIdConverter fileToIdConverter);
+    public void setResourceManager(ResourceManager resourceManager);
+    public Optional<StructureTemplate> load(Identifier id);
+    public Stream<Identifier> list();
+}
+//// TemplatePathFactory.java
+import java.nio.file.Path;
+import net.minecraft.resources.FileToIdConverter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackType;
+public class TemplatePathFactory {
+    public TemplatePathFactory(Path sourceDir, PackType packType);
+    public TemplatePathFactory(Path sourceDir);
+    public Path createAndValidatePathToStructure(Identifier id, FileToIdConverter converter);
+    public Path createAndValidatePathToStructure(Identifier resourceLocation);
+}
+//// TemplateSource.java
+import com.mojang.datafixers.DataFixer;
+import java.io.InputStream;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.IoSupplier;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+public abstract class TemplateSource {
+    protected TemplateSource(DataFixer fixerUpper, HolderGetter<Block> blockLookup);
+    public abstract Optional<StructureTemplate> load(Identifier id);
+    public abstract Stream<Identifier> list();
+    protected Optional<StructureTemplate> load(IoSupplier<InputStream> opener, boolean asText, Consumer<Throwable> onError);
+}

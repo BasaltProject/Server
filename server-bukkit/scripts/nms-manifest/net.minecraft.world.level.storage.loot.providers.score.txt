@@ -1,0 +1,42 @@
+//// ContextScoreboardNameProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.scores.ScoreHolder;
+public record ContextScoreboardNameProvider(LootContext.EntityTarget target) implements ScoreboardNameProvider {
+    public static final MapCodec<ContextScoreboardNameProvider> MAP_CODEC;
+    public static final Codec<ContextScoreboardNameProvider> INLINE_CODEC;
+    public static ScoreboardNameProvider forTarget(LootContext.EntityTarget target);
+    public MapCodec<ContextScoreboardNameProvider> codec();
+    public ScoreHolder getScoreHolder(LootContext context);
+    public Set<ContextKey<?>> getReferencedContextParams();
+}
+//// FixedScoreboardNameProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.scores.ScoreHolder;
+public record FixedScoreboardNameProvider(String name) implements ScoreboardNameProvider {
+    public static final MapCodec<FixedScoreboardNameProvider> MAP_CODEC;
+    public static ScoreboardNameProvider forName(String name);
+    public MapCodec<FixedScoreboardNameProvider> codec();
+    public ScoreHolder getScoreHolder(LootContext context);
+}
+//// ScoreboardNameProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.LootContextUser;
+import net.minecraft.world.scores.ScoreHolder;
+public interface ScoreboardNameProvider extends LootContextUser {
+    ScoreHolder getScoreHolder(LootContext context);
+    MapCodec<? extends ScoreboardNameProvider> codec();
+}
+//// ScoreboardNameProviders.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class ScoreboardNameProviders {
+    public static final Codec<ScoreboardNameProvider> CODEC;
+    public static MapCodec<? extends ScoreboardNameProvider> bootstrap(Registry<MapCodec<? extends ScoreboardNameProvider>> registry);
+}

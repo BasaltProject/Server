@@ -1,0 +1,393 @@
+//// BlockBehaviour.java
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.flag.FeatureElement;
+import net.minecraft.world.flag.FeatureFlag;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Explosion;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.SupportType;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.pathfinder.PathComputationType;
+import net.minecraft.world.level.redstone.Orientation;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public abstract class BlockBehaviour implements FeatureElement {
+    protected static final Direction[] UPDATE_SHAPE_ORDER;
+    protected final boolean hasCollision;
+    protected final float explosionResistance;
+    protected final boolean isRandomlyTicking;
+    protected final SoundType soundType;
+    protected final float friction;
+    protected final float speedFactor;
+    protected final float jumpFactor;
+    protected final float bounceRestitution;
+    protected final float fallDistanceReduction;
+    protected final boolean dynamicShape;
+    protected final FeatureFlagSet requiredFeatures;
+    protected final Properties properties;
+    protected final Optional<ResourceKey<LootTable>> drops;
+    protected final String descriptionId;
+    public BlockBehaviour(Properties properties);
+    public Properties properties();
+    protected void updateIndirectNeighbourShapes(BlockState state, LevelAccessor level, BlockPos pos, int updateFlags, int updateLimit);
+    protected boolean isPathfindable(BlockState state, PathComputationType type);
+    protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess ticks, BlockPos pos, Direction directionToNeighbour, BlockPos neighbourPos, BlockState neighbourState, RandomSource random);
+    protected boolean skipRendering(BlockState state, BlockState neighborState, Direction direction);
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston);
+    protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston);
+    protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean movedByPiston);
+    protected void onExplosionHit(BlockState state, ServerLevel level, BlockPos pos, Explosion explosion, BiConsumer<ItemStack, BlockPos> onHit);
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult);
+    protected InteractionResult useItemOn(ItemStack itemStack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult);
+    protected boolean showAsInteractableInSpectatorMode(BlockState state, Level level, BlockPos pos, BlockHitResult hitResult);
+    protected boolean triggerEvent(BlockState state, Level level, BlockPos pos, int b0, int b1);
+    protected RenderShape getRenderShape(BlockState state);
+    protected boolean useShapeForLightOcclusion(BlockState state);
+    protected FluidState getFluidState(BlockState state);
+    protected boolean hasAnalogOutputSignal(BlockState state);
+    protected float getMaxHorizontalOffset();
+    protected float getMaxVerticalOffset();
+    public FeatureFlagSet requiredFeatures();
+    protected boolean shouldChangedStateKeepBlockEntity(BlockState oldState);
+    protected BlockState rotate(BlockState state, Rotation rotation);
+    protected BlockState mirror(BlockState state, Mirror mirror);
+    protected boolean canBeReplaced(BlockState state, BlockPlaceContext context);
+    protected boolean canBeReplaced(BlockState state, Fluid fluid);
+    protected List<ItemStack> getDrops(BlockState state, LootParams.Builder params);
+    protected long getSeed(BlockState state, BlockPos pos);
+    protected VoxelShape getOcclusionShape(BlockState state);
+    protected VoxelShape getBlockSupportShape(BlockState state, BlockGetter level, BlockPos pos);
+    protected VoxelShape getInteractionShape(BlockState state, BlockGetter level, BlockPos pos);
+    protected int getLightDampening(BlockState state);
+    protected MenuProvider getMenuProvider(BlockState state, Level level, BlockPos pos);
+    protected boolean canSurvive(BlockState state, LevelReader level, BlockPos pos);
+    protected float getShadeBrightness(BlockState state, BlockGetter level, BlockPos pos);
+    protected int getAnalogOutputSignal(BlockState state, Level level, BlockPos pos, Direction direction);
+    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context);
+    protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context);
+    protected VoxelShape getEntityInsideCollisionShape(BlockState state, BlockGetter level, BlockPos pos, Entity entity);
+    protected boolean isCollisionShapeFullBlock(BlockState state, BlockGetter level, BlockPos pos);
+    protected VoxelShape getVisualShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context);
+    protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random);
+    protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random);
+    protected float getDestroyProgress(BlockState state, Player player, BlockGetter level, BlockPos pos);
+    protected void spawnAfterBreak(BlockState state, ServerLevel level, BlockPos pos, ItemStack tool, boolean dropExperience);
+    protected void attack(BlockState state, Level level, BlockPos pos, Player player);
+    protected boolean isSignalSource(BlockState state);
+    protected boolean shouldRedstoneWireConnectTo(BlockState state, BlockGetter level, BlockPos pos, Direction direction);
+    protected int getSignal(BlockState state, BlockGetter level, BlockPos pos, Direction direction);
+    protected int ownSignal(BlockState state, BlockGetter level, BlockPos pos);
+    protected void entityInside(BlockState state, Level level, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier, boolean isPrecise);
+    protected int getDirectSignal(BlockState state, BlockGetter level, BlockPos pos, Direction direction);
+    public final Optional<ResourceKey<LootTable>> getLootTable();
+    public final String getDescriptionId();
+    protected void onProjectileHit(Level level, BlockState state, BlockHitResult blockHit, Projectile projectile);
+    protected boolean propagatesSkylightDown(BlockState state);
+    protected boolean isRandomlyTicking(BlockState state);
+    protected SoundType getSoundType(BlockState state);
+    protected ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData);
+    public abstract Item asItem();
+    protected abstract Block asBlock();
+    public MapColor defaultMapColor();
+    public float defaultDestroyTime();
+    public static enum OffsetType {
+        NONE, XZ, XYZ;
+    }
+    public static class Properties {
+        private Properties();
+        public static Properties of();
+        public static Properties ofFullCopy(BlockBehaviour block);
+        public static Properties ofLegacyCopy(BlockBehaviour block);
+        public Properties mapColor(DyeColor dyeColor);
+        public Properties mapColor(MapColor mapColor);
+        public Properties mapColor(Function<BlockState, MapColor> mapColor);
+        public Properties noCollision();
+        public Properties noOcclusion();
+        public Properties friction(float friction);
+        public Properties speedFactor(float speedFactor);
+        public Properties jumpFactor(float jumpFactor);
+        public Properties bounceRestitution(float bounceRestitution);
+        public Properties fallDistanceReduction(float fallDistanceReduction);
+        public Properties sound(SoundType soundType);
+        public Properties lightLevel(ToIntFunction<BlockState> lightEmission);
+        public Properties strength(float destroyTime, float explosionResistance);
+        public Properties instabreak();
+        public Properties strength(float destroyTime);
+        public Properties randomTicks();
+        public Properties dynamicShape();
+        public Properties noLootTable();
+        public Properties overrideLootTable(Optional<ResourceKey<LootTable>> table);
+        protected Optional<ResourceKey<LootTable>> effectiveDrops();
+        public Properties ignitedByLava();
+        public Properties liquid();
+        public Properties forceSolidOn();
+        public Properties forceSolidOff();
+        public Properties pushReaction(PushReaction pushReaction);
+        public Properties air();
+        public Properties isValidSpawn(StateArgumentPredicate<EntityType<?>> isValidSpawn);
+        public Properties isRedstoneConductor(StatePredicate isRedstoneConductor);
+        public Properties isSuffocating(StatePredicate isSuffocating);
+        public Properties isViewBlocking(StateArgumentPredicate<AABB> isViewBlocking);
+        public Properties postProcess(PostProcess postProcess);
+        public Properties emissiveRendering(Predicate<BlockState> emissiveRendering);
+        public Properties requiresCorrectToolForDrops();
+        public Properties destroyTime(float destroyTime);
+        public Properties explosionResistance(float explosionResistance);
+        public Properties offsetType(OffsetType offsetType);
+        public Properties noTerrainParticles();
+        public Properties requiredFeatures(FeatureFlag... flags);
+        public Properties instrument(NoteBlockInstrument instrument);
+        public Properties replaceable();
+        public Properties setId(ResourceKey<Block> id);
+        public Properties overrideDescription(String descriptionId);
+        protected String effectiveDescriptionId();
+    }
+    public static abstract class BlockStateBase extends StateHolder<Block, BlockState> implements TypedInstance<Block> {
+        protected BlockStateBase(Block owner, Property<?>[] propertyKeys, Comparable<?>[] propertyValues);
+        public void initCache();
+        public Block getBlock();
+        public Holder<Block> typeHolder();
+        public boolean isSolid();
+        public boolean isValidSpawn(BlockGetter level, BlockPos pos, EntityType<?> type);
+        public boolean propagatesSkylightDown();
+        public int getLightDampening();
+        public VoxelShape getFaceOcclusionShape(Direction direction);
+        public VoxelShape getOcclusionShape();
+        public boolean hasLargeCollisionShape();
+        public boolean useShapeForLightOcclusion();
+        public int getLightEmission();
+        public boolean isAir();
+        public boolean ignitedByLava();
+        public boolean liquid();
+        public MapColor getMapColor(BlockGetter level, BlockPos pos);
+        public BlockState rotate(Rotation rotation);
+        public BlockState mirror(Mirror mirror);
+        public RenderShape getRenderShape();
+        public boolean emissiveRendering();
+        public float getShadeBrightness(BlockGetter level, BlockPos pos);
+        public boolean isRedstoneConductor(BlockGetter level, BlockPos pos);
+        public boolean isSignalSource();
+        public boolean shouldRedstoneWireConnectTo(BlockGetter level, BlockPos pos, Direction direction);
+        public int getOwnSignal(BlockGetter level, BlockPos pos);
+        public int getSignal(BlockGetter level, BlockPos pos, Direction direction);
+        public boolean hasAnalogOutputSignal();
+        public int getAnalogOutputSignal(Level level, BlockPos pos, Direction direction);
+        public float getDestroySpeed(BlockGetter level, BlockPos pos);
+        public float getDestroyProgress(Player player, BlockGetter level, BlockPos pos);
+        public int getDirectSignal(BlockGetter level, BlockPos pos, Direction direction);
+        public PushReaction getPistonPushReaction();
+        public boolean isSolidRender();
+        public boolean canOcclude();
+        public boolean skipRendering(BlockState neighborState, Direction direction);
+        public VoxelShape getShape(BlockGetter level, BlockPos pos);
+        public VoxelShape getShape(BlockGetter level, BlockPos pos, CollisionContext context);
+        public VoxelShape getCollisionShape(BlockGetter level, BlockPos pos);
+        public VoxelShape getCollisionShape(BlockGetter level, BlockPos pos, CollisionContext context);
+        public VoxelShape getEntityInsideCollisionShape(BlockGetter level, BlockPos pos, Entity entity);
+        public VoxelShape getBlockSupportShape(BlockGetter level, BlockPos pos);
+        public VoxelShape getVisualShape(BlockGetter level, BlockPos pos, CollisionContext context);
+        public VoxelShape getInteractionShape(BlockGetter level, BlockPos pos);
+        public final boolean entityCanStandOn(BlockGetter level, BlockPos pos, Entity entity);
+        public final boolean entityCanStandOnFace(BlockGetter level, BlockPos pos, Entity entity, Direction faceDirection);
+        public Vec3 getOffset(BlockPos pos);
+        public boolean hasOffsetFunction();
+        public boolean triggerEvent(Level level, BlockPos pos, int b0, int b1);
+        public void handleNeighborChanged(Level level, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston);
+        public final void updateNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags);
+        public final void updateNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags, int updateLimit);
+        public final void updateIndirectNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags);
+        public void updateIndirectNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags, int updateLimit);
+        public void onPlace(Level level, BlockPos pos, BlockState oldState, boolean movedByPiston);
+        public void affectNeighborsAfterRemoval(ServerLevel level, BlockPos pos, boolean movedByPiston);
+        public void onExplosionHit(ServerLevel level, BlockPos pos, Explosion explosion, BiConsumer<ItemStack, BlockPos> onHit);
+        public void tick(ServerLevel level, BlockPos pos, RandomSource random);
+        public void randomTick(ServerLevel level, BlockPos pos, RandomSource random);
+        public void entityInside(Level level, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier, boolean isPrecise);
+        public void spawnAfterBreak(ServerLevel level, BlockPos pos, ItemStack tool, boolean dropExperience);
+        public List<ItemStack> getDrops(LootParams.Builder params);
+        public InteractionResult useItemOn(ItemStack itemStack, Level level, Player player, InteractionHand hand, BlockHitResult hitResult);
+        public InteractionResult useWithoutItem(Level level, Player player, BlockHitResult hitResult);
+        public boolean showAsInteractableInSpectatorMode(Level level, BlockPos pos, BlockHitResult hitResult);
+        public void attack(Level level, BlockPos pos, Player player);
+        public boolean isSuffocating(BlockGetter level, BlockPos pos);
+        public boolean isLightPermeable();
+        public boolean isViewBlocking(BlockGetter level, BlockPos blockPos, AABB nearPlaneBox);
+        public BlockState updateShape(LevelReader level, ScheduledTickAccess ticks, BlockPos pos, Direction directionToNeighbour, BlockPos neighbourPos, BlockState neighbourState, RandomSource random);
+        public boolean isPathfindable(PathComputationType type);
+        public boolean canBeReplaced(BlockPlaceContext context);
+        public boolean canBeReplaced(Fluid fluid);
+        public boolean canBeReplaced();
+        public boolean canSurvive(LevelReader level, BlockPos pos);
+        public BlockPos getPostProcessPos(BlockGetter level, BlockPos pos);
+        public MenuProvider getMenuProvider(Level level, BlockPos pos);
+        public boolean is(TagKey<Block> tag, Predicate<BlockStateBase> predicate);
+        public boolean hasBlockEntity();
+        public boolean shouldChangedStateKeepBlockEntity(BlockState oldState);
+        public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockEntityType<T> type);
+        public FluidState getFluidState();
+        public boolean isRandomlyTicking();
+        public long getSeed(BlockPos pos);
+        public SoundType getSoundType();
+        public void onProjectileHit(Level level, BlockState state, BlockHitResult blockHit, Projectile entity);
+        public boolean isFaceSturdy(BlockGetter level, BlockPos pos, Direction direction);
+        public boolean isFaceSturdy(BlockGetter level, BlockPos pos, Direction direction, SupportType supportType);
+        public boolean isCollisionShapeFullBlock(BlockGetter level, BlockPos pos);
+        public ItemStack getCloneItemStack(LevelReader level, BlockPos pos, boolean includeData);
+        protected abstract BlockState asState();
+        public boolean requiresCorrectToolForDrops();
+        public boolean shouldSpawnTerrainParticles();
+        public BlockState withPropertiesOf(BlockState source);
+        public static <T extends Comparable<T>> BlockState copyProperty(BlockState from, BlockState to, Property<T> property);
+        public NoteBlockInstrument instrument();
+        static final class Cache {
+            public final VoxelShape collisionShape;
+            public final boolean largeCollisionShape;
+            public final boolean isCollisionShapeFullBlock;
+            private Cache(BlockState state);
+            public boolean isFaceSturdy(Direction direction, SupportType supportType);
+        }
+    }
+    public interface OffsetFunction {
+        Vec3 evaluate(BlockState state, BlockPos pos);
+    }
+    public interface PostProcess {
+        BlockPos getPostProcessPos(BlockState state, BlockGetter level, BlockPos pos);
+    }
+    public interface StateArgumentPredicate<A> {
+        boolean test(BlockState state, BlockGetter level, BlockPos pos, A a);
+    }
+    public interface StatePredicate {
+        boolean test(BlockState state, BlockGetter level, BlockPos pos);
+    }
+}
+//// BlockState.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.properties.Property;
+public class BlockState extends BlockBehaviour.BlockStateBase {
+    public static final Codec<BlockState> FULL_CODEC;
+    public static final Codec<BlockState> CODEC;
+    public BlockState(Block owner, Property<?>[] propertyKeys, Comparable<?>[] propertyValues);
+    protected BlockState asState();
+}
+//// SolidDebugger.java
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.block.Block;
+public class SolidDebugger {
+    public static boolean logAndGet(Holder<Block> block, Reason reason);
+    public void dump();
+    public static void runAndDump(Runnable task);
+    public static enum Reason {
+        FORCE_SOLID_ON, LARGE_ENOUGH_COLLISION_SHAPE, HIGH_ENOUGH_COLLISION_SHAPE, FORCE_SOLID_OFF, NULL_CACHE, EMPTY_COLLISION_SHAPE, FALLTHROUGH;
+    }
+}
+//// StateDefinition.java
+import com.google.common.collect.ImmutableList;
+import com.mojang.serialization.MapCodec;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import net.minecraft.world.level.block.state.properties.Property;
+public class StateDefinition<O, S extends StateHolder<O, S>> {
+    protected StateDefinition(Function<O, S> defaultState, O owner, Factory<O, S> factory, Map<String, Property<?>> properties);
+    public ImmutableList<S> getPossibleStates();
+    public S any();
+    public MapCodec<S> propertiesCodec();
+    public O getOwner();
+    public Collection<Property<?>> getProperties();
+    public String toString();
+    public Property<?> getProperty(String name);
+    public boolean isSingletonState();
+    public static class Builder<O, S extends StateHolder<O, S>> {
+        public Builder(O owner);
+        public Builder<O, S> add(Property<?>... properties);
+        public StateDefinition<O, S> create(Function<O, S> defaultState, Factory<O, S> factory);
+    }
+    static record StateCollection<S extends StateHolder<?, ?>>(Map<List<Comparable<?>>, S> statesByValues, Map<List<Comparable<?>>, S[]> statesByPivotCache) {
+        public S[][] fillNeighborsForState(Property<?>[] propertyKeys, List<Comparable<?>> propertyValues);
+        static enum Wildcard {
+            INSTANCE;
+        }
+    }
+    public interface Factory<O, S> {
+        S create(O type, Property<?>[] propertyKeys, Comparable<?>[] propertyValues);
+    }
+}
+//// StateHolder.java
+import com.mojang.serialization.Codec;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import net.minecraft.world.level.block.state.properties.Property;
+public abstract class StateHolder<O, S> {
+    public static final String ID_TAG = "id";
+    public static final String PROPERTIES_TAG = "properties";
+    protected final O owner;
+    protected StateHolder(O owner, Property<?>[] propertyKeys, Comparable<?>[] propertyValues);
+    public <T extends Comparable<T>> S cycle(Property<T> property);
+    protected static <T> T findNextInCollection(List<T> values, T current);
+    public String toString();
+    public final boolean equals(Object obj);
+    public int hashCode();
+    public Collection<Property<?>> getProperties();
+    public boolean hasProperty(Property<?> property);
+    public <T extends Comparable<T>> T getValue(Property<T> property);
+    public <T extends Comparable<T>> Optional<T> getOptionalValue(Property<T> property);
+    public <T extends Comparable<T>> T getValueOrElse(Property<T> property, T defaultValue);
+    public <T extends Comparable<T>, V extends T> S setValue(Property<T> property, V value);
+    public <T extends Comparable<T>, V extends T> S trySetValue(Property<T> property, V value);
+    void initializeNeighbors(S[][] neighbors);
+    public boolean isSingletonState();
+    public Stream<Property.Value<?>> getValues();
+    protected static <O, S extends StateHolder<O, S>> Codec<S> codec(Codec<O> ownerCodec, Function<O, S> defaultState, Function<O, StateDefinition<O, S>> stateDefinition);
+}

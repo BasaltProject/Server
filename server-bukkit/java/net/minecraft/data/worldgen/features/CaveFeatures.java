@@ -1,6 +1,9 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.data.worldgen.features;
 
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.world.level.levelgen.feature.Feature;
 
 public class CaveFeatures {
     protected CaveFeatures() {}
@@ -32,4 +35,7 @@ public class CaveFeatures {
     public static final ResourceKey<Object> SCULK_PATCH_DEEP_DARK = FeatureUtils.createKey("sculk_patch_deep_dark");
     public static final ResourceKey<Object> SCULK_PATCH_ANCIENT_CITY = FeatureUtils.createKey("sculk_patch_ancient_city");
     public static final ResourceKey<Object> SCULK_VEIN = FeatureUtils.createKey("sculk_vein");
+    public static void bootstrap(BootstrapContext<Feature> context) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.CaveFeatures#bootstrap");
+    }
 }

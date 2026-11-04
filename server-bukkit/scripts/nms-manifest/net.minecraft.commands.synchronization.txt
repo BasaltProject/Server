@@ -1,0 +1,80 @@
+//// ArgumentTypeInfo.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.arguments.ArgumentType;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.network.FriendlyByteBuf;
+public interface ArgumentTypeInfo<A extends ArgumentType<?>, T extends ArgumentTypeInfo.Template<A>> {
+    void serializeToNetwork(T template, FriendlyByteBuf out);
+    T deserializeFromNetwork(FriendlyByteBuf in);
+    void serializeToJson(T template, JsonObject out);
+    T unpack(A argument);
+    public interface Template<A extends ArgumentType<?>> {
+        A instantiate(CommandBuildContext context);
+        ArgumentTypeInfo<A, ?> type();
+    }
+}
+//// ArgumentTypeInfos.java
+import com.mojang.brigadier.arguments.ArgumentType;
+import net.minecraft.core.Registry;
+public class ArgumentTypeInfos {
+    public static ArgumentTypeInfo<?, ?> bootstrap(Registry<ArgumentTypeInfo<?, ?>> registry);
+    public static boolean isClassRecognized(Class<?> cls);
+    public static <A extends ArgumentType<?>> ArgumentTypeInfo<A, ?> byClass(A argumentType);
+    public static <A extends ArgumentType<?>> ArgumentTypeInfo.Template<A> unpack(A argumentType);
+}
+//// ArgumentUtils.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.tree.CommandNode;
+import java.util.Set;
+public class ArgumentUtils {
+    public static int createNumberFlags(boolean hasMin, boolean hasMax);
+    public static boolean numberHasMin(byte flags);
+    public static boolean numberHasMax(byte flags);
+    public static <S> JsonObject serializeNodeToJson(CommandDispatcher<S> dispatcher, CommandNode<S> node);
+    public static <T> Set<ArgumentType<?>> findUsedArgumentTypes(CommandNode<T> node);
+}
+//// SingletonArgumentInfo.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.arguments.ArgumentType;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.network.FriendlyByteBuf;
+public class SingletonArgumentInfo<A extends ArgumentType<?>> implements ArgumentTypeInfo<A, SingletonArgumentInfo<A>.Template> {
+    private SingletonArgumentInfo(Function<CommandBuildContext, A> constructor);
+    public static <T extends ArgumentType<?>> SingletonArgumentInfo<T> contextFree(Supplier<T> constructor);
+    public static <T extends ArgumentType<?>> SingletonArgumentInfo<T> contextAware(Function<CommandBuildContext, T> constructor);
+    public void serializeToNetwork(SingletonArgumentInfo<A>.Template template, FriendlyByteBuf out);
+    public void serializeToJson(SingletonArgumentInfo<A>.Template template, JsonObject out);
+    public SingletonArgumentInfo<A>.Template deserializeFromNetwork(FriendlyByteBuf in);
+    public SingletonArgumentInfo<A>.Template unpack(A argument);
+    public final class Template implements ArgumentTypeInfo.Template<A> {
+        public Template(Function<CommandBuildContext, A> constructor);
+        public A instantiate(CommandBuildContext context);
+        public ArgumentTypeInfo<A, ?> type();
+    }
+}
+//// SuggestionProviders.java
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.resources.Identifier;
+public class SuggestionProviders {
+    public static final SuggestionProvider<SharedSuggestionProvider> ASK_SERVER;
+    public static final SuggestionProvider<SharedSuggestionProvider> AVAILABLE_SOUNDS;
+    public static final SuggestionProvider<SharedSuggestionProvider> SUMMONABLE_ENTITIES;
+    public static final SuggestionProvider<SharedSuggestionProvider> POST_EFFECTS;
+    public static <S extends SharedSuggestionProvider> SuggestionProvider<S> register(Identifier name, SuggestionProvider<SharedSuggestionProvider> provider);
+    public static <S extends SharedSuggestionProvider> SuggestionProvider<S> cast(SuggestionProvider<SharedSuggestionProvider> provider);
+    public static <S extends SharedSuggestionProvider> SuggestionProvider<S> getProvider(Identifier name);
+    public static Identifier getName(SuggestionProvider<?> provider);
+    static record RegisteredSuggestion(Identifier name, SuggestionProvider<SharedSuggestionProvider> delegate) implements SuggestionProvider<SharedSuggestionProvider> {
+        public CompletableFuture<Suggestions> getSuggestions(CommandContext<SharedSuggestionProvider> context, SuggestionsBuilder builder) throws CommandSyntaxException;
+    }
+}

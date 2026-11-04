@@ -258,6 +258,7 @@ public:
 
     private:
         Chunk* chunk_;
+        Observer previous_;
     };
 
     class ExternalStateScope {

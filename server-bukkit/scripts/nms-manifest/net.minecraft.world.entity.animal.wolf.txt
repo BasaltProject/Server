@@ -1,0 +1,175 @@
+//// Wolf.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntityReference;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.goal.AvoidEntityGoal;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public class Wolf extends TamableAnimal implements NeutralMob {
+    public static final TargetingConditions.Selector PREY_SELECTOR;
+    public static final float DEFAULT_TAIL_ANGLE;
+    public Wolf(EntityType<? extends Wolf> type, Level level);
+    protected void registerGoals();
+    public Identifier getTexture();
+    public <T> T get(DataComponentType<? extends T> type);
+    protected void applyImplicitComponents(DataComponentGetter components);
+    protected <T> boolean applyImplicitComponent(DataComponentType<T> type, T value);
+    public static AttributeSupplier.Builder createAttributes();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void playStepSound(BlockPos pos, BlockState blockState);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData);
+    protected SoundEvent getAmbientSound();
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected SoundEvent getDeathSound();
+    protected float getSoundVolume();
+    public void aiStep();
+    public void tick();
+    public void die(DamageSource source);
+    public float getWetShade(float a);
+    public float getShakeAnim(float a);
+    public float getHeadRollAngle(float a);
+    public int getMaxHeadXRot();
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    protected void actuallyHurt(ServerLevel level, DamageSource source, float damage);
+    protected void applyTamingSideEffects();
+    protected void hurtArmor(DamageSource damageSource, float damage);
+    protected boolean canShearEquipment(Player player);
+    public InteractionResult mobInteract(Player player, InteractionHand hand);
+    public void handleEntityEvent(byte id);
+    public float getTailAngle();
+    public boolean isFood(ItemStack itemStack);
+    public int getMaxSpawnClusterSize();
+    public long getPersistentAngerEndTime();
+    public void setPersistentAngerEndTime(long endTime);
+    public void startPersistentAngerTimer();
+    public EntityReference<LivingEntity> getPersistentAngerTarget();
+    public void setPersistentAngerTarget(EntityReference<LivingEntity> persistentAngerTarget);
+    public DyeColor getCollarColor();
+    public EntityDimensions getDefaultDimensions(Pose pose);
+    public Wolf getBreedOffspring(ServerLevel level, AgeableMob partner);
+    public void setIsInterested(boolean value);
+    public boolean canMate(Animal partner);
+    public boolean isInterested();
+    public boolean wantsToAttack(LivingEntity target, LivingEntity owner);
+    public boolean canBeLeashed();
+    public Vec3 getLeashOffset();
+    public static boolean checkWolfSpawnRules(EntityType<Wolf> type, LevelAccessor level, EntitySpawnReason spawnReason, BlockPos pos, RandomSource random);
+    public static class WolfPackData extends AgeableMob.AgeableMobGroupData {
+        public final Holder<WolfVariant> type;
+        public WolfPackData(Holder<WolfVariant> type);
+    }
+    class WolfAvoidEntityGoal<T extends LivingEntity> extends AvoidEntityGoal<T> {
+        public WolfAvoidEntityGoal(Wolf wolf, Class<T> avoidClass, float maxDist, double walkSpeedModifier, double sprintSpeedModifier);
+        public boolean canUse();
+        public void start();
+        public void tick();
+    }
+}
+//// WolfSoundVariant.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.sounds.SoundEvent;
+public record WolfSoundVariant(WolfSoundSet adultSounds, WolfSoundSet babySounds) {
+    public static final Codec<WolfSoundVariant> DIRECT_CODEC;
+    public static final Codec<WolfSoundVariant> NETWORK_CODEC;
+    public static final Codec<Holder<WolfSoundVariant>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<WolfSoundVariant>> STREAM_CODEC;
+    public static record WolfSoundSet(Holder<SoundEvent> ambientSound, Holder<SoundEvent> deathSound, Holder<SoundEvent> growlSound, Holder<SoundEvent> hurtSound, Holder<SoundEvent> pantSound, Holder<SoundEvent> whineSound, Holder<SoundEvent> stepSound) {
+        public static final Codec<WolfSoundSet> CODEC;
+    }
+}
+//// WolfSoundVariants.java
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.RandomSource;
+public class WolfSoundVariants {
+    public static final ResourceKey<WolfSoundVariant> CLASSIC;
+    public static final ResourceKey<WolfSoundVariant> PUGLIN;
+    public static final ResourceKey<WolfSoundVariant> SAD;
+    public static final ResourceKey<WolfSoundVariant> ANGRY;
+    public static final ResourceKey<WolfSoundVariant> GRUMPY;
+    public static final ResourceKey<WolfSoundVariant> BIG;
+    public static final ResourceKey<WolfSoundVariant> CUTE;
+    public static void bootstrap(BootstrapContext<WolfSoundVariant> context);
+    public static Holder<WolfSoundVariant> pickRandomSoundVariant(RegistryAccess registryAccess, RandomSource random);
+    public static enum SoundSet {
+        CLASSIC, PUGLIN, SAD, ANGRY, GRUMPY, BIG, CUTE;
+        public String getIdentifier();
+        public String getSoundEventIdentifier();
+    }
+}
+//// WolfVariant.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.core.ClientAsset;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.variant.PriorityProvider;
+import net.minecraft.world.entity.variant.SpawnCondition;
+import net.minecraft.world.entity.variant.SpawnContext;
+import net.minecraft.world.entity.variant.SpawnPrioritySelectors;
+public record WolfVariant(AssetInfo adultInfo, AssetInfo babyInfo, SpawnPrioritySelectors spawnConditions) implements PriorityProvider<SpawnContext, SpawnCondition> {
+    public static final Codec<WolfVariant> DIRECT_CODEC;
+    public static final Codec<WolfVariant> NETWORK_CODEC;
+    public static final Codec<Holder<WolfVariant>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<WolfVariant>> STREAM_CODEC;
+    private WolfVariant(AssetInfo adultInfo, AssetInfo babyInfo);
+    public List<PriorityProvider.Selector<SpawnContext, SpawnCondition>> selectors();
+    public static record AssetInfo(ClientAsset.ResourceTexture wild, ClientAsset.ResourceTexture tame, ClientAsset.ResourceTexture angry) {
+        public static final Codec<AssetInfo> CODEC;
+    }
+}
+//// WolfVariants.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class WolfVariants {
+    public static final ResourceKey<WolfVariant> PALE;
+    public static final ResourceKey<WolfVariant> SPOTTED;
+    public static final ResourceKey<WolfVariant> SNOWY;
+    public static final ResourceKey<WolfVariant> BLACK;
+    public static final ResourceKey<WolfVariant> ASHEN;
+    public static final ResourceKey<WolfVariant> RUSTY;
+    public static final ResourceKey<WolfVariant> WOODS;
+    public static final ResourceKey<WolfVariant> CHESTNUT;
+    public static final ResourceKey<WolfVariant> STRIPED;
+    public static final ResourceKey<WolfVariant> DEFAULT;
+    public static void bootstrap(BootstrapContext<WolfVariant> context);
+}

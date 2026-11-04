@@ -378,6 +378,7 @@ void placeBlockEntityInto(Chunk& chunk, const StructureBlockInfo& blockInfo, std
 
 void StructureTemplate::load(const NbtCompound& nbt) {
     blocks_.clear();
+    jigsawIndices_.clear();
     palettes_.clear();
     entities_.clear();
     if (const NbtList* sizeList = nbt.getList("size"); sizeList != nullptr) {
@@ -409,6 +410,13 @@ void StructureTemplate::load(const NbtCompound& nbt) {
         palettes_.push_back(readPalette(*paletteList, *blockList));
     }
     blocks_ = palettes_.front();
+    for (std::size_t index = 0; index < blocks_.size(); ++index) {
+        const StructureBlockInfo& blockInfo = blocks_[index];
+        if (blockInfo.frontFacing.has_value() && blockInfo.topFacing.has_value() &&
+            blockInfo.blockEntityNbt.has_value()) {
+            jigsawIndices_.push_back(static_cast<std::uint32_t>(index));
+        }
+    }
 
     const NbtList* entityList = nbt.getList("entities");
     if (entityList == nullptr) {
@@ -444,11 +452,9 @@ std::vector<PlacedJigsaw> StructureTemplate::jigsawBlocks(const StructurePos pos
                                                           const StructureMirror mirror,
                                                           const StructurePos pivot) const {
     std::vector<PlacedJigsaw> placed;
-    for (const StructureBlockInfo& blockInfo : blocks_) {
-        if (!blockInfo.frontFacing.has_value() || !blockInfo.topFacing.has_value() ||
-            !blockInfo.blockEntityNbt.has_value()) {
-            continue;
-        }
+    placed.reserve(jigsawIndices_.size());
+    for (const std::uint32_t index : jigsawIndices_) {
+        const StructureBlockInfo& blockInfo = blocks_[index];
         const StructurePos worldPos = plus(transform(blockInfo.pos, mirror, rotation, pivot), position);
         const NbtCompound& nbt = *blockInfo.blockEntityNbt;
         const std::string_view joint = nbt.getString("joint");

@@ -1,0 +1,155 @@
+//// AggregateProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public interface AggregateProvider<Value extends Validatable> extends Validatable {
+    static <Value extends Validatable, Self extends AggregateProvider<Value>> MapCodec<Self> mapCodec(Codec<HolderSet<Value>> valueCodec, Factory<Value, Self> factory);
+    HolderSet<Value> inputs();
+    default void validate(ValidationContext context);
+    public interface Factory<Value extends Validatable, Self extends AggregateProvider<Value>> {
+        Self create(HolderSet<Value> value);
+    }
+}
+//// BinaryProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public interface BinaryProvider<Value extends Validatable> extends Validatable {
+    static <Value extends Validatable, Self extends BinaryProvider<Value>> MapCodec<Self> mapCodec(Codec<Holder<Value>> valueCodec, Factory<Value, Self> factory);
+    default void validate(ValidationContext context);
+    Holder<Value> left();
+    Holder<Value> right();
+    public interface Factory<Value extends Validatable, Self extends BinaryProvider<Value>> {
+        Self create(Holder<Value> left, Holder<Value> right);
+    }
+}
+//// ConditionalProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public interface ConditionalProvider<Value extends Validatable> extends Validatable {
+    static <Value extends Validatable, Self extends ConditionalProvider<Value>> MapCodec<Self> mapCodec(Codec<Holder<Value>> valueCodec, Holder<Value> defaultIfFalse, Factory<Value, Self> factory);
+    Holder<LootItemCondition> condition();
+    Holder<Value> onTrue();
+    Holder<Value> onFalse();
+    default Holder<Value> selectValue(LootContext context);
+    default void validate(ValidationContext context);
+    public interface Factory<Value extends Validatable, Self extends ConditionalProvider<Value>> {
+        Self create(Holder<LootItemCondition> condition, Holder<Value> onTrue, Holder<Value> onFalse);
+    }
+}
+//// DispatcherProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public interface DispatcherProvider<Value extends Validatable> extends Validatable {
+    static <Value extends Validatable, Self extends DispatcherProvider<Value>> MapCodec<Self> mapCodec(Codec<Holder<Value>> valueCodec, Holder<Value> defaultCase, Factory<Value, Self> factory);
+    default Holder<Value> selectValue(LootContext context);
+    List<Case<Value>> cases();
+    Holder<Value> defaultValue();
+    default void validate(ValidationContext context);
+    public static record Case<Value extends Validatable>(Holder<LootItemCondition> condition, Holder<Value> value) implements Validatable {
+        public static <Value extends Validatable> Codec<Case<Value>> codec(Codec<Holder<Value>> valueCodec);
+        public boolean test(LootContext context);
+        public void validate(ValidationContext context);
+    }
+    public interface Factory<Value extends Validatable, Self extends DispatcherProvider<Value>> {
+        Self create(List<Case<Value>> cases, Holder<Value> defaultValue);
+    }
+}
+//// DistributionProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public interface DistributionProvider<Value extends Validatable> extends Validatable {
+    WeightedList<Holder<Value>> distribution();
+    static <Value extends Validatable, Self extends DistributionProvider<Value>> MapCodec<Self> mapCodec(Codec<Holder<Value>> valueCodec, Factory<Value, Self> factory);
+    default void validate(ValidationContext context);
+    public interface Factory<Value extends Validatable, Self extends DistributionProvider<Value>> {
+        Self create(WeightedList<Holder<Value>> distribution);
+    }
+}
+//// EnvironmentAttributeProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.level.storage.loot.LootContextUser;
+public interface EnvironmentAttributeProvider extends LootContextUser {
+    static <Self extends EnvironmentAttributeProvider> MapCodec<Self> mapCodec(Codec<EnvironmentAttribute<?>> attributeCodec, Factory<Self> factory);
+    EnvironmentAttribute<?> attribute();
+    default Set<ContextKey<?>> getReferencedContextParams();
+    public interface Factory<Self extends EnvironmentAttributeProvider> {
+        Self create(EnvironmentAttribute<?> attribute);
+    }
+}
+//// PowerProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public interface PowerProvider<Value extends Validatable> extends Validatable {
+    static <Value extends Validatable, Self extends PowerProvider<Value>> MapCodec<Self> mapCodec(Codec<Holder<Value>> valueCodec, Factory<Value, Self> factory);
+    default void validate(ValidationContext context);
+    Holder<Value> base();
+    Holder<Value> exponent();
+    public interface Factory<Value extends Validatable, Self extends PowerProvider<Value>> {
+        Self create(Holder<Value> left, Holder<Value> right);
+    }
+}
+//// RangeProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public interface RangeProvider<Value extends Validatable> extends Validatable {
+    static <Value extends Validatable, Self extends RangeProvider<Value>> MapCodec<Self> mapCodec(Codec<Holder<Value>> valueCodec, Factory<Value, Self> factory);
+    Holder<Value> min();
+    Holder<Value> max();
+    default void validate(ValidationContext context);
+    public interface Factory<Value extends Validatable, Self extends RangeProvider<Value>> {
+        Self create(Holder<Value> min, Holder<Value> max);
+    }
+}
+//// StoredNumberAccess.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.commands.arguments.NbtPathArgument;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record StoredNumberAccess(Identifier storage, NbtPathArgument.NbtPath path) {
+    public static final MapCodec<StoredNumberAccess> MAP_CODEC;
+    public Number getNumericTag(LootContext context);
+}
+//// UnaryProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public interface UnaryProvider<Value extends Validatable> extends Validatable {
+    static <Value extends Validatable, Self extends UnaryProvider<Value>> MapCodec<Self> codec(Codec<Holder<Value>> valueCodec, Factory<Value, Self> factory);
+    Holder<Value> input();
+    default void validate(ValidationContext context);
+    public interface Factory<Value extends Validatable, Self extends UnaryProvider<Value>> {
+        Self create(Holder<Value> input);
+    }
+}

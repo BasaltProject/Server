@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.server.level;
 
 import java.util.Arrays;
@@ -15,15 +16,44 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.lighting.LayerLightEventListener;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import org.basaltmc.bukkit.WorldNatives;
+import net.minecraft.util.thread.ConsecutiveExecutor;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LightChunkGetter;
 
-public class ThreadedLevelLightEngine extends LevelLightEngine {
+public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCloseable {
     private final String world;
     private final Map<DataLayer, Handed> handed = new ConcurrentHashMap<>();
 
     private record Handed(int layer, int x, int y, int z, int hash) {}
 
-    ThreadedLevelLightEngine(String world) {
+    private final net.minecraft.world.level.LevelHeightAccessor heights;
+
+    ThreadedLevelLightEngine(String world, net.minecraft.world.level.LevelHeightAccessor heights) {
         this.world = world;
+        this.heights = heights;
+    }
+
+    @Override
+    public int getRawBrightness(net.minecraft.core.BlockPos pos, int skyDampen) {
+        flush();
+        int block = Math.max(0, WorldNatives.lightAt(world, pos.getX(), pos.getY(), pos.getZ(), 0));
+        int sky = Math.max(0, WorldNatives.lightAt(world, pos.getX(), pos.getY(), pos.getZ(), 1));
+        return Math.max(block, sky - skyDampen);
+    }
+
+    @Override
+    public int getMinLightSection() {
+        return heights.getMinSectionY() - 1;
+    }
+
+    @Override
+    public int getMaxLightSection() {
+        return heights.getMaxSectionY() + 1;
+    }
+
+    @Override
+    public int getLightSectionCount() {
+        return getMaxLightSection() - getMinLightSection() + 1;
     }
 
     private static int index(LightLayer layer) {
@@ -103,5 +133,49 @@ public class ThreadedLevelLightEngine extends LevelLightEngine {
         });
         WorldNatives.lightJob(world, pairs, done);
         return chunks.length;
+    }
+    public static final int DEFAULT_BATCH_SIZE = 1000;
+    public ThreadedLevelLightEngine(LightChunkGetter lightChunkGetter, ChunkMap chunkMap, boolean hasSkyLight, ConsecutiveExecutor consecutiveExecutor, ChunkTaskDispatcher taskDispatcher) {
+        super((net.minecraft.world.level.chunk.LightChunkGetter) null, false, false); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ThreadedLevelLightEngine#<init>");
+    }
+    public void close() {
+        flush();
+    }
+    public int runLightUpdates() {
+        flush();
+        return 0;
+    }
+    protected void updateChunkStatus(ChunkPos pos) {
+        flush();
+    }
+    public void updateSectionStatus(SectionPos pos, boolean sectionEmpty) {
+        flush();
+    }
+    public void propagateLightSources(ChunkPos pos) {
+        flush();
+    }
+    public void setLightEnabled(ChunkPos pos, boolean enable) {
+        return;
+    }
+    public void retainData(ChunkPos pos, boolean retain) {
+        return;
+    }
+    public CompletableFuture<ChunkAccess> initializeLight(ChunkAccess chunk, boolean lighted) {
+        flush();
+        return CompletableFuture.completedFuture(chunk);
+    }
+    public CompletableFuture<ChunkAccess> lightChunk(ChunkAccess centerChunk, boolean lighted) {
+        flush();
+        return CompletableFuture.completedFuture(centerChunk);
+    }
+    public void tryScheduleUpdate() {
+        flush();
+    }
+    public CompletableFuture<?> waitForPendingTasks(int chunkX, int chunkZ) {
+        flush();
+        return CompletableFuture.completedFuture(null);
+    }
+    static enum TaskType {
+        PRE_UPDATE, POST_UPDATE;
     }
 }

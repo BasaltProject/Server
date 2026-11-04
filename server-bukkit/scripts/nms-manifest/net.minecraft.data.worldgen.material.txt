@@ -1,0 +1,51 @@
+//// EndMaterialRules.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.material.rule.MaterialRule;
+public class EndMaterialRules {
+    public static final ResourceKey<MaterialRule> END;
+    public static void bootstrap(BootstrapContext<MaterialRule> context);
+}
+//// NetherMaterialRules.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.material.rule.MaterialRule;
+public class NetherMaterialRules {
+    public static final ResourceKey<MaterialRule> NETHER;
+    public static void bootstrap(BootstrapContext<MaterialRule> context);
+}
+//// OverworldMaterialRules.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.material.rule.MaterialRule;
+public class OverworldMaterialRules {
+    public static final ResourceKey<MaterialRule> OVERWORLD;
+    public static final ResourceKey<MaterialRule> OVERWORLD_CAVES;
+    public static final ResourceKey<MaterialRule> OVERWORLD_FLOATING_ISLANDS;
+    public static void bootstrap(BootstrapContext<MaterialRule> context);
+}
+//// VanillaMaterialConditions.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.material.condition.MaterialCondition;
+public class VanillaMaterialConditions {
+    public static final ResourceKey<MaterialCondition> ON_FLOOR;
+    public static final ResourceKey<MaterialCondition> UNDER_FLOOR;
+    public static final ResourceKey<MaterialCondition> DEEP_UNDER_FLOOR;
+    public static final ResourceKey<MaterialCondition> VERY_DEEP_UNDER_FLOOR;
+    public static final ResourceKey<MaterialCondition> ON_CEILING;
+    public static final ResourceKey<MaterialCondition> UNDER_CEILING;
+    public static final ResourceKey<MaterialCondition> NOT_UNDERWATER;
+    public static final ResourceKey<MaterialCondition> NOT_UNDER_DEEP_WATER;
+    public static void bootstrap(BootstrapContext<MaterialCondition> context);
+}
+//// VanillaMaterialRules.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.material.rule.MaterialRule;
+public class VanillaMaterialRules {
+    public static final ResourceKey<MaterialRule> BEDROCK_FLOOR;
+    public static final ResourceKey<MaterialRule> BEDROCK_ROOF;
+    public static void bootstrap(BootstrapContext<MaterialRule> context);
+    public static MaterialRule air();
+}

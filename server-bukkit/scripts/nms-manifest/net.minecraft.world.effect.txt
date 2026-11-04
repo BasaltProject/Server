@@ -1,0 +1,315 @@
+//// AbsorptionMobEffect.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+class AbsorptionMobEffect extends MobEffect {
+    protected AbsorptionMobEffect(MobEffectCategory category, int color);
+    public boolean applyEffectTick(ServerLevel level, LivingEntity mob, int amplification);
+    public boolean shouldApplyEffectTickThisTick(int tickCount, int amplification);
+    public void onEffectStarted(LivingEntity mob, int amplifier);
+}
+//// BadOmenMobEffect.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+class BadOmenMobEffect extends MobEffect {
+    protected BadOmenMobEffect(MobEffectCategory category, int color);
+    public boolean shouldApplyEffectTickThisTick(int remainingDuration, int amplification);
+    public boolean applyEffectTick(ServerLevel level, LivingEntity mob, int amplification);
+}
+//// HealOrHarmMobEffect.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+class HealOrHarmMobEffect extends InstantaneousMobEffect {
+    public HealOrHarmMobEffect(MobEffectCategory category, int color, boolean isHarm);
+    public boolean applyEffectTick(ServerLevel level, LivingEntity mob, int amplification);
+    public void applyInstantaneousEffect(ServerLevel serverLevel, Entity source, Entity owner, LivingEntity mob, int amplification, double scale);
+}
+//// HungerMobEffect.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+class HungerMobEffect extends MobEffect {
+    protected HungerMobEffect(MobEffectCategory category, int color);
+    public boolean applyEffectTick(ServerLevel serverLevel, LivingEntity mob, int amplification);
+    public boolean shouldApplyEffectTickThisTick(int tickCount, int amplification);
+}
+//// InfestedMobEffect.java
+import java.util.function.ToIntFunction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.LivingEntity;
+class InfestedMobEffect extends MobEffect {
+    protected InfestedMobEffect(MobEffectCategory category, int color, float chanceToSpawn, ToIntFunction<RandomSource> spawnedCount);
+    public void onMobHurt(ServerLevel level, LivingEntity mob, int amplifier, DamageSource source, float damage);
+}
+//// InstantaneousMobEffect.java
+public class InstantaneousMobEffect extends MobEffect {
+    public InstantaneousMobEffect(MobEffectCategory category, int color);
+    public boolean isInstantaneous();
+    public boolean shouldApplyEffectTickThisTick(int remainingDuration, int amplification);
+}
+//// MobEffect.java
+import com.mojang.serialization.Codec;
+import java.util.function.BiConsumer;
+import net.minecraft.core.Holder;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeMap;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.flag.FeatureElement;
+import net.minecraft.world.flag.FeatureFlag;
+import net.minecraft.world.flag.FeatureFlagSet;
+public class MobEffect implements FeatureElement {
+    public static final Codec<Holder<MobEffect>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<MobEffect>> STREAM_CODEC;
+    protected MobEffect(MobEffectCategory category, int color);
+    protected MobEffect(MobEffectCategory category, int color, ParticleOptions particleOptions);
+    public int getBlendInDurationTicks();
+    public int getBlendOutDurationTicks();
+    public int getBlendOutAdvanceTicks();
+    public boolean applyEffectTick(ServerLevel serverLevel, LivingEntity mob, int amplification);
+    public void applyInstantaneousEffect(ServerLevel level, Entity source, Entity owner, LivingEntity mob, int amplification, double scale);
+    public boolean shouldApplyEffectTickThisTick(int tickCount, int amplification);
+    public void onEffectStarted(LivingEntity mob, int amplifier);
+    public void onEffectAdded(LivingEntity mob, int amplifier);
+    public void onMobRemoved(ServerLevel level, LivingEntity mob, int amplifier, Entity.RemovalReason reason);
+    public void onMobHurt(ServerLevel level, LivingEntity mob, int amplifier, DamageSource source, float damage);
+    public boolean isInstantaneous();
+    protected String getOrCreateDescriptionId();
+    public String getDescriptionId();
+    public Component getDisplayName();
+    public MobEffectCategory getCategory();
+    public int getColor();
+    public MobEffect addAttributeModifier(Holder<Attribute> attribute, Identifier id, double amount, AttributeModifier.Operation operation);
+    public MobEffect setBlendDuration(int ticks);
+    public MobEffect setBlendDuration(int inTicks, int outTicks, int outAdvanceTicks);
+    public void createModifiers(int amplifier, BiConsumer<Holder<Attribute>, AttributeModifier> consumer);
+    public void removeAttributeModifiers(AttributeMap attributes);
+    public void addAttributeModifiers(AttributeMap attributes, int amplifier);
+    public boolean isBeneficial();
+    public ParticleOptions createParticleOptions(MobEffectInstance mobEffectInstance);
+    public MobEffect withSoundOnAdded(SoundEvent soundEvent);
+    public MobEffect requiredFeatures(FeatureFlag... flags);
+    public FeatureFlagSet requiredFeatures();
+    static record AttributeTemplate(Identifier id, double amount, AttributeModifier.Operation operation) {
+        public AttributeModifier create(int amplifier);
+    }
+}
+//// MobEffectCategory.java
+import net.minecraft.ChatFormatting;
+public enum MobEffectCategory {
+    BENEFICIAL, HARMFUL, NEUTRAL;
+    public ChatFormatting getTooltipFormatting();
+}
+//// MobEffectInstance.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.ints.Int2IntFunction;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+public class MobEffectInstance implements Comparable<MobEffectInstance> {
+    public static final int INFINITE_DURATION = -1;
+    public static final int MIN_AMPLIFIER = 0;
+    public static final int MAX_AMPLIFIER = 255;
+    public static final Codec<MobEffectInstance> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, MobEffectInstance> STREAM_CODEC;
+    public MobEffectInstance(Holder<MobEffect> effect);
+    public MobEffectInstance(Holder<MobEffect> effect, int duration);
+    public MobEffectInstance(Holder<MobEffect> effect, int duration, int amplifier);
+    public MobEffectInstance(Holder<MobEffect> effect, int duration, int amplifier, boolean ambient, boolean visible);
+    public MobEffectInstance(Holder<MobEffect> effect, int duration, int amplifier, boolean ambient, boolean visible, boolean showIcon);
+    public MobEffectInstance(Holder<MobEffect> effect, int duration, int amplifier, boolean ambient, boolean visible, boolean showIcon, MobEffectInstance hiddenEffect);
+    public MobEffectInstance(MobEffectInstance copy);
+    private MobEffectInstance(Holder<MobEffect> effect, Details details);
+    public float getBlendFactor(LivingEntity livingEntity, float partialTickTime);
+    public ParticleOptions getParticleOptions();
+    public boolean update(MobEffectInstance takeOver);
+    public boolean isInfiniteDuration();
+    public boolean endsWithin(int ticks);
+    public MobEffectInstance withScaledDuration(float scale);
+    public int mapDuration(Int2IntFunction mapper);
+    public Holder<MobEffect> getEffect();
+    public int getDuration();
+    public int getAmplifier();
+    public boolean isAmbient();
+    public boolean isVisible();
+    public boolean showIcon();
+    public boolean tickServer(ServerLevel serverLevel, LivingEntity target, Runnable onEffectUpdate);
+    public void tickClient();
+    public void onEffectStarted(LivingEntity mob);
+    public void onMobRemoved(ServerLevel level, LivingEntity mob, Entity.RemovalReason reason);
+    public void onMobHurt(ServerLevel level, LivingEntity mob, DamageSource source, float damage);
+    public String getDescriptionId();
+    public String toString();
+    public boolean equals(Object o);
+    public int hashCode();
+    public int compareTo(MobEffectInstance o);
+    public void onEffectAdded(LivingEntity livingEntity);
+    public boolean is(Holder<MobEffect> effect);
+    public void copyBlendState(MobEffectInstance instance);
+    public void skipBlending();
+    static record Details(int amplifier, int duration, boolean ambient, boolean showParticles, boolean showIcon, Optional<Details> hiddenEffect) {
+        public static final MapCodec<Details> MAP_CODEC;
+        public static final StreamCodec<ByteBuf, Details> STREAM_CODEC;
+    }
+    static class BlendState {
+        public void setImmediate(MobEffectInstance instance);
+        public void copyFrom(BlendState other);
+        public void tick(MobEffectInstance instance);
+        public float getFactor(LivingEntity livingEntity, float partialTickTime);
+    }
+}
+//// MobEffectUtil.java
+import java.util.List;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
+public final class MobEffectUtil {
+    public static Component formatDuration(MobEffectInstance instance, float scale, float tickrate);
+    public static boolean hasDigSpeed(LivingEntity mob);
+    public static int getDigSpeedAmplification(LivingEntity mob);
+    public static boolean hasWaterBreathing(LivingEntity mob);
+    public static boolean shouldEffectsRefillAirsupply(LivingEntity mob);
+    public static List<ServerPlayer> addEffectToPlayersAround(ServerLevel level, Entity source, Vec3 position, double radius, MobEffectInstance effectInstance, int displayEffectLimit);
+}
+//// MobEffects.java
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+public class MobEffects {
+    public static final Holder<MobEffect> SPEED;
+    public static final Holder<MobEffect> SLOWNESS;
+    public static final Holder<MobEffect> HASTE;
+    public static final Holder<MobEffect> MINING_FATIGUE;
+    public static final Holder<MobEffect> STRENGTH;
+    public static final Holder<MobEffect> INSTANT_HEALTH;
+    public static final Holder<MobEffect> INSTANT_DAMAGE;
+    public static final Holder<MobEffect> JUMP_BOOST;
+    public static final Holder<MobEffect> NAUSEA;
+    public static final Holder<MobEffect> REGENERATION;
+    public static final Holder<MobEffect> RESISTANCE;
+    public static final Holder<MobEffect> FIRE_RESISTANCE;
+    public static final Holder<MobEffect> WATER_BREATHING;
+    public static final Holder<MobEffect> INVISIBILITY;
+    public static final Holder<MobEffect> BLINDNESS;
+    public static final Holder<MobEffect> NIGHT_VISION;
+    public static final Holder<MobEffect> HUNGER;
+    public static final Holder<MobEffect> WEAKNESS;
+    public static final Holder<MobEffect> POISON;
+    public static final Holder<MobEffect> WITHER;
+    public static final Holder<MobEffect> HEALTH_BOOST;
+    public static final Holder<MobEffect> ABSORPTION;
+    public static final Holder<MobEffect> SATURATION;
+    public static final Holder<MobEffect> GLOWING;
+    public static final Holder<MobEffect> LEVITATION;
+    public static final Holder<MobEffect> LUCK;
+    public static final Holder<MobEffect> UNLUCK;
+    public static final Holder<MobEffect> SLOW_FALLING;
+    public static final Holder<MobEffect> CONDUIT_POWER;
+    public static final Holder<MobEffect> DOLPHINS_GRACE;
+    public static final Holder<MobEffect> BAD_OMEN;
+    public static final Holder<MobEffect> HERO_OF_THE_VILLAGE;
+    public static final Holder<MobEffect> DARKNESS;
+    public static final Holder<MobEffect> TRIAL_OMEN;
+    public static final Holder<MobEffect> RAID_OMEN;
+    public static final Holder<MobEffect> WIND_CHARGED;
+    public static final Holder<MobEffect> WEAVING;
+    public static final Holder<MobEffect> OOZING;
+    public static final Holder<MobEffect> INFESTED;
+    public static final Holder<MobEffect> BREATH_OF_THE_NAUTILUS;
+    public static Holder<MobEffect> bootstrap(Registry<MobEffect> registry);
+}
+//// OozingMobEffect.java
+import java.util.function.ToIntFunction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+class OozingMobEffect extends MobEffect {
+    public static final int SLIME_SIZE = 2;
+    protected OozingMobEffect(MobEffectCategory category, int color, ToIntFunction<RandomSource> spawnedCount);
+    protected static int numberOfSlimesToSpawn(int maxEntityCramming, NearbySlimes nearbySlimes, int numberRequested);
+    public void onMobRemoved(ServerLevel level, LivingEntity mob, int amplifier, Entity.RemovalReason reason);
+    protected interface NearbySlimes {
+        int count(int maxResults);
+    }
+}
+//// PoisonMobEffect.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+public class PoisonMobEffect extends MobEffect {
+    public static final int DAMAGE_INTERVAL = 25;
+    protected PoisonMobEffect(MobEffectCategory category, int color);
+    public boolean applyEffectTick(ServerLevel level, LivingEntity mob, int amplification);
+    public boolean shouldApplyEffectTickThisTick(int tickCount, int amplification);
+}
+//// RaidOmenMobEffect.java
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+class RaidOmenMobEffect extends MobEffect {
+    protected RaidOmenMobEffect(MobEffectCategory category, int color, ParticleOptions particleOptions);
+    public boolean shouldApplyEffectTickThisTick(int remainingDuration, int amplification);
+    public boolean applyEffectTick(ServerLevel level, LivingEntity mob, int amplification);
+}
+//// RegenerationMobEffect.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+class RegenerationMobEffect extends MobEffect {
+    protected RegenerationMobEffect(MobEffectCategory category, int color);
+    public boolean applyEffectTick(ServerLevel level, LivingEntity mob, int amplification);
+    public boolean shouldApplyEffectTickThisTick(int tickCount, int amplification);
+}
+//// SaturationMobEffect.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+class SaturationMobEffect extends InstantaneousMobEffect {
+    protected SaturationMobEffect(MobEffectCategory category, int color);
+    public boolean applyEffectTick(ServerLevel level, LivingEntity mob, int amplification);
+}
+//// WeavingMobEffect.java
+import java.util.function.ToIntFunction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+class WeavingMobEffect extends MobEffect {
+    protected WeavingMobEffect(MobEffectCategory category, int color, ToIntFunction<RandomSource> maxCobwebs);
+    public void onMobRemoved(ServerLevel level, LivingEntity mob, int amplifier, Entity.RemovalReason reason);
+}
+//// WindChargedMobEffect.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+class WindChargedMobEffect extends MobEffect {
+    protected WindChargedMobEffect(MobEffectCategory category, int color);
+    public void onMobRemoved(ServerLevel level, LivingEntity mob, int amplifier, Entity.RemovalReason reason);
+}
+//// WitherMobEffect.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+public class WitherMobEffect extends MobEffect {
+    public static final int DAMAGE_INTERVAL = 40;
+    protected WitherMobEffect(MobEffectCategory category, int color);
+    public boolean applyEffectTick(ServerLevel level, LivingEntity mob, int amplification);
+    public boolean shouldApplyEffectTickThisTick(int tickCount, int amplification);
+}

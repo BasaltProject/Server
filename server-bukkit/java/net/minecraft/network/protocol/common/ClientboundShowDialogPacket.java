@@ -1,0 +1,19 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.protocol.common;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.server.dialog.Dialog;
+public record ClientboundShowDialogPacket(Holder<Dialog> dialog) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundShowDialogPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundShowDialogPacket.STREAM_CODEC", () -> StreamCodec.composite(Dialog.STREAM_CODEC, ClientboundShowDialogPacket::dialog, ClientboundShowDialogPacket::new));
+    public static final StreamCodec<ByteBuf, ClientboundShowDialogPacket> CONTEXT_FREE_STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.network.protocol.common.ClientboundShowDialogPacket.class, "CONTEXT_FREE_STREAM_CODEC");
+    public PacketType<ClientboundShowDialogPacket> type() {
+        return CommonPacketTypes.CLIENTBOUND_SHOW_DIALOG;
+    }
+    public void handle(ClientCommonPacketListener listener) {
+        listener.handleShowDialog(this);
+    }
+}

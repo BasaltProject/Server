@@ -1,0 +1,37 @@
+//// ObjectiveCriteria.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.scores.TeamColor;
+public class ObjectiveCriteria {
+    public static final Codec<ObjectiveCriteria> CODEC;
+    public static final ObjectiveCriteria DUMMY;
+    public static final ObjectiveCriteria TRIGGER;
+    public static final ObjectiveCriteria DEATH_COUNT;
+    public static final ObjectiveCriteria KILL_COUNT_PLAYERS;
+    public static final ObjectiveCriteria KILL_COUNT_ALL;
+    public static final ObjectiveCriteria HEALTH;
+    public static final ObjectiveCriteria FOOD;
+    public static final ObjectiveCriteria AIR;
+    public static final ObjectiveCriteria ARMOR;
+    public static final ObjectiveCriteria EXPERIENCE;
+    public static final ObjectiveCriteria LEVEL;
+    public static final Map<TeamColor, ObjectiveCriteria> TEAM_KILL;
+    public static final Map<TeamColor, ObjectiveCriteria> KILLED_BY_TEAM;
+    protected ObjectiveCriteria(String name);
+    protected ObjectiveCriteria(String name, boolean readOnly, RenderType renderType);
+    public static Set<String> getCustomCriteriaNames();
+    public static Optional<ObjectiveCriteria> byName(String name);
+    public String getName();
+    public boolean isReadOnly();
+    public RenderType getDefaultRenderType();
+    public static enum RenderType implements StringRepresentable {
+        INTEGER, HEARTS;
+        public static final StringRepresentable.EnumCodec<RenderType> CODEC;
+        public String getId();
+        public String getSerializedName();
+        public static RenderType byId(String key);
+    }
+}

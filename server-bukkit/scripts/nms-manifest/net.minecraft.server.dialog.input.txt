@@ -1,0 +1,62 @@
+//// BooleanInput.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.chat.Component;
+public record BooleanInput(Component label, boolean initial, String onTrue, String onFalse) implements InputControl {
+    public static final MapCodec<BooleanInput> MAP_CODEC;
+    public MapCodec<BooleanInput> mapCodec();
+}
+//// InputControl.java
+import com.mojang.serialization.MapCodec;
+public interface InputControl {
+    MapCodec<InputControl> MAP_CODEC;
+    MapCodec<? extends InputControl> mapCodec();
+}
+//// InputControlTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class InputControlTypes {
+    public static MapCodec<? extends InputControl> bootstrap(Registry<MapCodec<? extends InputControl>> registry);
+}
+//// NumberRangeInput.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+public record NumberRangeInput(int width, Component label, String labelFormat, RangeInfo rangeInfo) implements InputControl {
+    public static final MapCodec<NumberRangeInput> MAP_CODEC;
+    public MapCodec<NumberRangeInput> mapCodec();
+    public Component computeLabel(String value);
+    public static record RangeInfo(float start, float end, Optional<Float> initial, Optional<Float> step) {
+        public static final MapCodec<RangeInfo> MAP_CODEC;
+        public float computeScaledValue(float sliderValue);
+        public float initialSliderValue();
+    }
+}
+//// SingleOptionInput.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+public record SingleOptionInput(int width, List<Entry> entries, Component label, boolean labelVisible) implements InputControl {
+    public static final MapCodec<SingleOptionInput> MAP_CODEC;
+    public MapCodec<SingleOptionInput> mapCodec();
+    public Optional<Entry> initial();
+    public static record Entry(String id, Optional<Component> display, boolean initial) {
+        public static final Codec<Entry> FULL_CODEC;
+        public static final Codec<Entry> CODEC;
+        public Component displayOrDefault();
+    }
+}
+//// TextInput.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+public record TextInput(int width, Component label, boolean labelVisible, String initial, int maxLength, Optional<MultilineOptions> multiline) implements InputControl {
+    public static final MapCodec<TextInput> MAP_CODEC;
+    public MapCodec<TextInput> mapCodec();
+    public static record MultilineOptions(Optional<Integer> maxLines, Optional<Integer> height) {
+        public static final int MAX_HEIGHT = 512;
+        public static final Codec<MultilineOptions> CODEC;
+    }
+}

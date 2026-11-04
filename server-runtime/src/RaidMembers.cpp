@@ -323,6 +323,48 @@ bool RaidSystem::controlBar(world::LoadedWorld& world, const std::int32_t id, co
     return true;
 }
 
+std::int32_t RaidSystem::controlRaid(world::LoadedWorld& world, const std::int32_t id, const std::string_view action,
+                                     const std::array<std::int32_t, 4>& arguments, const std::int32_t value) {
+    if (action == "create") {
+        for (PlayerSession* player : playersIn(world)) {
+            if (player->entityId() != arguments[0]) {
+                continue;
+            }
+            Raid* made = createOrExtendRaid(world, *player, RaidPos{arguments[1], arguments[2], arguments[3]}, value);
+            return made == nullptr ? -1 : raidsIn(world).idOf(made).value_or(-1);
+        }
+        return -1;
+    }
+    Raid* raid = raidsIn(world).get(id);
+    if (raid == nullptr) {
+        return -1;
+    }
+    if (action == "stop") {
+        raid->stop();
+        removeAllBarPlayers(world, *raid);
+        releaseRaiders(world, *raid);
+        world.raids().dirty = true;
+    } else if (action == "join" || action == "set_leader") {
+        const bool leading = action == "set_leader";
+        ServerEntity* raider = world.state().entity(arguments[leading ? 1 : 0]);
+        if (raider == nullptr || raider->removed) {
+            return -1;
+        }
+        if (leading) {
+            setLeader(world, *raid, arguments[0], *raider);
+        } else {
+            joinRaid(world, *raid, arguments[1], *raider);
+        }
+        world.raids().dirty = true;
+    } else if (action == "remove_leader") {
+        raid->leaders.erase(arguments[0]);
+        world.raids().dirty = true;
+    } else {
+        return -1;
+    }
+    return id;
+}
+
 void RaidSystem::removeAllBarPlayers(world::LoadedWorld& world, Raid& raid) {
     for (PlayerSession* player : playersIn(world)) {
         if (raid.barPlayers.contains(player->entityId()) && raid.barVisible) {

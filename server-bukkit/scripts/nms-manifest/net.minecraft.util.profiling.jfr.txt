@@ -1,0 +1,102 @@
+//// Environment.java
+import net.minecraft.server.MinecraftServer;
+public enum Environment {
+    CLIENT, SERVER;
+    public static Environment from(MinecraftServer server);
+    public String getDescription();
+}
+//// JfrProfiler.java
+import java.net.SocketAddress;
+import java.nio.file.Path;
+import net.minecraft.core.Holder;
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.profiling.jfr.callback.ProfiledDuration;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.storage.RegionFileVersion;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+import net.minecraft.world.level.levelgen.structure.Structure;
+public class JfrProfiler implements JvmProfiler {
+    public static final String ROOT_CATEGORY = "Minecraft";
+    public static final String WORLD_GEN_CATEGORY = "World Generation";
+    public static final String TICK_CATEGORY = "Ticking";
+    public static final String NETWORK_CATEGORY = "Network";
+    public static final String STORAGE_CATEGORY = "Storage";
+    private JfrProfiler();
+    public static JfrProfiler getInstance();
+    public boolean start(Environment environment);
+    public Path stop();
+    public boolean isRunning();
+    public boolean isAvailable();
+    public void onClientTick(int fps);
+    public void onServerTick(float currentAverageTickTime);
+    public void onPacketReceived(ConnectionProtocol protocol, PacketType<?> packetId, SocketAddress remoteAddress, int readableBytes);
+    public void onPacketSent(ConnectionProtocol protocol, PacketType<?> packetId, SocketAddress remoteAddress, int writtenBytes);
+    public void onRegionFileRead(RegionStorageInfo info, ChunkPos pos, RegionFileVersion version, int readBytes);
+    public void onRegionFileWrite(RegionStorageInfo info, ChunkPos pos, RegionFileVersion version, int writtenBytes);
+    public ProfiledDuration onWorldLoadedStarted();
+    public ProfiledDuration onChunkGenerate(ChunkPos pos, ResourceKey<Level> dimension, String name);
+    public ProfiledDuration onStructureGenerate(ChunkPos sourceChunkPos, ResourceKey<Level> dimension, Holder<Structure> structure);
+}
+//// JvmProfiler.java
+import java.net.SocketAddress;
+import java.nio.file.Path;
+import net.minecraft.core.Holder;
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.profiling.jfr.callback.ProfiledDuration;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.storage.RegionFileVersion;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+import net.minecraft.world.level.levelgen.structure.Structure;
+public interface JvmProfiler {
+    JvmProfiler INSTANCE;
+    boolean start(Environment environment);
+    Path stop();
+    boolean isRunning();
+    boolean isAvailable();
+    void onServerTick(float averageTickTime);
+    void onClientTick(int fps);
+    void onPacketReceived(ConnectionProtocol protocol, PacketType<?> packetId, SocketAddress remoteAddress, int readableBytes);
+    void onPacketSent(ConnectionProtocol protocol, PacketType<?> packetId, SocketAddress remoteAddress, int writtenBytes);
+    void onRegionFileRead(RegionStorageInfo info, ChunkPos pos, RegionFileVersion version, int readBytes);
+    void onRegionFileWrite(RegionStorageInfo info, ChunkPos pos, RegionFileVersion version, int writtenBytes);
+    ProfiledDuration onWorldLoadedStarted();
+    ProfiledDuration onChunkGenerate(ChunkPos pos, ResourceKey<Level> dimension, String name);
+    ProfiledDuration onStructureGenerate(ChunkPos sourceChunkPos, ResourceKey<Level> dimension, Holder<Structure> structure);
+    public static class NoOpProfiler implements JvmProfiler {
+        public boolean start(Environment environment);
+        public Path stop();
+        public boolean isRunning();
+        public boolean isAvailable();
+        public void onPacketReceived(ConnectionProtocol protocol, PacketType<?> packetId, SocketAddress remoteAddress, int readableBytes);
+        public void onPacketSent(ConnectionProtocol protocol, PacketType<?> packetId, SocketAddress remoteAddress, int writtenBytes);
+        public void onRegionFileRead(RegionStorageInfo info, ChunkPos pos, RegionFileVersion version, int readBytes);
+        public void onRegionFileWrite(RegionStorageInfo info, ChunkPos pos, RegionFileVersion version, int writtenBytes);
+        public void onServerTick(float averageTickTime);
+        public void onClientTick(int fps);
+        public ProfiledDuration onWorldLoadedStarted();
+        public ProfiledDuration onChunkGenerate(ChunkPos pos, ResourceKey<Level> dimension, String name);
+        public ProfiledDuration onStructureGenerate(ChunkPos sourceChunkPos, ResourceKey<Level> dimension, Holder<Structure> structure);
+    }
+}
+//// Percentiles.java
+import com.google.common.math.Quantiles;
+import java.util.Map;
+public class Percentiles {
+    public static final Quantiles.ScaleAndIndexes DEFAULT_INDEXES;
+    private Percentiles();
+    public static Map<Integer, Double> evaluate(long[] dataset);
+    public static Map<Integer, Double> evaluate(int[] dataset);
+    public static Map<Integer, Double> evaluate(double[] dataset);
+}
+//// SummaryReporter.java
+import java.nio.file.Path;
+public class SummaryReporter {
+    protected SummaryReporter(Runnable onDeregistration);
+    public void recordingStopped(Path result);
+}

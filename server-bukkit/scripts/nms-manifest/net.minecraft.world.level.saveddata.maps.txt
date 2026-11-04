@@ -1,0 +1,180 @@
+//// MapBanner.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.BlockGetter;
+public record MapBanner(BlockPos pos, DyeColor color, Optional<Component> name) {
+    public static final Codec<MapBanner> CODEC;
+    public static MapBanner fromWorld(BlockGetter level, BlockPos pos);
+    public Holder<MapDecorationType> getDecoration();
+    public String getId();
+}
+//// MapDecoration.java
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+public record MapDecoration(Holder<MapDecorationType> type, byte x, byte y, byte rot, Optional<Component> name) {
+    public static final StreamCodec<RegistryFriendlyByteBuf, MapDecoration> STREAM_CODEC;
+    public MapDecoration(Holder<MapDecorationType> type, byte x, byte y, byte rot, Optional<Component> name);
+    public Identifier getSpriteLocation();
+    public boolean renderOnFrame();
+}
+//// MapDecorationType.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+public record MapDecorationType(Identifier assetId, boolean showOnItemFrame, boolean trackCount) {
+    public static final Codec<Holder<MapDecorationType>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<MapDecorationType>> STREAM_CODEC;
+}
+//// MapDecorationTypes.java
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+public class MapDecorationTypes {
+    public static final Holder<MapDecorationType> PLAYER;
+    public static final Holder<MapDecorationType> FRAME;
+    public static final Holder<MapDecorationType> RED_MARKER;
+    public static final Holder<MapDecorationType> BLUE_MARKER;
+    public static final Holder<MapDecorationType> TARGET_X;
+    public static final Holder<MapDecorationType> TARGET_POINT;
+    public static final Holder<MapDecorationType> PLAYER_OFF_MAP;
+    public static final Holder<MapDecorationType> PLAYER_OFF_LIMITS;
+    public static final Holder<MapDecorationType> WOODLAND_MANSION;
+    public static final Holder<MapDecorationType> OCEAN_MONUMENT;
+    public static final Holder<MapDecorationType> WHITE_BANNER;
+    public static final Holder<MapDecorationType> ORANGE_BANNER;
+    public static final Holder<MapDecorationType> MAGENTA_BANNER;
+    public static final Holder<MapDecorationType> LIGHT_BLUE_BANNER;
+    public static final Holder<MapDecorationType> YELLOW_BANNER;
+    public static final Holder<MapDecorationType> LIME_BANNER;
+    public static final Holder<MapDecorationType> PINK_BANNER;
+    public static final Holder<MapDecorationType> GRAY_BANNER;
+    public static final Holder<MapDecorationType> LIGHT_GRAY_BANNER;
+    public static final Holder<MapDecorationType> CYAN_BANNER;
+    public static final Holder<MapDecorationType> PURPLE_BANNER;
+    public static final Holder<MapDecorationType> BLUE_BANNER;
+    public static final Holder<MapDecorationType> BROWN_BANNER;
+    public static final Holder<MapDecorationType> GREEN_BANNER;
+    public static final Holder<MapDecorationType> RED_BANNER;
+    public static final Holder<MapDecorationType> BLACK_BANNER;
+    public static final Holder<MapDecorationType> RED_X;
+    public static final Holder<MapDecorationType> DESERT_VILLAGE;
+    public static final Holder<MapDecorationType> PLAINS_VILLAGE;
+    public static final Holder<MapDecorationType> SAVANNA_VILLAGE;
+    public static final Holder<MapDecorationType> SNOWY_VILLAGE;
+    public static final Holder<MapDecorationType> TAIGA_VILLAGE;
+    public static final Holder<MapDecorationType> JUNGLE_TEMPLE;
+    public static final Holder<MapDecorationType> SWAMP_HUT;
+    public static final Holder<MapDecorationType> TRIAL_CHAMBERS;
+    public static final Holder<MapDecorationType> ABANDONED_CAMP;
+    public static final Holder<MapDecorationType> ANCIENT_CITY;
+    public static final Holder<MapDecorationType> DESERT_PYRAMID;
+    public static final Holder<MapDecorationType> MINESHAFT;
+    public static final Holder<MapDecorationType> OCEAN_RUIN_WARM;
+    public static Holder<MapDecorationType> bootstrap(Registry<MapDecorationType> registry);
+}
+//// MapFrame.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.BlockPos;
+public record MapFrame(BlockPos pos, int rotation, int entityId) {
+    public static final Codec<MapFrame> CODEC;
+    public String getId();
+    public static String frameId(BlockPos pos);
+}
+//// MapId.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipProvider;
+public record MapId(int id) implements TooltipProvider {
+    public static final Codec<MapId> CODEC;
+    public static final StreamCodec<ByteBuf, MapId> STREAM_CODEC;
+    public String key();
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// MapIndex.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public class MapIndex extends SavedData {
+    public static final Codec<MapIndex> CODEC;
+    public static final SavedDataType<MapIndex> TYPE;
+    public MapIndex();
+    public MapIndex(int lastMapId);
+    public MapId getNextMapId();
+}
+//// MapItemSavedData.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public class MapItemSavedData extends SavedData {
+    public static final int MAX_SCALE = 4;
+    public static final int TRACKED_DECORATION_LIMIT = 256;
+    public static final Codec<MapItemSavedData> CODEC;
+    public final int centerX;
+    public final int centerZ;
+    public final ResourceKey<Level> dimension;
+    public final byte scale;
+    public byte[] colors;
+    public final boolean locked;
+    public static SavedDataType<MapItemSavedData> type(MapId id);
+    private MapItemSavedData(int centerX, int centerZ, byte scale, boolean trackingPosition, boolean unlimitedTracking, boolean locked, ResourceKey<Level> dimension);
+    private MapItemSavedData(ResourceKey<Level> dimension, int centerX, int centerZ, byte scale, ByteBuffer colors, boolean trackingPosition, boolean unlimitedTracking, boolean locked, List<MapBanner> banners, List<MapFrame> frames);
+    public static MapItemSavedData createFresh(double originX, double originY, byte scale, boolean trackingPosition, boolean unlimitedTracking, ResourceKey<Level> dimension);
+    public static MapItemSavedData createForClient(byte scale, boolean isLocked, ResourceKey<Level> dimension);
+    public MapItemSavedData locked();
+    public MapItemSavedData scaled();
+    public void tickCarriedBy(Player tickingPlayer, ItemStack itemStack, ItemFrame placedInFrame);
+    public static void addTargetDecoration(ItemStack itemStack, BlockPos position, String key, Holder<MapDecorationType> decorationType);
+    public Packet<?> getUpdatePacket(MapId id, Player player);
+    public HoldingPlayer getHoldingPlayer(Player player);
+    public boolean toggleBanner(LevelAccessor level, BlockPos pos);
+    public void checkBanners(BlockGetter level, int x, int z);
+    public Collection<MapBanner> getBanners();
+    public void removedFromFrame(BlockPos pos, int entityID);
+    public boolean updateColor(int x, int y, byte newColor);
+    public void setColor(int x, int y, byte newColor);
+    public void addClientSideDecorations(List<MapDecoration> decorations);
+    public Iterable<MapDecoration> getDecorations();
+    public boolean isTrackedCountOverLimit(int limit);
+    public static record MapPatch(int startX, int startY, int width, int height, byte[] mapColors) {
+        public static final StreamCodec<ByteBuf, Optional<MapPatch>> STREAM_CODEC;
+        public void applyToMap(MapItemSavedData map);
+    }
+    public class HoldingPlayer {
+        public final Player player;
+        public int step;
+        private HoldingPlayer(Player player);
+    }
+    static record MapDecorationLocation(Holder<MapDecorationType> type, byte x, byte y, byte rot) {
+    }
+}

@@ -1,0 +1,41 @@
+//// CauldronInteraction.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+public interface CauldronInteraction {
+    CauldronInteraction DEFAULT;
+    InteractionResult interact(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, ItemStack itemInHand);
+    public static class Dispatcher {
+        void put(Item item, CauldronInteraction interaction);
+        void put(TagKey<Item> tag, CauldronInteraction interaction);
+        public CauldronInteraction get(ItemStack itemStack);
+    }
+}
+//// CauldronInteractions.java
+import com.mojang.serialization.Codec;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+public class CauldronInteractions {
+    public static final Codec<CauldronInteraction.Dispatcher> CODEC;
+    public static final CauldronInteraction.Dispatcher EMPTY;
+    public static final CauldronInteraction.Dispatcher WATER;
+    public static final CauldronInteraction.Dispatcher LAVA;
+    public static final CauldronInteraction.Dispatcher POWDER_SNOW;
+    public static void bootStrap();
+    public static void addDefaultInteractions(CauldronInteraction.Dispatcher interactionMap);
+    public static InteractionResult fillBucket(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, ItemStack itemInHand, ItemStack newItem, Predicate<BlockState> canFill, SoundEvent soundEvent);
+    public static InteractionResult emptyBucket(Level level, BlockPos pos, Player player, InteractionHand hand, ItemStack itemInHand, BlockState newState, SoundEvent soundEvent);
+}

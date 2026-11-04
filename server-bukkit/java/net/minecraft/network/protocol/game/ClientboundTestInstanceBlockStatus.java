@@ -1,0 +1,18 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.protocol.game;
+import java.util.Optional;
+import net.minecraft.core.Vec3i;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundTestInstanceBlockStatus(Component status, Optional<Vec3i> size) implements Packet<ClientGamePacketListener> {
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundTestInstanceBlockStatus> STREAM_CODEC = StreamCodec.composite(net.minecraft.network.chat.ComponentSerialization.STREAM_CODEC, ClientboundTestInstanceBlockStatus::status, net.minecraft.network.codec.ByteBufCodecs.optional(Vec3i.STREAM_CODEC), ClientboundTestInstanceBlockStatus::size, ClientboundTestInstanceBlockStatus::new);
+    public PacketType<ClientboundTestInstanceBlockStatus> type() {
+        return GamePacketTypes.CLIENTBOUND_TEST_INSTANCE_BLOCK_STATUS;
+    }
+    public void handle(ClientGamePacketListener listener) {
+        listener.handleTestInstanceBlockStatus(this);
+    }
+}

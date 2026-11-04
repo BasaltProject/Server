@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.nbt;
 
 import java.io.DataOutput;
@@ -82,5 +83,22 @@ public final class DoubleTag implements NumericTag {
     @Override
     public String toString() {
         return value + "d";
+    }
+    public static final TagType<DoubleTag> TYPE = org.basaltmc.bukkit.facade.NbtSupport.type("DOUBLE", "TAG_Double",
+        (in, acc) -> {
+            acc.accountBytes(16);
+            return DoubleTag.valueOf(in.readDouble());
+        });
+    public int sizeInBytes() {
+        return 16;
+    }
+    public TagType<DoubleTag> getType() {
+        return TYPE;
+    }
+    public void accept(TagVisitor visitor) {
+        visitor.visitDouble(this);
+    }
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor) {
+        return visitor.visit(value);
     }
 }

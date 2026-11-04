@@ -1,0 +1,341 @@
+//// BlockParticleOption.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.block.state.BlockState;
+public class BlockParticleOption implements ParticleOptions {
+    public static MapCodec<BlockParticleOption> codec(ParticleType<BlockParticleOption> type);
+    public static StreamCodec<? super RegistryFriendlyByteBuf, BlockParticleOption> streamCodec(ParticleType<BlockParticleOption> type);
+    public BlockParticleOption(ParticleType<BlockParticleOption> type, BlockState state);
+    public ParticleType<BlockParticleOption> getType();
+    public BlockState getState();
+}
+//// ColorParticleOption.java
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class ColorParticleOption implements ParticleOptions {
+    public static MapCodec<ColorParticleOption> codec(ParticleType<ColorParticleOption> type);
+    public static StreamCodec<? super ByteBuf, ColorParticleOption> streamCodec(ParticleType<ColorParticleOption> type);
+    private ColorParticleOption(ParticleType<ColorParticleOption> type, int color);
+    public ParticleType<ColorParticleOption> getType();
+    public float getRed();
+    public float getGreen();
+    public float getBlue();
+    public float getAlpha();
+    public static ColorParticleOption create(ParticleType<ColorParticleOption> type, int color);
+    public static ColorParticleOption create(ParticleType<ColorParticleOption> type, float red, float green, float blue);
+}
+//// DustColorTransitionOptions.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import org.joml.Vector3f;
+public class DustColorTransitionOptions extends ScalableParticleOptionsBase {
+    public static final int SCULK_PARTICLE_COLOR = 3790560;
+    public static final DustColorTransitionOptions SCULK_TO_REDSTONE;
+    public static final MapCodec<DustColorTransitionOptions> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DustColorTransitionOptions> STREAM_CODEC;
+    public DustColorTransitionOptions(int fromColor, int toColor, float scale);
+    public Vector3f getFromColor();
+    public Vector3f getToColor();
+    public ParticleType<DustColorTransitionOptions> getType();
+}
+//// DustParticleOptions.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import org.joml.Vector3f;
+public class DustParticleOptions extends ScalableParticleOptionsBase {
+    public static final int REDSTONE_PARTICLE_COLOR = 16711680;
+    public static final DustParticleOptions REDSTONE;
+    public static final MapCodec<DustParticleOptions> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DustParticleOptions> STREAM_CODEC;
+    public DustParticleOptions(int color, float scale);
+    public ParticleType<DustParticleOptions> getType();
+    public Vector3f getColor();
+}
+//// ExplosionParticleInfo.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record ExplosionParticleInfo(ParticleOptions particle, float scaling, float speed) {
+    public static final MapCodec<ExplosionParticleInfo> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ExplosionParticleInfo> STREAM_CODEC;
+}
+//// GeyserBaseParticleOptions.java
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record GeyserBaseParticleOptions(ParticleType<GeyserBaseParticleOptions> type, int waterBlocks, float burstImpulseBase) implements ParticleOptions {
+    public static MapCodec<GeyserBaseParticleOptions> codec(ParticleType<GeyserBaseParticleOptions> type);
+    public static StreamCodec<? super ByteBuf, GeyserBaseParticleOptions> streamCodec(ParticleType<GeyserBaseParticleOptions> type);
+    public ParticleType<GeyserBaseParticleOptions> getType();
+}
+//// GeyserParticleOptions.java
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record GeyserParticleOptions(ParticleType<GeyserParticleOptions> type, int waterBlocks) implements ParticleOptions {
+    public static MapCodec<GeyserParticleOptions> codec(ParticleType<GeyserParticleOptions> type);
+    public static StreamCodec<? super ByteBuf, GeyserParticleOptions> streamCodec(ParticleType<GeyserParticleOptions> type);
+    public ParticleType<GeyserParticleOptions> getType();
+}
+//// ItemParticleOption.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+public class ItemParticleOption implements ParticleOptions {
+    public static MapCodec<ItemParticleOption> codec(ParticleType<ItemParticleOption> type);
+    public static StreamCodec<? super RegistryFriendlyByteBuf, ItemParticleOption> streamCodec(ParticleType<ItemParticleOption> type);
+    public ItemParticleOption(ParticleType<ItemParticleOption> type, Item item);
+    public ItemParticleOption(ParticleType<ItemParticleOption> type, ItemStackTemplate itemStack);
+    public ParticleType<ItemParticleOption> getType();
+    public ItemStackTemplate getItem();
+}
+//// ParticleLimit.java
+public record ParticleLimit(int limit) {
+    public static final ParticleLimit SPORE_BLOSSOM;
+}
+//// ParticleOptions.java
+public interface ParticleOptions {
+    ParticleType<?> getType();
+}
+//// ParticleType.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public abstract class ParticleType<T extends ParticleOptions> {
+    protected ParticleType(boolean overrideLimiter);
+    public boolean getOverrideLimiter();
+    public abstract MapCodec<T> codec();
+    public abstract StreamCodec<? super RegistryFriendlyByteBuf, T> streamCodec();
+}
+//// ParticleTypes.java
+import com.mojang.serialization.Codec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class ParticleTypes {
+    public static final SimpleParticleType ANGRY_VILLAGER;
+    public static final ParticleType<BlockParticleOption> BLOCK;
+    public static final ParticleType<BlockParticleOption> BLOCK_MARKER;
+    public static final SimpleParticleType BUBBLE;
+    public static final SimpleParticleType SULFUR_BUBBLES;
+    public static final SimpleParticleType NOXIOUS_GAS;
+    public static final SimpleParticleType NOXIOUS_GAS_CLOUD;
+    public static final ParticleType<GeyserParticleOptions> GEYSER;
+    public static final ParticleType<GeyserBaseParticleOptions> GEYSER_BASE;
+    public static final ParticleType<GeyserBaseParticleOptions> GEYSER_POOF;
+    public static final ParticleType<GeyserParticleOptions> GEYSER_PLUME;
+    public static final SimpleParticleType CLOUD;
+    public static final SimpleParticleType COPPER_FIRE_FLAME;
+    public static final SimpleParticleType CRIT;
+    public static final SimpleParticleType DAMAGE_INDICATOR;
+    public static final ParticleType<PowerParticleOption> DRAGON_BREATH;
+    public static final SimpleParticleType DRIPPING_LAVA;
+    public static final SimpleParticleType FALLING_LAVA;
+    public static final SimpleParticleType LANDING_LAVA;
+    public static final SimpleParticleType DRIPPING_WATER;
+    public static final SimpleParticleType FALLING_WATER;
+    public static final ParticleType<DustParticleOptions> DUST;
+    public static final ParticleType<DustColorTransitionOptions> DUST_COLOR_TRANSITION;
+    public static final ParticleType<SpellParticleOption> EFFECT;
+    public static final SimpleParticleType ELDER_GUARDIAN;
+    public static final SimpleParticleType ENCHANTED_HIT;
+    public static final SimpleParticleType ENCHANT;
+    public static final SimpleParticleType END_ROD;
+    public static final ParticleType<ColorParticleOption> ENTITY_EFFECT;
+    public static final SimpleParticleType EXPLOSION_EMITTER;
+    public static final SimpleParticleType EXPLOSION;
+    public static final SimpleParticleType GUST;
+    public static final SimpleParticleType SMALL_GUST;
+    public static final SimpleParticleType GUST_EMITTER_LARGE;
+    public static final SimpleParticleType GUST_EMITTER_SMALL;
+    public static final SimpleParticleType SONIC_BOOM;
+    public static final ParticleType<BlockParticleOption> FALLING_DUST;
+    public static final SimpleParticleType FIREWORK;
+    public static final SimpleParticleType FISHING;
+    public static final SimpleParticleType FLAME;
+    public static final SimpleParticleType INFESTED;
+    public static final SimpleParticleType CHERRY_LEAVES;
+    public static final SimpleParticleType PALE_OAK_LEAVES;
+    public static final SimpleParticleType RED_POPLAR_LEAVES;
+    public static final SimpleParticleType ORANGE_POPLAR_LEAVES;
+    public static final SimpleParticleType YELLOW_POPLAR_LEAVES;
+    public static final ParticleType<ColorParticleOption> TINTED_LEAVES;
+    public static final SimpleParticleType SCULK_SOUL;
+    public static final ParticleType<SculkChargeParticleOptions> SCULK_CHARGE;
+    public static final SimpleParticleType SCULK_CHARGE_POP;
+    public static final SimpleParticleType SOUL_FIRE_FLAME;
+    public static final SimpleParticleType SOUL;
+    public static final ParticleType<ColorParticleOption> FLASH;
+    public static final SimpleParticleType HAPPY_VILLAGER;
+    public static final SimpleParticleType COMPOSTER;
+    public static final SimpleParticleType HEART;
+    public static final ParticleType<SpellParticleOption> INSTANT_EFFECT;
+    public static final ParticleType<ItemParticleOption> ITEM;
+    public static final ParticleType<VibrationParticleOption> VIBRATION;
+    public static final ParticleType<TrailParticleOption> TRAIL;
+    public static final SimpleParticleType PAUSE_MOB_GROWTH;
+    public static final SimpleParticleType RESET_MOB_GROWTH;
+    public static final SimpleParticleType ITEM_SLIME;
+    public static final SimpleParticleType ITEM_COBWEB;
+    public static final SimpleParticleType ITEM_SNOWBALL;
+    public static final SimpleParticleType LARGE_SMOKE;
+    public static final SimpleParticleType LAVA;
+    public static final SimpleParticleType MYCELIUM;
+    public static final SimpleParticleType NOTE;
+    public static final SimpleParticleType POOF;
+    public static final SimpleParticleType PORTAL;
+    public static final SimpleParticleType RAIN;
+    public static final SimpleParticleType SMOKE;
+    public static final SimpleParticleType WHITE_SMOKE;
+    public static final SimpleParticleType SNEEZE;
+    public static final SimpleParticleType SPIT;
+    public static final SimpleParticleType SQUID_INK;
+    public static final SimpleParticleType SWEEP_ATTACK;
+    public static final SimpleParticleType TOTEM_OF_UNDYING;
+    public static final SimpleParticleType UNDERWATER;
+    public static final SimpleParticleType SPLASH;
+    public static final SimpleParticleType WITCH;
+    public static final SimpleParticleType BUBBLE_POP;
+    public static final SimpleParticleType CURRENT_DOWN;
+    public static final SimpleParticleType BUBBLE_COLUMN_UP;
+    public static final SimpleParticleType NAUTILUS;
+    public static final SimpleParticleType DOLPHIN;
+    public static final SimpleParticleType CAMPFIRE_COSY_SMOKE;
+    public static final SimpleParticleType CAMPFIRE_SIGNAL_SMOKE;
+    public static final SimpleParticleType DRIPPING_HONEY;
+    public static final SimpleParticleType FALLING_HONEY;
+    public static final SimpleParticleType LANDING_HONEY;
+    public static final SimpleParticleType FALLING_NECTAR;
+    public static final SimpleParticleType FALLING_SPORE_BLOSSOM;
+    public static final SimpleParticleType ASH;
+    public static final SimpleParticleType CRIMSON_SPORE;
+    public static final SimpleParticleType WARPED_SPORE;
+    public static final SimpleParticleType SPORE_BLOSSOM_AIR;
+    public static final SimpleParticleType DRIPPING_OBSIDIAN_TEAR;
+    public static final SimpleParticleType FALLING_OBSIDIAN_TEAR;
+    public static final SimpleParticleType LANDING_OBSIDIAN_TEAR;
+    public static final SimpleParticleType REVERSE_PORTAL;
+    public static final SimpleParticleType WHITE_ASH;
+    public static final SimpleParticleType SMALL_FLAME;
+    public static final SimpleParticleType SNOWFLAKE;
+    public static final SimpleParticleType DRIPPING_DRIPSTONE_LAVA;
+    public static final SimpleParticleType FALLING_DRIPSTONE_LAVA;
+    public static final SimpleParticleType DRIPPING_DRIPSTONE_WATER;
+    public static final SimpleParticleType FALLING_DRIPSTONE_WATER;
+    public static final SimpleParticleType GLOW_SQUID_INK;
+    public static final SimpleParticleType GLOW;
+    public static final SimpleParticleType WAX_ON;
+    public static final SimpleParticleType WAX_OFF;
+    public static final SimpleParticleType ELECTRIC_SPARK;
+    public static final SimpleParticleType SCRAPE;
+    public static final ParticleType<ShriekParticleOption> SHRIEK;
+    public static final SimpleParticleType EGG_CRACK;
+    public static final SimpleParticleType DUST_PLUME;
+    public static final SimpleParticleType TRIAL_SPAWNER_DETECTED_PLAYER;
+    public static final SimpleParticleType TRIAL_SPAWNER_DETECTED_PLAYER_OMINOUS;
+    public static final SimpleParticleType VAULT_CONNECTION;
+    public static final ParticleType<BlockParticleOption> DUST_PILLAR;
+    public static final SimpleParticleType OMINOUS_SPAWNING;
+    public static final SimpleParticleType RAID_OMEN;
+    public static final SimpleParticleType TRIAL_OMEN;
+    public static final ParticleType<BlockParticleOption> BLOCK_CRUMBLE;
+    public static final SimpleParticleType FIREFLY;
+    public static final SimpleParticleType SULFUR_CUBE_GOO;
+    public static final Codec<ParticleOptions> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ParticleOptions> STREAM_CODEC;
+}
+//// PowerParticleOption.java
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class PowerParticleOption implements ParticleOptions {
+    public static MapCodec<PowerParticleOption> codec(ParticleType<PowerParticleOption> type);
+    public static StreamCodec<? super ByteBuf, PowerParticleOption> streamCodec(ParticleType<PowerParticleOption> type);
+    private PowerParticleOption(ParticleType<PowerParticleOption> type, float power);
+    public ParticleType<PowerParticleOption> getType();
+    public float getPower();
+    public static PowerParticleOption create(ParticleType<PowerParticleOption> type, float power);
+}
+//// ScalableParticleOptionsBase.java
+import com.mojang.serialization.Codec;
+public abstract class ScalableParticleOptionsBase implements ParticleOptions {
+    public static final float MIN_SCALE = 0.01F;
+    public static final float MAX_SCALE = 4.0F;
+    protected static final Codec<Float> SCALE;
+    public ScalableParticleOptionsBase(float scale);
+    public float getScale();
+}
+//// SculkChargeParticleOptions.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record SculkChargeParticleOptions(float roll) implements ParticleOptions {
+    public static final MapCodec<SculkChargeParticleOptions> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, SculkChargeParticleOptions> STREAM_CODEC;
+    public ParticleType<SculkChargeParticleOptions> getType();
+}
+//// ShriekParticleOption.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class ShriekParticleOption implements ParticleOptions {
+    public static final MapCodec<ShriekParticleOption> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShriekParticleOption> STREAM_CODEC;
+    public ShriekParticleOption(int delay);
+    public ParticleType<ShriekParticleOption> getType();
+    public int getDelay();
+}
+//// SimpleParticleType.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class SimpleParticleType extends ParticleType<SimpleParticleType> implements ParticleOptions {
+    protected SimpleParticleType(boolean overrideLimiter);
+    public SimpleParticleType getType();
+    public MapCodec<SimpleParticleType> codec();
+    public StreamCodec<RegistryFriendlyByteBuf, SimpleParticleType> streamCodec();
+}
+//// SpellParticleOption.java
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class SpellParticleOption implements ParticleOptions {
+    public static MapCodec<SpellParticleOption> codec(ParticleType<SpellParticleOption> type);
+    public static StreamCodec<? super ByteBuf, SpellParticleOption> streamCodec(ParticleType<SpellParticleOption> type);
+    private SpellParticleOption(ParticleType<SpellParticleOption> type, int color, float power);
+    public ParticleType<SpellParticleOption> getType();
+    public float getRed();
+    public float getGreen();
+    public float getBlue();
+    public float getPower();
+    public static SpellParticleOption create(ParticleType<SpellParticleOption> type, int color, float power);
+    public static SpellParticleOption create(ParticleType<SpellParticleOption> type, float red, float green, float blue, float power);
+}
+//// TrailParticleOption.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.phys.Vec3;
+public record TrailParticleOption(Vec3 target, int color, int duration) implements ParticleOptions {
+    public static final MapCodec<TrailParticleOption> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, TrailParticleOption> STREAM_CODEC;
+    public ParticleType<TrailParticleOption> getType();
+}
+//// VibrationParticleOption.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.gameevent.PositionSource;
+public class VibrationParticleOption implements ParticleOptions {
+    public static final MapCodec<VibrationParticleOption> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, VibrationParticleOption> STREAM_CODEC;
+    public VibrationParticleOption(PositionSource destination, int arrivalInTicks);
+    public ParticleType<VibrationParticleOption> getType();
+    public PositionSource getDestination();
+    public int getArrivalInTicks();
+}

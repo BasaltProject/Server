@@ -1,0 +1,80 @@
+//// Blender.java
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import java.util.Map;
+import net.minecraft.core.CompositeDirection;
+import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.biome.BiomeResolver;
+import net.minecraft.world.level.chunk.CarvingMask;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+public class Blender {
+    public static final ContextKey<Blender> CONTEXT_KEY;
+    public static final ContextKey<DensitySampler> ALPHA_KEY;
+    public static final ContextKey<DensitySampler> OFFSET_KEY;
+    public static Blender empty();
+    public static Blender of(WorldGenRegion region);
+    private Blender(Long2ObjectOpenHashMap<BlendingData> heightAndBiomeBlendingData, Long2ObjectOpenHashMap<BlendingData> densityBlendingData, CarvingMask. Filter carvingFilter);
+    public boolean isEmpty();
+    public OutputBuffer blendOffsetAndFactor(DensityVolume volume);
+    protected BlendingOutput blendOffsetAndFactor(int blockX, int blockZ);
+    public float blendDensity(int blockX, int blockY, int blockZ, float noiseValue);
+    public BiomeResolver getBiomeResolver(BiomeResolver biomeResolver);
+    public static void generateBorderTicks(WorldGenRegion region, ChunkAccess chunk);
+    public CarvingMask. Filter getCarvingFilter();
+    public static DistanceGetter makeOldChunkDistanceGetter(BlendingData centerBlendingData, Map<CompositeDirection.Direction8, BlendingData> oldSidesBlendingData);
+    protected static record BlendingOutput(float alpha, float blendingOffset) {
+    }
+    public static record OutputBuffer(Blender blender, int minCellX, int minCellZ, int cellCountX, int cellCountZ, float[] alphas, float[] offsets) {
+        public DensitySampler createAlphaSampler();
+        public DensitySampler createOffsetSampler();
+        public float getAlpha(int blockX, int blockZ);
+        public float getOffset(int blockX, int blockZ);
+    }
+    interface CellValueGetter {
+        float get(BlendingData data, int cellX, int cellY, int cellZ);
+    }
+    public interface DistanceGetter {
+        double getDistance(double x, double y, double z);
+    }
+}
+//// BlendingData.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.Set;
+import net.minecraft.core.CompositeDirection;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.biome.Biome;
+public class BlendingData {
+    protected static final int CELL_WIDTH = 4;
+    protected static final int CELL_HEIGHT = 8;
+    protected static final int CELL_RATIO = 2;
+    protected static final float NO_VALUE;
+    private BlendingData(int minSection, int maxSection, Optional<float[]> heights);
+    public static BlendingData unpack(Packed packed);
+    public Packed pack();
+    public static BlendingData getOrUpdateBlendingData(WorldGenRegion region, int chunkX, int chunkZ);
+    public static Set<CompositeDirection.Direction8> sideByGenerationAge(WorldGenLevel region, int chunkX, int chunkZ, boolean wantedOldGen);
+    protected float getHeight(int cellX, int cellY, int cellZ);
+    protected float getDensity(int cellX, int cellY, int cellZ);
+    protected void iterateBiomes(int minCellX, int quartY, int minCellZ, BiomeConsumer biomeConsumer);
+    protected void iterateHeights(int minCellX, int minCellZ, HeightConsumer heightConsumer);
+    protected void iterateDensities(int minCellX, int minCellZ, int fromCellY, int toCellY, DensityConsumer densityConsumer);
+    public LevelHeightAccessor getAreaWithOldGeneration();
+    public static record Packed(int minSection, int maxSection, Optional<float[]> heights) {
+        public static final Codec<Packed> CODEC;
+    }
+    protected interface BiomeConsumer {
+        void consume(int cellX, int cellZ, Holder<Biome> biome);
+    }
+    protected interface DensityConsumer {
+        void consume(int cellX, int cellY, int cellZ, float density);
+    }
+    protected interface HeightConsumer {
+        void consume(int cellX, int cellZ, float height);
+    }
+}

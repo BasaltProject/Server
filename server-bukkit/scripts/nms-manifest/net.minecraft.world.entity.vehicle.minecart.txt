@@ -1,0 +1,444 @@
+//// AbstractMinecart.java
+import com.mojang.datafixers.util.Pair;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.BlockUtil;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.InterpolationHandler;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.VehicleEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.RailShape;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public abstract class AbstractMinecart extends VehicleEntity {
+    protected static final float WATER_SLOWDOWN_FACTOR = 0.95F;
+    protected AbstractMinecart(EntityType<?> type, Level level);
+    protected AbstractMinecart(EntityType<?> type, Level level, double x, double y, double z);
+    public void setInitialPos(double x, double y, double z);
+    public static <T extends AbstractMinecart> T createMinecart(Level level, double x, double y, double z, EntityType<T> type, EntitySpawnReason reason, ItemStack itemStack, Player player);
+    public MinecartBehavior getBehavior();
+    protected Entity.MovementEmission getMovementEmission();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public boolean canCollideWith(Entity entity);
+    public boolean isPushable();
+    public Vec3 getRelativePortalPosition(Direction.Axis axis, BlockUtil.FoundRectangle portalArea);
+    protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale);
+    public Vec3 getDismountLocationForPassenger(LivingEntity passenger);
+    protected float getBlockSpeedFactor();
+    public void animateHurt(float yaw);
+    public boolean isPickable();
+    public static Pair<Vec3i, Vec3i> exits(RailShape shape);
+    public Direction getMotionDirection();
+    protected double getDefaultGravity();
+    public void tick();
+    public boolean isFirstTick();
+    public BlockPos getCurrentBlockPosOrRailBelow();
+    protected double getMaxSpeed(ServerLevel level);
+    public void activateMinecart(ServerLevel level, int xt, int yt, int zt, boolean state);
+    public void lerpPositionAndRotationStep(int stepsToTarget, double targetX, double targetY, double targetZ, double targetYRot, double targetXRot);
+    public void applyGravity();
+    public void reapplyPosition();
+    public boolean updateFluidInteraction();
+    public Vec3 getKnownMovement();
+    protected InterpolationHandler createInterpolationHandler();
+    public void onInterpolationStart(InterpolationHandler interpolation);
+    public void recreateFromPacket(ClientboundAddEntityPacket packet);
+    public void lerpMotion(Vec3 movement);
+    protected void moveAlongTrack(ServerLevel level);
+    protected void comeOffTrack(ServerLevel level);
+    protected float getAirDrag();
+    protected double makeStepAlongTrack(BlockPos pos, RailShape shape, double movementLeft);
+    public void move(MoverType moverType, Vec3 delta);
+    public void applyEffectsFromBlocks();
+    public boolean isOnRails();
+    public void setOnRails(boolean onRails);
+    public boolean isFlipped();
+    public void setFlipped(boolean flipped);
+    public Vec3 getRedstoneDirection(BlockPos pos);
+    public boolean isRedstoneConductor(BlockPos pos);
+    protected Vec3 applyNaturalSlowdown(Vec3 movement);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public void push(Entity entity);
+    public BlockState getDisplayBlockState();
+    public BlockState getDefaultDisplayBlockState();
+    public int getDisplayOffset();
+    public int getDefaultDisplayOffset();
+    public void setCustomDisplayBlockState(Optional<BlockState> state);
+    public void setDisplayOffset(int offset);
+    public static boolean useExperimentalMovement(Level level);
+    public abstract ItemStack getPickResult();
+    public boolean isRideable();
+    public boolean isFurnace();
+}
+//// AbstractMinecartContainer.java
+import net.minecraft.core.NonNullList;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.ContainerEntity;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.Vec3;
+public abstract class AbstractMinecartContainer extends AbstractMinecart implements ContainerEntity {
+    protected AbstractMinecartContainer(EntityType<?> type, Level level);
+    public void destroy(ServerLevel level, DamageSource source);
+    public ItemStack getItem(int slot);
+    public ItemStack removeItem(int slot, int count);
+    public ItemStack removeItemNoUpdate(int slot);
+    public void setItem(int slot, ItemStack itemStack);
+    public SlotAccess getSlot(int slot);
+    public void setChanged();
+    public boolean stillValid(Player player);
+    public void remove(Entity.RemovalReason reason);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    protected Vec3 applyNaturalSlowdown(Vec3 deltaMovement);
+    public void clearContent();
+    public void setLootTable(ResourceKey<LootTable> lootTable, long seed);
+    public AbstractContainerMenu createMenu(int containerId, Inventory inventory, Player player);
+    protected abstract AbstractContainerMenu createMenu(int containerId, Inventory inventory);
+    public ResourceKey<LootTable> getContainerLootTable();
+    public void setContainerLootTable(ResourceKey<LootTable> lootTable);
+    public long getContainerLootTableSeed();
+    public void setContainerLootTableSeed(long lootTableSeed);
+    public NonNullList<ItemStack> getItemStacks();
+    public void clearItemStacks();
+}
+//// Minecart.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+public class Minecart extends AbstractMinecart {
+    public Minecart(EntityType<?> type, Level level);
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    protected Item getDropItem();
+    public ItemStack getPickResult();
+    public void activateMinecart(ServerLevel level, int xt, int yt, int zt, boolean state);
+    public boolean isRideable();
+    public void tick();
+    protected void positionRider(Entity passenger, Entity.MoveFunction moveFunction);
+}
+//// MinecartBehavior.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.InterpolationHandler;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.properties.RailShape;
+import net.minecraft.world.phys.Vec3;
+public abstract class MinecartBehavior {
+    protected final AbstractMinecart minecart;
+    protected MinecartBehavior(AbstractMinecart minecart);
+    public void onInterpolationStart(InterpolationHandler interpolation);
+    public void lerpMotion(Vec3 movement);
+    public abstract void tick();
+    public Level level();
+    public abstract void moveAlongTrack(ServerLevel level);
+    public abstract double stepAlongTrack(BlockPos pos, RailShape shape, double movementLeft);
+    public abstract boolean pushAndPickupEntities();
+    public Vec3 getDeltaMovement();
+    public void setDeltaMovement(Vec3 deltaMovement);
+    public void setDeltaMovement(double x, double y, double z);
+    public Vec3 position();
+    public double getX();
+    public double getY();
+    public double getZ();
+    public void setPos(Vec3 pos);
+    public void setPos(double x, double y, double z);
+    public float getXRot();
+    public void setXRot(float rot);
+    public float getYRot();
+    public void setYRot(float rot);
+    public Direction getMotionDirection();
+    public Vec3 getKnownMovement(Vec3 knownMovement);
+    public abstract double getMaxSpeed(ServerLevel level);
+    public abstract double getSlowdownFactor();
+}
+//// MinecartChest.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.ContainerUser;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+public class MinecartChest extends AbstractMinecartContainer {
+    public MinecartChest(EntityType<? extends MinecartChest> type, Level level);
+    protected Item getDropItem();
+    public ItemStack getPickResult();
+    public int getContainerSize();
+    public BlockState getDefaultDisplayBlockState();
+    public int getDefaultDisplayOffset();
+    public AbstractContainerMenu createMenu(int containerId, Inventory inventory);
+    public void stopOpen(ContainerUser containerUser);
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+}
+//// MinecartCommandBlock.java
+import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BaseCommandBlock;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public class MinecartCommandBlock extends AbstractMinecart {
+    public MinecartCommandBlock(EntityType<? extends MinecartCommandBlock> type, Level level);
+    protected Item getDropItem();
+    public ItemStack getPickResult();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public BlockState getDefaultDisplayBlockState();
+    public BaseCommandBlock getCommandBlock();
+    public void activateMinecart(ServerLevel level, int xt, int yt, int zt, boolean state);
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    class MinecartCommandBase extends BaseCommandBlock {
+        private MinecartCommandBase();
+        public void onUpdated(ServerLevel level);
+        public CommandSourceStack createCommandSourceStack(ServerLevel level, CommandSource source);
+        public boolean isValid();
+    }
+}
+//// MinecartFurnace.java
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public class MinecartFurnace extends AbstractMinecart {
+    public Vec3 push;
+    public MinecartFurnace(EntityType<? extends MinecartFurnace> type, Level level);
+    public boolean isFurnace();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public void tick();
+    protected double getMaxSpeed(ServerLevel level);
+    protected Item getDropItem();
+    public ItemStack getPickResult();
+    protected Vec3 applyNaturalSlowdown(Vec3 deltaMovement);
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    public boolean addFuel(Vec3 interactingPos, ItemStack itemStack);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected boolean hasFuel();
+    protected void setHasFuel(boolean fuel);
+    public BlockState getDefaultDisplayBlockState();
+}
+//// MinecartHopper.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.Hopper;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.RailShape;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class MinecartHopper extends AbstractMinecartContainer implements Hopper {
+    public MinecartHopper(EntityType<? extends MinecartHopper> type, Level level);
+    public BlockState getDefaultDisplayBlockState();
+    public int getDefaultDisplayOffset();
+    public int getContainerSize();
+    public void activateMinecart(ServerLevel level, int xt, int yt, int zt, boolean state);
+    public boolean isEnabled();
+    public void setEnabled(boolean enabled);
+    public double getLevelX();
+    public double getLevelY();
+    public double getLevelZ();
+    public boolean isGridAligned();
+    public void tick();
+    protected double makeStepAlongTrack(BlockPos pos, RailShape shape, double movementLeft);
+    public boolean suckInItems();
+    protected Item getDropItem();
+    public ItemStack getPickResult();
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public AbstractContainerMenu createMenu(int containerId, Inventory inventory);
+}
+//// MinecartSpawner.java
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BaseSpawner;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class MinecartSpawner extends AbstractMinecart {
+    public MinecartSpawner(EntityType<? extends MinecartSpawner> type, Level level);
+    protected Item getDropItem();
+    public ItemStack getPickResult();
+    public BlockState getDefaultDisplayBlockState();
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public void handleEntityEvent(byte id);
+    public void tick();
+    public BaseSpawner getSpawner();
+}
+//// MinecartTNT.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Explosion;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class MinecartTNT extends AbstractMinecart {
+    public MinecartTNT(EntityType<? extends MinecartTNT> type, Level level);
+    public BlockState getDefaultDisplayBlockState();
+    public void tick();
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public void destroy(ServerLevel level, DamageSource source);
+    protected Item getDropItem();
+    public ItemStack getPickResult();
+    protected void explode(DamageSource damageSource, double speedSqr);
+    public boolean causeFallDamage(double fallDistance, float damageModifier, DamageSource damageSource);
+    public void activateMinecart(ServerLevel level, int xt, int yt, int zt, boolean state);
+    public void handleEntityEvent(byte id);
+    public void primeFuse(DamageSource source);
+    public int getFuse();
+    public boolean isPrimed();
+    public float getBlockExplosionResistance(Explosion explosion, BlockGetter level, BlockPos pos, BlockState block, FluidState fluid, float resistance);
+    public boolean shouldBlockExplode(Explosion explosion, BlockGetter level, BlockPos pos, BlockState state, float power);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected boolean shouldSourceDestroy(DamageSource source);
+}
+//// NewMinecartBehavior.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.RailShape;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public class NewMinecartBehavior extends MinecartBehavior {
+    public static final int POS_ROT_LERP_TICKS = 3;
+    public static final double ON_RAIL_Y_OFFSET = 0.1;
+    public static final double OPPOSING_SLOPES_REST_AT_SPEED_THRESHOLD = 0.005;
+    public final List<MinecartStep> lerpSteps;
+    public final List<MinecartStep> currentLerpSteps;
+    public double currentLerpStepsTotalWeight;
+    public MinecartStep oldLerp;
+    public NewMinecartBehavior(AbstractMinecart minecart);
+    public void tick();
+    public void setOldLerpValues();
+    public boolean cartHasPosRotLerp();
+    public float getCartLerpXRot(float partialTicks);
+    public float getCartLerpYRot(float partialTicks);
+    public Vec3 getCartLerpPosition(float partialTicks);
+    public Vec3 getCartLerpMovements(float partialTicks);
+    public void adjustToRails(BlockPos targetBlockPos, BlockState currentState, boolean instant);
+    public void moveAlongTrack(ServerLevel level);
+    public double stepAlongTrack(BlockPos pos, RailShape shape, double movementLeft);
+    public double getMaxSpeed(ServerLevel level);
+    public double getSlowdownFactor();
+    public boolean pushAndPickupEntities();
+    public boolean pickupEntities(AABB hitbox);
+    public boolean pushEntities(AABB hitbox);
+    public static record MinecartStep(Vec3 position, Vec3 movement, float yRot, float xRot, float weight) {
+        public static final StreamCodec<ByteBuf, MinecartStep> STREAM_CODEC;
+        public static final MinecartStep ZERO;
+    }
+    static class TrackIteration {
+        public double movementLeft;
+        public boolean firstIteration;
+        public boolean hasGainedSlopeSpeed;
+        public boolean hasHalted;
+        public boolean hasBoosted;
+        public boolean shouldIterate();
+    }
+    static record StepPartialTicks(float partialTicksInStep, MinecartStep currentStep, MinecartStep previousStep) {
+    }
+}
+//// OldMinecartBehavior.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.InterpolationHandler;
+import net.minecraft.world.level.block.state.properties.RailShape;
+import net.minecraft.world.phys.Vec3;
+public class OldMinecartBehavior extends MinecartBehavior {
+    public OldMinecartBehavior(AbstractMinecart minecart);
+    public void onInterpolationStart(InterpolationHandler interpolation);
+    public void lerpMotion(Vec3 movement);
+    public void tick();
+    public void moveAlongTrack(ServerLevel level);
+    public Vec3 getPosOffs(double x, double y, double z, double offs);
+    public Vec3 getPos(double x, double y, double z);
+    public double stepAlongTrack(BlockPos pos, RailShape shape, double movementLeft);
+    public boolean pushAndPickupEntities();
+    public Direction getMotionDirection();
+    public Vec3 getKnownMovement(Vec3 knownMovement);
+    public double getMaxSpeed(ServerLevel level);
+    public double getSlowdownFactor();
+}

@@ -1,0 +1,6 @@
+//// JfrResultJsonSerializer.java
+import net.minecraft.util.profiling.jfr.parse.JfrStatsResult;
+public class JfrResultJsonSerializer {
+    public JfrResultJsonSerializer();
+    public String format(JfrStatsResult jfrStats);
+}

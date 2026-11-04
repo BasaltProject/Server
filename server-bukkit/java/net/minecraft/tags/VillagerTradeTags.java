@@ -1,0 +1,84 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.tags;
+
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.trading.VillagerTrade;
+
+public final class VillagerTradeTags {
+    public static final TagKey<VillagerTrade> FARMER_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "farmer/level_1");
+    public static final TagKey<VillagerTrade> FARMER_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "farmer/level_2");
+    public static final TagKey<VillagerTrade> FARMER_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "farmer/level_3");
+    public static final TagKey<VillagerTrade> FARMER_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "farmer/level_4");
+    public static final TagKey<VillagerTrade> FARMER_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "farmer/level_5");
+    public static final TagKey<VillagerTrade> FISHERMAN_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fisherman/level_1");
+    public static final TagKey<VillagerTrade> FISHERMAN_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fisherman/level_2");
+    public static final TagKey<VillagerTrade> FISHERMAN_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fisherman/level_3");
+    public static final TagKey<VillagerTrade> FISHERMAN_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fisherman/level_4");
+    public static final TagKey<VillagerTrade> FISHERMAN_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fisherman/level_5");
+    public static final TagKey<VillagerTrade> SHEPHERD_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "shepherd/level_1");
+    public static final TagKey<VillagerTrade> SHEPHERD_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "shepherd/level_2");
+    public static final TagKey<VillagerTrade> SHEPHERD_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "shepherd/level_3");
+    public static final TagKey<VillagerTrade> SHEPHERD_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "shepherd/level_4");
+    public static final TagKey<VillagerTrade> SHEPHERD_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "shepherd/level_5");
+    public static final TagKey<VillagerTrade> FLETCHER_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fletcher/level_1");
+    public static final TagKey<VillagerTrade> FLETCHER_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fletcher/level_2");
+    public static final TagKey<VillagerTrade> FLETCHER_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fletcher/level_3");
+    public static final TagKey<VillagerTrade> FLETCHER_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fletcher/level_4");
+    public static final TagKey<VillagerTrade> FLETCHER_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "fletcher/level_5");
+    public static final TagKey<VillagerTrade> LIBRARIAN_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "librarian/level_1");
+    public static final TagKey<VillagerTrade> LIBRARIAN_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "librarian/level_2");
+    public static final TagKey<VillagerTrade> LIBRARIAN_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "librarian/level_3");
+    public static final TagKey<VillagerTrade> LIBRARIAN_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "librarian/level_4");
+    public static final TagKey<VillagerTrade> LIBRARIAN_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "librarian/level_5");
+    public static final TagKey<VillagerTrade> CARTOGRAPHER_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cartographer/level_1");
+    public static final TagKey<VillagerTrade> CARTOGRAPHER_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cartographer/level_2");
+    public static final TagKey<VillagerTrade> CARTOGRAPHER_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cartographer/level_3");
+    public static final TagKey<VillagerTrade> CARTOGRAPHER_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cartographer/level_4");
+    public static final TagKey<VillagerTrade> CARTOGRAPHER_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cartographer/level_5");
+    public static final TagKey<VillagerTrade> CLERIC_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cleric/level_1");
+    public static final TagKey<VillagerTrade> CLERIC_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cleric/level_2");
+    public static final TagKey<VillagerTrade> CLERIC_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cleric/level_3");
+    public static final TagKey<VillagerTrade> CLERIC_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cleric/level_4");
+    public static final TagKey<VillagerTrade> CLERIC_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "cleric/level_5");
+    public static final TagKey<VillagerTrade> COMMON_SMITH_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "common_smith/level_1");
+    public static final TagKey<VillagerTrade> COMMON_SMITH_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "common_smith/level_2");
+    public static final TagKey<VillagerTrade> COMMON_SMITH_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "common_smith/level_3");
+    public static final TagKey<VillagerTrade> COMMON_SMITH_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "common_smith/level_4");
+    public static final TagKey<VillagerTrade> COMMON_SMITH_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "common_smith/level_5");
+    public static final TagKey<VillagerTrade> ARMORER_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "armorer/level_1");
+    public static final TagKey<VillagerTrade> ARMORER_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "armorer/level_2");
+    public static final TagKey<VillagerTrade> ARMORER_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "armorer/level_3");
+    public static final TagKey<VillagerTrade> ARMORER_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "armorer/level_4");
+    public static final TagKey<VillagerTrade> ARMORER_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "armorer/level_5");
+    public static final TagKey<VillagerTrade> WEAPONSMITH_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "weaponsmith/level_1");
+    public static final TagKey<VillagerTrade> WEAPONSMITH_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "weaponsmith/level_2");
+    public static final TagKey<VillagerTrade> WEAPONSMITH_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "weaponsmith/level_3");
+    public static final TagKey<VillagerTrade> WEAPONSMITH_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "weaponsmith/level_4");
+    public static final TagKey<VillagerTrade> WEAPONSMITH_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "weaponsmith/level_5");
+    public static final TagKey<VillagerTrade> TOOLSMITH_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "toolsmith/level_1");
+    public static final TagKey<VillagerTrade> TOOLSMITH_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "toolsmith/level_2");
+    public static final TagKey<VillagerTrade> TOOLSMITH_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "toolsmith/level_3");
+    public static final TagKey<VillagerTrade> TOOLSMITH_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "toolsmith/level_4");
+    public static final TagKey<VillagerTrade> TOOLSMITH_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "toolsmith/level_5");
+    public static final TagKey<VillagerTrade> BUTCHER_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "butcher/level_1");
+    public static final TagKey<VillagerTrade> BUTCHER_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "butcher/level_2");
+    public static final TagKey<VillagerTrade> BUTCHER_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "butcher/level_3");
+    public static final TagKey<VillagerTrade> BUTCHER_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "butcher/level_4");
+    public static final TagKey<VillagerTrade> BUTCHER_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "butcher/level_5");
+    public static final TagKey<VillagerTrade> LEATHERWORKER_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "leatherworker/level_1");
+    public static final TagKey<VillagerTrade> LEATHERWORKER_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "leatherworker/level_2");
+    public static final TagKey<VillagerTrade> LEATHERWORKER_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "leatherworker/level_3");
+    public static final TagKey<VillagerTrade> LEATHERWORKER_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "leatherworker/level_4");
+    public static final TagKey<VillagerTrade> LEATHERWORKER_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "leatherworker/level_5");
+    public static final TagKey<VillagerTrade> MASON_LEVEL_1 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "mason/level_1");
+    public static final TagKey<VillagerTrade> MASON_LEVEL_2 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "mason/level_2");
+    public static final TagKey<VillagerTrade> MASON_LEVEL_3 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "mason/level_3");
+    public static final TagKey<VillagerTrade> MASON_LEVEL_4 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "mason/level_4");
+    public static final TagKey<VillagerTrade> MASON_LEVEL_5 = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "mason/level_5");
+    public static final TagKey<VillagerTrade> WANDERING_TRADER_BUYING = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "wandering_trader/buying");
+    public static final TagKey<VillagerTrade> WANDERING_TRADER_UNCOMMON = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "wandering_trader/uncommon");
+    public static final TagKey<VillagerTrade> WANDERING_TRADER_COMMON = org.basaltmc.bukkit.facade.Tags.key(Registries.VILLAGER_TRADE, "wandering_trader/common");
+
+    private VillagerTradeTags() {}
+}

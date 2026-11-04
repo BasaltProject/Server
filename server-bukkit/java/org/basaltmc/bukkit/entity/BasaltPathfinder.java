@@ -10,15 +10,21 @@ public final class BasaltPathfinder implements Pathfinder {
     private static final class Result implements Pathfinder.PathResult {
         private final Location destination;
         private final boolean reachable;
+        private final List<Location> points;
 
         Result(Location destination, boolean reachable) {
+            this(destination, reachable, List.of(destination));
+        }
+
+        Result(Location destination, boolean reachable, List<Location> points) {
             this.destination = destination;
             this.reachable = reachable;
+            this.points = points;
         }
 
         @Override
         public List<Location> getPoints() {
-            return List.of(destination);
+            return points;
         }
 
         @Override
@@ -69,7 +75,11 @@ public final class BasaltPathfinder implements Pathfinder {
 
     @Override
     public PathResult getCurrentPath() {
-        return hasPath() && destination != null ? new Result(destination, true) : null;
+        if (!hasPath() || destination == null) {
+            return null;
+        }
+        List<Location> nodes = nodesOf(core.call("path_nodes"));
+        return nodes.isEmpty() ? new Result(destination, true) : new Result(destination, true, nodes);
     }
 
     @Override
@@ -77,7 +87,22 @@ public final class BasaltPathfinder implements Pathfinder {
         if (location == null || !core.world.equals(location.getWorld())) {
             return null;
         }
-        return new Result(location.clone(), core.test("can_reach", location.getX(), location.getY(), location.getZ()));
+        List<Location> nodes = nodesOf(core.call("find_path", location.getX(), location.getY(), location.getZ()));
+        if (nodes.isEmpty()) {
+            return new Result(location.clone(), false);
+        }
+        return new Result(location.clone(), true, nodes);
+    }
+
+    private List<Location> nodesOf(Object stored) {
+        List<Location> nodes = new java.util.ArrayList<>();
+        if (stored instanceof String[] flat) {
+            for (int i = 0; i + 2 < flat.length; i += 3) {
+                nodes.add(new Location(core.world, Integer.parseInt(flat[i]) + 0.5, Integer.parseInt(flat[i + 1]),
+                    Integer.parseInt(flat[i + 2]) + 0.5));
+            }
+        }
+        return nodes;
     }
 
     @Override

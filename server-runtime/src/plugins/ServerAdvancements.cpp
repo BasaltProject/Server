@@ -1,4 +1,7 @@
 #include <basalt/server/runtime/plugins/ServerAdvancements.hpp>
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/RealLootTables.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
 
@@ -77,6 +80,7 @@ std::optional<PluginAdvancement> ServerAdvancements::advancement(std::string_vie
         out.announce = display.announceToChat;
         out.hidden = display.hidden;
     }
+    out.json = loaded->rawJson(*key);
     out.experience = found->rewards.experience;
     for (const Identifier& recipe : found->rewards.recipes) {
         out.recipes.push_back(recipe.toString());
@@ -122,6 +126,44 @@ bool ServerAdvancements::revoke(std::string_view uuid, std::string_view id, std:
     world::PlayerProgress* progress = hooks_.progress ? hooks_.progress() : nullptr;
     const std::optional<Identifier> key = parse(id);
     return progress != nullptr && key.has_value() && progress->revokeCriterion(uuid, *key, criterion);
+}
+
+bool ServerAdvancements::trigger(std::string_view uuid, std::string_view trigger,
+                                 const server::plugins::PluginTriggerFacts& facts) {
+    world::AdvancementTriggers* triggers = hooks_.triggers ? hooks_.triggers() : nullptr;
+    if (triggers == nullptr) {
+        return false;
+    }
+    const player::PlayerSession* found = nullptr;
+    for (const player::PlayerSession* session :
+         hooks_.sessions ? hooks_.sessions() : std::vector<player::PlayerSession*>{}) {
+        if (session->uuid().toString() == uuid) {
+            found = session;
+        }
+    }
+    if (found == nullptr || !triggers->listensTo(trigger)) {
+        return false;
+    }
+    const std::optional<storage::StoredItemStack> tool =
+        facts.item.empty() ? std::nullopt
+                           : std::optional{storage::StoredItemStack{.id = facts.item, .count = facts.count}};
+    world::TriggerEvent event;
+    if (facts.block.has_value()) {
+        world::LoadedWorld* where = hooks_.worldFor ? hooks_.worldFor(found->worldName) : nullptr;
+        if (where == nullptr || hooks_.lootTables == nullptr) {
+            return false;
+        }
+        const auto& at = *facts.block;
+        event.location =
+            world::triggerFacts::atBlock(*hooks_.lootTables, *where, *found, at[0], at[1], at[2], tool, std::nullopt);
+    } else if (const std::optional<world::TriggerItem> item = world::triggerFacts::itemOf(tool); item.has_value()) {
+        event.items.emplace("item", *item);
+    }
+    if (facts.distance.has_value()) {
+        event.numbers.emplace("distance", *facts.distance);
+    }
+    triggers->fire(trigger, found->name(), uuid, event);
+    return true;
 }
 
 } // namespace basalt::server::runtime::plugins

@@ -1,0 +1,76 @@
+//// ApplyInFolders.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+import net.minecraft.util.filefix.access.FileRelation;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+public record ApplyInFolders(FileRelation folders, List<FileFixOperation> fileFixOperations) implements FileFixOperation {
+    public void fix(Path baseDirectory, UpgradeProgress upgradeProgress) throws IOException;
+}
+//// DeleteFileOrEmptyDirectory.java
+import java.io.IOException;
+import java.nio.file.Path;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+public record DeleteFileOrEmptyDirectory(String target) implements FileFixOperation {
+    public void fix(Path baseDirectory, UpgradeProgress upgradeProgress) throws IOException;
+}
+//// FileFixOperation.java
+import java.io.IOException;
+import java.nio.file.Path;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+public interface FileFixOperation {
+    void fix(Path baseDirectory, UpgradeProgress upgradeProgress) throws IOException;
+}
+//// FileFixOperations.java
+import java.util.List;
+import java.util.Map;
+import net.minecraft.util.filefix.access.FileRelation;
+public class FileFixOperations {
+    public static Move moveSimple(String file);
+    public static Move move(String from, String to);
+    public static RegexMove moveRegex(String filePattern, String replacePattern);
+    public static DeleteFileOrEmptyDirectory delete(String target);
+    public static ApplyInFolders applyInFolders(FileRelation applicableFolders, List<FileFixOperation> operations);
+    public static GroupMove groupMove(Map<String, String> data, List<Move> move);
+}
+//// GroupMove.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+public record GroupMove(Map<String, String> fromTo, List<Move> fixers) implements FileFixOperation {
+    public void fix(Path baseDirectory, UpgradeProgress upgradeProgress) throws IOException;
+}
+//// ModifyContent.java
+import java.io.IOException;
+import java.nio.file.Path;
+import net.minecraft.util.filefix.access.FileAccessProvider;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+public class ModifyContent implements FileFixOperation {
+    public ModifyContent(FileAccessProvider fileAccessProvider, FixFunction fixFunction);
+    public void fix(Path baseDirectory, UpgradeProgress upgradeProgress) throws IOException;
+    public interface FileAccessFunction {
+        FixFunction make(FileAccessProvider fileAccessProvider);
+    }
+    public interface FixFunction {
+        void run(UpgradeProgress upgradeProgress) throws IOException;
+    }
+}
+//// Move.java
+import java.io.IOException;
+import java.nio.file.Path;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+public record Move(String from, String to) implements FileFixOperation {
+    public Move relative(String sourceFolder, String targetFolder);
+    public void fix(Path baseDirectory, UpgradeProgress upgradeProgress) throws IOException;
+}
+//// RegexMove.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.regex.Pattern;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+public record RegexMove(Pattern fromPattern, String toReplacement) implements FileFixOperation {
+    public RegexMove(String fromPattern, String toPattern);
+    public void fix(Path baseDirectory, UpgradeProgress upgradeProgress) throws IOException;
+}

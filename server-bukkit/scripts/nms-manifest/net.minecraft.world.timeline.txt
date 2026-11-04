@@ -1,0 +1,89 @@
+//// AttributeTrack.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.util.KeyframeTrack;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.modifier.AttributeModifier;
+import net.minecraft.world.clock.ClockManager;
+import net.minecraft.world.clock.WorldClock;
+public record AttributeTrack<Value, Argument>(AttributeModifier<Value, Argument> modifier, KeyframeTrack<Argument> argumentTrack) {
+    public static <Value> Codec<AttributeTrack<Value, ?>> createCodec(EnvironmentAttribute<Value> attribute);
+    public AttributeTrackSampler<Value, Argument> bakeSampler(EnvironmentAttribute<Value> attribute, Holder<WorldClock> clock, Optional<Integer> periodTicks, ClockManager clockManager);
+    public static DataResult<AttributeTrack<?, ?>> validatePeriod(AttributeTrack<?, ?> track, int periodTicks);
+}
+//// AttributeTrackSampler.java
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.util.KeyframeTrack;
+import net.minecraft.world.attribute.EnvironmentAttributeLayer;
+import net.minecraft.world.attribute.LerpFunction;
+import net.minecraft.world.attribute.modifier.AttributeModifier;
+import net.minecraft.world.clock.ClockManager;
+import net.minecraft.world.clock.WorldClock;
+public class AttributeTrackSampler<Value, Argument> implements EnvironmentAttributeLayer.TimeBased<Value> {
+    public AttributeTrackSampler(Holder<WorldClock> clock, Optional<Integer> periodTicks, AttributeModifier<Value, Argument> modifier, KeyframeTrack<Argument> argumentTrack, LerpFunction<Argument> argumentLerp, ClockManager clockManager);
+    public Value applyTimeBased(Value baseValue, int cacheTickId);
+}
+//// Timeline.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.KeyframeTrack;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.modifier.AttributeModifier;
+import net.minecraft.world.clock.ClockManager;
+import net.minecraft.world.clock.ClockTimeMarker;
+import net.minecraft.world.clock.WorldClock;
+public class Timeline {
+    public static final Codec<Holder<Timeline>> CODEC;
+    public static final Codec<Timeline> DIRECT_CODEC;
+    public static final Codec<Timeline> NETWORK_CODEC;
+    private Timeline(Holder<WorldClock> clock, Optional<Integer> periodTicks, Map<EnvironmentAttribute<?>, AttributeTrack<?, ?>> tracks, Map<ResourceKey<ClockTimeMarker>, TimeMarkerInfo> timeMarkers);
+    public static void validateRegistry(Registry<Timeline> timelines, Map<ResourceKey<?>, Exception> loadingErrors);
+    public static Builder builder(Holder<WorldClock> clock);
+    public int getPeriodCount(ClockManager clockManager);
+    public long getCurrentTicks(ClockManager clockManager);
+    public long getTotalTicks(ClockManager clockManager);
+    public Holder<WorldClock> clock();
+    public Optional<Integer> periodTicks();
+    public void registerTimeMarkers(BiConsumer<ResourceKey<ClockTimeMarker>, ClockTimeMarker> output);
+    public Set<EnvironmentAttribute<?>> attributes();
+    public <Value> AttributeTrackSampler<Value, ?> createTrackSampler(EnvironmentAttribute<Value> attribute, ClockManager clockManager);
+    static record TimeMarkerInfo(int ticks, boolean showInCommands) {
+        public static final Codec<TimeMarkerInfo> CODEC;
+    }
+    public static class Builder {
+        private Builder(Holder<WorldClock> clock);
+        public Builder setPeriodTicks(int periodTicks);
+        public <Value, Argument> Builder addModifierTrack(EnvironmentAttribute<Value> attribute, AttributeModifier<Value, Argument> modifier, Consumer<KeyframeTrack.Builder<Argument>> builder);
+        public <Value> Builder addTrack(EnvironmentAttribute<Value> attribute, Consumer<KeyframeTrack.Builder<Value>> builder);
+        public Builder addTimeMarker(ResourceKey<ClockTimeMarker> id, int ticks);
+        public Builder addTimeMarker(ResourceKey<ClockTimeMarker> id, int ticks, boolean showInCommands);
+        public Timeline build();
+    }
+}
+//// Timelines.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public interface Timelines {
+    ResourceKey<Timeline> OVERWORLD_DAY;
+    ResourceKey<Timeline> MOON;
+    ResourceKey<Timeline> VILLAGER_SCHEDULE;
+    ResourceKey<Timeline> EARLY_GAME;
+    float DAY_SKY_LIGHT_LEVEL;
+    float NIGHT_SKY_LIGHT_LEVEL;
+    int NIGHT_SKY_LIGHT_COLOR;
+    float NIGHT_SKY_LIGHT_FACTOR;
+    int NIGHT_SKY_COLOR_MULTIPLIER;
+    int NIGHT_FOG_COLOR_MULTIPLIER;
+    int NIGHT_CLOUD_COLOR_MULTIPLIER;
+    static void bootstrap(BootstrapContext<Timeline> context);
+}

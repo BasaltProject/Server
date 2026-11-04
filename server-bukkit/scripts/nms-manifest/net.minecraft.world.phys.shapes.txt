@@ -1,0 +1,323 @@
+//// ArrayVoxelShape.java
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+import net.minecraft.core.Direction;
+public class ArrayVoxelShape extends VoxelShape {
+    ArrayVoxelShape(DiscreteVoxelShape shape, double[] xs, double[] ys, double[] zs);
+    ArrayVoxelShape(DiscreteVoxelShape shape, DoubleList xs, DoubleList ys, DoubleList zs);
+    public DoubleList getCoords(Direction.Axis axis);
+}
+//// BitSetDiscreteVoxelShape.java
+import net.minecraft.core.Direction;
+public final class BitSetDiscreteVoxelShape extends DiscreteVoxelShape {
+    public BitSetDiscreteVoxelShape(int xSize, int ySize, int zSize);
+    public static BitSetDiscreteVoxelShape withFilledBounds(int xSize, int ySize, int zSize, int xMin, int yMin, int zMin, int xMax, int yMax, int zMax);
+    public BitSetDiscreteVoxelShape(DiscreteVoxelShape voxelShape);
+    public boolean isFull(int x, int y, int z);
+    public void fill(int x, int y, int z);
+    public boolean isEmpty();
+    public int firstFull(Direction.Axis axis);
+    public int lastFull(Direction.Axis axis);
+    public static BitSetDiscreteVoxelShape join(DiscreteVoxelShape first, DiscreteVoxelShape second, IndexMerger xMerger, IndexMerger yMerger, IndexMerger zMerger, BooleanOp op);
+    static void forAllBoxes(DiscreteVoxelShape voxelShape, DiscreteVoxelShape.IntLineConsumer consumer, boolean mergeNeighbors);
+    public boolean isInterior(int x, int y, int z);
+}
+//// BooleanOp.java
+public interface BooleanOp {
+    BooleanOp FALSE;
+    BooleanOp NOT_OR;
+    BooleanOp ONLY_SECOND;
+    BooleanOp NOT_FIRST;
+    BooleanOp ONLY_FIRST;
+    BooleanOp NOT_SECOND;
+    BooleanOp NOT_SAME;
+    BooleanOp NOT_AND;
+    BooleanOp AND;
+    BooleanOp SAME;
+    BooleanOp SECOND;
+    BooleanOp CAUSES;
+    BooleanOp FIRST;
+    BooleanOp CAUSED_BY;
+    BooleanOp OR;
+    BooleanOp TRUE;
+    boolean apply(boolean first, boolean second);
+}
+//// CollisionContext.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.CollisionGetter;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+public interface CollisionContext {
+    static CollisionContext empty();
+    static CollisionContext emptyWithFluidCollisions();
+    static CollisionContext of(Entity entity);
+    static CollisionContext of(Entity entity, boolean alwaysCollideWithFluid);
+    static CollisionContext positionContext(double y);
+    static CollisionContext placementContext(Player player);
+    static CollisionContext withPosition(Entity entity, double position);
+    boolean isDescending();
+    boolean isAbove(VoxelShape shape, BlockPos pos, boolean defaultValue);
+    boolean isHoldingItem(Item item);
+    boolean alwaysCollideWithFluid();
+    boolean canStandOnFluid(FluidState fluidStateAbove, FluidState fluid);
+    VoxelShape getCollisionShape(BlockState state, CollisionGetter collisionGetter, BlockPos pos);
+    default boolean isPlacement();
+}
+//// CubePointRange.java
+import it.unimi.dsi.fastutil.doubles.AbstractDoubleList;
+public class CubePointRange extends AbstractDoubleList {
+    public CubePointRange(int parts);
+    public double getDouble(int index);
+    public int size();
+}
+//// CubeVoxelShape.java
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+import net.minecraft.core.Direction;
+public final class CubeVoxelShape extends VoxelShape {
+    public CubeVoxelShape(DiscreteVoxelShape shape);
+    public DoubleList getCoords(Direction.Axis axis);
+    protected int findIndex(Direction.Axis axis, double coord);
+}
+//// DiscreteCubeMerger.java
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+public final class DiscreteCubeMerger implements IndexMerger {
+    DiscreteCubeMerger(int firstSize, int secondSize);
+    public boolean forMergedIndexes(IndexMerger.IndexConsumer consumer);
+    public int size();
+    public DoubleList getList();
+}
+//// DiscreteVoxelShape.java
+import com.mojang.math.OctahedralGroup;
+import net.minecraft.core.AxisCycle;
+import net.minecraft.core.Direction;
+public abstract class DiscreteVoxelShape {
+    protected final int xSize;
+    protected final int ySize;
+    protected final int zSize;
+    protected DiscreteVoxelShape(int xSize, int ySize, int zSize);
+    public DiscreteVoxelShape rotate(OctahedralGroup rotation);
+    public boolean isFullWide(AxisCycle transform, int x, int y, int z);
+    public boolean isFullWide(int x, int y, int z);
+    public boolean isFull(AxisCycle transform, int x, int y, int z);
+    public abstract boolean isFull(int x, int y, int z);
+    public abstract void fill(int x, int y, int z);
+    public boolean isEmpty();
+    public abstract int firstFull(Direction.Axis axis);
+    public abstract int lastFull(Direction.Axis axis);
+    public int firstFull(Direction.Axis aAxis, int b, int c);
+    public int lastFull(Direction.Axis aAxis, int b, int c);
+    public int getSize(Direction.Axis axis);
+    public int getXSize();
+    public int getYSize();
+    public int getZSize();
+    public void forAllEdges(IntLineConsumer consumer, boolean mergeNeighbors);
+    public void forAllBoxes(IntLineConsumer consumer, boolean mergeNeighbors);
+    public void forAllFaces(IntFaceConsumer consumer);
+    public interface IntFaceConsumer {
+        void consume(Direction direction, int x, int y, int z);
+    }
+    public interface IntLineConsumer {
+        void consume(int x1, int y1, int z1, int x2, int y2, int z2);
+    }
+}
+//// EntityCollisionContext.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.CollisionGetter;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+public class EntityCollisionContext implements CollisionContext {
+    protected EntityCollisionContext(boolean descending, boolean placement, double entityBottom, ItemStack heldItem, boolean alwaysCollideWithFluid, Entity entity);
+    protected EntityCollisionContext(Entity entity, boolean alwaysCollideWithFluid, boolean placement);
+    public boolean isHoldingItem(Item item);
+    public boolean alwaysCollideWithFluid();
+    public boolean canStandOnFluid(FluidState fluidStateAbove, FluidState fluid);
+    public VoxelShape getCollisionShape(BlockState state, CollisionGetter collisionGetter, BlockPos pos);
+    public boolean isDescending();
+    public boolean isAbove(VoxelShape shape, BlockPos pos, boolean defaultValue);
+    public Entity getEntity();
+    public boolean isPlacement();
+    protected static class Empty extends EntityCollisionContext {
+        protected static final CollisionContext WITHOUT_FLUID_COLLISIONS;
+        protected static final CollisionContext WITH_FLUID_COLLISIONS;
+        public Empty(boolean alwaysCollideWithFluid);
+        public boolean isAbove(VoxelShape shape, BlockPos pos, boolean defaultValue);
+    }
+}
+//// IdenticalMerger.java
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+public class IdenticalMerger implements IndexMerger {
+    public IdenticalMerger(DoubleList coords);
+    public boolean forMergedIndexes(IndexMerger.IndexConsumer consumer);
+    public int size();
+    public DoubleList getList();
+}
+//// IndexMerger.java
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+public interface IndexMerger {
+    DoubleList getList();
+    boolean forMergedIndexes(IndexConsumer consumer);
+    int size();
+    public interface IndexConsumer {
+        boolean merge(int firstIndex, int secondIndex, int resultIndex);
+    }
+}
+//// IndirectMerger.java
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+public class IndirectMerger implements IndexMerger {
+    public IndirectMerger(DoubleList first, DoubleList second, boolean firstOnlyMatters, boolean secondOnlyMatters);
+    public boolean forMergedIndexes(IndexMerger.IndexConsumer consumer);
+    public int size();
+    public DoubleList getList();
+}
+//// MinecartCollisionContext.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
+import net.minecraft.world.level.CollisionGetter;
+import net.minecraft.world.level.block.state.BlockState;
+public class MinecartCollisionContext extends EntityCollisionContext {
+    protected MinecartCollisionContext(AbstractMinecart entity, boolean alwaysStandOnFluid);
+    public VoxelShape getCollisionShape(BlockState state, CollisionGetter collisionGetter, BlockPos pos);
+}
+//// NonOverlappingMerger.java
+import it.unimi.dsi.fastutil.doubles.AbstractDoubleList;
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+public class NonOverlappingMerger extends AbstractDoubleList implements IndexMerger {
+    protected NonOverlappingMerger(DoubleList lower, DoubleList upper, boolean swap);
+    public int size();
+    public boolean forMergedIndexes(IndexMerger.IndexConsumer consumer);
+    public double getDouble(int index);
+    public DoubleList getList();
+}
+//// OffsetDoubleList.java
+import it.unimi.dsi.fastutil.doubles.AbstractDoubleList;
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+public class OffsetDoubleList extends AbstractDoubleList {
+    public OffsetDoubleList(DoubleList delegate, double offset);
+    public double getDouble(int index);
+    public int size();
+}
+//// PositionCollisionContext.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.CollisionGetter;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+public class PositionCollisionContext implements CollisionContext {
+    public PositionCollisionContext(double y);
+    public boolean isDescending();
+    public boolean isAbove(VoxelShape shape, BlockPos pos, boolean defaultValue);
+    public boolean isHoldingItem(Item item);
+    public boolean alwaysCollideWithFluid();
+    public boolean canStandOnFluid(FluidState fluidStateAbove, FluidState fluid);
+    public VoxelShape getCollisionShape(BlockState state, CollisionGetter collisionGetter, BlockPos pos);
+}
+//// Shapes.java
+import com.mojang.math.OctahedralGroup;
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+import java.util.Map;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.state.properties.AttachFace;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public final class Shapes {
+    public static final double EPSILON = 1e-07;
+    public static final double BIG_EPSILON = 1e-06;
+    public static final VoxelShape INFINITY;
+    public static VoxelShape empty();
+    public static VoxelShape block();
+    public static VoxelShape box(double minX, double minY, double minZ, double maxX, double maxY, double maxZ);
+    public static VoxelShape create(double minX, double minY, double minZ, double maxX, double maxY, double maxZ);
+    public static VoxelShape create(AABB aabb);
+    static int findBits(double min, double max);
+    static long lcm(int first, int second);
+    public static VoxelShape or(VoxelShape first, VoxelShape second);
+    public static VoxelShape or(VoxelShape first, VoxelShape... tail);
+    public static VoxelShape join(VoxelShape first, VoxelShape second, BooleanOp op);
+    public static VoxelShape joinUnoptimized(VoxelShape first, VoxelShape second, BooleanOp op);
+    public static boolean joinIsNotEmpty(VoxelShape first, VoxelShape second, BooleanOp op);
+    public static double collide(Direction.Axis axis, AABB moving, Iterable<VoxelShape> shapes, double distance);
+    public static boolean blockOccludes(VoxelShape shape, VoxelShape occluder, Direction direction);
+    public static boolean mergedFaceOccludes(VoxelShape shape, VoxelShape occluder, Direction direction);
+    public static boolean faceShapeOccludes(VoxelShape shape, VoxelShape occluder);
+    static IndexMerger createIndexMerger(int cost, DoubleList first, DoubleList second, boolean firstOnlyMatters, boolean secondOnlyMatters);
+    public static VoxelShape rotate(VoxelShape shape, OctahedralGroup rotation);
+    public static VoxelShape rotate(VoxelShape shape, OctahedralGroup rotation, Vec3 rotationPoint);
+    static DoubleList flipAxisIfNeeded(DoubleList newAxis, boolean flip, double newRelative, double oldRelative);
+    public static boolean equal(VoxelShape first, VoxelShape second);
+    public static Map<Direction.Axis, VoxelShape> rotateHorizontalAxis(VoxelShape zAxis);
+    public static Map<Direction.Axis, VoxelShape> rotateHorizontalAxis(VoxelShape zAxis, Vec3 rotationCenter);
+    public static Map<Direction.Axis, VoxelShape> rotateAllAxis(VoxelShape north);
+    public static Map<Direction.Axis, VoxelShape> rotateAllAxis(VoxelShape north, Vec3 rotationCenter);
+    public static Map<Direction, VoxelShape> rotateHorizontal(VoxelShape north);
+    public static Map<Direction, VoxelShape> rotateHorizontal(VoxelShape north, OctahedralGroup initial);
+    public static Map<Direction, VoxelShape> rotateHorizontal(VoxelShape north, OctahedralGroup initial, Vec3 rotationCenter);
+    public static Map<Direction, VoxelShape> rotateAll(VoxelShape north);
+    public static Map<Direction, VoxelShape> rotateAll(VoxelShape north, Vec3 rotationCenter);
+    public static Map<Direction, VoxelShape> rotateAll(VoxelShape north, OctahedralGroup initial, Vec3 rotationCenter);
+    public static Map<AttachFace, Map<Direction, VoxelShape>> rotateAttachFace(VoxelShape north);
+    public static Map<AttachFace, Map<Direction, VoxelShape>> rotateAttachFace(VoxelShape north, OctahedralGroup initial);
+    public interface DoubleLineConsumer {
+        void consume(double x1, double y1, double z1, double x2, double y2, double z2);
+    }
+}
+//// SliceShape.java
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+import net.minecraft.core.Direction;
+public class SliceShape extends VoxelShape {
+    public SliceShape(VoxelShape delegate, Direction.Axis axis, int point);
+    public DoubleList getCoords(Direction.Axis axis);
+}
+//// SubShape.java
+import net.minecraft.core.Direction;
+public final class SubShape extends DiscreteVoxelShape {
+    SubShape(DiscreteVoxelShape parent, int startX, int startY, int startZ, int endX, int endY, int endZ);
+    public boolean isFull(int x, int y, int z);
+    public void fill(int x, int y, int z);
+    public int firstFull(Direction.Axis axis);
+    public int lastFull(Direction.Axis axis);
+}
+//// VoxelShape.java
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.AxisCycle;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+public abstract class VoxelShape {
+    protected final DiscreteVoxelShape shape;
+    protected VoxelShape(DiscreteVoxelShape shape);
+    public double min(Direction.Axis axis);
+    public double max(Direction.Axis axis);
+    public AABB bounds();
+    public VoxelShape singleEncompassing();
+    protected double get(Direction.Axis axis, int i);
+    public abstract DoubleList getCoords(Direction.Axis axis);
+    public boolean isEmpty();
+    public VoxelShape move(Vec3 delta);
+    public VoxelShape move(Vec3i delta);
+    public VoxelShape move(double dx, double dy, double dz);
+    public VoxelShape optimize();
+    public void forAllEdges(Shapes.DoubleLineConsumer consumer);
+    public void forAllBoxes(Shapes.DoubleLineConsumer consumer);
+    public List<AABB> toAabbs();
+    public double min(Direction.Axis aAxis, double b, double c);
+    public double max(Direction.Axis aAxis, double b, double c);
+    protected int findIndex(Direction.Axis axis, double coord);
+    public BlockHitResult clip(Vec3 from, Vec3 to, BlockPos pos);
+    public Optional<Vec3> closestPointTo(Vec3 point);
+    public VoxelShape getFaceShape(Direction direction);
+    protected boolean isCubeLike();
+    public double collide(Direction.Axis axis, AABB moving, double distance);
+    protected double collideX(AxisCycle transform, AABB moving, double distance);
+    public boolean equals(Object obj);
+    public String toString();
+}

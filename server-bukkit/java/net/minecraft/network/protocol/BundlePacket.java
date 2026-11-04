@@ -1,5 +1,8 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.network.protocol;
-public abstract class BundlePacket<T> implements Packet<T> {
+
+import net.minecraft.network.PacketListener;
+public abstract class BundlePacket<T extends PacketListener> implements Packet<T> {
     private final Iterable<Packet<? super T>> packets;
     protected BundlePacket(Iterable<Packet<? super T>> packets) {
         this.packets = java.util.List.copyOf(toList(packets));
@@ -11,5 +14,8 @@ public abstract class BundlePacket<T> implements Packet<T> {
     }
     public Iterable<Packet<? super T>> subPackets() {
         return packets;
+    }
+    public PacketType<? extends BundlePacket<T>> type() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.BundlePacket#type");
     }
 }

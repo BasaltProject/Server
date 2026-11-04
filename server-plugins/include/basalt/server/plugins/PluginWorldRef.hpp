@@ -129,6 +129,10 @@ public:
         return false;
     }
 
+    [[nodiscard]] virtual bool difficultyLocked() const { return false; }
+
+    virtual void setDifficultyLocked(bool locked) { static_cast<void>(locked); }
+
     /// The block state id at a position, or -1 when the chunk is not loaded and `load` is false.
     [[nodiscard]] virtual std::int32_t stateAt(std::int32_t x, std::int32_t y, std::int32_t z, bool load) {
         static_cast<void>(x);
@@ -318,6 +322,14 @@ public:
         static_cast<void>(yaw);
         static_cast<void>(pitch);
         return 0;
+    }
+
+    /// Whether a tick of the block at the position is already booked.
+    virtual bool hasScheduledTick(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return false;
     }
 
     /// Books a tick of the block (or its fluid) `delay` ticks away; false when nothing there ticks.

@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/BiomeZoomer.hpp>
 #include <basalt/server/world/terrain/surface/SurfaceRuleEnvironment.hpp>
 
+#include <array>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -31,6 +32,14 @@ private:
     std::optional<BiomeZoomer> zoomer_;
     // Mutable because the lookups are logically const: the cache is memoization, not state.
     mutable std::unordered_map<std::int64_t, const std::string*> noiseBiomes_;
+
+    struct CornerSlot {
+        std::int64_t key = -1;
+        BiomeZoomer::Offsets offsets{};
+    };
+
+    static constexpr std::size_t kCornerSlots = 512;
+    mutable std::array<CornerSlot, kCornerSlots> corners_;
 };
 
 } // namespace basalt::server::world::terrain::surface

@@ -1,0 +1,518 @@
+//// BlockPredicate.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Collection;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.pattern.BlockInWorld;
+public record BlockPredicate(Optional<HolderSet<Block>> blocks, Optional<StatePropertiesPredicate> properties, Optional<NbtPredicate> nbt, DataComponentMatchers components) {
+    public static final MapCodec<BlockPredicate> MAP_CODEC;
+    public static final Codec<BlockPredicate> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, BlockPredicate> STREAM_CODEC;
+    public boolean matches(ServerLevel level, BlockPos pos);
+    public boolean willMatchBlockEntity();
+    public boolean matches(BlockInWorld blockInWorld);
+    public boolean matchesState(BlockState state);
+    public boolean matchesBlockEntity(LevelReader level, BlockEntity blockEntity);
+    public boolean requiresNbt();
+    public static class Builder {
+        private Builder();
+        public static Builder block();
+        public Builder of(HolderGetter<Block> lookup, Block... blocks);
+        public Builder of(HolderGetter<Block> lookup, Collection<Block> blocks);
+        public Builder of(HolderGetter<Block> lookup, TagKey<Block> tag);
+        public Builder hasNbt(CompoundTag nbt);
+        public Builder setProperties(StatePropertiesPredicate.Builder properties);
+        public Builder components(DataComponentMatchers components);
+        public BlockPredicate build();
+    }
+}
+//// CollectionContentsPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Predicate;
+public interface CollectionContentsPredicate<T, P extends Predicate<T>> extends Predicate<Iterable<? extends T>> {
+    List<P> unpack();
+    static <T, P extends Predicate<T>> Codec<CollectionContentsPredicate<T, P>> codec(Codec<P> elementCodec);
+    static <T, P extends Predicate<T>> CollectionContentsPredicate<T, P> of(P... predicates);
+    static <T, P extends Predicate<T>> CollectionContentsPredicate<T, P> of(List<P> predicates);
+    public static class Zero<T, P extends Predicate<T>> implements CollectionContentsPredicate<T, P> {
+        public boolean test(Iterable<? extends T> values);
+        public List<P> unpack();
+    }
+    public static record Single<T, P extends Predicate<T>>(P test) implements CollectionContentsPredicate<T, P> {
+        public boolean test(Iterable<? extends T> values);
+        public List<P> unpack();
+    }
+    public static record Multiple<T, P extends Predicate<T>>(List<P> tests) implements CollectionContentsPredicate<T, P> {
+        public boolean test(Iterable<? extends T> values);
+        public List<P> unpack();
+    }
+}
+//// CollectionCountsPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Predicate;
+public interface CollectionCountsPredicate<T, P extends Predicate<T>> extends Predicate<Iterable<? extends T>> {
+    List<Entry<T, P>> unpack();
+    static <T, P extends Predicate<T>> Codec<CollectionCountsPredicate<T, P>> codec(Codec<P> elementCodec);
+    static <T, P extends Predicate<T>> CollectionCountsPredicate<T, P> of(Entry<T, P>... predicates);
+    static <T, P extends Predicate<T>> CollectionCountsPredicate<T, P> of(List<Entry<T, P>> predicates);
+    public static class Zero<T, P extends Predicate<T>> implements CollectionCountsPredicate<T, P> {
+        public boolean test(Iterable<? extends T> values);
+        public List<Entry<T, P>> unpack();
+    }
+    public static record Single<T, P extends Predicate<T>>(Entry<T, P> entry) implements CollectionCountsPredicate<T, P> {
+        public boolean test(Iterable<? extends T> values);
+        public List<Entry<T, P>> unpack();
+    }
+    public static record Multiple<T, P extends Predicate<T>>(List<Entry<T, P>> entries) implements CollectionCountsPredicate<T, P> {
+        public boolean test(Iterable<? extends T> values);
+        public List<Entry<T, P>> unpack();
+    }
+    public static record Entry<T, P extends Predicate<T>>(P test, MinMaxBounds.Ints count) {
+        public static <T, P extends Predicate<T>> Codec<Entry<T, P>> codec(Codec<P> elementCodec);
+        public boolean test(Iterable<? extends T> values);
+    }
+}
+//// CollectionPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.function.Predicate;
+public record CollectionPredicate<T, P extends Predicate<T>>(Optional<CollectionContentsPredicate<T, P>> contains, Optional<CollectionCountsPredicate<T, P>> counts, Optional<MinMaxBounds.Ints> size) implements Predicate<Iterable<? extends T>> {
+    public static <T, P extends Predicate<T>> Codec<CollectionPredicate<T, P>> codec(Codec<P> elementCodec);
+    public boolean test(Iterable<? extends T> value);
+}
+//// DamagePredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
+public record DamagePredicate(MinMaxBounds.Doubles dealtDamage, MinMaxBounds.Doubles takenDamage, Optional<EntityPredicate> sourceEntity, Optional<Boolean> blocked, Optional<DamageSourcePredicate> type) {
+    public static final Codec<DamagePredicate> CODEC;
+    public boolean matches(ServerPlayer player, DamageSource source, float originalDamage, float actualDamage, boolean blocked);
+    public static class Builder {
+        public Builder();
+        public static Builder damageInstance();
+        public Builder dealtDamage(MinMaxBounds.Doubles dealtDamage);
+        public Builder takenDamage(MinMaxBounds.Doubles takenDamage);
+        public Builder sourceEntity(EntityPredicate sourceEntity);
+        public Builder blocked(Boolean blocked);
+        public Builder type(DamageSourcePredicate type);
+        public Builder type(DamageSourcePredicate.Builder type);
+        public DamagePredicate build();
+    }
+}
+//// DamageSourcePredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.phys.Vec3;
+public record DamageSourcePredicate(List<TagPredicate<DamageType>> tags, Optional<EntityPredicate> directEntity, Optional<EntityPredicate> sourceEntity, Optional<Boolean> isDirect) {
+    public static final Codec<DamageSourcePredicate> CODEC;
+    public boolean matches(ServerPlayer player, DamageSource source);
+    public boolean matches(ServerLevel level, Vec3 position, DamageSource source);
+    public static class Builder {
+        public static Builder damageType();
+        public Builder tag(TagPredicate<DamageType> tag);
+        public Builder direct(EntityPredicate.Builder directEntity);
+        public Builder source(EntityPredicate.Builder sourceEntity);
+        public Builder isDirect(boolean direct);
+        public DamageSourcePredicate build();
+    }
+}
+//// DataComponentMatchers.java
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import java.util.function.Predicate;
+import net.minecraft.core.component.DataComponentExactPredicate;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.predicates.DataComponentPredicate;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record DataComponentMatchers(DataComponentExactPredicate exact, Map<DataComponentPredicate.Type<?>, DataComponentPredicate> partial) implements Predicate<DataComponentGetter> {
+    public static final DataComponentMatchers ANY;
+    public static final MapCodec<DataComponentMatchers> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DataComponentMatchers> STREAM_CODEC;
+    public boolean test(DataComponentGetter values);
+    public boolean isEmpty();
+    public static class Builder {
+        private Builder();
+        public static Builder components();
+        public <T extends DataComponentType<?>> Builder any(DataComponentType<?> type);
+        public <T extends DataComponentPredicate> Builder partial(DataComponentPredicate.Type<T> type, T predicate);
+        public Builder exact(DataComponentExactPredicate exact);
+        public DataComponentMatchers build();
+    }
+}
+//// DistancePredicate.java
+import com.mojang.serialization.Codec;
+public record DistancePredicate(MinMaxBounds.Doubles x, MinMaxBounds.Doubles y, MinMaxBounds.Doubles z, MinMaxBounds.Doubles horizontal, MinMaxBounds.Doubles absolute) {
+    public static final Codec<DistancePredicate> CODEC;
+    public static DistancePredicate horizontal(MinMaxBounds.Doubles horizontal);
+    public static DistancePredicate vertical(MinMaxBounds.Doubles y);
+    public static DistancePredicate absolute(MinMaxBounds.Doubles absolute);
+    public boolean matches(double x0, double y0, double z0, double x1, double y1, double z1);
+}
+//// EnchantmentPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+public record EnchantmentPredicate(Optional<HolderSet<Enchantment>> enchantments, MinMaxBounds.Ints level) {
+    public static final Codec<EnchantmentPredicate> CODEC;
+    public EnchantmentPredicate(Holder<Enchantment> enchantment, MinMaxBounds.Ints level);
+    public EnchantmentPredicate(HolderSet<Enchantment> enchantments, MinMaxBounds.Ints level);
+    public boolean containedIn(ItemEnchantments itemEnchantments);
+}
+//// FluidPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderSet;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.material.Fluid;
+public record FluidPredicate(Optional<HolderSet<Fluid>> fluids, Optional<StatePropertiesPredicate> properties) {
+    public static final Codec<FluidPredicate> CODEC;
+    public boolean matches(ServerLevel level, BlockPos pos);
+    public static class Builder {
+        private Builder();
+        public static Builder fluid();
+        public Builder of(Fluid fluid);
+        public Builder of(HolderSet<Fluid> fluids);
+        public Builder setProperties(StatePropertiesPredicate properties);
+        public FluidPredicate build();
+    }
+}
+//// FoodPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.food.FoodData;
+public record FoodPredicate(MinMaxBounds.Ints level, MinMaxBounds.Doubles saturation) {
+    public static final FoodPredicate ANY;
+    public static final Codec<FoodPredicate> CODEC;
+    public boolean matches(FoodData food);
+    public static class Builder {
+        public Builder();
+        public Builder withLevel(MinMaxBounds.Ints level);
+        public Builder withSaturation(MinMaxBounds.Doubles saturation);
+        public static Builder food();
+        public FoodPredicate build();
+    }
+}
+//// GameTypePredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.world.level.GameType;
+public record GameTypePredicate(List<GameType> types) {
+    public static final GameTypePredicate ANY;
+    public static final GameTypePredicate SURVIVAL_LIKE;
+    public static final Codec<GameTypePredicate> CODEC;
+    public static GameTypePredicate of(GameType... types);
+    public boolean matches(GameType type);
+}
+//// InputPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.world.entity.player.Input;
+public record InputPredicate(Optional<Boolean> forward, Optional<Boolean> backward, Optional<Boolean> left, Optional<Boolean> right, Optional<Boolean> jump, Optional<Boolean> sneak, Optional<Boolean> sprint) {
+    public static final Codec<InputPredicate> CODEC;
+    public boolean matches(Input input);
+}
+//// ItemPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.level.ItemLike;
+public record ItemPredicate(Optional<HolderSet<Item>> items, MinMaxBounds.Ints count, DataComponentMatchers components) implements Predicate<ItemInstance> {
+    public static final Codec<ItemPredicate> CODEC;
+    public boolean test(ItemInstance itemStack);
+    public static class Builder {
+        public Builder();
+        public static Builder item();
+        public Builder of(HolderGetter<Item> lookup, ItemLike... items);
+        public Builder of(HolderGetter<Item> lookup, TagKey<Item> tag);
+        public Builder withCount(MinMaxBounds.Ints count);
+        public Builder withComponents(DataComponentMatchers components);
+        public ItemPredicate build();
+    }
+}
+//// LightPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+public record LightPredicate(MinMaxBounds.Ints composite) {
+    public static final Codec<LightPredicate> CODEC;
+    public boolean matches(ServerLevel level, BlockPos pos);
+    public static class Builder {
+        public Builder();
+        public static Builder light();
+        public Builder setComposite(MinMaxBounds.Ints composite);
+        public LightPredicate build();
+    }
+}
+//// LocationPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.structure.Structure;
+public record LocationPredicate(Optional<PositionPredicate> position, Optional<HolderSet<Biome>> biomes, Optional<HolderSet<Structure>> structures, Optional<ResourceKey<Level>> dimension, Optional<Boolean> smokey, Optional<LightPredicate> light, Optional<BlockPredicate> block, Optional<FluidPredicate> fluid, Optional<Boolean> canSeeSky) {
+    public static final Codec<LocationPredicate> CODEC;
+    public boolean matches(ServerLevel level, double x, double y, double z);
+    static record PositionPredicate(MinMaxBounds.Doubles x, MinMaxBounds.Doubles y, MinMaxBounds.Doubles z) {
+        public static final Codec<PositionPredicate> CODEC;
+        public boolean matches(double x, double y, double z);
+    }
+    public static class Builder {
+        public Builder();
+        public static Builder location();
+        public static Builder inBiome(Holder<Biome> biome);
+        public static Builder inDimension(ResourceKey<Level> dimension);
+        public static Builder inStructure(Holder<Structure> structure);
+        public static Builder atYLocation(MinMaxBounds.Doubles yLocation);
+        public Builder setX(MinMaxBounds.Doubles x);
+        public Builder setY(MinMaxBounds.Doubles y);
+        public Builder setZ(MinMaxBounds.Doubles z);
+        public Builder setBiomes(HolderSet<Biome> biomes);
+        public Builder setStructures(HolderSet<Structure> structures);
+        public Builder setDimension(ResourceKey<Level> dimension);
+        public Builder setLight(LightPredicate.Builder light);
+        public Builder setBlock(BlockPredicate.Builder block);
+        public Builder setFluid(FluidPredicate.Builder fluid);
+        public Builder setSmokey(boolean smokey);
+        public Builder setCanSeeSky(boolean canSeeSky);
+        public LocationPredicate build();
+    }
+}
+//// MinMaxBounds.java
+import com.google.common.collect.Range;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import net.minecraft.network.codec.StreamCodec;
+public interface MinMaxBounds<T extends Number & Comparable<T>> {
+    SimpleCommandExceptionType ERROR_EMPTY;
+    SimpleCommandExceptionType ERROR_SWAPPED;
+    Bounds<T> bounds();
+    default Optional<T> min();
+    default Optional<T> max();
+    default boolean isAny();
+    static <V extends Number & Comparable<V>, B extends MinMaxBounds<V>> Function<B, DataResult<B>> validateContainedInRange(MinMaxBounds<V> allowed);
+    public static record Ints(Bounds<Integer> bounds, Bounds<Long> boundsSqr) implements MinMaxBounds<Integer> {
+        public static final Ints ANY;
+        public static final Codec<Ints> CODEC;
+        public static final StreamCodec<ByteBuf, Ints> STREAM_CODEC;
+        private Ints(Bounds<Integer> bounds);
+        public static Ints exactly(int value);
+        public static Ints between(int min, int max);
+        public static Ints atLeast(int value);
+        public static Ints atMost(int value);
+        public boolean matches(int value);
+        public boolean matchesSqr(long valueSqr);
+        public static Ints fromReader(StringReader reader) throws CommandSyntaxException;
+    }
+    public static record Doubles(Bounds<Double> bounds, Bounds<Double> boundsSqr) implements MinMaxBounds<Double> {
+        public static final Doubles ANY;
+        public static final Codec<Doubles> CODEC;
+        public static final StreamCodec<ByteBuf, Doubles> STREAM_CODEC;
+        private Doubles(Bounds<Double> bounds);
+        public static Doubles exactly(double value);
+        public static Doubles between(double min, double max);
+        public static Doubles atLeast(double value);
+        public static Doubles atMost(double value);
+        public boolean matches(double value);
+        public boolean matchesSqr(double valueSqr);
+        public static Doubles fromReader(StringReader reader) throws CommandSyntaxException;
+    }
+    public static record FloatDegrees(Bounds<Float> bounds) implements MinMaxBounds<Float> {
+        public static final FloatDegrees ANY;
+        public static final Codec<FloatDegrees> CODEC;
+        public static final StreamCodec<ByteBuf, FloatDegrees> STREAM_CODEC;
+        public static FloatDegrees fromReader(StringReader reader) throws CommandSyntaxException;
+    }
+    public static record Bounds<T extends Number & Comparable<T>>(Optional<T> min, Optional<T> max) {
+        public boolean isAny();
+        public DataResult<Bounds<T>> validateSwappedBoundsInCodec();
+        public boolean areSwapped();
+        public Range<T> asRange();
+        public Optional<T> asPoint();
+        public static <T extends Number & Comparable<T>> Bounds<T> any();
+        public static <T extends Number & Comparable<T>> Bounds<T> exactly(T value);
+        public static <T extends Number & Comparable<T>> Bounds<T> between(T min, T max);
+        public static <T extends Number & Comparable<T>> Bounds<T> atLeast(T value);
+        public static <T extends Number & Comparable<T>> Bounds<T> atMost(T value);
+        public <U extends Number & Comparable<U>> Bounds<U> map(Function<T, U> mapper);
+        public static <T extends Number & Comparable<T>> Codec<Bounds<T>> createCodec(Codec<T> numberCodec);
+        public static <B extends ByteBuf, T extends Number & Comparable<T>> StreamCodec<B, Bounds<T>> createStreamCodec(StreamCodec<B, T> numberCodec);
+        public static <T extends Number & Comparable<T>> Bounds<T> fromReader(StringReader reader, Function<String, T> converter, Supplier<DynamicCommandExceptionType> parseExc) throws CommandSyntaxException;
+    }
+}
+//// MobEffectsPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+public record MobEffectsPredicate(Map<Holder<MobEffect>, MobEffectInstancePredicate> effectMap) implements Predicate<MobEffectInstance> {
+    public static final Codec<MobEffectsPredicate> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, MobEffectsPredicate> STREAM_CODEC;
+    public boolean matches(Entity entity);
+    public boolean matches(LivingEntity entity);
+    public boolean matches(Map<Holder<MobEffect>, MobEffectInstance> effects);
+    public boolean test(MobEffectInstance mobEffect);
+    public static class Builder {
+        public static Builder effects();
+        public Builder and(Holder<MobEffect> effect);
+        public Builder and(Holder<MobEffect> effect, MobEffectInstancePredicate predicate);
+        public MobEffectsPredicate build();
+    }
+    public static record MobEffectInstancePredicate(MinMaxBounds.Ints amplifier, MinMaxBounds.Ints duration, Optional<Boolean> ambient, Optional<Boolean> visible) {
+        public static final Codec<MobEffectInstancePredicate> CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, MobEffectInstancePredicate> STREAM_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, Map<Holder<MobEffect>, MobEffectInstancePredicate>> MAP_STREAM_CODEC;
+        public MobEffectInstancePredicate();
+        public boolean matches(MobEffectInstance instance);
+    }
+}
+//// NbtPredicate.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.Entity;
+public record NbtPredicate(CompoundTag tag) {
+    public static final Codec<NbtPredicate> CODEC;
+    public static final StreamCodec<ByteBuf, NbtPredicate> STREAM_CODEC;
+    public static final String SELECTED_ITEM_TAG = "SelectedItem";
+    public boolean matches(DataComponentGetter components);
+    public boolean matches(Entity entity);
+    public boolean matches(Tag tag);
+    public static CompoundTag getEntityTagToCompare(Entity entity);
+}
+//// SingleComponentItemPredicate.java
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.predicates.DataComponentPredicate;
+public interface SingleComponentItemPredicate<T> extends DataComponentPredicate {
+    default boolean matches(DataComponentGetter components);
+    DataComponentType<T> componentType();
+    boolean matches(T value);
+}
+//// SlotsPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.world.entity.SlotProvider;
+import net.minecraft.world.inventory.SlotRange;
+public record SlotsPredicate(Map<SlotRange, ItemPredicate> slots) {
+    public static final Codec<SlotsPredicate> CODEC;
+    public boolean matches(SlotProvider slotProvider);
+}
+//// StatePropertiesPredicate.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.StateHolder;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.level.material.FluidState;
+public record StatePropertiesPredicate(List<PropertyMatcher> properties) {
+    public static final Codec<StatePropertiesPredicate> CODEC;
+    public static final StreamCodec<ByteBuf, StatePropertiesPredicate> STREAM_CODEC;
+    public <S extends StateHolder<?, S>> boolean matches(StateDefinition<?, S> definition, S state);
+    public boolean matches(BlockState state);
+    public boolean matches(FluidState state);
+    public Optional<String> checkState(StateDefinition<?, ?> states);
+    static record PropertyMatcher(String name, ValueMatcher valueMatcher) {
+        public static final StreamCodec<ByteBuf, PropertyMatcher> STREAM_CODEC;
+        public <S extends StateHolder<?, S>> boolean match(StateDefinition<?, S> definition, S state);
+        public Optional<String> checkState(StateDefinition<?, ?> states);
+    }
+    interface ValueMatcher {
+        Codec<ValueMatcher> CODEC;
+        StreamCodec<ByteBuf, ValueMatcher> STREAM_CODEC;
+        <T extends Comparable<T>> boolean match(StateHolder<?, ?> state, Property<T> property);
+    }
+    static record ExactMatcher(String value) implements ValueMatcher {
+        public static final Codec<ExactMatcher> CODEC;
+        public static final StreamCodec<ByteBuf, ExactMatcher> STREAM_CODEC;
+        public <T extends Comparable<T>> boolean match(StateHolder<?, ?> state, Property<T> property);
+    }
+    static record RangedMatcher(Optional<String> minValue, Optional<String> maxValue) implements ValueMatcher {
+        public static final Codec<RangedMatcher> CODEC;
+        public static final StreamCodec<ByteBuf, RangedMatcher> STREAM_CODEC;
+        public <T extends Comparable<T>> boolean match(StateHolder<?, ?> state, Property<T> property);
+    }
+    public static class Builder {
+        private Builder();
+        public static Builder properties();
+        public Builder hasProperty(Property<?> property, String value);
+        public Builder hasProperty(Property<Integer> property, int value);
+        public Builder hasProperty(Property<Boolean> property, boolean value);
+        public <T extends Comparable<T> & StringRepresentable> Builder hasProperty(Property<T> property, T value);
+        public Optional<StatePropertiesPredicate> build();
+    }
+}
+//// TagPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+public record TagPredicate<T>(HolderSet<T> tag, boolean expected) {
+    public static <T> Codec<TagPredicate<T>> codec(ResourceKey<? extends Registry<T>> registryKey);
+    public static <T> TagPredicate<T> is(HolderGetter<T> lookup, TagKey<T> tag);
+    public static <T> TagPredicate<T> is(HolderSet<T> tag);
+    public static <T> TagPredicate<T> isNot(HolderGetter<T> lookup, TagKey<T> tag);
+    public static <T> TagPredicate<T> isNot(HolderSet<T> tag);
+    public boolean matches(Holder<T> holder);
+}

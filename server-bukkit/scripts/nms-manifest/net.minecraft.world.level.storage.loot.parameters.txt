@@ -1,0 +1,69 @@
+//// LootContextParamSets.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Registry;
+import net.minecraft.util.context.ContextKeySet;
+public class LootContextParamSets {
+    public static final Codec<ContextKeySet> CODEC;
+    public static final ContextKeySet EMPTY;
+    public static final ContextKeySet ALL_PARAMS;
+    public static final ContextKeySet CHEST;
+    public static final ContextKeySet COMMAND;
+    public static final ContextKeySet COMMAND_SLOT_SOURCE;
+    public static final ContextKeySet COMMAND_COMPUTE_DEFAULT;
+    public static final ContextKeySet COMMAND_COMPUTE_POSITION;
+    public static final ContextKeySet COMMAND_COMPUTE_ENTITY;
+    public static final ContextKeySet SELECTOR;
+    public static final ContextKeySet VILLAGER_TRADE;
+    public static final ContextKeySet FISHING;
+    public static final ContextKeySet ENTITY;
+    public static final ContextKeySet EQUIPMENT;
+    public static final ContextKeySet ARCHAEOLOGY;
+    public static final ContextKeySet GIFT;
+    public static final ContextKeySet PIGLIN_BARTER;
+    public static final ContextKeySet VAULT;
+    public static final ContextKeySet ADVANCEMENT_REWARD;
+    public static final ContextKeySet ADVANCEMENT_ENTITY;
+    public static final ContextKeySet ADVANCEMENT_LOCATION;
+    public static final ContextKeySet BLOCK_USE;
+    public static final ContextKeySet BLOCK;
+    public static final ContextKeySet SHEARING;
+    public static final ContextKeySet ENTITY_INTERACT;
+    public static final ContextKeySet BLOCK_INTERACT;
+    public static final ContextKeySet CONTAINER_PROCESS;
+    public static final ContextKeySet ENCHANTED_DAMAGE;
+    public static final ContextKeySet ENCHANTED_ITEM;
+    public static final ContextKeySet ENCHANTED_LOCATION;
+    public static final ContextKeySet ENCHANTED_ENTITY;
+    public static final ContextKeySet HIT_BLOCK;
+    public static ContextKeySet bootstrap(Registry<ContextKeySet> registry);
+    public static void validate();
+}
+//// LootContextParams.java
+import net.minecraft.util.Unit;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.SlotProvider;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+public class LootContextParams {
+    public static final ContextKey<Entity> THIS_ENTITY;
+    public static final ContextKey<Entity> INTERACTING_ENTITY;
+    public static final ContextKey<Entity> TARGET_ENTITY;
+    public static final ContextKey<Player> LAST_DAMAGE_PLAYER;
+    public static final ContextKey<DamageSource> DAMAGE_SOURCE;
+    public static final ContextKey<Entity> ATTACKING_ENTITY;
+    public static final ContextKey<Entity> DIRECT_ATTACKING_ENTITY;
+    public static final ContextKey<Vec3> ORIGIN;
+    public static final ContextKey<BlockState> BLOCK_STATE;
+    public static final ContextKey<BlockEntity> BLOCK_ENTITY;
+    public static final ContextKey<ItemInstance> TOOL;
+    public static final ContextKey<Float> EXPLOSION_RADIUS;
+    public static final ContextKey<Integer> ENCHANTMENT_LEVEL;
+    public static final ContextKey<Boolean> ENCHANTMENT_ACTIVE;
+    public static final ContextKey<Unit> ADDITIONAL_COST_COMPONENT_ALLOWED;
+    public static final ContextKey<SlotProvider> CONTAINER;
+}

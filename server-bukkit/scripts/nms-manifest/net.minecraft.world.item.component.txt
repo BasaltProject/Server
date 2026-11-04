@@ -1,0 +1,1067 @@
+//// AttackRange.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.Predicate;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+public record AttackRange(float minReach, float maxReach, float minCreativeReach, float maxCreativeReach, float hitboxMargin, float mobFactor) {
+    public static final Codec<AttackRange> CODEC;
+    public static final StreamCodec<ByteBuf, AttackRange> STREAM_CODEC;
+    public static AttackRange defaultFor(LivingEntity livingEntity);
+    public HitResult getClosesetHit(Entity attacker, float partial, Predicate<Entity> matching);
+    public float effectiveMinRange(Entity entity);
+    public float effectiveMaxRange(Entity entity);
+    public boolean isInRange(LivingEntity attacker, Vec3 location);
+    public boolean isInRange(LivingEntity attacker, AABB boundingBox, double extraBuffer);
+}
+//// Bees.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
+public record Bees(List<BeehiveBlockEntity.Occupant> bees) implements TooltipProvider {
+    public static final Codec<Bees> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Bees> STREAM_CODEC;
+    public static final Bees EMPTY;
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// BlockItemStateProperties.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Map;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
+public record BlockItemStateProperties(Map<String, String> properties) implements TooltipProvider {
+    public static final BlockItemStateProperties EMPTY;
+    public static final Codec<BlockItemStateProperties> CODEC;
+    public static final StreamCodec<ByteBuf, BlockItemStateProperties> STREAM_CODEC;
+    public <T extends Comparable<T>> BlockItemStateProperties with(Property<T> property, T value);
+    public <T extends Comparable<T>> BlockItemStateProperties with(Property<T> property, BlockState state);
+    public <T extends Comparable<T>> T get(Property<T> property);
+    public BlockState apply(BlockState state);
+    public boolean isEmpty();
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// BlockTransformers.java
+import net.minecraft.core.component.BlockTransformer;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class BlockTransformers {
+    public static final ResourceKey<BlockTransformer> SHOVEL;
+    public static final ResourceKey<BlockTransformer> AXE;
+    public static final ResourceKey<BlockTransformer> HOE;
+    public static void bootstrap(BootstrapContext<BlockTransformer> context);
+}
+//// BlocksAttacks.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public record BlocksAttacks(float blockDelaySeconds, float disableCooldownScale, List<DamageReduction> damageReductions, ItemDamageFunction itemDamage, Optional<HolderSet<DamageType>> bypassedBy, Optional<Holder<SoundEvent>> blockSound, Optional<Holder<SoundEvent>> disableSound) {
+    public static final Codec<BlocksAttacks> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, BlocksAttacks> STREAM_CODEC;
+    public void onBlocked(ServerLevel level, LivingEntity user);
+    public void disable(ServerLevel level, LivingEntity user, float baseSeconds, ItemStack blockingWith);
+    public void hurtBlockingItem(Level level, ItemStack item, LivingEntity user, InteractionHand hand, float damage);
+    public int blockDelayTicks();
+    public float resolveBlockedDamage(DamageSource source, float dealtDamage, double angle);
+    public static record DamageReduction(float horizontalBlockingAngle, Optional<HolderSet<DamageType>> type, float base, float factor) {
+        public static final Codec<DamageReduction> CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, DamageReduction> STREAM_CODEC;
+        public float resolve(DamageSource source, float dealtDamage, double angle);
+    }
+    public static record ItemDamageFunction(float threshold, float base, float factor) {
+        public static final Codec<ItemDamageFunction> CODEC;
+        public static final StreamCodec<ByteBuf, ItemDamageFunction> STREAM_CODEC;
+        public static final ItemDamageFunction DEFAULT;
+        public int apply(float dealtDamage);
+    }
+}
+//// BookContent.java
+import java.util.List;
+import net.minecraft.server.network.Filterable;
+public interface BookContent<T, C> {
+    List<Filterable<T>> pages();
+    C withReplacedPages(List<Filterable<T>> newPages);
+}
+//// BrewingFuel.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ResolvableFloat;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ResolvableInt;
+public record BrewingFuel(ResolvableInt uses, ResolvableFloat speedMultiplier) {
+    public static final Codec<BrewingFuel> CODEC;
+    public static final StreamCodec<ByteBuf, BrewingFuel> STREAM_CODEC;
+    public BrewingFuel(ResourceKey<ContextIntProvider> uses, ResourceKey<ContextFloatProvider> speedMultiplier);
+}
+//// BundleContents.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
+import net.minecraft.world.item.ItemProvider;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.slot.SlotSelector;
+import org.apache.commons.lang3.math.Fraction;
+public final class BundleContents implements ContainerComponent<BundleContents>, TooltipComponent {
+    public static final BundleContents EMPTY;
+    public static final Codec<BundleContents> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, BundleContents> STREAM_CODEC;
+    public static final int NO_SELECTED_ITEM_INDEX = -1;
+    public static final DataResult<Fraction> BEEHIVE_WEIGHT;
+    private BundleContents(List<ItemStackTemplate> items, int selectedItem);
+    public BundleContents(List<ItemStackTemplate> items);
+    public static boolean canItemBeInBundle(ItemStack itemToAdd);
+    public int getNumberOfItemsToShow();
+    public Stream<ItemStack> itemCopies();
+    public List<ItemStackTemplate> items();
+    public int size();
+    public DataResult<Fraction> weight();
+    public boolean isEmpty();
+    public int getSelectedItemIndex();
+    public ItemStackTemplate getSelectedItem();
+    public BundleContents copyWithContents(Stream<ItemStack> newContents);
+    public Mutable asMutable();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+    public static class Mutable extends GrowableMutableContainer<BundleContents> {
+        private Mutable(List<ItemStack> items, Fraction weight, int selectedItem);
+        public Mutable();
+        public Mutable clearItems();
+        public int tryInsert(ItemStack itemsToAdd);
+        public int tryTransfer(Slot slot, Player player);
+        public void toggleSelectedItem(int selectedItem);
+        public ItemStack removeOne();
+        public Fraction weight();
+        public int replaceSlotItems(ItemProvider newItems, SlotSelector slotSelector);
+        public void modifySlots(Consumer<? super SlotAccess> consumer, SlotSelector slotSelector);
+        protected boolean setItem(int slot, ItemStack itemStack);
+        protected boolean addSlotWithItem(ItemProvider newItems);
+        public boolean canInsertNewSlots();
+        public BundleContents toImmutable();
+    }
+}
+//// ChargedProjectiles.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemProvider;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.TooltipFlag;
+public record ChargedProjectiles(List<ItemStackTemplate> items) implements ContainerComponent<ChargedProjectiles>, TooltipProvider {
+    public static final ChargedProjectiles EMPTY;
+    public static final Codec<ChargedProjectiles> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ChargedProjectiles> STREAM_CODEC;
+    public static ChargedProjectiles of(ItemStackTemplate stack);
+    public static ChargedProjectiles ofNonEmpty(List<ItemStack> items);
+    public boolean contains(Item item);
+    public Stream<ItemStack> itemCopies();
+    public int size();
+    public boolean isEmpty();
+    public ChargedProjectiles copyWithContents(Stream<ItemStack> newContents);
+    public Mutable asMutable();
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+    public static class Mutable extends GrowableMutableContainer<ChargedProjectiles> {
+        private Mutable(List<ItemStack> items);
+        protected boolean addSlotWithItem(ItemProvider newItems);
+        public boolean canInsertNewSlots();
+        public ChargedProjectiles toImmutable();
+    }
+}
+//// Compostable.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ResolvableInt;
+public record Compostable(ResolvableInt layers) {
+    public static final Codec<Compostable> CODEC;
+    public static final StreamCodec<ByteBuf, Compostable> STREAM_CODEC;
+    public Compostable(ResourceKey<ContextIntProvider> layers);
+}
+//// Consumable.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemUseAnimation;
+import net.minecraft.world.item.consume_effects.ConsumeEffect;
+import net.minecraft.world.level.Level;
+public record Consumable(float consumeSeconds, ItemUseAnimation animation, Holder<SoundEvent> sound, boolean hasConsumeParticles, List<ConsumeEffect> onConsumeEffects) {
+    public static final float DEFAULT_CONSUME_SECONDS = 1.6F;
+    public static final Codec<Consumable> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Consumable> STREAM_CODEC;
+    public InteractionResult startConsuming(LivingEntity user, ItemStack stack, InteractionHand hand);
+    public ItemStack onConsume(Level level, LivingEntity user, ItemStack stack);
+    public boolean canConsume(LivingEntity user, ItemStack stack);
+    public int consumeTicks();
+    public void emitParticlesAndSounds(RandomSource random, LivingEntity user, ItemStack itemStack, int particleCount);
+    public boolean shouldEmitParticlesAndSounds(int useItemRemainingTicks);
+    public static Builder builder();
+    public static class Builder {
+        private Builder();
+        public Builder consumeSeconds(float consumeSeconds);
+        public Builder animation(ItemUseAnimation animation);
+        public Builder sound(Holder<SoundEvent> sound);
+        public Builder soundAfterConsume(Holder<SoundEvent> soundAfterConsume);
+        public Builder hasConsumeParticles(boolean hasConsumeParticles);
+        public Builder onConsume(ConsumeEffect effect);
+        public Consumable build();
+    }
+    public interface OverrideConsumeSound {
+        SoundEvent getConsumeSound(ItemStack itemStack);
+    }
+}
+//// ConsumableListener.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public interface ConsumableListener {
+    void onConsume(Level level, LivingEntity user, ItemStack stack, Consumable consumable);
+}
+//// Consumables.java
+public class Consumables {
+    public static final Consumable DEFAULT_FOOD;
+    public static final Consumable DEFAULT_DRINK;
+    public static final Consumable HONEY_BOTTLE;
+    public static final Consumable OMINOUS_BOTTLE;
+    public static final Consumable DRIED_KELP;
+    public static final Consumable CHICKEN;
+    public static final Consumable ENCHANTED_GOLDEN_APPLE;
+    public static final Consumable GOLDEN_APPLE;
+    public static final Consumable POISONOUS_POTATO;
+    public static final Consumable PUFFERFISH;
+    public static final Consumable ROTTEN_FLESH;
+    public static final Consumable SPIDER_EYE;
+    public static final Consumable MILK_BUCKET;
+    public static final Consumable CHORUS_FRUIT;
+    public static Consumable.Builder defaultFood();
+    public static Consumable.Builder defaultDrink();
+}
+//// ContainerComponent.java
+import java.util.stream.Stream;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.slot.SlotCollection;
+public interface ContainerComponent<T extends ContainerComponent<T>> {
+    Stream<ItemStack> itemCopies();
+    int size();
+    T copyWithContents(Stream<ItemStack> newContents);
+    Mutable<T> asMutable();
+    public interface Mutable<T> extends SlotCollection {
+        T toImmutable();
+    }
+}
+//// CookingFuel.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ResolvableFloat;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ResolvableInt;
+public record CookingFuel(ResolvableInt burnTime, ResolvableFloat speedMultiplier) {
+    public static final Codec<CookingFuel> CODEC;
+    public static final StreamCodec<ByteBuf, CookingFuel> STREAM_CODEC;
+    public CookingFuel(ResourceKey<ContextIntProvider> burnTime, ResourceKey<ContextFloatProvider> speedMultiplier);
+}
+//// CustomData.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+public final class CustomData {
+    public static final CustomData EMPTY;
+    public static final Codec<CompoundTag> COMPOUND_TAG_CODEC;
+    public static final Codec<CustomData> CODEC;
+    public static final StreamCodec<ByteBuf, CustomData> STREAM_CODEC;
+    private CustomData(CompoundTag tag);
+    public static CustomData of(CompoundTag tag);
+    public boolean matchedBy(CompoundTag expectedTag);
+    public static void update(DataComponentType<CustomData> component, ItemStack itemStack, Consumer<CompoundTag> consumer);
+    public static void set(DataComponentType<CustomData> component, ItemStack itemStack, CompoundTag tag);
+    public CustomData update(Consumer<CompoundTag> consumer);
+    public boolean isEmpty();
+    public CompoundTag copyTag();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+}
+//// CustomModelData.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.codec.StreamCodec;
+public record CustomModelData(List<Float> floats, List<Boolean> flags, List<String> strings, List<Integer> colors) {
+    public static final CustomModelData EMPTY;
+    public static final Codec<CustomModelData> CODEC;
+    public static final StreamCodec<ByteBuf, CustomModelData> STREAM_CODEC;
+    public Float getFloat(int index);
+    public Boolean getBoolean(int index);
+    public String getString(int index);
+    public Integer getColor(int index);
+}
+//// DamageResistant.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
+public record DamageResistant(HolderSet<DamageType> types) {
+    public static final Codec<DamageResistant> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DamageResistant> STREAM_CODEC;
+    public boolean isResistantTo(DamageSource source);
+}
+//// DeathProtection.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.consume_effects.ConsumeEffect;
+public record DeathProtection(List<ConsumeEffect> deathEffects) {
+    public static final Codec<DeathProtection> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DeathProtection> STREAM_CODEC;
+    public static final DeathProtection TOTEM_OF_UNDYING;
+    public void applyEffects(ItemStack itemStack, LivingEntity entity);
+}
+//// DebugStickState.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.properties.Property;
+public record DebugStickState(Map<Holder<Block>, Property<?>> properties) {
+    public static final DebugStickState EMPTY;
+    public static final Codec<DebugStickState> CODEC;
+    public DebugStickState withProperty(Holder<Block> block, Property<?> property);
+}
+//// DyedItemColor.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+public record DyedItemColor(int rgb) implements TooltipProvider {
+    public static final Codec<DyedItemColor> CODEC;
+    public static final StreamCodec<ByteBuf, DyedItemColor> STREAM_CODEC;
+    public static final int LEATHER_COLOR = -6265536;
+    public static int getOrDefault(ItemStack itemStack, int defaultColor);
+    public static ItemStack applyDyes(ItemStack itemStack, List<DyeColor> dyes);
+    public static DyedItemColor applyDyes(DyedItemColor currentDye, List<DyeColor> dyes);
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// FireworkExplosion.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.ints.IntList;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+public record FireworkExplosion(Shape shape, IntList colors, IntList fadeColors, boolean hasTrail, boolean hasTwinkle) implements TooltipProvider {
+    public static final FireworkExplosion DEFAULT;
+    public static final Codec<IntList> COLOR_LIST_CODEC;
+    public static final Codec<FireworkExplosion> CODEC;
+    public static final StreamCodec<ByteBuf, FireworkExplosion> STREAM_CODEC;
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+    public void addAdditionalTooltip(Consumer<Component> consumer);
+    public FireworkExplosion withFadeColors(IntList fadeColors);
+    public static enum Shape implements StringRepresentable {
+        SMALL_BALL, LARGE_BALL, STAR, CREEPER, BURST;
+        public static final StreamCodec<ByteBuf, Shape> STREAM_CODEC;
+        public static final Codec<Shape> CODEC;
+        public MutableComponent getName();
+        public int getId();
+        public static Shape byId(int id);
+        public String getSerializedName();
+    }
+}
+//// Fireworks.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+public record Fireworks(int flightDuration, List<FireworkExplosion> explosions) implements TooltipProvider {
+    public static final int MAX_EXPLOSIONS = 256;
+    public static final Codec<Fireworks> CODEC;
+    public static final StreamCodec<ByteBuf, Fireworks> STREAM_CODEC;
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// GrowableMutableContainer.java
+import java.util.List;
+import net.minecraft.world.item.ItemProvider;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.slot.SlotSelector;
+public abstract class GrowableMutableContainer<T> extends SimpleMutableContainer<T> {
+    public GrowableMutableContainer(List<ItemStack> items);
+    public abstract boolean canInsertNewSlots();
+    public int replaceSlotItems(ItemProvider newItems, SlotSelector slotSelector);
+    protected boolean addSlotWithItem(ItemProvider newItems);
+}
+//// InstrumentComponent.java
+import com.mojang.serialization.Codec;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Instrument;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+public record InstrumentComponent(Holder<Instrument> instrument) implements TooltipProvider {
+    public static final Codec<InstrumentComponent> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, InstrumentComponent> STREAM_CODEC;
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// ItemAttributeModifiers.java
+import com.mojang.serialization.Codec;
+import java.text.DecimalFormat;
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.player.Player;
+import org.apache.commons.lang3.function.TriConsumer;
+public record ItemAttributeModifiers(List<Entry> modifiers) {
+    public static final ItemAttributeModifiers EMPTY;
+    public static final Codec<ItemAttributeModifiers> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ItemAttributeModifiers> STREAM_CODEC;
+    public static final DecimalFormat ATTRIBUTE_MODIFIER_FORMAT;
+    public static Builder builder();
+    public ItemAttributeModifiers withModifierAdded(Holder<Attribute> attribute, AttributeModifier modifier, EquipmentSlotGroup slot);
+    public void forEach(EquipmentSlotGroup slot, TriConsumer<Holder<Attribute>, AttributeModifier, Display> consumer);
+    public void forEach(EquipmentSlotGroup slot, BiConsumer<Holder<Attribute>, AttributeModifier> consumer);
+    public void forEach(EquipmentSlot slot, BiConsumer<Holder<Attribute>, AttributeModifier> consumer);
+    public double compute(Holder<Attribute> attribute, double baseValue, EquipmentSlot slot);
+    public interface Display {
+        Codec<Display> CODEC;
+        StreamCodec<RegistryFriendlyByteBuf, Display> STREAM_CODEC;
+        static Display attributeModifiers();
+        static Display hidden();
+        static Display override(Component component);
+        Type type();
+        void apply(Consumer<Component> consumer, Player player, Holder<Attribute> attribute, AttributeModifier modifier);
+        public static enum Type implements StringRepresentable {
+            DEFAULT, HIDDEN, OVERRIDE;
+            public String getSerializedName();
+        }
+        public static record Default() implements Display {
+            public Type type();
+            public void apply(Consumer<Component> consumer, Player player, Holder<Attribute> attribute, AttributeModifier modifier);
+        }
+        public static record Hidden() implements Display {
+            public Type type();
+            public void apply(Consumer<Component> consumer, Player player, Holder<Attribute> attribute, AttributeModifier modifier);
+        }
+        public static record OverrideText(Component component) implements Display {
+            public Type type();
+            public void apply(Consumer<Component> consumer, Player player, Holder<Attribute> attribute, AttributeModifier modifier);
+        }
+    }
+    public static record Entry(Holder<Attribute> attribute, AttributeModifier modifier, EquipmentSlotGroup slot, Display display) {
+        public static final Codec<Entry> CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, Entry> STREAM_CODEC;
+        public Entry(Holder<Attribute> attribute, AttributeModifier modifier, EquipmentSlotGroup slot);
+        public boolean matches(Holder<Attribute> attribute, Identifier id);
+    }
+    public static class Builder {
+        private Builder();
+        public Builder add(Holder<Attribute> attribute, AttributeModifier modifier, EquipmentSlotGroup slot);
+        public Builder add(Holder<Attribute> attribute, AttributeModifier modifier, EquipmentSlotGroup slot, Display display);
+        public ItemAttributeModifiers build();
+    }
+}
+//// ItemContainerContents.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import net.minecraft.core.NonNullList;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.TooltipFlag;
+public final class ItemContainerContents implements ContainerComponent<ItemContainerContents>, TooltipProvider {
+    public static final int MAX_SIZE = 256;
+    public static final ItemContainerContents EMPTY;
+    public static final Codec<ItemContainerContents> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ItemContainerContents> STREAM_CODEC;
+    private ItemContainerContents(List<Optional<ItemStackTemplate>> items);
+    public static ItemContainerContents fromItems(List<ItemStack> itemStacks);
+    public void copyInto(NonNullList<ItemStack> destination);
+    public ItemStack copyOne();
+    public Stream<ItemStack> itemCopies();
+    public Stream<ItemStack> nonEmptyItemCopyStream();
+    public Iterable<ItemStackTemplate> nonEmptyItems();
+    public int size();
+    public ItemContainerContents copyWithContents(Stream<ItemStack> newContents);
+    public Mutable asMutable();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+    static record Slot(int index, ItemStackTemplate item) {
+        public static final Codec<Slot> CODEC;
+    }
+    public static class Mutable extends GrowableMutableContainer<ItemContainerContents> {
+        private Mutable(List<ItemStack> items);
+        public boolean canInsertNewSlots();
+        public ItemContainerContents toImmutable();
+    }
+}
+//// ItemLore.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+public record ItemLore(List<Component> lines, List<Component> styledLines) implements TooltipProvider {
+    public static final ItemLore EMPTY;
+    public static final int MAX_LINES = 256;
+    public static final Codec<ItemLore> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ItemLore> STREAM_CODEC;
+    public ItemLore(List<Component> lines);
+    public ItemLore withLineAdded(Component component);
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// KineticWeapon.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
+public record KineticWeapon(int contactCooldownTicks, int delayTicks, Optional<Condition> dismountConditions, Optional<Condition> knockbackConditions, Optional<Condition> damageConditions, float forwardMovement, float damageMultiplier, Optional<Holder<SoundEvent>> sound, Optional<Holder<SoundEvent>> hitSound) {
+    public static final int HIT_FEEDBACK_TICKS = 10;
+    public static final Codec<KineticWeapon> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, KineticWeapon> STREAM_CODEC;
+    public static Vec3 getMotion(Entity livingEntity);
+    public void makeSound(Entity causer);
+    public void makeLocalHitSound(Entity causer);
+    public int computeDamageUseDuration();
+    public void damageEntities(ItemStack stack, int ticksRemaining, LivingEntity livingEntity, EquipmentSlot equipmentSlot);
+    public static record Condition(int maxDurationTicks, float minSpeed, float minRelativeSpeed) {
+        public static final Codec<Condition> CODEC;
+        public static final StreamCodec<ByteBuf, Condition> STREAM_CODEC;
+        public boolean test(int ticksUsed, double attackerSpeed, double relativeSpeed, double entityFactor);
+        public static Optional<Condition> ofAttackerSpeed(int untilTicks, float minAttackerSpeed);
+        public static Optional<Condition> ofRelativeSpeed(int untilTicks, float minRelativeSpeed);
+    }
+}
+//// LodestoneTracker.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerLevel;
+public record LodestoneTracker(Optional<GlobalPos> target, boolean tracked) {
+    public static final Codec<LodestoneTracker> CODEC;
+    public static final StreamCodec<ByteBuf, LodestoneTracker> STREAM_CODEC;
+    public LodestoneTracker tick(ServerLevel level);
+}
+//// MapDecorations.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.saveddata.maps.MapDecorationType;
+public record MapDecorations(Map<String, Entry> decorations) {
+    public static final MapDecorations EMPTY;
+    public static final Codec<MapDecorations> CODEC;
+    public MapDecorations withDecoration(String id, Entry entry);
+    public static record Entry(Holder<MapDecorationType> type, double x, double z, float rotation) {
+        public static final Codec<Entry> CODEC;
+    }
+}
+//// MapPostProcessing.java
+import io.netty.buffer.ByteBuf;
+import java.util.function.IntFunction;
+import net.minecraft.network.codec.StreamCodec;
+public enum MapPostProcessing {
+    LOCK, SCALE;
+    public static final IntFunction<MapPostProcessing> ID_MAP;
+    public static final StreamCodec<ByteBuf, MapPostProcessing> STREAM_CODEC;
+    public int id();
+}
+//// MobVisibility.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.EntityType;
+public record MobVisibility(HolderSet<EntityType<?>> targetingEntityTypes, float visibility) {
+    public static final float MIN_VISIBILITY = 0.0F;
+    public static final float MAX_VISIBILITY = 10.0F;
+    public static final Codec<MobVisibility> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, MobVisibility> STREAM_CODEC;
+}
+//// OminousBottleAmplifier.java
+import com.mojang.serialization.Codec;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.Level;
+public record OminousBottleAmplifier(int value) implements ConsumableListener, TooltipProvider {
+    public static final int EFFECT_DURATION = 120000;
+    public static final int MIN_AMPLIFIER = 0;
+    public static final int MAX_AMPLIFIER = 4;
+    public static final Codec<OminousBottleAmplifier> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, OminousBottleAmplifier> STREAM_CODEC;
+    public void onConsume(Level level, LivingEntity user, ItemStack stack, Consumable consumable);
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// PiercingWeapon.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+public record PiercingWeapon(boolean dealsKnockback, boolean dismounts, Optional<Holder<SoundEvent>> sound, Optional<Holder<SoundEvent>> hitSound) {
+    public static final Codec<PiercingWeapon> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, PiercingWeapon> STREAM_CODEC;
+    public void makeSound(Entity causer);
+    public void makeHitSound(Entity causer);
+    public static boolean canHitEntity(Entity jabber, Entity target);
+    public void attack(LivingEntity attacker, EquipmentSlot hand);
+}
+//// ProvidesTrimMaterial.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.equipment.trim.TrimMaterial;
+public record ProvidesTrimMaterial(Holder<TrimMaterial> material) {
+    public static final Codec<ProvidesTrimMaterial> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ProvidesTrimMaterial> STREAM_CODEC;
+}
+//// ResolvableProfile.java
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.PropertyMap;
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.players.ProfileResolver;
+import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+public abstract class ResolvableProfile implements TooltipProvider {
+    public static final Codec<ResolvableProfile> CODEC;
+    public static final StreamCodec<ByteBuf, ResolvableProfile> STREAM_CODEC;
+    protected final GameProfile partialProfile;
+    protected final PlayerSkin.Patch skinPatch;
+    public static ResolvableProfile createResolved(GameProfile gameProfile);
+    public static ResolvableProfile createUnresolved(String name);
+    public static ResolvableProfile createUnresolved(UUID id);
+    protected abstract Either<GameProfile, Partial> unpack();
+    protected ResolvableProfile(GameProfile partialProfile, PlayerSkin.Patch skinPatch);
+    public abstract CompletableFuture<GameProfile> resolveProfile(ProfileResolver profileResolver);
+    public GameProfile partialProfile();
+    public PlayerSkin.Patch skinPatch();
+    public abstract Optional<String> name();
+    protected static record Partial(Optional<String> name, Optional<UUID> id, PropertyMap properties) {
+        public static final Partial EMPTY;
+        public static final StreamCodec<ByteBuf, Partial> STREAM_CODEC;
+    }
+    public static final class Static extends ResolvableProfile {
+        public static final Static EMPTY;
+        private Static(Either<GameProfile, Partial> contents, PlayerSkin.Patch skinPatch);
+        public CompletableFuture<GameProfile> resolveProfile(ProfileResolver profileResolver);
+        protected Either<GameProfile, Partial> unpack();
+        public Optional<String> name();
+        public boolean equals(Object o);
+        public int hashCode();
+        public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+    }
+    public static final class Dynamic extends ResolvableProfile {
+        private Dynamic(Either<String, UUID> nameOrId, PlayerSkin.Patch skinPatch);
+        public Optional<String> name();
+        public boolean equals(Object o);
+        public int hashCode();
+        protected Either<GameProfile, Partial> unpack();
+        public CompletableFuture<GameProfile> resolveProfile(ProfileResolver profileResolver);
+        public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+    }
+}
+//// SeededContainerLoot.java
+import com.mojang.serialization.Codec;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.storage.loot.LootTable;
+public record SeededContainerLoot(ResourceKey<LootTable> lootTable, long seed) implements TooltipProvider {
+    public static final Codec<SeededContainerLoot> CODEC;
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// SimpleMutableContainer.java
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.item.ItemProvider;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.slot.SlotSelector;
+public abstract class SimpleMutableContainer<T> implements ContainerComponent.Mutable<T> {
+    protected final List<ItemStack> items;
+    public SimpleMutableContainer(List<ItemStack> items);
+    public Stream<ItemStack> itemCopies();
+    public int size();
+    public int replaceSlotItems(ItemProvider newItems, SlotSelector slotSelector);
+    public void modifySlots(Consumer<? super SlotAccess> consumer, SlotSelector slotSelector);
+    protected boolean setItem(int slot, ItemStack itemStack);
+}
+//// SulfurCubeContent.java
+import com.mojang.serialization.Codec;
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.TooltipFlag;
+public record SulfurCubeContent(ItemStackTemplate absorbedBlockItemStack) implements TooltipProvider {
+    public static final Codec<SulfurCubeContent> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, SulfurCubeContent> STREAM_CODEC;
+    public static SulfurCubeContent ofNonEmpty(ItemStack itemStack);
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// SuspiciousStewEffects.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.Level;
+public record SuspiciousStewEffects(List<Entry> effects) implements ConsumableListener, TooltipProvider {
+    public static final SuspiciousStewEffects EMPTY;
+    public static final int DEFAULT_DURATION = 160;
+    public static final Codec<SuspiciousStewEffects> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, SuspiciousStewEffects> STREAM_CODEC;
+    public SuspiciousStewEffects withEffectAdded(Entry entry);
+    public void onConsume(Level level, LivingEntity user, ItemStack stack, Consumable consumable);
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+    public static record Entry(Holder<MobEffect> effect, int duration) {
+        public static final Codec<Entry> CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, Entry> STREAM_CODEC;
+        public MobEffectInstance createEffectInstance();
+    }
+}
+//// SwingAnimation.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.SwingAnimationType;
+public record SwingAnimation(SwingAnimationType type, int duration) {
+    public static final SwingAnimation DEFAULT;
+    public static final Codec<SwingAnimation> CODEC;
+    public static final StreamCodec<ByteBuf, SwingAnimation> STREAM_CODEC;
+}
+//// Tool.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public record Tool(List<Rule> rules, float defaultMiningSpeed, int damagePerBlock, boolean canDestroyBlocksInCreative) {
+    public static final Codec<Tool> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Tool> STREAM_CODEC;
+    public float getMiningSpeed(BlockState state);
+    public boolean isCorrectForDrops(BlockState state);
+    public static record Rule(HolderSet<Block> blocks, Optional<Float> speed, Optional<Boolean> correctForDrops) {
+        public static final Codec<Rule> CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, Rule> STREAM_CODEC;
+        public static Rule minesAndDrops(HolderSet<Block> blocks, float speed);
+        public static Rule deniesDrops(HolderSet<Block> blocks);
+        public static Rule overrideSpeed(HolderSet<Block> blocks, float speed);
+    }
+}
+//// TooltipDisplay.java
+import com.mojang.serialization.Codec;
+import java.util.SequencedSet;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record TooltipDisplay(boolean hideTooltip, SequencedSet<DataComponentType<?>> hiddenComponents) {
+    public static final Codec<TooltipDisplay> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, TooltipDisplay> STREAM_CODEC;
+    public static final TooltipDisplay DEFAULT;
+    public TooltipDisplay withHidden(DataComponentType<?> component, boolean hidden);
+    public boolean shows(DataComponentType<?> component);
+}
+//// TooltipProvider.java
+import java.util.function.Consumer;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+public interface TooltipProvider {
+    void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+    public interface Getter<T> {
+        TooltipProvider get(T component);
+    }
+}
+//// TypedEntityData.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.Consumer;
+import net.minecraft.core.DefaultedRegistry;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.SpawnData;
+import net.minecraft.world.level.block.entity.BlockEntity;
+public final class TypedEntityData<IdType> implements TooltipProvider {
+    public static <T> Codec<TypedEntityData<T>> codec(Codec<T> typeCodec);
+    public static <B extends ByteBuf, T> StreamCodec<B, TypedEntityData<T>> streamCodec(StreamCodec<B, T> typeCodec);
+    private TypedEntityData(IdType type, CompoundTag data);
+    public static <T> TypedEntityData<T> of(T type, CompoundTag data);
+    public IdType type();
+    public boolean contains(String name);
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+    public void loadInto(Entity entity);
+    public boolean loadInto(SpawnData spawnData, DefaultedRegistry<IdType> registry);
+    public boolean loadInto(BlockEntity blockEntity, HolderLookup.Provider registries);
+    public CompoundTag getUnsafe();
+    public CompoundTag copyTagWithoutId();
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// UseCooldown.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+public record UseCooldown(float seconds, Optional<Identifier> cooldownGroup) {
+    public static final Codec<UseCooldown> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, UseCooldown> STREAM_CODEC;
+    public UseCooldown(float seconds);
+    public int ticks();
+    public void apply(ItemStack stack, LivingEntity user);
+}
+//// UseEffects.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record UseEffects(boolean canSprint, boolean interactVibrations, float speedMultiplier) {
+    public static final UseEffects DEFAULT;
+    public static final Codec<UseEffects> CODEC;
+    public static final StreamCodec<ByteBuf, UseEffects> STREAM_CODEC;
+}
+//// UseRemainder.java
+import com.mojang.serialization.Codec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+public record UseRemainder(ItemStackTemplate convertInto) {
+    public static final Codec<UseRemainder> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, UseRemainder> STREAM_CODEC;
+    public ItemStack convertIntoRemainder(ItemStack usedStack, int stackCountBeforeUsing, boolean hasInfiniteMaterials, OnExtraCreatedRemainder onExtraCreatedRemainder);
+    public interface OnExtraCreatedRemainder {
+        void apply(ItemStack extraCreatedRemainder);
+    }
+}
+//// Weapon.java
+import com.mojang.serialization.Codec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record Weapon(int itemDamagePerAttack, float disableBlockingForSeconds) {
+    public static final float AXE_DISABLES_BLOCKING_FOR_SECONDS = 5.0F;
+    public static final Codec<Weapon> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Weapon> STREAM_CODEC;
+    public Weapon(int damagePerAttack);
+}
+//// WritableBookContent.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.stream.Stream;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.network.Filterable;
+public record WritableBookContent(List<Filterable<String>> pages) implements BookContent<String, WritableBookContent> {
+    public static final WritableBookContent EMPTY;
+    public static final int PAGE_EDIT_LENGTH = 1024;
+    public static final int MAX_PAGES = 100;
+    public static final Codec<List<Filterable<String>>> PAGES_CODEC;
+    public static final Codec<WritableBookContent> CODEC;
+    public static final StreamCodec<ByteBuf, WritableBookContent> STREAM_CODEC;
+    public Stream<String> getPages(boolean filterEnabled);
+    public WritableBookContent withReplacedPages(List<Filterable<String>> newPages);
+}
+//// WrittenBookContent.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ResolutionContext;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.network.Filterable;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+public record WrittenBookContent(Filterable<String> title, String author, int generation, List<Filterable<Component>> pages, boolean resolved) implements BookContent<Component, WrittenBookContent>, TooltipProvider {
+    public static final WrittenBookContent EMPTY;
+    public static final int PAGE_LENGTH = 32767;
+    public static final int TITLE_LENGTH = 16;
+    public static final int TITLE_MAX_LENGTH = 32;
+    public static final int MAX_GENERATION = 3;
+    public static final Codec<Component> CONTENT_CODEC;
+    public static final Codec<List<Filterable<Component>>> PAGES_CODEC;
+    public static final Codec<WrittenBookContent> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, WrittenBookContent> STREAM_CODEC;
+    public WrittenBookContent(Filterable<String> title, String author, int generation, List<Filterable<Component>> pages, boolean resolved);
+    public static Codec<List<Filterable<Component>>> pagesCodec(Codec<Component> contentCodec);
+    public WrittenBookContent craftCopy();
+    public static boolean resolveForItem(ItemStack itemStack, ResolutionContext context, HolderLookup.Provider registries);
+    public WrittenBookContent resolve(ResolutionContext context, HolderLookup.Provider registries);
+    public WrittenBookContent markResolved();
+    public List<Component> getPages(boolean filterEnabled);
+    public WrittenBookContent withReplacedPages(List<Filterable<Component>> newPages);
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}

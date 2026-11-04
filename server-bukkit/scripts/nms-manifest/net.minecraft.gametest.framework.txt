@@ -1,0 +1,922 @@
+//// BlockBasedTestInstance.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.chat.MutableComponent;
+public class BlockBasedTestInstance extends GameTestInstance {
+    public static final MapCodec<BlockBasedTestInstance> CODEC;
+    public BlockBasedTestInstance(TestData<Holder<TestEnvironmentDefinition<?>>> testData);
+    public void run(GameTestHelper helper);
+    public MapCodec<BlockBasedTestInstance> codec();
+    protected MutableComponent typeDescription();
+}
+//// BuiltinTestFunctions.java
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public class BuiltinTestFunctions implements TestFunctionLoader {
+    public static final ResourceKey<Consumer<GameTestHelper>> ALWAYS_PASS;
+    public static final Consumer<GameTestHelper> ALWAYS_PASS_INSTANCE;
+    public static Consumer<GameTestHelper> bootstrap(Registry<Consumer<GameTestHelper>> registry);
+    public void load(BiConsumer<ResourceKey<Consumer<GameTestHelper>>, Consumer<GameTestHelper>> register);
+}
+//// ExhaustedAttemptsException.java
+public class ExhaustedAttemptsException extends Throwable {
+    public ExhaustedAttemptsException(int attempts, int successes, GameTestInfo testInfo);
+}
+//// FailedTestTracker.java
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+public class FailedTestTracker {
+    public static Stream<Holder.Reference<GameTestInstance>> getLastFailedTests();
+    public static void rememberFailedTest(Holder.Reference<GameTestInstance> test);
+    public static void forgetFailedTests();
+}
+//// FunctionGameTestInstance.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.ResourceKey;
+public class FunctionGameTestInstance extends GameTestInstance {
+    public static final MapCodec<FunctionGameTestInstance> CODEC;
+    public FunctionGameTestInstance(ResourceKey<Consumer<GameTestHelper>> function, TestData<Holder<TestEnvironmentDefinition<?>>> info);
+    public void run(GameTestHelper helper);
+    public MapCodec<FunctionGameTestInstance> codec();
+    protected MutableComponent typeDescription();
+    public Component describe();
+}
+//// GameTestAssertException.java
+import net.minecraft.network.chat.Component;
+public class GameTestAssertException extends GameTestException {
+    protected final Component message;
+    protected final int tick;
+    public GameTestAssertException(Component message, int tick);
+    public Component getDescription();
+    public String getMessage();
+}
+//// GameTestAssertPosException.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+public class GameTestAssertPosException extends GameTestAssertException {
+    public GameTestAssertPosException(Component baseMessage, BlockPos absolutePos, BlockPos relativePos, int tick);
+    public Component getDescription();
+    public Component getMessageToShowAtBlock();
+    public BlockPos getRelativePos();
+    public BlockPos getAbsolutePos();
+}
+//// GameTestBatch.java
+import java.util.Collection;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+public record GameTestBatch(int index, Collection<GameTestInfo> gameTestInfos, Holder<TestEnvironmentDefinition<?>> environment, ResourceKey<Level> dimension) {
+}
+//// GameTestBatchFactory.java
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+public class GameTestBatchFactory {
+    public static final TestDecorator DIRECT;
+    public static List<GameTestBatch> divideIntoBatches(Collection<Holder.Reference<GameTestInstance>> allTests, TestDecorator decorator, MinecraftServer server);
+    public static GameTestRunner.GameTestBatcher fromGameTestInfo();
+    public static GameTestRunner.GameTestBatcher fromGameTestInfo(int maxTestsPerBatch);
+    public static GameTestBatch toGameTestBatch(Collection<GameTestInfo> tests, Holder<TestEnvironmentDefinition<?>> batch, int counter, ResourceKey<Level> dimension);
+    static record BatchKey(Holder<TestEnvironmentDefinition<?>> environment, ResourceKey<Level> dimension) {
+    }
+    public interface TestDecorator {
+        Stream<GameTestInfo> decorate(Holder.Reference<GameTestInstance> test, ServerLevel level);
+    }
+}
+//// GameTestBatchListener.java
+public interface GameTestBatchListener {
+    void testBatchStarting(GameTestBatch batch);
+    void testBatchFinished(GameTestBatch batch);
+}
+//// GameTestDimensions.java
+public interface GameTestDimensions {
+    String DEFAULT;
+    String NETHER;
+    String END;
+}
+//// GameTestEntityBuilder.java
+import java.util.List;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.phys.Vec3;
+public class GameTestEntityBuilder<E extends Entity> {
+    protected final GameTestHelper testHelper;
+    public GameTestEntityBuilder(GameTestHelper testHelper, EntityType<E> entityType, Vec3 position);
+    public GameTestEntityBuilder<E> spawnReason(EntitySpawnReason spawnReason);
+    public GameTestEntityBuilder<E> rotation(Rotation rotation);
+    public GameTestEntityBuilder<E> requirePersistence(boolean requirePersistence);
+    public E spawn();
+    public List<E> spawn(int amount);
+}
+//// GameTestEnvironments.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public interface GameTestEnvironments {
+    String DEFAULT;
+    ResourceKey<TestEnvironmentDefinition<?>> DEFAULT_KEY;
+    static void bootstrap(BootstrapContext<TestEnvironmentDefinition<?>> context);
+}
+//// GameTestEvent.java
+public class GameTestEvent {
+    public final Long expectedDelay;
+    public final Long minimumDelay;
+    public final Runnable assertion;
+    private GameTestEvent(Long expectedDelay, Long minimumDelay, Runnable assertion);
+    public static GameTestEvent create(Runnable runnable);
+    public static GameTestEvent create(long expectedTick, Runnable runnable);
+    public static GameTestEvent createWithMinimumDelay(long minimumDelay, Runnable runnable);
+}
+//// GameTestException.java
+import net.minecraft.network.chat.Component;
+public abstract class GameTestException extends RuntimeException {
+    public GameTestException(String message);
+    public abstract Component getDescription();
+}
+//// GameTestHelper.java
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.IntPredicate;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.npc.InventoryCarrier;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+public class GameTestHelper {
+    public GameTestHelper(GameTestInfo testInfo);
+    public GameTestAssertException assertionException(Component description);
+    public GameTestAssertException assertionException(String descriptionId, Object... arguments);
+    public GameTestAssertPosException assertionException(BlockPos pos, Component description);
+    public GameTestAssertPosException assertionException(BlockPos pos, String descriptionId, Object... arguments);
+    public ServerLevel getLevel();
+    public BlockState getBlockState(BlockPos pos);
+    public <T extends BlockEntity> T getBlockEntity(BlockPos pos, Class<T> type);
+    public void killAllEntities();
+    public void killAllEntitiesOfClass(Class<? extends Entity> baseClass);
+    public ItemEntity spawnItem(Item item, Vec3 pos);
+    public ItemEntity spawnItem(Item item, float x, float y, float z);
+    public ItemEntity spawnItem(Item item, BlockPos pos);
+    public void despawnItem(BlockPos pos, double distance);
+    public <E extends Entity> E spawn(EntityType<E> entityType, BlockPos pos);
+    public <E extends Entity> List<E> spawn(EntityType<E> entityType, BlockPos pos, int amount);
+    public <E extends Entity> List<E> spawn(EntityType<E> entityType, Vec3 pos, int amount);
+    public <E extends Entity> E spawn(EntityType<E> entityType, Vec3 pos);
+    public <E extends Mob> E spawn(EntityType<E> entityType, double x, double y, double z, EntitySpawnReason entitySpawnReason);
+    public <E extends Entity> E spawn(EntityType<E> entityType, BlockPos pos, EntitySpawnReason spawnReason);
+    public <E extends Entity> E spawn(EntityType<E> entityType, Vec3 pos, EntitySpawnReason spawnReason);
+    public <E extends Entity> GameTestEntityBuilder<E> spawnEntity(EntityType<E> entityType, Vec3 position);
+    public <E extends Entity> GameTestEntityBuilder<E> spawnEntity(EntityType<E> entityType, BlockPos position);
+    public <E extends Entity> GameTestEntityBuilder<E> spawnEntity(EntityType<E> entityType, int x, int y, int z);
+    public <E extends Entity> GameTestEntityBuilder<E> spawnEntity(EntityType<E> entityType, float x, float y, float z);
+    public <E extends Mob> GameTestMobBuilder<E> spawnMob(EntityType<E> entityType, Vec3 position);
+    public <E extends Mob> GameTestMobBuilder<E> spawnMob(EntityType<E> entityType, BlockPos position);
+    public <E extends Mob> GameTestMobBuilder<E> spawnMob(EntityType<E> entityType, int x, int y, int z);
+    public <E extends Mob> GameTestMobBuilder<E> spawnMob(EntityType<E> entityType, float x, float y, float z);
+    public void hurt(Entity entity, DamageSource source, float damage);
+    public void kill(Entity entity);
+    public void discard(Entity entity);
+    public <E extends Entity> E findOneEntity(EntityType<E> entityType);
+    public <E extends Entity> E findClosestEntity(EntityType<E> entityType, int x, int y, int z, double distance);
+    public <E extends Entity> List<E> findEntities(EntityType<E> entityType, int x, int y, int z, double distance);
+    public <E extends Entity> List<E> findEntities(EntityType<E> entityType, Vec3 pos, double distance);
+    public <E extends Entity> E spawn(EntityType<E> entityType, int x, int y, int z);
+    public <E extends Entity> E spawn(EntityType<E> entityType, float x, float y, float z);
+    public <E extends Mob> E spawnWithNoFreeWill(EntityType<E> entityType, BlockPos pos);
+    public <E extends Mob> E spawnWithNoFreeWill(EntityType<E> entityType, int x, int y, int z);
+    public <E extends Mob> E spawnWithNoFreeWill(EntityType<E> entityType, Vec3 pos);
+    public <E extends Mob> E spawnWithNoFreeWill(EntityType<E> entityType, float x, float y, float z);
+    public void moveTo(Mob mob, float x, float y, float z);
+    public void moveTo(Mob mob, BlockPos pos);
+    public void moveTo(Mob mob, Vec3 pos);
+    public GameTestSequence walkTo(Mob mob, BlockPos targetPos, float speedModifier);
+    public void pressButton(int x, int y, int z);
+    public void pressButton(BlockPos buttonPos);
+    public void useBlock(BlockPos relativePos);
+    public void useBlock(BlockPos relativePos, Player player);
+    public void useBlock(BlockPos relativePos, Player player, BlockHitResult hitResult);
+    public LivingEntity makeAboutToDrown(LivingEntity entity);
+    public LivingEntity withLowHealth(LivingEntity entity);
+    public Player makeMockPlayer(GameType gameType);
+    public Player makeMockServerPlayer(GameType gameType);
+    public void rotateEntityWithTest(Entity entity);
+    public ServerPlayer makeMockServerPlayerInLevel();
+    public void pullLever(int x, int y, int z);
+    public void pullLever(BlockPos leverPos);
+    public void placeBlock(BlockPos relativePos, Block block, Direction relativePlaceDirection);
+    public void placeBlock(int x, int y, int z, Block block, Direction placeDirection);
+    public void pulseRedstone(BlockPos pos, long duration);
+    public void destroyBlock(BlockPos pos);
+    public void setBlock(int x, int y, int z, Block block);
+    public void setBlock(int x, int y, int z, BlockState state);
+    public void setBlock(BlockPos blockPos, Block block);
+    public void setBlock(BlockPos blockPos, BlockState state);
+    public void setBlock(BlockPos blockPos, Block block, Direction direction);
+    public void setBlock(BlockPos blockPos, BlockState blockState, Direction direction);
+    public void placeAt(Player player, ItemStack blockStack, BlockPos pos, Direction face);
+    public void useItemOnBlock(Player player, Item item, BlockPos pos);
+    public void assertBlockPresent(Block blockType, int x, int y, int z);
+    public void assertBlockPresent(Block blockType, BlockPos pos);
+    public void assertBlockPresent(Block blockType);
+    public void assertBlockNotPresent(Block blockType, int x, int y, int z);
+    public void assertBlockNotPresent(Block blockType, BlockPos pos);
+    public void assertBlockTag(TagKey<Block> tag, BlockPos pos);
+    public void succeedWhenBlockPresent(Block block, int x, int y, int z);
+    public void succeedWhenBlockPresent(Block block, BlockPos pos);
+    public void assertBlock(BlockPos pos, Predicate<Block> predicate, Function<Block, Component> errorMessage);
+    public <T extends Comparable<T>> void assertBlockProperty(BlockPos pos, Property<T> property, T value);
+    public <T extends Comparable<T>> void assertBlockProperty(BlockPos pos, Property<T> property, Predicate<T> predicate, Component errorMessage);
+    public void assertBlockState(BlockPos pos, BlockState expected);
+    public void assertBlockState(BlockPos pos, Predicate<BlockState> predicate, Function<BlockState, Component> errorMessage);
+    public <T extends BlockEntity> void assertBlockEntityData(BlockPos pos, Class<T> type, Predicate<T> predicate, Supplier<Component> errorMessage);
+    public void assertRedstoneSignal(BlockPos pos, Direction direction, IntPredicate levelPredicate, Supplier<Component> errorMessage);
+    public void assertEntityPresent(EntityType<?> entityType);
+    public void assertEntityPresent(EntityType<?> entityType, int x, int y, int z);
+    public void assertEntityPresent(EntityType<?> entityType, BlockPos pos);
+    public void assertEntityPresent(EntityType<?> entityType, AABB relativeAABB);
+    public void assertEntityPresent(EntityType<?> entityType, AABB relativeAABB, Component message);
+    public void assertEntitiesPresent(EntityType<?> entityType, int expectedEntities);
+    public void assertEntitiesPresent(EntityType<?> entityType, BlockPos pos, int numOfExpectedEntities, double distance);
+    public void assertEntityPresent(EntityType<?> entityType, BlockPos pos, double distance);
+    public <T extends Entity> List<T> getEntities(EntityType<T> entityType, BlockPos pos, double distance);
+    public <T extends Entity> List<T> getEntities(EntityType<T> entityType);
+    public void assertEntityInstancePresent(Entity entity, int x, int y, int z);
+    public void assertEntityInstancePresent(Entity entity, BlockPos pos);
+    public void assertEntityInstancePresent(Entity entity, BlockPos pos, double inflate);
+    public void assertItemEntityCountIs(Item itemType, BlockPos pos, double distance, int count);
+    public void assertItemEntityPresent(Item itemType, BlockPos pos, double distance);
+    public void assertItemEntityNotPresent(Item itemType, BlockPos pos, double distance);
+    public void assertItemEntityPresent(Item itemType);
+    public void assertItemEntityNotPresent(Item itemType);
+    public void assertEntityNotPresent(EntityType<?> entityType);
+    public void assertEntityNotPresent(EntityType<?> entityType, int x, int y, int z);
+    public void assertEntityNotPresent(EntityType<?> entityType, BlockPos pos);
+    public void assertEntityNotPresent(EntityType<?> entityType, AABB relativeAABB);
+    public void assertEntityTouching(EntityType<?> entityType, double x, double y, double z);
+    public void assertEntityNotTouching(EntityType<?> entityType, double x, double y, double z);
+    public <E extends Entity, T> void assertEntityData(BlockPos pos, EntityType<E> entityType, Predicate<E> test);
+    public <E extends Entity, T> void assertEntityData(BlockPos pos, EntityType<E> entityType, Function<? super E, T> dataAccessor, T data);
+    public <E extends Entity, T> void assertEntityData(AABB box, EntityType<E> entityType, Function<? super E, T> dataAccessor, T data);
+    public <E extends LivingEntity> void assertEntityIsHolding(BlockPos pos, EntityType<E> entityType, Item item);
+    public <E extends Entity & InventoryCarrier> void assertEntityInventoryContains(BlockPos pos, EntityType<E> entityType, Item item);
+    public void assertContainerEmpty(BlockPos pos);
+    public void assertContainerContainsSingle(BlockPos pos, Item item);
+    public void assertContainerContains(BlockPos pos, Item item);
+    public void assertSameBlockStates(BoundingBox sourceBoundingBox, BlockPos targetBoundingBoxCorner);
+    public void assertSameBlockState(BlockPos sourcePos, BlockPos targetPos);
+    public void assertAtTickTimeContainerContains(long time, BlockPos pos, Item item);
+    public void assertAtTickTimeContainerEmpty(long time, BlockPos pos);
+    public <E extends Entity, T> void succeedWhenEntityData(BlockPos pos, EntityType<E> entityType, Function<E, T> dataAccessor, T data);
+    public <E extends Entity> void assertEntityProperty(E entity, Predicate<E> test, Component description);
+    public <E extends Entity, T> void assertEntityProperty(E entity, Function<E, T> test, T expected, Component description);
+    public void assertLivingEntityHasMobEffect(LivingEntity entity, Holder<MobEffect> mobEffect, int amplifier);
+    public void succeedWhenEntityPresent(EntityType<?> entityType, int x, int y, int z);
+    public void succeedWhenEntityPresent(EntityType<?> entityType, BlockPos pos);
+    public void succeedWhenEntityNotPresent(EntityType<?> entityType, int x, int y, int z);
+    public void succeedWhenEntityNotPresent(EntityType<?> entityType, BlockPos pos);
+    public void succeed();
+    public void succeedIf(Runnable asserter);
+    public void succeedWhen(Runnable asserter);
+    public void succeedOnTickWhen(int tick, Runnable asserter);
+    public void runAtTickTime(long time, Runnable asserter);
+    public void runBeforeTestEnd(Runnable asserter);
+    public void runAfterDelay(long ticksToDelay, Runnable whatToRun);
+    public void setTime(long ticks);
+    public void randomTick(BlockPos pos);
+    public void tickBlock(BlockPos pos);
+    public void tickPrecipitation(BlockPos pos);
+    public void tickPrecipitation();
+    public int getHeight(Heightmap.Types heightmap, int x, int z);
+    public void fail(Component message, BlockPos pos);
+    public void fail(Component message, Entity entity);
+    public void fail(Component message);
+    public void fail(String message);
+    public void failIf(Runnable asserter);
+    public void failIfEver(Runnable asserter);
+    public GameTestSequence startSequence();
+    public BlockPos absolutePos(BlockPos relativePos);
+    public BlockPos relativePos(BlockPos absolutePos);
+    public AABB absoluteAABB(AABB relativeAABB);
+    public AABB relativeAABB(AABB absoluteAABB);
+    public Vec3 absoluteVec(Vec3 relativeVec);
+    public Vec3 relativeVec(Vec3 absoluteVec);
+    public Rotation getTestRotation();
+    public Direction getTestDirection();
+    public Direction getAbsoluteDirection(Direction direction);
+    public void assertTrue(boolean condition, Component errorMessage);
+    public void assertTrue(boolean condition, String errorMessage);
+    public <N> void assertValueEqual(N value, N expected, String valueName);
+    public <N> void assertValueEqual(N value, N expected, Component valueName);
+    public <N extends Comparable<N>> void assertValueInBetween(N lowerBound, N value, N upperBound, String valueName);
+    public <N extends Comparable<N>> void assertValueInBetween(N lowerBound, N value, N upperBound, Component valueName);
+    public void assertFalse(boolean condition, Component errorMessage);
+    public void assertFalse(boolean condition, String errorMessage);
+    public long getTick();
+    public AABB getBounds();
+    public AABB getBoundsWithPadding();
+    public AABB getRelativeBounds();
+    public void forEveryBlockInStructure(Consumer<BlockPos> forBlock);
+    public void onEachTick(Runnable action);
+    public void setBiome(ResourceKey<Biome> biome);
+    class TestBlockPlaceContext extends BlockPlaceContext {
+        public TestBlockPlaceContext(Level level, InteractionHand hand, ItemStack itemStackInHand, BlockHitResult hitResult, Direction placeDirection);
+        public Direction getNearestLookingDirection();
+        public Direction[] getNearestLookingDirections();
+    }
+}
+//// GameTestInfo.java
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.entity.TestInstanceBlockEntity;
+import net.minecraft.world.phys.AABB;
+public class GameTestInfo {
+    public GameTestInfo(Holder.Reference<GameTestInstance> test, Rotation extraRotation, ServerLevel level, RetryOptions retryOptions);
+    public void setTestBlockPos(BlockPos testBlockPos);
+    public GameTestInfo startExecution(int tickDelay);
+    public void placeStructure();
+    public void tick(GameTestRunner runner);
+    public void setRunAtTickTime(long time, Runnable assertAtTickTime);
+    public Identifier id();
+    public BlockPos getTestBlockPos();
+    public BlockPos getTestOrigin();
+    public AABB getStructureBounds();
+    public TestInstanceBlockEntity getTestInstanceBlockEntity();
+    public ServerLevel getLevel();
+    public boolean hasSucceeded();
+    public boolean hasFailed();
+    public boolean hasStarted();
+    public boolean isDone();
+    public long getRunTime();
+    public void succeed();
+    public void fail(Component message);
+    public void fail(GameTestException error);
+    public GameTestException getError();
+    public String toString();
+    public void addListener(GameTestListener listener);
+    public GameTestInfo prepareTestStructure();
+    public int getTick();
+    public GameTestSequence createSequence();
+    public boolean isRequired();
+    public boolean isOptional();
+    public Identifier getStructure();
+    public Rotation getRotation();
+    public GameTestInstance getTest();
+    public Holder.Reference<GameTestInstance> getTestHolder();
+    public int getTimeoutTicks();
+    public boolean isFlaky();
+    public int maxAttempts();
+    public int requiredSuccesses();
+    public RetryOptions retryOptions();
+    public Stream<GameTestListener> getListeners();
+    public GameTestInfo copyReset();
+}
+//// GameTestInstance.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Rotation;
+public abstract class GameTestInstance {
+    public static final Codec<GameTestInstance> DIRECT_CODEC;
+    public static MapCodec<? extends GameTestInstance> bootstrap(Registry<MapCodec<? extends GameTestInstance>> registry);
+    protected GameTestInstance(TestData<Holder<TestEnvironmentDefinition<?>>> info);
+    public abstract void run(GameTestHelper helper);
+    public abstract MapCodec<? extends GameTestInstance> codec();
+    public Holder<TestEnvironmentDefinition<?>> batch();
+    public ResourceKey<Level> dimension();
+    public Identifier structure();
+    public int maxTicks();
+    public int setupTicks();
+    public boolean required();
+    public boolean manualOnly();
+    public int maxAttempts();
+    public int requiredSuccesses();
+    public boolean skyAccess();
+    public Rotation rotation();
+    public int padding();
+    protected TestData<Holder<TestEnvironmentDefinition<?>>> info();
+    protected abstract MutableComponent typeDescription();
+    public Component describe();
+    protected MutableComponent describeType();
+    protected Component describeInfo();
+    protected MutableComponent descriptionRow(String translationKey, String value);
+    protected MutableComponent descriptionRow(String translationKey, MutableComponent value);
+}
+//// GameTestInstances.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public interface GameTestInstances {
+    ResourceKey<GameTestInstance> ALWAYS_PASS;
+    static void bootstrap(BootstrapContext<GameTestInstance> context);
+}
+//// GameTestListener.java
+public interface GameTestListener {
+    void testStructureLoaded(GameTestInfo testInfo);
+    void testPassed(GameTestInfo testInfo, GameTestRunner runner);
+    void testFailed(GameTestInfo testInfo, GameTestRunner runner);
+    void testAddedForRerun(GameTestInfo original, GameTestInfo copy, GameTestRunner runner);
+}
+//// GameTestMainUtil.java
+import java.util.function.Consumer;
+public class GameTestMainUtil {
+    public static void runGameTestServer(String[] args, Consumer<String> onUniverseCreated) throws Exception;
+}
+//// GameTestMobBuilder.java
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.phys.Vec3;
+public class GameTestMobBuilder<E extends Mob> extends GameTestEntityBuilder<E> {
+    public GameTestMobBuilder(GameTestHelper testHelper, EntityType<E> entityType, Vec3 position);
+    public GameTestMobBuilder<E> withNoFreeWill();
+    public E spawn();
+}
+//// GameTestRunner.java
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.server.MinecraftServer;
+public class GameTestRunner {
+    public static final int DEFAULT_TESTS_PER_ROW = 8;
+    protected GameTestRunner(GameTestBatcher batcher, Collection<GameTestBatch> batches, MinecraftServer server, GameTestTicker testTicker, StructureSpawner existingStructureSpawner, StructureSpawner newStructureSpawner, boolean haltOnError, boolean clearBetweenBatches);
+    public List<GameTestInfo> getTestInfos();
+    public void start();
+    public void stop();
+    public void rerunTest(GameTestInfo info);
+    public void addListener(GameTestBatchListener listener);
+    public interface StructureSpawner {
+        StructureSpawner IN_PLACE;
+        StructureSpawner NOT_SET;
+        Optional<GameTestInfo> spawnStructure(GameTestInfo testInfo);
+        default void onBatchStart(MinecraftServer server);
+    }
+    public static class Builder {
+        private Builder(Collection<GameTestBatch> batches, MinecraftServer server);
+        public static Builder fromBatches(Collection<GameTestBatch> batches, MinecraftServer server);
+        public static Builder fromInfo(Collection<GameTestInfo> tests, MinecraftServer server);
+        public Builder haltOnError();
+        public Builder clearBetweenBatches();
+        public Builder newStructureSpawner(StructureSpawner structureSpawner);
+        public Builder existingStructureSpawner(StructureGridSpawner spawner);
+        public Builder batcher(GameTestBatcher batcher);
+        public GameTestRunner build();
+    }
+    public interface GameTestBatcher {
+        Collection<GameTestBatch> batch(Collection<GameTestInfo> infos);
+    }
+}
+//// GameTestSequence.java
+import java.util.function.Supplier;
+public class GameTestSequence {
+    public GameTestSequence(GameTestInfo parent);
+    public GameTestSequence thenWaitUntil(Runnable assertion);
+    public GameTestSequence thenWaitUntil(long expectedDelay, Runnable assertion);
+    public GameTestSequence thenWaitAtLeast(long minimumDelay, Runnable assertion);
+    public GameTestSequence thenIdle(int delta);
+    public GameTestSequence thenExecute(Runnable assertion);
+    public GameTestSequence thenExecuteAfter(int delta, Runnable after);
+    public GameTestSequence thenExecuteFor(int delta, Runnable check);
+    public void thenSucceed();
+    public void thenFail(Supplier<GameTestException> e);
+    public Condition thenTrigger();
+    public void tickAndContinue(int tick);
+    public void tickAndFailIfNotComplete(int tick);
+    public class Condition {
+        public Condition();
+        public void trigger(int time);
+        public void assertTriggeredThisTick();
+    }
+}
+//// GameTestServer.java
+import com.mojang.authlib.GameProfile;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.BooleanSupplier;
+import java.util.stream.Stream;
+import net.minecraft.CrashReport;
+import net.minecraft.SystemReport;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.WorldStem;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.permissions.LevelBasedPermissionSet;
+import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.ProfileResolver;
+import net.minecraft.server.players.UserNameToIdResolver;
+import net.minecraft.util.debugchart.SampleLogger;
+import net.minecraft.world.level.storage.LevelStorageSource;
+public class GameTestServer extends MinecraftServer {
+    public static GameTestServer create(Thread serverThread, LevelStorageSource.LevelStorageAccess levelStorageSource, PackRepository packRepository, Optional<String> testSelection, boolean verify, int repeatCount);
+    private GameTestServer(Thread serverThread, LevelStorageSource.LevelStorageAccess levelStorageSource, PackRepository packRepository, WorldStem worldStem, Optional<String> testSelection, boolean verify, int repeatCount);
+    protected boolean initServer();
+    public static Stream<Holder.Reference<GameTestInstance>> getTestsForSelection(RegistryAccess registries, String selection);
+    protected void tickServer(BooleanSupplier haveTime);
+    protected SampleLogger getTickTimeLogger();
+    public boolean isTickTimeLoggingEnabled();
+    protected void waitUntilNextTick();
+    public SystemReport fillServerSystemReport(SystemReport systemReport);
+    protected void onServerExit();
+    protected void onServerCrash(CrashReport report);
+    public boolean isHardcore();
+    public LevelBasedPermissionSet operatorUserPermissions();
+    public PermissionSet getFunctionCompilationPermissions();
+    public boolean shouldRconBroadcast();
+    public boolean isDedicatedServer();
+    public int getRateLimitPacketsPerSecond();
+    public int getCommandSpamThresholdSeconds();
+    public int getChatSpamThresholdSeconds();
+    public boolean useNativeTransport();
+    public boolean isPublished();
+    public boolean shouldInformAdmins();
+    public boolean isSingleplayerOwner(NameAndId nameAndId);
+    public int getMaxPlayers();
+    static class MockUserNameToIdResolver implements UserNameToIdResolver {
+        public void add(NameAndId nameAndId);
+        public Optional<NameAndId> get(String name);
+        public Optional<NameAndId> get(UUID id);
+        public void resolveOfflineUsers(boolean value);
+        public void save();
+    }
+    static class MockProfileResolver implements ProfileResolver {
+        public Optional<GameProfile> fetchByName(String name);
+        public Optional<GameProfile> fetchById(UUID id);
+    }
+}
+//// GameTestTicker.java
+public class GameTestTicker {
+    public static final GameTestTicker SINGLETON;
+    private GameTestTicker();
+    public void add(GameTestInfo testInfo);
+    public void clear();
+    public void setRunner(GameTestRunner runner);
+    public void tick();
+    static enum State {
+        IDLE, RUNNING, HALTING;
+    }
+}
+//// GameTestTimeoutException.java
+import net.minecraft.network.chat.Component;
+public class GameTestTimeoutException extends GameTestException {
+    protected final Component message;
+    public GameTestTimeoutException(Component message);
+    public Component getDescription();
+}
+//// GeneratedTest.java
+import java.util.Map;
+import java.util.function.Consumer;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+public record GeneratedTest(Map<Identifier, TestData<ResourceKey<TestEnvironmentDefinition<?>>>> tests, ResourceKey<Consumer<GameTestHelper>> functionKey, Consumer<GameTestHelper> function) {
+    public GeneratedTest(Map<Identifier, TestData<ResourceKey<TestEnvironmentDefinition<?>>>> tests, Identifier functionId, Consumer<GameTestHelper> function);
+    public GeneratedTest(Identifier id, TestData<ResourceKey<TestEnvironmentDefinition<?>>> testData, Consumer<GameTestHelper> function);
+}
+//// GlobalTestReporter.java
+public class GlobalTestReporter {
+    public static void replaceWith(TestReporter testReporter);
+    public static void onTestFailed(GameTestInfo testInfo);
+    public static void onTestSuccess(GameTestInfo testInfo);
+    public static void finish();
+}
+//// JUnitLikeTestReporter.java
+import java.io.File;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.TransformerException;
+public class JUnitLikeTestReporter implements TestReporter {
+    public JUnitLikeTestReporter(File destination) throws ParserConfigurationException;
+    public void onTestFailed(GameTestInfo testInfo);
+    public void onTestSuccess(GameTestInfo testInfo);
+    public void finish();
+    public void save(File file) throws TransformerException;
+}
+//// LogTestReporter.java
+public class LogTestReporter implements TestReporter {
+    public void onTestFailed(GameTestInfo testInfo);
+    public void onTestSuccess(GameTestInfo testInfo);
+}
+//// MultipleTestTracker.java
+import java.util.Collection;
+import java.util.function.Consumer;
+public class MultipleTestTracker {
+    public MultipleTestTracker();
+    public MultipleTestTracker(Collection<GameTestInfo> tests);
+    public void addTestToTrack(GameTestInfo testInfo);
+    public void addListener(GameTestListener listener);
+    public void addFailureListener(Consumer<GameTestInfo> listener);
+    public int getFailedRequiredCount();
+    public int getFailedOptionalCount();
+    public int getDoneCount();
+    public boolean hasFailedRequired();
+    public boolean hasFailedOptional();
+    public Collection<GameTestInfo> getFailedRequired();
+    public Collection<GameTestInfo> getFailedOptional();
+    public int getTotalCount();
+    public boolean isDone();
+    public String getProgressBar();
+    public String toString();
+    public void remove(GameTestInfo testInfo);
+}
+//// ReportGameListener.java
+import net.minecraft.ChatFormatting;
+import net.minecraft.server.level.ServerLevel;
+public class ReportGameListener implements GameTestListener {
+    public void testStructureLoaded(GameTestInfo testInfo);
+    public void testPassed(GameTestInfo testInfo, GameTestRunner runner);
+    public void testFailed(GameTestInfo testInfo, GameTestRunner runner);
+    public void testAddedForRerun(GameTestInfo original, GameTestInfo copy, GameTestRunner runner);
+    public static void reportPassed(GameTestInfo testInfo, String text);
+    protected static void reportFailure(GameTestInfo testInfo, Throwable error);
+    protected static void visualizeFailedTest(GameTestInfo testInfo, Throwable error);
+    protected static void say(ServerLevel level, ChatFormatting format, String text);
+}
+//// RetryOptions.java
+public record RetryOptions(int numberOfTries, boolean haltOnFailure) {
+    public static RetryOptions noRetries();
+    public boolean unlimitedTries();
+    public boolean hasTriesLeft(int attempts, int successes);
+    public boolean hasRetries();
+}
+//// StructureGridSpawner.java
+import java.util.Optional;
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.Level;
+public class StructureGridSpawner implements GameTestRunner.StructureSpawner {
+    public StructureGridSpawner(Function<ResourceKey<Level>, BlockPos> firstTestNorthWestCorner, int testsPerRow, boolean clearOnBatch);
+    public void onBatchStart(MinecraftServer server);
+    public Optional<GameTestInfo> spawnStructure(GameTestInfo testInfo);
+    static final class DimensionGridState {
+        private DimensionGridState(BlockPos start);
+    }
+}
+//// StructureUtils.java
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.entity.TestInstanceBlockEntity;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+public class StructureUtils {
+    public static final int DEFAULT_Y_SEARCH_RADIUS = 10;
+    public static Path testStructuresTargetDir;
+    public static Path testStructuresSourceDir;
+    public static Rotation getRotationForRotationSteps(int rotationSteps);
+    public static int getRotationStepsForRotation(Rotation rotation);
+    public static TestInstanceBlockEntity createNewEmptyTest(Identifier id, BlockPos structurePos, Vec3i size, Rotation rotation, ServerLevel level);
+    public static void clearSpaceForStructure(BoundingBox structureBoundingBox, ServerLevel level);
+    public static BlockPos getTransformedFarCorner(BlockPos structurePosition, Vec3i size, Rotation rotation);
+    public static BoundingBox getStructureBoundingBox(BlockPos northWestCorner, Vec3i size, Rotation rotation);
+    public static Optional<BlockPos> findTestContainingPos(BlockPos pos, int searchRadius, ServerLevel level);
+    public static Optional<BlockPos> findNearestTest(BlockPos relativeToPos, int searchRadius, ServerLevel level);
+    public static Stream<BlockPos> findTestBlocks(BlockPos centerPos, int searchRadius, ServerLevel level);
+    public static Stream<BlockPos> lookedAtTestPos(BlockPos pos, Entity camera, ServerLevel level);
+}
+//// TestCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+public class TestCommand {
+    public static final int TEST_NEARBY_SEARCH_RADIUS = 15;
+    public static final int TEST_FULL_SEARCH_RADIUS = 250;
+    public static final int VERIFY_TEST_GRID_AXIS_SIZE = 10;
+    public static final int VERIFY_TEST_BATCH_SIZE = 100;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public static CompletableFuture<Suggestions> suggestTestFunction(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder);
+    public static int trackAndStartRunner(CommandSourceStack source, GameTestRunner runner);
+    static record Info(ServerPlayer player, BlockPos playerPos, BlockPos testPos, int surfaceY) {
+    }
+    public static final class TestSummaryDisplayer implements GameTestListener {
+        public TestSummaryDisplayer(CommandSourceStack source, MultipleTestTracker tracker);
+        public void testStructureLoaded(GameTestInfo testInfo);
+        public void testPassed(GameTestInfo testInfo, GameTestRunner runner);
+        public void testFailed(GameTestInfo testInfo, GameTestRunner runner);
+        public void testAddedForRerun(GameTestInfo original, GameTestInfo copy, GameTestRunner runner);
+    }
+    static record TestBatchSummaryDisplayer(CommandSourceStack source) implements GameTestBatchListener {
+        public void testBatchStarting(GameTestBatch batch);
+        public void testBatchFinished(GameTestBatch batch);
+    }
+}
+//// TestData.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Function;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Rotation;
+public record TestData<EnvironmentType>(EnvironmentType environment, ResourceKey<Level> dimension, Identifier structure, int maxTicks, int setupTicks, boolean required, Rotation rotation, boolean manualOnly, int maxAttempts, int requiredSuccesses, boolean skyAccess, int padding) {
+    public static final MapCodec<TestData<Holder<TestEnvironmentDefinition<?>>>> CODEC;
+    public TestData(EnvironmentType environment, Identifier structure, int maxTicks, int setupTicks, boolean required, Rotation rotation);
+    public TestData(EnvironmentType environment, Identifier structure, int maxTicks, int setupTicks, boolean required);
+    public <T> TestData<T> map(Function<EnvironmentType, T> mapper);
+}
+//// TestEnvironmentDefinition.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.Unit;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.attribute.EnvironmentAttributeSystem;
+import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.level.gamerules.GameRuleMap;
+import net.minecraft.world.timeline.Timeline;
+public interface TestEnvironmentDefinition<SavedDataType> {
+    Codec<TestEnvironmentDefinition<?>> DIRECT_CODEC;
+    Codec<Holder<TestEnvironmentDefinition<?>>> CODEC;
+    static MapCodec<? extends TestEnvironmentDefinition<?>> bootstrap(Registry<MapCodec<? extends TestEnvironmentDefinition<?>>> registry);
+    SavedDataType setup(ServerLevel level);
+    void teardown(ServerLevel level, SavedDataType saveData);
+    MapCodec<? extends TestEnvironmentDefinition<SavedDataType>> codec();
+    static <T> Activation<T> activate(TestEnvironmentDefinition<T> environment, ServerLevel level);
+    public static class Activation<T> {
+        private Activation(T value, TestEnvironmentDefinition<T> definition, ServerLevel level);
+        public void teardown();
+    }
+    public static record Weather(Type weather) implements TestEnvironmentDefinition<Type> {
+        public static final MapCodec<Weather> CODEC;
+        public Type setup(ServerLevel level);
+        public void teardown(ServerLevel level, Type saveData);
+        public MapCodec<Weather> codec();
+        public static enum Type implements StringRepresentable {
+            CLEAR, RAIN, THUNDER;
+            public static final Codec<Type> CODEC;
+            public void apply(ServerLevel level);
+            public String getSerializedName();
+        }
+    }
+    public static record ClockTime(Holder<WorldClock> clock, int time) implements TestEnvironmentDefinition<Long> {
+        public static final MapCodec<ClockTime> CODEC;
+        public Long setup(ServerLevel level);
+        public void teardown(ServerLevel level, Long saveData);
+        public MapCodec<ClockTime> codec();
+    }
+    public static record SetGameRules(GameRuleMap gameRulesMap) implements TestEnvironmentDefinition<GameRuleMap> {
+        public static final MapCodec<SetGameRules> CODEC;
+        public GameRuleMap setup(ServerLevel level);
+        public void teardown(ServerLevel level, GameRuleMap saveData);
+        public MapCodec<SetGameRules> codec();
+    }
+    public static record Functions(Optional<Identifier> setupFunction, Optional<Identifier> teardownFunction) implements TestEnvironmentDefinition<Unit> {
+        public static final MapCodec<Functions> CODEC;
+        public Unit setup(ServerLevel level);
+        public void teardown(ServerLevel level, Unit saveData);
+        public MapCodec<Functions> codec();
+    }
+    public static record AllOf(List<Holder<TestEnvironmentDefinition<?>>> definitions) implements TestEnvironmentDefinition<List<? extends Activation<?>>> {
+        public static final MapCodec<AllOf> CODEC;
+        public AllOf(TestEnvironmentDefinition<?>... defs);
+        public List<? extends Activation<?>> setup(ServerLevel level);
+        public void teardown(ServerLevel level, List<? extends Activation<?>> activations);
+        public MapCodec<AllOf> codec();
+    }
+    public static record Timelines(List<Holder<Timeline>> timelines) implements TestEnvironmentDefinition<EnvironmentAttributeSystem> {
+        public static final MapCodec<Timelines> CODEC;
+        public EnvironmentAttributeSystem setup(ServerLevel level);
+        public void teardown(ServerLevel level, EnvironmentAttributeSystem saveData);
+        public MapCodec<Timelines> codec();
+    }
+    public static record SetDifficulty(Difficulty difficulty) implements TestEnvironmentDefinition<Difficulty> {
+        public static final MapCodec<SetDifficulty> CODEC;
+        public Difficulty setup(ServerLevel level);
+        public void teardown(ServerLevel level, Difficulty saveData);
+        public MapCodec<SetDifficulty> codec();
+    }
+}
+//// TestFinder.java
+import com.mojang.brigadier.context.CommandContext;
+import java.util.Collection;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.Holder;
+public class TestFinder implements TestInstanceFinder, TestPosFinder {
+    public Stream<GlobalPos> findTestPos();
+    public static Builder builder();
+    private TestFinder(CommandSourceStack source, TestInstanceFinder testInstanceFinder, TestPosFinder testPosFinder);
+    public CommandSourceStack source();
+    public Stream<Holder.Reference<GameTestInstance>> findTests();
+    public static class Builder {
+        public Builder();
+        private Builder(UnaryOperator<Supplier<Stream<Holder.Reference<GameTestInstance>>>> testFinderWrapper, UnaryOperator<Supplier<Stream<GlobalPos>>> structureBlockPosFinderWrapper);
+        public Builder createMultipleCopies(int amount);
+        public TestFinder radius(CommandContext<CommandSourceStack> sourceStack, int radius);
+        public TestFinder nearest(CommandContext<CommandSourceStack> sourceStack);
+        public TestFinder allNearby(CommandContext<CommandSourceStack> sourceStack);
+        public TestFinder lookedAt(CommandContext<CommandSourceStack> sourceStack);
+        public TestFinder failedTests(CommandContext<CommandSourceStack> sourceStack, boolean onlyRequiredTests);
+        public TestFinder byResourceSelection(CommandContext<CommandSourceStack> sourceStack, Collection<Holder.Reference<GameTestInstance>> holders);
+        public TestFinder failedTests(CommandContext<CommandSourceStack> sourceStack);
+    }
+}
+//// TestFunctionLoader.java
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public interface TestFunctionLoader {
+    List<TestFunctionLoader> ALL_LOADERS;
+    static void registerLoader(TestFunctionLoader loader);
+    static void runLoaders(Registry<Consumer<GameTestHelper>> registry);
+    void load(BiConsumer<ResourceKey<Consumer<GameTestHelper>>, Consumer<GameTestHelper>> register);
+}
+//// TestInstanceFinder.java
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+public interface TestInstanceFinder {
+    Stream<Holder.Reference<GameTestInstance>> findTests();
+}
+//// TestPosFinder.java
+import java.util.stream.Stream;
+import net.minecraft.core.GlobalPos;
+public interface TestPosFinder {
+    Stream<GlobalPos> findTestPos();
+}
+//// TestReporter.java
+public interface TestReporter {
+    void onTestFailed(GameTestInfo testInfo);
+    void onTestSuccess(GameTestInfo testInfo);
+    default void finish();
+}
+//// UnknownGameTestException.java
+import net.minecraft.network.chat.Component;
+public class UnknownGameTestException extends GameTestException {
+    public UnknownGameTestException(Throwable reason);
+    public Component getDescription();
+}

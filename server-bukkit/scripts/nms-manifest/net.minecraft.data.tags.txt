@@ -1,0 +1,307 @@
+//// BannerPatternTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.level.block.entity.BannerPattern;
+public class BannerPatternTagsProvider extends TagsProvider<BannerPattern> {
+    public BannerPatternTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// BiomeTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.level.biome.Biome;
+public class BiomeTagsProvider extends TagsProvider<Biome> {
+    public BiomeTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// BlockItemTagAppender.java
+import net.minecraft.references.BlockItemId;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.block.ColorCollection;
+import net.minecraft.world.level.block.WeatheringCopperCollection;
+public abstract class BlockItemTagAppender<Element> implements TagAppender<Element> {
+    public BlockItemTagAppender(TagAppender<Element> original);
+    protected abstract ResourceKey<Element> convertElement(BlockItemId element);
+    public BlockItemTagAppender<Element> add(ResourceKey<Element> element);
+    public BlockItemTagAppender<Element> add(BlockItemId... ids);
+    public BlockItemTagAppender<Element> addAll(ColorCollection<ResourceKey<Element>> collection);
+    public BlockItemTagAppender<Element> addAll(WeatheringCopperCollection<ResourceKey<Element>> collection);
+    public final BlockItemTagAppender<Element> add(ResourceKey<Element>... elements);
+    public BlockItemTagAppender<Element> addOptional(ResourceKey<Element> element);
+    public BlockItemTagAppender<Element> addTag(TagKey<Element> tag);
+    public BlockItemTagAppender<Element> addOptionalTag(TagKey<Element> tag);
+}
+//// BlockItemTagsProvider.java
+import java.util.Collection;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import net.minecraft.references.BlockItemId;
+import net.minecraft.tags.BlockItemTagId;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+public abstract class BlockItemTagsProvider {
+    protected BlockItemTagsProvider(Function<BlockItemTagId, CombinedAppender> tagSupplier);
+    protected CombinedAppender tag(BlockItemTagId tag);
+    protected abstract void run();
+    public static CombinedAppender wrapForBlocks(TagAppender<Block> appender);
+    public static CombinedAppender wrapForItems(TagAppender<Item> appender);
+    public interface CombinedAppender {
+        CombinedAppender addAll(Stream<BlockItemId> ids);
+        CombinedAppender addTag(BlockItemTagId id);
+        default CombinedAppender addTag(BlockItemTagId... ids);
+        default CombinedAppender add(BlockItemId... ids);
+        default CombinedAppender addAll(Collection<BlockItemId> ids);
+    }
+}
+//// DamageTypeTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.damagesource.DamageType;
+public class DamageTypeTagsProvider extends TagsProvider<DamageType> {
+    public DamageTypeTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// DialogTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.server.dialog.Dialog;
+public class DialogTagsProvider extends TagsProvider<Dialog> {
+    public DialogTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// EnchantmentTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.enchantment.Enchantment;
+public abstract class EnchantmentTagsProvider extends TagsProvider<Enchantment> {
+    public EnchantmentTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void tooltipOrder(HolderLookup.Provider registries, ResourceKey<Enchantment>... order);
+}
+//// EntityTypeTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.entity.EntityType;
+public class EntityTypeTagsProvider extends TagsProvider<EntityType<?>> {
+    public EntityTypeTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// FeatureTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.level.levelgen.feature.Feature;
+public class FeatureTagsProvider extends TagsProvider<Feature> {
+    public FeatureTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// FlatLevelGeneratorPresetTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorPreset;
+public class FlatLevelGeneratorPresetTagsProvider extends TagsProvider<FlatLevelGeneratorPreset> {
+    public FlatLevelGeneratorPresetTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// FluidTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.level.material.Fluid;
+public class FluidTagsProvider extends TagsProvider<Fluid> {
+    public FluidTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// GameEventTagsProvider.java
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.gameevent.GameEvent;
+public class GameEventTagsProvider extends TagsProvider<GameEvent> {
+    static final List<ResourceKey<GameEvent>> VIBRATIONS_EXCEPT_FLAP;
+    public GameEventTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// InstrumentTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.item.Instrument;
+public class InstrumentTagsProvider extends TagsProvider<Instrument> {
+    public InstrumentTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// PaintingVariantTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.entity.decoration.painting.PaintingVariant;
+public class PaintingVariantTagsProvider extends TagsProvider<PaintingVariant> {
+    public PaintingVariantTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// PoiTypeTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
+public class PoiTypeTagsProvider extends TagsProvider<PoiType> {
+    public PoiTypeTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// PotionTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.item.alchemy.Potion;
+public class PotionTagsProvider extends TagsProvider<Potion> {
+    public PotionTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// StructureTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.level.levelgen.structure.Structure;
+public class StructureTagsProvider extends TagsProvider<Structure> {
+    public StructureTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// TagAppender.java
+import java.util.Collection;
+import java.util.stream.Stream;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagBuilder;
+import net.minecraft.tags.TagKey;
+public interface TagAppender<T> {
+    TagAppender<T> add(ResourceKey<T> element);
+    default TagAppender<T> add(ResourceKey<T>... elements);
+    default TagAppender<T> addAll(Collection<ResourceKey<T>> elements);
+    default TagAppender<T> addAll(Stream<ResourceKey<T>> elements);
+    TagAppender<T> addOptional(ResourceKey<T> element);
+    TagAppender<T> addTag(TagKey<T> tag);
+    TagAppender<T> addOptionalTag(TagKey<T> tag);
+    static <T> TagAppender<T> forBuilder(TagBuilder builder);
+}
+//// TagsProvider.java
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagBuilder;
+import net.minecraft.tags.TagKey;
+public abstract class TagsProvider<T> implements DataProvider {
+    protected final PackOutput.PathProvider pathProvider;
+    protected final ResourceKey<? extends Registry<T>> registryKey;
+    protected TagsProvider(PackOutput output, ResourceKey<? extends Registry<T>> registryKey, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected TagsProvider(PackOutput output, ResourceKey<? extends Registry<T>> registryKey, CompletableFuture<HolderLookup.Provider> lookupProvider, CompletableFuture<TagLookup<T>> parentProvider);
+    public final String getName();
+    protected abstract void addTags(HolderLookup.Provider registries);
+    public CompletableFuture<?> run(CachedOutput cache);
+    protected TagBuilder getOrCreateRawBuilder(TagKey<T> tag);
+    public CompletableFuture<TagLookup<T>> contentsGetter();
+    protected CompletableFuture<HolderLookup.Provider> createContentsProvider();
+    protected TagAppender<T> tag(TagKey<T> tag);
+    protected TagAppender<T> tag(TagKey<T> tag, boolean replace);
+    public interface TagLookup<T> extends Function<TagKey<T>, Optional<TagBuilder>> {
+        static <T> TagLookup<T> empty();
+        default boolean contains(TagKey<T> key);
+    }
+}
+//// TimelineTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.timeline.Timeline;
+public class TimelineTagsProvider extends TagsProvider<Timeline> {
+    public TimelineTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// TradeRebalanceEnchantmentTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.item.enchantment.Enchantment;
+public class TradeRebalanceEnchantmentTagsProvider extends TagsProvider<Enchantment> {
+    public TradeRebalanceEnchantmentTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// TradeRebalanceTradeTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.item.trading.VillagerTrade;
+public class TradeRebalanceTradeTagsProvider extends TagsProvider<VillagerTrade> {
+    public TradeRebalanceTradeTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// VanillaBlockItemTagsProvider.java
+import java.util.function.Function;
+import net.minecraft.tags.BlockItemTagId;
+public class VanillaBlockItemTagsProvider extends BlockItemTagsProvider {
+    protected VanillaBlockItemTagsProvider(Function<BlockItemTagId, BlockItemTagsProvider.CombinedAppender> tagSupplier);
+    protected void run();
+}
+//// VanillaBlockTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.block.Block;
+public class VanillaBlockTagsProvider extends TagsProvider<Block> {
+    public VanillaBlockTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected BlockItemTagAppender<Block> tag(TagKey<Block> tag);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// VanillaEnchantmentTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+public class VanillaEnchantmentTagsProvider extends EnchantmentTagsProvider {
+    public VanillaEnchantmentTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// VanillaItemTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
+public class VanillaItemTagsProvider extends TagsProvider<Item> {
+    public VanillaItemTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected BlockItemTagAppender<Item> tag(TagKey<Item> tag);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// VillagerTradesTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.item.trading.VillagerTrade;
+public class VillagerTradesTagsProvider extends TagsProvider<VillagerTrade> {
+    public VillagerTradesTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}
+//// WorldPresetTagsProvider.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.world.level.levelgen.presets.WorldPreset;
+public class WorldPresetTagsProvider extends TagsProvider<WorldPreset> {
+    public WorldPresetTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider);
+    protected void addTags(HolderLookup.Provider registries);
+}

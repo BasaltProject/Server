@@ -1,0 +1,29 @@
+//// MinecraftServerGui.java
+import javax.swing.JComponent;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import net.minecraft.server.dedicated.DedicatedServer;
+public class MinecraftServerGui extends JComponent {
+    public static MinecraftServerGui showFrameFor(DedicatedServer server);
+    private MinecraftServerGui(DedicatedServer server);
+    public void addFinalizer(Runnable finalizer);
+    public void start();
+    public void close();
+    public void print(JTextArea console, JScrollPane scrollPane, String line);
+}
+//// PlayerListComponent.java
+import javax.swing.JList;
+import net.minecraft.server.MinecraftServer;
+public class PlayerListComponent extends JList<String> {
+    public PlayerListComponent(MinecraftServer server);
+    public void tick();
+}
+//// StatsComponent.java
+import java.awt.Graphics;
+import javax.swing.JComponent;
+import net.minecraft.server.MinecraftServer;
+public class StatsComponent extends JComponent {
+    public StatsComponent(MinecraftServer server);
+    public void paint(Graphics g);
+    public void close();
+}

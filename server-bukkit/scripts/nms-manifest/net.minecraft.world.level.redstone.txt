@@ -1,0 +1,145 @@
+//// CollectingNeighborUpdater.java
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class CollectingNeighborUpdater implements NeighborUpdater {
+    public CollectingNeighborUpdater(Level level, int maxChainedNeighborUpdates);
+    public void setDebugListener(Consumer<BlockPos> debugListener);
+    public void shapeUpdate(Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit);
+    public void neighborChanged(BlockPos pos, Block block, Orientation orientation);
+    public void neighborChanged(BlockState state, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston);
+    public void updateNeighborsAtExceptFromFacing(BlockPos pos, Block block, Direction skipDirection, Orientation orientation);
+    static record SimpleNeighborUpdate(BlockPos pos, Block block, Orientation orientation) implements NeighborUpdates {
+        public boolean runNext(Level level);
+        public void forEachUpdatedPos(Consumer<BlockPos> output);
+    }
+    static record FullNeighborUpdate(BlockState state, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston) implements NeighborUpdates {
+        public boolean runNext(Level level);
+        public void forEachUpdatedPos(Consumer<BlockPos> output);
+    }
+    static final class MultiNeighborUpdate implements NeighborUpdates {
+        public MultiNeighborUpdate(BlockPos sourcePos, Block sourceBlock, Orientation orientation, Direction skipDirection);
+        public boolean runNext(Level level);
+        public void forEachUpdatedPos(Consumer<BlockPos> output);
+    }
+    static record ShapeUpdate(Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit) implements NeighborUpdates {
+        public boolean runNext(Level level);
+        public void forEachUpdatedPos(Consumer<BlockPos> output);
+    }
+    interface NeighborUpdates {
+        boolean runNext(Level level);
+        void forEachUpdatedPos(Consumer<BlockPos> output);
+    }
+}
+//// DefaultRedstoneWireEvaluator.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.RedstoneWireBlock;
+import net.minecraft.world.level.block.state.BlockState;
+public class DefaultRedstoneWireEvaluator extends RedstoneWireEvaluator {
+    public DefaultRedstoneWireEvaluator(RedstoneWireBlock wireBlock);
+    public void updatePowerStrength(Level level, BlockPos pos, BlockState state, Orientation orientation, boolean skipShapeUpdates);
+}
+//// ExperimentalRedstoneUtils.java
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
+public class ExperimentalRedstoneUtils {
+    public static Orientation initialOrientation(Level level, Direction front, Direction up);
+    public static Orientation withFront(Orientation orientation, Direction front);
+}
+//// ExperimentalRedstoneWireEvaluator.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.RedstoneWireBlock;
+import net.minecraft.world.level.block.state.BlockState;
+public class ExperimentalRedstoneWireEvaluator extends RedstoneWireEvaluator {
+    public ExperimentalRedstoneWireEvaluator(RedstoneWireBlock wireBlock);
+    public void updatePowerStrength(Level level, BlockPos initialPos, BlockState ignored, Orientation orientation, boolean shapeUpdateWiresAroundInitialPosition);
+    protected int getWireSignal(BlockPos pos, BlockState state);
+}
+//// InstantNeighborUpdater.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class InstantNeighborUpdater implements NeighborUpdater {
+    public InstantNeighborUpdater(Level level);
+    public void shapeUpdate(Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit);
+    public void neighborChanged(BlockPos pos, Block changedBlock, Orientation orientation);
+    public void neighborChanged(BlockState state, BlockPos pos, Block changedBlock, Orientation orientation, boolean movedByPiston);
+}
+//// NeighborUpdater.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public interface NeighborUpdater {
+    Direction[] UPDATE_ORDER;
+    void shapeUpdate(Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit);
+    void neighborChanged(BlockPos pos, Block changedBlock, Orientation orientation);
+    void neighborChanged(BlockState state, BlockPos pos, Block changedBlock, Orientation orientation, boolean movedByPiston);
+    default void updateNeighborsAtExceptFromFacing(BlockPos pos, Block block, Direction skipDirection, Orientation orientation);
+    static void executeShapeUpdate(LevelAccessor level, Direction direction, BlockPos pos, BlockPos neighborPos, BlockState neighborState, int updateFlags, int updateLimit);
+    static void executeUpdate(Level level, BlockState state, BlockPos pos, Block changedBlock, Orientation orientation, boolean movedByPiston);
+}
+//// Orientation.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.core.Direction;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.RandomSource;
+public class Orientation {
+    public static final StreamCodec<ByteBuf, Orientation> STREAM_CODEC;
+    private Orientation(Direction up, Direction front, SideBias sideBias);
+    public static Orientation of(Direction up, Direction front, SideBias sideBias);
+    public Orientation withUp(Direction up);
+    public Orientation withFront(Direction front);
+    public Orientation withFrontPreserveUp(Direction front);
+    public Orientation withFrontAdjustSideBias(Direction front);
+    public Orientation withSideBias(SideBias sideBias);
+    public Orientation withMirror();
+    public Direction getFront();
+    public Direction getUp();
+    public Direction getSide();
+    public SideBias getSideBias();
+    public List<Direction> getDirections();
+    public List<Direction> getHorizontalDirections();
+    public List<Direction> getVerticalDirections();
+    public String toString();
+    public int getIndex();
+    public static Orientation fromIndex(int index);
+    public static Orientation random(RandomSource rand);
+    protected static int generateIndex(Direction up, Direction front, SideBias sideBias);
+    public static enum SideBias {
+        LEFT, RIGHT;
+        public SideBias getOpposite();
+        public String toString();
+    }
+}
+//// Redstone.java
+public class Redstone {
+    public static final int BITS = 4;
+    public static final int MASK = 15;
+    public static final int SIGNAL_MIN = 0;
+    public static final int SIGNAL_MAX = 15;
+    public static final int SIGNAL_NONE = 0;
+}
+//// RedstoneWireEvaluator.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.RedstoneWireBlock;
+import net.minecraft.world.level.block.state.BlockState;
+public abstract class RedstoneWireEvaluator {
+    protected final RedstoneWireBlock wireBlock;
+    protected RedstoneWireEvaluator(RedstoneWireBlock wireBlock);
+    public abstract void updatePowerStrength(Level level, BlockPos pos, BlockState state, Orientation orientation, boolean skipShapeUpdates);
+    protected int getBlockSignal(Level level, BlockPos pos);
+    protected int getWireSignal(BlockPos pos, BlockState state);
+    protected int getIncomingWireSignal(Level level, BlockPos pos);
+}

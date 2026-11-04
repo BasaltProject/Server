@@ -1,0 +1,100 @@
+//// EmptyNotificationService.java
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.IpBanListEntry;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.ServerOpListEntry;
+import net.minecraft.server.players.UserBanListEntry;
+import net.minecraft.world.level.gamerules.GameRule;
+public class EmptyNotificationService implements NotificationService {
+    public void playerJoined(ServerPlayer player);
+    public void playerLeft(ServerPlayer player);
+    public void serverStarted();
+    public void serverShuttingDown();
+    public void serverSaveStarted();
+    public void serverSaveCompleted();
+    public void serverActivityOccured();
+    public void worldUpgradeStarted();
+    public void worldUpgradeProgress(float progressPercentage);
+    public void worldUpgradeFinished();
+    public void worldUpgradeFailed(String reason);
+    public void playerOped(ServerOpListEntry operator);
+    public void playerDeoped(ServerOpListEntry operator);
+    public void playerAddedToAllowlist(NameAndId player);
+    public void playerRemovedFromAllowlist(NameAndId player);
+    public void ipBanned(IpBanListEntry ban);
+    public void ipUnbanned(String ip);
+    public void playerBanned(UserBanListEntry ban);
+    public void playerUnbanned(NameAndId player);
+    public <T> void onGameRuleChanged(GameRule<T> gameRule, T value);
+    public void statusHeartbeat();
+}
+//// NotificationManager.java
+import net.minecraft.server.dedicated.DedicatedServer;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.IpBanListEntry;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.ServerOpListEntry;
+import net.minecraft.server.players.UserBanListEntry;
+import net.minecraft.world.level.gamerules.GameRule;
+public class NotificationManager implements NotificationService {
+    public void registerService(NotificationService notificationService);
+    public void setServer(DedicatedServer server);
+    public DedicatedServer server();
+    public void playerJoined(ServerPlayer player);
+    public void playerLeft(ServerPlayer player);
+    public void serverStarted();
+    public void serverShuttingDown();
+    public void serverSaveStarted();
+    public void serverSaveCompleted();
+    public void serverActivityOccured();
+    public void worldUpgradeStarted();
+    public void worldUpgradeProgress(float progressPercentage);
+    public void worldUpgradeFinished();
+    public void worldUpgradeFailed(String reason);
+    public void playerOped(ServerOpListEntry operator);
+    public void playerDeoped(ServerOpListEntry operator);
+    public void playerAddedToAllowlist(NameAndId player);
+    public void playerRemovedFromAllowlist(NameAndId player);
+    public void ipBanned(IpBanListEntry ban);
+    public void ipUnbanned(String ip);
+    public void playerBanned(UserBanListEntry ban);
+    public void playerUnbanned(NameAndId player);
+    public <T> void onGameRuleChanged(GameRule<T> gameRule, T value);
+    public void statusHeartbeat();
+}
+//// NotificationService.java
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.IpBanListEntry;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.ServerOpListEntry;
+import net.minecraft.server.players.UserBanListEntry;
+import net.minecraft.world.level.gamerules.GameRule;
+public interface NotificationService {
+    void playerJoined(ServerPlayer player);
+    void playerLeft(ServerPlayer player);
+    void serverStarted();
+    void serverShuttingDown();
+    void serverSaveStarted();
+    void serverSaveCompleted();
+    void serverActivityOccured();
+    void worldUpgradeStarted();
+    void worldUpgradeProgress(float progressPercentage);
+    void worldUpgradeFinished();
+    void worldUpgradeFailed(String reason);
+    void playerOped(ServerOpListEntry operator);
+    void playerDeoped(ServerOpListEntry operator);
+    void playerAddedToAllowlist(NameAndId player);
+    void playerRemovedFromAllowlist(NameAndId player);
+    void ipBanned(IpBanListEntry ban);
+    void ipUnbanned(String ip);
+    void playerBanned(UserBanListEntry ban);
+    void playerUnbanned(NameAndId player);
+    <T> void onGameRuleChanged(GameRule<T> gameRule, T value);
+    void statusHeartbeat();
+}
+//// ServerActivityMonitor.java
+public class ServerActivityMonitor {
+    public ServerActivityMonitor(NotificationManager notificationManager, int secondsBetweenNotifications);
+    public void tick();
+    public void reportLoginActivity();
+}

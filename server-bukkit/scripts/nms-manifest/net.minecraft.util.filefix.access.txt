@@ -1,0 +1,128 @@
+//// ChunkNbt.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.UnaryOperator;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+public class ChunkNbt implements AutoCloseable {
+    public ChunkNbt(RegionStorageInfo info, Path path, DataFixTypes type, int targetVersion);
+    public CompletableFuture<?> updateChunk(ChunkPos pos, CompoundTag dataFixContext, UnaryOperator<CompoundTag> fixer);
+    public void close() throws IOException;
+}
+//// CompressedNbt.java
+import com.mojang.serialization.Dynamic;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+import net.minecraft.nbt.Tag;
+public abstract class CompressedNbt implements AutoCloseable {
+    public CompressedNbt(Path path, MissingSeverity missingSeverity);
+    public abstract Optional<Dynamic<Tag>> read() throws IOException;
+    protected final Optional<Dynamic<Tag>> readFile() throws IOException;
+    public abstract <T> void write(Dynamic<T> data);
+    protected final <T> void writeFile(Dynamic<T> data);
+    public Path path();
+    public void close();
+    public static enum MissingSeverity {
+        IMPORTANT, NEUTRAL, MINOR;
+        public void log(String message, Path path);
+    }
+}
+//// FileAccess.java
+import java.util.List;
+public class FileAccess<T extends AutoCloseable> implements AutoCloseable {
+    public FileAccess(FileAccessProvider fileAccessProvider, FileResourceType<T> type, FileRelation fileRelation);
+    public List<T> get();
+    public T getOnlyFile();
+    public void close();
+}
+//// FileAccessProvider.java
+import java.nio.file.Path;
+public class FileAccessProvider implements AutoCloseable {
+    public FileAccessProvider(int dataVersion);
+    public <T extends AutoCloseable> FileAccess<T> getFileAccess(FileResourceType<T> type, FileRelation fileRelation);
+    public void freeze();
+    public ScopedValue<Path> baseDirectory();
+    public int dataVersion();
+    public void close();
+}
+//// FileRelation.java
+import java.nio.file.Path;
+import java.util.List;
+import org.slf4j.Logger;
+public interface FileRelation {
+    Logger LOGGER;
+    FileRelation ORIGIN;
+    FileRelation REGION;
+    FileRelation DATA;
+    FileRelation PLAYER_DATA;
+    FileRelation DIMENSIONS;
+    FileRelation DIMENSIONS_DATA;
+    FileRelation GENERATED_NAMESPACES;
+    FileRelation OLD_OVERWORLD;
+    FileRelation OLD_NETHER;
+    FileRelation OLD_END;
+    List<Path> getPaths(Path basePath);
+    static FileRelation forDataFileInDimension(String dimension, String fileName);
+    default FileRelation forFile(String fileName);
+    default FileRelation resolve(FileRelation other);
+    default FileRelation join(FileRelation... relations);
+    static List<Path> directoriesInPath(Path path);
+}
+//// FileResourceType.java
+import java.nio.file.Path;
+public class FileResourceType<T extends AutoCloseable> {
+    public FileResourceType(AccessFactory<T> factory);
+    public T create(Path path, int dataVersion);
+    public interface AccessFactory<T> {
+        T create(Path path, int dataVersion);
+    }
+}
+//// FileResourceTypes.java
+import com.mojang.datafixers.DSL;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+public class FileResourceTypes {
+    public static final FileResourceType<LevelDat> LEVEL_DAT;
+    public static final FileResourceType<PlayerData> PLAYER_DATA;
+    public static FileResourceType<SavedDataNbt> savedData(DSL.TypeReference type);
+    public static FileResourceType<SavedDataNbt> savedData(DSL.TypeReference type, CompressedNbt.MissingSeverity missingSeverity);
+    public static FileResourceType<ChunkNbt> chunk(DataFixTypes type, RegionStorageInfo info);
+}
+//// LevelDat.java
+import com.mojang.serialization.Dynamic;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+import net.minecraft.nbt.Tag;
+public class LevelDat extends CompressedNbt {
+    public LevelDat(Path path, int targetVersion);
+    public Optional<Dynamic<Tag>> read() throws IOException;
+    public <T> void write(Dynamic<T> data);
+}
+//// PlayerData.java
+import com.mojang.serialization.Dynamic;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+import net.minecraft.nbt.Tag;
+public class PlayerData extends CompressedNbt {
+    public PlayerData(Path path, int targetVersion);
+    public Optional<Dynamic<Tag>> read() throws IOException;
+    public <T> void write(Dynamic<T> data);
+}
+//// SavedDataNbt.java
+import com.mojang.datafixers.DSL;
+import com.mojang.serialization.Dynamic;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+import net.minecraft.nbt.Tag;
+public class SavedDataNbt extends CompressedNbt {
+    public SavedDataNbt(DSL.TypeReference type, Path path, int targetVersion, CompressedNbt.MissingSeverity missingSeverity);
+    public Optional<Dynamic<Tag>> read() throws IOException;
+    public <T> void write(Dynamic<T> data);
+}

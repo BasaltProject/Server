@@ -1,0 +1,49 @@
+//// EntitySelectorOptions.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.function.Predicate;
+import net.minecraft.commands.arguments.selector.EntitySelectorParser;
+import net.minecraft.network.chat.Component;
+public class EntitySelectorOptions {
+    public static final DynamicCommandExceptionType ERROR_UNKNOWN_OPTION;
+    public static final DynamicCommandExceptionType ERROR_INAPPLICABLE_OPTION;
+    public static final SimpleCommandExceptionType ERROR_RANGE_NEGATIVE;
+    public static final SimpleCommandExceptionType ERROR_LEVEL_NEGATIVE;
+    public static final SimpleCommandExceptionType ERROR_LIMIT_TOO_SMALL;
+    public static final DynamicCommandExceptionType ERROR_SORT_UNKNOWN;
+    public static final DynamicCommandExceptionType ERROR_GAME_MODE_INVALID;
+    public static final DynamicCommandExceptionType ERROR_ENTITY_TYPE_INVALID;
+    public static void bootStrap();
+    public static Modifier get(EntitySelectorParser parser, String key, int start) throws CommandSyntaxException;
+    public static void suggestNames(EntitySelectorParser parser, SuggestionsBuilder builder);
+    static record Option(Modifier modifier, Predicate<EntitySelectorParser> canUse, Component description) {
+    }
+    public interface Modifier {
+        void handle(EntitySelectorParser parser) throws CommandSyntaxException;
+    }
+}
+//// InvertableSetOptionState.java
+import net.minecraft.resources.Identifier;
+public class InvertableSetOptionState {
+    public InvertableSetOptionState();
+    public boolean canParsePositiveElement();
+    public boolean canParseNegativeElement();
+    public boolean canParseAnyTag();
+    public boolean canParseTag(Identifier tag);
+    public boolean canParseAny();
+    public boolean canParseElement(boolean inverted);
+    public void markParsedPositiveElement();
+    public void markParsedNegativeElement();
+    public void markParsedTag(Identifier tag);
+    public void markParsedElement(boolean inverted);
+    static enum Limitation {
+        NONE, SINGLE, MULTIPLE;
+    }
+}
+//// SetOnceOptionState.java
+public class SetOnceOptionState {
+    public boolean canParse();
+    public void markParsed();
+}

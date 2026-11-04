@@ -1,0 +1,431 @@
+//// CubeMobPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record CubeMobPredicate(MinMaxBounds.Ints size) implements EntitySubPredicate {
+    public static final Codec<CubeMobPredicate> CODEC;
+    public static CubeMobPredicate sized(MinMaxBounds.Ints size);
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// DistanceToPlayerPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.DistancePredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record DistanceToPlayerPredicate(DistancePredicate distance) implements EntitySubPredicate {
+    public static final Codec<DistanceToPlayerPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// EntityEffectsPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.MobEffectsPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record EntityEffectsPredicate(MobEffectsPredicate effects) implements EntitySubPredicate {
+    public static final Codec<EntityEffectsPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// EntityEquipmentPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.entity.BannerPattern;
+import net.minecraft.world.phys.Vec3;
+public record EntityEquipmentPredicate(Optional<ItemPredicate> head, Optional<ItemPredicate> chest, Optional<ItemPredicate> legs, Optional<ItemPredicate> feet, Optional<ItemPredicate> body, Optional<ItemPredicate> mainhand, Optional<ItemPredicate> offhand) implements EntitySubPredicate {
+    public static final Codec<EntityEquipmentPredicate> CODEC;
+    public static EntityEquipmentPredicate captainPredicate(HolderGetter<Item> items, HolderGetter<BannerPattern> patternGetter);
+    public boolean matches(Entity entity);
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+    public static class Builder {
+        public static Builder equipment();
+        public Builder head(ItemPredicate.Builder head);
+        public Builder chest(ItemPredicate.Builder chest);
+        public Builder legs(ItemPredicate.Builder legs);
+        public Builder feet(ItemPredicate.Builder feet);
+        public Builder body(ItemPredicate.Builder body);
+        public Builder mainhand(ItemPredicate.Builder mainhand);
+        public Builder offhand(ItemPredicate.Builder offhand);
+        public EntityEquipmentPredicate build();
+    }
+}
+//// EntityExactDataComponentsPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.component.DataComponentExactPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record EntityExactDataComponentsPredicate(DataComponentExactPredicate predicate) implements EntitySubPredicate {
+    public static final Codec<EntityExactDataComponentsPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// EntityFlagsPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record EntityFlagsPredicate(Optional<Boolean> isOnGround, Optional<Boolean> isOnFire, Optional<Boolean> isCrouching, Optional<Boolean> isSprinting, Optional<Boolean> isSwimming, Optional<Boolean> isFlying, Optional<Boolean> isBaby, Optional<Boolean> isInWater, Optional<Boolean> isFallFlying) implements EntitySubPredicate {
+    public static final Codec<EntityFlagsPredicate> CODEC;
+    public boolean matches(Entity entity);
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+    public static class Builder {
+        public static Builder flags();
+        public Builder setOnGround(Boolean onGround);
+        public Builder setOnFire(Boolean onFire);
+        public Builder setCrouching(Boolean crouching);
+        public Builder setSprinting(Boolean sprinting);
+        public Builder setSwimming(Boolean swimming);
+        public Builder setIsFlying(Boolean flying);
+        public Builder setIsBaby(Boolean baby);
+        public Builder setIsInWater(Boolean inWater);
+        public Builder setIsFallFlying(Boolean fallFlying);
+        public EntityFlagsPredicate build();
+    }
+}
+//// EntityLocationPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.LocationPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record EntityLocationPredicate(LocationPredicate predicate) implements EntitySubPredicate {
+    public static final Codec<EntityLocationPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// EntityNbtPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.NbtPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record EntityNbtPredicate(NbtPredicate nbt) implements EntitySubPredicate {
+    public static final Codec<EntityNbtPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// EntityPartialComponentsPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.core.component.predicates.DataComponentPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record EntityPartialComponentsPredicate(Map<DataComponentPredicate.Type<?>, DataComponentPredicate> predicates) implements EntitySubPredicate {
+    public static final Codec<EntityPartialComponentsPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// EntityPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.DataComponentMatchers;
+import net.minecraft.advancements.predicates.DistancePredicate;
+import net.minecraft.advancements.predicates.LocationPredicate;
+import net.minecraft.advancements.predicates.MobEffectsPredicate;
+import net.minecraft.advancements.predicates.NbtPredicate;
+import net.minecraft.advancements.predicates.SlotsPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.component.DataComponentExactPredicate;
+import net.minecraft.core.component.predicates.DataComponentPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.phys.Vec3;
+public final class EntityPredicate {
+    public static final Codec<EntityPredicate> CODEC;
+    public EntityPredicate(Map<Codec<? extends EntitySubPredicate>, EntitySubPredicate> parts);
+    public static Holder<LootItemCondition> wrap(Builder singlePredicate);
+    public static Optional<Holder<LootItemCondition>> wrap(Optional<EntityPredicate> singlePredicate);
+    public static List<Holder<LootItemCondition>> wrap(Builder... predicates);
+    public static Holder<LootItemCondition> wrap(EntityPredicate singlePredicate);
+    public boolean matches(ServerPlayer player, Entity entity);
+    public boolean matches(ServerLevel level, Vec3 position, Entity entity);
+    public static LootContext createContext(ServerPlayer player, Entity entity);
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+    public static class Builder {
+        public static Builder entity();
+        public <T extends EntitySubPredicate> Builder put(Codec<T> key, T predicate);
+        public Builder of(HolderGetter<EntityType<?>> lookup, EntityType<?> entityType);
+        public Builder of(HolderGetter<EntityType<?>> lookup, TagKey<EntityType<?>> entityTypeTag);
+        public Builder entityType(EntityTypePredicate entityType);
+        public Builder distance(DistancePredicate distanceToPlayer);
+        public Builder moving(MovementPredicate movement);
+        public Builder located(LocationPredicate.Builder location);
+        public Builder steppingOn(LocationPredicate.Builder location);
+        public Builder movementAffectedBy(LocationPredicate.Builder location);
+        public Builder effects(MobEffectsPredicate.Builder effects);
+        public Builder nbt(NbtPredicate nbt);
+        public Builder flags(EntityFlagsPredicate.Builder flags);
+        public Builder equipment(EntityEquipmentPredicate.Builder equipment);
+        public Builder equipment(EntityEquipmentPredicate equipment);
+        public Builder periodicTick(int period);
+        public Builder vehicle(Builder vehicle);
+        public Builder passenger(Builder passenger);
+        public Builder targetedEntity(Builder targetedEntity);
+        public Builder team(String team);
+        public Builder slots(SlotsPredicate slots);
+        public Builder components(DataComponentMatchers components);
+        public Builder components(DataComponentExactPredicate components);
+        public Builder components(Map<DataComponentPredicate.Type<?>, DataComponentPredicate> components);
+        public Builder lightingBolt(LightningBoltPredicate lightningBolt);
+        public Builder player(PlayerPredicate player);
+        public Builder sheep(SheepPredicate sheep);
+        public Builder cubeMob(CubeMobPredicate cubeMob);
+        public Builder raider(RaiderPredicate raider);
+        public Builder fishingHook(FishingHookPredicate fishingHook);
+        public EntityPredicate build();
+    }
+}
+//// EntitySlotsPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.SlotsPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record EntitySlotsPredicate(SlotsPredicate slots) implements EntitySubPredicate {
+    public static final Codec<EntitySlotsPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// EntitySubPredicate.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public interface EntitySubPredicate {
+    EntitySubPredicate ALWAYS_TRUE;
+    boolean matches(Entity entity, ServerLevel level, Vec3 position);
+    default EntitySubPredicate and(EntitySubPredicate other);
+}
+//// EntitySubPredicates.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Registry;
+public class EntitySubPredicates {
+    public static Codec<? extends EntitySubPredicate> bootstrap(Registry<Codec<? extends EntitySubPredicate>> registry);
+}
+//// EntityTagPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record EntityTagPredicate(Optional<List<String>> anyOf, Optional<List<String>> allOf, Optional<List<String>> noneOf) implements EntitySubPredicate {
+    public static final Codec<EntityTagPredicate> CODEC;
+    public boolean matches(Set<String> tags);
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// EntityTypePredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.phys.Vec3;
+public record EntityTypePredicate(HolderSet<EntityType<?>> types) implements EntitySubPredicate {
+    public static final Codec<EntityTypePredicate> CODEC;
+    public static EntityTypePredicate of(HolderGetter<EntityType<?>> lookup, EntityType<?> type);
+    public static EntityTypePredicate of(HolderGetter<EntityType<?>> lookup, TagKey<EntityType<?>> type);
+    public boolean matches(Holder<EntityType<?>> type);
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// FishingHookPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record FishingHookPredicate(Optional<Boolean> inOpenWater) implements EntitySubPredicate {
+    public static final FishingHookPredicate ANY;
+    public static final Codec<FishingHookPredicate> CODEC;
+    public static FishingHookPredicate inOpenWater(boolean requirement);
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// LightningBoltPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record LightningBoltPredicate(MinMaxBounds.Ints blocksSetOnFire, Optional<EntityPredicate> entityStruck) implements EntitySubPredicate {
+    public static final Codec<LightningBoltPredicate> CODEC;
+    public static LightningBoltPredicate blockSetOnFire(MinMaxBounds.Ints count);
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// MovementAffectedByPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.LocationPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record MovementAffectedByPredicate(LocationPredicate predicate) implements EntitySubPredicate {
+    public static final Codec<MovementAffectedByPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// MovementPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record MovementPredicate(MinMaxBounds.Doubles x, MinMaxBounds.Doubles y, MinMaxBounds.Doubles z, MinMaxBounds.Doubles speed, MinMaxBounds.Doubles horizontalSpeed, MinMaxBounds.Doubles verticalSpeed, MinMaxBounds.Doubles fallDistance) implements EntitySubPredicate {
+    public static final Codec<MovementPredicate> CODEC;
+    public static MovementPredicate speed(MinMaxBounds.Doubles bounds);
+    public static MovementPredicate horizontalSpeed(MinMaxBounds.Doubles bounds);
+    public static MovementPredicate verticalSpeed(MinMaxBounds.Doubles bounds);
+    public static MovementPredicate fallDistance(MinMaxBounds.Doubles bounds);
+    public boolean matches(double x, double y, double z, double fallDistance);
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// PassengerPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record PassengerPredicate(EntityPredicate passenger) implements EntitySubPredicate {
+    public static final Codec<PassengerPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// PeriodicEntityTickPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record PeriodicEntityTickPredicate(int periodicTick) implements EntitySubPredicate {
+    public static final Codec<PeriodicEntityTickPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// PlayerPredicate.java
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import net.minecraft.advancements.AdvancementProgress;
+import net.minecraft.advancements.predicates.FoodPredicate;
+import net.minecraft.advancements.predicates.GameTypePredicate;
+import net.minecraft.advancements.predicates.InputPredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.stats.Stat;
+import net.minecraft.stats.StatType;
+import net.minecraft.stats.StatsCounter;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.phys.Vec3;
+public record PlayerPredicate(MinMaxBounds.Ints level, FoodPredicate food, GameTypePredicate gameType, List<StatMatcher<?>> stats, Object2BooleanMap<ResourceKey<Recipe<?>>> recipes, Map<Identifier, AdvancementPredicate> advancements, Optional<EntityPredicate> lookingAt, Optional<InputPredicate> input) implements EntitySubPredicate {
+    public static final int LOOKING_AT_RANGE = 100;
+    public static final Codec<PlayerPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+    interface AdvancementPredicate extends Predicate<AdvancementProgress> {
+        Codec<AdvancementPredicate> CODEC;
+    }
+    static record AdvancementDonePredicate(boolean state) implements AdvancementPredicate {
+        public static final Codec<AdvancementDonePredicate> CODEC;
+        public boolean test(AdvancementProgress progress);
+    }
+    static record AdvancementCriterionsPredicate(Object2BooleanMap<String> criterions) implements AdvancementPredicate {
+        public static final Codec<AdvancementCriterionsPredicate> CODEC;
+        public boolean test(AdvancementProgress progress);
+    }
+    static record StatMatcher<T>(StatType<T> type, Holder<T> value, MinMaxBounds.Ints range, Supplier<Stat<T>> stat) {
+        public static final Codec<StatMatcher<?>> CODEC;
+        public StatMatcher(StatType<T> type, Holder<T> value, MinMaxBounds.Ints range);
+        public boolean matches(StatsCounter counter);
+    }
+    public static class Builder {
+        public Builder();
+        public static Builder player();
+        public Builder setLevel(MinMaxBounds.Ints level);
+        public Builder setFood(FoodPredicate food);
+        public <T> Builder addStat(StatType<T> type, Holder.Reference<T> value, MinMaxBounds.Ints range);
+        public Builder addRecipe(ResourceKey<Recipe<?>> recipe, boolean present);
+        public Builder setGameType(GameTypePredicate gameType);
+        public Builder setLookingAt(EntityPredicate.Builder lookingAt);
+        public Builder checkAdvancementDone(Identifier advancement, boolean isDone);
+        public Builder checkAdvancementCriterions(Identifier advancement, Map<String, Boolean> criterions);
+        public Builder hasInput(InputPredicate input);
+        public PlayerPredicate build();
+    }
+}
+//// RaiderPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record RaiderPredicate(boolean hasRaid, boolean isCaptain) implements EntitySubPredicate {
+    public static final Codec<RaiderPredicate> CODEC;
+    public static final RaiderPredicate CAPTAIN_WITHOUT_RAID;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// SheepPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record SheepPredicate(Optional<Boolean> sheared) implements EntitySubPredicate {
+    public static final Codec<SheepPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+    public static SheepPredicate hasWool();
+}
+//// SteppingOnPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.LocationPredicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record SteppingOnPredicate(LocationPredicate predicate) implements EntitySubPredicate {
+    public static final Codec<SteppingOnPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// TargetedEntityPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record TargetedEntityPredicate(EntityPredicate targetedEntity) implements EntitySubPredicate {
+    public static final Codec<TargetedEntityPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// TeamPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record TeamPredicate(String team) implements EntitySubPredicate {
+    public static final Codec<TeamPredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}
+//// VehiclePredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public record VehiclePredicate(EntityPredicate vehicle) implements EntitySubPredicate {
+    public static final Codec<VehiclePredicate> CODEC;
+    public boolean matches(Entity entity, ServerLevel level, Vec3 position);
+}

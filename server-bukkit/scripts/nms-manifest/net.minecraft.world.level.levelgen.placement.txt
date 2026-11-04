@@ -1,0 +1,297 @@
+//// BiomeFilter.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public class BiomeFilter implements PlacementFilter {
+    public static final MapCodec<BiomeFilter> CODEC;
+    private BiomeFilter();
+    public static BiomeFilter biome();
+    public boolean shouldPlace(PlacementContext context, RandomSource random, BlockPos origin);
+    public MapCodec<BiomeFilter> codec();
+}
+//// BlockPredicateFilter.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate;
+public record BlockPredicateFilter(BlockPredicate predicate) implements PlacementFilter {
+    public static final MapCodec<BlockPredicateFilter> CODEC;
+    public static BlockPredicateFilter forPredicate(BlockPredicate predicate);
+    public boolean shouldPlace(PlacementContext context, RandomSource random, BlockPos origin);
+    public MapCodec<BlockPredicateFilter> codec();
+}
+//// CaveSurface.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Direction;
+import net.minecraft.util.StringRepresentable;
+public enum CaveSurface implements StringRepresentable {
+    CEILING, FLOOR;
+    public static final Codec<CaveSurface> CODEC;
+    public Direction getDirection();
+    public int getY();
+    public String getSerializedName();
+}
+//// CountOnEveryLayerPlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+public record CountOnEveryLayerPlacement(IntProvider count) implements PlacementModifier {
+    public static final MapCodec<CountOnEveryLayerPlacement> CODEC;
+    public static CountOnEveryLayerPlacement of(IntProvider count);
+    public static CountOnEveryLayerPlacement of(int count);
+    public void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    public MapCodec<CountOnEveryLayerPlacement> codec();
+}
+//// CountPlacement.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+public record CountPlacement(IntProvider count) implements RepeatingPlacement {
+    public static final MapCodec<CountPlacement> CODEC;
+    public static CountPlacement of(IntProvider count);
+    public static CountPlacement of(int count);
+    public int count(RandomSource random, BlockPos origin);
+    public MapCodec<CountPlacement> codec();
+}
+//// EnvironmentScanPlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate;
+public record EnvironmentScanPlacement(Direction directionOfSearch, BlockPredicate targetCondition, BlockPredicate allowedSearchCondition, int maxSteps) implements PlacementModifier {
+    public static final MapCodec<EnvironmentScanPlacement> CODEC;
+    public static EnvironmentScanPlacement scanningFor(Direction directionOfSearch, BlockPredicate targetCondition, BlockPredicate allowedSearchCondition, int maxSteps);
+    public static EnvironmentScanPlacement scanningFor(Direction directionOfSearch, BlockPredicate targetCondition, int maxSteps);
+    public void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    public MapCodec<EnvironmentScanPlacement> codec();
+}
+//// FeaturePlacer.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+public class FeaturePlacer {
+    public FeaturePlacer(WorldGenLevel level, ChunkGenerator generator);
+    public boolean place(PlacedFeature placedFeature, RandomSource random, BlockPos origin);
+    public boolean placeWithBiomeCheck(PlacedFeature placedFeature, RandomSource random, BlockPos origin);
+}
+//// FixedPlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public record FixedPlacement(List<BlockPos> positions) implements PlacementModifier {
+    public static final MapCodec<FixedPlacement> CODEC;
+    public static FixedPlacement of(BlockPos... pos);
+    public void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    public MapCodec<FixedPlacement> codec();
+}
+//// HeightRangePlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
+public record HeightRangePlacement(HeightProvider height) implements PlacementModifier {
+    public static final MapCodec<HeightRangePlacement> CODEC;
+    public static HeightRangePlacement of(HeightProvider height);
+    public static HeightRangePlacement uniform(VerticalAnchor minInclusive, VerticalAnchor maxInclusive);
+    public static HeightRangePlacement triangle(VerticalAnchor minInclusive, VerticalAnchor maxInclusive);
+    public void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    public MapCodec<HeightRangePlacement> codec();
+}
+//// HeightmapPlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.Heightmap;
+public record HeightmapPlacement(Heightmap.Types heightmap) implements PlacementModifier {
+    public static final MapCodec<HeightmapPlacement> CODEC;
+    public static HeightmapPlacement onHeightmap(Heightmap.Types heightmap);
+    public void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    public MapCodec<HeightmapPlacement> codec();
+}
+//// InSquarePlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public class InSquarePlacement implements PlacementModifier {
+    public static final MapCodec<InSquarePlacement> CODEC;
+    public static InSquarePlacement spread();
+    public void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    public MapCodec<InSquarePlacement> codec();
+}
+//// NoiseBasedCountPlacement.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public record NoiseBasedCountPlacement(int noiseToCountRatio, double noiseFactor, double noiseOffset) implements RepeatingPlacement {
+    public static final MapCodec<NoiseBasedCountPlacement> CODEC;
+    public static NoiseBasedCountPlacement of(int noiseToCountRatio, double noiseFactor, double noiseOffset);
+    public int count(RandomSource random, BlockPos origin);
+    public MapCodec<NoiseBasedCountPlacement> codec();
+}
+//// NoiseThresholdCountPlacement.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public record NoiseThresholdCountPlacement(double noiseLevel, int belowNoise, int aboveNoise) implements RepeatingPlacement {
+    public static final MapCodec<NoiseThresholdCountPlacement> CODEC;
+    public static NoiseThresholdCountPlacement of(double noiseLevel, int belowNoise, int aboveNoise);
+    public int count(RandomSource random, BlockPos origin);
+    public MapCodec<NoiseThresholdCountPlacement> codec();
+}
+//// OffsetPlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+public record OffsetPlacement(IntProvider x, IntProvider y, IntProvider z) implements PlacementModifier {
+    public static final MapCodec<OffsetPlacement> CODEC;
+    public static OffsetPlacement of(IntProvider xzSpread, IntProvider ySpread);
+    public static OffsetPlacement ofTriangle(int xzRange, int yRange);
+    public static OffsetPlacement vertical(IntProvider ySpread);
+    public static OffsetPlacement horizontal(IntProvider xzSpread);
+    public static OffsetPlacement of(int x, int y, int z);
+    public static OffsetPlacement of(Direction direction);
+    public static OffsetPlacement above();
+    public void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    public MapCodec<OffsetPlacement> codec();
+}
+//// PlacedFeature.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.feature.Feature;
+public record PlacedFeature(Holder<Feature> feature, List<PlacementModifier> placement) {
+    public static final Codec<PlacedFeature> DIRECT_CODEC;
+    public static final Codec<Holder<PlacedFeature>> CODEC;
+    public static final Codec<HolderSet<PlacedFeature>> LIST_CODEC;
+    public static final Codec<List<HolderSet<PlacedFeature>>> LIST_OF_LISTS_CODEC;
+    public boolean place(WorldGenLevel level, ChunkGenerator generator, RandomSource random, BlockPos origin);
+    public Stream<Holder<Feature>> getFeatures();
+    public String toString();
+}
+//// PlacementContext.java
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+public class PlacementContext extends WorldGenerationContext {
+    public PlacementContext(WorldGenLevel level, ChunkGenerator generator, Optional<PlacedFeature> topFeature);
+    public int getHeight(Heightmap.Types type, int x, int z);
+    public BlockState getBlockState(BlockPos pos);
+    public int getMinY();
+    public WorldGenLevel getLevel();
+    public Optional<PlacedFeature> topFeature();
+    public ChunkGenerator generator();
+}
+//// PlacementFilter.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public interface PlacementFilter extends PlacementModifier {
+    default void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    boolean shouldPlace(PlacementContext context, RandomSource random, BlockPos origin);
+    MapCodec<? extends PlacementFilter> codec();
+}
+//// PlacementModifier.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public interface PlacementModifier {
+    Codec<PlacementModifier> CODEC;
+    void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    MapCodec<? extends PlacementModifier> codec();
+}
+//// PlacementModifierTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public interface PlacementModifierTypes {
+    static MapCodec<? extends PlacementModifier> bootstrap(Registry<MapCodec<? extends PlacementModifier>> registry);
+}
+//// RandomChancePlacement.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public record RandomChancePlacement(float chance) implements PlacementFilter {
+    public static final MapCodec<RandomChancePlacement> CODEC;
+    public MapCodec<RandomChancePlacement> codec();
+    public boolean shouldPlace(PlacementContext context, RandomSource random, BlockPos origin);
+}
+//// RandomlySelectedPlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public record RandomlySelectedPlacement(List<PlacementModifier> placements) implements PlacementModifier {
+    public static final MapCodec<RandomlySelectedPlacement> CODEC;
+    public RandomlySelectedPlacement(PlacementModifier... placements);
+    public void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    public MapCodec<RandomlySelectedPlacement> codec();
+}
+//// RarityFilter.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public record RarityFilter(int chance) implements PlacementFilter {
+    public static final MapCodec<RarityFilter> CODEC;
+    public static RarityFilter onAverageOnceEvery(int chance);
+    public boolean shouldPlace(PlacementContext context, RandomSource random, BlockPos origin);
+    public MapCodec<RarityFilter> codec();
+}
+//// RepeatingPlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public interface RepeatingPlacement extends PlacementModifier {
+    int count(RandomSource random, BlockPos origin);
+    default void modify(PlacementContext context, RandomSource random, BlockPos origin, Consumer<BlockPos> output);
+    MapCodec<? extends RepeatingPlacement> codec();
+}
+//// SurfaceRelativeThresholdFilter.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.Heightmap;
+public record SurfaceRelativeThresholdFilter(Heightmap.Types heightmap, int minInclusive, int maxInclusive) implements PlacementFilter {
+    public static final MapCodec<SurfaceRelativeThresholdFilter> CODEC;
+    public static SurfaceRelativeThresholdFilter of(Heightmap.Types heightmap, int minInclusive, int maxInclusive);
+    public boolean shouldPlace(PlacementContext context, RandomSource random, BlockPos origin);
+    public MapCodec<SurfaceRelativeThresholdFilter> codec();
+}
+//// SurfaceWaterDepthFilter.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public record SurfaceWaterDepthFilter(int maxWaterDepth) implements PlacementFilter {
+    public static final MapCodec<SurfaceWaterDepthFilter> CODEC;
+    public static SurfaceWaterDepthFilter forMaxDepth(int maxWaterDepth);
+    public boolean shouldPlace(PlacementContext context, RandomSource random, BlockPos origin);
+    public MapCodec<SurfaceWaterDepthFilter> codec();
+}

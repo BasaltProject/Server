@@ -1,0 +1,196 @@
+//// CompositeSlotSource.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.function.Function;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public abstract class CompositeSlotSource implements SlotSource {
+    protected final HolderSet<SlotSource> terms;
+    protected CompositeSlotSource(HolderSet<SlotSource> terms);
+    protected static <T extends CompositeSlotSource> MapCodec<T> createCodec(Function<HolderSet<SlotSource>, T> factory);
+    protected static <T extends CompositeSlotSource> Codec<T> createInlineCodec(Function<HolderSet<SlotSource>, T> factory);
+    public abstract MapCodec<? extends CompositeSlotSource> codec();
+    public SlotCollection provide(LootContext context);
+    public void validate(ValidationContext context);
+}
+//// ContentsSlotSource.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.ContainerComponentManipulator;
+public class ContentsSlotSource extends TransformedSlotSource {
+    public static final MapCodec<ContentsSlotSource> MAP_CODEC;
+    private ContentsSlotSource(Holder<SlotSource> slotSource, ContainerComponentManipulator<?> component);
+    public MapCodec<ContentsSlotSource> codec();
+    protected SlotCollection transform(SlotCollection slots);
+}
+//// CountingModifier.java
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.item.ItemStack;
+public class CountingModifier implements Consumer<SlotAccess> {
+    public CountingModifier(UnaryOperator<ItemStack> modifier);
+    public void accept(SlotAccess slot);
+    public int updatedCount();
+}
+//// EmptySlotSource.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record EmptySlotSource() implements SlotSource {
+    public static final MapCodec<EmptySlotSource> MAP_CODEC;
+    public MapCodec<EmptySlotSource> codec();
+    public SlotCollection provide(LootContext context);
+}
+//// FilteredSlotSource.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.core.Holder;
+public class FilteredSlotSource extends TransformedSlotSource {
+    public static final MapCodec<FilteredSlotSource> MAP_CODEC;
+    private FilteredSlotSource(Holder<SlotSource> slotSource, ItemPredicate filter);
+    public MapCodec<FilteredSlotSource> codec();
+    protected SlotCollection transform(SlotCollection slots);
+}
+//// GroupSlotSource.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+public class GroupSlotSource extends CompositeSlotSource {
+    public static final MapCodec<GroupSlotSource> MAP_CODEC;
+    public static final Codec<GroupSlotSource> INLINE_CODEC;
+    private GroupSlotSource(HolderSet<SlotSource> terms);
+    public MapCodec<GroupSlotSource> codec();
+}
+//// LimitSlotSource.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+public class LimitSlotSource extends TransformedSlotSource {
+    public static final MapCodec<LimitSlotSource> MAP_CODEC;
+    private LimitSlotSource(Holder<SlotSource> slotSource, int limit);
+    public MapCodec<LimitSlotSource> codec();
+    protected SlotCollection transform(SlotCollection slots);
+}
+//// RangeSlotSource.java
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.inventory.SlotRange;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.LootContextArg;
+public class RangeSlotSource implements SlotSource {
+    public static final MapCodec<RangeSlotSource> MAP_CODEC;
+    private RangeSlotSource(LootContextArg<Object> source, SlotRange slotRange);
+    public MapCodec<RangeSlotSource> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public final SlotCollection provide(LootContext context);
+    public static RangeSlotSource slotRange(SlotRange slotRange);
+}
+//// SlotCollection.java
+import java.util.Collection;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.item.ItemProvider;
+import net.minecraft.world.item.ItemStack;
+public interface SlotCollection {
+    SlotCollection EMPTY;
+    Stream<ItemStack> itemCopies();
+    int size();
+    int replaceSlotItems(ItemProvider items, SlotSelector slotSelector);
+    default int replaceSlotItems(ItemProvider items);
+    void modifySlots(Consumer<? super SlotAccess> consumer, SlotSelector slotSelector);
+    default void modifySlots(Consumer<? super SlotAccess> consumer);
+    default SlotCollection filter(Predicate<? super ItemStack> predicate);
+    default SlotCollection flatMap(Function<ItemStack, ? extends SlotCollection> mapper);
+    default SlotCollection limit(int limit);
+    static SlotCollection of(SlotAccess slotAccess);
+    static SlotCollection of(Collection<? extends SlotAccess> slots);
+    static SlotCollection concat(SlotCollection first, SlotCollection second);
+    static SlotCollection concat(List<? extends SlotCollection> terms);
+    public static record Filtered(SlotCollection slots, Predicate<? super ItemStack> filter) implements SlotCollection {
+        public Stream<ItemStack> itemCopies();
+        public int size();
+        public int replaceSlotItems(ItemProvider items, SlotSelector slotSelector);
+        public void modifySlots(Consumer<? super SlotAccess> consumer, SlotSelector slotSelector);
+        public SlotCollection filter(Predicate<? super ItemStack> predicate);
+    }
+    public static record FlatMapped(SlotCollection slots, Function<ItemStack, ? extends SlotCollection> mapper) implements SlotCollection {
+        public Stream<ItemStack> itemCopies();
+        public int size();
+        public int replaceSlotItems(ItemProvider items, SlotSelector slotSelector);
+        public void modifySlots(Consumer<? super SlotAccess> consumer, SlotSelector slotSelector);
+    }
+    public static record Limited(SlotCollection slots, int limit) implements SlotCollection {
+        public Stream<ItemStack> itemCopies();
+        public int size();
+        public int replaceSlotItems(ItemProvider items, SlotSelector slotSelector);
+        public void modifySlots(Consumer<? super SlotAccess> consumer, SlotSelector slotSelector);
+        public SlotCollection limit(int limit);
+    }
+}
+//// SlotSelector.java
+import java.util.function.Predicate;
+import net.minecraft.world.item.ItemStack;
+import org.apache.commons.lang3.mutable.MutableInt;
+public interface SlotSelector {
+    SlotSelector ANY_SLOT;
+    SlotSelector EMPTY_SLOTS;
+    SlotSelector NON_EMPTY_SLOTS;
+    boolean trySelectSlot(ItemStack itemInSlot);
+    SlotSelector filter(Predicate<? super ItemStack> predicate);
+    SlotSelector limit(int limit);
+    static SlotSelector selecting(Predicate<? super ItemStack> predicate);
+    static SlotSelector tracking(SlotSelector slotSelector, MutableInt selectedCount);
+    static SlotSelector tracking(MutableInt selectedCount);
+    public static record FilteringSelector(Predicate<? super ItemStack> filter) implements SlotSelector {
+        public boolean trySelectSlot(ItemStack itemInSlot);
+        public SlotSelector filter(Predicate<? super ItemStack> predicate);
+        public SlotSelector limit(int limit);
+    }
+    public static record TrackingSelector(SlotSelector slotSelector, int limit, MutableInt selectedCount) implements SlotSelector {
+        public boolean trySelectSlot(ItemStack itemInSlot);
+        public SlotSelector filter(Predicate<? super ItemStack> predicate);
+        public SlotSelector limit(int limit);
+    }
+}
+//// SlotSource.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.LootContextUser;
+public interface SlotSource extends LootContextUser {
+    MapCodec<? extends SlotSource> codec();
+    SlotCollection provide(LootContext context);
+}
+//// SlotSources.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+public interface SlotSources {
+    Codec<SlotSource> TYPED_CODEC;
+    Codec<SlotSource> DIRECT_CODEC;
+    Codec<Holder<SlotSource>> CODEC;
+    Codec<HolderSet<SlotSource>> LIST_CODEC;
+    static MapCodec<? extends SlotSource> bootstrap(Registry<MapCodec<? extends SlotSource>> registry);
+}
+//// TransformedSlotSource.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public abstract class TransformedSlotSource implements SlotSource {
+    protected final Holder<SlotSource> slotSource;
+    protected TransformedSlotSource(Holder<SlotSource> slotSource);
+    public abstract MapCodec<? extends TransformedSlotSource> codec();
+    protected static <T extends TransformedSlotSource> Products.P1<RecordCodecBuilder.Mu<T>, Holder<SlotSource>> commonFields(RecordCodecBuilder.Instance<T> i);
+    protected abstract SlotCollection transform(SlotCollection slots);
+    public final SlotCollection provide(LootContext context);
+    public void validate(ValidationContext context);
+}

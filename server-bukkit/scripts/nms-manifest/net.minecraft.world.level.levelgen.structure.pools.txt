@@ -1,0 +1,274 @@
+//// DimensionPadding.java
+import com.mojang.serialization.Codec;
+public record DimensionPadding(int bottom, int top) {
+    public static final Codec<DimensionPadding> CODEC;
+    public static final DimensionPadding ZERO;
+    public DimensionPadding(int value);
+    public boolean hasEqualTopAndBottom();
+}
+//// EmptyPoolElement.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class EmptyPoolElement extends StructurePoolElement {
+    public static final MapCodec<EmptyPoolElement> CODEC;
+    public static final EmptyPoolElement INSTANCE;
+    private EmptyPoolElement();
+    public Vec3i getSize(StructureTemplateManager structureTemplateManager, Rotation rotation);
+    public List<StructureTemplate.JigsawBlockInfo> getShuffledJigsawBlocks(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation, RandomSource random);
+    public BoundingBox getBoundingBox(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation);
+    public boolean place(StructureTemplateManager structureTemplateManager, WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, BlockPos position, BlockPos referencePos, Rotation rotation, BoundingBox chunkBB, RandomSource random, LiquidSettings liquidSettings, boolean keepJigsaws);
+    public StructurePoolElementType<?> getType();
+    public String toString();
+}
+//// FeaturePoolElement.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class FeaturePoolElement extends StructurePoolElement {
+    public static final MapCodec<FeaturePoolElement> CODEC;
+    protected FeaturePoolElement(Holder<PlacedFeature> feature, StructureTemplatePool.Projection projection);
+    public Vec3i getSize(StructureTemplateManager structureTemplateManager, Rotation rotation);
+    public List<StructureTemplate.JigsawBlockInfo> getShuffledJigsawBlocks(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation, RandomSource random);
+    public BoundingBox getBoundingBox(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation);
+    public boolean place(StructureTemplateManager structureTemplateManager, WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, BlockPos position, BlockPos referencePos, Rotation rotation, BoundingBox chunkBB, RandomSource random, LiquidSettings liquidSettings, boolean keepJigsaws);
+    public StructurePoolElementType<?> getType();
+    public String toString();
+}
+//// JigsawJunction.java
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.DynamicOps;
+public class JigsawJunction {
+    public JigsawJunction(int sourceX, int sourceGroundY, int sourceZ, int deltaY, StructureTemplatePool.Projection destProjection);
+    public int getSourceX();
+    public int getSourceGroundY();
+    public int getSourceZ();
+    public int getDeltaY();
+    public StructureTemplatePool.Projection getDestProjection();
+    public <T> Dynamic<T> serialize(DynamicOps<T> ops);
+    public static <T> JigsawJunction deserialize(Dynamic<T> input);
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+}
+//// JigsawPlacement.java
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.PoolElementStructurePiece;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.pools.alias.PoolAliasLookup;
+import net.minecraft.world.level.levelgen.structure.structures.JigsawStructure;
+import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import org.apache.commons.lang3.mutable.MutableObject;
+public class JigsawPlacement {
+    public static Optional<Structure.GenerationStub> addPieces(Structure.GenerationContext context, Holder<StructureTemplatePool> startPool, Optional<Identifier> startJigsaw, int maxDepth, BlockPos position, boolean doExpansionHack, Optional<Heightmap.Types> projectStartToHeightmap, JigsawStructure.MaxDistance maxDistanceFromCenter, PoolAliasLookup poolAliasLookup, DimensionPadding dimensionPadding, LiquidSettings liquidSettings);
+    public static boolean generateJigsaw(ServerLevel level, Holder<StructureTemplatePool> pool, Identifier target, int maxDepth, BlockPos position, boolean keepJigsaws);
+    static record PieceState(PoolElementStructurePiece piece, MutableObject<VoxelShape> free, int depth) {
+    }
+    static final class Placer {
+        private Placer(Registry<StructureTemplatePool> pools, int maxDepth, ChunkGenerator chunkGenerator, StructureTemplateManager structureTemplateManager, List<? super PoolElementStructurePiece> pieces, RandomSource random);
+    }
+}
+//// LegacySinglePoolElement.java
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorList;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+public class LegacySinglePoolElement extends SinglePoolElement {
+    public static final MapCodec<LegacySinglePoolElement> CODEC;
+    protected LegacySinglePoolElement(Either<Identifier, StructureTemplate> template, Holder<StructureProcessorList> processors, StructureTemplatePool.Projection projection, Optional<LiquidSettings> liquidSettings);
+    protected StructurePlaceSettings getSettings(Rotation rotation, BoundingBox chunkBB, LiquidSettings liquidSettings, boolean keepJigsaws);
+    public StructurePoolElementType<?> getType();
+    public String toString();
+}
+//// ListPoolElement.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class ListPoolElement extends StructurePoolElement {
+    public static final MapCodec<ListPoolElement> CODEC;
+    public ListPoolElement(List<StructurePoolElement> elements, StructureTemplatePool.Projection projection);
+    public Vec3i getSize(StructureTemplateManager structureTemplateManager, Rotation rotation);
+    public List<StructureTemplate.JigsawBlockInfo> getShuffledJigsawBlocks(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation, RandomSource random);
+    public BoundingBox getBoundingBox(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation);
+    public boolean place(StructureTemplateManager structureTemplateManager, WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, BlockPos position, BlockPos referencePos, Rotation rotation, BoundingBox chunkBB, RandomSource random, LiquidSettings liquidSettings, boolean keepJigsaws);
+    public StructurePoolElementType<?> getType();
+    public StructurePoolElement setProjection(StructureTemplatePool.Projection projection);
+    public String toString();
+    public List<StructurePoolElement> getElements();
+}
+//// SinglePoolElement.java
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorList;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class SinglePoolElement extends StructurePoolElement {
+    public static final MapCodec<SinglePoolElement> CODEC;
+    protected final Either<Identifier, StructureTemplate> template;
+    protected final Holder<StructureProcessorList> processors;
+    protected final Optional<LiquidSettings> overrideLiquidSettings;
+    protected static <E extends SinglePoolElement> RecordCodecBuilder<E, Holder<StructureProcessorList>> processorsCodec();
+    protected static <E extends SinglePoolElement> RecordCodecBuilder<E, Optional<LiquidSettings>> overrideLiquidSettingsCodec();
+    protected static <E extends SinglePoolElement> RecordCodecBuilder<E, Either<Identifier, StructureTemplate>> templateCodec();
+    protected SinglePoolElement(Either<Identifier, StructureTemplate> template, Holder<StructureProcessorList> processors, StructureTemplatePool.Projection projection, Optional<LiquidSettings> overrideLiquidSettings);
+    public Vec3i getSize(StructureTemplateManager structureTemplateManager, Rotation rotation);
+    public List<StructureTemplate.StructureBlockInfo> getDataMarkers(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation, boolean absolute);
+    public List<StructureTemplate.JigsawBlockInfo> getShuffledJigsawBlocks(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation, RandomSource random);
+    static void sortBySelectionPriority(List<StructureTemplate.JigsawBlockInfo> blocks);
+    public BoundingBox getBoundingBox(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation);
+    public boolean place(StructureTemplateManager structureTemplateManager, WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, BlockPos position, BlockPos referencePos, Rotation rotation, BoundingBox chunkBB, RandomSource random, LiquidSettings liquidSettings, boolean keepJigsaws);
+    protected StructurePlaceSettings getSettings(Rotation rotation, BoundingBox chunkBB, LiquidSettings liquidSettings, boolean keepJigsaws);
+    public StructurePoolElementType<?> getType();
+    public String toString();
+    public Identifier getTemplateLocation();
+}
+//// StructurePoolElement.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.List;
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorList;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public abstract class StructurePoolElement {
+    public static final Codec<StructurePoolElement> CODEC;
+    protected static <E extends StructurePoolElement> RecordCodecBuilder<E, StructureTemplatePool.Projection> projectionCodec();
+    protected StructurePoolElement(StructureTemplatePool.Projection projection);
+    public abstract Vec3i getSize(StructureTemplateManager structureTemplateManager, Rotation rotation);
+    public abstract List<StructureTemplate.JigsawBlockInfo> getShuffledJigsawBlocks(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation, RandomSource random);
+    public abstract BoundingBox getBoundingBox(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation);
+    public abstract boolean place(StructureTemplateManager structureTemplateManager, WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, BlockPos position, BlockPos referencePos, Rotation rotation, BoundingBox chunkBB, RandomSource random, LiquidSettings liquidSettings, boolean keepJigsaws);
+    public abstract StructurePoolElementType<?> getType();
+    public void handleDataMarker(LevelAccessor level, StructureTemplate.StructureBlockInfo dataMarker, BlockPos position, Rotation rotation, RandomSource random, BoundingBox chunkBB);
+    public StructurePoolElement setProjection(StructureTemplatePool.Projection projection);
+    public StructureTemplatePool.Projection getProjection();
+    public int getGroundLevelDelta();
+    public static Function<StructureTemplatePool.Projection, EmptyPoolElement> empty();
+    public static Function<StructureTemplatePool.Projection, LegacySinglePoolElement> legacy(String location);
+    public static Function<StructureTemplatePool.Projection, LegacySinglePoolElement> legacy(String location, Holder<StructureProcessorList> processors);
+    public static Function<StructureTemplatePool.Projection, SinglePoolElement> single(String location);
+    public static Function<StructureTemplatePool.Projection, SinglePoolElement> single(String location, Holder<StructureProcessorList> processors);
+    public static Function<StructureTemplatePool.Projection, SinglePoolElement> single(String location, LiquidSettings overrideLiquidSettings);
+    public static Function<StructureTemplatePool.Projection, SinglePoolElement> single(String location, Holder<StructureProcessorList> processors, LiquidSettings overrideLiquidSettings);
+    public static Function<StructureTemplatePool.Projection, FeaturePoolElement> feature(Holder<PlacedFeature> feature);
+    public static Function<StructureTemplatePool.Projection, ListPoolElement> list(List<Function<StructureTemplatePool.Projection, ? extends StructurePoolElement>> elements);
+}
+//// StructurePoolElementType.java
+import com.mojang.serialization.MapCodec;
+public interface StructurePoolElementType<P extends StructurePoolElement> {
+    StructurePoolElementType<SinglePoolElement> SINGLE;
+    StructurePoolElementType<ListPoolElement> LIST;
+    StructurePoolElementType<FeaturePoolElement> FEATURE;
+    StructurePoolElementType<EmptyPoolElement> EMPTY;
+    StructurePoolElementType<LegacySinglePoolElement> LEGACY;
+    MapCodec<P> codec();
+    static <P extends StructurePoolElement> StructurePoolElementType<P> register(String id, MapCodec<P> codec);
+}
+//// StructureTemplatePool.java
+import com.google.common.collect.ImmutableList;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Function;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessor;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class StructureTemplatePool {
+    public static final Codec<StructureTemplatePool> DIRECT_CODEC;
+    public static final Codec<Holder<StructureTemplatePool>> CODEC;
+    public StructureTemplatePool(Holder<StructureTemplatePool> fallback, List<Pair<StructurePoolElement, Integer>> templates);
+    public StructureTemplatePool(Holder<StructureTemplatePool> fallback, List<Pair<Function<Projection, ? extends StructurePoolElement>, Integer>> templates, Projection projection);
+    public int getMaxSize(StructureTemplateManager manager);
+    public List<Pair<StructurePoolElement, Integer>> getTemplates();
+    public Holder<StructureTemplatePool> getFallback();
+    public StructurePoolElement getRandomTemplate(RandomSource random);
+    public List<StructurePoolElement> getShuffledTemplates(RandomSource random);
+    public int size();
+    public static enum Projection implements StringRepresentable {
+        TERRAIN_MATCHING, RIGID;
+        public static final StringRepresentable.EnumCodec<Projection> CODEC;
+        public String getName();
+        public static Projection byName(String name);
+        public ImmutableList<StructureProcessor> getProcessors();
+        public String getSerializedName();
+    }
+}

@@ -1,0 +1,186 @@
+//// MovingPistonBlock.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.block.state.properties.PistonType;
+import net.minecraft.world.level.pathfinder.PathComputationType;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public class MovingPistonBlock extends BaseEntityBlock {
+    public static final EnumProperty<Direction> FACING;
+    public static final EnumProperty<PistonType> TYPE;
+    public MovingPistonBlock(BlockBehaviour.Properties properties);
+    public BlockEntity newBlockEntity(BlockPos worldPosition, BlockState blockState);
+    public static BlockEntity newMovingBlockEntity(BlockPos position, BlockState blockState, BlockState movedState, Direction direction, boolean extending, boolean isSourcePiston);
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState blockState, BlockEntityType<T> type);
+    public void destroy(LevelAccessor level, BlockPos pos, BlockState state);
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult);
+    protected List<ItemStack> getDrops(BlockState state, LootParams.Builder params);
+    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context);
+    protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context);
+    protected RenderShape getRenderShape(BlockState state);
+    protected ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData);
+    protected BlockState rotate(BlockState state, Rotation rotation);
+    protected BlockState mirror(BlockState state, Mirror mirror);
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder);
+    protected boolean isPathfindable(BlockState state, PathComputationType type);
+}
+//// PistonBaseBlock.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.DirectionalBlock;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.pathfinder.PathComputationType;
+import net.minecraft.world.level.redstone.Orientation;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public class PistonBaseBlock extends DirectionalBlock {
+    public static final BooleanProperty EXTENDED;
+    public static final int TRIGGER_EXTEND = 0;
+    public static final int TRIGGER_CONTRACT = 1;
+    public static final int TRIGGER_DROP = 2;
+    public static final int PLATFORM_THICKNESS = 4;
+    public PistonBaseBlock(boolean isSticky, BlockBehaviour.Properties properties);
+    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context);
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, LivingEntity by, ItemStack itemStack);
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston);
+    protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston);
+    public BlockState getStateForPlacement(BlockPlaceContext context);
+    protected boolean triggerEvent(BlockState state, Level level, BlockPos pos, int b0, int b1);
+    public static boolean isPushable(BlockState state, Level level, BlockPos pos, Direction direction, boolean allowDestroyable, Direction connectionDirection);
+    protected BlockState rotate(BlockState state, Rotation rotation);
+    protected BlockState mirror(BlockState state, Mirror mirror);
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder);
+    protected boolean useShapeForLightOcclusion(BlockState state);
+    protected boolean isPathfindable(BlockState state, PathComputationType type);
+}
+//// PistonHeadBlock.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.DirectionalBlock;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.block.state.properties.PistonType;
+import net.minecraft.world.level.pathfinder.PathComputationType;
+import net.minecraft.world.level.redstone.Orientation;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public class PistonHeadBlock extends DirectionalBlock {
+    public static final EnumProperty<PistonType> TYPE;
+    public static final BooleanProperty SHORT;
+    public static final int PLATFORM_THICKNESS = 4;
+    public PistonHeadBlock(BlockBehaviour.Properties properties);
+    protected boolean useShapeForLightOcclusion(BlockState state);
+    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context);
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player);
+    protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean movedByPiston);
+    protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess ticks, BlockPos pos, Direction directionToNeighbour, BlockPos neighbourPos, BlockState neighbourState, RandomSource random);
+    protected boolean canSurvive(BlockState state, LevelReader level, BlockPos pos);
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston);
+    protected ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData);
+    protected BlockState rotate(BlockState state, Rotation rotation);
+    protected BlockState mirror(BlockState state, Mirror mirror);
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder);
+    protected boolean isPathfindable(BlockState state, PathComputationType type);
+}
+//// PistonMath.java
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.AABB;
+public class PistonMath {
+    public static AABB getMovementArea(AABB aabb, Direction direction, double amount);
+}
+//// PistonMovingBlockEntity.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public class PistonMovingBlockEntity extends BlockEntity {
+    public static final double TICK_MOVEMENT = 0.51;
+    public PistonMovingBlockEntity(BlockPos worldPosition, BlockState blockState);
+    public PistonMovingBlockEntity(BlockPos worldPosition, BlockState blockState, BlockState movedState, Direction direction, boolean extending, boolean isSourcePiston);
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries);
+    public boolean isExtending();
+    public Direction getDirection();
+    public boolean isSourcePiston();
+    public float getProgress(float a);
+    public float getXOff(float a);
+    public float getYOff(float a);
+    public float getZOff(float a);
+    public Direction getMovementDirection();
+    public BlockState getMovedState();
+    public void finalTick();
+    public void preRemoveSideEffects(BlockPos pos, BlockState state);
+    public Direction getPushDirection();
+    public static void tick(Level level, BlockPos pos, BlockState state, PistonMovingBlockEntity entity);
+    protected void loadAdditional(ValueInput input);
+    protected void saveAdditional(ValueOutput output);
+    public VoxelShape getCollisionShape(BlockGetter level, BlockPos pos);
+    public long getLastTicked();
+    public void setLevel(Level level);
+}
+//// PistonStructureResolver.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
+public class PistonStructureResolver {
+    public static final int MAX_PUSH_DEPTH = 12;
+    public PistonStructureResolver(Level level, BlockPos pistonPos, Direction direction, boolean extending);
+    public boolean resolve();
+    public Direction getPushDirection();
+    public List<BlockPos> getToPush();
+    public List<BlockPos> getToDestroy();
+}

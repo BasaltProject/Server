@@ -441,6 +441,12 @@ void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorld
                                                        static_cast<std::int32_t>(args.toInteger(spot.next))));
                     return 1;
                 })
+        .method("has_tick",
+                [world](LuaArgs& args) {
+                    const Spot spot = spotAt(args, firstArgument(args));
+                    args.pushBoolean(world->hasScheduledTick(spot.x, spot.y, spot.z));
+                    return 1;
+                })
         .method("schedule_tick",
                 [world](LuaArgs& args) {
                     const Spot spot = spotAt(args, firstArgument(args));

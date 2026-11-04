@@ -24,6 +24,10 @@ bool moveTo(world::WorldState& world, ServerEntity& mob, double x, double y, dou
 /// parity: `PathNavigation.createPath` before a goal starts.
 [[nodiscard]] bool canReach(world::WorldState& world, ServerEntity& mob, double x, double y, double z);
 
+/// The nodes `PathNavigation.createPath` would walk, empty when there is none; nothing starts moving.
+[[nodiscard]] std::vector<std::array<std::int32_t, 3>> findPath(world::WorldState& world, ServerEntity& mob, double x,
+                                                                double y, double z);
+
 [[nodiscard]] bool isDone(const ServerEntity& mob);
 
 /// parity: `PathNavigation.moveTo(Path, speed)`, a path already worked out.

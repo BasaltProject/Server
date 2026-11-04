@@ -1,0 +1,1170 @@
+//// NamespacedSchema.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.Type;
+import com.mojang.serialization.codecs.PrimitiveCodec;
+public class NamespacedSchema extends Schema {
+    public static final PrimitiveCodec<String> NAMESPACED_STRING_CODEC;
+    public NamespacedSchema(int versionKey, Schema parent);
+    public static String ensureNamespaced(String input);
+    public static Type<String> namespacedString();
+    public Type<?> getChoiceType(DSL.TypeReference type, String choiceName);
+}
+//// V100.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V100 extends Schema {
+    public V100(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V102.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V102 extends Schema {
+    public V102(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V1022.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1022 extends Schema {
+    public V1022(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V106.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V106 extends Schema {
+    public V106(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V107.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V107 extends Schema {
+    public V107(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1125.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1125 extends NamespacedSchema {
+    public V1125(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V135.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V135 extends Schema {
+    public V135(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V143.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V143 extends Schema {
+    public V143(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1451.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1451 extends NamespacedSchema {
+    public V1451(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V1451_1.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1451_1 extends NamespacedSchema {
+    public V1451_1(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V1451_2.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1451_2 extends NamespacedSchema {
+    public V1451_2(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V1451_3.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1451_3 extends NamespacedSchema {
+    public V1451_3(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1451_4.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1451_4 extends NamespacedSchema {
+    public V1451_4(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V1451_5.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1451_5 extends NamespacedSchema {
+    public V1451_5(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V1451_6.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.Hook;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1451_6 extends NamespacedSchema {
+    public static final String SPECIAL_OBJECTIVE_MARKER = "_special";
+    protected static final Hook.HookFunction UNPACK_OBJECTIVE_ID;
+    protected static final Hook.HookFunction REPACK_OBJECTIVE_ID;
+    public V1451_6(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+    protected static Map<String, Supplier<TypeTemplate>> createCriterionTypes(Schema schema);
+    public static String packNamespacedWithDot(String location);
+}
+//// V1458.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1458 extends NamespacedSchema {
+    public V1458(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+    public static TypeTemplate nameableInventory(Schema schema);
+    public static TypeTemplate nameable(Schema schema);
+}
+//// V1460.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1460 extends NamespacedSchema {
+    public V1460(int versionKey, Schema parent);
+    protected static void registerMob(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    protected static void registerInventory(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V1466.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1466 extends NamespacedSchema {
+    public V1466(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V1470.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1470 extends NamespacedSchema {
+    public V1470(int versionKey, Schema parent);
+    protected static void registerMob(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1481.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1481 extends NamespacedSchema {
+    public V1481(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V1483.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1483 extends NamespacedSchema {
+    public V1483(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1486.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1486 extends NamespacedSchema {
+    public V1486(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1488.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1488 extends NamespacedSchema {
+    public V1488(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V1510.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1510 extends NamespacedSchema {
+    public V1510(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1800.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1800 extends NamespacedSchema {
+    public V1800(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1801.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1801 extends NamespacedSchema {
+    public V1801(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1904.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1904 extends NamespacedSchema {
+    public V1904(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1906.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1906 extends NamespacedSchema {
+    public V1906(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+    protected static void registerInventory(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+}
+//// V1909.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1909 extends NamespacedSchema {
+    public V1909(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V1920.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1920 extends NamespacedSchema {
+    public V1920(int versionKey, Schema parent);
+    protected static void registerInventory(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V1928.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1928 extends NamespacedSchema {
+    public V1928(int versionKey, Schema parent);
+    protected static void registerMob(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1929.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1929 extends NamespacedSchema {
+    public V1929(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V1931.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V1931 extends NamespacedSchema {
+    public V1931(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2100.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2100 extends NamespacedSchema {
+    public V2100(int versionKey, Schema parent);
+    protected static void registerMob(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V2501.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2501 extends NamespacedSchema {
+    public V2501(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V2502.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2502 extends NamespacedSchema {
+    public V2502(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2505.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2505 extends NamespacedSchema {
+    public V2505(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2509.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2509 extends NamespacedSchema {
+    public V2509(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2511_1.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2511_1 extends NamespacedSchema {
+    public V2511_1(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2519.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2519 extends NamespacedSchema {
+    public V2519(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2522.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2522 extends NamespacedSchema {
+    public V2522(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2551.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2551 extends NamespacedSchema {
+    public V2551(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V2568.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2568 extends NamespacedSchema {
+    public V2568(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2571.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2571 extends NamespacedSchema {
+    public V2571(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2684.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2684 extends NamespacedSchema {
+    public V2684(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V2686.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2686 extends NamespacedSchema {
+    public V2686(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2688.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2688 extends NamespacedSchema {
+    public V2688(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2704.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2704 extends NamespacedSchema {
+    public V2704(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2707.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2707 extends NamespacedSchema {
+    public V2707(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V2831.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2831 extends NamespacedSchema {
+    public V2831(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V2832.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2832 extends NamespacedSchema {
+    public V2832(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V2842.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V2842 extends NamespacedSchema {
+    public V2842(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V3076.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3076 extends NamespacedSchema {
+    public V3076(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3078.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3078 extends NamespacedSchema {
+    public V3078(int versionKey, Schema parent);
+    protected static void registerMob(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3081.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3081 extends NamespacedSchema {
+    public V3081(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3082.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3082 extends NamespacedSchema {
+    public V3082(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3083.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3083 extends NamespacedSchema {
+    public V3083(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3202.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3202 extends NamespacedSchema {
+    public V3202(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3203.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3203 extends NamespacedSchema {
+    public V3203(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3204.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3204 extends NamespacedSchema {
+    public V3204(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3325.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3325 extends NamespacedSchema {
+    public V3325(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3326.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3326 extends NamespacedSchema {
+    public V3326(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3327.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3327 extends NamespacedSchema {
+    public V3327(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3328.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3328 extends NamespacedSchema {
+    public V3328(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3438.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3438 extends NamespacedSchema {
+    public V3438(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3439.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3439 extends NamespacedSchema {
+    public V3439(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+    public static TypeTemplate sign(Schema schema);
+}
+//// V3439_1.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3439_1 extends NamespacedSchema {
+    public V3439_1(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3448.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3448 extends NamespacedSchema {
+    public V3448(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3682.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3682 extends NamespacedSchema {
+    public V3682(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3683.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3683 extends NamespacedSchema {
+    public V3683(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3685.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3685 extends NamespacedSchema {
+    public V3685(int versionKey, Schema parent);
+    protected static TypeTemplate abstractArrow(Schema schema);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3689.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3689 extends NamespacedSchema {
+    public V3689(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3799.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3799 extends NamespacedSchema {
+    public V3799(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3807.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3807 extends NamespacedSchema {
+    public V3807(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3808.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3808 extends NamespacedSchema {
+    public V3808(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3808_1.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3808_1 extends NamespacedSchema {
+    public V3808_1(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3808_2.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3808_2 extends NamespacedSchema {
+    public V3808_2(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3813.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3813 extends NamespacedSchema {
+    public V3813(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V3816.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3816 extends NamespacedSchema {
+    public V3816(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3818.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3818 extends NamespacedSchema {
+    public V3818(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V3818_3.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.SequencedMap;
+import java.util.function.Supplier;
+public class V3818_3 extends NamespacedSchema {
+    public V3818_3(int versionKey, Schema parent);
+    public static SequencedMap<String, Supplier<TypeTemplate>> components(Schema schema);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V3818_4.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3818_4 extends NamespacedSchema {
+    public V3818_4(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V3818_5.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.Hook;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import com.mojang.datafixers.types.templates.Hook.HookFunction;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3818_5 extends NamespacedSchema {
+    protected static final Hook.HookFunction UNPACK_PLAIN_ID;
+    public V3818_5(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V3825.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3825 extends NamespacedSchema {
+    public V3825(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V3938.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V3938 extends NamespacedSchema {
+    public V3938(int versionKey, Schema parent);
+    protected static TypeTemplate abstractArrow(Schema schema);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4059.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.SequencedMap;
+import java.util.function.Supplier;
+public class V4059 extends NamespacedSchema {
+    public V4059(int versionKey, Schema parent);
+    public static SequencedMap<String, Supplier<TypeTemplate>> components(Schema schema);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V4067.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4067 extends NamespacedSchema {
+    public V4067(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4070.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4070 extends NamespacedSchema {
+    public V4070(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4071.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4071 extends NamespacedSchema {
+    public V4071(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V4290.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4290 extends NamespacedSchema {
+    public V4290(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V4292.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4292 extends NamespacedSchema {
+    public V4292(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V4300.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4300 extends NamespacedSchema {
+    public V4300(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4301.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4301 extends NamespacedSchema {
+    public V4301(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V4302.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4302 extends NamespacedSchema {
+    public V4302(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V4306.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4306 extends NamespacedSchema {
+    public V4306(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4307.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.SequencedMap;
+import java.util.function.Supplier;
+public class V4307 extends NamespacedSchema {
+    public V4307(int versionKey, Schema parent);
+    public static SequencedMap<String, Supplier<TypeTemplate>> components(Schema schema);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V4312.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4312 extends NamespacedSchema {
+    public V4312(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V4420.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4420 extends NamespacedSchema {
+    public V4420(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4421.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4421 extends NamespacedSchema {
+    public V4421(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4531.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4531 extends NamespacedSchema {
+    public V4531(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4532.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4532 extends NamespacedSchema {
+    public V4532(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V4533.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4533 extends NamespacedSchema {
+    public V4533(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V4543.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4543 extends NamespacedSchema {
+    public V4543(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4648.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4648 extends NamespacedSchema {
+    public V4648(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4656.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4656 extends NamespacedSchema {
+    public V4656(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V4771.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4771 extends NamespacedSchema {
+    public V4771(int versionKey, Schema parent);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V4881.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4881 extends NamespacedSchema {
+    public V4881(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V4885.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4885 extends NamespacedSchema {
+    public V4885(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V4996.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.SequencedMap;
+import java.util.function.Supplier;
+public class V4996 extends NamespacedSchema {
+    public V4996(int versionKey, Schema parent);
+    public static SequencedMap<String, Supplier<TypeTemplate>> components(Schema schema);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V4996_1.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4996_1 extends NamespacedSchema {
+    public V4996_1(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V4997.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V4997 extends NamespacedSchema {
+    public V4997(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V5000.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V5000 extends NamespacedSchema {
+    public V5000(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V501.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V501 extends Schema {
+    public V501(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V700.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V700 extends Schema {
+    public V700(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V701.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V701 extends Schema {
+    public V701(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V702.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V702 extends Schema {
+    public V702(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V703.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V703 extends Schema {
+    public V703(int versionKey, Schema parent);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+}
+//// V704.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.Type;
+import com.mojang.datafixers.types.templates.Hook;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import com.mojang.datafixers.types.templates.Hook.HookFunction;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V704 extends Schema {
+    protected static final Map<String, String> ITEM_TO_BLOCKENTITY;
+    protected static final Hook.HookFunction ADD_NAMES;
+    public V704(int versionKey, Schema parent);
+    public Type<?> getChoiceType(DSL.TypeReference type, String choiceName);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V705.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.Hook;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import com.mojang.datafixers.types.templates.Hook.HookFunction;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V705 extends NamespacedSchema {
+    protected static final Hook.HookFunction ADD_NAMES;
+    public V705(int versionKey, Schema parent);
+    protected static void registerMob(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    protected static void registerThrowableProjectile(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+}
+//// V808.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V808 extends NamespacedSchema {
+    public V808(int versionKey, Schema parent);
+    protected static void registerInventory(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+}
+//// V99.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.templates.Hook;
+import com.mojang.datafixers.types.templates.TypeTemplate;
+import com.mojang.datafixers.types.templates.Hook.HookFunction;
+import com.mojang.serialization.Dynamic;
+import java.util.Map;
+import java.util.function.Supplier;
+public class V99 extends Schema {
+    public static final Map<String, String> ITEM_TO_ENTITY;
+    protected static final Hook.HookFunction ADD_NAMES;
+    public V99(int versionKey, Schema parent);
+    protected static void registerThrowableProjectile(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    protected static void registerMinecart(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    protected static void registerInventory(Schema schema, Map<String, Supplier<TypeTemplate>> map, String name);
+    public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema);
+    public Map<String, Supplier<TypeTemplate>> registerBlockEntities(Schema schema);
+    public static TypeTemplate sign(Schema schema);
+    public void registerTypes(Schema schema, Map<String, Supplier<TypeTemplate>> entityTypes, Map<String, Supplier<TypeTemplate>> blockEntityTypes);
+    public static TypeTemplate itemStackTag(Schema schema);
+    protected static <T> T addNames(Dynamic<T> input, Map<String, String> itemToBlockEntityMap, Map<String, String> itemToEntityMap);
+}

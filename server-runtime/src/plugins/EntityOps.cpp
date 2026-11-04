@@ -626,6 +626,25 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
                                         : entity::ai::navigation::moveTo(environment.world->state(), entity, x, y, z,
                                                                          asReal(at(arguments, 3), 1.0));
     }
+    if (operation == "find_path" || operation == "path_nodes") {
+        std::vector<std::array<std::int32_t, 3>> nodes;
+        if (operation == "path_nodes") {
+            if (entity.path.has_value()) {
+                nodes = *entity.path;
+            }
+        } else if (environment.world != nullptr) {
+            nodes = entity::ai::navigation::findPath(environment.world->state(), entity, asReal(at(arguments, 0)),
+                                                     asReal(at(arguments, 1)), asReal(at(arguments, 2)));
+        }
+        std::vector<std::string> flat;
+        flat.reserve(nodes.size() * 3);
+        for (const std::array<std::int32_t, 3>& node : nodes) {
+            for (const std::int32_t axis : node) {
+                flat.push_back(std::to_string(axis));
+            }
+        }
+        return flat;
+    }
     if (operation == "stop_path") {
         entity::ai::navigation::stop(entity);
         return true;

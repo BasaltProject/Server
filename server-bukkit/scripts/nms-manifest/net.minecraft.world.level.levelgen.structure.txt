@@ -1,0 +1,518 @@
+//// BoundingBox.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.ChunkPos;
+public class BoundingBox {
+    public static final Codec<BoundingBox> CODEC;
+    public static final StreamCodec<ByteBuf, BoundingBox> STREAM_CODEC;
+    public BoundingBox(BlockPos content);
+    public BoundingBox(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
+    public static BoundingBox fromCorners(Vec3i pos0, Vec3i pos1);
+    public static BoundingBox infinite();
+    public static BoundingBox orientBox(int footX, int footY, int footZ, int offX, int offY, int offZ, int width, int height, int depth, Direction direction);
+    public Stream<ChunkPos> intersectingChunks();
+    public boolean intersects(BoundingBox other);
+    public boolean intersects(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
+    public boolean intersects(int minX, int minZ, int maxX, int maxZ);
+    public static Optional<BoundingBox> encapsulatingPositions(Iterable<BlockPos> iterable);
+    public static Optional<BoundingBox> encapsulatingBoxes(Iterable<BoundingBox> iterable);
+    public BoundingBox encapsulate(BoundingBox other);
+    public static BoundingBox encapsulating(BoundingBox a, BoundingBox b);
+    public BoundingBox encapsulate(BlockPos pos);
+    public BoundingBox move(int dx, int dy, int dz);
+    public BoundingBox move(Vec3i amount);
+    public BoundingBox moved(int dx, int dy, int dz);
+    public BoundingBox inflatedBy(int amountToAddAllDirections);
+    public BoundingBox inflatedBy(int inflateX, int inflateY, int inflateZ);
+    public boolean isInside(Vec3i pos);
+    public boolean isInside(int x, int y, int z);
+    public Vec3i getLength();
+    public int getXSpan();
+    public int getYSpan();
+    public int getZSpan();
+    public BlockPos getCenter();
+    public void forAllCorners(Consumer<BlockPos> consumer);
+    public String toString();
+    public boolean equals(Object o);
+    public int hashCode();
+    public int minX();
+    public int minY();
+    public int minZ();
+    public int maxX();
+    public int maxY();
+    public int maxZ();
+}
+//// BuiltinStructureSets.java
+import net.minecraft.resources.ResourceKey;
+public interface BuiltinStructureSets {
+    ResourceKey<StructureSet> VILLAGES;
+    ResourceKey<StructureSet> DESERT_PYRAMIDS;
+    ResourceKey<StructureSet> IGLOOS;
+    ResourceKey<StructureSet> JUNGLE_TEMPLES;
+    ResourceKey<StructureSet> SWAMP_HUTS;
+    ResourceKey<StructureSet> PILLAGER_OUTPOSTS;
+    ResourceKey<StructureSet> OCEAN_MONUMENTS;
+    ResourceKey<StructureSet> WOODLAND_MANSIONS;
+    ResourceKey<StructureSet> BURIED_TREASURES;
+    ResourceKey<StructureSet> MINESHAFTS;
+    ResourceKey<StructureSet> RUINED_PORTALS;
+    ResourceKey<StructureSet> SHIPWRECKS;
+    ResourceKey<StructureSet> OCEAN_RUINS;
+    ResourceKey<StructureSet> NETHER_COMPLEXES;
+    ResourceKey<StructureSet> NETHER_FOSSILS;
+    ResourceKey<StructureSet> END_CITIES;
+    ResourceKey<StructureSet> ANCIENT_CITIES;
+    ResourceKey<StructureSet> STRONGHOLDS;
+    ResourceKey<StructureSet> TRAIL_RUINS;
+    ResourceKey<StructureSet> TRIAL_CHAMBERS;
+    ResourceKey<StructureSet> ABANDONED_CAMP;
+}
+//// BuiltinStructures.java
+import net.minecraft.resources.ResourceKey;
+public interface BuiltinStructures {
+    ResourceKey<Structure> PILLAGER_OUTPOST;
+    ResourceKey<Structure> MINESHAFT;
+    ResourceKey<Structure> MINESHAFT_MESA;
+    ResourceKey<Structure> WOODLAND_MANSION;
+    ResourceKey<Structure> JUNGLE_TEMPLE;
+    ResourceKey<Structure> DESERT_PYRAMID;
+    ResourceKey<Structure> IGLOO;
+    ResourceKey<Structure> SHIPWRECK;
+    ResourceKey<Structure> SHIPWRECK_BEACHED;
+    ResourceKey<Structure> SWAMP_HUT;
+    ResourceKey<Structure> STRONGHOLD;
+    ResourceKey<Structure> OCEAN_MONUMENT;
+    ResourceKey<Structure> OCEAN_RUIN_COLD;
+    ResourceKey<Structure> OCEAN_RUIN_WARM;
+    ResourceKey<Structure> FORTRESS;
+    ResourceKey<Structure> NETHER_FOSSIL;
+    ResourceKey<Structure> END_CITY;
+    ResourceKey<Structure> BURIED_TREASURE;
+    ResourceKey<Structure> BASTION_REMNANT;
+    ResourceKey<Structure> VILLAGE_PLAINS;
+    ResourceKey<Structure> VILLAGE_DESERT;
+    ResourceKey<Structure> VILLAGE_SAVANNA;
+    ResourceKey<Structure> VILLAGE_SNOWY;
+    ResourceKey<Structure> VILLAGE_TAIGA;
+    ResourceKey<Structure> RUINED_PORTAL_STANDARD;
+    ResourceKey<Structure> RUINED_PORTAL_DESERT;
+    ResourceKey<Structure> RUINED_PORTAL_JUNGLE;
+    ResourceKey<Structure> RUINED_PORTAL_SWAMP;
+    ResourceKey<Structure> RUINED_PORTAL_MOUNTAIN;
+    ResourceKey<Structure> RUINED_PORTAL_OCEAN;
+    ResourceKey<Structure> RUINED_PORTAL_NETHER;
+    ResourceKey<Structure> ANCIENT_CITY;
+    ResourceKey<Structure> TRAIL_RUINS;
+    ResourceKey<Structure> TRIAL_CHAMBERS;
+    ResourceKey<Structure> ABANDONED_CAMP_BAMBOO_JUNGLE;
+    ResourceKey<Structure> ABANDONED_CAMP_BIRCH_FOREST;
+    ResourceKey<Structure> ABANDONED_CAMP_CHERRY_GROVE;
+    ResourceKey<Structure> ABANDONED_CAMP_DAPPLED_FOREST;
+    ResourceKey<Structure> ABANDONED_CAMP_FLOWER_FOREST;
+    ResourceKey<Structure> ABANDONED_CAMP_FOREST;
+    ResourceKey<Structure> ABANDONED_CAMP_MEADOW;
+    ResourceKey<Structure> ABANDONED_CAMP_OLD_GROWTH_BIRCH_FOREST;
+    ResourceKey<Structure> ABANDONED_CAMP_OLD_GROWTH_PINE_TAIGA;
+    ResourceKey<Structure> ABANDONED_CAMP_OLD_GROWTH_SPRUCE_TAIGA;
+    ResourceKey<Structure> ABANDONED_CAMP_PALE_GARDEN;
+    ResourceKey<Structure> ABANDONED_CAMP_SAVANNA;
+    ResourceKey<Structure> ABANDONED_CAMP_SNOWY_TAIGA;
+    ResourceKey<Structure> ABANDONED_CAMP_SPARSE_JUNGLE;
+    ResourceKey<Structure> ABANDONED_CAMP_SWAMP;
+    ResourceKey<Structure> ABANDONED_CAMP_TAIGA;
+    ResourceKey<Structure> ABANDONED_CAMP_WINDSWEPT_FOREST;
+    ResourceKey<Structure> ABANDONED_CAMP_WOODED_BADLANDS;
+}
+//// PoolElementStructurePiece.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pools.JigsawJunction;
+import net.minecraft.world.level.levelgen.structure.pools.StructurePoolElement;
+import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class PoolElementStructurePiece extends StructurePiece {
+    protected final StructurePoolElement element;
+    protected BlockPos position;
+    protected final Rotation rotation;
+    public PoolElementStructurePiece(StructureTemplateManager structureTemplateManager, StructurePoolElement element, BlockPos position, int groundLevelDelta, Rotation rotation, BoundingBox boundingBox, LiquidSettings liquidSettings);
+    public PoolElementStructurePiece(StructurePieceSerializationContext context, CompoundTag tag);
+    protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+    public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    public void place(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, BlockPos referencePos, boolean keepJigsaws);
+    public void move(int dx, int dy, int dz);
+    public Rotation getRotation();
+    public String toString();
+    public StructurePoolElement getElement();
+    public BlockPos getPosition();
+    public int getGroundLevelDelta();
+    public void addJunction(JigsawJunction junction);
+    public List<JigsawJunction> getJunctions();
+}
+//// PostPlacementProcessor.java
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.pieces.PiecesContainer;
+public interface PostPlacementProcessor {
+    PostPlacementProcessor NONE;
+    void afterPlace(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, PiecesContainer pieces);
+}
+//// ScatteredFeaturePiece.java
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
+public abstract class ScatteredFeaturePiece extends StructurePiece {
+    protected final int width;
+    protected final int height;
+    protected final int depth;
+    protected int heightPosition;
+    protected ScatteredFeaturePiece(StructurePieceType type, int west, int floor, int north, int width, int height, int depth, Direction direction);
+    protected ScatteredFeaturePiece(StructurePieceType type, CompoundTag tag);
+    protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+    protected boolean updateAverageGroundHeight(LevelAccessor level, BoundingBox chunkBB, int offset);
+    protected boolean updateHeightPositionToLowestGroundHeight(LevelAccessor level, int offset);
+}
+//// SinglePieceStructure.java
+import java.util.Optional;
+import net.minecraft.world.level.levelgen.WorldgenRandom;
+public abstract class SinglePieceStructure extends Structure {
+    protected SinglePieceStructure(PieceConstructor constructor, int width, int depth, Structure.StructureSettings settings);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    protected interface PieceConstructor {
+        StructurePiece construct(WorldgenRandom random, int x, int z);
+    }
+}
+//// Structure.java
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeResolver;
+import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.biome.Climate;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.WorldgenRandom;
+import net.minecraft.world.level.levelgen.structure.pieces.PiecesContainer;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public abstract class Structure {
+    public static final Codec<Structure> DIRECT_CODEC;
+    public static final Codec<Holder<Structure>> CODEC;
+    protected final StructureSettings settings;
+    public static <S extends Structure> RecordCodecBuilder<S, StructureSettings> settingsCodec(RecordCodecBuilder.Instance<S> i);
+    public static <S extends Structure> MapCodec<S> simpleCodec(Function<StructureSettings, S> constructor);
+    protected Structure(StructureSettings settings);
+    public HolderSet<Biome> biomes();
+    public Map<MobCategory, StructureSpawnOverride> spawnOverrides();
+    public GenerationStep.Decoration step();
+    public TerrainAdjustment terrainAdaptation();
+    public BoundingBox adjustBoundingBox(BoundingBox boundingBox);
+    public StructureStart generate(Holder<Structure> selected, ResourceKey<Level> dimension, RegistryAccess registryAccess, ChunkGenerator chunkGenerator, BiomeSource biomeSource, Climate.Sampler climateSampler, RandomState randomState, StructureTemplateManager structureTemplateManager, long seed, ChunkPos sourceChunkPos, int references, LevelHeightAccessor heightAccessor, Predicate<Holder<Biome>> validBiome);
+    protected static Optional<GenerationStub> onTopOfChunkCenter(GenerationContext context, Heightmap.Types heightmap, Consumer<StructurePiecesBuilder> generator);
+    protected static Optional<GenerationStub> onTopOfChunkCenterWithoutBiomeCheck(GenerationContext context, Heightmap.Types heightmap, Consumer<StructurePiecesBuilder> generator);
+    public void afterPlace(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, PiecesContainer pieces);
+    public static int getMeanFirstOccupiedHeight(GenerationContext context, int minX, int sizeX, int minZ, int sizeZ);
+    protected static int getLowestY(GenerationContext context, int sizeX, int sizeZ);
+    protected static int getLowestY(GenerationContext context, int minX, int minZ, int sizeX, int sizeZ);
+    protected BlockPos getLowestYIn5by5Box(GenerationContext context, int blockX, int blockZ, Rotation rotation);
+    protected abstract Optional<GenerationStub> findGenerationPoint(GenerationContext context);
+    public Optional<GenerationStub> findValidGenerationPoint(GenerationContext context);
+    public abstract StructureType<?> type();
+    public static record StructureSettings(HolderSet<Biome> biomes, Map<MobCategory, StructureSpawnOverride> spawnOverrides, GenerationStep.Decoration step, TerrainAdjustment terrainAdaptation) {
+        public static final MapCodec<StructureSettings> CODEC;
+        public StructureSettings(HolderSet<Biome> biomes);
+        public static class Builder {
+            public Builder(HolderSet<Biome> biomes);
+            public Builder spawnOverrides(Map<MobCategory, StructureSpawnOverride> spawnOverrides);
+            public Builder generationStep(GenerationStep.Decoration step);
+            public Builder terrainAdapation(TerrainAdjustment terrainAdaption);
+            public StructureSettings build();
+        }
+    }
+    public static record GenerationContext(RegistryAccess registryAccess, ChunkGenerator chunkGenerator, BiomeSource biomeSource, Climate.Sampler climateSampler, BiomeResolver biomeResolver, RandomState randomState, StructureTemplateManager structureTemplateManager, WorldgenRandom random, long seed, ChunkPos chunkPos, LevelHeightAccessor heightAccessor, Predicate<Holder<Biome>> validBiome) {
+        public GenerationContext(RegistryAccess registryAccess, ChunkGenerator chunkGenerator, BiomeSource biomeSource, Climate.Sampler climateSampler, RandomState randomState, StructureTemplateManager structureTemplateManager, long seed, ChunkPos chunkPos, LevelHeightAccessor heightAccessor, Predicate<Holder<Biome>> validBiome);
+        public boolean isValidBiome(GenerationStub stub);
+        public boolean couldStructureExistInColumn(int blockX, int blockZ, int minBlockY, int maxBlockY);
+        public boolean couldValidBiomeExistInTerrainColumn(int blockX, int blockZ);
+        public boolean couldValidBiomeExistOnTopOfChunkCenter();
+    }
+    public static record GenerationStub(BlockPos position, Either<Consumer<StructurePiecesBuilder>, StructurePiecesBuilder> generator) {
+        public GenerationStub(BlockPos position, Consumer<StructurePiecesBuilder> generator);
+        public StructurePiecesBuilder getPiecesBuilder();
+    }
+}
+//// StructureCheck.java
+import com.mojang.datafixers.DataFixer;
+import java.util.Map;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class StructureCheck {
+    public StructureCheck(ChunkScanAccess storageAccess, RegistryAccess registryAccess, StructureTemplateManager structureTemplateManager, ResourceKey<Level> dimension, ChunkGenerator chunkGenerator, RandomState randomState, LevelHeightAccessor heightAccessor, BiomeSource biomeSource, long seed, DataFixer fixerUpper);
+    public StructureCheckResult checkStart(ChunkPos pos, Structure structure, StructurePlacement placement, boolean requireUnreferenced);
+    public void onStructureLoad(ChunkPos pos, Map<Structure, StructureStart> starts);
+    public void incrementReference(ChunkPos chunkPos, Structure structure);
+}
+//// StructureCheckResult.java
+public enum StructureCheckResult {
+    START_PRESENT, START_NOT_PRESENT, CHUNK_LOAD_NEEDED;
+}
+//// StructurePiece.java
+import java.util.List;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
+import net.minecraft.world.level.storage.loot.LootTable;
+public abstract class StructurePiece {
+    protected static final BlockState CAVE_AIR;
+    protected BoundingBox boundingBox;
+    protected int genDepth;
+    protected StructurePiece(StructurePieceType type, int genDepth, BoundingBox boundingBox);
+    public StructurePiece(StructurePieceType type, CompoundTag tag);
+    protected static BoundingBox makeBoundingBox(int x, int y, int z, Direction direction, int width, int height, int depth);
+    protected static Direction getRandomHorizontalDirection(RandomSource random);
+    public final CompoundTag createTag(StructurePieceSerializationContext context);
+    protected abstract void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+    public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+    public abstract void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    public BoundingBox getBoundingBox();
+    public int getGenDepth();
+    public void setGenDepth(int genDepth);
+    public boolean isCloseToChunk(ChunkPos pos, int distance);
+    public BlockPos getLocatorPosition();
+    protected BlockPos.MutableBlockPos getWorldPos(int x, int y, int z);
+    protected int getWorldX(int x, int z);
+    protected int getWorldY(int y);
+    protected int getWorldZ(int x, int z);
+    protected void placeBlock(WorldGenLevel level, BlockState blockState, int x, int y, int z, BoundingBox chunkBB);
+    protected boolean canBeReplaced(LevelReader level, int x, int y, int z, BoundingBox chunkBB);
+    protected BlockState getBlock(BlockGetter level, int x, int y, int z, BoundingBox chunkBB);
+    protected boolean isInterior(LevelReader level, int x, int y, int z, BoundingBox chunkBB);
+    protected void generateAirBox(WorldGenLevel level, BoundingBox chunkBB, int x0, int y0, int z0, int x1, int y1, int z1);
+    protected void generateBox(WorldGenLevel level, BoundingBox chunkBB, int x0, int y0, int z0, int x1, int y1, int z1, BlockState edgeBlock, BlockState fillBlock, boolean skipAir);
+    protected void generateBox(WorldGenLevel level, BoundingBox chunkBB, BoundingBox boxBB, BlockState edgeBlock, BlockState fillBlock, boolean skipAir);
+    protected void generateBox(WorldGenLevel level, BoundingBox chunkBB, int x0, int y0, int z0, int x1, int y1, int z1, boolean skipAir, RandomSource random, BlockSelector selector);
+    protected void generateBox(WorldGenLevel level, BoundingBox chunkBB, BoundingBox boxBB, boolean skipAir, RandomSource random, BlockSelector selector);
+    protected void generateMaybeBox(WorldGenLevel level, BoundingBox chunkBB, RandomSource random, float probability, int x0, int y0, int z0, int x1, int y1, int z1, BlockState edgeBlock, BlockState fillBlock, boolean skipAir, boolean hasToBeInside);
+    protected void maybeGenerateBlock(WorldGenLevel level, BoundingBox chunkBB, RandomSource random, float probability, int x, int y, int z, BlockState blockState);
+    protected void generateUpperHalfSphere(WorldGenLevel level, BoundingBox chunkBB, int x0, int y0, int z0, int x1, int y1, int z1, BlockState fillBlock, boolean skipAir);
+    protected void fillColumnDown(WorldGenLevel level, BlockState blockState, int x, int startY, int z, BoundingBox chunkBB);
+    protected boolean isReplaceableByStructures(BlockState state);
+    protected boolean createChest(WorldGenLevel level, BoundingBox chunkBB, RandomSource random, int x, int y, int z, ResourceKey<LootTable> lootTable);
+    public static BlockState reorient(BlockGetter level, BlockPos blockPos, BlockState blockState);
+    protected boolean createChest(ServerLevelAccessor level, BoundingBox chunkBB, RandomSource random, BlockPos pos, ResourceKey<LootTable> lootTable, BlockState blockState);
+    protected boolean createDispenser(WorldGenLevel level, BoundingBox chunkBB, RandomSource random, int x, int y, int z, Direction facing, ResourceKey<LootTable> lootTable);
+    public void move(int dx, int dy, int dz);
+    public static BoundingBox createBoundingBox(Stream<StructurePiece> pieces);
+    public static StructurePiece findCollisionPiece(List<StructurePiece> pieces, BoundingBox box);
+    public Direction getOrientation();
+    public void setOrientation(Direction orientation);
+    public Rotation getRotation();
+    public Mirror getMirror();
+    public StructurePieceType getType();
+    public static abstract class BlockSelector {
+        protected BlockState next;
+        public BlockSelector();
+        public abstract void next(RandomSource random, int worldX, int worldY, int worldZ, boolean isEdge);
+        public BlockState getNext();
+    }
+}
+//// StructureSet.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement;
+public record StructureSet(List<StructureSelectionEntry> structures, StructurePlacement placement) {
+    public static final Codec<StructureSet> DIRECT_CODEC;
+    public static final Codec<Holder<StructureSet>> CODEC;
+    public StructureSet(Holder<Structure> singleEntry, StructurePlacement placement);
+    public static StructureSelectionEntry entry(Holder<Structure> structure, int weight);
+    public static StructureSelectionEntry entry(Holder<Structure> structure);
+    public static record StructureSelectionEntry(Holder<Structure> structure, int weight) {
+        public static final Codec<StructureSelectionEntry> CODEC;
+    }
+}
+//// StructureSpawnOverride.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.biome.MobSpawnSettings;
+public record StructureSpawnOverride(BoundingBoxType boundingBox, WeightedList<MobSpawnSettings.SpawnerData> spawns) {
+    public static final Codec<StructureSpawnOverride> CODEC;
+    public static enum BoundingBoxType implements StringRepresentable {
+        PIECE, STRUCTURE;
+        public static final Codec<BoundingBoxType> CODEC;
+        public String getSerializedName();
+    }
+}
+//// StructureStart.java
+import java.util.List;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.pieces.PiecesContainer;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+public final class StructureStart {
+    public static final String INVALID_START_ID = "INVALID";
+    public static final StructureStart INVALID_START;
+    public StructureStart(Structure structure, ChunkPos chunkPos, int references, PiecesContainer pieceContainer);
+    public static StructureStart loadStaticStart(StructurePieceSerializationContext context, CompoundTag tag, long seed);
+    public BoundingBox getBoundingBox();
+    public void placeInChunk(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos);
+    public CompoundTag createTag(StructurePieceSerializationContext context, ChunkPos chunkPos);
+    public boolean isValid();
+    public ChunkPos getChunkPos();
+    public boolean canBeReferenced();
+    public void addReference();
+    public int getReferences();
+    protected int getMaxReferences();
+    public Structure getStructure();
+    public List<StructurePiece> getPieces();
+}
+//// StructureType.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.levelgen.structure.structures.BuriedTreasureStructure;
+import net.minecraft.world.level.levelgen.structure.structures.DesertPyramidStructure;
+import net.minecraft.world.level.levelgen.structure.structures.EndCityStructure;
+import net.minecraft.world.level.levelgen.structure.structures.IglooStructure;
+import net.minecraft.world.level.levelgen.structure.structures.JigsawStructure;
+import net.minecraft.world.level.levelgen.structure.structures.JungleTempleStructure;
+import net.minecraft.world.level.levelgen.structure.structures.MineshaftStructure;
+import net.minecraft.world.level.levelgen.structure.structures.NetherFortressStructure;
+import net.minecraft.world.level.levelgen.structure.structures.NetherFossilStructure;
+import net.minecraft.world.level.levelgen.structure.structures.OceanMonumentStructure;
+import net.minecraft.world.level.levelgen.structure.structures.OceanRuinStructure;
+import net.minecraft.world.level.levelgen.structure.structures.RuinedPortalStructure;
+import net.minecraft.world.level.levelgen.structure.structures.ShipwreckStructure;
+import net.minecraft.world.level.levelgen.structure.structures.StrongholdStructure;
+import net.minecraft.world.level.levelgen.structure.structures.SwampHutStructure;
+import net.minecraft.world.level.levelgen.structure.structures.WoodlandMansionStructure;
+public interface StructureType<S extends Structure> {
+    StructureType<BuriedTreasureStructure> BURIED_TREASURE;
+    StructureType<DesertPyramidStructure> DESERT_PYRAMID;
+    StructureType<EndCityStructure> END_CITY;
+    StructureType<NetherFortressStructure> FORTRESS;
+    StructureType<IglooStructure> IGLOO;
+    StructureType<JigsawStructure> JIGSAW;
+    StructureType<JungleTempleStructure> JUNGLE_TEMPLE;
+    StructureType<MineshaftStructure> MINESHAFT;
+    StructureType<NetherFossilStructure> NETHER_FOSSIL;
+    StructureType<OceanMonumentStructure> OCEAN_MONUMENT;
+    StructureType<OceanRuinStructure> OCEAN_RUIN;
+    StructureType<RuinedPortalStructure> RUINED_PORTAL;
+    StructureType<ShipwreckStructure> SHIPWRECK;
+    StructureType<StrongholdStructure> STRONGHOLD;
+    StructureType<SwampHutStructure> SWAMP_HUT;
+    StructureType<WoodlandMansionStructure> WOODLAND_MANSION;
+    MapCodec<S> codec();
+}
+//// TemplateStructurePiece.java
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public abstract class TemplateStructurePiece extends StructurePiece {
+    protected final String templateName;
+    protected final StructureTemplate template;
+    protected final StructurePlaceSettings placeSettings;
+    protected BlockPos templatePosition;
+    public TemplateStructurePiece(StructurePieceType type, int genDepth, StructureTemplateManager structureTemplateManager, Identifier templateLocation, String templateName, StructurePlaceSettings placeSettings, BlockPos position);
+    public TemplateStructurePiece(StructurePieceType type, CompoundTag tag, StructureTemplateManager structureTemplateManager, Function<Identifier, StructurePlaceSettings> structurePlaceSettingsSupplier);
+    protected Identifier makeTemplateLocation();
+    protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+    public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    protected abstract void handleDataMarker(String markerId, BlockPos position, ServerLevelAccessor level, RandomSource random, BoundingBox chunkBB);
+    public void move(int dx, int dy, int dz);
+    public Rotation getRotation();
+    public StructureTemplate template();
+    public BlockPos templatePosition();
+    public StructurePlaceSettings placeSettings();
+}
+//// TerrainAdjustment.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum TerrainAdjustment implements StringRepresentable {
+    NONE, BURY, BEARD_THIN, BEARD_BOX, ENCAPSULATE;
+    public static final Codec<TerrainAdjustment> CODEC;
+    public String getSerializedName();
+}

@@ -111,6 +111,41 @@ public final class Recipes {
         };
     }
 
+    private static final Map<String, Boolean> kCooks = new java.util.concurrent.ConcurrentHashMap<>();
+    private static int cooksStamp;
+
+    public static boolean cooks(String itemKey, String kind) {
+        int stamp = java.util.Arrays.hashCode(InventoryNatives.recipeIds());
+        synchronized (kCooks) {
+            if (stamp != cooksStamp) {
+                kCooks.clear();
+                cooksStamp = stamp;
+            }
+        }
+        return kCooks.computeIfAbsent(kind + "|" + itemKey, key -> scanCooks(itemKey, kind));
+    }
+
+    private static boolean scanCooks(String itemKey, String kind) {
+        org.bukkit.Material material = org.bukkit.Material.matchMaterial(itemKey);
+        if (material == null) {
+            return false;
+        }
+        ItemStack probe = new ItemStack(material);
+        Iterator<Recipe> all = iterator();
+        while (all.hasNext()) {
+            if (all.next() instanceof org.bukkit.inventory.CookingRecipe<?> cooking && kindOf(cooking).equals(kind)
+                && cooking.getInputChoice().test(probe)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String kindOf(org.bukkit.inventory.CookingRecipe<?> recipe) {
+        return recipe instanceof org.bukkit.inventory.BlastingRecipe ? "blasting"
+            : recipe instanceof org.bukkit.inventory.SmokingRecipe ? "smoking" : recipe instanceof org.bukkit.inventory.CampfireRecipe ? "campfire" : "furnace";
+    }
+
     public static List<Recipe> producing(ItemStack result) {
         List<Recipe> out = new ArrayList<>();
         Iterator<Recipe> all = iterator();

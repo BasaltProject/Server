@@ -1,0 +1,100 @@
+//// BlockSource.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.entity.DispenserBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+public record BlockSource(ServerLevel level, BlockPos pos, BlockState state, DispenserBlockEntity blockEntity) {
+    public Vec3 center();
+}
+//// BoatDispenseItemBehavior.java
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
+import net.minecraft.world.item.ItemStack;
+public class BoatDispenseItemBehavior extends DefaultDispenseItemBehavior {
+    public BoatDispenseItemBehavior(EntityType<? extends AbstractBoat> type);
+    public ItemStack execute(BlockSource source, ItemStack dispensed);
+    protected void playSound(BlockSource source);
+}
+//// DefaultDispenseItemBehavior.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public class DefaultDispenseItemBehavior implements DispenseItemBehavior {
+    public final ItemStack dispense(BlockSource source, ItemStack dispensed);
+    protected ItemStack execute(BlockSource source, ItemStack dispensed);
+    public static void spawnItem(Level level, ItemStack itemStack, int accuracy, Direction direction, Position position);
+    protected void playSound(BlockSource source);
+    protected void playAnimation(BlockSource source, Direction direction);
+    protected ItemStack consumeWithRemainder(BlockSource source, ItemStack dispensed, ItemStack remainder);
+}
+//// DispenseItemBehavior.java
+import net.minecraft.world.item.ItemStack;
+import org.slf4j.Logger;
+public interface DispenseItemBehavior {
+    Logger LOGGER;
+    DispenseItemBehavior NOOP;
+    ItemStack dispense(BlockSource source, ItemStack dispensed);
+    static void bootStrap();
+}
+//// EquipmentDispenseItemBehavior.java
+import net.minecraft.world.item.ItemStack;
+public class EquipmentDispenseItemBehavior extends DefaultDispenseItemBehavior {
+    public static final EquipmentDispenseItemBehavior INSTANCE;
+    protected ItemStack execute(BlockSource source, ItemStack dispensed);
+    public static boolean dispenseEquipment(BlockSource source, ItemStack dispensed);
+}
+//// FlintAndSteelDispenseItemBehavior.java
+import net.minecraft.world.item.ItemStack;
+public class FlintAndSteelDispenseItemBehavior extends OptionalDispenseItemBehavior {
+    protected ItemStack execute(BlockSource source, ItemStack dispensed);
+}
+//// MinecartDispenseItemBehavior.java
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
+import net.minecraft.world.item.ItemStack;
+public class MinecartDispenseItemBehavior extends DefaultDispenseItemBehavior {
+    public MinecartDispenseItemBehavior(EntityType<? extends AbstractMinecart> entityType);
+    public ItemStack execute(BlockSource source, ItemStack dispensed);
+    protected void playSound(BlockSource source);
+}
+//// OptionalDispenseItemBehavior.java
+public abstract class OptionalDispenseItemBehavior extends DefaultDispenseItemBehavior {
+    public boolean isSuccess();
+    public void setSuccess(boolean success);
+    protected void playSound(BlockSource source);
+}
+//// ProjectileDispenseBehavior.java
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+public class ProjectileDispenseBehavior extends DefaultDispenseItemBehavior {
+    public ProjectileDispenseBehavior(Item item);
+    public ItemStack execute(BlockSource source, ItemStack dispensed);
+    protected void playSound(BlockSource source);
+}
+//// ShearsDispenseItemBehavior.java
+import net.minecraft.world.item.ItemStack;
+public class ShearsDispenseItemBehavior extends OptionalDispenseItemBehavior {
+    protected ItemStack execute(BlockSource source, ItemStack dispensed);
+}
+//// ShulkerBoxDispenseBehavior.java
+import net.minecraft.world.item.ItemStack;
+public class ShulkerBoxDispenseBehavior extends OptionalDispenseItemBehavior {
+    protected ItemStack execute(BlockSource source, ItemStack dispensed);
+}
+//// SpawnEggItemBehavior.java
+import net.minecraft.world.item.ItemStack;
+public class SpawnEggItemBehavior extends DefaultDispenseItemBehavior {
+    public static final SpawnEggItemBehavior INSTANCE;
+    public ItemStack execute(BlockSource source, ItemStack dispensed);
+}
+//// SulfurCubeBlockDispenseItemBehavior.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
+public class SulfurCubeBlockDispenseItemBehavior extends DefaultDispenseItemBehavior {
+    public static final SulfurCubeBlockDispenseItemBehavior INSTANCE;
+    protected ItemStack execute(BlockSource source, ItemStack dispensed);
+    public static boolean dispenseBlock(ServerLevel level, BlockPos pos, ItemStack dispensed);
+}

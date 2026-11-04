@@ -1,0 +1,54 @@
+//// AbstractSampleLogger.java
+public abstract class AbstractSampleLogger implements SampleLogger {
+    protected final long[] defaults;
+    protected final long[] sample;
+    protected AbstractSampleLogger(int dimensions, long[] defaults);
+    public void logFullSample(long[] sample);
+    public void logSample(long sample);
+    public void logPartialSample(long sample, int dimension);
+    protected abstract void useSample();
+    protected void resetSample();
+}
+//// LocalSampleLogger.java
+public class LocalSampleLogger extends AbstractSampleLogger implements SampleStorage {
+    public static final int CAPACITY = 240;
+    public LocalSampleLogger(int dimensions);
+    public LocalSampleLogger(int dimensions, long[] defaults);
+    protected void useSample();
+    public int capacity();
+    public int size();
+    public long get(int index);
+    public long get(int index, int dimension);
+    public void reset();
+}
+//// RemoteDebugSampleType.java
+import net.minecraft.util.debug.DebugSubscription;
+public enum RemoteDebugSampleType {
+    TICK_TIME;
+    public DebugSubscription<?> subscription();
+}
+//// RemoteSampleLogger.java
+import net.minecraft.util.debug.ServerDebugSubscribers;
+public class RemoteSampleLogger extends AbstractSampleLogger {
+    public RemoteSampleLogger(int dimensions, ServerDebugSubscribers subscribers, RemoteDebugSampleType sampleType);
+    public RemoteSampleLogger(int dimensions, ServerDebugSubscribers subscribers, RemoteDebugSampleType sampleType, long[] defaults);
+    protected void useSample();
+}
+//// SampleLogger.java
+public interface SampleLogger {
+    void logFullSample(long[] sample);
+    void logSample(long sample);
+    void logPartialSample(long sample, int dimension);
+}
+//// SampleStorage.java
+public interface SampleStorage {
+    int capacity();
+    int size();
+    long get(int index);
+    long get(int index, int dimension);
+    void reset();
+}
+//// TpsDebugDimensions.java
+public enum TpsDebugDimensions {
+    FULL_TICK, TICK_SERVER_METHOD, SCHEDULED_TASKS, IDLE;
+}

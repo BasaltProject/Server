@@ -2,6 +2,7 @@
 
 #include <basalt/server/plugins/PluginServerControl.hpp>
 #include <basalt/server/runtime/TickLoop.hpp>
+#include <basalt/server/runtime/command/commands/StopwatchCommand.hpp>
 #include <basalt/server/runtime/plugins/ServerSettings.hpp>
 
 #include <functional>
@@ -18,10 +19,13 @@ public:
         std::function<std::vector<std::uint8_t>()> serverIcon;
         std::function<bool()> reloadCommands;
         ServerSettings* settings = nullptr;
+        std::function<command::commands::Stopwatches*()> stopwatches;
     };
 
     explicit ServerControl(Hooks hooks);
 
+    [[nodiscard]] std::vector<std::string> stopwatchIds() override;
+    std::optional<double> stopwatch(std::string_view operation, std::string_view id) override;
     [[nodiscard]] float tickRate() override;
     [[nodiscard]] std::array<double, 4> pace() override;
     [[nodiscard]] std::vector<std::int64_t> tickTimes() override;

@@ -1,0 +1,180 @@
+//// AbstractBoat.java
+import java.util.function.Supplier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.BlockUtil;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.InterpolationHandler;
+import net.minecraft.world.entity.Leashable;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.VehicleEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public abstract class AbstractBoat extends VehicleEntity implements Leashable {
+    public static final int PADDLE_LEFT = 0;
+    public static final int PADDLE_RIGHT = 1;
+    public static final double PADDLE_SOUND_TIME;
+    public static final int BUBBLE_TIME = 60;
+    public AbstractBoat(EntityType<? extends AbstractBoat> type, Level level, Supplier<Item> dropItem);
+    public void setInitialPos(double x, double y, double z);
+    protected Entity.MovementEmission getMovementEmission();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public boolean canCollideWith(Entity entity);
+    public static boolean canVehicleCollide(Entity vehicle, Entity entity);
+    public boolean canBeCollidedWith(Entity other);
+    public boolean isPushable();
+    public Vec3 getRelativePortalPosition(Direction.Axis axis, BlockUtil.FoundRectangle portalArea);
+    protected abstract double rideHeight(EntityDimensions dimensions);
+    protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale);
+    public void onAboveBubbleColumn(boolean dragDown, BlockPos pos);
+    public void push(Entity entity);
+    public void animateHurt(float yaw);
+    public boolean isPickable();
+    protected InterpolationHandler createInterpolationHandler();
+    public Direction getMotionDirection();
+    public void tick();
+    public void handleEntityEvent(byte id);
+    protected void handleBubbleColumnEffect(boolean dragDown);
+    protected SoundEvent getPaddleSound();
+    public void setPaddleState(boolean left, boolean right);
+    public float getRowingTime(int side, float a);
+    public Leashable. LeashData getLeashData();
+    public void setLeashData(Leashable. LeashData leashData);
+    public Vec3 getLeashOffset();
+    public boolean supportQuadLeash();
+    public Vec3[] getQuadLeashOffsets();
+    public float getWaterLevelAbove();
+    public float getGroundFriction();
+    protected double getDefaultGravity();
+    protected float getAirDrag();
+    protected float getSinglePassengerXOffset();
+    public boolean hasEnoughSpaceFor(Entity entity);
+    protected void positionRider(Entity passenger, Entity.MoveFunction moveFunction);
+    public Vec3 getDismountLocationForPassenger(LivingEntity passenger);
+    protected float clampRotation(Entity passenger);
+    public void onPassengerTurned(Entity passenger);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    public void remove(Entity.RemovalReason reason);
+    protected void checkFallDamage(double ya, boolean onGround, BlockState onState, BlockPos pos);
+    public boolean getPaddleState(int side);
+    public float getBubbleAngle(float a);
+    protected boolean canAddPassenger(Entity passenger);
+    protected int getMaxPassengers();
+    public LivingEntity getControllingPassenger();
+    public void setInput(boolean left, boolean right, boolean up, boolean down);
+    public boolean isUnderWater();
+    protected final Item getDropItem();
+    public final ItemStack getPickResult();
+    protected AABB modifyPassengerFluidInteractionBox(AABB passengerBox);
+    public static enum Status {
+        IN_WATER, UNDER_WATER, UNDER_FLOWING_WATER, ON_LAND, IN_AIR;
+    }
+}
+//// AbstractChestBoat.java
+import java.util.function.Supplier;
+import net.minecraft.core.NonNullList;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.ContainerUser;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.HasCustomInventoryScreen;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.ContainerEntity;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.Vec3;
+public abstract class AbstractChestBoat extends AbstractBoat implements HasCustomInventoryScreen, ContainerEntity {
+    public AbstractChestBoat(EntityType<? extends AbstractChestBoat> type, Level level, Supplier<Item> dropItem);
+    protected float getSinglePassengerXOffset();
+    protected int getMaxPassengers();
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public void destroy(ServerLevel level, DamageSource source);
+    public void remove(Entity.RemovalReason reason);
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    public void openCustomInventoryScreen(Player player);
+    public void clearContent();
+    public int getContainerSize();
+    public ItemStack getItem(int slot);
+    public ItemStack removeItem(int slot, int count);
+    public ItemStack removeItemNoUpdate(int slot);
+    public void setItem(int slot, ItemStack itemStack);
+    public SlotAccess getSlot(int slot);
+    public void setChanged();
+    public boolean stillValid(Player player);
+    public AbstractContainerMenu createMenu(int containerId, Inventory inventory, Player player);
+    public void unpackLootTable(Player player);
+    public ResourceKey<LootTable> getContainerLootTable();
+    public void setContainerLootTable(ResourceKey<LootTable> lootTable);
+    public long getContainerLootTableSeed();
+    public void setContainerLootTableSeed(long lootTableSeed);
+    public NonNullList<ItemStack> getItemStacks();
+    public void clearItemStacks();
+    public void stopOpen(ContainerUser containerUser);
+}
+//// Boat.java
+import java.util.function.Supplier;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.Level;
+public class Boat extends AbstractBoat {
+    public Boat(EntityType<? extends Boat> type, Level level, Supplier<Item> dropItem);
+    protected double rideHeight(EntityDimensions dimensions);
+}
+//// ChestBoat.java
+import java.util.function.Supplier;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.Level;
+public class ChestBoat extends AbstractChestBoat {
+    public ChestBoat(EntityType<? extends ChestBoat> type, Level level, Supplier<Item> dropItem);
+    protected double rideHeight(EntityDimensions dimensions);
+}
+//// ChestRaft.java
+import java.util.function.Supplier;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.Level;
+public class ChestRaft extends AbstractChestBoat {
+    public ChestRaft(EntityType<? extends ChestRaft> type, Level level, Supplier<Item> dropItem);
+    protected double rideHeight(EntityDimensions dimensions);
+}
+//// Raft.java
+import java.util.function.Supplier;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.Level;
+public class Raft extends AbstractBoat {
+    public Raft(EntityType<? extends Raft> type, Level level, Supplier<Item> dropItem);
+    protected double rideHeight(EntityDimensions dimensions);
+}

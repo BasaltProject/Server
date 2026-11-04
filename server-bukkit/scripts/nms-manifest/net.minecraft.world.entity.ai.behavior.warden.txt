@@ -1,0 +1,87 @@
+//// Digging.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.behavior.Behavior;
+import net.minecraft.world.entity.monster.warden.Warden;
+public class Digging<E extends Warden> extends Behavior<E> {
+    public Digging(int ticks);
+    protected boolean canStillUse(ServerLevel level, E body, long timestamp);
+    protected boolean checkExtraStartConditions(ServerLevel level, E body);
+    protected void start(ServerLevel level, E body, long timestamp);
+    protected void stop(ServerLevel level, E body, long timestamp);
+}
+//// Emerging.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.behavior.Behavior;
+import net.minecraft.world.entity.monster.warden.Warden;
+public class Emerging<E extends Warden> extends Behavior<E> {
+    public Emerging(int ticks);
+    protected boolean canStillUse(ServerLevel level, E body, long timestamp);
+    protected void start(ServerLevel level, E body, long timestamp);
+    protected void stop(ServerLevel level, E body, long timestamp);
+}
+//// ForceUnmount.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.behavior.Behavior;
+public class ForceUnmount extends Behavior<LivingEntity> {
+    public ForceUnmount();
+    protected boolean checkExtraStartConditions(ServerLevel level, LivingEntity body);
+    protected void start(ServerLevel level, LivingEntity body, long timestamp);
+}
+//// Roar.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.behavior.Behavior;
+import net.minecraft.world.entity.monster.warden.Warden;
+public class Roar extends Behavior<Warden> {
+    public Roar();
+    protected void start(ServerLevel level, Warden body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, Warden body, long timestamp);
+    protected void tick(ServerLevel level, Warden body, long timestamp);
+    protected void stop(ServerLevel level, Warden body, long timestamp);
+}
+//// SetRoarTarget.java
+import java.util.Optional;
+import java.util.function.Function;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.behavior.BehaviorControl;
+import net.minecraft.world.entity.monster.warden.Warden;
+public class SetRoarTarget {
+    public static <E extends Warden> BehaviorControl<E> create(Function<E, Optional<? extends LivingEntity>> targetFinderFunction);
+}
+//// SetWardenLookTarget.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.behavior.BehaviorControl;
+public class SetWardenLookTarget {
+    public static BehaviorControl<LivingEntity> create();
+}
+//// Sniffing.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.behavior.Behavior;
+import net.minecraft.world.entity.monster.warden.Warden;
+public class Sniffing<E extends Warden> extends Behavior<E> {
+    public Sniffing(int ticks);
+    protected boolean canStillUse(ServerLevel level, E body, long timestamp);
+    protected void start(ServerLevel level, E body, long timestamp);
+    protected void stop(ServerLevel level, E body, long timestamp);
+}
+//// SonicBoom.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.behavior.Behavior;
+import net.minecraft.world.entity.monster.warden.Warden;
+public class SonicBoom extends Behavior<Warden> {
+    public static final int COOLDOWN = 40;
+    public SonicBoom();
+    protected boolean checkExtraStartConditions(ServerLevel level, Warden body);
+    protected boolean canStillUse(ServerLevel level, Warden body, long timestamp);
+    protected void start(ServerLevel level, Warden body, long timestamp);
+    protected void tick(ServerLevel level, Warden body, long timestamp);
+    protected void stop(ServerLevel level, Warden body, long timestamp);
+    public static void setCooldown(LivingEntity body, int cooldown);
+}
+//// TryToSniff.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.behavior.BehaviorControl;
+public class TryToSniff {
+    public static BehaviorControl<LivingEntity> create();
+}

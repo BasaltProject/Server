@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.server.level;
 
 import java.util.Map;
@@ -17,6 +18,26 @@ import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.storage.SavedDataStorage;
 import org.basaltmc.bukkit.Unsupported;
 import org.basaltmc.bukkit.WorldNatives;
+import com.mojang.datafixers.DataFixer;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.io.IOException;
+import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
+import net.minecraft.core.SectionPos;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.NaturalSpawner;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.chunk.LightChunk;
+import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
+import net.minecraft.world.level.entity.ChunkStatusUpdateListener;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import net.minecraft.world.level.storage.LevelStorageSource;
 
 public class ServerChunkCache extends ChunkSource {
     private static final Set<ServerChunkCache> kAll = ConcurrentHashMap.newKeySet();
@@ -44,7 +65,7 @@ public class ServerChunkCache extends ChunkSource {
     ServerChunkCache(ServerLevel level) {
         this.level = level;
         this.world = level.getWorld().getName();
-        this.lightEngine = new ThreadedLevelLightEngine(world);
+        this.lightEngine = new ThreadedLevelLightEngine(world, level);
         this.chunkMap = new ChunkMap(this, world);
         kAll.add(this);
     }
@@ -199,7 +220,7 @@ public class ServerChunkCache extends ChunkSource {
     }
 
     public ChunkGenerator getGenerator() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerChunkCache.getGenerator");
+        return new org.basaltmc.bukkit.facade.NativeChunkGenerator(level);
     }
 
     public ThreadedLevelLightEngine getLightEngine() {
@@ -212,5 +233,166 @@ public class ServerChunkCache extends ChunkSource {
 
     public RandomState randomState() {
         throw Unsupported.hit("net.minecraft.server.level.ServerChunkCache.randomState");
+    }
+    public ServerChunkCache(ServerLevel level, LevelStorageSource.LevelStorageAccess levelStorage, DataFixer fixerUpper, StructureTemplateManager structureTemplateManager, Executor executor, ChunkGenerator generator, int viewDistance, int simulationDistance, boolean syncWrites, ChunkStatusUpdateListener chunkStatusListener) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#<init>");
+    }
+    public ChunkAccess getChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate) {
+        return getChunk(x, z, loadOrGenerate);
+    }
+    public LevelChunk getChunkNow(int x, int z) {
+        return getChunk(x, z, false);
+    }
+    public CompletableFuture<ChunkResult<ChunkAccess>> getChunkFuture(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate) {
+        return getChunkFutureMainThread(x, z, targetStatus, loadOrGenerate);
+    }
+    public boolean hasChunk(int x, int z) {
+        return WorldNatives.chunkLoaded(world, x, z);
+    }
+    public LightChunk getChunkForLighting(int x, int z) {
+        return getChunk(x, z, false);
+    }
+    public Level getLevel() {
+        return level;
+    }
+    boolean runDistanceManagerUpdates() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#runDistanceManagerUpdates");
+    }
+    public boolean isPositionTicking(long chunkKey) {
+        return WorldNatives.chunkLoaded(world, ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey));
+    }
+    public void save(boolean flushStorage) {
+        WorldNatives.saveWorld(world);
+    }
+    public void close() throws IOException {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#close");
+    }
+    public void tick(BooleanSupplier haveTime, boolean tickChunks) {
+
+    }
+    public String gatherStats() {
+        return Integer.toString(getLoadedChunksCount());
+    }
+    public int getPendingTasksCount() {
+        return 0;
+    }
+    public ChunkGeneratorStructureState getGeneratorState() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#getGeneratorState");
+    }
+    public int getLoadedChunksCount() {
+        int[] loaded = WorldNatives.loadedChunks(world);
+        return loaded == null ? 0 : loaded.length / 2;
+    }
+    public void onLightUpdate(LightLayer layer, SectionPos pos) {
+
+    }
+    public boolean hasActiveTickets() {
+        return false;
+    }
+    public void addTicket(Ticket ticket, ChunkPos pos) {
+        return;
+    }
+    public CompletableFuture<?> addTicketAndLoadWithRadius(TicketType type, ChunkPos pos, int radius) {
+        addTicketWithRadius(type, pos, radius);
+        return CompletableFuture.completedFuture(null);
+    }
+    public void removeTicketWithRadius(TicketType type, ChunkPos pos, int radius) {
+        WorldNatives.releaseChunks(world, ticketToken(type, pos));
+    }
+    public boolean updateChunkForced(ChunkPos pos, boolean forced) {
+        level.getWorld().setChunkForceLoaded(pos.x(), pos.z(), forced);
+        return true;
+    }
+    public LongSet getForceLoadedChunks() {
+        return level.getForceLoadedChunks();
+    }
+    public void move(ServerPlayer player) {
+
+    }
+    public boolean hasEntityWithId(int id) {
+        return level.getEntity(id) != null;
+    }
+    public void removeEntity(Entity entity) {
+        return;
+    }
+    private java.util.List<ServerPlayer> trackers(Entity entity) {
+        java.util.List<ServerPlayer> found = new java.util.ArrayList<>();
+        org.bukkit.Location at = new org.bukkit.Location(level.getWorld(), entity.getX(), entity.getY(), entity.getZ());
+        for (org.bukkit.entity.Player player : level.getWorld().getPlayers()) {
+            if (player instanceof org.bukkit.craftbukkit.entity.CraftPlayer craft && craft.getHandle() != entity
+                    && player.getLocation().distanceSquared(at) <= 128.0 * 128.0) {
+                found.add(craft.getHandle());
+            }
+        }
+        return found;
+    }
+    public void addEntity(Entity entity) {
+        return;
+    }
+    public void sendToTrackingPlayersAndSelf(Entity entity, Packet<? super ClientGamePacketListener> packet) {
+        sendToTrackingPlayersFiltered(entity, packet, player -> true);
+        if (entity instanceof ServerPlayer self && !trackers(entity).contains(self)) {
+            self.connection.send(packet);
+        }
+    }
+    public void sendToTrackingPlayers(Entity entity, Packet<? super ClientGamePacketListener> packet) {
+        sendToTrackingPlayersFiltered(entity, packet, player -> true);
+    }
+    public void sendToTrackingPlayersFiltered(Entity entity, Packet<? super ClientGamePacketListener> packet, Predicate<ServerPlayer> targetPredicate) {
+        for (ServerPlayer player : trackers(entity)) {
+            if (targetPredicate.test(player)) {
+                player.connection.send(packet);
+            }
+        }
+    }
+    public void setViewDistance(int newDistance) {
+        level.getWorld().setViewDistance(newDistance);
+    }
+    public void setSimulationDistance(int simulationDistance) {
+        level.getWorld().setSimulationDistance(simulationDistance);
+    }
+    public void setSpawnSettings(boolean spawnEnemies) {
+
+    }
+    public String getChunkDebugData(ChunkPos pos) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#getChunkDebugData");
+    }
+    public PoiManager getPoiManager() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#getPoiManager");
+    }
+    public ChunkScanAccess chunkScanner() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#chunkScanner");
+    }
+    public NaturalSpawner. SpawnState getLastSpawnState() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#getLastSpawnState");
+    }
+    public void deactivateTicketsOnClosing() {
+
+    }
+    public void onChunkReadyToSend(ChunkHolder chunk) {
+
+    }
+    final class MainThreadExecutor extends BlockableEventLoop<Runnable> {
+        private MainThreadExecutor(Level level) {
+            super((String) null, false); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#<init>");
+        }
+        public Runnable wrapRunnable(Runnable runnable) {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#wrapRunnable");
+        }
+        protected boolean shouldRun(Runnable task) {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#shouldRun");
+        }
+        protected boolean scheduleExecutables() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#scheduleExecutables");
+        }
+        protected Thread getRunningThread() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#getRunningThread");
+        }
+        protected void doRunTask(Runnable task) {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#doRunTask");
+        }
+        protected boolean pollTask() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#pollTask");
+        }
     }
 }

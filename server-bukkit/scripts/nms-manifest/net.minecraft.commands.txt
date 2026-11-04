@@ -1,0 +1,337 @@
+//// ArgumentVisitor.java
+import com.mojang.brigadier.ParseResults;
+import com.mojang.brigadier.context.CommandContextBuilder;
+import com.mojang.brigadier.context.ParsedArgument;
+import com.mojang.brigadier.tree.ArgumentCommandNode;
+public class ArgumentVisitor {
+    public static <S> void visitArguments(ParseResults<S> command, Output<S> output, boolean rejectRootRedirects);
+    public interface Output<S> {
+        <T> void accept(CommandContextBuilder<S> context, ArgumentCommandNode<S, T> argument, ParsedArgument<S, T> value);
+    }
+}
+//// BrigadierExceptions.java
+import com.mojang.brigadier.exceptions.BuiltInExceptionProvider;
+import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+public class BrigadierExceptions implements BuiltInExceptionProvider {
+    public Dynamic2CommandExceptionType doubleTooLow();
+    public Dynamic2CommandExceptionType doubleTooHigh();
+    public Dynamic2CommandExceptionType floatTooLow();
+    public Dynamic2CommandExceptionType floatTooHigh();
+    public Dynamic2CommandExceptionType integerTooLow();
+    public Dynamic2CommandExceptionType integerTooHigh();
+    public Dynamic2CommandExceptionType longTooLow();
+    public Dynamic2CommandExceptionType longTooHigh();
+    public DynamicCommandExceptionType literalIncorrect();
+    public SimpleCommandExceptionType readerExpectedStartOfQuote();
+    public SimpleCommandExceptionType readerExpectedEndOfQuote();
+    public DynamicCommandExceptionType readerInvalidEscape();
+    public DynamicCommandExceptionType readerInvalidBool();
+    public DynamicCommandExceptionType readerInvalidInt();
+    public SimpleCommandExceptionType readerExpectedInt();
+    public DynamicCommandExceptionType readerInvalidLong();
+    public SimpleCommandExceptionType readerExpectedLong();
+    public DynamicCommandExceptionType readerInvalidDouble();
+    public SimpleCommandExceptionType readerExpectedDouble();
+    public DynamicCommandExceptionType readerInvalidFloat();
+    public SimpleCommandExceptionType readerExpectedFloat();
+    public SimpleCommandExceptionType readerExpectedBool();
+    public DynamicCommandExceptionType readerExpectedSymbol();
+    public SimpleCommandExceptionType dispatcherUnknownCommand();
+    public SimpleCommandExceptionType dispatcherUnknownArgument();
+    public SimpleCommandExceptionType dispatcherExpectedArgumentSeparator();
+    public DynamicCommandExceptionType dispatcherParseException();
+}
+//// CacheableFunction.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.commands.functions.CommandFunction;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.ServerFunctionManager;
+public class CacheableFunction {
+    public static final Codec<CacheableFunction> CODEC;
+    public CacheableFunction(Identifier id);
+    public Optional<CommandFunction<CommandSourceStack>> get(ServerFunctionManager manager);
+    public Identifier getId();
+    public boolean equals(Object obj);
+    public int hashCode();
+}
+//// CommandBuildContext.java
+import net.minecraft.core.HolderLookup;
+import net.minecraft.world.flag.FeatureFlagSet;
+public interface CommandBuildContext extends HolderLookup.Provider {
+    static CommandBuildContext simple(HolderLookup.Provider access, FeatureFlagSet enabledFeatures);
+    FeatureFlagSet enabledFeatures();
+}
+//// CommandResultCallback.java
+public interface CommandResultCallback {
+    CommandResultCallback EMPTY;
+    void onResult(boolean success, int result);
+    default void onSuccess(int result);
+    default void onFailure();
+    static CommandResultCallback chain(CommandResultCallback first, CommandResultCallback second);
+}
+//// CommandSigningContext.java
+import java.util.Map;
+import net.minecraft.network.chat.PlayerChatMessage;
+public interface CommandSigningContext {
+    CommandSigningContext ANONYMOUS;
+    PlayerChatMessage getArgument(String name);
+    public static record SignedArguments(Map<String, PlayerChatMessage> arguments) implements CommandSigningContext {
+        public PlayerChatMessage getArgument(String name);
+    }
+}
+//// CommandSource.java
+import net.minecraft.network.chat.Component;
+public interface CommandSource {
+    CommandSource NULL;
+    void sendSystemMessage(Component message);
+    boolean acceptsSuccess();
+    boolean acceptsFailure();
+    boolean shouldInformAdmins();
+    default boolean alwaysAccepts();
+}
+//// CommandSourceStack.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.Message;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandExceptionType;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BinaryOperator;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.commands.execution.TraceCallbacks;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.network.chat.ChatType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.OutgoingChatMessage;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.util.TaskChainer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+public class CommandSourceStack implements SharedSuggestionProvider, ExecutionCommandSource<CommandSourceStack> {
+    public static final SimpleCommandExceptionType ERROR_NOT_PLAYER;
+    public static final SimpleCommandExceptionType ERROR_NOT_ENTITY;
+    public CommandSourceStack(CommandSource source, Vec3 position, Vec2 rotation, ServerLevel level, PermissionSet permissions, MinecraftServer server, Entity entity);
+    public CommandSourceStack(CommandSource source, Vec3 position, Vec2 rotation, ServerLevel level, PermissionSet permissions, Component name, MinecraftServer server);
+    private CommandSourceStack(CommandSource source, Vec3 position, Vec2 rotation, ServerLevel level, PermissionSet permissions, NamesProvider namesProvider, MinecraftServer server, Entity entity);
+    private CommandSourceStack(CommandSource source, Vec3 position, Vec2 rotation, ServerLevel level, PermissionSet permissions, NamesProvider namesProvider, MinecraftServer server, Entity entity, boolean silent, CommandResultCallback resultCallback, EntityAnchorArgument.Anchor anchor, CommandSigningContext signingContext, TaskChainer chatMessageChainer);
+    public CommandSourceStack withSource(CommandSource source);
+    public CommandSourceStack withEntity(Entity entity);
+    public CommandSourceStack withPosition(Vec3 pos);
+    public CommandSourceStack withRotation(Vec2 rotation);
+    public CommandSourceStack withCallback(CommandResultCallback resultCallback);
+    public CommandSourceStack withCallback(CommandResultCallback newCallback, BinaryOperator<CommandResultCallback> combiner);
+    public CommandSourceStack withSuppressedOutput();
+    public CommandSourceStack withPermission(PermissionSet permissions);
+    public CommandSourceStack withMaximumPermission(PermissionSet newPermissions);
+    public CommandSourceStack withAnchor(EntityAnchorArgument.Anchor anchor);
+    public CommandSourceStack withLevel(ServerLevel level);
+    public CommandSourceStack facing(Entity entity, EntityAnchorArgument.Anchor anchor);
+    public CommandSourceStack facing(Vec3 pos);
+    public CommandSourceStack withSigningContext(CommandSigningContext signingContext, TaskChainer chatMessageChainer);
+    public Component getDisplayName();
+    public String getTextName();
+    public PermissionSet permissions();
+    public Vec3 getPosition();
+    public ServerLevel getLevel();
+    public Entity getEntity();
+    public Entity getEntityOrException() throws CommandSyntaxException;
+    public ServerPlayer getPlayerOrException() throws CommandSyntaxException;
+    public ServerPlayer getPlayer();
+    public boolean isPlayer();
+    public Vec2 getRotation();
+    public MinecraftServer getServer();
+    public EntityAnchorArgument.Anchor getAnchor();
+    public CommandSigningContext getSigningContext();
+    public TaskChainer getChatMessageChainer();
+    public boolean shouldFilterMessageTo(ServerPlayer receiver);
+    public void sendChatMessage(OutgoingChatMessage message, boolean filtered, ChatType.Bound chatType);
+    public void sendSystemMessage(Component message);
+    public void sendSuccess(Supplier<Component> messageSupplier, boolean broadcast);
+    public void sendFailure(Component message);
+    public CommandResultCallback callback();
+    public Collection<String> getOnlinePlayerNames();
+    public Collection<String> getAllTeams();
+    public Stream<Identifier> getAvailableSounds();
+    public Stream<Identifier> getAvailablePostEffects();
+    public CompletableFuture<Suggestions> customSuggestion(CommandContext<?> context);
+    public <E> CompletableFuture<Suggestions> suggestRegistryElements(ResourceKey<? extends Registry<E>> key, SharedSuggestionProvider.ElementSuggestionType elements, SuggestionsBuilder builder, CommandContext<?> context, Predicate<E> filter);
+    public Set<ResourceKey<Level>> levels();
+    public RegistryAccess registryAccess();
+    public FeatureFlagSet enabledFeatures();
+    public CommandDispatcher<CommandSourceStack> dispatcher();
+    public void handleError(CommandExceptionType type, Message message, boolean forked, TraceCallbacks tracer);
+    public boolean isSilent();
+    public interface NamesProvider {
+        NamesProvider FOR_ENTITY;
+        Component displayName(Entity entity);
+        String textName(Entity entity);
+        static NamesProvider constant(Component value);
+    }
+}
+//// Commands.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.ParseResults;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
+import net.minecraft.commands.execution.ExecutionContext;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.PermissionCheck;
+import net.minecraft.server.permissions.PermissionProviderCheck;
+import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.server.permissions.PermissionSetSupplier;
+public class Commands {
+    public static final String COMMAND_PREFIX = "/";
+    public static final PermissionCheck LEVEL_ALL;
+    public static final PermissionCheck LEVEL_MODERATORS;
+    public static final PermissionCheck LEVEL_GAMEMASTERS;
+    public static final PermissionCheck LEVEL_ADMINS;
+    public static final PermissionCheck LEVEL_OWNERS;
+    public Commands(CommandSelection commandSelection, CommandBuildContext context);
+    public static <S> ParseResults<S> mapSource(ParseResults<S> parse, UnaryOperator<S> sourceOperator);
+    public void performPrefixedCommand(CommandSourceStack sender, String command);
+    public static String trimOptionalPrefix(String command);
+    public void performCommand(ParseResults<CommandSourceStack> command, String commandString);
+    public static void executeCommandInContext(CommandSourceStack context, Consumer<ExecutionContext<CommandSourceStack>> config);
+    public void sendCommands(ServerPlayer player);
+    public static LiteralArgumentBuilder<CommandSourceStack> literal(String literal);
+    public static <T> RequiredArgumentBuilder<CommandSourceStack, T> argument(String name, ArgumentType<T> type);
+    public static Predicate<String> createValidator(ParseFunction parser);
+    public CommandDispatcher<CommandSourceStack> getDispatcher();
+    public static <S> void validateParseResults(ParseResults<S> command) throws CommandSyntaxException;
+    public static <S> CommandSyntaxException getParseException(ParseResults<S> parse);
+    public static CommandBuildContext createValidationContext(HolderLookup.Provider registries);
+    public static void validate();
+    public static <T extends PermissionSetSupplier> PermissionProviderCheck<T> hasPermission(PermissionCheck permission);
+    public static CommandSourceStack createCompilationContext(PermissionSet compilationPermissions);
+    public static enum CommandSelection {
+        ALL, DEDICATED, INTEGRATED;
+    }
+    public interface ParseFunction {
+        void parse(StringReader value) throws CommandSyntaxException;
+    }
+}
+//// ExecutionCommandSource.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.Message;
+import com.mojang.brigadier.ResultConsumer;
+import com.mojang.brigadier.exceptions.CommandExceptionType;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.execution.TraceCallbacks;
+import net.minecraft.server.permissions.PermissionSetSupplier;
+public interface ExecutionCommandSource<T extends ExecutionCommandSource<T>> extends PermissionSetSupplier {
+    T withCallback(CommandResultCallback resultCallback);
+    CommandResultCallback callback();
+    default T clearCallbacks();
+    CommandDispatcher<T> dispatcher();
+    void handleError(CommandExceptionType type, Message message, boolean forked, TraceCallbacks tracer);
+    boolean isSilent();
+    default void handleError(CommandSyntaxException e, boolean forked, TraceCallbacks tracer);
+    static <T extends ExecutionCommandSource<T>> ResultConsumer<T> resultConsumer();
+}
+//// FunctionInstantiationException.java
+import net.minecraft.network.chat.Component;
+public class FunctionInstantiationException extends Exception {
+    public FunctionInstantiationException(Component messageComponent);
+    public Component messageComponent();
+}
+//// ParserUtils.java
+import com.mojang.brigadier.StringReader;
+import net.minecraft.CharPredicate;
+public class ParserUtils {
+    public static String readWhile(StringReader reader, CharPredicate predicate);
+}
+//// SharedSuggestionProvider.java
+import com.google.common.base.CharMatcher;
+import com.mojang.brigadier.Message;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.permissions.PermissionSetSupplier;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.level.Level;
+public interface SharedSuggestionProvider extends PermissionSetSupplier {
+    CharMatcher MATCH_SPLITTER;
+    Collection<String> getOnlinePlayerNames();
+    default Collection<String> getCustomTabSuggestions();
+    default Collection<String> getSelectedEntities();
+    Collection<String> getAllTeams();
+    Stream<Identifier> getAvailableSounds();
+    Stream<Identifier> getAvailablePostEffects();
+    CompletableFuture<Suggestions> customSuggestion(CommandContext<?> context);
+    default Collection<TextCoordinates> getRelevantCoordinates();
+    default Collection<TextCoordinates> getAbsoluteCoordinates();
+    Set<ResourceKey<Level>> levels();
+    RegistryAccess registryAccess();
+    FeatureFlagSet enabledFeatures();
+    default <E> void suggestRegistryElements(HolderLookup<E> registry, ElementSuggestionType elements, SuggestionsBuilder builder, Predicate<E> filter);
+    static <S, E> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder, ResourceKey<? extends Registry<E>> registryKey, ElementSuggestionType type);
+    static <S, E> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder, ResourceKey<? extends Registry<E>> registryKey, ElementSuggestionType type, Predicate<E> filter);
+    <E> CompletableFuture<Suggestions> suggestRegistryElements(ResourceKey<? extends Registry<E>> key, ElementSuggestionType elements, SuggestionsBuilder builder, CommandContext<?> context, Predicate<E> filter);
+    static <T> void filterResources(Iterable<T> values, String contents, Function<T, Identifier> converter, Consumer<T> consumer);
+    static <T> void filterResources(Iterable<T> values, String contents, String prefix, Function<T, Identifier> converter, Consumer<T> consumer);
+    static CompletableFuture<Suggestions> suggestResource(Iterable<Identifier> values, SuggestionsBuilder builder, String prefix);
+    static CompletableFuture<Suggestions> suggestResource(Stream<Identifier> values, SuggestionsBuilder builder, String prefix);
+    static CompletableFuture<Suggestions> suggestResource(Iterable<Identifier> values, SuggestionsBuilder builder);
+    static <T> CompletableFuture<Suggestions> suggestResource(Iterable<T> values, SuggestionsBuilder builder, Function<T, Identifier> id, Function<T, Message> tooltip);
+    static CompletableFuture<Suggestions> suggestResource(Stream<Identifier> values, SuggestionsBuilder builder);
+    static <T> CompletableFuture<Suggestions> suggestResource(Stream<T> values, SuggestionsBuilder builder, Function<T, Identifier> id, Function<T, Message> tooltip);
+    static CompletableFuture<Suggestions> suggestCoordinates(String currentInput, Collection<TextCoordinates> allSuggestions, SuggestionsBuilder builder, Predicate<String> validator);
+    static CompletableFuture<Suggestions> suggest2DCoordinates(String currentInput, Collection<TextCoordinates> allSuggestions, SuggestionsBuilder builder, Predicate<String> validator);
+    static CompletableFuture<Suggestions> suggest(Iterable<String> values, SuggestionsBuilder builder);
+    static CompletableFuture<Suggestions> suggest(Stream<String> values, SuggestionsBuilder builder);
+    static CompletableFuture<Suggestions> suggest(String[] values, SuggestionsBuilder builder);
+    static <T> CompletableFuture<Suggestions> suggest(Iterable<T> values, SuggestionsBuilder builder, Function<T, String> toString, Function<T, Message> tooltip);
+    static boolean matchesSubStr(String pattern, String input);
+    public static class TextCoordinates {
+        public static final TextCoordinates DEFAULT_LOCAL;
+        public static final TextCoordinates DEFAULT_GLOBAL;
+        public final String x;
+        public final String y;
+        public final String z;
+        public TextCoordinates(String x, String y, String z);
+    }
+    public static enum ElementSuggestionType {
+        TAGS, ELEMENTS, ALL;
+        public boolean shouldSuggestTags();
+        public boolean shouldSuggestElements();
+    }
+}

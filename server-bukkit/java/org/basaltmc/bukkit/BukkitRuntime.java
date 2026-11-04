@@ -153,7 +153,9 @@ public final class BukkitRuntime {
             server.schedulerImpl().runTaskTimer((Plugin) null, () -> {
                 net.minecraft.server.MinecraftServer.currentTick = (int) Natives.currentTick();
                 net.minecraft.server.level.ServerChunkCache.tickAll();
+                VibrationDispatch.tick();
             }, 1L, 1L);
+            EventBridge.ready();
             Blocks.begin();
             try {
                 manager.loadPlugins(folder);

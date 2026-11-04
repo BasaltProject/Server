@@ -1,7 +1,18 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.network.protocol.game;
-public class ClientboundBundlePacket extends net.minecraft.network.protocol.BundlePacket<ClientGamePacketListener> {
+
+import net.minecraft.network.protocol.BundlePacket;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ClientboundBundlePacket extends BundlePacket<ClientGamePacketListener> {
     public ClientboundBundlePacket(
         Iterable<net.minecraft.network.protocol.Packet<? super ClientGamePacketListener>> packets) {
         super(packets);
+    }
+    public PacketType<ClientboundBundlePacket> type() {
+        return GamePacketTypes.CLIENTBOUND_BUNDLE;
+    }
+    public void handle(ClientGamePacketListener listener) {
+        listener.handleBundlePacket(this);
     }
 }

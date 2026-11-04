@@ -1,0 +1,74 @@
+//// CaveSpider.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.phys.Vec3;
+public class CaveSpider extends Spider {
+    public CaveSpider(EntityType<? extends CaveSpider> type, Level level);
+    public static AttributeSupplier.Builder createCaveSpider();
+    public boolean doHurtTarget(ServerLevel level, Entity target);
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData);
+    public Vec3 getVehicleAttachmentPoint(Entity vehicle);
+}
+//// Spider.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+public class Spider extends Monster {
+    public Spider(EntityType<? extends Spider> type, Level level);
+    protected void registerGoals();
+    protected PathNavigation createNavigation(Level level);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public void tick();
+    public static AttributeSupplier.Builder createAttributes();
+    protected SoundEvent getAmbientSound();
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected SoundEvent getDeathSound();
+    protected void playStepSound(BlockPos pos, BlockState blockState);
+    public boolean onClimbable();
+    public void makeStuckInBlock(BlockState state, Vec3 speedMultiplier);
+    public boolean canBeAffected(MobEffectInstance newEffect);
+    public boolean isClimbing();
+    public void setClimbing(boolean value);
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData);
+    public Vec3 getVehicleAttachmentPoint(Entity vehicle);
+    public static class SpiderEffectsGroupData implements SpawnGroupData {
+        public Holder<MobEffect> effect;
+        public void setRandomEffect(RandomSource random);
+    }
+    static class SpiderAttackGoal extends MeleeAttackGoal {
+        public SpiderAttackGoal(Spider mob);
+        public boolean canUse();
+        public boolean canContinueToUse();
+    }
+    static class SpiderTargetGoal<T extends LivingEntity> extends NearestAttackableTargetGoal<T> {
+        public SpiderTargetGoal(Spider mob, Class<T> targetType);
+        public boolean canUse();
+    }
+}

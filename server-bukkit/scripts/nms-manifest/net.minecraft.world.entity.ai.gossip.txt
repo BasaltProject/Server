@@ -1,0 +1,56 @@
+//// GossipContainer.java
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.DoublePredicate;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.util.RandomSource;
+public class GossipContainer {
+    public static final Codec<GossipContainer> CODEC;
+    public static final int DISCARD_THRESHOLD = 2;
+    public GossipContainer();
+    private GossipContainer(List<GossipEntry> entries);
+    public Map<UUID, Object2IntMap<GossipType>> getGossipEntries();
+    public void decay();
+    public int transferFrom(GossipContainer source, RandomSource random, int maxCount);
+    public int getReputation(UUID entity, Predicate<GossipType> types);
+    public long getCountForType(GossipType type, DoublePredicate valueTest);
+    public void add(UUID target, GossipType type, int amountToAdd);
+    public void remove(UUID target, GossipType type, int amountToRemove);
+    public void remove(UUID target, GossipType type);
+    public void remove(GossipType type);
+    public void clear();
+    public void putAll(GossipContainer container);
+    public GossipContainer copy();
+    static record GossipEntry(UUID target, GossipType type, int value) {
+        public static final Codec<GossipEntry> CODEC;
+        public int weightedValue();
+    }
+    static class EntityGossips {
+        public int weightedValue(Predicate<GossipType> types);
+        public Stream<GossipEntry> unpack(UUID target);
+        public void decay();
+        public boolean isEmpty();
+        public void makeSureValueIsntTooLowOrTooHigh(GossipType type);
+        public void remove(GossipType type);
+    }
+}
+//// GossipType.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum GossipType implements StringRepresentable {
+    MAJOR_NEGATIVE, MINOR_NEGATIVE, MINOR_POSITIVE, MAJOR_POSITIVE, TRADING;
+    public static final int REPUTATION_CHANGE_PER_EVENT = 25;
+    public static final int REPUTATION_CHANGE_PER_EVERLASTING_MEMORY = 20;
+    public static final int REPUTATION_CHANGE_PER_TRADE = 2;
+    public final String id;
+    public final int weight;
+    public final int max;
+    public final int decayPerDay;
+    public final int decayPerTransfer;
+    public static final Codec<GossipType> CODEC;
+    public String getSerializedName();
+}

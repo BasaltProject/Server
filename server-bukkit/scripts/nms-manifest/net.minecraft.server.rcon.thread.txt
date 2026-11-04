@@ -1,0 +1,44 @@
+//// GenericThread.java
+public abstract class GenericThread implements Runnable {
+    protected boolean running;
+    protected final String name;
+    protected Thread thread;
+    protected GenericThread(String name);
+    public boolean start();
+    public void stop();
+    public boolean isRunning();
+}
+//// QueryThreadGs4.java
+import java.net.DatagramPacket;
+import net.minecraft.server.ServerInterface;
+public class QueryThreadGs4 extends GenericThread {
+    private QueryThreadGs4(ServerInterface serverInterface, int port);
+    public static QueryThreadGs4 create(ServerInterface serverInterface);
+    public void run();
+    public boolean start();
+    static class RequestChallenge {
+        public RequestChallenge(DatagramPacket src);
+        public Boolean before(long time);
+        public int getChallenge();
+        public byte[] getChallengeBytes();
+        public byte[] getIdentBytes();
+        public String getIdent();
+    }
+}
+//// RconClient.java
+import java.net.Socket;
+import net.minecraft.server.ServerInterface;
+public class RconClient extends GenericThread {
+    public RconClient(ServerInterface serverInterface, String rconPassword, Socket socket);
+    public void run();
+    public void stop();
+}
+//// RconThread.java
+import java.net.ServerSocket;
+import net.minecraft.server.ServerInterface;
+public class RconThread extends GenericThread {
+    private RconThread(ServerInterface serverInterface, ServerSocket socket, String rconPassword);
+    public void run();
+    public static RconThread create(ServerInterface serverInterface);
+    public void stop();
+}

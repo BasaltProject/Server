@@ -1,0 +1,167 @@
+//// Panda.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.ai.goal.AvoidEntityGoal;
+import net.minecraft.world.entity.ai.goal.BreedGoal;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
+import net.minecraft.world.entity.ai.goal.PanicGoal;
+import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class Panda extends Animal {
+    public static final int TOTAL_ROLL_STEPS = 32;
+    public int rollCounter;
+    public Panda(EntityType<? extends Panda> type, Level level);
+    protected boolean canDispenserEquipIntoSlot(EquipmentSlot slot);
+    public int getUnhappyCounter();
+    public void setUnhappyCounter(int value);
+    public boolean isSneezing();
+    public boolean isSitting();
+    public void sit(boolean value);
+    public boolean isOnBack();
+    public void setOnBack(boolean value);
+    public boolean isEating();
+    public void eat(boolean value);
+    public void sneeze(boolean value);
+    public int getSneezeCounter();
+    public void setSneezeCounter(int value);
+    public Gene getMainGene();
+    public void setMainGene(Gene gene);
+    public Gene getHiddenGene();
+    public void setHiddenGene(Gene gene);
+    public boolean isRolling();
+    public void roll(boolean value);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob partner);
+    protected void registerGoals();
+    public static AttributeSupplier.Builder createAttributes();
+    public Gene getVariant();
+    public boolean isLazy();
+    public boolean isWorried();
+    public boolean isPlayful();
+    public boolean isBrown();
+    public boolean isWeak();
+    public boolean isAggressive();
+    public boolean canBeLeashed();
+    public boolean doHurtTarget(ServerLevel level, Entity target);
+    public void playAttackSound();
+    public void tick();
+    public boolean isScared();
+    public float getSitAmount(float a);
+    public float getLieOnBackAmount(float a);
+    public float getRollAmount(float a);
+    protected void pickUpItem(ServerLevel level, ItemEntity entity);
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData);
+    public void setGeneFromParents(Panda parent1, Panda parent2);
+    public void setAttributes();
+    public InteractionResult mobInteract(Player player, InteractionHand hand);
+    protected SoundEvent getAmbientSound();
+    protected void playStepSound(BlockPos pos, BlockState blockState);
+    public boolean isFood(ItemStack itemStack);
+    protected SoundEvent getDeathSound();
+    protected SoundEvent getHurtSound(DamageSource source);
+    public boolean canPerformAction();
+    public EntityDimensions getDefaultDimensions(Pose pose);
+    public static enum Gene implements StringRepresentable {
+        NORMAL, LAZY, WORRIED, PLAYFUL, BROWN, WEAK, AGGRESSIVE;
+        public static final Codec<Gene> CODEC;
+        public int getId();
+        public String getSerializedName();
+        public boolean isRecessive();
+        public static Gene byId(int id);
+        public static Gene getRandom(RandomSource random);
+    }
+    static class PandaMoveControl<T extends Panda> extends MoveControl<T> {
+        public PandaMoveControl(T mob);
+        public void tick();
+    }
+    static class PandaAttackGoal extends MeleeAttackGoal {
+        public PandaAttackGoal(Panda mob, double speedModifier, boolean trackTarget);
+        public boolean canUse();
+    }
+    static class PandaLookAtPlayerGoal extends LookAtPlayerGoal {
+        public PandaLookAtPlayerGoal(Panda mob, Class<? extends LivingEntity> lookAtType, float lookDistance);
+        public void setTarget(LivingEntity entity);
+        public boolean canContinueToUse();
+        public boolean canUse();
+        public void tick();
+    }
+    static class PandaRollGoal extends Goal {
+        public PandaRollGoal(Panda panda);
+        public boolean canUse();
+        public boolean canContinueToUse();
+        public void start();
+        public boolean isInterruptable();
+    }
+    static class PandaSneezeGoal extends Goal {
+        public PandaSneezeGoal(Panda panda);
+        public boolean canUse();
+        public boolean canContinueToUse();
+        public void start();
+    }
+    static class PandaBreedGoal extends BreedGoal {
+        public PandaBreedGoal(Panda panda, double speedModifier);
+        public boolean canUse();
+    }
+    static class PandaAvoidGoal<T extends LivingEntity> extends AvoidEntityGoal<T> {
+        public PandaAvoidGoal(Panda panda, Class<T> avoidClass, float maxDist, double walkSpeedModifier, double sprintSpeedModifier);
+        public boolean canUse();
+    }
+    class PandaSitGoal extends Goal {
+        public PandaSitGoal();
+        public boolean canUse();
+        public boolean canContinueToUse();
+        public void tick();
+        public void start();
+        public void stop();
+    }
+    static class PandaLieOnBackGoal extends Goal {
+        public PandaLieOnBackGoal(Panda panda);
+        public boolean canUse();
+        public boolean canContinueToUse();
+        public void start();
+        public void stop();
+    }
+    static class PandaHurtByTargetGoal extends HurtByTargetGoal {
+        public PandaHurtByTargetGoal(Panda mob, Class<?>... ignoreDamageFromTheseTypes);
+        public boolean canContinueToUse();
+        protected void alertOther(Mob other, LivingEntity hurtByMob);
+    }
+    static class PandaPanicGoal extends PanicGoal {
+        public PandaPanicGoal(Panda mob, double speedModifier);
+        public boolean canContinueToUse();
+    }
+}

@@ -1,0 +1,24 @@
+//// CustomQueryAnswerPayload.java
+import net.minecraft.network.FriendlyByteBuf;
+public interface CustomQueryAnswerPayload {
+    void write(FriendlyByteBuf output);
+}
+//// CustomQueryPayload.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.Identifier;
+public interface CustomQueryPayload {
+    Identifier id();
+    void write(FriendlyByteBuf output);
+}
+//// DiscardedQueryAnswerPayload.java
+import net.minecraft.network.FriendlyByteBuf;
+public record DiscardedQueryAnswerPayload() implements CustomQueryAnswerPayload {
+    public static final DiscardedQueryAnswerPayload INSTANCE;
+    public void write(FriendlyByteBuf output);
+}
+//// DiscardedQueryPayload.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.Identifier;
+public record DiscardedQueryPayload(Identifier id) implements CustomQueryPayload {
+    public void write(FriendlyByteBuf output);
+}

@@ -1,0 +1,227 @@
+//// AllowlistService.java
+import java.util.List;
+import net.minecraft.server.jsonrpc.api.PlayerDto;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+public class AllowlistService {
+    public static List<PlayerDto> get(MinecraftApi minecraftApi);
+    public static List<PlayerDto> add(MinecraftApi minecraftApi, List<PlayerDto> playerDtos, ClientInfo clientInfo);
+    public static List<PlayerDto> clear(MinecraftApi minecraftApi, ClientInfo clientInfo);
+    public static List<PlayerDto> remove(MinecraftApi minecraftApi, List<PlayerDto> playerDtos, ClientInfo clientInfo);
+    public static List<PlayerDto> set(MinecraftApi minecraftApi, List<PlayerDto> playerDtos, ClientInfo clientInfo);
+}
+//// BanlistService.java
+import com.mojang.serialization.MapCodec;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.server.jsonrpc.api.PlayerDto;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.UserBanListEntry;
+public class BanlistService {
+    public static List<UserBanDto> get(MinecraftApi minecraftApi);
+    public static List<UserBanDto> add(MinecraftApi minecraftApi, List<UserBanDto> bans, ClientInfo clientInfo);
+    public static List<UserBanDto> clear(MinecraftApi minecraftApi, ClientInfo clientInfo);
+    public static List<UserBanDto> remove(MinecraftApi minecraftApi, List<PlayerDto> remove, ClientInfo clientInfo);
+    public static List<UserBanDto> set(MinecraftApi minecraftApi, List<UserBanDto> bans, ClientInfo clientInfo);
+    public static record UserBanDto(PlayerDto player, Optional<String> reason, Optional<String> source, Optional<Instant> expires) {
+        public static final MapCodec<UserBanDto> CODEC;
+        public static UserBanDto from(UserBanListEntry entry);
+    }
+    static record UserBan(NameAndId player, String reason, String source, Optional<Instant> expires) {
+    }
+}
+//// ClientInfo.java
+public record ClientInfo(Integer connectionId) {
+    public static ClientInfo of(Integer connectionId);
+}
+//// DiscoveryService.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Map;
+import net.minecraft.server.jsonrpc.api.MethodInfo;
+import net.minecraft.server.jsonrpc.api.Schema;
+import net.minecraft.server.jsonrpc.api.SchemaComponent;
+public class DiscoveryService {
+    public static DiscoverResponse discover(List<SchemaComponent<?>> schemaRegistry);
+    public static record DiscoverResponse(String jsonRpcProtocolVersion, DiscoverInfo discoverInfo, List<MethodInfo.Named<?, ?>> methods, DiscoverComponents components) {
+        public static final MapCodec<DiscoverResponse> CODEC;
+    }
+    public static record DiscoverComponents(Map<String, Schema<?>> schemas) {
+        public static final MapCodec<DiscoverComponents> CODEC;
+    }
+    public static record DiscoverInfo(String title, String version) {
+        public static final MapCodec<DiscoverInfo> CODEC;
+    }
+}
+//// EncodeJsonRpcException.java
+public class EncodeJsonRpcException extends RuntimeException {
+    public EncodeJsonRpcException(String message);
+}
+//// GameRulesService.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+import net.minecraft.world.level.gamerules.GameRule;
+public class GameRulesService {
+    public static List<GameRuleUpdate<?>> get(MinecraftApi minecraftApi);
+    public static <T> GameRuleUpdate<T> getTypedRule(MinecraftApi minecraftApi, GameRule<T> gameRule, T value);
+    public static <T> GameRuleUpdate<T> update(MinecraftApi minecraftApi, GameRuleUpdate<T> update, ClientInfo clientInfo);
+    public static record GameRuleUpdate<T>(GameRule<T> gameRule, T value) {
+        public static final Codec<GameRuleUpdate<?>> TYPED_CODEC;
+        public static final Codec<GameRuleUpdate<?>> CODEC;
+    }
+}
+//// InvalidParameterJsonRpcException.java
+public class InvalidParameterJsonRpcException extends RuntimeException {
+    public InvalidParameterJsonRpcException(String message);
+}
+//// InvalidRequestJsonRpcException.java
+public class InvalidRequestJsonRpcException extends RuntimeException {
+    public InvalidRequestJsonRpcException(String message);
+}
+//// IpBanlistService.java
+import com.mojang.serialization.MapCodec;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.server.jsonrpc.api.PlayerDto;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+import net.minecraft.server.players.IpBanListEntry;
+public class IpBanlistService {
+    public static List<IpBanDto> get(MinecraftApi minecraftApi);
+    public static List<IpBanDto> add(MinecraftApi minecraftApi, List<IncomingIpBanDto> bans, ClientInfo clientInfo);
+    public static List<IpBanDto> clear(MinecraftApi minecraftApi, ClientInfo clientInfo);
+    public static List<IpBanDto> remove(MinecraftApi minecraftApi, List<String> ban, ClientInfo clientInfo);
+    public static List<IpBanDto> set(MinecraftApi minecraftApi, List<IpBanDto> ips, ClientInfo clientInfo);
+    public static record IncomingIpBanDto(Optional<PlayerDto> player, Optional<String> ip, Optional<String> reason, Optional<String> source, Optional<Instant> expires) {
+        public static final MapCodec<IncomingIpBanDto> CODEC;
+    }
+    public static record IpBanDto(String ip, Optional<String> reason, Optional<String> source, Optional<Instant> expires) {
+        public static final MapCodec<IpBanDto> CODEC;
+        public static IpBanDto from(IpBanListEntry ban);
+    }
+    static record IpBan(String ip, String reason, String source, Optional<Instant> expires) {
+    }
+}
+//// Message.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+public record Message(Optional<String> literal, Optional<String> translatable, Optional<List<String>> translatableParams) {
+    public static final Codec<Message> CODEC;
+    public Optional<Component> asComponent();
+}
+//// MethodNotFoundJsonRpcException.java
+public class MethodNotFoundJsonRpcException extends RuntimeException {
+    public MethodNotFoundJsonRpcException(String message);
+}
+//// OperatorService.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.server.jsonrpc.api.PlayerDto;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+import net.minecraft.server.permissions.PermissionLevel;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.ServerOpListEntry;
+public class OperatorService {
+    public static List<OperatorDto> get(MinecraftApi minecraftApi);
+    public static List<OperatorDto> clear(MinecraftApi minecraftApi, ClientInfo clientInfo);
+    public static List<OperatorDto> remove(MinecraftApi minecraftApi, List<PlayerDto> playerDtos, ClientInfo clientInfo);
+    public static List<OperatorDto> add(MinecraftApi minecraftApi, List<OperatorDto> operators, ClientInfo clientInfo);
+    public static List<OperatorDto> set(MinecraftApi minecraftApi, List<OperatorDto> operators, ClientInfo clientInfo);
+    public static record OperatorDto(PlayerDto player, Optional<PermissionLevel> permissionLevel, Optional<Boolean> bypassesPlayerLimit) {
+        public static final MapCodec<OperatorDto> CODEC;
+        public static OperatorDto from(ServerOpListEntry serverOpListEntry);
+    }
+    static record Op(NameAndId user, Optional<PermissionLevel> permissionLevel, Optional<Boolean> bypassesPlayerLimit) {
+    }
+}
+//// PlayerService.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.server.jsonrpc.api.PlayerDto;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+public class PlayerService {
+    public static List<PlayerDto> get(MinecraftApi minecraftApi);
+    public static List<PlayerDto> kick(MinecraftApi minecraftApi, List<KickDto> kick, ClientInfo clientInfo);
+    public static record KickDto(PlayerDto player, Optional<Message> message) {
+        public static final MapCodec<KickDto> CODEC;
+    }
+}
+//// RemoteRpcErrorException.java
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+public class RemoteRpcErrorException extends RuntimeException {
+    public RemoteRpcErrorException(JsonElement id, JsonObject error);
+}
+//// ServerSettingsService.java
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+import net.minecraft.server.permissions.PermissionLevel;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameType;
+public class ServerSettingsService {
+    public static boolean autosave(MinecraftApi minecraftApi);
+    public static boolean setAutosave(MinecraftApi minecraftApi, boolean enabled, ClientInfo clientInfo);
+    public static Difficulty difficulty(MinecraftApi minecraftApi);
+    public static Difficulty setDifficulty(MinecraftApi minecraftApi, Difficulty difficulty, ClientInfo clientInfo);
+    public static boolean enforceAllowlist(MinecraftApi minecraftApi);
+    public static boolean setEnforceAllowlist(MinecraftApi minecraftApi, boolean enforce, ClientInfo clientInfo);
+    public static boolean usingAllowlist(MinecraftApi minecraftApi);
+    public static boolean setUsingAllowlist(MinecraftApi minecraftApi, boolean use, ClientInfo clientInfo);
+    public static int maxPlayers(MinecraftApi minecraftApi);
+    public static int setMaxPlayers(MinecraftApi minecraftApi, int maxPlayers, ClientInfo clientInfo);
+    public static int pauseWhenEmpty(MinecraftApi minecraftApi);
+    public static int setPauseWhenEmpty(MinecraftApi minecraftApi, int emptySeconds, ClientInfo clientInfo);
+    public static int playerIdleTimeout(MinecraftApi minecraftApi);
+    public static int setPlayerIdleTimeout(MinecraftApi minecraftApi, int idleTime, ClientInfo clientInfo);
+    public static boolean allowFlight(MinecraftApi minecraftApi);
+    public static boolean setAllowFlight(MinecraftApi minecraftApi, boolean allow, ClientInfo clientInfo);
+    public static int spawnProtection(MinecraftApi minecraftApi);
+    public static int setSpawnProtection(MinecraftApi minecraftApi, int spawnProtection, ClientInfo clientInfo);
+    public static String motd(MinecraftApi minecraftApi);
+    public static String setMotd(MinecraftApi minecraftApi, String motd, ClientInfo clientInfo);
+    public static boolean forceGameMode(MinecraftApi minecraftApi);
+    public static boolean setForceGameMode(MinecraftApi minecraftApi, boolean force, ClientInfo clientInfo);
+    public static GameType gameMode(MinecraftApi minecraftApi);
+    public static GameType setGameMode(MinecraftApi minecraftApi, GameType gameMode, ClientInfo clientInfo);
+    public static int viewDistance(MinecraftApi minecraftApi);
+    public static int setViewDistance(MinecraftApi minecraftApi, int viewDistance, ClientInfo clientInfo);
+    public static int simulationDistance(MinecraftApi minecraftApi);
+    public static int setSimulationDistance(MinecraftApi minecraftApi, int simulationDistance, ClientInfo clientInfo);
+    public static boolean acceptTransfers(MinecraftApi minecraftApi);
+    public static boolean setAcceptTransfers(MinecraftApi minecraftApi, boolean accept, ClientInfo clientInfo);
+    public static int statusHeartbeatInterval(MinecraftApi minecraftApi);
+    public static int setStatusHeartbeatInterval(MinecraftApi minecraftApi, int statusHeartbeatInterval, ClientInfo clientInfo);
+    public static PermissionLevel operatorUserPermissionLevel(MinecraftApi minecraftApi);
+    public static PermissionLevel setOperatorUserPermissionLevel(MinecraftApi minecraftApi, PermissionLevel level, ClientInfo clientInfo);
+    public static boolean hidesOnlinePlayers(MinecraftApi minecraftApi);
+    public static boolean setHidesOnlinePlayers(MinecraftApi minecraftApi, boolean hide, ClientInfo clientInfo);
+    public static boolean repliesToStatus(MinecraftApi minecraftApi);
+    public static boolean setRepliesToStatus(MinecraftApi minecraftApi, boolean enable, ClientInfo clientInfo);
+    public static int entityBroadcastRangePercentage(MinecraftApi minecraftApi);
+    public static int setEntityBroadcastRangePercentage(MinecraftApi minecraftApi, int percentage, ClientInfo clientInfo);
+}
+//// ServerStateService.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.protocol.status.ServerStatus;
+import net.minecraft.server.jsonrpc.api.PlayerDto;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+public class ServerStateService {
+    public static ServerState status(MinecraftApi minecraftApi);
+    public static boolean save(MinecraftApi minecraftApi, boolean flush, ClientInfo clientInfo);
+    public static boolean stop(MinecraftApi minecraftApi, ClientInfo clientInfo);
+    public static boolean systemMessage(MinecraftApi minecraftApi, SystemMessage systemMessage, ClientInfo clientInfo);
+    public static record ServerState(boolean started, List<PlayerDto> players, ServerStatus.Version version) {
+        public static final Codec<ServerState> CODEC;
+        public static final ServerState NOT_STARTED;
+    }
+    public static record SystemMessage(Message message, boolean overlay, Optional<List<PlayerDto>> receivingPlayers) {
+        public static final Codec<SystemMessage> CODEC;
+    }
+}

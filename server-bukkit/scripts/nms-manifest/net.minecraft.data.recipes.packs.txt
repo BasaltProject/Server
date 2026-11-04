@@ -1,0 +1,27 @@
+//// VanillaBrewingProvider.java
+import net.minecraft.data.recipes.BrewingProvider;
+import net.minecraft.data.recipes.RecipeOutput;
+public class VanillaBrewingProvider extends BrewingProvider {
+    protected VanillaBrewingProvider(RecipeOutput recipeOutput);
+    protected void addContainers();
+    protected void addContainerTransformations();
+    protected void buildMixes();
+}
+//// VanillaRecipeProvider.java
+import java.util.stream.Stream;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.core.registries.MultiRegistryBootstrap;
+import net.minecraft.data.recipes.RecipeProvider;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.equipment.trim.TrimPattern;
+public class VanillaRecipeProvider extends RecipeProvider {
+    public VanillaRecipeProvider(BootstrapContext<Recipe<?>> recipeOutput, BootstrapContext<Advancement> advancementOutput);
+    public static MultiRegistryBootstrap create();
+    protected void buildRecipes();
+    public static Stream<TrimTemplate> smithingTrims();
+    public static record TrimTemplate(Item template, ResourceKey<TrimPattern> patternId, ResourceKey<Recipe<?>> recipeId) {
+    }
+}

@@ -1,0 +1,507 @@
+//// Biome.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.EnvironmentAttributeMap;
+import net.minecraft.world.attribute.modifier.AttributeModifier;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.levelgen.synth.Noise;
+public final class Biome {
+    public static final Codec<Biome> DIRECT_CODEC;
+    public static final Codec<Biome> NETWORK_CODEC;
+    public static final Codec<Holder<Biome>> CODEC;
+    public static final Codec<HolderSet<Biome>> LIST_CODEC;
+    public static final Noise FROZEN_TEMPERATURE_NOISE;
+    public static final Noise BIOME_INFO_NOISE;
+    private Biome(ClimateSettings climateSettings, EnvironmentAttributeMap attributes, BiomeSpecialEffects specialEffects, BiomeGenerationSettings generationSettings);
+    public boolean hasPrecipitation();
+    public Precipitation getPrecipitationAt(BlockPos pos, int seaLevel);
+    public boolean shouldFreeze(LevelReader level, BlockPos pos);
+    public boolean shouldFreeze(LevelReader level, BlockPos pos, boolean checkNeighbors);
+    public boolean coldEnoughToSnow(BlockPos pos, int seaLevel);
+    public boolean warmEnoughToRain(BlockPos pos, int seaLevel);
+    public boolean shouldMeltFrozenOceanIcebergSlightly(BlockPos pos, int seaLevel);
+    public boolean shouldSnow(LevelReader level, BlockPos pos);
+    public BiomeGenerationSettings getGenerationSettings();
+    public int getGrassColor(double x, double z);
+    public int getFoliageColor();
+    public int getDryFoliageColor();
+    public float getBaseTemperature();
+    public EnvironmentAttributeMap getAttributes();
+    public BiomeSpecialEffects getSpecialEffects();
+    public int getWaterColor();
+    public static enum Precipitation implements StringRepresentable {
+        NONE, RAIN, SNOW;
+        public static final Codec<Precipitation> CODEC;
+        public String getSerializedName();
+    }
+    public static enum TemperatureModifier implements StringRepresentable {
+        NONE, FROZEN;
+        public static final Codec<TemperatureModifier> CODEC;
+        public abstract float modifyTemperature(BlockPos pos, float baseTemperature);
+        public String getName();
+        public String getSerializedName();
+    }
+    public static class BiomeBuilder {
+        public BiomeBuilder();
+        public BiomeBuilder hasPrecipitation(boolean hasPrecipitation);
+        public BiomeBuilder temperature(float temperature);
+        public BiomeBuilder downfall(float downfall);
+        public BiomeBuilder putAttributes(EnvironmentAttributeMap attributes);
+        public BiomeBuilder putAttributes(EnvironmentAttributeMap.Builder attributes);
+        public <Value> BiomeBuilder setAttribute(EnvironmentAttribute<Value> attribute, Value value);
+        public <Value, Parameter> BiomeBuilder modifyAttribute(EnvironmentAttribute<Value> attribute, AttributeModifier<Value, Parameter> modifier, Parameter value);
+        public BiomeBuilder specialEffects(BiomeSpecialEffects specialEffects);
+        public BiomeBuilder mobSpawnSettings(MobSpawnSettings mobSpawnSettings);
+        public BiomeBuilder generationSettings(BiomeGenerationSettings generationSettings);
+        public BiomeBuilder temperatureAdjustment(TemperatureModifier temperatureModifier);
+        public Biome build();
+        public String toString();
+    }
+    static record ClimateSettings(boolean hasPrecipitation, float temperature, TemperatureModifier temperatureModifier, float downfall) {
+        public static final MapCodec<ClimateSettings> CODEC;
+    }
+}
+//// BiomeGenerationSettings.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.carver.WorldCarver;
+import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+public class BiomeGenerationSettings {
+    public static final BiomeGenerationSettings EMPTY;
+    public static final MapCodec<BiomeGenerationSettings> CODEC;
+    private BiomeGenerationSettings(HolderSet<WorldCarver> carvers, List<HolderSet<PlacedFeature>> features);
+    public Iterable<Holder<WorldCarver>> getCarvers();
+    public List<Feature> getBoneMealFeatures();
+    public List<HolderSet<PlacedFeature>> features();
+    public boolean hasFeature(PlacedFeature feature);
+    public static class PlainBuilder {
+        public PlainBuilder addFeature(GenerationStep.Decoration step, Holder<PlacedFeature> feature);
+        public PlainBuilder addFeature(int index, Holder<PlacedFeature> feature);
+        public PlainBuilder addCarver(Holder<WorldCarver> carver);
+        public BiomeGenerationSettings build();
+    }
+    public static class Builder extends PlainBuilder {
+        public Builder(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> worldCarvers);
+        public Builder addFeature(GenerationStep.Decoration step, ResourceKey<PlacedFeature> feature);
+        public Builder addCarver(ResourceKey<WorldCarver> carver);
+    }
+}
+//// BiomeManager.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+public class BiomeManager {
+    public static final int CHUNK_CENTER_QUART;
+    public BiomeManager(BiomeResolver noiseBiomeSource, long seed);
+    public static long obfuscateSeed(long seed);
+    public BiomeManager withDifferentSource(BiomeResolver biomeSource);
+    public Holder<Biome> getBiome(BlockPos pos);
+    public Holder<Biome> getBiome(int x, int y, int z);
+    public Holder<Biome> getNoiseBiomeAtPosition(double x, double y, double z);
+    public Holder<Biome> getNoiseBiomeAtPosition(BlockPos blockPos);
+    public Holder<Biome> getNoiseBiomeAtQuart(int quartX, int quartY, int quartZ);
+}
+//// BiomeResolver.java
+import java.util.Set;
+import net.minecraft.core.Holder;
+public interface BiomeResolver {
+    Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ);
+    default Set<Holder<Biome>> getBiomesWithin(int x, int y, int z, int radius);
+}
+//// BiomeSource.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.levelgen.RandomState;
+public abstract class BiomeSource {
+    public static final Codec<BiomeSource> CODEC;
+    protected BiomeSource();
+    protected abstract MapCodec<? extends BiomeSource> codec();
+    protected abstract Stream<Holder<Biome>> collectPossibleBiomes();
+    public Set<Holder<Biome>> possibleBiomes();
+    public Pair<BlockPos, Holder<Biome>> findBiomeHorizontal(int x, int y, int z, int searchRadius, Predicate<Holder<Biome>> allowed, RandomSource random, RandomState randomState);
+    public Pair<BlockPos, Holder<Biome>> findClosestBiome3d(BlockPos origin, int searchRadius, int sampleResolutionHorizontal, int sampleResolutionVertical, Predicate<Holder<Biome>> allowed, RandomState randomState, LevelReader level);
+    public Pair<BlockPos, Holder<Biome>> findBiomeHorizontal(int originX, int originY, int originZ, int searchRadius, int skipSteps, Predicate<Holder<Biome>> allowed, RandomSource random, boolean findClosest, RandomState randomState);
+    public final BiomeResolver createUncachedResolver(RandomState randomState);
+    public final BiomeResolver createCachingResolver(RandomState randomState);
+    public abstract BiomeResolver createResolver(Climate.Sampler sampler);
+    public BiomeResolver createResolverForChunk(Climate.Sampler sampler, int minQuartX, int minQuartY, int minQuartZ, int quartSizeX, int quartSizeY, int quartSizeZ);
+    public void addDebugInfo(List<String> result, BlockPos feetPos, Climate.Sampler sampler);
+}
+//// BiomeSources.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class BiomeSources {
+    public static MapCodec<? extends BiomeSource> bootstrap(Registry<MapCodec<? extends BiomeSource>> registry);
+}
+//// BiomeSpecialEffects.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.util.StringRepresentable;
+public record BiomeSpecialEffects(int waterColor, Optional<Integer> foliageColorOverride, Optional<Integer> dryFoliageColorOverride, Optional<Integer> grassColorOverride, GrassColorModifier grassColorModifier) {
+    public static final Codec<BiomeSpecialEffects> CODEC;
+    public static class Builder {
+        public Builder();
+        public Builder waterColor(int waterColor);
+        public Builder foliageColorOverride(int foliageColor);
+        public Builder dryFoliageColorOverride(int dryFoliageColor);
+        public Builder grassColorOverride(int grassColor);
+        public Builder grassColorModifier(GrassColorModifier grassModifier);
+        public BiomeSpecialEffects build();
+    }
+    public static enum GrassColorModifier implements StringRepresentable {
+        NONE, DARK_FOREST, SWAMP;
+        public static final Codec<GrassColorModifier> CODEC;
+        public abstract int modifyColor(double x, double z, int baseColor);
+        public String getName();
+        public String getSerializedName();
+    }
+}
+//// Biomes.java
+import net.minecraft.resources.ResourceKey;
+public abstract class Biomes {
+    public static final ResourceKey<Biome> THE_VOID;
+    public static final ResourceKey<Biome> PLAINS;
+    public static final ResourceKey<Biome> SUNFLOWER_PLAINS;
+    public static final ResourceKey<Biome> SNOWY_PLAINS;
+    public static final ResourceKey<Biome> ICE_SPIKES;
+    public static final ResourceKey<Biome> DESERT;
+    public static final ResourceKey<Biome> SWAMP;
+    public static final ResourceKey<Biome> MANGROVE_SWAMP;
+    public static final ResourceKey<Biome> FOREST;
+    public static final ResourceKey<Biome> FLOWER_FOREST;
+    public static final ResourceKey<Biome> BIRCH_FOREST;
+    public static final ResourceKey<Biome> DAPPLED_FOREST;
+    public static final ResourceKey<Biome> DARK_FOREST;
+    public static final ResourceKey<Biome> PALE_GARDEN;
+    public static final ResourceKey<Biome> OLD_GROWTH_BIRCH_FOREST;
+    public static final ResourceKey<Biome> OLD_GROWTH_PINE_TAIGA;
+    public static final ResourceKey<Biome> OLD_GROWTH_SPRUCE_TAIGA;
+    public static final ResourceKey<Biome> TAIGA;
+    public static final ResourceKey<Biome> SNOWY_TAIGA;
+    public static final ResourceKey<Biome> SAVANNA;
+    public static final ResourceKey<Biome> SAVANNA_PLATEAU;
+    public static final ResourceKey<Biome> WINDSWEPT_HILLS;
+    public static final ResourceKey<Biome> WINDSWEPT_GRAVELLY_HILLS;
+    public static final ResourceKey<Biome> WINDSWEPT_FOREST;
+    public static final ResourceKey<Biome> WINDSWEPT_SAVANNA;
+    public static final ResourceKey<Biome> JUNGLE;
+    public static final ResourceKey<Biome> SPARSE_JUNGLE;
+    public static final ResourceKey<Biome> BAMBOO_JUNGLE;
+    public static final ResourceKey<Biome> BADLANDS;
+    public static final ResourceKey<Biome> ERODED_BADLANDS;
+    public static final ResourceKey<Biome> WOODED_BADLANDS;
+    public static final ResourceKey<Biome> MEADOW;
+    public static final ResourceKey<Biome> CHERRY_GROVE;
+    public static final ResourceKey<Biome> GROVE;
+    public static final ResourceKey<Biome> SNOWY_SLOPES;
+    public static final ResourceKey<Biome> FROZEN_PEAKS;
+    public static final ResourceKey<Biome> JAGGED_PEAKS;
+    public static final ResourceKey<Biome> STONY_PEAKS;
+    public static final ResourceKey<Biome> RIVER;
+    public static final ResourceKey<Biome> FROZEN_RIVER;
+    public static final ResourceKey<Biome> BEACH;
+    public static final ResourceKey<Biome> SNOWY_BEACH;
+    public static final ResourceKey<Biome> STONY_SHORE;
+    public static final ResourceKey<Biome> WARM_OCEAN;
+    public static final ResourceKey<Biome> LUKEWARM_OCEAN;
+    public static final ResourceKey<Biome> DEEP_LUKEWARM_OCEAN;
+    public static final ResourceKey<Biome> OCEAN;
+    public static final ResourceKey<Biome> DEEP_OCEAN;
+    public static final ResourceKey<Biome> COLD_OCEAN;
+    public static final ResourceKey<Biome> DEEP_COLD_OCEAN;
+    public static final ResourceKey<Biome> FROZEN_OCEAN;
+    public static final ResourceKey<Biome> DEEP_FROZEN_OCEAN;
+    public static final ResourceKey<Biome> MUSHROOM_FIELDS;
+    public static final ResourceKey<Biome> DRIPSTONE_CAVES;
+    public static final ResourceKey<Biome> LUSH_CAVES;
+    public static final ResourceKey<Biome> DEEP_DARK;
+    public static final ResourceKey<Biome> SULFUR_CAVES;
+    public static final ResourceKey<Biome> NETHER_WASTES;
+    public static final ResourceKey<Biome> WARPED_FOREST;
+    public static final ResourceKey<Biome> CRIMSON_FOREST;
+    public static final ResourceKey<Biome> SOUL_SAND_VALLEY;
+    public static final ResourceKey<Biome> BASALT_DELTAS;
+    public static final ResourceKey<Biome> THE_END;
+    public static final ResourceKey<Biome> END_HIGHLANDS;
+    public static final ResourceKey<Biome> END_MIDLANDS;
+    public static final ResourceKey<Biome> SMALL_END_ISLANDS;
+    public static final ResourceKey<Biome> END_BARRENS;
+}
+//// CheckerboardColumnBiomeSource.java
+import com.mojang.serialization.MapCodec;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+public class CheckerboardColumnBiomeSource extends BiomeSource implements BiomeResolver {
+    public static final MapCodec<CheckerboardColumnBiomeSource> CODEC;
+    public CheckerboardColumnBiomeSource(HolderSet<Biome> allowedBiomes, int size);
+    protected Stream<Holder<Biome>> collectPossibleBiomes();
+    public BiomeResolver createResolver(Climate.Sampler sampler);
+    protected MapCodec<CheckerboardColumnBiomeSource> codec();
+    public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ);
+}
+//// Climate.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+public class Climate {
+    protected static final int PARAMETER_COUNT = 7;
+    public static TargetPoint target(float temperature, float humidity, float continentalness, float erosion, float depth, float weirdness);
+    public static ParameterPoint parameters(float temperature, float humidity, float continentalness, float erosion, float depth, float weirdness, float offset);
+    public static ParameterPoint parameters(Parameter temperature, Parameter humidity, Parameter continentalness, Parameter erosion, Parameter depth, Parameter weirdness, float offset);
+    public static long quantizeCoord(float coord);
+    public static float unquantizeCoord(long coord);
+    protected static final class RTree<T> {
+        private RTree(Node<T> root);
+        public static <T> RTree<T> create(List<Pair<ParameterPoint, T>> values);
+        public static <T> RTree<T> create(List<Pair<ParameterPoint, T>> values, int childrenPerNode);
+        public T search(TargetPoint target, DistanceMetric<T> distanceMetric);
+        static abstract class Node<T> {
+            protected final Parameter[] parameterSpace;
+            protected Node(List<Parameter> parameterSpace);
+            protected abstract Leaf<T> search(long[] target, Leaf<T> candidate, DistanceMetric<T> distanceMetric);
+            protected long distance(long[] target);
+            public String toString();
+        }
+        static final class Leaf<T> extends Node<T> {
+            private Leaf(ParameterPoint parameterPoint, T value);
+            protected Leaf<T> search(long[] target, Leaf<T> candidate, DistanceMetric<T> distanceMetric);
+        }
+        static final class SubTree<T> extends Node<T> {
+            public SubTree(List<? extends Node<T>> children);
+            public SubTree(List<Parameter> parameterSpace, List<? extends Node<T>> children);
+            protected Leaf<T> search(long[] target, Leaf<T> candidate, DistanceMetric<T> distanceMetric);
+        }
+    }
+    public static class ParameterList<T> {
+        public static <T> Codec<ParameterList<T>> codec(MapCodec<T> valueCodec);
+        public ParameterList(List<Pair<ParameterPoint, T>> values);
+        private ParameterList(List<Pair<ParameterPoint, T>> values, int childrenPerNode);
+        public ParameterList<T> rebuildWithChildrenPerNode(int childrenPerNode);
+        public List<Pair<ParameterPoint, T>> values();
+        public T findValue(TargetPoint target);
+        public T findValueBruteForce(TargetPoint target);
+        public T findValueIndex(TargetPoint target);
+        protected T findValueIndex(TargetPoint target, DistanceMetric<T> distanceMetric);
+    }
+    public static record TargetPoint(long temperature, long humidity, long continentalness, long erosion, long depth, long weirdness) {
+        long[] toParameterArray();
+    }
+    public static record ParameterPoint(Parameter temperature, Parameter humidity, Parameter continentalness, Parameter erosion, Parameter depth, Parameter weirdness, long offset) {
+        public static final Codec<ParameterPoint> CODEC;
+        public long fitness(TargetPoint target);
+        List<Parameter> parameterSpace();
+    }
+    public static record Parameter(long min, long max) {
+        public static final Codec<Parameter> CODEC;
+        public static Parameter point(float min);
+        public static Parameter span(float min, float max);
+        public static Parameter span(Parameter min, Parameter max);
+        public String toString();
+        public long distance(long target);
+        public Parameter span(Parameter other);
+    }
+    public static record Sampler(DensitySampler.Bound temperature, DensitySampler.Bound humidity, DensitySampler.Bound continentalness, DensitySampler.Bound erosion, DensitySampler.Bound depth, DensitySampler.Bound weirdness) {
+        public TargetPoint sample(int quartX, int quartY, int quartZ);
+    }
+    interface DistanceMetric<T> {
+        long distance(RTree.Node<T> node, long[] target);
+    }
+}
+//// FeatureSorter.java
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+public class FeatureSorter {
+    public static <T> List<StepFeatureData> buildFeaturesPerStep(List<T> featureSources, Function<T, List<HolderSet<PlacedFeature>>> featureGetter, boolean tryReducingError);
+    public static record StepFeatureData(List<PlacedFeature> features, ToIntFunction<PlacedFeature> indexMapping) {
+        private StepFeatureData(List<PlacedFeature> features);
+    }
+}
+//// FixedBiomeSource.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.levelgen.RandomState;
+public class FixedBiomeSource extends BiomeSource implements BiomeResolver {
+    public static final MapCodec<FixedBiomeSource> CODEC;
+    public FixedBiomeSource(Holder<Biome> biome);
+    protected Stream<Holder<Biome>> collectPossibleBiomes();
+    protected MapCodec<FixedBiomeSource> codec();
+    public BiomeResolver createResolver(Climate.Sampler sampler);
+    public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ);
+    public Pair<BlockPos, Holder<Biome>> findBiomeHorizontal(int originX, int originY, int originZ, int r, int skipStep, Predicate<Holder<Biome>> allowed, RandomSource random, boolean findClosest, RandomState randomState);
+    public Pair<BlockPos, Holder<Biome>> findClosestBiome3d(BlockPos origin, int searchRadius, int sampleResolutionHorizontal, int sampleResolutionVertical, Predicate<Holder<Biome>> allowed, RandomState randomState, LevelReader level);
+    public Set<Holder<Biome>> getBiomesWithin(int x, int y, int z, int radius);
+}
+//// MobSpawnSettings.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import java.util.Set;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
+public class MobSpawnSettings {
+    public static final float DEFAULT_CREATURE_WORLD_GEN_SPAWN_PROBABILITY = 0.1F;
+    public static final WeightedList<SpawnerData> EMPTY_MOB_LIST;
+    public static final MobSpawnSettings EMPTY;
+    public static final MobSpawnSettings NO_SPAWNS;
+    public static final Codec<MobSpawnSettings> CODEC;
+    private MobSpawnSettings(Map<MobCategory, WeightedList<SpawnerData>> spawnsByCategory, Map<EntityType<?>, MobSpawnCost> mobSpawnCosts);
+    public WeightedList<SpawnerData> getMobsToSpawn(MobCategory category);
+    public WeightedList<SpawnerData> getMobsInCategory(MobCategory category);
+    public Set<MobCategory> definedCategories();
+    public MobSpawnCost getMobSpawnCost(EntityType<?> type);
+    public Map<EntityType<?>, MobSpawnCost> allSpawnCosts();
+    public static record SpawnerData(EntityType<?> type, IntProvider count) {
+        public static final MapCodec<SpawnerData> CODEC;
+        public SpawnerData(EntityType<?> type, IntProvider count);
+        public String toString();
+    }
+    public static record MobSpawnCost(double energyBudget, double charge) {
+        public static final Codec<MobSpawnCost> CODEC;
+    }
+    public static class Builder {
+        public Builder addSpawn(EntityType<?> type, int weight, int minCount, int maxCount);
+        public Builder addSpawn(EntityType<?> type, int weight, IntProvider count);
+        public Builder addSpawn(EntityType<?> type, MobCategory category, int weight, IntProvider count);
+        public Builder addAllSpawns(MobCategory category, WeightedList<SpawnerData> spawns);
+        public Builder noSpawns(MobCategory category);
+        public Builder dontOverride(MobCategory category);
+        public Builder addMobSpawnCost(EntityType<?> type, double charge, double energyBudget);
+        public Builder addAllCosts(Map<EntityType<?>, MobSpawnCost> costs);
+        public MobSpawnSettings build();
+    }
+}
+//// MultiNoiseBiomeSource.java
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+public class MultiNoiseBiomeSource extends BiomeSource {
+    public static final MapCodec<Climate.ParameterList<Holder<Biome>>> DIRECT_CODEC;
+    public static final MapCodec<MultiNoiseBiomeSource> CODEC;
+    private MultiNoiseBiomeSource(Either<Climate.ParameterList<Holder<Biome>>, Holder<MultiNoiseBiomeSourceParameterList>> parameters);
+    public static MultiNoiseBiomeSource createFromList(Climate.ParameterList<Holder<Biome>> parameters);
+    public static MultiNoiseBiomeSource createFromPreset(Holder<MultiNoiseBiomeSourceParameterList> preset);
+    protected Stream<Holder<Biome>> collectPossibleBiomes();
+    protected MapCodec<MultiNoiseBiomeSource> codec();
+    public boolean stable(ResourceKey<MultiNoiseBiomeSourceParameterList> expected);
+    public BiomeResolver createResolver(Climate.Sampler sampler);
+    public BiomeResolver createResolverForChunk(Climate.Sampler sampler, int minQuartX, int minQuartY, int minQuartZ, int quartSizeX, int quartSizeY, int quartSizeZ);
+    public Holder<Biome> getNoiseBiome(Climate.TargetPoint target);
+    public void addDebugInfo(List<String> result, BlockPos feetPos, Climate.Sampler sampler);
+}
+//// MultiNoiseBiomeSourceParameterList.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+public class MultiNoiseBiomeSourceParameterList {
+    public static final Codec<MultiNoiseBiomeSourceParameterList> DIRECT_CODEC;
+    public static final Codec<Holder<MultiNoiseBiomeSourceParameterList>> CODEC;
+    public MultiNoiseBiomeSourceParameterList(Preset preset, HolderGetter<Biome> biomes);
+    public Climate.ParameterList<Holder<Biome>> parameters();
+    public static Map<Preset, Climate.ParameterList<ResourceKey<Biome>>> knownPresets();
+    public static record Preset(Identifier id, SourceProvider provider) {
+        public static final Preset NETHER;
+        public static final Preset OVERWORLD;
+        public static final Codec<Preset> CODEC;
+        public Stream<ResourceKey<Biome>> usedBiomes();
+        interface SourceProvider {
+            <T> Climate.ParameterList<T> apply(Function<ResourceKey<Biome>, T> lookup);
+        }
+    }
+}
+//// MultiNoiseBiomeSourceParameterLists.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class MultiNoiseBiomeSourceParameterLists {
+    public static final ResourceKey<MultiNoiseBiomeSourceParameterList> NETHER;
+    public static final ResourceKey<MultiNoiseBiomeSourceParameterList> OVERWORLD;
+    public static void bootstrap(BootstrapContext<MultiNoiseBiomeSourceParameterList> context);
+}
+//// OverworldBiomeBuilder.java
+import com.mojang.datafixers.util.Pair;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.OverworldFunctionSet;
+import net.minecraft.world.level.levelgen.SpawnTargetPoint;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+public final class OverworldBiomeBuilder {
+    public static final float HIGH_START = 0.4F;
+    public static final float PEAK_START = 0.56666666F;
+    public static final float NEAR_INLAND_START = -0.11F;
+    public static final float MID_INLAND_START = 0.03F;
+    public static final float FAR_INLAND_START = 0.3F;
+    public static final float EROSION_INDEX_1_START = -0.78F;
+    public static final float EROSION_INDEX_2_START = -0.375F;
+    public OverworldBiomeBuilder();
+    public List<SpawnTargetPoint> spawnTarget(OverworldFunctionSet<Holder<DensityFunction>> functions, Holder<DensityFunction> weirdness);
+    void addBiomes(Consumer<Pair<Climate.ParameterPoint, ResourceKey<Biome>>> biomes);
+    public static DensityFunction deepDarkRegion(DensityFunction erosion, DensityFunction depth);
+    public static String getDebugStringForPeaksAndValleys(double peaksAndValleys);
+    public String getDebugStringForContinentalness(double continentalness);
+    public String getDebugStringForErosion(double erosion);
+    public String getDebugStringForTemperature(double temperature);
+    public String getDebugStringForHumidity(double humidity);
+    public Climate.Parameter[] getTemperatureThresholds();
+    public Climate.Parameter[] getHumidityThresholds();
+    public Climate.Parameter[] getErosionThresholds();
+    public Climate.Parameter[] getContinentalnessThresholds();
+    public Climate.Parameter[] getPeaksAndValleysThresholds();
+    public Climate.Parameter[] getWeirdnessThresholds();
+}
+//// TheEndBiomeSource.java
+import com.mojang.serialization.MapCodec;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+public class TheEndBiomeSource extends BiomeSource {
+    public static final MapCodec<TheEndBiomeSource> CODEC;
+    public static TheEndBiomeSource create(HolderGetter<Biome> biomes);
+    private TheEndBiomeSource(Holder<Biome> end, Holder<Biome> highlands, Holder<Biome> midlands, Holder<Biome> islands, Holder<Biome> barrens);
+    protected Stream<Holder<Biome>> collectPossibleBiomes();
+    protected MapCodec<TheEndBiomeSource> codec();
+    public BiomeResolver createResolver(Climate.Sampler sampler);
+}

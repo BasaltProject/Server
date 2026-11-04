@@ -1,0 +1,82 @@
+//// BandlandsRule.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.levelgen.material.MaterialRuleContext;
+public enum BandlandsRule implements MaterialRule {
+    INSTANCE;
+    public static final MapCodec<BandlandsRule> CODEC;
+    public MapCodec<BandlandsRule> codec();
+    public RuleEvaluator compile(MaterialRuleContext context);
+}
+//// BlockRule.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.material.MaterialRuleContext;
+public record BlockRule(BlockState resultState) implements MaterialRule, RuleEvaluator {
+    public static final MapCodec<BlockRule> CODEC;
+    public MapCodec<BlockRule> codec();
+    public RuleEvaluator compile(MaterialRuleContext context);
+    public BlockState tryApply(int blockX, int blockY, int blockZ);
+}
+//// ConditionRule.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.levelgen.material.MaterialRuleContext;
+import net.minecraft.world.level.levelgen.material.condition.MaterialCondition;
+public record ConditionRule(MaterialCondition ifTrue, MaterialRule thenRun) implements MaterialRule {
+    public static final MapCodec<ConditionRule> CODEC;
+    public MapCodec<ConditionRule> codec();
+    public RuleEvaluator compile(MaterialRuleContext context);
+}
+//// MaterialRule.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.levelgen.material.MaterialRuleContext;
+public interface MaterialRule {
+    Codec<MaterialRule> DIRECT_CODEC;
+    Codec<Holder<MaterialRule>> HOLDER_CODEC;
+    Codec<MaterialRule> CODEC;
+    RuleEvaluator compile(MaterialRuleContext context);
+    MapCodec<? extends MaterialRule> codec();
+    public static record HolderHolder(Holder<MaterialRule> holder) implements MaterialRule {
+        public RuleEvaluator compile(MaterialRuleContext context);
+        public MapCodec<HolderHolder> codec();
+    }
+}
+//// OreVeinRule.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.material.MaterialRuleContext;
+public record OreVeinRule(BlockState oreBlock, BlockState rawOreBlock, BlockState fillerBlock, float rawOreChance, DensityFunction density, DensityFunction richness, DensityFunction fillerGap) implements MaterialRule {
+    public static final float VEININESS_THRESHOLD = 0.4F;
+    public static final int EDGE_ROUNDOFF_BEGIN = 20;
+    public static final float MAX_EDGE_ROUNDOFF = 0.2F;
+    public static final float VEIN_SOLIDNESS = 0.7F;
+    public static final float MIN_RICHNESS = 0.1F;
+    public static final float MAX_RICHNESS = 0.3F;
+    public static final float MAX_RICHNESS_THRESHOLD = 0.6F;
+    public static final float SKIP_ORE_IF_GAP_NOISE_IS_BELOW = -0.3F;
+    public static final MapCodec<OreVeinRule> CODEC;
+    public RuleEvaluator compile(MaterialRuleContext context);
+    public MapCodec<OreVeinRule> codec();
+    public static enum VeinType {
+        COPPER, IRON;
+        public final int minY;
+        public final int maxY;
+        public OreVeinRule create(DensityFunction density, DensityFunction richness, DensityFunction fillerGap);
+    }
+}
+//// RuleEvaluator.java
+import net.minecraft.world.level.block.state.BlockState;
+public interface RuleEvaluator {
+    BlockState tryApply(int blockX, int blockY, int blockZ);
+}
+//// SequenceRule.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.world.level.levelgen.material.MaterialRuleContext;
+public record SequenceRule(List<MaterialRule> sequence) implements MaterialRule {
+    public static final MapCodec<SequenceRule> CODEC;
+    public MapCodec<SequenceRule> codec();
+    public RuleEvaluator compile(MaterialRuleContext context);
+}

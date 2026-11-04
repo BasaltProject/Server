@@ -1,0 +1,166 @@
+//// Axolotl.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.BinaryAnimator;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.AnimationState;
+import net.minecraft.world.entity.Bucketable;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.Brain;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.control.SmoothSwimmingLookControl;
+import net.minecraft.world.entity.ai.control.SmoothSwimmingMoveControl;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public class Axolotl extends Animal implements Bucketable {
+    public static final int TOTAL_PLAYDEAD_TIME = 200;
+    public static final double PLAYER_REGEN_DETECTION_RANGE = 20.0;
+    public static final int RARE_VARIANT_CHANCE = 1200;
+    public static final String VARIANT_TAG = "Variant";
+    public final BinaryAnimator playingDeadAnimator;
+    public final BinaryAnimator inWaterAnimator;
+    public final BinaryAnimator onGroundAnimator;
+    public final BinaryAnimator movingAnimator;
+    public final AnimationState swimAnimationState;
+    public final AnimationState walkAnimationState;
+    public final AnimationState walkUnderWaterAnimationState;
+    public final AnimationState idleUnderWaterAnimationState;
+    public final AnimationState idleUnderWaterOnGroundAnimationState;
+    public final AnimationState idleOnGroundAnimationState;
+    public final AnimationState playDeadAnimationState;
+    public Axolotl(EntityType<? extends Axolotl> type, Level level);
+    public float getWalkTargetValue(BlockPos pos, LevelReader level);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public void playAmbientSound();
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData);
+    public void baseTick();
+    protected void handleAirSupply(ServerLevel level, int preTickAirSupply);
+    public void rehydrate();
+    public int getMaxAirSupply();
+    public Variant getVariant();
+    public <T> T get(DataComponentType<? extends T> type);
+    protected void applyImplicitComponents(DataComponentGetter components);
+    protected <T> boolean applyImplicitComponent(DataComponentType<T> type, T value);
+    public boolean checkSpawnObstruction(LevelReader level);
+    public boolean isPushedByFluid();
+    public void setPlayingDead(boolean playingDead);
+    public boolean isPlayingDead();
+    public boolean fromBucket();
+    public void setFromBucket(boolean fromBucket);
+    public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob partner);
+    public boolean isFood(ItemStack itemStack);
+    public boolean canBeLeashed();
+    protected void customServerAiStep(ServerLevel level);
+    public static AttributeSupplier.Builder createAttributes();
+    protected PathNavigation createNavigation(Level level);
+    public void playAttackSound();
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public int getMaxHeadXRot();
+    public int getMaxHeadYRot();
+    public InteractionResult mobInteract(Player player, InteractionHand hand);
+    public void saveToBucketTag(ItemStack bucket);
+    public void loadFromBucketTag(CompoundTag tag);
+    public ItemStack getBucketItemStack();
+    public SoundEvent getPickupSound();
+    public boolean canBeSeenAsEnemy();
+    public static void onStopAttacking(ServerLevel level, Axolotl body, LivingEntity target);
+    public void applySupportingEffects(Player player);
+    public boolean requiresCustomPersistence();
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected SoundEvent getDeathSound();
+    protected SoundEvent getAmbientSound();
+    protected SoundEvent getSwimSplashSound();
+    protected SoundEvent getSwimSound();
+    protected Brain<Axolotl> makeBrain(Brain.Packed packedBrain);
+    public Brain<Axolotl> getBrain();
+    protected void travelInWater(Vec3 input, double baseGravity, boolean isFalling, double oldY);
+    protected void usePlayerItem(Player player, InteractionHand hand, ItemStack itemStack);
+    public boolean removeWhenFarAway(double distSqr);
+    public LivingEntity getTarget();
+    public static boolean checkAxolotlSpawnRules(EntityType<? extends LivingEntity> type, ServerLevelAccessor level, EntitySpawnReason spawnReason, BlockPos pos, RandomSource random);
+    public EntityDimensions getDefaultDimensions(Pose pose);
+    public static enum Variant implements StringRepresentable {
+        LUCY, WILD, GOLD, CYAN, BLUE;
+        public static final Variant DEFAULT;
+        public static final StreamCodec<ByteBuf, Variant> STREAM_CODEC;
+        public static final Codec<Variant> CODEC;
+        public static final Codec<Variant> LEGACY_CODEC;
+        public int getId();
+        public String getName();
+        public String getSerializedName();
+        public static Variant byId(int id);
+        public static Variant getCommonSpawnVariant(RandomSource random);
+        public static Variant getRareSpawnVariant(RandomSource random);
+    }
+    static class AxolotlMoveControl<T extends Axolotl> extends SmoothSwimmingMoveControl<T> {
+        public AxolotlMoveControl(T axolotl);
+        public void tick();
+    }
+    class AxolotlLookControl extends SmoothSwimmingLookControl {
+        public AxolotlLookControl(Axolotl axolotl, int maxYRotFromCenter);
+        public void tick();
+    }
+    public static class AxolotlGroupData extends AgeableMob.AgeableMobGroupData {
+        public final Variant[] types;
+        public AxolotlGroupData(Variant... types);
+        public Variant getVariant(RandomSource random);
+    }
+    public static enum AxolotlAnimationState {
+        PLAYING_DEAD, IN_WATER, ON_GROUND, IN_AIR;
+    }
+}
+//// AxolotlAi.java
+import java.util.List;
+import net.minecraft.world.entity.ai.ActivityData;
+public class AxolotlAi {
+    protected static List<ActivityData<Axolotl>> getActivities();
+    protected static ActivityData<Axolotl> initPlayDeadActivity();
+    protected static ActivityData<Axolotl> initFightActivity();
+    protected static ActivityData<Axolotl> initCoreActivity();
+    protected static ActivityData<Axolotl> initIdleActivity();
+    public static void updateActivity(Axolotl body);
+}
+//// PlayDead.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.behavior.Behavior;
+public class PlayDead extends Behavior<Axolotl> {
+    public PlayDead();
+    protected boolean checkExtraStartConditions(ServerLevel level, Axolotl body);
+    protected boolean canStillUse(ServerLevel level, Axolotl body, long timestamp);
+    protected void start(ServerLevel level, Axolotl body, long timestamp);
+}
+//// ValidatePlayDead.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.behavior.BehaviorControl;
+public class ValidatePlayDead {
+    public static BehaviorControl<LivingEntity> create();
+}

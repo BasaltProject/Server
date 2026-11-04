@@ -1,0 +1,370 @@
+//// AddValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+public record AddValue(LevelBasedValue value) implements EnchantmentValueEffect {
+    public static final MapCodec<AddValue> CODEC;
+    public float process(int enchantmentLevel, RandomSource random, float inputValue);
+    public MapCodec<AddValue> codec();
+}
+//// AllOf.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.Function;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.phys.Vec3;
+public interface AllOf {
+    static <T, A extends T> MapCodec<A> codec(Codec<T> topLevelCodec, Function<List<T>, A> constructor, Function<A, List<T>> accessor);
+    static EntityEffects entityEffects(EnchantmentEntityEffect... effects);
+    static LocationBasedEffects locationBasedEffects(EnchantmentLocationBasedEffect... effects);
+    static ValueEffects valueEffects(EnchantmentValueEffect... effects);
+    public static record EntityEffects(List<EnchantmentEntityEffect> effects) implements EnchantmentEntityEffect {
+        public static final MapCodec<EntityEffects> CODEC;
+        public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+        public MapCodec<EntityEffects> codec();
+    }
+    public static record LocationBasedEffects(List<EnchantmentLocationBasedEffect> effects) implements EnchantmentLocationBasedEffect {
+        public static final MapCodec<LocationBasedEffects> CODEC;
+        public void onChangedBlock(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position, boolean becameActive);
+        public void onDeactivated(EnchantedItemInUse item, Entity entity, Vec3 position, int level);
+        public MapCodec<LocationBasedEffects> codec();
+    }
+    public static record ValueEffects(List<EnchantmentValueEffect> effects) implements EnchantmentValueEffect {
+        public static final MapCodec<ValueEffects> CODEC;
+        public float process(int enchantmentLevel, RandomSource random, float value);
+        public MapCodec<ValueEffects> codec();
+    }
+}
+//// ApplyEntityImpulse.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.phys.Vec3;
+public record ApplyEntityImpulse(Vec3 direction, Vec3 coordinateScale, LevelBasedValue magnitude) implements EnchantmentEntityEffect {
+    public static final MapCodec<ApplyEntityImpulse> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<ApplyEntityImpulse> codec();
+}
+//// ApplyExhaustion.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.phys.Vec3;
+public record ApplyExhaustion(LevelBasedValue amount) implements EnchantmentEntityEffect {
+    public static final MapCodec<ApplyExhaustion> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<ApplyExhaustion> codec();
+}
+//// ApplyMobEffect.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.phys.Vec3;
+public record ApplyMobEffect(HolderSet<MobEffect> toApply, LevelBasedValue minDuration, LevelBasedValue maxDuration, LevelBasedValue minAmplifier, LevelBasedValue maxAmplifier) implements EnchantmentEntityEffect {
+    public static final MapCodec<ApplyMobEffect> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<ApplyMobEffect> codec();
+}
+//// ChangeItemDamage.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.phys.Vec3;
+public record ChangeItemDamage(LevelBasedValue amount) implements EnchantmentEntityEffect {
+    public static final MapCodec<ChangeItemDamage> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<ChangeItemDamage> codec();
+}
+//// DamageEntity.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.phys.Vec3;
+public record DamageEntity(LevelBasedValue minDamage, LevelBasedValue maxDamage, Holder<DamageType> damageType) implements EnchantmentEntityEffect {
+    public static final MapCodec<DamageEntity> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<DamageEntity> codec();
+}
+//// DamageImmunity.java
+import com.mojang.serialization.Codec;
+public record DamageImmunity() {
+    public static final DamageImmunity INSTANCE;
+    public static final Codec<DamageImmunity> CODEC;
+}
+//// EnchantmentAttributeEffect.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.phys.Vec3;
+public record EnchantmentAttributeEffect(Identifier id, Holder<Attribute> attribute, LevelBasedValue amount, AttributeModifier.Operation operation) implements EnchantmentLocationBasedEffect {
+    public static final MapCodec<EnchantmentAttributeEffect> MAP_CODEC;
+    public AttributeModifier getModifier(int level, StringRepresentable slot);
+    public void onChangedBlock(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position, boolean becameActive);
+    public void onDeactivated(EnchantedItemInUse item, Entity entity, Vec3 position, int level);
+    public MapCodec<EnchantmentAttributeEffect> codec();
+}
+//// EnchantmentEntityEffect.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.phys.Vec3;
+public interface EnchantmentEntityEffect extends EnchantmentLocationBasedEffect {
+    Codec<EnchantmentEntityEffect> CODEC;
+    static MapCodec<? extends EnchantmentEntityEffect> bootstrap(Registry<MapCodec<? extends EnchantmentEntityEffect>> registry);
+    void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    default void onChangedBlock(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position, boolean becameActive);
+    MapCodec<? extends EnchantmentEntityEffect> codec();
+}
+//// EnchantmentLocationBasedEffect.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.phys.Vec3;
+public interface EnchantmentLocationBasedEffect {
+    Codec<EnchantmentLocationBasedEffect> CODEC;
+    static MapCodec<? extends EnchantmentLocationBasedEffect> bootstrap(Registry<MapCodec<? extends EnchantmentLocationBasedEffect>> registry);
+    void onChangedBlock(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position, boolean becameActive);
+    default void onDeactivated(EnchantedItemInUse item, Entity entity, Vec3 position, int level);
+    MapCodec<? extends EnchantmentLocationBasedEffect> codec();
+}
+//// EnchantmentValueEffect.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+import net.minecraft.util.RandomSource;
+public interface EnchantmentValueEffect {
+    Codec<EnchantmentValueEffect> CODEC;
+    static MapCodec<? extends EnchantmentValueEffect> bootstrap(Registry<MapCodec<? extends EnchantmentValueEffect>> registry);
+    float process(int enchantmentLevel, RandomSource random, float inputValue);
+    MapCodec<? extends EnchantmentValueEffect> codec();
+}
+//// ExplodeEffect.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.particles.ExplosionParticleInfo;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.phys.Vec3;
+public record ExplodeEffect(boolean attributeToUser, Optional<Holder<DamageType>> damageType, Optional<LevelBasedValue> knockbackMultiplier, Optional<HolderSet<Block>> immuneBlocks, Vec3 offset, LevelBasedValue radius, boolean createFire, Level.ExplosionInteraction blockInteraction, ParticleOptions smallParticle, ParticleOptions largeParticle, WeightedList<ExplosionParticleInfo> blockParticles, Holder<SoundEvent> sound) implements EnchantmentEntityEffect {
+    public static final MapCodec<ExplodeEffect> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<ExplodeEffect> codec();
+}
+//// Ignite.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.phys.Vec3;
+public record Ignite(LevelBasedValue duration) implements EnchantmentEntityEffect {
+    public static final MapCodec<Ignite> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<Ignite> codec();
+}
+//// MultiplyValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+public record MultiplyValue(LevelBasedValue factor) implements EnchantmentValueEffect {
+    public static final MapCodec<MultiplyValue> CODEC;
+    public float process(int enchantmentLevel, RandomSource random, float inputValue);
+    public MapCodec<MultiplyValue> codec();
+}
+//// PlaySoundEffect.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.valueproviders.FloatProvider;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.phys.Vec3;
+public record PlaySoundEffect(List<Holder<SoundEvent>> soundEvents, FloatProvider volume, FloatProvider pitch) implements EnchantmentEntityEffect {
+    public static final MapCodec<PlaySoundEffect> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<PlaySoundEffect> codec();
+}
+//// RemoveBinomial.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+public record RemoveBinomial(LevelBasedValue chance) implements EnchantmentValueEffect {
+    public static final MapCodec<RemoveBinomial> CODEC;
+    public float process(int level, RandomSource random, float n);
+    public MapCodec<RemoveBinomial> codec();
+}
+//// ReplaceBlock.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+import net.minecraft.world.phys.Vec3;
+public record ReplaceBlock(Vec3i offset, Optional<BlockPredicate> predicate, Holder<BlockStateProvider> blockState, Optional<Holder<GameEvent>> triggerGameEvent) implements EnchantmentEntityEffect {
+    public static final MapCodec<ReplaceBlock> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<ReplaceBlock> codec();
+}
+//// ReplaceDisk.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+import net.minecraft.world.phys.Vec3;
+public record ReplaceDisk(LevelBasedValue radius, LevelBasedValue height, Vec3i offset, Optional<BlockPredicate> predicate, Holder<BlockStateProvider> blockState, Optional<Holder<GameEvent>> triggerGameEvent) implements EnchantmentEntityEffect {
+    public static final MapCodec<ReplaceDisk> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<ReplaceDisk> codec();
+}
+//// RunFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.phys.Vec3;
+public record RunFunction(Identifier function) implements EnchantmentEntityEffect {
+    public static final MapCodec<RunFunction> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<RunFunction> codec();
+}
+//// ScaleExponentially.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+public record ScaleExponentially(LevelBasedValue base, LevelBasedValue exponent) implements EnchantmentValueEffect {
+    public static final MapCodec<ScaleExponentially> CODEC;
+    public float process(int level, RandomSource random, float inputValue);
+    public MapCodec<ScaleExponentially> codec();
+}
+//// SetBlockProperties.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.component.BlockItemStateProperties;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.phys.Vec3;
+public record SetBlockProperties(BlockItemStateProperties properties, Vec3i offset, Optional<Holder<GameEvent>> triggerGameEvent) implements EnchantmentEntityEffect {
+    public static final MapCodec<SetBlockProperties> CODEC;
+    public SetBlockProperties(BlockItemStateProperties properties);
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<SetBlockProperties> codec();
+}
+//// SetValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+public record SetValue(LevelBasedValue value) implements EnchantmentValueEffect {
+    public static final MapCodec<SetValue> CODEC;
+    public float process(int enchantmentLevel, RandomSource random, float inputValue);
+    public MapCodec<SetValue> codec();
+}
+//// SpawnParticlesEffect.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.valueproviders.FloatProvider;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.phys.Vec3;
+public record SpawnParticlesEffect(ParticleOptions particle, PositionSource horizontalPosition, PositionSource verticalPosition, VelocitySource horizontalVelocity, VelocitySource verticalVelocity, FloatProvider speed) implements EnchantmentEntityEffect {
+    public static final MapCodec<SpawnParticlesEffect> CODEC;
+    public static PositionSource offsetFromEntityPosition(float offset);
+    public static PositionSource inBoundingBox();
+    public static VelocitySource movementScaled(float scale);
+    public static VelocitySource fixedVelocity(FloatProvider provider);
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<SpawnParticlesEffect> codec();
+    public static enum PositionSourceType implements StringRepresentable {
+        ENTITY_POSITION, BOUNDING_BOX;
+        public static final Codec<PositionSourceType> CODEC;
+        public double getCoordinate(double position, double center, float boundingBoxSpan, RandomSource random);
+        public String getSerializedName();
+        interface CoordinateSource {
+            double getCoordinate(double pos, double center, float boundingBoxSpan, RandomSource random);
+        }
+    }
+    public static record PositionSource(PositionSourceType type, float offset, float scale) {
+        public static final MapCodec<PositionSource> CODEC;
+        public double getCoordinate(double position, double center, float boundingBoxSpan, RandomSource random);
+    }
+    public static record VelocitySource(float movementScale, FloatProvider base) {
+        public static final MapCodec<VelocitySource> CODEC;
+        public double getVelocity(double movement, RandomSource random);
+    }
+}
+//// SummonEntityEffect.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.enchantment.EnchantedItemInUse;
+import net.minecraft.world.phys.Vec3;
+public record SummonEntityEffect(HolderSet<EntityType<?>> entityTypes, boolean joinTeam) implements EnchantmentEntityEffect {
+    public static final MapCodec<SummonEntityEffect> CODEC;
+    public void apply(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity, Vec3 position);
+    public MapCodec<SummonEntityEffect> codec();
+}

@@ -1,0 +1,808 @@
+//// Aquifer.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySamplerSet;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+public interface Aquifer {
+    static Aquifer createDisabled(FluidPicker fluidRule);
+    BlockState computeSubstance(int blockX, int blockY, int blockZ, double density);
+    boolean shouldScheduleFluidUpdate();
+    public static record Config(DensityFunction barrierNoise, DensityFunction fluidLevelFloodednessNoise, DensityFunction fluidLevelSpreadNoise, DensityFunction lavaNoise, DensityFunction exclusion, DensityFunction surfaceLevel) {
+        public static final Codec<Config> CODEC;
+        public Aquifer create(DensitySamplerSet cachingSamplers, PositionalRandomFactory positionalRandomFactory, DensityVolume volume, FluidPicker fluidRule);
+    }
+    public static class NoiseBasedAquifer implements Aquifer {
+        private NoiseBasedAquifer(DensitySamplerSet cachingSamplers, Config config, PositionalRandomFactory positionalRandomFactory, DensityVolume volume, FluidPicker globalFluidPicker);
+        public BlockState computeSubstance(int blockX, int blockY, int blockZ, double density);
+        public boolean shouldScheduleFluidUpdate();
+    }
+    public static record FluidStatus(int fluidLevel, BlockState fluidType) {
+        public BlockState at(int blockY);
+    }
+    public interface FluidPicker {
+        FluidStatus computeFluid(int blockX, int blockY, int blockZ);
+    }
+}
+//// Beardifier.java
+import java.util.List;
+import net.minecraft.util.Interval;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.TerrainAdjustment;
+import net.minecraft.world.level.levelgen.structure.pools.JigsawJunction;
+public class Beardifier implements DensitySampler {
+    public static final Interval RANGE;
+    public static final ContextKey<Beardifier> CONTEXT_KEY;
+    public static final int BEARD_KERNEL_RADIUS = 12;
+    public static final Beardifier EMPTY;
+    public static Beardifier forStructuresInChunk(StructureManager structureManager, ChunkPos chunkPos);
+    public Beardifier(List<Rigid> pieces, List<JigsawJunction> junctions, BoundingBox affectedBox);
+    public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+    public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    public static record Rigid(BoundingBox box, TerrainAdjustment terrainAdjustment, int groundLevelDelta) {
+    }
+}
+//// BelowZeroRetrogen.java
+import com.mojang.serialization.Codec;
+import java.util.BitSet;
+import java.util.Optional;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.biome.BiomeResolver;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+public final class BelowZeroRetrogen {
+    public static final Codec<BelowZeroRetrogen> CODEC;
+    public static final LevelHeightAccessor UPGRADE_HEIGHT_ACCESSOR;
+    private BelowZeroRetrogen(ChunkStatus targetStatus, Optional<BitSet> missingBedrock);
+    public static void replaceOldBedrock(ProtoChunk chunk);
+    public void applyBedrockMask(ProtoChunk chunk);
+    public ChunkStatus targetStatus();
+    public boolean hasBedrockHoles();
+    public boolean hasBedrockHole(int x, int z);
+    public static BiomeResolver getBiomeResolver(BiomeResolver biomeResolver, ChunkAccess protoChunk);
+}
+//// BitRandomSource.java
+import net.minecraft.util.RandomSource;
+public interface BitRandomSource extends RandomSource {
+    float FLOAT_MULTIPLIER;
+    double DOUBLE_MULTIPLIER;
+    int next(int bits);
+    default int nextInt();
+    default int nextInt(int bound);
+    default long nextLong();
+    default boolean nextBoolean();
+    default float nextFloat();
+    default double nextDouble();
+}
+//// Column.java
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelSimulatedReader;
+import net.minecraft.world.level.block.state.BlockState;
+public abstract class Column {
+    public static Range around(int lowest, int highest);
+    public static Range inside(int floor, int ceiling);
+    public static Column below(int ceiling);
+    public static Column fromHighest(int highest);
+    public static Column above(int floor);
+    public static Column fromLowest(int lowest);
+    public static Column line();
+    public static Column create(OptionalInt floor, OptionalInt ceiling);
+    public abstract OptionalInt getCeiling();
+    public abstract OptionalInt getFloor();
+    public abstract OptionalInt getHeight();
+    public Column withFloor(OptionalInt floor);
+    public Column withCeiling(OptionalInt ceiling);
+    public static Optional<Column> scan(LevelSimulatedReader level, BlockPos pos, int searchRange, Predicate<BlockState> insideColumn, Predicate<BlockState> validEdge);
+    public static final class Range extends Column {
+        public Range(int floor, int ceiling);
+        public OptionalInt getCeiling();
+        public OptionalInt getFloor();
+        public OptionalInt getHeight();
+        public int ceiling();
+        public int floor();
+        public int height();
+        public String toString();
+    }
+    public static final class Line extends Column {
+        private Line();
+        public OptionalInt getCeiling();
+        public OptionalInt getFloor();
+        public OptionalInt getHeight();
+        public String toString();
+    }
+    public static final class Ray extends Column {
+        public Ray(int edge, boolean pointingUp);
+        public OptionalInt getCeiling();
+        public OptionalInt getFloor();
+        public OptionalInt getHeight();
+        public String toString();
+    }
+}
+//// DebugLevelSource.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.NoiseColumn;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.blending.Blender;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public class DebugLevelSource extends ChunkGenerator {
+    public static final MapCodec<DebugLevelSource> CODEC;
+    protected static final BlockState AIR;
+    protected static final BlockState BARRIER;
+    public static final int HEIGHT = 70;
+    public static final int BARRIER_HEIGHT = 60;
+    public DebugLevelSource(Holder.Reference<Biome> plains);
+    protected MapCodec<? extends ChunkGenerator> codec();
+    public void applyBiomeDecoration(WorldGenLevel level, ChunkAccess chunk, StructureManager structureManager);
+    public CompletableFuture<ChunkAccess> buildTerrain(ChunkAccess chunk, Blender blender, RandomState randomState, StructureManager structureManager, BiomeManager biomeManager, WorldGenRegion carverBiomeRegion, Set<Holder<Biome>> possibleBiomes);
+    public int getBaseHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public void addDebugScreenInfo(List<String> result, RandomState randomState, BlockPos feetPos, SamplerContext samplerContext);
+    public static BlockState getBlockStateFor(int worldX, int worldZ);
+    public void spawnOriginalMobs(WorldGenRegion worldGenRegion);
+    public int getMinY();
+    public int getGenDepth();
+    public int getSeaLevel();
+}
+//// Density.java
+public class Density {
+    public static final float SURFACE = 0.0F;
+    public static final float UNRECOVERABLY_DENSE = 64.0F;
+    public static final float UNRECOVERABLY_THIN = -64.0F;
+}
+//// FlatLevelSource.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.NoiseColumn;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.levelgen.blending.Blender;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
+public class FlatLevelSource extends ChunkGenerator {
+    public static final MapCodec<FlatLevelSource> CODEC;
+    public FlatLevelSource(FlatLevelGeneratorSettings generatorSettings);
+    public ChunkGeneratorStructureState createState(HolderLookup<StructureSet> structureSets, RandomState randomState, long levelSeed);
+    protected MapCodec<? extends ChunkGenerator> codec();
+    public FlatLevelGeneratorSettings settings();
+    public int getSpawnHeight(LevelHeightAccessor heightAccessor);
+    public CompletableFuture<ChunkAccess> buildTerrain(ChunkAccess chunk, Blender blender, RandomState randomState, StructureManager structureManager, BiomeManager biomeManager, WorldGenRegion carverBiomeRegion, Set<Holder<Biome>> possibleBiomes);
+    public int getBaseHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public void addDebugScreenInfo(List<String> result, RandomState randomState, BlockPos feetPos, SamplerContext samplerContext);
+    public void spawnOriginalMobs(WorldGenRegion worldGenRegion);
+    public int getMinY();
+    public int getGenDepth();
+    public int getSeaLevel();
+}
+//// GenerationStep.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public class GenerationStep {
+    public static enum Decoration implements StringRepresentable {
+        RAW_GENERATION, LAKES, LOCAL_MODIFICATIONS, UNDERGROUND_STRUCTURES, SURFACE_STRUCTURES, STRONGHOLDS, UNDERGROUND_ORES, UNDERGROUND_DECORATION, FLUID_SPRINGS, VEGETAL_DECORATION, TOP_LAYER_MODIFICATION;
+        public static final Codec<Decoration> CODEC;
+        public String getName();
+        public String getSerializedName();
+    }
+}
+//// GeodeBlockSettings.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public record GeodeBlockSettings(Holder<BlockStateProvider> fillingProvider, Holder<BlockStateProvider> innerLayerProvider, Holder<BlockStateProvider> alternateInnerLayerProvider, Holder<BlockStateProvider> middleLayerProvider, Holder<BlockStateProvider> outerLayerProvider, List<BlockState> innerPlacements, HolderSet<Block> cannotReplace, HolderSet<Block> invalidBlocks) {
+    public static final Codec<GeodeBlockSettings> CODEC;
+}
+//// GeodeCrackSettings.java
+import com.mojang.serialization.Codec;
+public class GeodeCrackSettings {
+    public static final Codec<GeodeCrackSettings> CODEC;
+    public final double generateCrackChance;
+    public final double baseCrackSize;
+    public final int crackPointOffset;
+    public GeodeCrackSettings(double generateCrackChance, double baseCrackSize, int crackPointOffset);
+}
+//// GeodeLayerSettings.java
+import com.mojang.serialization.Codec;
+public class GeodeLayerSettings {
+    public static final Codec<GeodeLayerSettings> CODEC;
+    public final double filling;
+    public final double innerLayer;
+    public final double middleLayer;
+    public final double outerLayer;
+    public GeodeLayerSettings(double filling, double innerLayer, double middleLayer, double outerLayer);
+}
+//// Heightmap.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Set;
+import java.util.function.Predicate;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+public class Heightmap {
+    public Heightmap(ChunkAccess chunk, Types heightmapType);
+    public static void primeHeightmaps(ChunkAccess chunk, Set<Types> types);
+    public boolean update(int localX, int localY, int localZ, BlockState state);
+    public int getFirstAvailable(int x, int z);
+    public int getHighestTaken(int x, int z);
+    public void setRawData(ChunkAccess chunk, Types type, long[] data);
+    public long[] getRawData();
+    public static enum Usage {
+        WORLDGEN, LIVE_WORLD, CLIENT;
+    }
+    public static enum Types implements StringRepresentable {
+        WORLD_SURFACE_WG, WORLD_SURFACE, OCEAN_FLOOR_WG, OCEAN_FLOOR, MOTION_BLOCKING, MOTION_BLOCKING_NO_LEAVES;
+        public static final Codec<Types> CODEC;
+        public static final StreamCodec<ByteBuf, Types> STREAM_CODEC;
+        public String getSerializationKey();
+        public boolean sendToClient();
+        public boolean keepAfterWorldgen();
+        public Predicate<BlockState> isOpaque();
+        public String getSerializedName();
+    }
+}
+//// LegacyRandomSource.java
+import net.minecraft.util.RandomSource;
+public class LegacyRandomSource implements BitRandomSource {
+    public LegacyRandomSource(long seed);
+    public RandomSource fork();
+    public PositionalRandomFactory forkPositional();
+    public void setSeed(long seed);
+    public int next(int bits);
+    public double nextGaussian();
+    public static class LegacyPositionalRandomFactory implements PositionalRandomFactory {
+        public LegacyPositionalRandomFactory(long seed);
+        public RandomSource at(int x, int y, int z);
+        public RandomSource fromHashOf(String name);
+        public RandomSource fromSeed(long seed);
+        public void parityConfigString(StringBuilder sb);
+    }
+}
+//// MarsagliaPolarGaussian.java
+import net.minecraft.util.RandomSource;
+public class MarsagliaPolarGaussian {
+    public final RandomSource randomSource;
+    public MarsagliaPolarGaussian(RandomSource randomSource);
+    public void reset();
+    public double nextGaussian();
+}
+//// NoiseBasedChunkGenerator.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.NoiseColumn;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.biome.BiomeResolver;
+import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.blending.Blender;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public final class NoiseBasedChunkGenerator extends ChunkGenerator {
+    public static final MapCodec<NoiseBasedChunkGenerator> CODEC;
+    public NoiseBasedChunkGenerator(BiomeSource biomeSource, Holder<NoiseGeneratorSettings> settings);
+    protected BiomeResolver decorateBiomeResolver(Blender blender, ChunkAccess protoChunk, BiomeResolver biomeResolver);
+    public ChunkPos getOrigin(RandomState randomState);
+    protected MapCodec<? extends ChunkGenerator> codec();
+    public Holder<NoiseGeneratorSettings> generatorSettings();
+    public boolean stable(ResourceKey<NoiseGeneratorSettings> expectedPreset);
+    public int getBaseHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public void addDebugScreenInfo(List<String> result, RandomState randomState, BlockPos feetPos, SamplerContext samplerContext);
+    public CompletableFuture<ChunkAccess> buildTerrain(ChunkAccess chunk, Blender blender, RandomState randomState, StructureManager structureManager, BiomeManager biomeManager, WorldGenRegion carverBiomeRegion, Set<Holder<Biome>> possibleBiomes);
+    public int getGenDepth();
+    public int getSeaLevel();
+    public int getMinY();
+    public void spawnOriginalMobs(WorldGenRegion worldGenRegion);
+}
+//// NoiseChunk.java
+import net.minecraft.world.level.levelgen.blending.Blender;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySamplerSet;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+public class NoiseChunk implements AutoCloseable {
+    public NoiseChunk(RandomState randomState, Beardifier beardifier, NoiseGeneratorSettings settings, Aquifer.FluidPicker globalFluidPicker, Blender blender, DensityVolume volume);
+    public DensityVolume volume();
+    public Aquifer aquifer();
+    public DensitySamplerSet cachingSamplers();
+    public void close();
+}
+//// NoiseGeneratorSettings.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.material.rule.MaterialRule;
+public record NoiseGeneratorSettings(NoiseSettings noiseSettings, BlockState defaultBlock, BlockState defaultFluid, NoiseRouter noiseRouter, Holder<MaterialRule> materialRule, List<SpawnTargetPoint> spawnTarget, int seaLevel, boolean disableMobGeneration, Optional<Aquifer.Config> aquifers, boolean useLegacyRandomSource, DebugFunctions debugFunctions) {
+    public static final Codec<NoiseGeneratorSettings> DIRECT_CODEC;
+    public static final Codec<Holder<NoiseGeneratorSettings>> CODEC;
+    public static final ResourceKey<NoiseGeneratorSettings> OVERWORLD;
+    public static final ResourceKey<NoiseGeneratorSettings> LARGE_BIOMES;
+    public static final ResourceKey<NoiseGeneratorSettings> AMPLIFIED;
+    public static final ResourceKey<NoiseGeneratorSettings> NETHER;
+    public static final ResourceKey<NoiseGeneratorSettings> END;
+    public static final ResourceKey<NoiseGeneratorSettings> CAVES;
+    public static final ResourceKey<NoiseGeneratorSettings> FLOATING_ISLANDS;
+    public boolean disableMobGeneration();
+    public WorldgenRandom.Algorithm getRandomSource();
+    public static void bootstrap(BootstrapContext<NoiseGeneratorSettings> context);
+    public static record DebugFunctions(List<DebugFunctionEntry> functions) {
+        public static final DebugFunctions EMPTY;
+        public static final Codec<DebugFunctions> CODEC;
+    }
+    public static record DebugFunctionEntry(String label, DensityFunction function) {
+        public static final Codec<DebugFunctionEntry> CODEC;
+    }
+}
+//// NoiseRouter.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.level.biome.Climate;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySamplerSet;
+public record NoiseRouter(DensityFunction temperature, DensityFunction vegetation, DensityFunction continents, DensityFunction erosion, DensityFunction depth, DensityFunction ridges, DensityFunction chunkSurfaceLevel, DensityFunction finalDensity) {
+    public static final Codec<NoiseRouter> CODEC;
+    public Climate.Sampler createClimateSampler(DensitySamplerSet densitySamplers);
+}
+//// NoiseRouterData.java
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public class NoiseRouterData {
+    public static final float GLOBAL_OFFSET = -0.50375F;
+    public static final float NOISE_ZERO = 0.390625F;
+    public static final int ISLAND_CHUNK_DISTANCE = 64;
+    public static final long ISLAND_CHUNK_DISTANCE_SQR = 4096L;
+    public static final ResourceKey<DensityFunction> RIDGES;
+    public static final ResourceKey<DensityFunction> RIDGES_FOLDED;
+    public static final OverworldFunctionSet<ResourceKey<DensityFunction>> OVERWORLD_FUNCTIONS;
+    public static final OverworldFunctionSet<ResourceKey<DensityFunction>> AMPLIFIED_OVERWORLD_FUNCTIONS;
+    public static final OverworldFunctionSet<ResourceKey<DensityFunction>> LARGE_OVERWORLD_FUNCTIONS;
+    public static final ResourceKey<DensityFunction> ORE_VEIN_RICHNESS;
+    public static final ResourceKey<DensityFunction> ORE_VEIN_COPPER_DENSITY;
+    public static final ResourceKey<DensityFunction> ORE_VEIN_IRON_DENSITY;
+    public static final ResourceKey<DensityFunction> ORE_VEIN_GAP;
+    public static void bootstrap(BootstrapContext<DensityFunction> context);
+    public static DensityFunction getFunction(HolderGetter<DensityFunction> functions, ResourceKey<DensityFunction> name);
+    public static DensityFunction peaksAndValleys(DensityFunction weirdness);
+    public static float peaksAndValleys(float weirdness);
+    protected static NoiseRouter overworld(HolderGetter<DensityFunction> functions, OverworldFunctionSet<ResourceKey<DensityFunction>> functionNames);
+    protected static Aquifer.Config overworldAquifers(HolderGetter<DensityFunction> functions, HolderGetter<NormalNoise> noises, OverworldFunctionSet<ResourceKey<DensityFunction>> names);
+    protected static NoiseRouter nether(HolderGetter<DensityFunction> functions, HolderGetter<NormalNoise> noises);
+    protected static NoiseRouter caves(HolderGetter<DensityFunction> functions);
+    protected static NoiseRouter floatingIslands(HolderGetter<DensityFunction> functions, HolderGetter<NormalNoise> noises);
+    protected static NoiseRouter end(HolderGetter<DensityFunction> functions);
+    public static NoiseRouter none();
+    protected static final class QuantizedSpaghettiRarity {
+        public static DensityFunction wrapRarity2d(DensityFunction input, Holder<NormalNoise> noise);
+        public static DensityFunction wrapRarity3d(DensityFunction input, Holder<NormalNoise> noise);
+    }
+}
+//// NoiseSettings.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.level.LevelHeightAccessor;
+public record NoiseSettings(int minY, int height) {
+    public static final Codec<NoiseSettings> CODEC;
+    static final NoiseSettings OVERWORLD_NOISE_SETTINGS;
+    static final NoiseSettings NETHER_NOISE_SETTINGS;
+    static final NoiseSettings END_NOISE_SETTINGS;
+    static final NoiseSettings CAVES_NOISE_SETTINGS;
+    static final NoiseSettings FLOATING_ISLANDS_NOISE_SETTINGS;
+    public static NoiseSettings create(int minY, int height);
+    public NoiseSettings clampToHeightAccessor(LevelHeightAccessor heightAccessor);
+}
+//// NoiseSpawnFinder.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySamplerSet;
+public class NoiseSpawnFinder {
+    private NoiseSpawnFinder(List<SpawnTargetPoint> targetPoints, DensitySamplerSet samplers);
+    public static BlockPos findSpawnPosition(List<SpawnTargetPoint> targetPoints, DensitySamplerSet samplers);
+    static record Result(BlockPos location, long fitness) {
+    }
+}
+//// Noises.java
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.synth.Noise;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public class Noises {
+    public static final ResourceKey<NormalNoise> TEMPERATURE;
+    public static final ResourceKey<NormalNoise> VEGETATION;
+    public static final ResourceKey<NormalNoise> CONTINENTALNESS;
+    public static final ResourceKey<NormalNoise> EROSION;
+    public static final ResourceKey<NormalNoise> TEMPERATURE_LARGE;
+    public static final ResourceKey<NormalNoise> VEGETATION_LARGE;
+    public static final ResourceKey<NormalNoise> CONTINENTALNESS_LARGE;
+    public static final ResourceKey<NormalNoise> EROSION_LARGE;
+    public static final ResourceKey<NormalNoise> RIDGE;
+    public static final ResourceKey<NormalNoise> SHIFT;
+    public static final ResourceKey<NormalNoise> TEMPERATURE_NETHER;
+    public static final ResourceKey<NormalNoise> VEGETATION_NETHER;
+    public static final ResourceKey<NormalNoise> AQUIFER_BARRIER;
+    public static final ResourceKey<NormalNoise> AQUIFER_FLUID_LEVEL_FLOODEDNESS;
+    public static final ResourceKey<NormalNoise> AQUIFER_LAVA;
+    public static final ResourceKey<NormalNoise> AQUIFER_FLUID_LEVEL_SPREAD;
+    public static final ResourceKey<NormalNoise> PILLAR;
+    public static final ResourceKey<NormalNoise> PILLAR_RARENESS;
+    public static final ResourceKey<NormalNoise> PILLAR_THICKNESS;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_2D;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_2D_ELEVATION;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_2D_MODULATOR;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_2D_THICKNESS;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_3D_1;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_3D_2;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_3D_RARITY;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_3D_THICKNESS;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_ROUGHNESS;
+    public static final ResourceKey<NormalNoise> SPAGHETTI_ROUGHNESS_MODULATOR;
+    public static final ResourceKey<NormalNoise> CAVE_ENTRANCE;
+    public static final ResourceKey<NormalNoise> CAVE_LAYER;
+    public static final ResourceKey<NormalNoise> CAVE_CHEESE;
+    public static final ResourceKey<NormalNoise> ORE_VEININESS;
+    public static final ResourceKey<NormalNoise> ORE_VEIN_A;
+    public static final ResourceKey<NormalNoise> ORE_VEIN_B;
+    public static final ResourceKey<NormalNoise> ORE_GAP;
+    public static final ResourceKey<NormalNoise> NOODLE;
+    public static final ResourceKey<NormalNoise> NOODLE_THICKNESS;
+    public static final ResourceKey<NormalNoise> NOODLE_RIDGE_A;
+    public static final ResourceKey<NormalNoise> NOODLE_RIDGE_B;
+    public static final ResourceKey<NormalNoise> JAGGED;
+    public static final ResourceKey<NormalNoise> SURFACE;
+    public static final ResourceKey<NormalNoise> SURFACE_SECONDARY;
+    public static final ResourceKey<NormalNoise> CLAY_BANDS_OFFSET;
+    public static final ResourceKey<NormalNoise> BADLANDS_PILLAR;
+    public static final ResourceKey<NormalNoise> BADLANDS_PILLAR_ROOF;
+    public static final ResourceKey<NormalNoise> BADLANDS_SURFACE;
+    public static final ResourceKey<NormalNoise> ICEBERG_PILLAR;
+    public static final ResourceKey<NormalNoise> ICEBERG_PILLAR_ROOF;
+    public static final ResourceKey<NormalNoise> ICEBERG_SURFACE;
+    public static final ResourceKey<NormalNoise> SULFUR_CAVE_GRADIENT;
+    public static final ResourceKey<NormalNoise> SWAMP;
+    public static final ResourceKey<NormalNoise> CALCITE;
+    public static final ResourceKey<NormalNoise> GRAVEL;
+    public static final ResourceKey<NormalNoise> POWDER_SNOW;
+    public static final ResourceKey<NormalNoise> PACKED_ICE;
+    public static final ResourceKey<NormalNoise> ICE;
+    public static final ResourceKey<NormalNoise> SOUL_SAND_LAYER;
+    public static final ResourceKey<NormalNoise> GRAVEL_LAYER;
+    public static final ResourceKey<NormalNoise> PATCH;
+    public static final ResourceKey<NormalNoise> SMALL_PATCH;
+    public static final ResourceKey<NormalNoise> NETHERRACK;
+    public static final ResourceKey<NormalNoise> NETHER_WART;
+    public static final ResourceKey<NormalNoise> NETHER_STATE_SELECTOR;
+    public static Noise instantiate(HolderGetter<NormalNoise> noises, PositionalRandomFactory context, ResourceKey<NormalNoise> name);
+}
+//// OverworldFunctionSet.java
+import java.util.function.Function;
+public record OverworldFunctionSet<T>(T temperature, T vegetation, T continents, T erosion, T offset, T factor, T jaggedness, T depth, T slopedCheese, T preliminarySurfaceLevel, T chunkSurfaceLevel, T finalDensity) {
+    public <U> OverworldFunctionSet<U> map(Function<T, U> function);
+}
+//// PatrolSpawner.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.CustomSpawner;
+public class PatrolSpawner implements CustomSpawner {
+    public void tick(ServerLevel level, boolean spawnEnemies);
+}
+//// PhantomSpawner.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.CustomSpawner;
+public class PhantomSpawner implements CustomSpawner {
+    public void tick(ServerLevel level, boolean spawnEnemies);
+}
+//// PositionalRandomFactory.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+public interface PositionalRandomFactory {
+    default RandomSource at(BlockPos pos);
+    default RandomSource fromHashOf(Identifier name);
+    RandomSource fromHashOf(String name);
+    RandomSource fromSeed(long seed);
+    RandomSource at(int x, int y, int z);
+    void parityConfigString(StringBuilder sb);
+}
+//// RandomState.java
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.biome.Climate;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBufferPool;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySamplerSet;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+import net.minecraft.world.level.levelgen.material.MaterialSystem;
+import net.minecraft.world.level.levelgen.synth.Noise;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public final class RandomState {
+    public static RandomState create(HolderGetter<NormalNoise> noises, long seed, NoiseGeneratorSettings settings);
+    public static RandomState create(HolderGetter<NormalNoise> noises, long seed, boolean useLegacyRandom, BlockState defaultBlock, int seaLevel, NoiseRouter noiseRouter);
+    private RandomState(HolderGetter<NormalNoise> noises, long seed, boolean useLegacyRandom, BlockState defaultBlock, int seaLevel, NoiseRouter router);
+    public DensitySamplerSet samplersWithContext(SamplerContext context);
+    public Climate.Sampler createClimateSampler(SamplerContext context);
+    public Noise getOrCreateNoise(ResourceKey<NormalNoise> noise);
+    public PositionalRandomFactory getOrCreateRandomFactory(Identifier name);
+    public MaterialSystem surfaceSystem();
+    public DensitySampler getSampler(DensityFunction function);
+    public float sampleBlockValueUncached(DensityFunction function, int x, int y, int z);
+    public DensityBufferPool acquireDensityBufferPool();
+    public void releaseDensityBufferPool(DensityBufferPool pool);
+    public void garbageCollect();
+    public long seed();
+}
+//// RandomSupport.java
+public final class RandomSupport {
+    public static final long GOLDEN_RATIO_64 = -7046029254386353131L;
+    public static final long SILVER_RATIO_64 = 7640891576956012809L;
+    public static long mixStafford13(long z);
+    public static Seed128bit upgradeSeedTo128bitUnmixed(long legacySeed);
+    public static Seed128bit upgradeSeedTo128bit(long legacySeed);
+    public static Seed128bit seedFromHashOf(String input);
+    public static long generateUniqueSeed();
+    public static record Seed128bit(long seedLo, long seedHi) {
+        public Seed128bit xor(long lo, long hi);
+        public Seed128bit xor(Seed128bit other);
+        public Seed128bit mixed();
+    }
+}
+//// SingleThreadedRandomSource.java
+import net.minecraft.util.RandomSource;
+public class SingleThreadedRandomSource implements BitRandomSource {
+    public SingleThreadedRandomSource(long seed);
+    public RandomSource fork();
+    public PositionalRandomFactory forkPositional();
+    public void setSeed(long seed);
+    public int next(int bits);
+    public double nextGaussian();
+}
+//// SpawnTargetPoint.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.biome.Climate;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySamplerSet;
+public record SpawnTargetPoint(Map<Holder<DensityFunction>, Climate.Parameter> parameters) {
+    public static final Codec<SpawnTargetPoint> CODEC;
+    public long sampleFitness(DensitySamplerSet samplers, int blockX, int blockY, int blockZ);
+}
+//// ThreadSafeLegacyRandomSource.java
+import net.minecraft.util.RandomSource;
+public class ThreadSafeLegacyRandomSource implements BitRandomSource {
+    public ThreadSafeLegacyRandomSource(long seed);
+    public RandomSource fork();
+    public PositionalRandomFactory forkPositional();
+    public void setSeed(long seed);
+    public int next(int bits);
+    public double nextGaussian();
+}
+//// VerticalAnchor.java
+import com.mojang.serialization.Codec;
+public interface VerticalAnchor {
+    Codec<VerticalAnchor> CODEC;
+    VerticalAnchor BOTTOM;
+    VerticalAnchor TOP;
+    static VerticalAnchor absolute(int value);
+    static VerticalAnchor aboveBottom(int offset);
+    static VerticalAnchor belowTop(int offset);
+    static VerticalAnchor bottom();
+    static VerticalAnchor top();
+    static VerticalAnchor relativeToSeaLevel(int offset);
+    static VerticalAnchor seaLevel();
+    int resolveY(WorldGenerationContext heightAccessor);
+    public static record Absolute(int y) implements VerticalAnchor {
+        public static final Codec<Absolute> CODEC;
+        public int resolveY(WorldGenerationContext heightAccessor);
+        public String toString();
+    }
+    public static record AboveBottom(int offset) implements VerticalAnchor {
+        public static final Codec<AboveBottom> CODEC;
+        public int resolveY(WorldGenerationContext heightAccessor);
+        public String toString();
+    }
+    public static record BelowTop(int offset) implements VerticalAnchor {
+        public static final Codec<BelowTop> CODEC;
+        public int resolveY(WorldGenerationContext heightAccessor);
+        public String toString();
+    }
+    public static record RelativeToSeaLevel(int offset) implements VerticalAnchor {
+        public static final Codec<RelativeToSeaLevel> CODEC;
+        public int resolveY(WorldGenerationContext heightAccessor);
+        public String toString();
+    }
+}
+//// WorldDimensions.java
+import com.google.common.collect.ImmutableSet;
+import com.mojang.serialization.Lifecycle;
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.storage.PrimaryLevelData;
+public record WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions) {
+    public static final MapCodec<WorldDimensions> CODEC;
+    public WorldDimensions(Registry<LevelStem> registry);
+    public static Stream<ResourceKey<LevelStem>> keysInOrder(Set<ResourceKey<LevelStem>> knownKeys);
+    public WorldDimensions replaceOverworldGenerator(HolderLookup.Provider registries, ChunkGenerator generator);
+    public static Map<ResourceKey<LevelStem>, LevelStem> withOverworld(HolderLookup<DimensionType> dimensionTypes, Map<ResourceKey<LevelStem>, LevelStem> dimensions, ChunkGenerator generator);
+    public static Map<ResourceKey<LevelStem>, LevelStem> withOverworld(Map<ResourceKey<LevelStem>, LevelStem> dimensions, Holder<DimensionType> type, ChunkGenerator generator);
+    public ChunkGenerator overworld();
+    public Optional<LevelStem> get(ResourceKey<LevelStem> key);
+    public ImmutableSet<ResourceKey<Level>> levels();
+    public boolean isDebug();
+    public Complete bake(Registry<LevelStem> baseDimensions);
+    public static record Complete(Registry<LevelStem> dimensions, PrimaryLevelData.SpecialWorldProperty specialWorldProperty) {
+        public Lifecycle lifecycle();
+        public RegistryAccess.Frozen dimensionsRegistryAccess();
+    }
+}
+//// WorldGenSettings.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public final class WorldGenSettings extends SavedData {
+    public static final Codec<WorldGenSettings> CODEC;
+    public static final SavedDataType<WorldGenSettings> TYPE;
+    public WorldGenSettings(WorldOptions options, WorldDimensions dimensions);
+    public static WorldGenSettings of(WorldOptions options, RegistryAccess registryAccess);
+    public WorldOptions options();
+    public WorldDimensions dimensions();
+    public int hashCode();
+    public String toString();
+}
+//// WorldGenerationContext.java
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+public class WorldGenerationContext {
+    public static WorldGenerationContext of(LevelAccessor level);
+    public WorldGenerationContext(ChunkGenerator generator, LevelHeightAccessor heightAccessor);
+    private WorldGenerationContext(LevelAccessor level);
+    public int getMinGenY();
+    public int getGenDepth();
+    public int seaLevel();
+}
+//// WorldOptions.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.OptionalLong;
+public class WorldOptions {
+    public static final MapCodec<WorldOptions> CODEC;
+    public static final WorldOptions DEMO_OPTIONS;
+    public WorldOptions(long seed, boolean generateStructures, boolean generateBonusChest);
+    public static WorldOptions defaultWithRandomSeed();
+    public static WorldOptions testWorldWithRandomSeed();
+    private WorldOptions(long seed, boolean generateStructures, boolean generateBonusChest, Optional<String> legacyCustomOptions);
+    public long seed();
+    public boolean generateStructures();
+    public boolean generateBonusChest();
+    public boolean isOldCustomizedWorld();
+    public WorldOptions withBonusChest(boolean generateBonusChest);
+    public WorldOptions withStructures(boolean generateStructures);
+    public WorldOptions withSeed(OptionalLong seed);
+    public static OptionalLong parseSeed(String seedString);
+    public static long randomSeed();
+}
+//// WorldgenRandom.java
+import net.minecraft.util.RandomSource;
+public class WorldgenRandom extends LegacyRandomSource {
+    public WorldgenRandom(RandomSource randomSource);
+    public int getCount();
+    public RandomSource fork();
+    public PositionalRandomFactory forkPositional();
+    public int next(int bits);
+    public void setSeed(long seed);
+    public long setDecorationSeed(long seed, int chunkX, int chunkZ);
+    public void setFeatureSeed(long seed, int index, int step);
+    public void setLargeFeatureSeed(long seed, int chunkX, int chunkZ);
+    public void setLargeFeatureWithSalt(long seed, int x, int z, int blend);
+    public static RandomSource seedSlimeChunk(int x, int z, long seed, long salt);
+    public static enum Algorithm {
+        LEGACY, XOROSHIRO;
+        public RandomSource newInstance(long seed);
+    }
+}
+//// Xoroshiro128PlusPlus.java
+import com.mojang.serialization.Codec;
+public class Xoroshiro128PlusPlus {
+    public static final Codec<Xoroshiro128PlusPlus> CODEC;
+    public Xoroshiro128PlusPlus(RandomSupport.Seed128bit seed);
+    public Xoroshiro128PlusPlus(long seedLo, long seedHi);
+    public long nextLong();
+}
+//// XoroshiroRandomSource.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.RandomSource;
+public class XoroshiroRandomSource implements RandomSource {
+    public static final Codec<XoroshiroRandomSource> CODEC;
+    public XoroshiroRandomSource(long seed);
+    public XoroshiroRandomSource(RandomSupport.Seed128bit seed);
+    public XoroshiroRandomSource(long seedLo, long seedHi);
+    private XoroshiroRandomSource(Xoroshiro128PlusPlus randomNumberGenerator);
+    public RandomSource fork();
+    public PositionalRandomFactory forkPositional();
+    public void setSeed(long seed);
+    public int nextInt();
+    public int nextInt(int bound);
+    public long nextLong();
+    public boolean nextBoolean();
+    public float nextFloat();
+    public double nextDouble();
+    public double nextGaussian();
+    public void consumeCount(int rounds);
+    public static class XoroshiroPositionalRandomFactory implements PositionalRandomFactory {
+        public XoroshiroPositionalRandomFactory(long seedLo, long seedHi);
+        public RandomSource at(int x, int y, int z);
+        public RandomSource fromHashOf(String name);
+        public RandomSource fromSeed(long seed);
+        public void parityConfigString(StringBuilder sb);
+    }
+}

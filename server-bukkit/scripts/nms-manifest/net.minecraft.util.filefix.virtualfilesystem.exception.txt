@@ -1,0 +1,37 @@
+//// CowFSCreationException.java
+public class CowFSCreationException extends CowFSFileSystemException {
+    public CowFSCreationException(String message);
+}
+//// CowFSDirectoryNotEmptyException.java
+import java.nio.file.DirectoryNotEmptyException;
+public class CowFSDirectoryNotEmptyException extends DirectoryNotEmptyException {
+    public CowFSDirectoryNotEmptyException(String message);
+}
+//// CowFSFileAlreadyExistsException.java
+import java.nio.file.FileAlreadyExistsException;
+public class CowFSFileAlreadyExistsException extends FileAlreadyExistsException {
+    public CowFSFileAlreadyExistsException(String message);
+}
+//// CowFSFileSystemException.java
+import java.nio.file.FileSystemException;
+public class CowFSFileSystemException extends FileSystemException {
+    public CowFSFileSystemException(String message);
+}
+//// CowFSIllegalArgumentException.java
+public class CowFSIllegalArgumentException extends IllegalArgumentException {
+    public CowFSIllegalArgumentException(String message);
+}
+//// CowFSNoSuchFileException.java
+import java.nio.file.NoSuchFileException;
+public class CowFSNoSuchFileException extends NoSuchFileException {
+    public CowFSNoSuchFileException(String message);
+}
+//// CowFSNotDirectoryException.java
+import java.nio.file.NotDirectoryException;
+public class CowFSNotDirectoryException extends NotDirectoryException {
+    public CowFSNotDirectoryException(String message);
+}
+//// CowFSSymlinkException.java
+public class CowFSSymlinkException extends CowFSCreationException {
+    public CowFSSymlinkException(String message);
+}

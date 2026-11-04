@@ -93,6 +93,42 @@ jintArray JNICALL nativePlaceTree(JNIEnv* env, jclass, jstring world, jstring tr
     return array;
 }
 
+jintArray JNICALL nativePlaceFeature(JNIEnv* env, jclass, jstring world, jstring feature, jint x, jint y, jint z,
+                                     jlong seed, jboolean apply) {
+    const std::string name = toStd(env, world);
+    const std::string kind = toStd(env, feature);
+    const auto placed = withEnv<std::optional<std::vector<plugins::PluginPlacedBlock>>>(
+        name, std::nullopt,
+        [&](plugins::PluginWorldEnv& target) { return target.placeFeature(kind, x, y, z, seed, apply != JNI_FALSE); });
+    if (!placed.has_value()) {
+        return nullptr;
+    }
+    std::vector<jint> flat;
+    flat.reserve(placed->size() * 5);
+    for (const plugins::PluginPlacedBlock& block : *placed) {
+        flat.insert(flat.end(), {block.x, block.y, block.z, block.before, block.after});
+    }
+    jintArray array = env->NewIntArray(static_cast<jsize>(flat.size()));
+    env->SetIntArrayRegion(array, 0, static_cast<jsize>(flat.size()), flat.data());
+    return array;
+}
+
+jobjectArray JNICALL nativeFeatureIds(JNIEnv* env, jclass) {
+    const auto worlds = jni::onServer<std::vector<std::string>>({}, [] {
+        const auto found = BukkitBridge::current().services().worlds().all();
+        plugins::PluginWorldEnv* any = found.empty() || found.front() == nullptr ? nullptr : found.front()->env();
+        return any == nullptr ? std::vector<std::string>{} : any->featureIds();
+    });
+    jclass string = env->FindClass("java/lang/String");
+    jobjectArray array = env->NewObjectArray(static_cast<jsize>(worlds.size()), string, nullptr);
+    for (std::size_t index = 0; index < worlds.size(); ++index) {
+        jstring text = toJava(env, worlds[index]);
+        env->SetObjectArrayElement(array, static_cast<jsize>(index), text);
+        env->DeleteLocalRef(text);
+    }
+    return array;
+}
+
 jstring JNICALL nativeBlockInstrument(JNIEnv* env, jclass, jint state) {
     const auto name = jni::onServer<std::string>(
         {}, [&] { return BukkitBridge::current().services().worlds().blockInstrument(state); });
@@ -251,6 +287,9 @@ void registerRestNatives(JNIEnv* env, jclass natives) {
         method("randomTick", "(Ljava/lang/String;III)Z", reinterpret_cast<void*>(&nativeRandomTick)),
         method("tickableBlockEntities", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeTickableBlockEntities)),
         method("placeTree", "(Ljava/lang/String;Ljava/lang/String;IIIZ)[I", reinterpret_cast<void*>(&nativePlaceTree)),
+        method("placeFeature", "(Ljava/lang/String;Ljava/lang/String;IIIJZ)[I",
+               reinterpret_cast<void*>(&nativePlaceFeature)),
+        method("featureIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeFeatureIds)),
         method("blockInstrument", "(I)Ljava/lang/String;", reinterpret_cast<void*>(&nativeBlockInstrument)),
         method("placeEndGateway", "(Ljava/lang/String;III)Z", reinterpret_cast<void*>(&nativePlaceEndGateway)),
         method("nextEntityId", "()I", reinterpret_cast<void*>(&nativeNextEntityId)),

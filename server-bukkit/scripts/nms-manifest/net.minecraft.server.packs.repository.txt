@@ -1,0 +1,175 @@
+//// BuiltInPackSource.java
+import java.nio.file.Path;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.VanillaPackResources;
+import net.minecraft.world.level.validation.DirectoryValidator;
+public abstract class BuiltInPackSource implements RepositorySource {
+    public static final String VANILLA_ID = "vanilla";
+    public static final String TESTS_ID = "tests";
+    public static final KnownPack CORE_PACK_INFO;
+    public BuiltInPackSource(PackType packType, VanillaPackResources vanillaPack, Identifier packDir, DirectoryValidator validator);
+    public void loadPacks(Consumer<Pack> result);
+    protected abstract Pack createVanillaPack(Pack.ResourcesSupplier resources);
+    protected abstract Component getPackTitle(String id);
+    public VanillaPackResources getVanillaPack();
+    protected void populatePackList(BiConsumer<String, Function<String, Pack>> discoveredPacks);
+    protected void discoverPacksInPath(Path targetDir, BiConsumer<String, Function<String, Pack>> discoveredPacks);
+    protected abstract Pack createBuiltinPack(String id, Pack.ResourcesSupplier resources, Component name);
+}
+//// FolderRepositorySource.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.world.level.validation.DirectoryValidator;
+public class FolderRepositorySource implements RepositorySource {
+    public FolderRepositorySource(Path folder, PackType packType, PackSource packSource, DirectoryValidator validator);
+    public void loadPacks(Consumer<Pack> result);
+    public static void discoverPacks(Path folder, DirectoryValidator validator, BiConsumer<Path, Pack.ResourcesSupplier> result) throws IOException;
+    static class FolderPackDetector extends PackDetector<Pack.ResourcesSupplier> {
+        protected FolderPackDetector(DirectoryValidator validator);
+        protected Pack. ResourcesSupplier createZipPack(Path content);
+        protected Pack.ResourcesSupplier createDirectoryPack(Path content);
+    }
+}
+//// KnownPack.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record KnownPack(String namespace, String id, String version) {
+    public static final StreamCodec<ByteBuf, KnownPack> STREAM_CODEC;
+    public static final String VANILLA_NAMESPACE = "minecraft";
+    public static KnownPack vanilla(String id);
+    public boolean isVanilla();
+    public String toString();
+}
+//// Pack.java
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.PackMetadataResources;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackSelectionConfig;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.metadata.pack.PackFormat;
+import net.minecraft.world.flag.FeatureFlagSet;
+public class Pack {
+    public static Pack readMetaAndCreate(PackLocationInfo location, ResourcesSupplier resources, PackType packType, PackSelectionConfig selectionConfig);
+    public Pack(PackLocationInfo location, ResourcesSupplier resources, Metadata metadata, PackSelectionConfig selectionConfig);
+    public static Metadata readPackMetadata(PackLocationInfo location, ResourcesSupplier resources, PackFormat currentPackVersion, PackType type);
+    public PackLocationInfo location();
+    public Component getTitle();
+    public Component getDescription();
+    public Component getChatLink(boolean enabled);
+    public PackCompatibility getCompatibility();
+    public FeatureFlagSet getRequestedFeatures();
+    public PackMetadataResources openMetadata();
+    public Stream<PackResources> open();
+    public String getId();
+    public PackSelectionConfig selectionConfig();
+    public boolean isRequired();
+    public boolean isFixedPosition();
+    public Position getDefaultPosition();
+    public PackSource getPackSource();
+    public boolean equals(Object o);
+    public int hashCode();
+    public static record Metadata(Component description, PackCompatibility compatibility, FeatureFlagSet requestedFeatures, List<String> overlays) {
+    }
+    public static enum Position {
+        TOP, BOTTOM;
+        public <T> int insert(List<T> list, T value, Function<T, PackSelectionConfig> converter, boolean reverse);
+        public Position opposite();
+    }
+    public interface ResourcesSupplier {
+        PackMetadataResources openMetadata(PackLocationInfo location);
+        Stream<PackResources> openResources(PackLocationInfo location, Metadata metadata);
+    }
+}
+//// PackCompatibility.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.metadata.pack.PackFormat;
+import net.minecraft.util.InclusiveRange;
+public enum PackCompatibility {
+    TOO_OLD, TOO_NEW, UNKNOWN, COMPATIBLE;
+    public static final int UNKNOWN_VERSION = 2147483647;
+    public boolean isCompatible();
+    public static PackCompatibility forVersion(InclusiveRange<PackFormat> packDeclaredVersions, PackFormat gameSupportedVersion);
+    public Component getDescription();
+    public Component getConfirmation();
+}
+//// PackDetector.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+import net.minecraft.world.level.validation.DirectoryValidator;
+import net.minecraft.world.level.validation.ForbiddenSymlinkInfo;
+public abstract class PackDetector<T> {
+    protected PackDetector(DirectoryValidator validator);
+    public T detectPackResources(Path content, List<ForbiddenSymlinkInfo> issues) throws IOException;
+    protected abstract T createZipPack(Path content) throws IOException;
+    protected abstract T createDirectoryPack(Path content) throws IOException;
+}
+//// PackRepository.java
+import java.util.Collection;
+import java.util.List;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.world.flag.FeatureFlagSet;
+public class PackRepository {
+    public PackRepository(RepositorySource... sources);
+    public static String displayPackList(Collection<Pack> packs);
+    public void reload();
+    public boolean isAbleToClearAnyPack();
+    public void setSelected(Collection<String> packs);
+    public boolean addPack(String packId);
+    public boolean removePack(String packId);
+    public Collection<String> getAvailableIds();
+    public Collection<Pack> getAvailablePacks();
+    public Collection<String> getSelectedIds();
+    public FeatureFlagSet getRequestedFeatureFlags();
+    public Collection<Pack> getSelectedPacks();
+    public Pack getPack(String id);
+    public boolean isAvailable(String id);
+    public List<PackResources> openAllSelected();
+}
+//// PackSource.java
+import java.util.function.UnaryOperator;
+import net.minecraft.network.chat.Component;
+public interface PackSource {
+    UnaryOperator<Component> NO_DECORATION;
+    PackSource DEFAULT;
+    PackSource BUILT_IN;
+    PackSource FEATURE;
+    PackSource WORLD;
+    PackSource SERVER;
+    Component decorate(Component packDescription);
+    boolean shouldAddAutomatically();
+    static PackSource create(UnaryOperator<Component> decorator, boolean addAutomatically);
+}
+//// RepositorySource.java
+import java.util.function.Consumer;
+public interface RepositorySource {
+    void loadPacks(Consumer<Pack> result);
+}
+//// ServerPacksSource.java
+import java.nio.file.Path;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.VanillaPackResources;
+import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.validation.DirectoryValidator;
+public class ServerPacksSource extends BuiltInPackSource {
+    public ServerPacksSource(DirectoryValidator validator);
+    public static VanillaPackResources createVanillaPackSource();
+    protected Component getPackTitle(String id);
+    protected Pack createVanillaPack(Pack.ResourcesSupplier resources);
+    protected Pack createBuiltinPack(String id, Pack.ResourcesSupplier resources, Component name);
+    public static PackRepository createPackRepository(Path datapackDir, DirectoryValidator validator);
+    public static PackRepository createVanillaTrustedRepository();
+    public static PackRepository createPackRepository(LevelStorageSource.LevelStorageAccess levelSourceAccess);
+}

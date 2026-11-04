@@ -715,14 +715,21 @@ std::vector<ChunkGeneratedBlockTick> Chunk::takeGeneratedBlockTicks() {
     return std::exchange(generatedBlockTicks_, {});
 }
 
-Chunk::BlockWriteObserverScope::BlockWriteObserverScope(Chunk& chunk, Observer observer) : chunk_(&chunk) {
-    if (chunk_->blockWriteObserver_) {
-        throw std::logic_error{"nested block write observers are not supported"};
+Chunk::BlockWriteObserverScope::BlockWriteObserverScope(Chunk& chunk, Observer observer)
+    : chunk_(&chunk), previous_(std::move(chunk.blockWriteObserver_)) {
+    if (!previous_) {
+        chunk_->blockWriteObserver_ = std::move(observer);
+        return;
     }
-    chunk_->blockWriteObserver_ = std::move(observer);
+    chunk_->blockWriteObserver_ = [outer = previous_, inner = std::move(observer)](std::int32_t x, std::int32_t y,
+                                                                                   std::int32_t z, std::int32_t before,
+                                                                                   std::int32_t after) {
+        outer(x, y, z, before, after);
+        inner(x, y, z, before, after);
+    };
 }
 
-Chunk::BlockWriteObserverScope::~BlockWriteObserverScope() { chunk_->blockWriteObserver_ = nullptr; }
+Chunk::BlockWriteObserverScope::~BlockWriteObserverScope() { chunk_->blockWriteObserver_ = std::move(previous_); }
 
 Chunk::ExternalStateScope::ExternalStateScope(Chunk& chunk, Reader reader)
     : chunk_(&chunk), previous_(std::move(chunk.externalDecorationState_)) {

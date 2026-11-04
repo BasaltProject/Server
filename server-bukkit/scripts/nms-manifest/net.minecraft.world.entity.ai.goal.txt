@@ -1,0 +1,762 @@
+//// AvoidEntityGoal.java
+import java.util.function.Predicate;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.level.pathfinder.Path;
+public class AvoidEntityGoal<T extends LivingEntity> extends Goal {
+    protected final PathfinderMob mob;
+    protected T toAvoid;
+    protected final float maxDist;
+    protected Path path;
+    protected final PathNavigation pathNav;
+    protected final Class<T> avoidClass;
+    protected final Predicate<? super LivingEntity> avoidPredicate;
+    protected final Predicate<? super LivingEntity> predicateOnAvoidEntity;
+    public AvoidEntityGoal(PathfinderMob mob, Class<T> avoidClass, float maxDist, double walkSpeedModifier, double sprintSpeedModifier);
+    public AvoidEntityGoal(PathfinderMob mob, Class<T> avoidClass, Predicate<LivingEntity> avoidPredicate, float maxDist, double walkSpeedModifier, double sprintSpeedModifier, Predicate<? super LivingEntity> predicateOnAvoidEntity);
+    public AvoidEntityGoal(PathfinderMob mob, Class<T> avoidClass, float maxDist, double walkSpeedModifier, double sprintSpeedModifier, Predicate<? super LivingEntity> predicateOnAvoidEntity);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// BegGoal.java
+import net.minecraft.world.entity.animal.wolf.Wolf;
+public class BegGoal extends Goal {
+    public BegGoal(Wolf wolf, float lookDistance);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// BreakDoorGoal.java
+import java.util.function.Predicate;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.Mob;
+public class BreakDoorGoal extends DoorInteractGoal {
+    protected int breakTime;
+    protected int lastBreakProgress;
+    protected int doorBreakTime;
+    public BreakDoorGoal(Mob mob, Predicate<Difficulty> validDifficulties);
+    public BreakDoorGoal(Mob mob, int seconds, Predicate<Difficulty> validDifficulties);
+    protected int getDoorBreakTime();
+    public boolean canUse();
+    public void start();
+    public boolean canContinueToUse();
+    public void stop();
+    public void tick();
+}
+//// BreathAirGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+public class BreathAirGoal extends Goal {
+    public BreathAirGoal(PathfinderMob mob);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public boolean isInterruptable();
+    public void start();
+    public void tick();
+}
+//// BreedGoal.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.animal.Animal;
+public class BreedGoal extends Goal {
+    protected final Animal animal;
+    protected final ServerLevel level;
+    protected Animal partner;
+    public BreedGoal(Animal animal, double speedModifier);
+    public BreedGoal(Animal animal, double speedModifier, Class<? extends Animal> clazz);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void stop();
+    public void tick();
+    protected void breed();
+}
+//// CatLieOnBlockGoal.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.animal.feline.Cat;
+import net.minecraft.world.level.LevelReader;
+public class CatLieOnBlockGoal extends MoveToBlockGoal {
+    public CatLieOnBlockGoal(Cat cat, double speedModifier, int searchRange);
+    public boolean canUse();
+    public void start();
+    protected int nextStartTick(PathfinderMob mob);
+    public void stop();
+    public void tick();
+    protected boolean isValidTarget(LevelReader level, BlockPos pos);
+}
+//// CatSitOnBlockGoal.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.animal.feline.Cat;
+import net.minecraft.world.level.LevelReader;
+public class CatSitOnBlockGoal extends MoveToBlockGoal {
+    public CatSitOnBlockGoal(Cat cat, double speedModifier);
+    public boolean canUse();
+    public void start();
+    public void stop();
+    public void tick();
+    protected boolean isValidTarget(LevelReader level, BlockPos pos);
+}
+//// ClimbOnTopOfPowderSnowGoal.java
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.Level;
+public class ClimbOnTopOfPowderSnowGoal extends Goal {
+    public ClimbOnTopOfPowderSnowGoal(Mob mob, Level level);
+    public boolean canUse();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+}
+//// DolphinJumpGoal.java
+import net.minecraft.world.entity.animal.dolphin.Dolphin;
+public class DolphinJumpGoal extends JumpGoal {
+    public DolphinJumpGoal(Dolphin dolphin, int interval);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public boolean isInterruptable();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// DoorInteractGoal.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+public abstract class DoorInteractGoal extends Goal {
+    protected Mob mob;
+    protected BlockPos doorPos;
+    protected boolean hasDoor;
+    public DoorInteractGoal(Mob mob);
+    protected boolean isOpen();
+    protected void setOpen(boolean open);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+}
+//// EatBlockGoal.java
+import net.minecraft.world.entity.Mob;
+public class EatBlockGoal extends Goal {
+    public EatBlockGoal(Mob mob);
+    public boolean canUse();
+    public void start();
+    public void stop();
+    public boolean canContinueToUse();
+    public int getEatAnimationTick();
+    public void tick();
+}
+//// FleeSunGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class FleeSunGoal extends Goal {
+    protected final PathfinderMob mob;
+    public FleeSunGoal(PathfinderMob mob, double speedModifier);
+    public boolean canUse();
+    protected boolean setWantedPos();
+    public boolean canContinueToUse();
+    public void start();
+    protected Vec3 getHidePos();
+}
+//// FloatGoal.java
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.material.Fluid;
+public class FloatGoal extends Goal {
+    protected final TagKey<Fluid> fluid;
+    public FloatGoal(Mob mob);
+    public FloatGoal(Mob mob, TagKey<Fluid> fluid);
+    public boolean canUse();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+}
+//// FollowFlockLeaderGoal.java
+import net.minecraft.world.entity.animal.fish.AbstractSchoolingFish;
+public class FollowFlockLeaderGoal extends Goal {
+    public FollowFlockLeaderGoal(AbstractSchoolingFish mob);
+    protected int nextStartTick(AbstractSchoolingFish mob);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// FollowMobGoal.java
+import net.minecraft.world.entity.Mob;
+public class FollowMobGoal extends Goal {
+    public FollowMobGoal(Mob mob, double speedModifier, float stopDistance, float areaSize);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// FollowOwnerGoal.java
+import net.minecraft.world.entity.TamableAnimal;
+public class FollowOwnerGoal extends Goal {
+    public FollowOwnerGoal(TamableAnimal tamable, double speedModifier, float startDistance, float stopDistance);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// FollowParentGoal.java
+import net.minecraft.world.entity.animal.Animal;
+public class FollowParentGoal extends Goal {
+    public static final int HORIZONTAL_SCAN_RANGE = 8;
+    public static final int VERTICAL_SCAN_RANGE = 4;
+    public static final int DONT_FOLLOW_IF_CLOSER_THAN = 3;
+    public FollowParentGoal(Animal animal, double speedModifier);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// FollowPlayerRiddenEntityGoal.java
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.PathfinderMob;
+public class FollowPlayerRiddenEntityGoal extends Goal {
+    public FollowPlayerRiddenEntityGoal(PathfinderMob mob, Class<? extends Entity> entityTypeToFollow);
+    public boolean canUse();
+    public boolean isInterruptable();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+    static enum FollowEntityGoal {
+        GO_TO_ENTITY, GO_IN_ENTITY_DIRECTION;
+    }
+}
+//// Goal.java
+import java.util.EnumSet;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+public abstract class Goal {
+    public abstract boolean canUse();
+    public boolean canContinueToUse();
+    public boolean isInterruptable();
+    public void start();
+    public void stop();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+    public void setFlags(EnumSet<Flag> requiredControlFlags);
+    public String toString();
+    public EnumSet<Flag> getFlags();
+    protected int adjustedTickDelay(int ticks);
+    protected static int reducedTickDelay(int ticks);
+    protected static ServerLevel getServerLevel(Entity entity);
+    protected static ServerLevel getServerLevel(Level level);
+    public static enum Flag {
+        MOVE, LOOK, JUMP, TARGET;
+    }
+}
+//// GoalSelector.java
+import java.util.Set;
+import java.util.function.Predicate;
+public class GoalSelector {
+    public void addGoal(int prio, Goal goal);
+    public void removeAllGoals(Predicate<Goal> predicate);
+    public void removeGoal(Goal toRemove);
+    public void tick();
+    public void tickRunningGoals(boolean forceTickAllRunningGoals);
+    public Set<WrappedGoal> getAvailableGoals();
+    public void disableControlFlag(Goal.Flag flag);
+    public void enableControlFlag(Goal.Flag flag);
+    public void setControlFlag(Goal.Flag flag, boolean enabled);
+}
+//// GolemRandomStrollInVillageGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class GolemRandomStrollInVillageGoal extends RandomStrollGoal {
+    public GolemRandomStrollInVillageGoal(PathfinderMob mob, double speedModifier);
+    protected Vec3 getPosition();
+}
+//// InteractGoal.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+public class InteractGoal extends LookAtPlayerGoal {
+    public InteractGoal(Mob mob, Class<? extends LivingEntity> lookAtType, float lookDistance);
+    public InteractGoal(Mob mob, Class<? extends LivingEntity> lookAtType, float lookDistance, float probability);
+}
+//// JumpGoal.java
+public abstract class JumpGoal extends Goal {
+    public JumpGoal();
+}
+//// LandOnOwnersShoulderGoal.java
+import net.minecraft.world.entity.animal.parrot.ShoulderRidingEntity;
+public class LandOnOwnersShoulderGoal extends Goal {
+    public LandOnOwnersShoulderGoal(ShoulderRidingEntity entity);
+    public boolean canUse();
+    public boolean isInterruptable();
+    public void start();
+    public void tick();
+}
+//// LeapAtTargetGoal.java
+import net.minecraft.world.entity.Mob;
+public class LeapAtTargetGoal extends Goal {
+    public LeapAtTargetGoal(Mob mob, float yd);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+}
+//// LlamaFollowCaravanGoal.java
+import net.minecraft.world.entity.animal.equine.Llama;
+public class LlamaFollowCaravanGoal extends Goal {
+    public final Llama llama;
+    public LlamaFollowCaravanGoal(Llama llama, double speedModifier);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void stop();
+    public void tick();
+}
+//// LookAtPlayerGoal.java
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+public class LookAtPlayerGoal extends Goal {
+    public static final float DEFAULT_PROBABILITY = 0.02F;
+    protected final Mob mob;
+    protected Entity lookAt;
+    protected final float lookDistance;
+    protected final float probability;
+    protected final Class<? extends LivingEntity> lookAtType;
+    protected final TargetingConditions lookAtContext;
+    public LookAtPlayerGoal(Mob mob, Class<? extends LivingEntity> lookAtType, float lookDistance);
+    public LookAtPlayerGoal(Mob mob, Class<? extends LivingEntity> lookAtType, float lookDistance, float probability);
+    public LookAtPlayerGoal(Mob mob, Class<? extends LivingEntity> lookAtType, float lookDistance, float probability, boolean onlyHorizontal);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// LookAtTradingPlayerGoal.java
+import net.minecraft.world.entity.npc.villager.AbstractVillager;
+public class LookAtTradingPlayerGoal extends LookAtPlayerGoal {
+    public LookAtTradingPlayerGoal(AbstractVillager villager);
+    public boolean canUse();
+}
+//// MeleeAttackGoal.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.PathfinderMob;
+public class MeleeAttackGoal extends Goal {
+    protected final PathfinderMob mob;
+    public MeleeAttackGoal(PathfinderMob mob, double speedModifier, boolean followingTargetEvenIfNotSeen);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+    protected void checkAndPerformAttack(LivingEntity target);
+    protected void resetAttackCooldown();
+    protected boolean isTimeToAttack();
+    protected boolean canPerformAttack(LivingEntity target);
+    protected int getTicksUntilNextAttack();
+    protected int getAttackInterval();
+}
+//// MoveBackToVillageGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class MoveBackToVillageGoal extends RandomStrollGoal {
+    public MoveBackToVillageGoal(PathfinderMob mob, double speedModifier, boolean checkNoActionTime);
+    public boolean canUse();
+    protected Vec3 getPosition();
+}
+//// MoveThroughVillageGoal.java
+import java.util.function.BooleanSupplier;
+import net.minecraft.world.entity.PathfinderMob;
+public class MoveThroughVillageGoal extends Goal {
+    protected final PathfinderMob mob;
+    public MoveThroughVillageGoal(PathfinderMob mob, double speedModifier, boolean onlyAtNight, int distanceToPoi, BooleanSupplier canDealWithDoors);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+}
+//// MoveToBlockGoal.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.level.LevelReader;
+public abstract class MoveToBlockGoal extends Goal {
+    protected final PathfinderMob mob;
+    public final double speedModifier;
+    protected int nextStartTick;
+    protected int tryTicks;
+    protected BlockPos blockPos;
+    protected int verticalSearchStart;
+    public MoveToBlockGoal(PathfinderMob mob, double speedModifier, int searchRange);
+    public MoveToBlockGoal(PathfinderMob mob, double speedModifier, int searchRange, int verticalSearchRange);
+    public boolean canUse();
+    protected int nextStartTick(PathfinderMob mob);
+    public boolean canContinueToUse();
+    public void start();
+    protected void moveMobToBlock();
+    public double acceptedDistance();
+    protected BlockPos getMoveToTarget();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+    public boolean shouldRecalculatePath();
+    protected boolean isReachedTarget();
+    protected boolean findNearestBlock();
+    protected abstract boolean isValidTarget(LevelReader level, BlockPos pos);
+}
+//// MoveTowardsRestrictionGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+public class MoveTowardsRestrictionGoal extends Goal {
+    public MoveTowardsRestrictionGoal(PathfinderMob mob, double moveSpeedModifier);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+}
+//// MoveTowardsTargetGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+public class MoveTowardsTargetGoal extends Goal {
+    public MoveTowardsTargetGoal(PathfinderMob mob, double speedModifier, float within);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void stop();
+    public void start();
+}
+//// OcelotAttackGoal.java
+import net.minecraft.world.entity.Mob;
+public class OcelotAttackGoal extends Goal {
+    public OcelotAttackGoal(Mob mob);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void stop();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+}
+//// OfferFlowerGoal.java
+import net.minecraft.world.entity.animal.golem.IronGolem;
+public class OfferFlowerGoal extends Goal {
+    public static final int OFFER_TICKS = 400;
+    public OfferFlowerGoal(IronGolem golem);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// OpenDoorGoal.java
+import net.minecraft.world.entity.Mob;
+public class OpenDoorGoal extends DoorInteractGoal {
+    public OpenDoorGoal(Mob mob, boolean closeDoorAfter);
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+}
+//// PanicGoal.java
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.level.LevelReader;
+public class PanicGoal extends Goal {
+    public static final int WATER_CHECK_DISTANCE_VERTICAL = 1;
+    protected final PathfinderMob mob;
+    protected final double speedModifier;
+    protected double posX;
+    protected double posY;
+    protected double posZ;
+    protected boolean isRunning;
+    public PanicGoal(PathfinderMob mob, double speedModifier);
+    public PanicGoal(PathfinderMob mob, double speedModifier, TagKey<DamageType> panicCausingDamageTypes);
+    public PanicGoal(PathfinderMob mob, double speedModifier, Function<PathfinderMob, TagKey<DamageType>> panicCausingDamageTypes);
+    public boolean canUse();
+    protected boolean shouldPanic();
+    protected boolean findRandomPosition();
+    public boolean isRunning();
+    public void start();
+    public void stop();
+    public boolean canContinueToUse();
+    protected BlockPos lookForWater(LevelReader level, Entity mob, int xzDist);
+}
+//// PathfindToRaidGoal.java
+import net.minecraft.world.entity.raid.Raider;
+public class PathfindToRaidGoal<T extends Raider> extends Goal {
+    public PathfindToRaidGoal(T mob);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void tick();
+}
+//// RandomLookAroundGoal.java
+import net.minecraft.world.entity.Mob;
+public class RandomLookAroundGoal extends Goal {
+    public RandomLookAroundGoal(Mob mob);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+}
+//// RandomStandGoal.java
+import net.minecraft.world.entity.animal.equine.AbstractHorse;
+public class RandomStandGoal extends Goal {
+    public RandomStandGoal(AbstractHorse horse);
+    public void start();
+    public boolean canContinueToUse();
+    public boolean canUse();
+    public boolean requiresUpdateEveryTick();
+}
+//// RandomStrollGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class RandomStrollGoal extends Goal {
+    public static final int DEFAULT_INTERVAL = 120;
+    protected final PathfinderMob mob;
+    protected double wantedX;
+    protected double wantedY;
+    protected double wantedZ;
+    protected final double speedModifier;
+    protected int interval;
+    protected boolean forceTrigger;
+    public RandomStrollGoal(PathfinderMob mob, double speedModifier);
+    public RandomStrollGoal(PathfinderMob mob, double speedModifier, int interval);
+    public RandomStrollGoal(PathfinderMob mob, double speedModifier, int interval, boolean checkNoActionTime);
+    public boolean canUse();
+    protected Vec3 getPosition();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void trigger();
+    public void setInterval(int interval);
+}
+//// RandomSwimmingGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class RandomSwimmingGoal extends RandomStrollGoal {
+    public RandomSwimmingGoal(PathfinderMob mob, double speedModifier, int interval);
+    protected Vec3 getPosition();
+}
+//// RangedAttackGoal.java
+import net.minecraft.world.entity.monster.RangedAttackMob;
+public class RangedAttackGoal extends Goal {
+    public RangedAttackGoal(RangedAttackMob mob, double speedModifier, int attackInterval, float attackRadius);
+    public RangedAttackGoal(RangedAttackMob mob, double speedModifier, int attackIntervalMin, int attackIntervalMax, float attackRadius);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void stop();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+}
+//// RangedBowAttackGoal.java
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.monster.RangedAttackMob;
+public class RangedBowAttackGoal<T extends Monster & RangedAttackMob> extends Goal {
+    public RangedBowAttackGoal(T mob, double speedModifier, int attackIntervalMin, float attackRadius);
+    public void setMinAttackInterval(int ticks);
+    public boolean canUse();
+    protected boolean isHoldingBow();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+}
+//// RangedCrossbowAttackGoal.java
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.entity.monster.CrossbowAttackMob;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.monster.RangedAttackMob;
+public class RangedCrossbowAttackGoal<T extends Monster & RangedAttackMob & CrossbowAttackMob> extends Goal {
+    public static final UniformInt PATHFINDING_DELAY_RANGE;
+    public RangedCrossbowAttackGoal(T mob, double speedModifier, float attackRadius);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void stop();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+    static enum CrossbowState {
+        UNCHARGED, CHARGING, CHARGED, READY_TO_ATTACK;
+    }
+}
+//// RemoveBlockGoal.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+public class RemoveBlockGoal extends MoveToBlockGoal {
+    public RemoveBlockGoal(Block blockToRemove, PathfinderMob mob, double speedModifier, int verticalSearchRange);
+    public boolean canUse();
+    public void stop();
+    public void start();
+    public void playDestroyProgressSound(LevelAccessor level, BlockPos pos);
+    public void playBreakSound(Level level, BlockPos pos);
+    public void tick();
+    protected boolean isValidTarget(LevelReader level, BlockPos pos);
+}
+//// RestrictSunGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+public class RestrictSunGoal extends Goal {
+    public RestrictSunGoal(PathfinderMob mob);
+    public boolean canUse();
+    public void start();
+    public void stop();
+}
+//// RunAroundLikeCrazyGoal.java
+import net.minecraft.world.entity.animal.equine.AbstractHorse;
+public class RunAroundLikeCrazyGoal extends Goal {
+    public RunAroundLikeCrazyGoal(AbstractHorse mob, double speedModifier);
+    public boolean canUse();
+    public void start();
+    public boolean canContinueToUse();
+    public void tick();
+}
+//// SitWhenOrderedToGoal.java
+import net.minecraft.world.entity.TamableAnimal;
+public class SitWhenOrderedToGoal extends Goal {
+    public SitWhenOrderedToGoal(TamableAnimal mob);
+    public boolean canContinueToUse();
+    public boolean canUse();
+    public void start();
+    public void stop();
+}
+//// SpearUseGoal.java
+import net.minecraft.world.entity.monster.Monster;
+public class SpearUseGoal<T extends Monster> extends Goal {
+    public SpearUseGoal(T mob, double speedModifierWhenCharging, double speedModifierWhenRepositioning, float approachDistance, float targetInRangeRadius);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+    public void tick();
+    public static class SpearUseState {
+        public boolean notEngagedYet();
+        public void startEngagement(int spearDownTime);
+        public boolean tickAndCheckEngagement();
+        public boolean tickAndCheckFleeing();
+    }
+}
+//// StrollThroughVillageGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+public class StrollThroughVillageGoal extends Goal {
+    public StrollThroughVillageGoal(PathfinderMob mob, int interval);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void tick();
+}
+//// SwellGoal.java
+import net.minecraft.world.entity.monster.Creeper;
+public class SwellGoal extends Goal {
+    public SwellGoal(Creeper creeper);
+    public boolean canUse();
+    public void start();
+    public void stop();
+    public boolean requiresUpdateEveryTick();
+    public void tick();
+}
+//// TemptGoal.java
+import java.util.function.Predicate;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+public class TemptGoal extends Goal {
+    protected final Mob mob;
+    protected final double speedModifier;
+    protected Player player;
+    public TemptGoal(PathfinderMob mob, double speedModifier, Predicate<ItemStack> items, boolean canScare);
+    public TemptGoal(PathfinderMob mob, double speedModifier, Predicate<ItemStack> items, boolean canScare, double stopDistance);
+    private TemptGoal(Mob mob, double speedModifier, Predicate<ItemStack> items, boolean canScare, double stopDistance);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    protected boolean canScare();
+    public void start();
+    public void stop();
+    public void tick();
+    protected void stopNavigation();
+    protected void navigateTowards(Player player);
+    public boolean isRunning();
+    public static class ForNonPathfinders extends TemptGoal {
+        public ForNonPathfinders(Mob mob, double speedModifier, Predicate<ItemStack> items, boolean canScare, double stopDistance);
+        protected void stopNavigation();
+        protected void navigateTowards(Player player);
+    }
+}
+//// TradeWithPlayerGoal.java
+import net.minecraft.world.entity.npc.villager.AbstractVillager;
+public class TradeWithPlayerGoal extends Goal {
+    public TradeWithPlayerGoal(AbstractVillager mob);
+    public boolean canUse();
+    public void start();
+    public void stop();
+}
+//// TryFindLiquidGoal.java
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.level.material.Fluid;
+public class TryFindLiquidGoal extends Goal {
+    public TryFindLiquidGoal(PathfinderMob mob, TagKey<Fluid> fluidTag);
+    public boolean canUse();
+    public void start();
+}
+//// UseItemGoal.java
+import java.util.function.Predicate;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.item.ItemStack;
+public class UseItemGoal<T extends Mob> extends Goal {
+    public UseItemGoal(T mob, ItemStack item, SoundEvent finishUsingSound, Predicate<? super T> canUseSelector);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public void start();
+    public void stop();
+}
+//// WaterAvoidingRandomFlyingGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class WaterAvoidingRandomFlyingGoal extends WaterAvoidingRandomStrollGoal {
+    public WaterAvoidingRandomFlyingGoal(PathfinderMob mob, double speedModifier);
+    protected Vec3 getPosition();
+}
+//// WaterAvoidingRandomStrollGoal.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class WaterAvoidingRandomStrollGoal extends RandomStrollGoal {
+    public static final float PROBABILITY = 0.001F;
+    protected final float probability;
+    public WaterAvoidingRandomStrollGoal(PathfinderMob mob, double speedModifier);
+    public WaterAvoidingRandomStrollGoal(PathfinderMob mob, double speedModifier, float probability);
+    protected Vec3 getPosition();
+}
+//// WrappedGoal.java
+import java.util.EnumSet;
+public class WrappedGoal extends Goal {
+    public WrappedGoal(int priority, Goal goal);
+    public boolean canBeReplacedBy(WrappedGoal goal);
+    public boolean canUse();
+    public boolean canContinueToUse();
+    public boolean isInterruptable();
+    public void start();
+    public void stop();
+    public boolean requiresUpdateEveryTick();
+    protected int adjustedTickDelay(int ticks);
+    public void tick();
+    public void setFlags(EnumSet<Goal.Flag> requiredControlFlags);
+    public EnumSet<Goal.Flag> getFlags();
+    public boolean isRunning();
+    public int getPriority();
+    public Goal getGoal();
+    public boolean equals(Object o);
+    public int hashCode();
+}
+//// ZombieAttackGoal.java
+import net.minecraft.world.entity.monster.zombie.Zombie;
+public class ZombieAttackGoal extends MeleeAttackGoal {
+    public ZombieAttackGoal(Zombie zombie, double speedModifier, boolean trackTarget);
+    public void start();
+    public void stop();
+    public void tick();
+}

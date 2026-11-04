@@ -26,9 +26,9 @@ public final class ChannelBridge {
     private static final int kHandshake = 0;
     private static final int kServerProtocol = 777;
     private static final long kInboundTimeoutSeconds = 5;
-    private static final boolean kTrace = System.getenv("BASALT_PACKET_TRACE") != null;
+    static final boolean kTrace = System.getenv("BASALT_PACKET_TRACE") != null;
 
-    private static final ConcurrentHashMap<Long, Link> links = new ConcurrentHashMap<>();
+    static final ConcurrentHashMap<Long, Link> links = new ConcurrentHashMap<>();
     private static final Object guard = new Object();
     private static DefaultEventLoopGroup group;
     private static BasaltServerChannel serverChannel;
@@ -48,7 +48,7 @@ public final class ChannelBridge {
         }
     }
 
-    private static final class Link {
+    static final class Link {
         final BasaltChannel channel;
         final Connection connection;
         volatile Pending pending;
@@ -59,7 +59,7 @@ public final class ChannelBridge {
         }
     }
 
-    private static final class Pending {
+    static final class Pending {
         volatile byte[] result;
         volatile boolean reached;
     }
@@ -106,7 +106,7 @@ public final class ChannelBridge {
         return link == null ? null : link.channel;
     }
 
-    private static int readVarInt(byte[] data) {
+    static int readVarInt(byte[] data) {
         int value = 0;
         int shift = 0;
         for (int i = 0; i < data.length && i < 5; i++) {
@@ -119,7 +119,7 @@ public final class ChannelBridge {
         return -1;
     }
 
-    private static void writeVarInt(ByteBuf out, int value) {
+    static void writeVarInt(ByteBuf out, int value) {
         while ((value & ~0x7F) != 0) {
             out.writeByte((value & 0x7F) | 0x80);
             value >>>= 7;
@@ -127,7 +127,7 @@ public final class ChannelBridge {
         out.writeByte(value);
     }
 
-    private static int varIntLength(int value) {
+    static int varIntLength(int value) {
         int length = 1;
         while ((value & ~0x7F) != 0) {
             length++;
@@ -136,8 +136,8 @@ public final class ChannelBridge {
         return length;
     }
 
-    private static final class FromWire extends ChannelInboundHandlerAdapter {
-        private final Link link;
+    static final class FromWire extends ChannelInboundHandlerAdapter {
+        final Link link;
 
         FromWire(Link link) {
             this.link = link;
@@ -176,8 +176,8 @@ public final class ChannelBridge {
         }
     }
 
-    private static final class ToWire extends ChannelOutboundHandlerAdapter {
-        private final Link link;
+    static final class ToWire extends ChannelOutboundHandlerAdapter {
+        final Link link;
 
         ToWire(Link link) {
             this.link = link;
@@ -211,7 +211,7 @@ public final class ChannelBridge {
         }
     }
 
-    private static Link open(long connection, String address, int port) {
+    static Link open(long connection, String address, int port) {
         Link made;
         synchronized (guard) {
             Link existing = links.get(connection);
@@ -258,7 +258,7 @@ public final class ChannelBridge {
         open(connection, address, port);
     }
 
-    private static byte[] patchHandshake(byte[] body) {
+    static byte[] patchHandshake(byte[] body) {
         int version = readVarInt(body);
         if (version == kServerProtocol || version < 0) {
             return body;
@@ -273,14 +273,14 @@ public final class ChannelBridge {
         return patched;
     }
 
-    private static ByteBuf frame(int id, byte[] body) {
+    static ByteBuf frame(int id, byte[] body) {
         ByteBuf buffer = Unpooled.buffer(body.length + 5);
         writeVarInt(buffer, id);
         buffer.writeBytes(body);
         return buffer;
     }
 
-    private static Link linkFor(long connection, int phase, String address, int port) {
+    static Link linkFor(long connection, int phase, String address, int port) {
         Link link = links.get(connection);
         if (link == null && phase == kHandshake) {
             link = open(connection, address, port);

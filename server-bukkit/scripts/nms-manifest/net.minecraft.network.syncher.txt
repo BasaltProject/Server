@@ -1,0 +1,147 @@
+//// EntityDataAccessor.java
+public record EntityDataAccessor<T>(int id, EntityDataSerializer<T> serializer) {
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+}
+//// EntityDataSerializer.java
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public interface EntityDataSerializer<T> {
+    StreamCodec<? super RegistryFriendlyByteBuf, T> codec();
+    default EntityDataAccessor<T> createAccessor(int id);
+    T copy(T value);
+    static <T> EntityDataSerializer<T> forValueType(StreamCodec<? super RegistryFriendlyByteBuf, T> codec);
+    public interface ForValueType<T> extends EntityDataSerializer<T> {
+        default T copy(T value);
+    }
+}
+//// EntityDataSerializers.java
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Rotations;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.EntityReference;
+import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.animal.armadillo.Armadillo;
+import net.minecraft.world.entity.animal.chicken.ChickenSoundVariant;
+import net.minecraft.world.entity.animal.chicken.ChickenVariant;
+import net.minecraft.world.entity.animal.cow.CowSoundVariant;
+import net.minecraft.world.entity.animal.cow.CowVariant;
+import net.minecraft.world.entity.animal.feline.CatSoundVariant;
+import net.minecraft.world.entity.animal.feline.CatVariant;
+import net.minecraft.world.entity.animal.frog.FrogVariant;
+import net.minecraft.world.entity.animal.golem.CopperGolemState;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilusVariant;
+import net.minecraft.world.entity.animal.pig.PigSoundVariant;
+import net.minecraft.world.entity.animal.pig.PigVariant;
+import net.minecraft.world.entity.animal.sniffer.Sniffer;
+import net.minecraft.world.entity.animal.wolf.WolfSoundVariant;
+import net.minecraft.world.entity.animal.wolf.WolfVariant;
+import net.minecraft.world.entity.decoration.painting.PaintingVariant;
+import net.minecraft.world.entity.npc.villager.VillagerData;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ResolvableProfile;
+import net.minecraft.world.level.block.WeatheringCopper;
+import net.minecraft.world.level.block.state.BlockState;
+import org.joml.Quaternionfc;
+import org.joml.Vector3fc;
+public class EntityDataSerializers {
+    public static final EntityDataSerializer<Byte> BYTE;
+    public static final EntityDataSerializer<Integer> INT;
+    public static final EntityDataSerializer<Long> LONG;
+    public static final EntityDataSerializer<Float> FLOAT;
+    public static final EntityDataSerializer<String> STRING;
+    public static final EntityDataSerializer<Component> COMPONENT;
+    public static final EntityDataSerializer<Optional<Component>> OPTIONAL_COMPONENT;
+    public static final EntityDataSerializer<ItemStack> ITEM_STACK;
+    public static final EntityDataSerializer<BlockState> BLOCK_STATE;
+    public static final EntityDataSerializer<Optional<BlockState>> OPTIONAL_BLOCK_STATE;
+    public static final EntityDataSerializer<Boolean> BOOLEAN;
+    public static final EntityDataSerializer<ParticleOptions> PARTICLE;
+    public static final EntityDataSerializer<List<ParticleOptions>> PARTICLES;
+    public static final EntityDataSerializer<Rotations> ROTATIONS;
+    public static final EntityDataSerializer<BlockPos> BLOCK_POS;
+    public static final EntityDataSerializer<Optional<BlockPos>> OPTIONAL_BLOCK_POS;
+    public static final EntityDataSerializer<Direction> DIRECTION;
+    public static final EntityDataSerializer<Optional<EntityReference<LivingEntity>>> OPTIONAL_LIVING_ENTITY_REFERENCE;
+    public static final EntityDataSerializer<Optional<GlobalPos>> OPTIONAL_GLOBAL_POS;
+    public static final EntityDataSerializer<VillagerData> VILLAGER_DATA;
+    public static final EntityDataSerializer<OptionalInt> OPTIONAL_UNSIGNED_INT;
+    public static final EntityDataSerializer<Pose> POSE;
+    public static final EntityDataSerializer<Holder<CatVariant>> CAT_VARIANT;
+    public static final EntityDataSerializer<Holder<CatSoundVariant>> CAT_SOUND_VARIANT;
+    public static final EntityDataSerializer<Holder<ChickenVariant>> CHICKEN_VARIANT;
+    public static final EntityDataSerializer<Holder<ChickenSoundVariant>> CHICKEN_SOUND_VARIANT;
+    public static final EntityDataSerializer<Holder<CowVariant>> COW_VARIANT;
+    public static final EntityDataSerializer<Holder<CowSoundVariant>> COW_SOUND_VARIANT;
+    public static final EntityDataSerializer<Holder<WolfVariant>> WOLF_VARIANT;
+    public static final EntityDataSerializer<Holder<WolfSoundVariant>> WOLF_SOUND_VARIANT;
+    public static final EntityDataSerializer<Holder<FrogVariant>> FROG_VARIANT;
+    public static final EntityDataSerializer<Holder<PigVariant>> PIG_VARIANT;
+    public static final EntityDataSerializer<Holder<PigSoundVariant>> PIG_SOUND_VARIANT;
+    public static final EntityDataSerializer<Holder<ZombieNautilusVariant>> ZOMBIE_NAUTILUS_VARIANT;
+    public static final EntityDataSerializer<Holder<PaintingVariant>> PAINTING_VARIANT;
+    public static final EntityDataSerializer<Armadillo.ArmadilloState> ARMADILLO_STATE;
+    public static final EntityDataSerializer<Sniffer.State> SNIFFER_STATE;
+    public static final EntityDataSerializer<WeatheringCopper.WeatherState> WEATHERING_COPPER_STATE;
+    public static final EntityDataSerializer<CopperGolemState> COPPER_GOLEM_STATE;
+    public static final EntityDataSerializer<Vector3fc> VECTOR3;
+    public static final EntityDataSerializer<Quaternionfc> QUATERNION;
+    public static final EntityDataSerializer<ResolvableProfile> RESOLVABLE_PROFILE;
+    public static final EntityDataSerializer<HumanoidArm> HUMANOID_ARM;
+    public static final EntityDataSerializer<DyeColor> DYE_COLOR;
+    public static void registerSerializer(EntityDataSerializer<?> serializer);
+    public static EntityDataSerializer<?> getSerializer(int id);
+    public static int getSerializedId(EntityDataSerializer<?> serializer);
+    private EntityDataSerializers();
+}
+//// SyncedDataHolder.java
+import java.util.List;
+public interface SyncedDataHolder {
+    void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    void onSyncedDataUpdated(List<SynchedEntityData.DataValue<?>> updatedItems);
+}
+//// SynchedEntityData.java
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+public class SynchedEntityData {
+    private SynchedEntityData(SyncedDataHolder entity, DataItem<?>[] itemsById);
+    public static <T> EntityDataAccessor<T> defineId(Class<? extends SyncedDataHolder> clazz, EntityDataSerializer<T> type);
+    public <T> T get(EntityDataAccessor<T> accessor);
+    public <T> void set(EntityDataAccessor<T> accessor, T value);
+    public <T> void set(EntityDataAccessor<T> accessor, T value, boolean forceDirty);
+    public boolean isDirty();
+    public List<DataValue<?>> packDirty();
+    public List<DataValue<?>> getNonDefaultValues();
+    public void assignValues(List<DataValue<?>> items);
+    public static record DataValue<T>(int id, EntityDataSerializer<T> serializer, T value) {
+        public static <T> DataValue<T> create(EntityDataAccessor<T> accessor, T value);
+        public void write(RegistryFriendlyByteBuf output);
+        public static DataValue<?> read(RegistryFriendlyByteBuf input, int id);
+    }
+    public static class DataItem<T> {
+        public DataItem(EntityDataAccessor<T> accessor, T initialValue);
+        public EntityDataAccessor<T> getAccessor();
+        public void setValue(T value);
+        public T getValue();
+        public boolean isDirty();
+        public void setDirty(boolean dirty);
+        public boolean isSetToDefault();
+        public DataValue<T> value();
+    }
+    public static class Builder {
+        public Builder(SyncedDataHolder entity);
+        public <T> Builder define(EntityDataAccessor<T> accessor, T value);
+        public SynchedEntityData build();
+    }
+}

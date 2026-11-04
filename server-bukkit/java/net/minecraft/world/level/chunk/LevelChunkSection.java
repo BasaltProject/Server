@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.chunk;
 
 import net.minecraft.core.Holder;
@@ -5,6 +6,9 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
+import java.util.function.Predicate;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.level.biome.BiomeResolver;
 
 public class LevelChunkSection {
     public static final int BIOME_CONTAINER_BITS = 2;
@@ -182,5 +186,83 @@ public class LevelChunkSection {
 
     public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ) {
         return getBiomes().get(quartX, quartY, quartZ);
+    }
+    private LevelChunkSection(LevelChunkSection source) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunkSection#<init>");
+    }
+    public void acquire() {
+
+    }
+    public void release() {
+
+    }
+    public BlockState setBlockState(int sectionX, int sectionY, int sectionZ, BlockState state, boolean checkThreading) {
+        return setBlockState(sectionX, sectionY, sectionZ, state);
+    }
+    public boolean hasFluid() {
+        return maybeHas(state -> !state.getFluidState().isEmpty());
+    }
+    public boolean isRandomlyTickingBlocks() {
+        return tickingBlockCount > 0;
+    }
+    public boolean isRandomlyTickingFluids() {
+        return maybeHas(state -> state.getFluidState().is(net.minecraft.world.level.material.Fluids.LAVA));
+    }
+    public void read(FriendlyByteBuf buffer) {
+        buffer.readShort();
+        buffer.readShort();
+        getStates().read(buffer);
+        readBiomes(buffer);
+        recalcBlockCounts();
+    }
+    public void readBiomes(FriendlyByteBuf buffer) {
+        PalettedContainer<Holder<Biome>> fresh = (PalettedContainer<Holder<Biome>>) getBiomes().recreate();
+        fresh.read(buffer);
+        biomes = fresh;
+    }
+    public void write(FriendlyByteBuf buffer) {
+        int solid = 0;
+        int fluids = 0;
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    BlockState state = getBlockState(x, y, z);
+                    if (!state.isAir()) {
+                        solid++;
+                    }
+                    if (!state.getFluidState().isEmpty()) {
+                        fluids++;
+                    }
+                }
+            }
+        }
+        buffer.writeShort(solid);
+        buffer.writeShort(fluids);
+        getStates().write(buffer);
+        getBiomes().write(buffer);
+    }
+    public int getSerializedSize() {
+        return 4 + getStates().getSerializedSize() + getBiomes().getSerializedSize();
+    }
+    public boolean maybeHas(Predicate<BlockState> predicate) {
+        if (hasOnlyAir()) {
+            return predicate.test(net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+        }
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    if (predicate.test(getBlockState(x, y, z))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    public void fillBiomesFromNoise(BiomeResolver biomeResolver, int quartMinX, int quartMinY, int quartMinZ) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunkSection#fillBiomesFromNoise");
+    }
+    public LevelChunkSection copy() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunkSection#copy");
     }
 }

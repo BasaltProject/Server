@@ -1,0 +1,7 @@
+//// BundleTooltip.java
+import net.minecraft.world.item.component.BundleContents;
+public record BundleTooltip(BundleContents contents) implements TooltipComponent {
+}
+//// TooltipComponent.java
+public interface TooltipComponent {
+}

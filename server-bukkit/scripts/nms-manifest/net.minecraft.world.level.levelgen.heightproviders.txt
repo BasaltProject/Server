@@ -1,0 +1,99 @@
+//// BiasedToBottomHeight.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+public class BiasedToBottomHeight extends HeightProvider {
+    public static final MapCodec<BiasedToBottomHeight> CODEC;
+    private BiasedToBottomHeight(VerticalAnchor minInclusive, VerticalAnchor maxInclusive, int inner);
+    public static BiasedToBottomHeight of(VerticalAnchor minInclusive, VerticalAnchor maxInclusive, int offset);
+    public int sample(RandomSource random, WorldGenerationContext context);
+    public HeightProviderType<?> getType();
+    public String toString();
+}
+//// ConstantHeight.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+public class ConstantHeight extends HeightProvider {
+    public static final ConstantHeight ZERO;
+    public static final MapCodec<ConstantHeight> CODEC;
+    public static ConstantHeight of(VerticalAnchor value);
+    private ConstantHeight(VerticalAnchor value);
+    public VerticalAnchor getValue();
+    public int sample(RandomSource random, WorldGenerationContext context);
+    public HeightProviderType<?> getType();
+    public String toString();
+}
+//// HeightProvider.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+public abstract class HeightProvider {
+    public static final Codec<HeightProvider> CODEC;
+    public abstract int sample(RandomSource random, WorldGenerationContext heightAccessor);
+    public abstract HeightProviderType<?> getType();
+}
+//// HeightProviderType.java
+import com.mojang.serialization.MapCodec;
+public interface HeightProviderType<P extends HeightProvider> {
+    HeightProviderType<ConstantHeight> CONSTANT;
+    HeightProviderType<UniformHeight> UNIFORM;
+    HeightProviderType<BiasedToBottomHeight> BIASED_TO_BOTTOM;
+    HeightProviderType<VeryBiasedToBottomHeight> VERY_BIASED_TO_BOTTOM;
+    HeightProviderType<TrapezoidHeight> TRAPEZOID;
+    HeightProviderType<WeightedListHeight> WEIGHTED_LIST;
+    MapCodec<P> codec();
+}
+//// TrapezoidHeight.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+public class TrapezoidHeight extends HeightProvider {
+    public static final MapCodec<TrapezoidHeight> CODEC;
+    private TrapezoidHeight(VerticalAnchor minInclusive, VerticalAnchor maxInclusive, int plateau);
+    public static TrapezoidHeight of(VerticalAnchor minInclusive, VerticalAnchor maxInclusive, int plateau);
+    public static TrapezoidHeight of(VerticalAnchor minInclusive, VerticalAnchor maxInclusive);
+    public int sample(RandomSource random, WorldGenerationContext context);
+    public HeightProviderType<?> getType();
+    public String toString();
+}
+//// UniformHeight.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+public class UniformHeight extends HeightProvider {
+    public static final MapCodec<UniformHeight> CODEC;
+    private UniformHeight(VerticalAnchor minInclusive, VerticalAnchor maxInclusive);
+    public static UniformHeight of(VerticalAnchor minInclusive, VerticalAnchor maxInclusive);
+    public int sample(RandomSource random, WorldGenerationContext context);
+    public HeightProviderType<?> getType();
+    public String toString();
+}
+//// VeryBiasedToBottomHeight.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+public class VeryBiasedToBottomHeight extends HeightProvider {
+    public static final MapCodec<VeryBiasedToBottomHeight> CODEC;
+    private VeryBiasedToBottomHeight(VerticalAnchor minInclusive, VerticalAnchor maxInclusive, int inner);
+    public static VeryBiasedToBottomHeight of(VerticalAnchor minInclusive, VerticalAnchor maxInclusive, int offset);
+    public int sample(RandomSource random, WorldGenerationContext context);
+    public HeightProviderType<?> getType();
+    public String toString();
+}
+//// WeightedListHeight.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+public class WeightedListHeight extends HeightProvider {
+    public static final MapCodec<WeightedListHeight> CODEC;
+    public WeightedListHeight(WeightedList<HeightProvider> distribution);
+    public int sample(RandomSource random, WorldGenerationContext heightAccessor);
+    public HeightProviderType<?> getType();
+}

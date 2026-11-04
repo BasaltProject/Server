@@ -11,9 +11,7 @@ public final class WirePacketEncoder extends MessageToMessageEncoder<Packet<?>> 
             try {
                 frames.add(io.netty.buffer.Unpooled.buffer(1).writeByte(0));
                 for (Packet<?> item : bundle.subPackets()) {
-                    if (!(item instanceof WirePacket wire))
-                        throw new IllegalArgumentException("Unsupported bundled packet: " + item.getClass());
-                    frames.add(PacketCodec.frame(wire));
+                    frames.add(PacketCodec.frame(PacketEncoding.toWire(item)));
                 }
                 frames.add(io.netty.buffer.Unpooled.buffer(1).writeByte(0));
             } catch (RuntimeException | Error failure) {
@@ -22,6 +20,6 @@ public final class WirePacketEncoder extends MessageToMessageEncoder<Packet<?>> 
             }
             out.addAll(frames);
         } else
-            throw new IllegalArgumentException("Unsupported packet: " + packet.getClass());
+            out.add(PacketCodec.frame(PacketEncoding.toWire(packet)));
     }
 }

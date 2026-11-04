@@ -1,0 +1,291 @@
+//// DisplaySlot.java
+import java.util.function.IntFunction;
+import net.minecraft.util.StringRepresentable;
+public enum DisplaySlot implements StringRepresentable {
+    LIST, SIDEBAR, BELOW_NAME, TEAM_BLACK, TEAM_DARK_BLUE, TEAM_DARK_GREEN, TEAM_DARK_AQUA, TEAM_DARK_RED, TEAM_DARK_PURPLE, TEAM_GOLD, TEAM_GRAY, TEAM_DARK_GRAY, TEAM_BLUE, TEAM_GREEN, TEAM_AQUA, TEAM_RED, TEAM_LIGHT_PURPLE, TEAM_YELLOW, TEAM_WHITE;
+    public static final StringRepresentable.EnumCodec<DisplaySlot> CODEC;
+    public static final IntFunction<DisplaySlot> BY_ID;
+    public int id();
+    public String getSerializedName();
+}
+//// Objective.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.numbers.NumberFormat;
+import net.minecraft.world.scores.criteria.ObjectiveCriteria;
+public class Objective {
+    public Objective(Scoreboard scoreboard, String name, ObjectiveCriteria criteria, Component displayName, ObjectiveCriteria.RenderType renderType, boolean displayAutoUpdate, NumberFormat numberFormat);
+    public Packed pack();
+    public Scoreboard getScoreboard();
+    public String getName();
+    public ObjectiveCriteria getCriteria();
+    public Component getDisplayName();
+    public boolean displayAutoUpdate();
+    public NumberFormat numberFormat();
+    public NumberFormat numberFormatOrDefault(NumberFormat _default);
+    public Component getFormattedDisplayName();
+    public void setDisplayName(Component name);
+    public ObjectiveCriteria.RenderType getRenderType();
+    public void setRenderType(ObjectiveCriteria.RenderType renderType);
+    public void setDisplayAutoUpdate(boolean displayAutoUpdate);
+    public void setNumberFormat(NumberFormat numberFormat);
+    public static record Packed(String name, ObjectiveCriteria criteria, Component displayName, ObjectiveCriteria.RenderType renderType, boolean displayAutoUpdate, Optional<NumberFormat> numberFormat) {
+        public static final Codec<Packed> CODEC;
+    }
+}
+//// PlayerScoreEntry.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.numbers.NumberFormat;
+public record PlayerScoreEntry(String owner, int value, Component display, NumberFormat numberFormatOverride) {
+    public boolean isHidden();
+    public Component ownerName();
+    public MutableComponent formatValue(NumberFormat _default);
+}
+//// PlayerScores.java
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import java.util.Map;
+import java.util.function.Consumer;
+class PlayerScores {
+    public Score get(Objective objective);
+    public Score getOrCreate(Objective objective, Consumer<Score> newResultCallback);
+    public boolean remove(Objective objective);
+    public boolean hasScores();
+    public Object2IntMap<Objective> listScores();
+    void setScore(Objective objective, Score score);
+    Map<Objective, Score> listRawScores();
+}
+//// PlayerTeam.java
+import com.mojang.serialization.Codec;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+public class PlayerTeam extends Team {
+    public PlayerTeam(Scoreboard scoreboard, String name);
+    public Packed pack();
+    public Scoreboard getScoreboard();
+    public String getName();
+    public Component getDisplayName();
+    public MutableComponent getFormattedDisplayName();
+    public void setDisplayName(Component displayName);
+    public void setPlayerPrefix(Component playerPrefix);
+    public Component getPlayerPrefix();
+    public void setPlayerSuffix(Component playerSuffix);
+    public Component getPlayerSuffix();
+    public Collection<String> getPlayers();
+    public MutableComponent getFormattedName(Component teamMemberName);
+    public static MutableComponent formatNameForTeam(Team team, Component name);
+    public boolean isAllowFriendlyFire();
+    public void setAllowFriendlyFire(boolean allowFriendlyFire);
+    public boolean canSeeFriendlyInvisibles();
+    public void setSeeFriendlyInvisibles(boolean seeFriendlyInvisibles);
+    public Team.Visibility getNameTagVisibility();
+    public Team.Visibility getDeathMessageVisibility();
+    public void setNameTagVisibility(Team.Visibility visibility);
+    public void setDeathMessageVisibility(Team.Visibility visibility);
+    public Team.CollisionRule getCollisionRule();
+    public void setCollisionRule(Team.CollisionRule collisionRule);
+    public byte packOptions();
+    public void unpackOptions(byte options);
+    public void setColor(Optional<TeamColor> color);
+    public Optional<TeamColor> getColor();
+    public static record Packed(String name, Optional<Component> displayName, Optional<TeamColor> color, boolean allowFriendlyFire, boolean seeFriendlyInvisibles, Component memberNamePrefix, Component memberNameSuffix, Team.Visibility nameTagVisibility, Team.Visibility deathMessageVisibility, Team.CollisionRule collisionRule, List<String> players) {
+        public static final Codec<Packed> CODEC;
+    }
+    public @interface OptionFlags {
+    }
+}
+//// ReadOnlyScoreInfo.java
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.numbers.NumberFormat;
+public interface ReadOnlyScoreInfo {
+    int value();
+    boolean isLocked();
+    NumberFormat numberFormat();
+    default MutableComponent formatValue(NumberFormat defaultFormat);
+}
+//// Score.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.numbers.NumberFormat;
+public class Score implements ReadOnlyScoreInfo {
+    public Score();
+    public Score(Packed packed);
+    public Packed pack();
+    public int value();
+    public void value(int score);
+    public boolean isLocked();
+    public void setLocked(boolean locked);
+    public Component display();
+    public void display(Component display);
+    public NumberFormat numberFormat();
+    public void numberFormat(NumberFormat numberFormat);
+    public static record Packed(int value, boolean locked, Optional<Component> display, Optional<NumberFormat> numberFormat) {
+        public static final MapCodec<Packed> MAP_CODEC;
+    }
+}
+//// ScoreAccess.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.numbers.NumberFormat;
+public interface ScoreAccess {
+    int get();
+    void set(int value);
+    default int add(int count);
+    default int increment();
+    default void reset();
+    boolean locked();
+    void unlock();
+    void lock();
+    Component display();
+    void display(Component display);
+    void numberFormatOverride(NumberFormat numberFormat);
+}
+//// ScoreHolder.java
+import com.mojang.authlib.GameProfile;
+import net.minecraft.network.chat.Component;
+public interface ScoreHolder {
+    String WILDCARD_NAME;
+    ScoreHolder WILDCARD;
+    String getScoreboardName();
+    default Component getDisplayName();
+    default Component getFeedbackDisplayName();
+    static ScoreHolder forNameOnly(String name);
+    static ScoreHolder fromGameProfile(GameProfile profile);
+}
+//// Scoreboard.java
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.numbers.NumberFormat;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.scores.criteria.ObjectiveCriteria;
+public class Scoreboard {
+    public static final String HIDDEN_SCORE_PREFIX = "#";
+    public Objective getObjective(String name);
+    public Objective addObjective(String name, ObjectiveCriteria criteria, Component displayName, ObjectiveCriteria.RenderType renderType, boolean displayAutoUpdate, NumberFormat numberFormat);
+    public final void forAllObjectives(ObjectiveCriteria criteria, ScoreHolder name, Consumer<ScoreAccess> operation);
+    public ScoreAccess getOrCreatePlayerScore(ScoreHolder holder, Objective objective);
+    public ScoreAccess getOrCreatePlayerScore(ScoreHolder scoreHolder, Objective objective, boolean forceWritable);
+    public ReadOnlyScoreInfo getPlayerScoreInfo(ScoreHolder name, Objective objective);
+    public Collection<PlayerScoreEntry> listPlayerScores(Objective objective);
+    public Collection<Objective> getObjectives();
+    public Collection<String> getObjectiveNames();
+    public Collection<ScoreHolder> getTrackedPlayers();
+    public void resetAllPlayerScores(ScoreHolder player);
+    public void resetSinglePlayerScore(ScoreHolder player, Objective objective);
+    public Object2IntMap<Objective> listPlayerScores(ScoreHolder player);
+    public void removeObjective(Objective objective);
+    public void setDisplayObjective(DisplaySlot slot, Objective objective);
+    public Objective getDisplayObjective(DisplaySlot slot);
+    public PlayerTeam getPlayerTeam(String name);
+    public PlayerTeam addPlayerTeam(String name);
+    public void removePlayerTeam(PlayerTeam team);
+    public boolean addPlayerToTeam(String player, PlayerTeam team);
+    public boolean removePlayerFromTeam(String player);
+    public void removePlayerFromTeam(String player, PlayerTeam team);
+    public Collection<String> getTeamNames();
+    public Collection<PlayerTeam> getPlayerTeams();
+    public PlayerTeam getPlayersTeam(String name);
+    public void onObjectiveAdded(Objective objective);
+    public void onObjectiveChanged(Objective objective);
+    public void onObjectiveRemoved(Objective objective);
+    protected void onScoreChanged(ScoreHolder owner, Objective objective, Score score);
+    protected void onScoreLockChanged(ScoreHolder owner, Objective objective);
+    public void onPlayerRemoved(ScoreHolder player);
+    public void onPlayerScoreRemoved(ScoreHolder player, Objective objective);
+    public void onTeamAdded(PlayerTeam team);
+    public void onTeamChanged(PlayerTeam team);
+    public void onTeamRemoved(PlayerTeam team);
+    public void entityRemoved(Entity entity);
+    protected List<PackedScore> packPlayerScores();
+    protected void loadPlayerScore(PackedScore score);
+    protected List<PlayerTeam.Packed> packPlayerTeams();
+    protected void loadPlayerTeam(PlayerTeam.Packed packed);
+    protected List<Objective.Packed> packObjectives();
+    protected void loadObjective(Objective.Packed objective);
+    protected Map<DisplaySlot, String> packDisplaySlots();
+    public static record PackedScore(String owner, String objective, Score.Packed score) {
+        public static final Codec<PackedScore> CODEC;
+    }
+}
+//// ScoreboardSaveData.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Map;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public class ScoreboardSaveData extends SavedData {
+    public static final SavedDataType<ScoreboardSaveData> TYPE;
+    private ScoreboardSaveData();
+    public ScoreboardSaveData(Packed data);
+    public Packed getData();
+    public void setData(Packed data);
+    public static record Packed(List<Objective.Packed> objectives, List<Scoreboard.PackedScore> scores, Map<DisplaySlot, String> displaySlots, List<PlayerTeam.Packed> teams) {
+        public static final Packed EMPTY;
+        public static final Codec<Packed> CODEC;
+    }
+}
+//// Team.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Collection;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public abstract class Team {
+    public boolean isAlliedTo(Team other);
+    public abstract String getName();
+    public abstract MutableComponent getFormattedName(Component teamMemberName);
+    public abstract boolean canSeeFriendlyInvisibles();
+    public abstract boolean isAllowFriendlyFire();
+    public abstract Visibility getNameTagVisibility();
+    public abstract Optional<TeamColor> getColor();
+    public abstract Collection<String> getPlayers();
+    public abstract Visibility getDeathMessageVisibility();
+    public abstract CollisionRule getCollisionRule();
+    public static enum Visibility implements StringRepresentable {
+        ALWAYS, NEVER, HIDE_FOR_OTHER_TEAMS, HIDE_FOR_OWN_TEAM;
+        public static final Codec<Visibility> CODEC;
+        public static final StreamCodec<ByteBuf, Visibility> STREAM_CODEC;
+        public final String name;
+        public final int id;
+        public Component getDisplayName();
+        public String getSerializedName();
+    }
+    public static enum CollisionRule implements StringRepresentable {
+        ALWAYS, NEVER, PUSH_OTHER_TEAMS, PUSH_OWN_TEAM;
+        public static final Codec<CollisionRule> CODEC;
+        public static final StreamCodec<ByteBuf, CollisionRule> STREAM_CODEC;
+        public final String name;
+        public final int id;
+        public Component getDisplayName();
+        public String getSerializedName();
+    }
+}
+//// TeamColor.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.chat.TextColor;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum TeamColor implements StringRepresentable {
+    BLACK, DARK_BLUE, DARK_GREEN, DARK_AQUA, DARK_RED, DARK_PURPLE, GOLD, GRAY, DARK_GRAY, BLUE, GREEN, AQUA, RED, LIGHT_PURPLE, YELLOW, WHITE;
+    public static final List<TeamColor> VALUES;
+    public static final StringRepresentable.EnumCodec<TeamColor> CODEC;
+    public static final StreamCodec<ByteBuf, TeamColor> STREAM_CODEC;
+    public static TeamColor byName(String name);
+    public TextColor textColor();
+    public DisplaySlot displaySlot();
+    public int rgb();
+    public String getSerializedName();
+}

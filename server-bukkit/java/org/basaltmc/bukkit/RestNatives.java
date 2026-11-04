@@ -17,6 +17,8 @@ public final class RestNatives {
     public static native int tickableBlockEntities(String world);
 
     /** Five numbers per block (x, y, z, state before, state after); null when the tree does not fit. */
+    public static native String[] featureIds();
+    public static native int[] placeFeature(String world, String feature, int x, int y, int z, long seed, boolean apply);
     public static native int[] placeTree(String world, String tree, int x, int y, int z, boolean apply);
 
     public static native String blockInstrument(int state);

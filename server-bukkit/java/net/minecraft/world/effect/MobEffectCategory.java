@@ -1,0 +1,18 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.world.effect;
+
+import net.minecraft.ChatFormatting;
+
+public enum MobEffectCategory {
+    BENEFICIAL(ChatFormatting.BLUE), HARMFUL(ChatFormatting.RED), NEUTRAL(ChatFormatting.BLUE);
+
+    private final ChatFormatting tooltipFormatting;
+
+    MobEffectCategory(ChatFormatting tooltipFormatting) {
+        this.tooltipFormatting = tooltipFormatting;
+    }
+
+    public ChatFormatting getTooltipFormatting() {
+        return tooltipFormatting;
+    }
+}

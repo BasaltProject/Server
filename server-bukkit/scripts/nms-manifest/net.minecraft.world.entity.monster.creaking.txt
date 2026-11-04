@@ -1,0 +1,119 @@
+//// Creaking.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AnimationState;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.Brain;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.control.BodyRotationControl;
+import net.minecraft.world.entity.ai.control.JumpControl;
+import net.minecraft.world.entity.ai.control.LookControl;
+import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.pathfinder.PathFinder;
+import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.level.pathfinder.PathfindingContext;
+import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class Creaking extends Monster {
+    public static final int ATTACK_INTERVAL = 40;
+    public static final float SPEED_MULTIPLIER_WHEN_IDLING = 0.3F;
+    public static final int CREAKING_ORANGE = 16545810;
+    public static final int CREAKING_GRAY = 6250335;
+    public static final int INVULNERABILITY_ANIMATION_DURATION = 8;
+    public static final int TWITCH_DEATH_DURATION = 45;
+    public final AnimationState attackAnimationState;
+    public final AnimationState invulnerabilityAnimationState;
+    public final AnimationState deathAnimationState;
+    public Creaking(EntityType<? extends Creaking> type, Level level);
+    public void setTransient(BlockPos pos);
+    public boolean isHeartBound();
+    protected BodyRotationControl createBodyControl();
+    protected Brain<Creaking> makeBrain(Brain.Packed packedBrain);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public static AttributeSupplier.Builder createAttributes();
+    public boolean canMove();
+    public boolean doHurtTarget(ServerLevel level, Entity target);
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public Player blameSourceForDamage(DamageSource source);
+    public boolean isPushable();
+    public void push(double xa, double ya, double za);
+    public Brain<Creaking> getBrain();
+    protected void customServerAiStep(ServerLevel level);
+    public void aiStep();
+    public void tick();
+    protected void tickDeath();
+    protected void updateWalkAnimation(float distance);
+    public void tearDown();
+    public void creakingDeathEffects(DamageSource source);
+    public void handleEntityEvent(byte id);
+    public boolean fireImmune();
+    public boolean canUsePortal(boolean ignorePassenger);
+    protected PathNavigation createNavigation(Level level);
+    public boolean playerIsStuckInYou();
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public void setHomePos(BlockPos pos);
+    public BlockPos getHomePos();
+    public void setTearingDown();
+    public boolean isTearingDown();
+    public boolean hasGlowingEyes();
+    public void checkEyeBlink();
+    public void playAttackSound();
+    protected SoundEvent getAmbientSound();
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected SoundEvent getDeathSound();
+    protected void playStepSound(BlockPos pos, BlockState blockState);
+    public LivingEntity getTarget();
+    public void knockback(double power, double xd, double zd, DamageSource source, float damage, boolean comesFromEffect);
+    public boolean checkCanMove();
+    public void activate(Player player);
+    public void deactivate();
+    public void setIsActive(boolean active);
+    public boolean isActive();
+    public float getWalkTargetValue(BlockPos pos, LevelReader level);
+    class CreakingLookControl extends LookControl {
+        public CreakingLookControl(Creaking creaking);
+        public void tick();
+    }
+    static class CreakingMoveControl<T extends Creaking> extends MoveControl<T> {
+        public CreakingMoveControl(T creaking);
+        public void tick();
+    }
+    class CreakingJumpControl extends JumpControl {
+        public CreakingJumpControl(Creaking creaking);
+        public void tick();
+    }
+    class CreakingBodyRotationControl extends BodyRotationControl {
+        public CreakingBodyRotationControl(Creaking creaking);
+        public void clientTick();
+    }
+    class HomeNodeEvaluator extends WalkNodeEvaluator {
+        private HomeNodeEvaluator();
+        public PathType getPathType(PathfindingContext context, int x, int y, int z);
+    }
+    class CreakingPathNavigation extends GroundPathNavigation {
+        public CreakingPathNavigation(Creaking mob, Level level);
+        public void tick();
+        protected PathFinder createPathFinder(int maxVisitedNodes);
+    }
+}
+//// CreakingAi.java
+import java.util.List;
+import net.minecraft.world.entity.ai.ActivityData;
+public class CreakingAi {
+    protected static List<ActivityData<Creaking>> getActivities(Creaking creaking);
+    public static void updateActivity(Creaking creaking);
+}

@@ -1,0 +1,150 @@
+//// AbstractConsecutiveExecutor.java
+import java.util.List;
+import java.util.concurrent.Executor;
+import net.minecraft.util.profiling.metrics.MetricSampler;
+import net.minecraft.util.profiling.metrics.ProfilerMeasured;
+public abstract class AbstractConsecutiveExecutor<T extends Runnable> implements Runnable, TaskScheduler<T>, ProfilerMeasured {
+    public AbstractConsecutiveExecutor(StrictQueue<T> queue, Executor executor, String name);
+    public void close();
+    public void run();
+    public void runAll();
+    public void schedule(T task);
+    public int size();
+    public boolean hasWork();
+    public String toString();
+    public String name();
+    public List<MetricSampler> profiledMetrics();
+    static enum Status {
+        SLEEPING, RUNNING, CLOSED;
+    }
+}
+//// BlockableEventLoop.java
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
+import net.minecraft.CrashReport;
+import net.minecraft.util.profiling.metrics.MetricSampler;
+import net.minecraft.util.profiling.metrics.ProfilerMeasured;
+public abstract class BlockableEventLoop<R extends Runnable> implements Executor, TaskScheduler<R>, ProfilerMeasured {
+    public static final long BLOCK_TIME_NANOS = 100000L;
+    protected BlockableEventLoop(String name, boolean propagatesCrashes);
+    protected abstract boolean shouldRun(R task);
+    public boolean isSameThread();
+    protected abstract Thread getRunningThread();
+    protected boolean scheduleExecutables();
+    public int getPendingTasksCount();
+    public String name();
+    public <V> CompletableFuture<V> submit(Supplier<V> supplier);
+    public CompletableFuture<Void> submit(Runnable runnable);
+    public void executeBlocking(Runnable runnable);
+    public void schedule(R r);
+    public void execute(Runnable command);
+    public void executeIfPossible(Runnable command);
+    protected void dropAllTasks();
+    protected void runAllTasks();
+    protected boolean shouldRunAllTasks();
+    protected boolean pollTask();
+    public void managedBlock(BooleanSupplier condition);
+    protected void waitForTasks();
+    protected void doRunTask(R task);
+    public List<MetricSampler> profiledMetrics();
+    public static boolean isNonRecoverable(Throwable t);
+    public void delayCrash(CrashReport crashReport);
+    public static void relayDelayCrash(CrashReport crashReport);
+}
+//// ConsecutiveExecutor.java
+import java.util.concurrent.Executor;
+public class ConsecutiveExecutor extends AbstractConsecutiveExecutor<Runnable> {
+    public ConsecutiveExecutor(Executor dispatcher, String name);
+    public Runnable wrapRunnable(Runnable runnable);
+}
+//// ParallelMapTransform.java
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
+public class ParallelMapTransform {
+    public static <K, U, V> CompletableFuture<Map<K, V>> schedule(Map<K, U> input, BiFunction<K, U, V> operation, int maxTaskCount, Executor executor);
+    public static <K, U, V> CompletableFuture<Map<K, V>> schedule(Map<K, U> input, BiFunction<K, U, V> operation, Executor executor);
+    static record Container<K, U, V>(BiFunction<K, U, V> operation, Object[] keys, Object[] values) {
+        public Container(BiFunction<K, U, V> operation, int size);
+        public void put(int index, K key, U input);
+        public void applyOperation(int index);
+        public void copyOut(int index, Map<K, V> output);
+        public int size();
+    }
+    static abstract class SplitterBase<K, U, V> {
+        private SplitterBase(BiFunction<K, U, V> operation, int size, int taskCount);
+        public CompletableFuture<Map<K, V>> scheduleTasks(Map<K, U> input, Executor executor);
+        protected abstract int batchSize(int index);
+        protected abstract CompletableFuture<?> scheduleBatch(Container<K, U, V> container, int startIndex, int endIndex, Executor executor);
+        protected abstract CompletableFuture<Map<K, V>> scheduleFinalOperation(CompletableFuture<?> allTasksDone, Container<K, U, V> container);
+    }
+    static class SingleTaskSplitter<K, U, V> extends SplitterBase<K, U, V> {
+        private SingleTaskSplitter(BiFunction<K, U, V> operation, int size);
+        protected int batchSize(int index);
+        protected CompletableFuture<?> scheduleBatch(Container<K, U, V> container, int startIndex, int endIndex, Executor executor);
+        protected CompletableFuture<Map<K, V>> scheduleFinalOperation(CompletableFuture<?> allTasksDone, Container<K, U, V> container);
+    }
+    static class BatchedTaskSplitter<K, U, V> extends SplitterBase<K, U, V> {
+        private BatchedTaskSplitter(BiFunction<K, U, V> operation, int size, int maxTasks);
+        protected CompletableFuture<?> scheduleBatch(Container<K, U, V> container, int startIndex, int endIndex, Executor executor);
+        protected int batchSize(int index);
+        protected CompletableFuture<Map<K, V>> scheduleFinalOperation(CompletableFuture<?> allTasksDone, Container<K, U, V> container);
+    }
+}
+//// PriorityConsecutiveExecutor.java
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
+public class PriorityConsecutiveExecutor extends AbstractConsecutiveExecutor<StrictQueue.RunnableWithPriority> {
+    public PriorityConsecutiveExecutor(int priorityCount, Executor executor, String name);
+    public StrictQueue.RunnableWithPriority wrapRunnable(Runnable runnable);
+    public <Source> CompletableFuture<Source> scheduleWithResult(int priority, Consumer<CompletableFuture<Source>> futureConsumer);
+}
+//// ReentrantBlockableEventLoop.java
+public abstract class ReentrantBlockableEventLoop<R extends Runnable> extends BlockableEventLoop<R> {
+    public ReentrantBlockableEventLoop(String name, boolean propagatesCrashes);
+    protected boolean scheduleExecutables();
+    protected boolean runningTask();
+    protected void doRunTask(R task);
+}
+//// StrictQueue.java
+import java.util.Queue;
+public interface StrictQueue<T extends Runnable> {
+    Runnable pop();
+    boolean push(T t);
+    boolean isEmpty();
+    int size();
+    public static final class QueueStrictQueue implements StrictQueue<Runnable> {
+        public QueueStrictQueue(Queue<Runnable> queue);
+        public Runnable pop();
+        public boolean push(Runnable t);
+        public boolean isEmpty();
+        public int size();
+    }
+    public static record RunnableWithPriority(int priority, Runnable task) implements Runnable {
+        public void run();
+    }
+    public static final class FixedPriorityQueue implements StrictQueue<RunnableWithPriority> {
+        public FixedPriorityQueue(int size);
+        public Runnable pop();
+        public boolean push(RunnableWithPriority task);
+        public boolean isEmpty();
+        public int size();
+    }
+}
+//// TaskScheduler.java
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
+public interface TaskScheduler<R extends Runnable> extends AutoCloseable {
+    String name();
+    void schedule(R r);
+    default void close();
+    R wrapRunnable(Runnable runnable);
+    default <Source> CompletableFuture<Source> scheduleWithResult(Consumer<CompletableFuture<Source>> futureConsumer);
+    static TaskScheduler<Runnable> wrapExecutor(String name, Executor executor);
+}

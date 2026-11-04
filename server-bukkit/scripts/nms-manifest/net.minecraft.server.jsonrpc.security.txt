@@ -1,0 +1,31 @@
+//// AuthenticationHandler.java
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
+public class AuthenticationHandler extends ChannelDuplexHandler {
+    public static final String BEARER_PREFIX = "Bearer ";
+    public AuthenticationHandler(SecurityConfig securityConfig, String allowedOrigins);
+    public void channelRead(ChannelHandlerContext context, Object msg) throws Exception;
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception;
+    public boolean isValidApiKey(String suppliedKey);
+    static class SecurityCheckResult {
+        private SecurityCheckResult(boolean allowed, String reason, boolean tokenSentInSecWebsocketProtocol);
+        public static SecurityCheckResult allowed();
+        public static SecurityCheckResult allowed(boolean tokenSentInSecWebsocketProtocol);
+        public static SecurityCheckResult denied(String reason);
+        public boolean isAllowed();
+        public String getReason();
+        public boolean isTokenSentInSecWebsocketProtocol();
+    }
+}
+//// JsonRpcSslContextProvider.java
+import io.netty.handler.ssl.SslContext;
+public class JsonRpcSslContextProvider {
+    public static SslContext createFrom(String keystorePath, String keystorePasswordFromServerProperties) throws Exception;
+    public static void printInstructions();
+}
+//// SecurityConfig.java
+public record SecurityConfig(String secretKey) {
+    public static boolean isValid(String secretKey);
+    public static String generateSecretKey();
+}

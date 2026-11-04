@@ -1,0 +1,75 @@
+//// FeatureElement.java
+import java.util.Set;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public interface FeatureElement {
+    Set<ResourceKey<? extends Registry<? extends FeatureElement>>> FILTERED_REGISTRIES;
+    FeatureFlagSet requiredFeatures();
+    default boolean isEnabled(FeatureFlagSet enabledFeatures);
+}
+//// FeatureFlag.java
+public class FeatureFlag {
+    final FeatureFlagUniverse universe;
+    final long mask;
+    FeatureFlag(FeatureFlagUniverse universe, int bit);
+}
+//// FeatureFlagRegistry.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
+import net.minecraft.resources.Identifier;
+public class FeatureFlagRegistry {
+    private FeatureFlagRegistry(FeatureFlagUniverse universe, FeatureFlagSet allFlags, Map<Identifier, FeatureFlag> names);
+    public boolean isSubset(FeatureFlagSet set);
+    public FeatureFlagSet allFlags();
+    public FeatureFlagSet fromNames(Iterable<Identifier> flagIds);
+    public FeatureFlagSet subset(FeatureFlag... flags);
+    public FeatureFlagSet fromNames(Iterable<Identifier> flagIds, Consumer<Identifier> unknownFlags);
+    public Set<Identifier> toNames(FeatureFlagSet set);
+    public Codec<FeatureFlagSet> codec();
+    public static class Builder {
+        public Builder(String universeId);
+        public FeatureFlag createVanilla(String name);
+        public FeatureFlag create(Identifier name);
+        public FeatureFlagRegistry build();
+    }
+}
+//// FeatureFlagSet.java
+import java.util.Collection;
+public final class FeatureFlagSet {
+    public static final int MAX_CONTAINER_SIZE = 64;
+    private FeatureFlagSet(FeatureFlagUniverse universe, long mask);
+    static FeatureFlagSet create(FeatureFlagUniverse universe, Collection<FeatureFlag> flags);
+    public static FeatureFlagSet of();
+    public static FeatureFlagSet of(FeatureFlag flag);
+    public static FeatureFlagSet of(FeatureFlag flag, FeatureFlag... flags);
+    public boolean contains(FeatureFlag flag);
+    public boolean isEmpty();
+    public boolean isSubsetOf(FeatureFlagSet set);
+    public boolean intersects(FeatureFlagSet set);
+    public FeatureFlagSet join(FeatureFlagSet other);
+    public FeatureFlagSet subtract(FeatureFlagSet other);
+    public boolean equals(Object o);
+    public int hashCode();
+}
+//// FeatureFlagUniverse.java
+public class FeatureFlagUniverse {
+    public FeatureFlagUniverse(String id);
+    public String toString();
+}
+//// FeatureFlags.java
+import com.mojang.serialization.Codec;
+public class FeatureFlags {
+    public static final FeatureFlag VANILLA;
+    public static final FeatureFlag TRADE_REBALANCE;
+    public static final FeatureFlag REDSTONE_EXPERIMENTS;
+    public static final FeatureFlag MINECART_IMPROVEMENTS;
+    public static final FeatureFlagRegistry REGISTRY;
+    public static final Codec<FeatureFlagSet> CODEC;
+    public static final FeatureFlagSet VANILLA_SET;
+    public static final FeatureFlagSet DEFAULT_FLAGS;
+    public static String printMissingFlags(FeatureFlagSet allowedFlags, FeatureFlagSet requestedFlags);
+    public static String printMissingFlags(FeatureFlagRegistry registry, FeatureFlagSet allowedFlags, FeatureFlagSet requestedFlags);
+    public static boolean isExperimental(FeatureFlagSet features);
+}

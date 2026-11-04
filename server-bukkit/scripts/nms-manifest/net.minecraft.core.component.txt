@@ -1,0 +1,567 @@
+//// BlockTransformer.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+import net.minecraft.world.level.storage.loot.LootTable;
+public record BlockTransformer(List<BlockTransformData> transforms) {
+    public static final Codec<BlockTransformer> DIRECT_CODEC;
+    public static final Codec<Holder<BlockTransformer>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<BlockTransformer>> STREAM_CODEC;
+    public InteractionResult transformBlock(UseOnContext context);
+    public static record BlockTransformData(Holder<BlockStateProvider> blockStateProvider, Holder<SoundEvent> sound, TransformParticle particle, List<Direction> disallowedFaces, Optional<ResourceKey<LootTable>> loot, DropStrategy dropStrategy, boolean updateFromNeighbors, TransformType transformType, boolean consumeOnUse, int itemDamagePerUse) {
+        public static final Codec<BlockTransformData> CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, BlockTransformData> STREAM_CODEC;
+        public static Builder builder(Holder<BlockStateProvider> targetStateProvider);
+        public static Builder builder(BlockStateProvider targetStateProvider);
+        public static Builder builder(BlockPredicate predicate, Block block);
+        public static class Builder {
+            private Builder(Holder<BlockStateProvider> targetStateProvider);
+            public Builder sound(Holder<SoundEvent> sound);
+            public Builder particle(TransformParticle particle);
+            public Builder disallowedFaces(List<Direction> disallowedFaces);
+            public Builder loot(ResourceKey<LootTable> loot);
+            public Builder dropStrategy(DropStrategy dropStrategy);
+            public Builder updateFromNeighbors(boolean updateFromNeighbors);
+            public Builder transformType(TransformType transformType);
+            public Builder consumeOnUse(boolean consumeOnUse);
+            public Builder itemDamagePerUse(int itemDamagePerUse);
+            public BlockTransformData build();
+        }
+    }
+    public static enum TransformParticle implements StringRepresentable {
+        NONE, SCRAPE, WAX_ON, WAX_OFF;
+        public static final Codec<TransformParticle> CODEC;
+        public static final StreamCodec<ByteBuf, TransformParticle> STREAM_CODEC;
+        public void send(Level level, Entity player, BlockPos pos);
+        public String getSerializedName();
+        public int getId();
+        public int getLevelEvent();
+    }
+    public static enum DropStrategy implements StringRepresentable {
+        CLICKED_FACE, FROM_MIDDLE;
+        public static final Codec<DropStrategy> CODEC;
+        public static final StreamCodec<ByteBuf, DropStrategy> STREAM_CODEC;
+        public String getSerializedName();
+        public int getId();
+        public void pop(Level level, BlockPos pos, Direction direction, ItemStack stack);
+        public interface ResourcePopper {
+            ResourcePopper FROM_FACE;
+            ResourcePopper FROM_MIDDLE;
+            void pop(Level level, BlockPos pos, Direction direction, ItemStack stack);
+        }
+    }
+    public static enum TransformType implements StringRepresentable {
+        SINGLE_BLOCK, COPPER_CHEST;
+        public static final Codec<TransformType> CODEC;
+        public static final StreamCodec<ByteBuf, TransformType> STREAM_CODEC;
+        public String getSerializedName();
+        public int getId();
+    }
+}
+//// DataComponentExactPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Predicate;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public final class DataComponentExactPredicate implements Predicate<DataComponentGetter> {
+    public static final Codec<DataComponentExactPredicate> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DataComponentExactPredicate> STREAM_CODEC;
+    public static final DataComponentExactPredicate EMPTY;
+    private DataComponentExactPredicate(List<TypedDataComponent<?>> expectedComponents);
+    public static Builder builder();
+    public static <T> DataComponentExactPredicate expect(DataComponentType<T> type, T value);
+    public static DataComponentExactPredicate allOf(DataComponentMap components);
+    public static DataComponentExactPredicate someOf(DataComponentMap components, DataComponentType<?>... types);
+    public boolean isEmpty();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+    public boolean test(DataComponentGetter actualComponents);
+    public boolean alwaysMatches();
+    public DataComponentPatch asPatch();
+    public static class Builder {
+        private Builder();
+        public <T> Builder expect(TypedDataComponent<T> value);
+        public <T> Builder expect(DataComponentType<? super T> type, T value);
+        public DataComponentExactPredicate build();
+    }
+}
+//// DataComponentGetter.java
+public interface DataComponentGetter {
+    <T> T get(DataComponentType<? extends T> type);
+    default <T> T getOrDefault(DataComponentType<? extends T> type, T defaultValue);
+    default <T> TypedDataComponent<T> getTyped(DataComponentType<T> type);
+}
+//// DataComponentHolder.java
+import java.util.stream.Stream;
+public interface DataComponentHolder extends DataComponentGetter {
+    DataComponentMap getComponents();
+    default <T> T get(DataComponentType<? extends T> type);
+    default <T> Stream<T> getAllOfType(Class<? extends T> valueClass);
+    default <T> T getOrDefault(DataComponentType<? extends T> type, T defaultValue);
+    default boolean has(DataComponentType<?> type);
+}
+//// DataComponentInitializers.java
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public class DataComponentInitializers {
+    public <T> void add(ResourceKey<T> key, Initializer<T> initializer);
+    public List<PendingComponents<?>> build(HolderLookup.Provider context);
+    static record InitializerEntry<T>(ResourceKey<T> key, Initializer<T> initializer) {
+        public void run(DataComponentMap.Builder components, HolderLookup.Provider context);
+    }
+    static record BakedEntry<T>(Holder.Reference<T> element, DataComponentMap components) {
+        public void apply();
+    }
+    public interface Initializer<T> {
+        void run(DataComponentMap.Builder components, HolderLookup.Provider context, ResourceKey<T> key);
+        default Initializer<T> andThen(Initializer<T> other);
+        default <C> Initializer<T> add(DataComponentType<C> type, C value);
+    }
+    public interface SingleComponentInitializer<C> {
+        C create(HolderLookup.Provider context);
+        default <T> Initializer<T> asInitializer(DataComponentType<C> type);
+    }
+    static record PendingComponentBuilders<T>(ResourceKey<? extends Registry<T>> registryKey, Map<ResourceKey<T>, DataComponentMap.Builder> builders) {
+    }
+    public interface PendingComponents<T> {
+        ResourceKey<? extends Registry<? extends T>> key();
+        void forEach(BiConsumer<Holder.Reference<T>, DataComponentMap> output);
+        void apply();
+    }
+}
+//// DataComponentLookup.java
+import com.google.common.collect.Multimap;
+import java.util.Collection;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+public class DataComponentLookup<T> {
+    public DataComponentLookup(Iterable<? extends Holder<T>> elements);
+    public <C> Stream<Holder<T>> findMatching(DataComponentType<C> type, Predicate<C> predicate);
+    public <C> Collection<Holder<T>> findAll(DataComponentType<C> type, C value);
+    public <C> Collection<Holder<T>> findAll(DataComponentType<C> type);
+    static record ComponentStorage<C, T>(Multimap<C, Holder<T>> valueToComponent) {
+        public Collection<Holder<T>> findAll(C value);
+        public Stream<Holder<T>> findMatching(Predicate<C> predicate);
+    }
+}
+//// DataComponentMap.java
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+public interface DataComponentMap extends Iterable<TypedDataComponent<?>>, DataComponentGetter {
+    DataComponentMap EMPTY;
+    Codec<DataComponentMap> CODEC;
+    static Codec<DataComponentMap> makeCodec(Codec<DataComponentType<?>> componentTypeCodec);
+    static Codec<DataComponentMap> makeCodecFromMap(Codec<Map<DataComponentType<?>, Object>> mapCodec);
+    static DataComponentMap composite(DataComponentMap prototype, DataComponentMap overrides);
+    static Builder builder();
+    Set<DataComponentType<?>> keySet();
+    default boolean has(DataComponentType<?> type);
+    default Iterator<TypedDataComponent<?>> iterator();
+    default Stream<TypedDataComponent<?>> stream();
+    default int size();
+    default boolean isEmpty();
+    default DataComponentMap filter(Predicate<DataComponentType<?>> predicate);
+    public static class Builder {
+        private Builder();
+        public <T> Builder set(DataComponentType<T> type, T value);
+        <T> void setUnchecked(DataComponentType<T> type, Object value);
+        public Builder addAll(DataComponentMap map);
+        public Builder addValidator(Consumer<DataComponentMap> newValidator);
+        public DataComponentMap build();
+        static record SimpleMap(Reference2ObjectMap<DataComponentType<?>, Object> map) implements DataComponentMap {
+            public <T> T get(DataComponentType<? extends T> type);
+            public boolean has(DataComponentType<?> type);
+            public Set<DataComponentType<?>> keySet();
+            public Iterator<TypedDataComponent<?>> iterator();
+            public int size();
+            public String toString();
+        }
+    }
+}
+//// DataComponentPatch.java
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import java.util.Set;
+import java.util.function.Predicate;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public final class DataComponentPatch {
+    public static final DataComponentPatch EMPTY;
+    public static final Codec<DataComponentPatch> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DataComponentPatch> STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DataComponentPatch> DELIMITED_STREAM_CODEC;
+    final Reference2ObjectMap<DataComponentType<?>, Object> map;
+    DataComponentPatch(Reference2ObjectMap<DataComponentType<?>, Object> map);
+    public static Builder builder();
+    public <T> T get(DataComponentGetter prototype, DataComponentType<? extends T> type);
+    static <T> T getFromPatchAndPrototype(Reference2ObjectMap<DataComponentType<?>, Object> patch, DataComponentGetter prototype, DataComponentType<? extends T> type);
+    public int size();
+    public DataComponentPatch forget(Predicate<DataComponentType<?>> test);
+    public boolean isEmpty();
+    public SplitResult split();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+    static String toString(Reference2ObjectMap<DataComponentType<?>, Object> map);
+    public static record SplitResult(DataComponentMap added, Set<DataComponentType<?>> removed) {
+        public static final SplitResult EMPTY;
+    }
+    static record PatchKey(DataComponentType<?> type, boolean removed) {
+        public static final Codec<PatchKey> CODEC;
+        public Codec<?> valueCodec();
+    }
+    public static class Builder {
+        private Builder();
+        public <T> Builder set(DataComponentType<T> type, T value);
+        public <T> Builder remove(DataComponentType<T> type);
+        public <T> Builder set(TypedDataComponent<T> component);
+        public <T> Builder set(Iterable<TypedDataComponent<?>> components);
+        public DataComponentPatch build();
+    }
+    interface CodecGetter {
+        <T> StreamCodec<? super RegistryFriendlyByteBuf, T> apply(DataComponentType<T> type);
+    }
+}
+//// DataComponentType.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public interface DataComponentType<T> {
+    Codec<DataComponentType<?>> CODEC;
+    StreamCodec<RegistryFriendlyByteBuf, DataComponentType<?>> STREAM_CODEC;
+    Codec<DataComponentType<?>> PERSISTENT_CODEC;
+    Codec<Map<DataComponentType<?>, Object>> VALUE_MAP_CODEC;
+    static <T> Builder<T> builder();
+    Codec<T> codec();
+    default Codec<T> codecOrThrow();
+    default boolean isTransient();
+    boolean ignoreSwapAnimation();
+    StreamCodec<? super RegistryFriendlyByteBuf, T> streamCodec();
+    public static class Builder<T> {
+        public Builder<T> persistent(Codec<T> codec);
+        public Builder<T> networkSynchronized(StreamCodec<? super RegistryFriendlyByteBuf, T> streamCodec);
+        public Builder<T> cacheEncoding();
+        public DataComponentType<T> build();
+        public Builder<T> ignoreSwapAnimation();
+        static class SimpleType<T> implements DataComponentType<T> {
+            private SimpleType(Codec<T> codec, StreamCodec<? super RegistryFriendlyByteBuf, T> streamCodec, boolean ignoreSwapAnimation);
+            public boolean ignoreSwapAnimation();
+            public Codec<T> codec();
+            public StreamCodec<? super RegistryFriendlyByteBuf, T> streamCodec();
+            public String toString();
+        }
+    }
+}
+//// DataComponents.java
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.EncoderCache;
+import net.minecraft.util.Unit;
+import net.minecraft.world.LockCode;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.animal.axolotl.Axolotl;
+import net.minecraft.world.entity.animal.chicken.ChickenSoundVariant;
+import net.minecraft.world.entity.animal.chicken.ChickenVariant;
+import net.minecraft.world.entity.animal.cow.CowSoundVariant;
+import net.minecraft.world.entity.animal.cow.CowVariant;
+import net.minecraft.world.entity.animal.cow.MushroomCow;
+import net.minecraft.world.entity.animal.equine.Llama;
+import net.minecraft.world.entity.animal.equine.Variant;
+import net.minecraft.world.entity.animal.feline.CatSoundVariant;
+import net.minecraft.world.entity.animal.feline.CatVariant;
+import net.minecraft.world.entity.animal.fish.Salmon;
+import net.minecraft.world.entity.animal.fish.TropicalFish;
+import net.minecraft.world.entity.animal.fox.Fox;
+import net.minecraft.world.entity.animal.frog.FrogVariant;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilusVariant;
+import net.minecraft.world.entity.animal.parrot.Parrot;
+import net.minecraft.world.entity.animal.pig.PigSoundVariant;
+import net.minecraft.world.entity.animal.pig.PigVariant;
+import net.minecraft.world.entity.animal.rabbit.Rabbit;
+import net.minecraft.world.entity.animal.wolf.WolfSoundVariant;
+import net.minecraft.world.entity.animal.wolf.WolfVariant;
+import net.minecraft.world.entity.decoration.painting.PaintingVariant;
+import net.minecraft.world.entity.npc.villager.VillagerType;
+import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.food.VillagerFood;
+import net.minecraft.world.item.AdventureModePredicate;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.JukeboxPlayable;
+import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.component.AttackRange;
+import net.minecraft.world.item.component.Bees;
+import net.minecraft.world.item.component.BlockItemStateProperties;
+import net.minecraft.world.item.component.BlocksAttacks;
+import net.minecraft.world.item.component.BrewingFuel;
+import net.minecraft.world.item.component.BundleContents;
+import net.minecraft.world.item.component.ChargedProjectiles;
+import net.minecraft.world.item.component.Compostable;
+import net.minecraft.world.item.component.Consumable;
+import net.minecraft.world.item.component.CookingFuel;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.CustomModelData;
+import net.minecraft.world.item.component.DamageResistant;
+import net.minecraft.world.item.component.DeathProtection;
+import net.minecraft.world.item.component.DebugStickState;
+import net.minecraft.world.item.component.DyedItemColor;
+import net.minecraft.world.item.component.FireworkExplosion;
+import net.minecraft.world.item.component.Fireworks;
+import net.minecraft.world.item.component.InstrumentComponent;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.world.item.component.ItemLore;
+import net.minecraft.world.item.component.KineticWeapon;
+import net.minecraft.world.item.component.LodestoneTracker;
+import net.minecraft.world.item.component.MapDecorations;
+import net.minecraft.world.item.component.MapPostProcessing;
+import net.minecraft.world.item.component.MobVisibility;
+import net.minecraft.world.item.component.OminousBottleAmplifier;
+import net.minecraft.world.item.component.PiercingWeapon;
+import net.minecraft.world.item.component.ResolvableProfile;
+import net.minecraft.world.item.component.SeededContainerLoot;
+import net.minecraft.world.item.component.SulfurCubeContent;
+import net.minecraft.world.item.component.SuspiciousStewEffects;
+import net.minecraft.world.item.component.SwingAnimation;
+import net.minecraft.world.item.component.Tool;
+import net.minecraft.world.item.component.TooltipDisplay;
+import net.minecraft.world.item.component.TypedEntityData;
+import net.minecraft.world.item.component.UseCooldown;
+import net.minecraft.world.item.component.UseEffects;
+import net.minecraft.world.item.component.UseRemainder;
+import net.minecraft.world.item.component.Weapon;
+import net.minecraft.world.item.component.WritableBookContent;
+import net.minecraft.world.item.component.WrittenBookContent;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.enchantment.Enchantable;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.item.enchantment.Repairable;
+import net.minecraft.world.item.equipment.Equippable;
+import net.minecraft.world.item.equipment.trim.ArmorTrim;
+import net.minecraft.world.item.equipment.trim.TrimMaterial;
+import net.minecraft.world.level.block.entity.BannerPattern;
+import net.minecraft.world.level.block.entity.BannerPatternLayers;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.entity.DecoratedPotPattern;
+import net.minecraft.world.level.block.entity.PotDecorations;
+import net.minecraft.world.level.block.entity.SignText;
+import net.minecraft.world.level.saveddata.maps.MapId;
+public class DataComponents {
+    static final EncoderCache ENCODER_CACHE;
+    public static final DataComponentType<CustomData> CUSTOM_DATA;
+    public static final DataComponentType<Integer> MAX_STACK_SIZE;
+    public static final DataComponentType<Integer> MAX_DAMAGE;
+    public static final DataComponentType<Integer> DAMAGE;
+    public static final DataComponentType<Unit> UNBREAKABLE;
+    public static final DataComponentType<UseEffects> USE_EFFECTS;
+    public static final DataComponentType<Component> CUSTOM_NAME;
+    public static final DataComponentType<Float> MINIMUM_ATTACK_CHARGE;
+    public static final DataComponentType<Holder<DamageType>> DAMAGE_TYPE;
+    public static final DataComponentType<Component> ITEM_NAME;
+    public static final DataComponentType<Identifier> ITEM_MODEL;
+    public static final DataComponentType<ItemLore> LORE;
+    public static final DataComponentType<Rarity> RARITY;
+    public static final DataComponentType<ItemEnchantments> ENCHANTMENTS;
+    public static final DataComponentType<AdventureModePredicate> CAN_PLACE_ON;
+    public static final DataComponentType<AdventureModePredicate> CAN_BREAK;
+    public static final DataComponentType<ItemAttributeModifiers> ATTRIBUTE_MODIFIERS;
+    public static final DataComponentType<CustomModelData> CUSTOM_MODEL_DATA;
+    public static final DataComponentType<TooltipDisplay> TOOLTIP_DISPLAY;
+    public static final DataComponentType<Integer> REPAIR_COST;
+    public static final DataComponentType<Unit> CREATIVE_SLOT_LOCK;
+    public static final DataComponentType<Boolean> ENCHANTMENT_GLINT_OVERRIDE;
+    public static final DataComponentType<Unit> INTANGIBLE_PROJECTILE;
+    public static final DataComponentType<FoodProperties> FOOD;
+    public static final DataComponentType<Consumable> CONSUMABLE;
+    public static final DataComponentType<UseRemainder> USE_REMAINDER;
+    public static final DataComponentType<UseCooldown> USE_COOLDOWN;
+    public static final DataComponentType<DamageResistant> DAMAGE_RESISTANT;
+    public static final DataComponentType<Tool> TOOL;
+    public static final DataComponentType<Weapon> WEAPON;
+    public static final DataComponentType<AttackRange> ATTACK_RANGE;
+    public static final DataComponentType<Enchantable> ENCHANTABLE;
+    public static final DataComponentType<Equippable> EQUIPPABLE;
+    public static final DataComponentType<Repairable> REPAIRABLE;
+    public static final DataComponentType<Unit> GLIDER;
+    public static final DataComponentType<Identifier> TOOLTIP_STYLE;
+    public static final DataComponentType<DeathProtection> DEATH_PROTECTION;
+    public static final DataComponentType<BlocksAttacks> BLOCKS_ATTACKS;
+    public static final DataComponentType<PiercingWeapon> PIERCING_WEAPON;
+    public static final DataComponentType<KineticWeapon> KINETIC_WEAPON;
+    public static final DataComponentType<SwingAnimation> ATTACK_ANIMATION;
+    public static final DataComponentType<SwingAnimation> INTERACT_ANIMATION;
+    public static final DataComponentType<Integer> ADDITIONAL_TRADE_COST;
+    public static final DataComponentType<Holder<BlockTransformer>> BLOCK_TRANSFORMER;
+    public static final DataComponentType<VillagerFood> VILLAGER_FOOD;
+    public static final DataComponentType<ItemEnchantments> STORED_ENCHANTMENTS;
+    public static final DataComponentType<DyeColor> DYE;
+    public static final DataComponentType<DyedItemColor> DYED_COLOR;
+    public static final DataComponentType<MapId> MAP_ID;
+    public static final DataComponentType<MapDecorations> MAP_DECORATIONS;
+    public static final DataComponentType<MapPostProcessing> MAP_POST_PROCESSING;
+    public static final DataComponentType<ChargedProjectiles> CHARGED_PROJECTILES;
+    public static final DataComponentType<BundleContents> BUNDLE_CONTENTS;
+    public static final DataComponentType<PotionContents> POTION_CONTENTS;
+    public static final DataComponentType<Float> POTION_DURATION_SCALE;
+    public static final DataComponentType<SuspiciousStewEffects> SUSPICIOUS_STEW_EFFECTS;
+    public static final DataComponentType<WritableBookContent> WRITABLE_BOOK_CONTENT;
+    public static final DataComponentType<WrittenBookContent> WRITTEN_BOOK_CONTENT;
+    public static final DataComponentType<ArmorTrim> TRIM;
+    public static final DataComponentType<DebugStickState> DEBUG_STICK_STATE;
+    public static final DataComponentType<TypedEntityData<EntityType<?>>> ENTITY_DATA;
+    public static final DataComponentType<CustomData> BUCKET_ENTITY_DATA;
+    public static final DataComponentType<TypedEntityData<BlockEntityType<?>>> BLOCK_ENTITY_DATA;
+    public static final DataComponentType<InstrumentComponent> INSTRUMENT;
+    public static final DataComponentType<Holder<TrimMaterial>> PROVIDES_TRIM_MATERIAL;
+    public static final DataComponentType<OminousBottleAmplifier> OMINOUS_BOTTLE_AMPLIFIER;
+    public static final DataComponentType<JukeboxPlayable> JUKEBOX_PLAYABLE;
+    public static final DataComponentType<HolderSet<BannerPattern>> PROVIDES_BANNER_PATTERNS;
+    public static final DataComponentType<List<ResourceKey<Recipe<?>>>> RECIPES;
+    public static final DataComponentType<LodestoneTracker> LODESTONE_TRACKER;
+    public static final DataComponentType<FireworkExplosion> FIREWORK_EXPLOSION;
+    public static final DataComponentType<Fireworks> FIREWORKS;
+    public static final DataComponentType<ResolvableProfile> PROFILE;
+    public static final DataComponentType<Identifier> NOTE_BLOCK_SOUND;
+    public static final DataComponentType<BannerPatternLayers> BANNER_PATTERNS;
+    public static final DataComponentType<DyeColor> BASE_COLOR;
+    public static final DataComponentType<PotDecorations> POT_DECORATIONS;
+    public static final DataComponentType<ItemContainerContents> CONTAINER;
+    public static final DataComponentType<BlockItemStateProperties> BLOCK_STATE;
+    public static final DataComponentType<Bees> BEES;
+    public static final DataComponentType<SulfurCubeContent> SULFUR_CUBE_CONTENT;
+    public static final DataComponentType<LockCode> LOCK;
+    public static final DataComponentType<SeededContainerLoot> CONTAINER_LOOT;
+    public static final DataComponentType<Holder<SoundEvent>> BREAK_SOUND;
+    public static final DataComponentType<Compostable> COMPOSTABLE;
+    public static final DataComponentType<CookingFuel> COOKING_FUEL;
+    public static final DataComponentType<BrewingFuel> BREWING_FUEL;
+    public static final DataComponentType<MobVisibility> MOB_VISIBILITY;
+    public static final DataComponentType<Holder<VillagerType>> VILLAGER_VARIANT;
+    public static final DataComponentType<Holder<WolfVariant>> WOLF_VARIANT;
+    public static final DataComponentType<Holder<WolfSoundVariant>> WOLF_SOUND_VARIANT;
+    public static final DataComponentType<DyeColor> WOLF_COLLAR;
+    public static final DataComponentType<Fox.Variant> FOX_VARIANT;
+    public static final DataComponentType<Salmon.Variant> SALMON_SIZE;
+    public static final DataComponentType<Parrot.Variant> PARROT_VARIANT;
+    public static final DataComponentType<TropicalFish.Pattern> TROPICAL_FISH_PATTERN;
+    public static final DataComponentType<DyeColor> TROPICAL_FISH_BASE_COLOR;
+    public static final DataComponentType<DyeColor> TROPICAL_FISH_PATTERN_COLOR;
+    public static final DataComponentType<MushroomCow.Variant> MOOSHROOM_VARIANT;
+    public static final DataComponentType<Rabbit.Variant> RABBIT_VARIANT;
+    public static final DataComponentType<Holder<PigVariant>> PIG_VARIANT;
+    public static final DataComponentType<Holder<PigSoundVariant>> PIG_SOUND_VARIANT;
+    public static final DataComponentType<Holder<CowVariant>> COW_VARIANT;
+    public static final DataComponentType<Holder<CowSoundVariant>> COW_SOUND_VARIANT;
+    public static final DataComponentType<Holder<ChickenVariant>> CHICKEN_VARIANT;
+    public static final DataComponentType<Holder<ChickenSoundVariant>> CHICKEN_SOUND_VARIANT;
+    public static final DataComponentType<Holder<ZombieNautilusVariant>> ZOMBIE_NAUTILUS_VARIANT;
+    public static final DataComponentType<Holder<FrogVariant>> FROG_VARIANT;
+    public static final DataComponentType<Variant> HORSE_VARIANT;
+    public static final DataComponentType<Holder<PaintingVariant>> PAINTING_VARIANT;
+    public static final DataComponentType<Llama.Variant> LLAMA_VARIANT;
+    public static final DataComponentType<Axolotl.Variant> AXOLOTL_VARIANT;
+    public static final DataComponentType<Holder<CatVariant>> CAT_VARIANT;
+    public static final DataComponentType<Holder<CatSoundVariant>> CAT_SOUND_VARIANT;
+    public static final DataComponentType<DyeColor> CAT_COLLAR;
+    public static final DataComponentType<DyeColor> SHEEP_COLOR;
+    public static final DataComponentType<DyeColor> SHULKER_COLOR;
+    public static final DataComponentType<Holder<DecoratedPotPattern>> PROVIDES_POTTERY_PATTERN;
+    public static final DataComponentType<SignText> SIGN_TEXT_FRONT;
+    public static final DataComponentType<SignText> SIGN_TEXT_BACK;
+    public static final DataComponentType<Unit> WAXED;
+    public static final DataComponentType<DyeColor> CUSHION_COLOR;
+    public static final DataComponentMap COMMON_ITEM_COMPONENTS;
+    public static DataComponentType<?> bootstrap(Registry<DataComponentType<?>> registry);
+}
+//// PatchedDataComponentMap.java
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import java.util.Iterator;
+import java.util.Set;
+public final class PatchedDataComponentMap implements DataComponentMap {
+    public PatchedDataComponentMap(DataComponentMap prototype);
+    private PatchedDataComponentMap(DataComponentMap prototype, Reference2ObjectMap<DataComponentType<?>, Object> patch, boolean copyOnWrite);
+    public static PatchedDataComponentMap fromPatch(DataComponentMap prototype, DataComponentPatch patch);
+    public <T> T get(DataComponentType<? extends T> type);
+    public boolean hasNonDefault(DataComponentType<?> type);
+    public <T> T set(DataComponentType<T> type, T value);
+    public <T> T set(TypedDataComponent<T> value);
+    public <T> T remove(DataComponentType<? extends T> type);
+    public void applyPatch(DataComponentPatch patch);
+    public void restorePatch(DataComponentPatch patch);
+    public void clearPatch();
+    public void setAll(DataComponentMap components);
+    public Set<DataComponentType<?>> keySet();
+    public Iterator<TypedDataComponent<?>> iterator();
+    public int size();
+    public DataComponentPatch asPatch();
+    public PatchedDataComponentMap copy();
+    public DataComponentMap toImmutableMap();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+}
+//// Removed.java
+import com.mojang.serialization.Codec;
+final class Removed {
+    public static final Removed INSTANCE;
+    public static final Codec<Removed> CODEC;
+    private Removed();
+    public String toString();
+    public static boolean isNotRemoved(Object value);
+    public static boolean isRemoved(Object value);
+    public static Object nullToRemoved(Object value);
+    public static Object removedToNull(Object value);
+}
+//// TypedDataComponent.java
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import java.util.Map;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record TypedDataComponent<T>(DataComponentType<T> type, T value) {
+    public static final StreamCodec<RegistryFriendlyByteBuf, TypedDataComponent<?>> STREAM_CODEC;
+    static TypedDataComponent<?> fromEntryUnchecked(Map.Entry<DataComponentType<?>, Object> entry);
+    public static <T> TypedDataComponent<T> createUnchecked(DataComponentType<T> type, Object value);
+    public void applyTo(PatchedDataComponentMap components);
+    public <D> DataResult<D> encodeValue(DynamicOps<D> ops);
+    public String toString();
+}

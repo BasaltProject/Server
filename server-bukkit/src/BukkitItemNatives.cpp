@@ -278,6 +278,24 @@ jbyteArray JNICALL nativeCraft(JNIEnv* env, jclass, jint width, jint height, jby
     return made.has_value() ? javaBytes(env, *made) : nullptr;
 }
 
+jbyteArray JNICALL nativeAnvil(JNIEnv* env, jclass, jbyteArray left, jbyteArray right, jstring name) {
+    const std::vector<std::uint8_t> first = bytesOf(env, left);
+    const std::vector<std::uint8_t> second = bytesOf(env, right);
+    const std::string typed = toStd(env, name);
+    const std::optional<std::vector<std::uint8_t>> made = onServerThread<std::optional<std::vector<std::uint8_t>>>(
+        std::nullopt, [&] { return inventories().anvil(first, second, typed); });
+    return made.has_value() ? javaBytes(env, *made) : nullptr;
+}
+
+jbyteArray JNICALL nativeSmithing(JNIEnv* env, jclass, jbyteArray templateStack, jbyteArray base, jbyteArray addition) {
+    const std::vector<std::uint8_t> first = bytesOf(env, templateStack);
+    const std::vector<std::uint8_t> second = bytesOf(env, base);
+    const std::vector<std::uint8_t> third = bytesOf(env, addition);
+    const std::optional<std::vector<std::uint8_t>> made = onServerThread<std::optional<std::vector<std::uint8_t>>>(
+        std::nullopt, [&] { return inventories().smithing(first, second, third); });
+    return made.has_value() ? javaBytes(env, *made) : nullptr;
+}
+
 jobjectArray JNICALL nativeRecipeIds(JNIEnv* env, jclass) {
     const std::vector<std::string> ids =
         onServerThread<std::vector<std::string>>({}, [] { return inventories().recipeIds(); });
@@ -401,6 +419,10 @@ void registerInventoryNatives(JNIEnv* env, jclass natives) {
                         reinterpret_cast<void*>(&nativeEnchantmentIds)},
         JNINativeMethod{const_cast<char*>("craft"), const_cast<char*>("(II[B)[B"),
                         reinterpret_cast<void*>(&nativeCraft)},
+        JNINativeMethod{const_cast<char*>("smithing"), const_cast<char*>("([B[B[B)[B"),
+                        reinterpret_cast<void*>(&nativeSmithing)},
+        JNINativeMethod{const_cast<char*>("anvil"), const_cast<char*>("([B[BLjava/lang/String;)[B"),
+                        reinterpret_cast<void*>(&nativeAnvil)},
         JNINativeMethod{const_cast<char*>("recipeIds"), const_cast<char*>("()[Ljava/lang/String;"),
                         reinterpret_cast<void*>(&nativeRecipeIds)},
         JNINativeMethod{const_cast<char*>("recipeData"), const_cast<char*>("(Ljava/lang/String;)[B"),

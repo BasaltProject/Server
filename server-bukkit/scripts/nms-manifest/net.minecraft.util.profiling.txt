@@ -1,0 +1,236 @@
+//// ActiveProfiler.java
+import com.mojang.datafixers.util.Pair;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import java.util.Set;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
+import net.minecraft.util.profiling.metrics.MetricCategory;
+public class ActiveProfiler implements ProfileCollector {
+    public ActiveProfiler(LongSupplier getRealTime, IntSupplier getTickTime, BooleanSupplier suppressWarnings);
+    public void startTick();
+    public void endTick();
+    public void push(String name);
+    public void push(Supplier<String> name);
+    public void markForCharting(MetricCategory category);
+    public void pop();
+    public void popPush(String name);
+    public void popPush(Supplier<String> name);
+    public void incrementCounter(String name, int amount);
+    public void incrementCounter(Supplier<String> name, int amount);
+    public ProfileResults getResults();
+    public PathEntry getEntry(String path);
+    public Set<Pair<String, MetricCategory>> getChartedPaths();
+    public static class PathEntry implements ProfilerPathEntry {
+        public long getDuration();
+        public long getMaxDuration();
+        public long getCount();
+        public Object2LongMap<String> getCounters();
+    }
+}
+//// ContinuousProfiler.java
+import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
+import java.util.function.LongSupplier;
+public class ContinuousProfiler {
+    public ContinuousProfiler(LongSupplier realTime, IntSupplier tickCount, BooleanSupplier suppressWarnings);
+    public boolean isEnabled();
+    public void disable();
+    public void enable();
+    public ProfilerFiller getFiller();
+    public ProfileResults getResults();
+}
+//// EmptyProfileResults.java
+import java.nio.file.Path;
+import java.util.List;
+public class EmptyProfileResults implements ProfileResults {
+    public static final EmptyProfileResults EMPTY;
+    private EmptyProfileResults();
+    public List<ResultField> getTimes(String path);
+    public boolean saveResults(Path file);
+    public long getStartTimeNano();
+    public int getStartTimeTicks();
+    public long getEndTimeNano();
+    public int getEndTimeTicks();
+    public String getProfilerResults();
+}
+//// FilledProfileResults.java
+import java.nio.file.Path;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+public class FilledProfileResults implements ProfileResults {
+    public FilledProfileResults(Map<String, ? extends ProfilerPathEntry> entries, long startTimeNano, int startTimeTicks, long endTimeNano, int endTimeTicks);
+    public List<ResultField> getTimes(String path);
+    public long getStartTimeNano();
+    public int getStartTimeTicks();
+    public long getEndTimeNano();
+    public int getEndTimeTicks();
+    public boolean saveResults(Path file);
+    protected String getProfilerResults(long timespan, int tickspan);
+    public String getProfilerResults();
+    public int getTickDuration();
+    static class CounterCollector {
+        public void addValue(Iterator<String> path, long value);
+    }
+}
+//// InactiveProfiler.java
+import com.mojang.datafixers.util.Pair;
+import java.util.Set;
+import java.util.function.Supplier;
+import net.minecraft.util.profiling.metrics.MetricCategory;
+public class InactiveProfiler implements ProfileCollector {
+    public static final InactiveProfiler INSTANCE;
+    private InactiveProfiler();
+    public void startTick();
+    public void endTick();
+    public void push(String name);
+    public void push(Supplier<String> name);
+    public void markForCharting(MetricCategory category);
+    public void pop();
+    public void popPush(String name);
+    public void popPush(Supplier<String> name);
+    public Zone zone(String name);
+    public Zone zone(Supplier<String> name);
+    public void incrementCounter(String name, int amount);
+    public void incrementCounter(Supplier<String> name, int amount);
+    public ProfileResults getResults();
+    public ActiveProfiler. PathEntry getEntry(String path);
+    public Set<Pair<String, MetricCategory>> getChartedPaths();
+}
+//// ProfileCollector.java
+import com.mojang.datafixers.util.Pair;
+import java.util.Set;
+import net.minecraft.util.profiling.metrics.MetricCategory;
+public interface ProfileCollector extends ProfilerFiller {
+    ProfileResults getResults();
+    ActiveProfiler. PathEntry getEntry(String path);
+    Set<Pair<String, MetricCategory>> getChartedPaths();
+}
+//// ProfileResults.java
+import java.nio.file.Path;
+import java.util.List;
+public interface ProfileResults {
+    char PATH_SEPARATOR;
+    List<ResultField> getTimes(String path);
+    boolean saveResults(Path file);
+    long getStartTimeNano();
+    int getStartTimeTicks();
+    long getEndTimeNano();
+    int getEndTimeTicks();
+    default long getNanoDuration();
+    default int getTickDuration();
+    String getProfilerResults();
+    static String demanglePath(String path);
+}
+//// Profiler.java
+public final class Profiler {
+    private Profiler();
+    public static Scope use(ProfilerFiller filler);
+    public static ProfilerFiller get();
+    public interface Scope extends AutoCloseable {
+        void close();
+    }
+}
+//// ProfilerFiller.java
+import java.util.function.Supplier;
+import net.minecraft.util.profiling.metrics.MetricCategory;
+public interface ProfilerFiller {
+    String ROOT;
+    void startTick();
+    void endTick();
+    void push(String name);
+    void push(Supplier<String> name);
+    void pop();
+    void popPush(String name);
+    void popPush(Supplier<String> name);
+    default void addZoneText(String text);
+    default void addZoneValue(long value);
+    default void setZoneColor(int color);
+    default Zone zone(String name);
+    default Zone zone(Supplier<String> name);
+    void markForCharting(MetricCategory category);
+    default void incrementCounter(String name);
+    void incrementCounter(String name, int amount);
+    default void incrementCounter(Supplier<String> name);
+    void incrementCounter(Supplier<String> name, int amount);
+    static ProfilerFiller combine(ProfilerFiller first, ProfilerFiller second);
+    public static class CombinedProfileFiller implements ProfilerFiller {
+        public CombinedProfileFiller(ProfilerFiller first, ProfilerFiller second);
+        public void startTick();
+        public void endTick();
+        public void push(String name);
+        public void push(Supplier<String> name);
+        public void markForCharting(MetricCategory category);
+        public void pop();
+        public void popPush(String name);
+        public void popPush(Supplier<String> name);
+        public void incrementCounter(String name, int amount);
+        public void incrementCounter(Supplier<String> name, int amount);
+        public void addZoneText(String text);
+        public void addZoneValue(long value);
+        public void setZoneColor(int color);
+    }
+}
+//// ProfilerPathEntry.java
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+public interface ProfilerPathEntry {
+    long getDuration();
+    long getMaxDuration();
+    long getCount();
+    Object2LongMap<String> getCounters();
+}
+//// ResultField.java
+public final class ResultField implements Comparable<ResultField> {
+    public final double percentage;
+    public final double globalPercentage;
+    public final long count;
+    public final String name;
+    public ResultField(String name, double percentage, double globalPercentage, long count);
+    public int compareTo(ResultField resultField);
+    public int getColor();
+}
+//// SingleTickProfiler.java
+import java.util.function.LongSupplier;
+public class SingleTickProfiler {
+    public SingleTickProfiler(LongSupplier realTime, String location, long saveThresholdNs);
+    public ProfilerFiller startTick();
+    public void endTick();
+    public static SingleTickProfiler createTickProfiler(String name);
+    public static ProfilerFiller decorateFiller(ProfilerFiller filler, SingleTickProfiler tickProfiler);
+}
+//// TracyZoneFiller.java
+import java.util.function.Supplier;
+import net.minecraft.util.profiling.metrics.MetricCategory;
+public class TracyZoneFiller implements ProfilerFiller {
+    public void startTick();
+    public void endTick();
+    public void push(String name);
+    public void push(Supplier<String> name);
+    public void pop();
+    public void popPush(String name);
+    public void popPush(Supplier<String> name);
+    public void markForCharting(MetricCategory category);
+    public void incrementCounter(String name, int amount);
+    public void incrementCounter(Supplier<String> name, int amount);
+    public void addZoneText(String text);
+    public void addZoneValue(long value);
+    public void setZoneColor(int color);
+    static final class PlotAndValue {
+        private PlotAndValue(String name);
+        public void set(int value);
+        public void add(int amount);
+    }
+}
+//// Zone.java
+import java.util.function.Supplier;
+public class Zone implements AutoCloseable {
+    public static final Zone INACTIVE;
+    Zone(ProfilerFiller profiler);
+    public Zone addText(String text);
+    public Zone addText(Supplier<String> text);
+    public Zone addValue(long value);
+    public Zone setColor(int color);
+    public void close();
+}

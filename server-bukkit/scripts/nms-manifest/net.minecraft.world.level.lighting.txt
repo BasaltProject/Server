@@ -1,0 +1,305 @@
+//// BlockLightEngine.java
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+public final class BlockLightEngine extends LightEngine<BlockLightSectionStorage.BlockDataLayerStorageMap, BlockLightSectionStorage> {
+    public BlockLightEngine(LightChunkGetter chunkSource);
+    public BlockLightEngine(LightChunkGetter chunkSource, BlockLightSectionStorage storage);
+    protected void checkNode(long blockNode);
+    protected void propagateIncrease(long fromNode, long increaseData, int fromLevel);
+    protected void propagateDecrease(long fromNode, long decreaseData);
+    public void propagateLightSources(ChunkPos pos);
+}
+//// BlockLightSectionStorage.java
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+public class BlockLightSectionStorage extends LayerLightSectionStorage<BlockDataLayerStorageMap> {
+    protected BlockLightSectionStorage(LightChunkGetter chunkSource);
+    protected int getLightValue(long blockNode);
+    protected static final class BlockDataLayerStorageMap extends DataLayerStorageMap<BlockDataLayerStorageMap> {
+        public BlockDataLayerStorageMap(Long2ObjectOpenHashMap<DataLayer> map);
+        public BlockDataLayerStorageMap copy();
+    }
+}
+//// ChunkSkyLightSources.java
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.chunk.ChunkAccess;
+public class ChunkSkyLightSources {
+    public static final int NEGATIVE_INFINITY = -2147483648;
+    public ChunkSkyLightSources(LevelHeightAccessor level);
+    public void fillFrom(ChunkAccess chunk);
+    public boolean update(BlockGetter level, int x, int y, int z);
+    public int getLowestSourceY(int x, int z);
+    public int getHighestLowestSourceY();
+}
+//// DataLayerStorageMap.java
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import net.minecraft.world.level.chunk.DataLayer;
+public abstract class DataLayerStorageMap<M extends DataLayerStorageMap<M>> {
+    protected final Long2ObjectOpenHashMap<DataLayer> map;
+    protected DataLayerStorageMap(Long2ObjectOpenHashMap<DataLayer> map);
+    public abstract M copy();
+    public DataLayer copyDataLayer(long sectionNode);
+    public boolean hasLayer(long sectionNode);
+    public DataLayer getLayer(long sectionNode);
+    public DataLayer removeLayer(long sectionNode);
+    public void setLayer(long sectionNode, DataLayer layer);
+    public void clearCache();
+    public void disableCache();
+}
+//// DynamicGraphMinFixedPoint.java
+import java.util.function.LongPredicate;
+public abstract class DynamicGraphMinFixedPoint {
+    public static final long SOURCE = 2147483647L;
+    protected final int levelCount;
+    protected DynamicGraphMinFixedPoint(int levelCount, int minQueueSize, int minMapSize);
+    protected void removeFromQueue(long node);
+    public void removeIf(LongPredicate pred);
+    protected void checkNode(long node);
+    protected void checkEdge(long from, long to, int newLevelFrom, boolean onlyDecreased);
+    protected final void checkNeighbor(long from, long to, int level, boolean onlyDecreased);
+    protected final boolean hasWork();
+    protected final int runUpdates(int count);
+    public int getQueueSize();
+    protected boolean isSource(long node);
+    protected abstract int getComputedLevel(long node, long knownParent, int knownLevelFromParent);
+    protected abstract void checkNeighborsAfterUpdate(long node, int level, boolean onlyDecrease);
+    protected abstract int getLevel(long node);
+    protected abstract void setLevel(long node, int level);
+    protected abstract int computeLevelFromNeighbor(long from, long to, int fromLevel);
+}
+//// LayerLightEventListener.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.DataLayer;
+public interface LayerLightEventListener extends LightEventListener {
+    DataLayer getDataLayerData(SectionPos pos);
+    int getLightValue(BlockPos pos);
+    public static enum DummyLightLayerEventListener implements LayerLightEventListener {
+        INSTANCE;
+        public DataLayer getDataLayerData(SectionPos pos);
+        public int getLightValue(BlockPos pos);
+        public void checkBlock(BlockPos pos);
+        public boolean hasLightWork();
+        public int runLightUpdates();
+        public void updateSectionStatus(SectionPos pos, boolean sectionEmpty);
+        public void setLightEnabled(ChunkPos pos, boolean enable);
+        public void propagateLightSources(ChunkPos pos);
+    }
+}
+//// LayerLightSectionStorage.java
+import it.unimi.dsi.fastutil.longs.Long2ByteMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>> {
+    protected final LightChunkGetter chunkSource;
+    protected final Long2ByteMap sectionStates;
+    protected M visibleSectionData;
+    protected final M updatingSectionData;
+    protected final LongSet changedSections;
+    protected final LongSet sectionsAffectedByLightUpdates;
+    protected final Long2ObjectMap<DataLayer> queuedSections;
+    protected boolean hasInconsistencies;
+    protected LayerLightSectionStorage(LightLayer layer, LightChunkGetter chunkSource, M initialMap);
+    protected boolean storingLightForSection(long sectionNode);
+    protected DataLayer getDataLayer(long sectionNode, boolean updating);
+    protected DataLayer getDataLayer(M sections, long sectionNode);
+    protected DataLayer getDataLayerToWrite(long sectionNode);
+    public DataLayer getDataLayerData(long sectionNode);
+    protected abstract int getLightValue(long blockNode);
+    protected int getStoredLevel(long blockNode);
+    protected void setStoredLevel(long blockNode, int level);
+    protected void markSectionAndNeighborsAsAffected(long sectionNode);
+    protected DataLayer createDataLayer(long sectionNode);
+    protected boolean hasInconsistencies();
+    protected void markNewInconsistencies(LightEngine<M, ?> engine);
+    protected void onNodeAdded(long sectionNode);
+    protected void onNodeRemoved(long sectionNode);
+    protected void setLightEnabled(long zeroNode, boolean enable);
+    protected boolean lightOnInSection(long sectionNode);
+    protected boolean lightOnInColumn(long sectionZeroNode);
+    public void retainData(long zeroNode, boolean retain);
+    protected void queueSectionData(long sectionNode, DataLayer data);
+    protected void updateSectionStatus(long sectionNode, boolean sectionEmpty);
+    protected void putSectionState(long sectionNode, byte state);
+    protected void swapSectionMap();
+    public SectionType getDebugSectionType(long sectionNode);
+    protected static class SectionState {
+        public static final byte EMPTY = (byte) 0;
+        public static byte hasData(byte state, boolean hasData);
+        public static byte neighborCount(byte state, int neighborCount);
+        public static boolean hasData(byte state);
+        public static int neighborCount(byte state);
+        public static SectionType type(byte state);
+    }
+    public static enum SectionType {
+        EMPTY, LIGHT_ONLY, LIGHT_AND_DATA;
+        public String display();
+    }
+}
+//// LevelLightEngine.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+public class LevelLightEngine implements LightEventListener {
+    public static final int LIGHT_SECTION_PADDING = 1;
+    public static final LevelLightEngine EMPTY;
+    protected final LevelHeightAccessor levelHeightAccessor;
+    public LevelLightEngine(LightChunkGetter chunkSource, boolean hasBlockLight, boolean hasSkyLight);
+    private LevelLightEngine();
+    public void checkBlock(BlockPos pos);
+    public boolean hasLightWork();
+    public int runLightUpdates();
+    public void updateSectionStatus(SectionPos pos, boolean sectionEmpty);
+    public void setLightEnabled(ChunkPos pos, boolean enable);
+    public void propagateLightSources(ChunkPos pos);
+    public LayerLightEventListener getLayerListener(LightLayer layer);
+    public String getDebugData(LightLayer layer, SectionPos pos);
+    public LayerLightSectionStorage.SectionType getDebugSectionType(LightLayer layer, SectionPos pos);
+    public void queueSectionData(LightLayer layer, SectionPos pos, DataLayer data);
+    public void retainData(ChunkPos pos, boolean retain);
+    public int getRawBrightness(BlockPos pos, int skyDampen);
+    public boolean lightOnInColumn(long sectionZeroNode);
+    public int getLightSectionCount();
+    public int getMinLightSection();
+    public int getMaxLightSection();
+}
+//// LeveledPriorityQueue.java
+public class LeveledPriorityQueue {
+    public LeveledPriorityQueue(int levelCount, int minSize);
+    public long removeFirstLong();
+    public boolean isEmpty();
+    public void dequeue(long node, int key, int upperBound);
+    public void enqueue(long node, int key);
+}
+//// LightEngine.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LightChunk;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends LayerLightSectionStorage<M>> implements LayerLightEventListener {
+    public static final int MAX_LEVEL = 15;
+    protected static final int MIN_OPACITY = 1;
+    protected static final long PULL_LIGHT_IN_ENTRY;
+    protected static final Direction[] PROPAGATION_DIRECTIONS;
+    protected final LightChunkGetter chunkSource;
+    protected final S storage;
+    protected LightEngine(LightChunkGetter chunkSource, S storage);
+    public static boolean hasDifferentLightProperties(BlockState oldState, BlockState newState);
+    public static int getLightDampeningInto(BlockState fromState, BlockState toState, Direction direction, int simpleOpacity);
+    public static VoxelShape getOcclusionShape(BlockState state, Direction direction);
+    protected static boolean isEmptyShape(BlockState state);
+    protected BlockState getState(BlockPos pos);
+    protected int getOpacity(BlockState state);
+    protected boolean shapeOccludes(BlockState fromState, BlockState toState, Direction direction);
+    protected LightChunk getChunk(int chunkX, int chunkZ);
+    public void checkBlock(BlockPos pos);
+    public void queueSectionData(long pos, DataLayer data);
+    public void retainData(ChunkPos pos, boolean retain);
+    public void updateSectionStatus(SectionPos pos, boolean sectionEmpty);
+    public void setLightEnabled(ChunkPos pos, boolean enable);
+    public int runLightUpdates();
+    protected void enqueueDecrease(long fromNode, long decreaseData);
+    protected void enqueueIncrease(long fromNode, long increaseData);
+    public boolean hasLightWork();
+    public DataLayer getDataLayerData(SectionPos pos);
+    public int getLightValue(BlockPos pos);
+    public String getDebugData(long sectionNode);
+    public LayerLightSectionStorage.SectionType getDebugSectionType(long sectionNode);
+    protected abstract void checkNode(long blockNode);
+    protected abstract void propagateIncrease(long fromNode, long increaseData, int fromLevel);
+    protected abstract void propagateDecrease(long fromNode, long decreaseData);
+    public static class QueueEntry {
+        public static long decreaseSkipOneDirection(int oldFromLevel, Direction skipDirection);
+        public static long decreaseAllDirections(int oldFromLevel);
+        public static long increaseLightFromEmission(int newFromLevel, boolean fromEmptyShape);
+        public static long increaseSkipOneDirection(int newFromLevel, boolean fromEmptyShape, Direction skipDirection);
+        public static long increaseOnlyOneDirection(int newFromLevel, boolean fromEmptyShape, Direction direction);
+        public static long increaseSkySourceInDirections(boolean down, boolean north, boolean south, boolean west, boolean east);
+        public static int getFromLevel(long entry);
+        public static boolean isFromEmptyShape(long entry);
+        public static boolean isIncreaseFromEmission(long entry);
+        public static boolean shouldPropagateInDirection(long entry, Direction direction);
+    }
+}
+//// LightEventListener.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.ChunkPos;
+public interface LightEventListener {
+    void checkBlock(BlockPos pos);
+    boolean hasLightWork();
+    int runLightUpdates();
+    default void updateSectionStatus(BlockPos pos, boolean sectionEmpty);
+    void updateSectionStatus(SectionPos pos, boolean sectionEmpty);
+    void setLightEnabled(ChunkPos pos, boolean enable);
+    void propagateLightSources(ChunkPos pos);
+}
+//// SkyLightEngine.java
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+public final class SkyLightEngine extends LightEngine<SkyLightSectionStorage.SkyDataLayerStorageMap, SkyLightSectionStorage> {
+    public SkyLightEngine(LightChunkGetter chunkSource);
+    SkyLightEngine(LightChunkGetter chunkSource, SkyLightSectionStorage storage);
+    protected void checkNode(long blockNode);
+    protected void propagateIncrease(long fromNode, long increaseData, int fromLevel);
+    protected void propagateDecrease(long fromNode, long decreaseData);
+    public void setLightEnabled(ChunkPos pos, boolean enable);
+    public void propagateLightSources(ChunkPos pos);
+}
+//// SkyLightSectionStorage.java
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+public class SkyLightSectionStorage extends LayerLightSectionStorage<SkyDataLayerStorageMap> {
+    protected SkyLightSectionStorage(LightChunkGetter chunkSource);
+    protected int getLightValue(long blockNode);
+    protected int getLightValue(long blockNode, boolean updating);
+    protected void onNodeAdded(long sectionNode);
+    protected void onNodeRemoved(long sectionNode);
+    protected DataLayer createDataLayer(long sectionNode);
+    protected boolean hasLightDataAtOrBelow(int sectionY);
+    protected boolean isAboveData(long sectionNode);
+    protected int getTopSectionY(long zeroNode);
+    protected int getBottomSectionY();
+    protected static final class SkyDataLayerStorageMap extends DataLayerStorageMap<SkyDataLayerStorageMap> {
+        public SkyDataLayerStorageMap(Long2ObjectOpenHashMap<DataLayer> map, Long2IntOpenHashMap topSections, int currentLowestY);
+        public SkyDataLayerStorageMap copy();
+    }
+}
+//// SpatialLongSet.java
+import it.unimi.dsi.fastutil.longs.Long2LongLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
+public class SpatialLongSet extends LongLinkedOpenHashSet {
+    public SpatialLongSet(int expected, float f);
+    public boolean add(long k);
+    public boolean rem(long k);
+    public long removeFirstLong();
+    public int size();
+    public boolean isEmpty();
+    static class InternalMap extends Long2LongLinkedOpenHashMap {
+        public InternalMap(int expected, float f);
+        static long getOuterKey(long key);
+        static int getInnerKey(long key);
+        static long getFullKey(long outerKey, int innerKey);
+        public boolean addBit(long key);
+        public boolean removeBit(long key);
+        public long removeFirstBit();
+        protected void rehash(int newN);
+    }
+}

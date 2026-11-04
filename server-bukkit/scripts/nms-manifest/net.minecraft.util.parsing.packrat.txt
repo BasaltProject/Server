@@ -1,0 +1,203 @@
+//// Atom.java
+public record Atom<T>(String name) {
+    public String toString();
+    public static <T> Atom<T> of(String name);
+}
+//// CachedParseState.java
+public abstract class CachedParseState<S> implements ParseState<S> {
+    protected CachedParseState(ErrorCollector<S> errorCollector);
+    public Scope scope();
+    public ErrorCollector<S> errorCollector();
+    public <T> T parse(NamedRule<S, T> rule);
+    public Control acquireControl();
+    public void releaseControl();
+    public ParseState<S> silent();
+    static class PositionCache {
+        public static final int ENTRY_STRIDE = 2;
+        public int findKeyIndex(Atom<?> key);
+        public int allocateNewEntry(Atom<?> key);
+        public <T> CacheEntry<T> getValue(int keyIndex);
+        public void setValue(int keyIndex, CacheEntry<?> entry);
+    }
+    static record CacheEntry<T>(T value, int markAfterParse) {
+        public static final CacheEntry<?> NEGATIVE;
+        public static <T> CacheEntry<T> negativeEntry();
+    }
+    class Silent implements ParseState<S> {
+        private Silent();
+        public ErrorCollector<S> errorCollector();
+        public Scope scope();
+        public <T> T parse(NamedRule<S, T> rule);
+        public S input();
+        public int mark();
+        public void restore(int mark);
+        public Control acquireControl();
+        public void releaseControl();
+        public ParseState<S> silent();
+    }
+    static class SimpleControl implements Control {
+        public void cut();
+        public boolean hasCut();
+        public void reset();
+    }
+}
+//// Control.java
+public interface Control {
+    Control UNBOUND;
+    void cut();
+    boolean hasCut();
+}
+//// DelayedException.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+public interface DelayedException<T extends Exception> {
+    T create(String contents, int position);
+    static DelayedException<CommandSyntaxException> create(SimpleCommandExceptionType type);
+    static DelayedException<CommandSyntaxException> create(DynamicCommandExceptionType type, String argument);
+}
+//// Dictionary.java
+import java.util.function.Supplier;
+public class Dictionary<S> {
+    public <T> NamedRule<S, T> put(Atom<T> name, Rule<S, T> entry);
+    public <T> NamedRule<S, T> putComplex(Atom<T> name, Term<S> term, Rule.RuleAction<S, T> action);
+    public <T> NamedRule<S, T> put(Atom<T> name, Term<S> term, Rule.SimpleRuleAction<S, T> action);
+    public void checkAllBound();
+    public <T> NamedRule<S, T> getOrThrow(Atom<T> name);
+    public <T> NamedRule<S, T> forward(Atom<T> name);
+    public <T> Term<S> named(Atom<T> name);
+    public <T> Term<S> namedWithAlias(Atom<T> nameToParse, Atom<T> nameToStore);
+    static record Reference<S, T>(Entry<S, T> ruleToParse, Atom<T> nameToStore) implements Term<S> {
+        public boolean parse(ParseState<S> state, Scope scope, Control control);
+    }
+    static class Entry<S, T> implements NamedRule<S, T>, Supplier<String> {
+        private Entry(Atom<T> name);
+        public Atom<T> name();
+        public Rule<S, T> value();
+        public String get();
+    }
+}
+//// ErrorCollector.java
+import java.util.List;
+public interface ErrorCollector<S> {
+    void store(int cursor, SuggestionSupplier<S> suggestions, Object reason);
+    default void store(int cursor, Object reason);
+    void finish(int finalCursor);
+    public static class Nop<S> implements ErrorCollector<S> {
+        public void store(int cursor, SuggestionSupplier<S> suggestions, Object reason);
+        public void finish(int finalCursor);
+    }
+    public static class LongestOnly<S> implements ErrorCollector<S> {
+        public void finish(int finalCursor);
+        public void store(int cursor, SuggestionSupplier<S> suggestions, Object reason);
+        public List<ErrorEntry<S>> entries();
+        public int cursor();
+        static class MutableErrorEntry<S> {
+        }
+    }
+}
+//// ErrorEntry.java
+public record ErrorEntry<S>(int cursor, SuggestionSupplier<S> suggestions, Object reason) {
+}
+//// NamedRule.java
+public interface NamedRule<S, T> {
+    Atom<T> name();
+    Rule<S, T> value();
+}
+//// ParseState.java
+import java.util.Optional;
+public interface ParseState<S> {
+    Scope scope();
+    ErrorCollector<S> errorCollector();
+    default <T> Optional<T> parseTopRule(NamedRule<S, T> rule);
+    <T> T parse(NamedRule<S, T> rule);
+    S input();
+    int mark();
+    void restore(int mark);
+    Control acquireControl();
+    void releaseControl();
+    ParseState<S> silent();
+}
+//// Rule.java
+public interface Rule<S, T> {
+    T parse(ParseState<S> state);
+    static <S, T> Rule<S, T> fromTerm(Term<S> child, RuleAction<S, T> action);
+    static <S, T> Rule<S, T> fromTerm(Term<S> child, SimpleRuleAction<S, T> action);
+    public interface SimpleRuleAction<S, T> extends RuleAction<S, T> {
+        T run(Scope ruleScope);
+        default T run(ParseState<S> state);
+    }
+    public static record WrappedTerm<S, T>(RuleAction<S, T> action, Term<S> child) implements Rule<S, T> {
+        public T parse(ParseState<S> state);
+    }
+    public interface RuleAction<S, T> {
+        T run(ParseState<S> state);
+    }
+}
+//// Scope.java
+import java.util.Map;
+public final class Scope {
+    public Scope();
+    public int valueIndexForAny(Atom<?>... atoms);
+    public void pushFrame();
+    public void popFrame();
+    public void splitFrame();
+    public void clearFrameValues();
+    public void mergeFrame();
+    public <T> void put(Atom<T> name, T value);
+    public <T> T get(Atom<T> name);
+    public <T> T getOrThrow(Atom<T> name);
+    public <T> T getOrDefault(Atom<T> name, T fallback);
+    public final <T> T getAny(Atom<? extends T>... names);
+    public final <T> T getAnyOrThrow(Atom<? extends T>... names);
+    public String toString();
+    public Map<Atom<?>, ?> lastFrame();
+    public boolean hasOnlySingleFrame();
+}
+//// SuggestionSupplier.java
+import java.util.stream.Stream;
+public interface SuggestionSupplier<S> {
+    Stream<String> possibleValues(ParseState<S> state);
+    static <S> SuggestionSupplier<S> empty();
+}
+//// Term.java
+import java.util.List;
+public interface Term<S> {
+    boolean parse(ParseState<S> state, Scope scope, Control control);
+    static <S, T> Term<S> marker(Atom<T> name, T value);
+    static <S> Term<S> sequence(Term<S>... terms);
+    static <S> Term<S> alternative(Term<S>... terms);
+    static <S> Term<S> optional(Term<S> term);
+    static <S, T> Term<S> repeated(NamedRule<S, T> element, Atom<List<T>> listName);
+    static <S, T> Term<S> repeated(NamedRule<S, T> element, Atom<List<T>> listName, int minRepetitions);
+    static <S, T> Term<S> repeatedWithTrailingSeparator(NamedRule<S, T> element, Atom<List<T>> listName, Term<S> separator);
+    static <S, T> Term<S> repeatedWithTrailingSeparator(NamedRule<S, T> element, Atom<List<T>> listName, Term<S> separator, int minRepetitions);
+    static <S, T> Term<S> repeatedWithoutTrailingSeparator(NamedRule<S, T> element, Atom<List<T>> listName, Term<S> separator);
+    static <S, T> Term<S> repeatedWithoutTrailingSeparator(NamedRule<S, T> element, Atom<List<T>> listName, Term<S> separator, int minRepetitions);
+    static <S> Term<S> positiveLookahead(Term<S> term);
+    static <S> Term<S> negativeLookahead(Term<S> term);
+    static <S> Term<S> cut();
+    static <S> Term<S> empty();
+    static <S> Term<S> fail(Object message);
+    public static record Marker<S, T>(Atom<T> name, T value) implements Term<S> {
+        public boolean parse(ParseState<S> state, Scope scope, Control control);
+    }
+    public static record Sequence<S>(Term<S>[] elements) implements Term<S> {
+        public boolean parse(ParseState<S> state, Scope scope, Control control);
+    }
+    public static record Alternative<S>(Term<S>[] elements) implements Term<S> {
+        public boolean parse(ParseState<S> state, Scope scope, Control control);
+    }
+    public static record Maybe<S>(Term<S> term) implements Term<S> {
+        public boolean parse(ParseState<S> state, Scope scope, Control control);
+    }
+    public static record Repeated<S, T>(NamedRule<S, T> element, Atom<List<T>> listName, int minRepetitions) implements Term<S> {
+        public boolean parse(ParseState<S> state, Scope scope, Control control);
+    }
+    public static record RepeatedWithSeparator<S, T>(NamedRule<S, T> element, Atom<List<T>> listName, Term<S> separator, int minRepetitions, boolean allowTrailingSeparator) implements Term<S> {
+        public boolean parse(ParseState<S> state, Scope scope, Control control);
+    }
+    public static record LookAhead<S>(Term<S> term, boolean positive) implements Term<S> {
+        public boolean parse(ParseState<S> state, Scope scope, Control control);
+    }
+}

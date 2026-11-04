@@ -1,0 +1,368 @@
+//// AbandonedCampStructurePools.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class AbandonedCampStructurePools {
+    public static final AbandonedCampStructure BAMBOO_JUNGLE;
+    public static final AbandonedCampStructure BIRCH_FOREST;
+    public static final AbandonedCampStructure CHERRY_GROVE;
+    public static final AbandonedCampStructure DAPPLED_FOREST;
+    public static final AbandonedCampStructure FLOWER_FOREST;
+    public static final AbandonedCampStructure FOREST;
+    public static final AbandonedCampStructure MEADOW;
+    public static final AbandonedCampStructure OLD_GROWTH_BIRCH_FOREST;
+    public static final AbandonedCampStructure OLD_GROWTH_PINE_TAIGA;
+    public static final AbandonedCampStructure OLD_GROWTH_SPRUCE_TAIGA;
+    public static final AbandonedCampStructure PALE_GARDEN;
+    public static final AbandonedCampStructure SAVANNA;
+    public static final AbandonedCampStructure SNOWY_TAIGA;
+    public static final AbandonedCampStructure SPARSE_JUNGLE;
+    public static final AbandonedCampStructure SWAMP;
+    public static final AbandonedCampStructure TAIGA;
+    public static final AbandonedCampStructure WINDSWEPT_FOREST;
+    public static final AbandonedCampStructure WOODED_BADLANDS;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+    public static record AbandonedCampStructure(ResourceKey<StructureTemplatePool> campStructureDirectory, ResourceKey<StructureTemplatePool> tentStructureDirectory, String name) {
+    }
+}
+//// AncientCityStructurePieces.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class AncientCityStructurePieces {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// AncientCityStructurePools.java
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class AncientCityStructurePools {
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// BastionBridgePools.java
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class BastionBridgePools {
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// BastionHoglinStablePools.java
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class BastionHoglinStablePools {
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// BastionHousingUnitsPools.java
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class BastionHousingUnitsPools {
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// BastionPieces.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class BastionPieces {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// BastionSharedPools.java
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class BastionSharedPools {
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// BastionTreasureRoomPools.java
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class BastionTreasureRoomPools {
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// BiomeDefaultFeatures.java
+import net.minecraft.world.level.biome.BiomeGenerationSettings;
+import net.minecraft.world.level.biome.MobSpawnSettings;
+public class BiomeDefaultFeatures {
+    public static void addDefaultCarversAndLakes(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultMonsterRoom(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultUndergroundVariety(BiomeGenerationSettings.Builder builder);
+    public static void addDripstone(BiomeGenerationSettings.Builder builder);
+    public static void addSculk(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultOres(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultOres(BiomeGenerationSettings.Builder builder, boolean largeCopperBlobs);
+    public static void addExtraGold(BiomeGenerationSettings.Builder builder);
+    public static void addExtraEmeralds(BiomeGenerationSettings.Builder builder);
+    public static void addInfestedStone(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultSoftDisks(BiomeGenerationSettings.Builder builder);
+    public static void addSwampClayDisk(BiomeGenerationSettings.Builder builder);
+    public static void addMangroveSwampDisks(BiomeGenerationSettings.Builder builder);
+    public static void addMossyStoneBlock(BiomeGenerationSettings.Builder builder);
+    public static void addFerns(BiomeGenerationSettings.Builder builder);
+    public static void addBushes(BiomeGenerationSettings.Builder builder);
+    public static void addRareBerryBushes(BiomeGenerationSettings.Builder builder);
+    public static void addCommonBerryBushes(BiomeGenerationSettings.Builder builder);
+    public static void addLightBambooVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addBambooVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addTaigaTrees(BiomeGenerationSettings.Builder builder);
+    public static void addGroveTrees(BiomeGenerationSettings.Builder builder);
+    public static void addWaterTrees(BiomeGenerationSettings.Builder builder);
+    public static void addBirchTrees(BiomeGenerationSettings.Builder builder);
+    public static void addOtherBirchTrees(BiomeGenerationSettings.Builder builder);
+    public static void addTallBirchTrees(BiomeGenerationSettings.Builder builder);
+    public static void addBirchForestFlowers(BiomeGenerationSettings.Builder builder);
+    public static void addSavannaTrees(BiomeGenerationSettings.Builder builder);
+    public static void addShatteredSavannaTrees(BiomeGenerationSettings.Builder builder);
+    public static void addLushCavesVegetationFeatures(BiomeGenerationSettings.Builder builder);
+    public static void addSulfurCavesFeatures(BiomeGenerationSettings.Builder builder);
+    public static void addLushCavesSpecialOres(BiomeGenerationSettings.Builder builder);
+    public static void addMountainTrees(BiomeGenerationSettings.Builder builder);
+    public static void addMountainForestTrees(BiomeGenerationSettings.Builder builder);
+    public static void addJungleTrees(BiomeGenerationSettings.Builder builder);
+    public static void addSparseJungleTrees(BiomeGenerationSettings.Builder builder);
+    public static void addBadlandsTrees(BiomeGenerationSettings.Builder builder);
+    public static void addSnowyTrees(BiomeGenerationSettings.Builder builder);
+    public static void addJungleGrass(BiomeGenerationSettings.Builder builder);
+    public static void addSavannaGrass(BiomeGenerationSettings.Builder builder);
+    public static void addShatteredSavannaGrass(BiomeGenerationSettings.Builder builder);
+    public static void addSavannaExtraGrass(BiomeGenerationSettings.Builder builder);
+    public static void addBadlandGrass(BiomeGenerationSettings.Builder builder);
+    public static void addForestFlowers(BiomeGenerationSettings.Builder builder);
+    public static void addForestGrass(BiomeGenerationSettings.Builder builder);
+    public static void addSwampVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addDappledForestVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addMangroveSwampVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addMushroomFieldVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addPlainVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addDesertVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addGiantTaigaVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultFlowers(BiomeGenerationSettings.Builder builder);
+    public static void addCherryGroveVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addMeadowVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addWarmFlowers(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultGrass(BiomeGenerationSettings.Builder builder);
+    public static void addTaigaGrass(BiomeGenerationSettings.Builder builder);
+    public static void addPlainGrass(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultMushrooms(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultExtraVegetation(BiomeGenerationSettings.Builder builder, boolean shouldGenerateNearWaterVegetation);
+    public static void addNearWaterVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addLeafLitterPatch(BiomeGenerationSettings.Builder builder);
+    public static void addBadlandExtraVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addJungleMelons(BiomeGenerationSettings.Builder builder);
+    public static void addSparseJungleMelons(BiomeGenerationSettings.Builder builder);
+    public static void addJungleVines(BiomeGenerationSettings.Builder builder);
+    public static void addDesertExtraVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addSwampExtraVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addMangroveSwampExtraVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addDesertExtraDecoration(BiomeGenerationSettings.Builder builder);
+    public static void addFossilDecoration(BiomeGenerationSettings.Builder builder);
+    public static void addColdOceanExtraVegetation(BiomeGenerationSettings.Builder builder);
+    public static void addLukeWarmKelp(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultSprings(BiomeGenerationSettings.Builder builder);
+    public static void addFrozenSprings(BiomeGenerationSettings.Builder builder);
+    public static void addIcebergs(BiomeGenerationSettings.Builder builder);
+    public static void addBlueIce(BiomeGenerationSettings.Builder builder);
+    public static void addSurfaceFreezing(BiomeGenerationSettings.Builder builder);
+    public static void addNetherDefaultOres(BiomeGenerationSettings.Builder builder);
+    public static void addAncientDebris(BiomeGenerationSettings.Builder builder);
+    public static void addDefaultCrystalFormations(BiomeGenerationSettings.Builder builder);
+    public static void farmAnimals(MobSpawnSettings.Builder builder);
+    public static void caveSpawns(MobSpawnSettings.Builder builder);
+    public static void commonSpawns(MobSpawnSettings.Builder builder);
+    public static void commonSpawns(MobSpawnSettings.Builder builder, int skeletonWeight);
+    public static void commonSpawnWithZombieHorse(MobSpawnSettings.Builder builder);
+    public static void swampSpawns(MobSpawnSettings.Builder builder, int swampSkeletonWeight);
+    public static void oceanSpawns(MobSpawnSettings.Builder builder, int squidProbabilityWeight, int squidMaxCount, int codProbabilityWeight);
+    public static void warmOceanSpawns(MobSpawnSettings.Builder builder, int squidProbabilityWeight, int squidMinCount);
+    public static void plainsSpawns(MobSpawnSettings.Builder builder);
+    public static void snowySpawns(MobSpawnSettings.Builder builder, boolean spawnZombieHorse);
+    public static void desertSpawns(MobSpawnSettings.Builder builder);
+    public static void dripstoneCavesSpawns(MobSpawnSettings.Builder builder);
+    public static void monsters(MobSpawnSettings.Builder builder, int zombieWeight, int zombieVillagerWeight, int zombieHorseWeight, int skeletonWeight, boolean drownedZombies);
+    public static void mooshroomSpawns(MobSpawnSettings.Builder builder);
+    public static void baseJungleSpawns(MobSpawnSettings.Builder builder);
+    public static void endSpawns(MobSpawnSettings.Builder builder);
+}
+//// BlockStateProviders.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public interface BlockStateProviders {
+    ResourceKey<BlockStateProvider> CAVE_VINES_BODY;
+    ResourceKey<BlockStateProvider> CAVE_VINES_HEAD;
+    ResourceKey<BlockStateProvider> FLOWER_FLOWER_FOREST;
+    ResourceKey<BlockStateProvider> FLOWER_MEADOW;
+    ResourceKey<BlockStateProvider> FLOWER_PLAIN;
+    ResourceKey<BlockStateProvider> MANGROVE_PROPAGULE;
+    ResourceKey<BlockStateProvider> PODZOL_BENEATH_TREE;
+    ResourceKey<BlockStateProvider> SOIL_BENEATH_TREE;
+    static void bootstrap(BootstrapContext<BlockStateProvider> context);
+}
+//// BootstrapContext.java
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+public interface BootstrapContext<T> extends BootstrapContextAccess {
+    Holder.Reference<T> register(ResourceKey<T> key, T value);
+}
+//// BootstrapContextAccess.java
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public interface BootstrapContextAccess {
+    <S> HolderGetter<S> lookup(ResourceKey<? extends Registry<? extends S>> key);
+    <S> Stream<Holder.Reference<S>> listContextElements(ResourceKey<? extends Registry<? extends S>> key);
+}
+//// Carvers.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.carver.WorldCarver;
+public interface Carvers {
+    ResourceKey<WorldCarver> CAVE;
+    ResourceKey<WorldCarver> CAVE_EXTRA_UNDERGROUND;
+    ResourceKey<WorldCarver> CANYON;
+    ResourceKey<WorldCarver> NETHER_CAVE;
+    static void bootstrap(BootstrapContext<WorldCarver> context);
+}
+//// DesertVillagePools.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class DesertVillagePools {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// DimensionTypes.java
+import net.minecraft.world.level.dimension.DimensionType;
+public class DimensionTypes {
+    public static void bootstrap(BootstrapContext<DimensionType> context);
+}
+//// NoiseData.java
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public class NoiseData {
+    public static final NormalNoise DEFAULT_SHIFT;
+    public static void bootstrap(BootstrapContext<NormalNoise> context);
+}
+//// PillagerOutpostPools.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class PillagerOutpostPools {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// PlainVillagePools.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class PlainVillagePools {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// Pools.java
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class Pools {
+    public static final ResourceKey<StructureTemplatePool> EMPTY;
+    public static ResourceKey<StructureTemplatePool> createKey(Identifier location);
+    public static ResourceKey<StructureTemplatePool> createKey(String name);
+    public static ResourceKey<StructureTemplatePool> parseKey(String name);
+    public static void register(BootstrapContext<StructureTemplatePool> context, String name, StructureTemplatePool pool);
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// ProcessorLists.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorList;
+public class ProcessorLists {
+    public static final ResourceKey<StructureProcessorList> ZOMBIE_PLAINS;
+    public static final ResourceKey<StructureProcessorList> ZOMBIE_SAVANNA;
+    public static final ResourceKey<StructureProcessorList> ZOMBIE_SNOWY;
+    public static final ResourceKey<StructureProcessorList> ZOMBIE_TAIGA;
+    public static final ResourceKey<StructureProcessorList> ZOMBIE_DESERT;
+    public static final ResourceKey<StructureProcessorList> MOSSIFY_10_PERCENT;
+    public static final ResourceKey<StructureProcessorList> MOSSIFY_20_PERCENT;
+    public static final ResourceKey<StructureProcessorList> MOSSIFY_70_PERCENT;
+    public static final ResourceKey<StructureProcessorList> STREET_PLAINS;
+    public static final ResourceKey<StructureProcessorList> STREET_SAVANNA;
+    public static final ResourceKey<StructureProcessorList> STREET_SNOWY_OR_TAIGA;
+    public static final ResourceKey<StructureProcessorList> FARM_PLAINS;
+    public static final ResourceKey<StructureProcessorList> FARM_SAVANNA;
+    public static final ResourceKey<StructureProcessorList> FARM_SNOWY;
+    public static final ResourceKey<StructureProcessorList> FARM_TAIGA;
+    public static final ResourceKey<StructureProcessorList> FARM_DESERT;
+    public static final ResourceKey<StructureProcessorList> OUTPOST_ROT;
+    public static final ResourceKey<StructureProcessorList> BOTTOM_RAMPART;
+    public static final ResourceKey<StructureProcessorList> TREASURE_ROOMS;
+    public static final ResourceKey<StructureProcessorList> HOUSING;
+    public static final ResourceKey<StructureProcessorList> SIDE_WALL_DEGRADATION;
+    public static final ResourceKey<StructureProcessorList> STABLE_DEGRADATION;
+    public static final ResourceKey<StructureProcessorList> BASTION_GENERIC_DEGRADATION;
+    public static final ResourceKey<StructureProcessorList> RAMPART_DEGRADATION;
+    public static final ResourceKey<StructureProcessorList> ENTRANCE_REPLACEMENT;
+    public static final ResourceKey<StructureProcessorList> BRIDGE;
+    public static final ResourceKey<StructureProcessorList> ROOF;
+    public static final ResourceKey<StructureProcessorList> HIGH_WALL;
+    public static final ResourceKey<StructureProcessorList> HIGH_RAMPART;
+    public static final ResourceKey<StructureProcessorList> FOSSIL_ROT;
+    public static final ResourceKey<StructureProcessorList> FOSSIL_COAL;
+    public static final ResourceKey<StructureProcessorList> FOSSIL_DIAMONDS;
+    public static final ResourceKey<StructureProcessorList> ANCIENT_CITY_START_DEGRADATION;
+    public static final ResourceKey<StructureProcessorList> ANCIENT_CITY_GENERIC_DEGRADATION;
+    public static final ResourceKey<StructureProcessorList> ANCIENT_CITY_WALLS_DEGRADATION;
+    public static final ResourceKey<StructureProcessorList> TRAIL_RUINS_HOUSES_ARCHAEOLOGY;
+    public static final ResourceKey<StructureProcessorList> TRAIL_RUINS_ROADS_ARCHAEOLOGY;
+    public static final ResourceKey<StructureProcessorList> TRAIL_RUINS_TOWER_TOP_ARCHAEOLOGY;
+    public static final ResourceKey<StructureProcessorList> TRIAL_CHAMBERS_COPPER_BULB_DEGRADATION;
+    public static void bootstrap(BootstrapContext<StructureProcessorList> context);
+}
+//// SavannaVillagePools.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class SavannaVillagePools {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// SnowyVillagePools.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class SnowyVillagePools {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// StructureSets.java
+import net.minecraft.world.level.levelgen.structure.StructureSet;
+public interface StructureSets {
+    static void bootstrap(BootstrapContext<StructureSet> context);
+}
+//// Structures.java
+import net.minecraft.world.level.levelgen.structure.Structure;
+public class Structures {
+    public static void bootstrap(BootstrapContext<Structure> context);
+}
+//// TaigaVillagePools.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class TaigaVillagePools {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// TerrainProvider.java
+import it.unimi.dsi.fastutil.floats.Float2FloatFunction;
+import net.minecraft.util.BoundedFloatFunction;
+import net.minecraft.util.CubicSpline;
+public class TerrainProvider {
+    public static <I extends BoundedFloatFunction<?>> CubicSpline<I> overworldOffset(I continents, I erosion, I ridges, boolean amplified);
+    public static <I extends BoundedFloatFunction<?>> CubicSpline<I> overworldFactor(I continents, I erosion, I weirdness, I ridges, boolean amplified);
+    public static <I extends BoundedFloatFunction<?>> CubicSpline<I> overworldJaggedness(I continents, I erosion, I weirdness, I ridges, boolean amplified);
+    public static float peaksAndValleys(float weirdness);
+    public static <I extends BoundedFloatFunction<?>> CubicSpline<I> buildErosionOffsetSpline(I erosion, I ridges, float lowValley, float hill, float tallHill, float mountainFactor, float plain, float swamp, boolean includeExtremeHills, boolean saddle, Float2FloatFunction offsetTransformer);
+}
+//// TrailRuinsStructurePools.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class TrailRuinsStructurePools {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// TrialChambersStructurePools.java
+import java.util.List;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+import net.minecraft.world.level.levelgen.structure.pools.alias.PoolAliasBinding;
+public class TrialChambersStructurePools {
+    public static final ResourceKey<StructureTemplatePool> START;
+    public static final ResourceKey<StructureTemplatePool> HALLWAY_FALLBACK;
+    public static final List<PoolAliasBinding> ALIAS_BINDINGS;
+    public static String spawner(String alias);
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}
+//// VillagePools.java
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class VillagePools {
+    public static void bootstrap(BootstrapContext<StructureTemplatePool> context);
+}

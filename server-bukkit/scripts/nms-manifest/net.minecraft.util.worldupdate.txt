@@ -1,0 +1,157 @@
+//// FileToUpgrade.java
+import java.util.List;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.storage.RegionFile;
+public record FileToUpgrade(RegionFile file, List<ChunkPos> chunksToUpgrade) {
+}
+//// RegionStorageUpgrader.java
+import com.mojang.datafixers.DataFixer;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.storage.LevelStorageSource;
+public class RegionStorageUpgrader {
+    protected CompletableFuture<Void> previousWriteFuture;
+    protected final DataFixTypes dataFixType;
+    protected final int defaultVersion;
+    protected RegionStorageUpgrader(DataFixer dataFixer, DataFixTypes dataFixType, String type, String folderName, int defaultVersion, boolean recreateRegionFiles, UpgradeProgress upgradeProgress, int startIndex, CompoundTag dataFixContextTag, Int2ObjectMap<TagModifier> tagModifiers);
+    public void init(ResourceKey<Level> dimensionKey, LevelStorageSource.LevelStorageAccess levelStorage);
+    public void upgrade();
+    protected final SimpleRegionStorage createStorage(RegionStorageInfo info, Path regionFolder);
+    public int fileAmount();
+    protected boolean tryProcessOnePosition(SimpleRegionStorage storage, ChunkPos pos);
+    protected CompoundTag upgradeTag(SimpleRegionStorage storage, CompoundTag chunkTag, int targetVersion);
+    protected static Path resolveRecreateDirectory(Path directoryPath);
+    public static class Builder {
+        public Builder(DataFixer dataFixer);
+        public Builder setDataFixType(DataFixTypes dataFixType);
+        public Builder setTypeAndFolderName(String name);
+        public Builder setType(String type);
+        public Builder setFolderName(String folderName);
+        public Builder setDefaultVersion(int defaultVersion);
+        public Builder setRecreateRegionFiles(boolean recreateRegionFiles);
+        public Builder trackProgress(UpgradeProgress upgradeProgress);
+        public Builder setDataFixContextTag(CompoundTag dataFixContextTag);
+        public Builder addTagModifier(int version, TagModifier tagModifier);
+        public Builder copy();
+        public RegionStorageUpgrader build(int previousCopiesFileAmounts);
+    }
+    public interface TagModifier {
+        boolean modifyTagAfterFix(ChunkPos pos, CompoundTag upgradedTag);
+    }
+}
+//// UpgradeProgress.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.notifications.NotificationService;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.Level;
+public class UpgradeProgress {
+    public UpgradeProgress();
+    public UpgradeProgress(NotificationService notificationService);
+    public boolean isFinished();
+    public void setFinished(boolean finished);
+    public FileFixStats getTotalFileFixStats();
+    public FileFixStats getTypeFileFixStats();
+    public FileFixStats getRunningFileFixerStats();
+    public void addTotalFileFixOperations(int additionalFileFixOperations);
+    public float getTotalProgress();
+    public void setTotalProgress(float totalProgress);
+    public int getTotalChunks();
+    public void addTotalChunks(int additionalTotalChunks);
+    public int getConverted();
+    public void setDimensionProgress(ResourceKey<Level> dimensionKey, float currentProgress);
+    public float getDimensionProgress(ResourceKey<Level> dimensionKey);
+    public void incrementConverted();
+    public int getSkipped();
+    public void incrementSkipped();
+    public void incrementFinishedOperations();
+    public void incrementFinishedOperationsBy(int count);
+    public void setCanceled();
+    public boolean isCanceled();
+    public Status getStatus();
+    public void setStatus(Status status);
+    public DataFixTypes getDataFixType();
+    public void setType(Type type);
+    public Type getType();
+    public void setApplicableFixerAmount(int amount);
+    public void incrementRunningFileFixer();
+    public void reset(DataFixTypes dataFixType);
+    public void logProgress();
+    public NotificationService notifications();
+    public static enum Status {
+        COUNTING, FAILED, FINISHED, UPGRADING;
+    }
+    public static enum Type implements StringRepresentable {
+        FILES, LEGACY_STRUCTURES, REGIONS;
+        public String getSerializedName();
+        public Component label();
+    }
+    public static class FileFixStats {
+        public int finishedOperations();
+        public int totalOperations();
+        public void reset();
+        public float getProgress();
+    }
+    public static class Noop extends UpgradeProgress {
+        public void setFinished(boolean finished);
+        public void addTotalFileFixOperations(int additionalFileFixOperations);
+        public void setTotalProgress(float totalProgress);
+        public void addTotalChunks(int additionalTotalChunks);
+        public void setDimensionProgress(ResourceKey<Level> dimensionKey, float currentProgress);
+        public void incrementConverted();
+        public void incrementSkipped();
+        public void incrementFinishedOperations();
+        public void incrementFinishedOperationsBy(int count);
+        public void setCanceled();
+        public void setStatus(Status status);
+        public void setApplicableFixerAmount(int amount);
+        public void incrementRunningFileFixer();
+        public void reset(DataFixTypes dataFixType);
+    }
+}
+//// UpgradeStatusTranslator.java
+import net.minecraft.network.chat.Component;
+public class UpgradeStatusTranslator {
+    public Component translate(UpgradeProgress upgradeProgress);
+    public static record Messages(Component upgrading, Component finished) {
+        public static Messages create(String type);
+        public Component forStatus(UpgradeProgress.Status status);
+    }
+}
+//// WorldUpgrader.java
+import com.mojang.datafixers.DataFixer;
+import java.util.Set;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.storage.LevelStorageSource;
+public class WorldUpgrader implements AutoCloseable {
+    public WorldUpgrader(LevelStorageSource.LevelStorageAccess levelSource, DataFixer dataFixer, RegistryAccess registryAccess, boolean eraseCache, boolean recreateRegionFiles);
+    public static CompoundTag getDataFixContextTag(Registry<LevelStem> dimensions, ResourceKey<Level> dimension);
+    public static boolean verifyChunkPosAndEraseCache(ChunkPos pos, CompoundTag upgradedTag);
+    public static boolean verifyChunkPos(ChunkPos pos, CompoundTag upgradedTag);
+    public void cancel();
+    public boolean isFinished();
+    public Set<ResourceKey<Level>> levels();
+    public float dimensionProgress(ResourceKey<Level> dimension);
+    public float getTotalProgress();
+    public int getTotalChunks();
+    public int getConverted();
+    public int getSkipped();
+    public Component getStatus();
+    public void close();
+}

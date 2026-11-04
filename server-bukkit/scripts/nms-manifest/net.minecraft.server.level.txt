@@ -1,0 +1,1389 @@
+//// BlockDestructionProgress.java
+import net.minecraft.core.BlockPos;
+public class BlockDestructionProgress implements Comparable<BlockDestructionProgress> {
+    public BlockDestructionProgress(int id, BlockPos pos);
+    public int getId();
+    public BlockPos getPos();
+    public void setProgress(int progress);
+    public int getProgress();
+    public void updateTick(long tick);
+    public long getUpdatedRenderTick();
+    public boolean equals(Object o);
+    public int hashCode();
+    public int compareTo(BlockDestructionProgress o);
+}
+//// ChunkGenerationTask.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.util.StaticCache2D;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+public class ChunkGenerationTask {
+    public final ChunkStatus targetStatus;
+    private ChunkGenerationTask(GeneratingChunkMap chunkMap, ChunkStatus targetStatus, ChunkPos pos, StaticCache2D<GenerationChunkHolder> cache);
+    public static ChunkGenerationTask create(GeneratingChunkMap chunkMap, ChunkStatus targetStatus, ChunkPos pos);
+    public CompletableFuture<?> runUntilWait();
+    public void markForCancellation();
+    public GenerationChunkHolder getCenter();
+}
+//// ChunkHolder.java
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+public class ChunkHolder extends GenerationChunkHolder {
+    public static final ChunkResult<LevelChunk> UNLOADED_LEVEL_CHUNK;
+    public ChunkHolder(ChunkPos pos, int ticketLevel, LevelHeightAccessor levelHeightAccessor, LevelLightEngine lightEngine, LevelChangeListener onLevelChange, PlayerProvider playerProvider);
+    public CompletableFuture<ChunkResult<LevelChunk>> getTickingChunkFuture();
+    public CompletableFuture<ChunkResult<LevelChunk>> getEntityTickingChunkFuture();
+    public CompletableFuture<ChunkResult<LevelChunk>> getFullChunkFuture();
+    public LevelChunk getTickingChunk();
+    public LevelChunk getChunkToSend();
+    public CompletableFuture<?> getSendSyncFuture();
+    public void addSendDependency(CompletableFuture<?> sync);
+    public CompletableFuture<?> getSaveSyncFuture();
+    public boolean isReadyForSaving();
+    protected void addSaveDependency(CompletableFuture<?> sync);
+    public boolean blockChanged(BlockPos pos);
+    public boolean sectionLightChanged(LightLayer layer, int chunkY);
+    public boolean hasChangesToBroadcast();
+    public void broadcastChanges(LevelChunk chunk);
+    public int getTicketLevel();
+    public int getQueueLevel();
+    public void setTicketLevel(int ticketLevel);
+    protected void updateFutures(ChunkMap scheduler, Executor mainThreadExecutor);
+    public boolean wasAccessibleSinceLastSave();
+    public void refreshAccessibility();
+    public interface LevelChangeListener {
+        void onLevelChange(ChunkPos pos, IntSupplier oldLevel, int newLevel, IntConsumer setQueueLevel);
+    }
+    public interface PlayerProvider {
+        List<ServerPlayer> getPlayers(ChunkPos pos, boolean borderOnly);
+    }
+}
+//// ChunkLevel.java
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+public class ChunkLevel {
+    public static final int RADIUS_AROUND_FULL_CHUNK;
+    public static final int MAX_LEVEL;
+    public static ChunkStatus generationStatus(int level);
+    public static ChunkStatus getStatusAroundFullChunk(int distanceToFullChunk, ChunkStatus defaultValue);
+    public static ChunkStatus getStatusAroundFullChunk(int distanceToFullChunk);
+    public static int byStatus(ChunkStatus status);
+    public static FullChunkStatus fullStatus(int level);
+    public static int byStatus(FullChunkStatus status);
+    public static boolean isEntityTicking(int level);
+    public static boolean isBlockTicking(int level);
+    public static boolean isLoaded(int level);
+}
+//// ChunkLoadCounter.java
+public class ChunkLoadCounter {
+    public void track(ServerLevel level, Runnable scheduler);
+    public int readyChunks();
+    public int pendingChunks();
+    public int totalChunks();
+}
+//// ChunkMap.java
+import com.mojang.datafixers.DataFixer;
+import java.io.IOException;
+import java.io.Writer;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
+import java.util.function.IntSupplier;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.ReportedException;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.StaticCache2D;
+import net.minecraft.util.thread.BlockableEventLoop;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.UpdateInterval;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.TicketStorage;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.chunk.status.ChunkStep;
+import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.entity.ChunkStatusUpdateListener;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import net.minecraft.world.level.storage.LevelStorageSource;
+public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerProvider, GeneratingChunkMap {
+    public static final int MIN_VIEW_DISTANCE = 2;
+    public static final int MAX_VIEW_DISTANCE = 32;
+    public static final int FORCED_TICKET_LEVEL;
+    public ChunkMap(ServerLevel level, LevelStorageSource.LevelStorageAccess levelStorage, DataFixer dataFixer, StructureTemplateManager structureManager, Executor executor, BlockableEventLoop<Runnable> mainThreadExecutor, LightChunkGetter chunkGetter, ChunkGenerator generator, ChunkStatusUpdateListener chunkStatusListener, TicketStorage ticketStorage, int serverViewDistance, boolean syncWrites);
+    protected ChunkGenerator generator();
+    protected ChunkGeneratorStructureState generatorState();
+    protected RandomState randomState();
+    public boolean isChunkTracked(ServerPlayer player, int chunkX, int chunkZ);
+    protected ThreadedLevelLightEngine getLightEngine();
+    public ChunkHolder getUpdatingChunkIfPresent(long key);
+    protected ChunkHolder getVisibleChunkIfPresent(long key);
+    public ChunkStatus getLatestStatus(long key);
+    protected IntSupplier getChunkQueueLevel(long pos);
+    public String getChunkDebugData(ChunkPos pos);
+    CompletableFuture<ChunkResult<List<ChunkAccess>>> getChunkRangeFuture(ChunkHolder centerChunk, int range, IntFunction<ChunkStatus> distanceToStatus);
+    public ReportedException debugFuturesAndCreateReportedException(IllegalStateException exception, String details);
+    public CompletableFuture<ChunkResult<LevelChunk>> prepareEntityTickingChunk(ChunkHolder chunk);
+    public void close() throws IOException;
+    protected void saveAllChunks(boolean flushStorage);
+    protected void tick(BooleanSupplier haveTime);
+    public boolean hasWork();
+    protected boolean promoteChunkMap();
+    public GenerationChunkHolder acquireGeneration(long chunkNode);
+    public void releaseGeneration(GenerationChunkHolder chunkHolder);
+    public CompletableFuture<ChunkAccess> applyStep(GenerationChunkHolder chunkHolder, ChunkStep step, StaticCache2D<GenerationChunkHolder> cache);
+    public ChunkGenerationTask scheduleGenerationTask(ChunkStatus targetStatus, ChunkPos pos);
+    public void runGenerationTasks();
+    public CompletableFuture<ChunkResult<LevelChunk>> prepareTickingChunk(ChunkHolder chunk);
+    public CompletableFuture<ChunkResult<LevelChunk>> prepareAccessibleChunk(ChunkHolder chunk);
+    Stream<ChunkHolder> allChunksWithAtLeastStatus(ChunkStatus status);
+    protected void setServerViewDistance(int newViewDistance);
+    public LevelChunk getChunkToSend(long key);
+    public int size();
+    public net.minecraft.server.level.DistanceManager getDistanceManager();
+    void dumpChunks(Writer output) throws IOException;
+    public static CompoundTag getChunkDataFixContextTag(ResourceKey<Level> dimension, Optional<Identifier> generatorIdentifier);
+    public void collectSpawningChunks(List<LevelChunk> output);
+    public void forEachBlockTickingChunk(Consumer<LevelChunk> tickingChunkConsumer);
+    public boolean anyPlayerCloseEnoughForSpawning(ChunkPos pos);
+    public boolean anyPlayerCloseEnoughTo(BlockPos pos, int maxDistance);
+    public List<ServerPlayer> getPlayersCloseForSpawning(ChunkPos pos);
+    public void move(ServerPlayer player);
+    public List<ServerPlayer> getPlayers(ChunkPos pos, boolean borderOnly);
+    public boolean hasEntityWithId(int id);
+    protected void addEntity(Entity entity);
+    protected void removeEntity(Entity entity);
+    protected void tick();
+    public void sendToTrackingPlayers(Entity entity, Packet<? super ClientGamePacketListener> packet);
+    public void sendToTrackingPlayersFiltered(Entity entity, Packet<? super ClientGamePacketListener> packet, Predicate<ServerPlayer> targetPredicate);
+    protected void sendToTrackingPlayersAndSelf(Entity entity, Packet<? super ClientGamePacketListener> packet);
+    public boolean isTrackedByAnyPlayer(Entity entity);
+    public void forEachEntityTrackedBy(ServerPlayer player, Consumer<Entity> consumer);
+    public void resendBiomesForChunks(List<ChunkAccess> chunks);
+    protected PoiManager getPoiManager();
+    void onFullChunkStatusChange(ChunkPos pos, FullChunkStatus status);
+    public void waitForLightBeforeSending(ChunkPos centerChunk, int chunkRadius);
+    public void forEachReadyToSendChunk(Consumer<LevelChunk> consumer);
+    class DistanceManager extends net.minecraft.server.level.DistanceManager {
+        protected DistanceManager(TicketStorage ticketStorage, Executor executor, Executor mainThreadExecutor);
+        protected boolean isChunkToRemove(long node);
+        protected ChunkHolder getChunk(long node);
+        protected ChunkHolder updateChunkScheduling(long node, int level, ChunkHolder chunk, int oldLevel);
+    }
+    class TrackedEntity implements ServerEntity.Synchronizer {
+        public TrackedEntity(Entity entity, int range, UpdateInterval updateInterval, boolean trackDelta);
+        public boolean equals(Object obj);
+        public int hashCode();
+        public void sendToTrackingPlayers(Packet<? super ClientGamePacketListener> packet);
+        public void sendToTrackingPlayersAndSelf(Packet<? super ClientGamePacketListener> packet);
+        public void sendToTrackingPlayersFiltered(Packet<? super ClientGamePacketListener> packet, Predicate<ServerPlayer> targetPredicate);
+        public void broadcastRemoved();
+        public void removePlayer(ServerPlayer player);
+        public void updatePlayer(ServerPlayer player);
+        public void updatePlayers(List<ServerPlayer> players);
+    }
+}
+//// ChunkResult.java
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+public interface ChunkResult<T> {
+    static <T> ChunkResult<T> of(T value);
+    static <T> ChunkResult<T> error(String error);
+    static <T> ChunkResult<T> error(Supplier<String> errorSupplier);
+    boolean isSuccess();
+    T orElse(T orElse);
+    static <R> R orElse(ChunkResult<? extends R> chunkResult, R orElse);
+    String getError();
+    ChunkResult<T> ifSuccess(Consumer<T> consumer);
+    <R> ChunkResult<R> map(Function<T, R> map);
+    <E extends Throwable> T orElseThrow(Supplier<E> exceptionSupplier) throws E;
+    public static record Success<T>(T value) implements ChunkResult<T> {
+        public boolean isSuccess();
+        public T orElse(T orElse);
+        public String getError();
+        public ChunkResult<T> ifSuccess(Consumer<T> consumer);
+        public <R> ChunkResult<R> map(Function<T, R> map);
+        public <E extends Throwable> T orElseThrow(Supplier<E> exceptionSupplier) throws E;
+    }
+    public static record Fail<T>(Supplier<String> error) implements ChunkResult<T> {
+        public boolean isSuccess();
+        public T orElse(T orElse);
+        public String getError();
+        public ChunkResult<T> ifSuccess(Consumer<T> consumer);
+        public <R> ChunkResult<R> map(Function<T, R> map);
+        public <E extends Throwable> T orElseThrow(Supplier<E> exceptionSupplier) throws E;
+    }
+}
+//// ChunkTaskDispatcher.java
+import java.util.concurrent.Executor;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
+import net.minecraft.util.thread.TaskScheduler;
+import net.minecraft.world.level.ChunkPos;
+public class ChunkTaskDispatcher implements ChunkHolder.LevelChangeListener, AutoCloseable {
+    public static final int DISPATCHER_PRIORITY_COUNT = 4;
+    protected boolean sleeping;
+    public ChunkTaskDispatcher(TaskScheduler<Runnable> executor, Executor dispatcherExecutor);
+    public boolean hasWork();
+    public void onLevelChange(ChunkPos pos, IntSupplier oldLevel, int newLevel, IntConsumer setQueueLevel);
+    public void release(long pos, Runnable whenReleased, boolean clearQueue);
+    public void submit(Runnable task, long pos, IntSupplier level);
+    protected void pollTask();
+    protected void scheduleForExecution(ChunkTaskPriorityQueue.TasksForChunk tasksForChunk);
+    protected void onRelease(long key);
+    protected ChunkTaskPriorityQueue. TasksForChunk popTasks();
+    public void close();
+}
+//// ChunkTaskPriorityQueue.java
+import java.util.List;
+import net.minecraft.world.level.ChunkPos;
+public class ChunkTaskPriorityQueue {
+    public static final int PRIORITY_LEVEL_COUNT;
+    public ChunkTaskPriorityQueue(String name);
+    protected void resortChunkTasks(int oldPriority, ChunkPos pos, int newPriority);
+    protected void submit(Runnable task, long chunkPos, int level);
+    protected void release(long pos, boolean unschedule);
+    public TasksForChunk pop();
+    public boolean hasWork();
+    public String toString();
+    public static record TasksForChunk(long chunkPos, List<Runnable> tasks) {
+    }
+}
+//// ChunkTracker.java
+import net.minecraft.world.level.lighting.DynamicGraphMinFixedPoint;
+public abstract class ChunkTracker extends DynamicGraphMinFixedPoint {
+    protected ChunkTracker(int levelCount, int minQueueSize, int minMapSize);
+    protected boolean isSource(long node);
+    protected void checkNeighborsAfterUpdate(long node, int level, boolean onlyDecrease);
+    protected int getComputedLevel(long node, long knownParent, int knownLevelFromParent);
+    protected int computeLevelFromNeighbor(long from, long to, int fromLevel);
+    protected abstract int getLevelFromSource(long to);
+    public void update(long node, int newLevelFrom, boolean onlyDecreased);
+}
+//// ChunkTrackingView.java
+import java.util.function.Consumer;
+import net.minecraft.world.level.ChunkPos;
+public interface ChunkTrackingView {
+    ChunkTrackingView EMPTY;
+    static ChunkTrackingView of(ChunkPos center, int radius);
+    static void difference(ChunkTrackingView from, ChunkTrackingView to, Consumer<ChunkPos> onEnter, Consumer<ChunkPos> onLeave);
+    default boolean contains(ChunkPos pos);
+    default boolean contains(int x, int z);
+    boolean contains(int chunkX, int chunkZ, boolean includeNeighbors);
+    void forEach(Consumer<ChunkPos> consumer);
+    default boolean isInViewDistance(int chunkX, int chunkZ);
+    static boolean isInViewDistance(int centerX, int centerZ, int viewDistance, int chunkX, int chunkZ);
+    static boolean isWithinDistance(int centerX, int centerZ, int viewDistance, int chunkX, int chunkZ, boolean includeNeighbors);
+    public static record Positioned(ChunkPos center, int viewDistance) implements ChunkTrackingView {
+        boolean squareIntersects(Positioned other);
+        public boolean contains(int chunkX, int chunkZ, boolean includeNeighbors);
+        public void forEach(Consumer<ChunkPos> consumer);
+    }
+}
+//// ClientInformation.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.player.ChatVisiblity;
+public record ClientInformation(String language, int viewDistance, ChatVisiblity chatVisibility, boolean chatColors, int modelCustomisation, HumanoidArm mainHand, boolean textFilteringEnabled, boolean allowsListing, ParticleStatus particleStatus) {
+    public static final int MAX_LANGUAGE_LENGTH = 16;
+    public ClientInformation(FriendlyByteBuf input);
+    public void write(FriendlyByteBuf output);
+    public static ClientInformation createDefault();
+}
+//// ColumnPos.java
+import net.minecraft.world.level.ChunkPos;
+public record ColumnPos(int x, int z) {
+    public ChunkPos toChunkPos();
+    public long toLong();
+    public static long asLong(int x, int z);
+    public static int getX(long pos);
+    public static int getZ(long pos);
+    public String toString();
+    public int hashCode();
+}
+//// DemoMode.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
+public class DemoMode extends ServerPlayerGameMode {
+    public static final int DEMO_DAYS = 5;
+    public static final int TOTAL_PLAY_TICKS = 120500;
+    public DemoMode(ServerPlayer player);
+    public void tick();
+    public void handleBlockBreakAction(BlockPos pos, ServerboundPlayerActionPacket.Action action, Direction direction, int maxY, int sequence);
+    public InteractionResult useItem(ServerPlayer player, Level level, ItemStack itemStack, InteractionHand hand);
+    public InteractionResult useItemOn(ServerPlayer player, Level level, ItemStack itemStack, InteractionHand hand, BlockHitResult hitResult);
+}
+//// DistanceManager.java
+import it.unimi.dsi.fastutil.longs.Long2ByteMap;
+import it.unimi.dsi.fastutil.longs.LongConsumer;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import java.util.Set;
+import java.util.concurrent.Executor;
+import net.minecraft.core.SectionPos;
+import net.minecraft.util.TriState;
+import net.minecraft.world.level.TicketStorage;
+public abstract class DistanceManager {
+    protected final Set<ChunkHolder> chunksToUpdateFutures;
+    protected DistanceManager(TicketStorage ticketStorage, Executor executor, Executor mainThreadExecutor);
+    protected abstract boolean isChunkToRemove(long node);
+    protected abstract ChunkHolder getChunk(long node);
+    protected abstract ChunkHolder updateChunkScheduling(long node, int level, ChunkHolder chunk, int oldLevel);
+    public boolean runAllUpdates(ChunkMap scheduler);
+    public void addPlayer(SectionPos pos, ServerPlayer player);
+    public void removePlayer(SectionPos pos, ServerPlayer player);
+    public boolean inEntityTickingRange(long key);
+    public boolean inBlockTickingRange(long key);
+    public int getChunkLevel(long key, boolean simulation);
+    protected void updatePlayerTickets(int viewDistance);
+    public void updateSimulationDistance(int newDistance);
+    public int getNaturalSpawnChunkCount();
+    public TriState hasPlayersNearby(long pos);
+    public void forEachEntityTickingChunk(LongConsumer consumer);
+    public LongIterator getSpawnCandidateChunks();
+    public String getDebugStatus();
+    public boolean hasTickets();
+    class FixedPlayerDistanceChunkTracker extends ChunkTracker {
+        protected final Long2ByteMap chunks;
+        protected final int maxDistance;
+        protected FixedPlayerDistanceChunkTracker(int maxDistance);
+        protected int getLevel(long node);
+        protected void setLevel(long node, int level);
+        protected void onLevelChange(long node, int oldLevel, int level);
+        protected int getLevelFromSource(long to);
+        public void runAllUpdates();
+    }
+    class PlayerTicketTracker extends FixedPlayerDistanceChunkTracker {
+        protected PlayerTicketTracker(int maxDistance);
+        protected void onLevelChange(long node, int oldLevel, int level);
+        public void updateViewDistance(int viewDistance);
+        public void runAllUpdates();
+    }
+}
+//// FullChunkStatus.java
+public enum FullChunkStatus {
+    INACCESSIBLE, FULL, BLOCK_TICKING, ENTITY_TICKING;
+    public boolean isOrAfter(FullChunkStatus step);
+}
+//// GeneratingChunkMap.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.util.StaticCache2D;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.chunk.status.ChunkStep;
+public interface GeneratingChunkMap {
+    GenerationChunkHolder acquireGeneration(long chunkNode);
+    void releaseGeneration(GenerationChunkHolder chunkHolder);
+    CompletableFuture<ChunkAccess> applyStep(GenerationChunkHolder chunkHolder, ChunkStep step, StaticCache2D<GenerationChunkHolder> cache);
+    ChunkGenerationTask scheduleGenerationTask(ChunkStatus targetStatus, ChunkPos pos);
+    void runGenerationTasks();
+}
+//// GenerationChunkHolder.java
+import com.mojang.datafixers.util.Pair;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.util.StaticCache2D;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ImposterProtoChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.chunk.status.ChunkStep;
+public abstract class GenerationChunkHolder {
+    public static final ChunkResult<ChunkAccess> UNLOADED_CHUNK;
+    public static final CompletableFuture<ChunkResult<ChunkAccess>> UNLOADED_CHUNK_FUTURE;
+    protected final ChunkPos pos;
+    public GenerationChunkHolder(ChunkPos pos);
+    public CompletableFuture<ChunkResult<ChunkAccess>> scheduleChunkGenerationTask(ChunkStatus status, ChunkMap scheduler);
+    CompletableFuture<ChunkResult<ChunkAccess>> applyStep(ChunkStep step, GeneratingChunkMap chunkMap, StaticCache2D<GenerationChunkHolder> cache);
+    protected void updateHighestAllowedStatus(ChunkMap scheduler);
+    public void replaceProtoChunk(ImposterProtoChunk chunk);
+    void removeTask(ChunkGenerationTask task);
+    protected abstract void addSaveDependency(CompletableFuture<?> sync);
+    public void increaseGenerationRefCount();
+    public void decreaseGenerationRefCount();
+    public ChunkAccess getChunkIfPresentUnchecked(ChunkStatus status);
+    public ChunkAccess getChunkIfPresent(ChunkStatus status);
+    public ChunkAccess getLatestChunk();
+    public ChunkStatus getPersistedStatus();
+    public ChunkPos getPos();
+    public FullChunkStatus getFullStatus();
+    public abstract int getTicketLevel();
+    public abstract int getQueueLevel();
+    public List<Pair<ChunkStatus, CompletableFuture<ChunkResult<ChunkAccess>>>> getAllFutures();
+    public ChunkStatus getLatestStatus();
+}
+//// LoadingChunkTracker.java
+import net.minecraft.world.level.TicketStorage;
+public class LoadingChunkTracker extends ChunkTracker {
+    public LoadingChunkTracker(DistanceManager distanceManager, TicketStorage ticketStorage);
+    protected int getLevelFromSource(long to);
+    protected int getLevel(long node);
+    protected void setLevel(long node, int level);
+    public int runDistanceUpdates(int count);
+}
+//// ParticleStatus.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+public enum ParticleStatus {
+    ALL, DECREASED, MINIMAL;
+    public static final Codec<ParticleStatus> LEGACY_CODEC;
+    public static final StreamCodec<ByteBuf, ParticleStatus> STREAM_CODEC;
+    public Component caption();
+}
+//// PlayerMap.java
+import java.util.Set;
+public final class PlayerMap {
+    public Set<ServerPlayer> getAllPlayers();
+    public void addPlayer(ServerPlayer player, boolean ignored);
+    public void removePlayer(ServerPlayer player);
+    public void ignorePlayer(ServerPlayer player);
+    public void unIgnorePlayer(ServerPlayer player);
+    public boolean ignoredOrUnknown(ServerPlayer player);
+    public boolean ignored(ServerPlayer player);
+}
+//// PlayerSpawnFinder.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.phys.Vec3;
+public class PlayerSpawnFinder {
+    private PlayerSpawnFinder(ServerLevel level, BlockPos spawnSuggestion, int radius);
+    public static CompletableFuture<Vec3> findSpawn(ServerLevel level, BlockPos spawnSuggestion);
+    protected static BlockPos getLevelRespawnPos(ServerLevel level, int x, int z);
+    public static BlockPos getSpawnPosInChunk(ServerLevel level, ChunkPos chunkPos);
+}
+//// SectionTracker.java
+import net.minecraft.world.level.lighting.DynamicGraphMinFixedPoint;
+public abstract class SectionTracker extends DynamicGraphMinFixedPoint {
+    protected SectionTracker(int levelCount, int minQueueSize, int minMapSize);
+    protected void checkNeighborsAfterUpdate(long node, int level, boolean onlyDecrease);
+    protected int getComputedLevel(long node, long knownParent, int knownLevelFromParent);
+    protected int computeLevelFromNeighbor(long from, long to, int fromLevel);
+    protected abstract int getLevelFromSource(long to);
+    public void update(long node, int newLevelFrom, boolean onlyDecreased);
+}
+//// ServerBossEvent.java
+import java.util.Collection;
+import java.util.UUID;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.BossEvent;
+public class ServerBossEvent extends BossEvent {
+    public ServerBossEvent(UUID id, Component name, BossEvent.BossBarColor color, BossEvent.BossBarOverlay overlay);
+    public void setProgress(float progress);
+    public void setColor(BossEvent.BossBarColor color);
+    public void setOverlay(BossEvent.BossBarOverlay overlay);
+    public BossEvent setDarkenScreen(boolean darkenScreen);
+    public BossEvent setPlayBossMusic(boolean playBossMusic);
+    public BossEvent setCreateWorldFog(boolean createWorldFog);
+    public void setName(Component name);
+    public void addPlayer(ServerPlayer player);
+    public void removePlayer(ServerPlayer player);
+    public void removeAllPlayers();
+    public boolean isVisible();
+    public void setVisible(boolean visible);
+    public Collection<ServerPlayer> getPlayers();
+    protected void setDirty();
+}
+//// ServerChunkCache.java
+import com.mojang.datafixers.DataFixer;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.util.thread.BlockableEventLoop;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.NaturalSpawner;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.chunk.ChunkSource;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LightChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
+import net.minecraft.world.level.entity.ChunkStatusUpdateListener;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.SavedDataStorage;
+public class ServerChunkCache extends ChunkSource {
+    public final ChunkMap chunkMap;
+    public ServerChunkCache(ServerLevel level, LevelStorageSource.LevelStorageAccess levelStorage, DataFixer fixerUpper, StructureTemplateManager structureTemplateManager, Executor executor, ChunkGenerator generator, int viewDistance, int simulationDistance, boolean syncWrites, ChunkStatusUpdateListener chunkStatusListener);
+    public ThreadedLevelLightEngine getLightEngine();
+    public ChunkAccess getChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate);
+    public LevelChunk getChunkNow(int x, int z);
+    public CompletableFuture<ChunkResult<ChunkAccess>> getChunkFuture(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate);
+    public boolean hasChunk(int x, int z);
+    public LightChunk getChunkForLighting(int x, int z);
+    public Level getLevel();
+    public boolean pollTask();
+    boolean runDistanceManagerUpdates();
+    public boolean isPositionTicking(long chunkKey);
+    public void save(boolean flushStorage);
+    public void close() throws IOException;
+    public void tick(BooleanSupplier haveTime, boolean tickChunks);
+    public String gatherStats();
+    public int getPendingTasksCount();
+    public ChunkGenerator getGenerator();
+    public ChunkGeneratorStructureState getGeneratorState();
+    public RandomState randomState();
+    public int getLoadedChunksCount();
+    public void blockChanged(BlockPos pos);
+    public void onLightUpdate(LightLayer layer, SectionPos pos);
+    public boolean hasActiveTickets();
+    public void addTicket(Ticket ticket, ChunkPos pos);
+    public CompletableFuture<?> addTicketAndLoadWithRadius(TicketType type, ChunkPos pos, int radius);
+    public void addTicketWithRadius(TicketType type, ChunkPos pos, int radius);
+    public void removeTicketWithRadius(TicketType type, ChunkPos pos, int radius);
+    public boolean updateChunkForced(ChunkPos pos, boolean forced);
+    public LongSet getForceLoadedChunks();
+    public void move(ServerPlayer player);
+    public boolean hasEntityWithId(int id);
+    public void removeEntity(Entity entity);
+    public void addEntity(Entity entity);
+    public void sendToTrackingPlayersAndSelf(Entity entity, Packet<? super ClientGamePacketListener> packet);
+    public void sendToTrackingPlayers(Entity entity, Packet<? super ClientGamePacketListener> packet);
+    public void sendToTrackingPlayersFiltered(Entity entity, Packet<? super ClientGamePacketListener> packet, Predicate<ServerPlayer> targetPredicate);
+    public void setViewDistance(int newDistance);
+    public void setSimulationDistance(int simulationDistance);
+    public void setSpawnSettings(boolean spawnEnemies);
+    public String getChunkDebugData(ChunkPos pos);
+    public SavedDataStorage getDataStorage();
+    public PoiManager getPoiManager();
+    public ChunkScanAccess chunkScanner();
+    public NaturalSpawner. SpawnState getLastSpawnState();
+    public void deactivateTicketsOnClosing();
+    public void onChunkReadyToSend(ChunkHolder chunk);
+    final class MainThreadExecutor extends BlockableEventLoop<Runnable> {
+        private MainThreadExecutor(Level level);
+        public Runnable wrapRunnable(Runnable runnable);
+        protected boolean shouldRun(Runnable task);
+        protected boolean scheduleExecutables();
+        protected Thread getRunningThread();
+        protected void doRunTask(Runnable task);
+        protected boolean pollTask();
+    }
+}
+//// ServerEntity.java
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.UpdateInterval;
+import net.minecraft.world.phys.Vec3;
+public class ServerEntity {
+    public static final int FORCED_POS_UPDATE_PERIOD = 60;
+    public ServerEntity(ServerLevel level, Entity entity, UpdateInterval updateInterval, boolean trackDelta, Synchronizer synchronizer);
+    public void sendChanges();
+    public void removePairing(ServerPlayer player);
+    public void addPairing(ServerPlayer player);
+    public void sendPairingData(ServerPlayer player, Consumer<Packet<ClientGamePacketListener>> broadcast);
+    public Vec3 getPositionBase();
+    public Vec3 getLastSentMovement();
+    public float getLastSentXRot();
+    public float getLastSentYRot();
+    public float getLastSentYHeadRot();
+    public interface Synchronizer {
+        void sendToTrackingPlayers(Packet<? super ClientGamePacketListener> packet);
+        void sendToTrackingPlayersAndSelf(Packet<? super ClientGamePacketListener> packet);
+        void sendToTrackingPlayersFiltered(Packet<? super ClientGamePacketListener> packet, Predicate<ServerPlayer> predicate);
+    }
+}
+//// ServerEntityGetter.java
+import java.util.List;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.EntityGetter;
+import net.minecraft.world.phys.AABB;
+public interface ServerEntityGetter extends EntityGetter {
+    ServerLevel getLevel();
+    default Player getNearestPlayer(TargetingConditions targetConditions, LivingEntity source);
+    default Player getNearestPlayer(TargetingConditions targetConditions, LivingEntity source, double x, double y, double z);
+    default Player getNearestPlayer(TargetingConditions targetConditions, double x, double y, double z);
+    default <T extends LivingEntity> T getNearestEntity(Class<? extends T> type, TargetingConditions targetConditions, LivingEntity source, double x, double y, double z, AABB bb);
+    default LivingEntity getNearestEntity(TagKey<EntityType<?>> tag, TargetingConditions targetConditions, LivingEntity source, double x, double y, double z, AABB bb);
+    default <T extends Entity> T getNearestEntity(List<? extends T> entities, double x, double y, double z);
+    default <T extends LivingEntity> T getNearestEntity(List<? extends T> entities, TargetingConditions targetConditions, LivingEntity source, double x, double y, double z);
+    default List<Player> getNearbyPlayers(TargetingConditions targetConditions, LivingEntity source, AABB bb);
+    default <T extends LivingEntity> List<T> getNearbyEntities(Class<T> type, TargetingConditions targetConditions, LivingEntity source, AABB bb);
+}
+//// ServerLevel.java
+import com.mojang.datafixers.util.Pair;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.CrashReport;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.particles.ExplosionParticleInfo;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.ServerScoreboard;
+import net.minecraft.server.waypoints.ServerWaypointManager;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.ProgressListener;
+import net.minecraft.util.debug.LevelDebugSynchronizers;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.TickRateManager;
+import net.minecraft.world.attribute.EnvironmentAttributeSystem;
+import net.minecraft.world.clock.ServerClockManager;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ReputationEventHandler;
+import net.minecraft.world.entity.ai.village.ReputationEventType;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragonPart;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.raid.Raid;
+import net.minecraft.world.entity.raid.Raids;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.CustomSpawner;
+import net.minecraft.world.level.ExplosionDamageCalculator;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeResolver;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.border.WorldBorder;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.dimension.end.EnderDragonFight;
+import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.level.entity.LevelCallback;
+import net.minecraft.world.level.entity.LevelEntityGetter;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.pathfinder.PathTypeCache;
+import net.minecraft.world.level.portal.PortalForcer;
+import net.minecraft.world.level.redstone.Orientation;
+import net.minecraft.world.level.saveddata.WeatherData;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
+import net.minecraft.world.level.storage.LevelData;
+import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.SavedDataStorage;
+import net.minecraft.world.level.storage.ServerLevelData;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.ticks.LevelTicks;
+public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGetter {
+    public static final BlockPos END_SPAWN_POINT;
+    public static final IntProvider RAIN_DELAY;
+    public static final IntProvider RAIN_DURATION;
+    public static final IntProvider THUNDER_DURATION;
+    public boolean noSave;
+    protected final Raids raids;
+    public ServerLevel(MinecraftServer server, Executor executor, LevelStorageSource.LevelStorageAccess levelStorage, ServerLevelData levelData, ResourceKey<Level> dimension, LevelStem levelStem, boolean isDebug, long biomeZoomSeed, List<CustomSpawner> customSpawners, boolean tickTime);
+    public int getNextEntityId();
+    public void setDragonFight(EnderDragonFight fight);
+    public Holder<Biome> getUncachedNoiseBiome(int quartX, int quartY, int quartZ);
+    public BiomeResolver uncachedBiomeResolver();
+    public StructureManager structureManager();
+    public ServerClockManager clockManager();
+    public EnvironmentAttributeSystem environmentAttributes();
+    public EnvironmentAttributeSystem setEnvironmentAttributes(EnvironmentAttributeSystem environmentAttributes);
+    public void tick(BooleanSupplier haveTime);
+    public boolean shouldTickBlocksAt(long chunkPos);
+    protected void tickTime();
+    public void tickCustomSpawners(boolean spawnEnemies);
+    public void tickChunk(LevelChunk chunk, int tickSpeed);
+    public void tickThunder(LevelChunk chunk);
+    public void tickPrecipitation(BlockPos pos);
+    protected BlockPos findLightningTargetAround(BlockPos pos);
+    public boolean isHandlingTick();
+    public boolean canSleepThroughNights();
+    public void updateSleepingPlayerList();
+    public ServerScoreboard getScoreboard();
+    public ServerWaypointManager getWaypointManager();
+    public DifficultyInstance getCurrentDifficultyAt(BlockPos pos);
+    public float getMoonBrightness(BlockPos pos);
+    public void resetWeatherCycle();
+    public void resetEmptyTime();
+    public void tickNonPassenger(Entity entity);
+    public void updateNeighboursOnBlockSet(BlockPos pos, BlockState oldState);
+    public boolean mayInteract(Entity entity, BlockPos pos);
+    public void save(ProgressListener progressListener, boolean flush, boolean noSave);
+    public <T extends Entity> List<? extends T> getEntities(EntityTypeTest<Entity, T> type, Predicate<? super T> selector);
+    public <T extends Entity> void getEntities(EntityTypeTest<Entity, T> type, Predicate<? super T> selector, List<? super T> result);
+    public <T extends Entity> void getEntities(EntityTypeTest<Entity, T> type, Predicate<? super T> selector, List<? super T> result, int maxResults);
+    public List<? extends EnderDragon> getDragons();
+    public List<ServerPlayer> getPlayers(Predicate<? super ServerPlayer> selector);
+    public List<ServerPlayer> getPlayers(Predicate<? super ServerPlayer> selector, int maxResults);
+    public ServerPlayer getRandomPlayer();
+    public boolean addFreshEntity(Entity entity);
+    public boolean addWithUUID(Entity entity);
+    public void addDuringTeleport(Entity entity);
+    public void addNewPlayer(ServerPlayer player);
+    public void addRespawnedPlayer(ServerPlayer player);
+    public boolean tryAddFreshEntityWithPassengers(Entity entity);
+    public void unload(LevelChunk levelChunk);
+    public void removePlayerImmediately(ServerPlayer player, Entity.RemovalReason reason);
+    public void destroyBlockProgress(int id, BlockPos blockPos, int progress);
+    public void playSeededSound(Entity except, double x, double y, double z, Holder<SoundEvent> sound, SoundSource source, float volume, float pitch, long seed);
+    public void playSeededSound(Entity except, Entity sourceEntity, Holder<SoundEvent> sound, SoundSource source, float volume, float pitch, long seed);
+    public void globalLevelEvent(int type, BlockPos pos, int data);
+    public void levelEvent(Entity source, int type, BlockPos pos, int data);
+    public int getLogicalHeight();
+    public void gameEvent(Holder<GameEvent> gameEvent, Vec3 position, GameEvent.Context context);
+    public void sendBlockUpdated(BlockPos pos, BlockState old, BlockState current, int updateFlags);
+    public void updateNeighborsAt(BlockPos pos, Block sourceBlock);
+    public void updateNeighborsAt(BlockPos pos, Block sourceBlock, Orientation orientation);
+    public void updateNeighborsAtExceptFromFacing(BlockPos pos, Block blockObject, Direction skipDirection, Orientation orientation);
+    public void neighborChanged(BlockPos pos, Block changedBlock, Orientation orientation);
+    public void neighborChanged(BlockState state, BlockPos pos, Block changedBlock, Orientation orientation, boolean movedByPiston);
+    public void broadcastEntityEvent(Entity entity, byte event);
+    public void broadcastDamageEvent(Entity entity, DamageSource source);
+    public ServerChunkCache getChunkSource();
+    public void explode(Entity source, DamageSource damageSource, ExplosionDamageCalculator damageCalculator, double x, double y, double z, float r, boolean fire, Level.ExplosionInteraction interactionType, ParticleOptions smallExplosionParticles, ParticleOptions largeExplosionParticles, WeightedList<ExplosionParticleInfo> blockParticles, Holder<SoundEvent> explosionSound);
+    public void blockEvent(BlockPos pos, Block block, int b0, int b1);
+    public LevelTicks<Block> getBlockTicks();
+    public LevelTicks<Fluid> getFluidTicks();
+    public MinecraftServer getServer();
+    public PortalForcer getPortalForcer();
+    public StructureTemplateManager getStructureTemplateManager();
+    public <T extends ParticleOptions> int sendParticles(T particle, double x, double y, double z, int count, double xDist, double yDist, double zDist, double speed);
+    public <T extends ParticleOptions> int sendParticles(T particle, double x, double y, double z, int count, double xDist, double yDist, double zDist, double speed, ClientboundLevelParticlesPacket.RandomizationType randomizationType);
+    public <T extends ParticleOptions> int sendParticles(T particle, double x, double y, double z, int count, double xDist, double yDist, double zDist, double xSpeed, double ySpeed, double zSpeed);
+    public <T extends ParticleOptions> int sendParticles(T particle, double x, double y, double z, int count, double xDist, double yDist, double zDist, double xSpeed, double ySpeed, double zSpeed, ClientboundLevelParticlesPacket.RandomizationType randomizationType);
+    public <T extends ParticleOptions> int sendParticles(T particle, boolean overrideLimiter, boolean alwaysShow, double x, double y, double z, int count, double xDist, double yDist, double zDist, double speed);
+    public <T extends ParticleOptions> int sendParticles(T particle, boolean overrideLimiter, boolean alwaysShow, double x, double y, double z, int count, double xDist, double yDist, double zDist, double speed, ClientboundLevelParticlesPacket.RandomizationType randomizationType);
+    public <T extends ParticleOptions> int sendParticles(T particle, boolean overrideLimiter, boolean alwaysShow, double x, double y, double z, int count, double xDist, double yDist, double zDist, double xSpeed, double ySpeed, double zSpeed, ClientboundLevelParticlesPacket.RandomizationType randomizationType);
+    public <T extends ParticleOptions> boolean sendParticles(ServerPlayer player, T particle, boolean overrideLimiter, boolean alwaysShow, double x, double y, double z, int count, double xDist, double yDist, double zDist, double speed);
+    public Entity getEntity(int id);
+    public Entity getEntityInAnyDimension(UUID uuid);
+    public Player getPlayerInAnyDimension(UUID uuid);
+    public Entity getEntityOrPart(int id);
+    public Collection<EnderDragonPart> dragonParts();
+    public BlockPos findNearestMapStructure(TagKey<Structure> structureTag, BlockPos origin, int maxSearchRadius, boolean createReference);
+    public BlockPos findNearestMapStructure(HolderSet<Structure> structureTag, BlockPos origin, int maxSearchRadius, boolean createReference);
+    public Pair<BlockPos, Holder<Biome>> findClosestBiome3d(Predicate<Holder<Biome>> biomeTest, BlockPos origin, int maxSearchRadius, int sampleResolutionHorizontal, int sampleResolutionVertical);
+    public WorldBorder getWorldBorder();
+    public RecipeManager recipeAccess();
+    public TickRateManager tickRateManager();
+    public boolean noSave();
+    public SavedDataStorage getDataStorage();
+    public MapItemSavedData getMapData(MapId id);
+    public void setMapData(MapId id, MapItemSavedData data);
+    public MapId getFreeMapId();
+    public void setRespawnData(LevelData.RespawnData respawnData);
+    public LevelData.RespawnData getRespawnData();
+    public LongSet getForceLoadedChunks();
+    public boolean setChunkForced(int chunkX, int chunkZ, boolean forced);
+    public List<ServerPlayer> players();
+    public void updatePOIOnBlockStateChange(BlockPos pos, BlockState oldState, BlockState newState);
+    public PoiManager getPoiManager();
+    public boolean isVillage(BlockPos pos);
+    public boolean isVillage(SectionPos sectionPos);
+    public boolean isCloseToVillage(BlockPos pos, int sectionDistance);
+    public int sectionsToVillage(SectionPos pos);
+    public Raids getRaids();
+    public Raid getRaidAt(BlockPos pos);
+    public boolean isRaided(BlockPos pos);
+    public void onReputationEvent(ReputationEventType type, Entity source, ReputationEventHandler target);
+    public void saveDebugReport(Path rootDir) throws IOException;
+    public void clearBlockEvents(BoundingBox bb);
+    public Iterable<Entity> getAllEntities();
+    public String toString();
+    public boolean isFlat();
+    public long getSeed();
+    public EnderDragonFight getDragonFight();
+    public WeatherData getWeatherData();
+    public ServerLevel getLevel();
+    public String getWatchdogStats();
+    protected LevelEntityGetter<Entity> getEntities();
+    public void addLegacyChunkEntities(Stream<Entity> loaded);
+    public void addWorldGenChunkEntities(Stream<Entity> loaded);
+    public void startTickingChunk(LevelChunk levelChunk);
+    public void onStructureStartsAvailable(ChunkAccess chunk);
+    public PathTypeCache getPathTypeCache();
+    public void waitForEntities(ChunkPos centerChunk, int radius);
+    public boolean isSpawningMonsters();
+    public void close() throws IOException;
+    public String gatherChunkSourceStats();
+    public boolean areEntitiesLoaded(long chunkKey);
+    public boolean isPositionTickingWithEntitiesLoaded(long key);
+    public boolean isPositionEntityTicking(BlockPos pos);
+    public boolean areEntitiesActuallyLoadedAndTicking(ChunkPos pos);
+    public boolean anyPlayerCloseEnoughForSpawning(BlockPos pos);
+    public boolean anyPlayerCloseEnoughForSpawning(ChunkPos pos);
+    public boolean canSpreadFireAround(BlockPos pos);
+    public boolean canSpawnEntitiesInChunk(ChunkPos pos);
+    public FeatureFlagSet enabledFeatures();
+    public GameRules getGameRules();
+    public CrashReportCategory fillReportDetails(CrashReport report);
+    public int getSeaLevel();
+    public void onBlockEntityAdded(BlockEntity blockEntity);
+    public LevelDebugSynchronizers debugSynchronizers();
+    public boolean isAllowedToEnterPortal(Level toLevel);
+    public boolean isPvpAllowed();
+    public boolean isCommandBlockEnabled();
+    public boolean isSpawnerBlockEnabled();
+    final class EntityCallbacks implements LevelCallback<Entity> {
+        private EntityCallbacks();
+        public void onCreated(Entity entity);
+        public void onDestroyed(Entity entity);
+        public void onTickingStart(Entity entity);
+        public void onTickingEnd(Entity entity);
+        public void onTrackingStart(Entity entity);
+        public void onTrackingEnd(Entity entity);
+        public void onSectionChange(Entity entity);
+    }
+}
+//// ServerPlayer.java
+import com.mojang.authlib.GameProfile;
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
+import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.SectionPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.ChatType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.OutgoingChatMessage;
+import net.minecraft.network.chat.RemoteChatSession;
+import net.minecraft.network.protocol.game.CommonPlayerSpawnInfo;
+import net.minecraft.network.protocol.status.ServerStatus;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.PlayerAdvancements;
+import net.minecraft.server.dialog.Dialog;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.server.network.TextFilter;
+import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.stats.ServerRecipeBook;
+import net.minecraft.stats.ServerStatsCounter;
+import net.minecraft.stats.Stat;
+import net.minecraft.util.Prediction;
+import net.minecraft.util.Unit;
+import net.minecraft.util.debug.DebugSubscription;
+import net.minecraft.world.Container;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.attribute.BedRule;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.Relative;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.animal.equine.AbstractHorse;
+import net.minecraft.world.entity.animal.nautilus.AbstractNautilus;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.warden.WardenSpawnTracker;
+import net.minecraft.world.entity.player.ChatVisiblity;
+import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEnderpearl;
+import net.minecraft.world.item.ItemCooldowns;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.SwingAnimation;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.trading.MerchantOffers;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.AbstractBedBlock;
+import net.minecraft.world.level.block.entity.CommandBlockEntity;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignTextSlot;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.portal.TeleportTransition;
+import net.minecraft.world.level.storage.LevelData;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+public class ServerPlayer extends Player {
+    public static final double BLOCK_INTERACTION_DISTANCE_VERIFICATION_BUFFER = 1.0;
+    public static final double ENTITY_INTERACTION_DISTANCE_VERIFICATION_BUFFER = 3.0;
+    public static final int ENDER_PEARL_TICKET_RADIUS = 2;
+    public static final String ENDER_PEARLS_TAG = "ender_pearls";
+    public static final String ENDER_PEARL_DIMENSION_TAG = "ender_pearl_dimension";
+    public static final String TAG_DIMENSION = "Dimension";
+    public ServerGamePacketListenerImpl connection;
+    public final ServerPlayerGameMode gameMode;
+    public boolean seenCredits;
+    public final Object object;
+    public boolean wonGame;
+    public ServerPlayer(MinecraftServer server, ServerLevel level, GameProfile gameProfile, ClientInformation clientInformation);
+    public BlockPos adjustSpawnLocation(ServerLevel level, BlockPos spawnSuggestion);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public void loadAndSpawnParentVehicle(ValueInput playerInput);
+    public void loadAndSpawnEnderPearls(ValueInput playerInput);
+    public void setExperiencePoints(int amount);
+    public void setExperienceLevels(int amount);
+    public void giveExperienceLevels(int amount);
+    public void onEnchantmentPerformed(ItemStack itemStack, int enchantmentCost);
+    public void initInventoryMenu();
+    public void onEnterCombat();
+    public void onLeaveCombat();
+    public void onInsideBlock(BlockState state);
+    protected ItemCooldowns createItemCooldowns();
+    public void tick();
+    public void doTick();
+    protected void tickRegeneration();
+    public void handleShoulderEntities();
+    public boolean setEntityOnShoulder(CompoundTag entityTag);
+    protected void removeEntitiesOnShoulder();
+    public void resetFallDistance();
+    public void trackStartFallingPosition();
+    public void trackEnteredOrExitedLavaOnVehicle();
+    public void die(DamageSource source);
+    public void awardKillScore(Entity victim, DamageSource killingBlow);
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public boolean canHarmPlayer(Player target);
+    public TeleportTransition findRespawnPositionAndUseSpawnBlock(boolean consumeSpawnBlock, TeleportTransition.PostTeleportTransition postTeleportTransition);
+    public boolean isReceivingWaypoints();
+    protected void onAttributeUpdated(Holder<Attribute> attribute);
+    public void sendPostEffects();
+    public boolean addPostEffect(Identifier postEffect);
+    public boolean clearPostEffects();
+    public List<Identifier> getPostEffects();
+    public boolean removePostEffect(Identifier postEffect);
+    public void showEndCredits();
+    public ServerPlayer teleport(TeleportTransition transition);
+    public void forceSetRotation(float yRot, boolean relativeY, float xRot, boolean relativeX);
+    public boolean broadcastToPlayer(ServerPlayer player);
+    public void take(Entity entity, int orgCount);
+    public Either<Player.BedSleepingProblem, Unit> startSleepInBed(AbstractBedBlock bedBlock, BlockState bedBlockState, BedRule rule, BlockPos pos);
+    public boolean startSleeping(BlockPos bedPosition);
+    public void stopSleepInBed(boolean forcefulWakeUp, boolean updateLevelList);
+    public boolean isInvulnerableTo(ServerLevel level, DamageSource source);
+    protected void onChangedBlock(ServerLevel level, BlockPos pos);
+    protected void checkFallDamage(double ya, boolean onGround, BlockState onState, BlockPos pos);
+    public void onExplosionHit(Entity explosionCausedBy);
+    protected void pushEntities();
+    public void openTextEdit(SignBlockEntity sign, SignTextSlot slot);
+    public void openDialog(Holder<Dialog> dialog);
+    public OptionalInt openMenu(MenuProvider provider);
+    public void sendMerchantOffers(int containerId, MerchantOffers offers, int merchantLevel, int merchantXp, boolean showProgressBar, boolean canRestock);
+    public void openHorseInventory(AbstractHorse horse, Container container);
+    public void openNautilusInventory(AbstractNautilus nautilus, Container container);
+    public void openItemGui(ItemStack itemStack, InteractionHand hand);
+    public void openCommandBlock(CommandBlockEntity commandBlock);
+    public void closeContainer();
+    public void doCloseContainer();
+    public void rideTick();
+    public void checkMovementStatistics(double dx, double dy, double dz);
+    public void awardStat(Stat<?> stat, int count);
+    public void resetStat(Stat<?> stat);
+    public int awardRecipes(Collection<RecipeHolder<?>> recipes);
+    public void triggerRecipeCrafted(RecipeHolder<?> recipe, List<ItemStack> itemStacks);
+    public void awardRecipesByKey(List<ResourceKey<Recipe<?>>> recipeIds);
+    public int resetRecipes(Collection<RecipeHolder<?>> recipe);
+    public void jumpFromGround();
+    public void giveExperiencePoints(int i);
+    public void disconnect();
+    public boolean hasDisconnected();
+    public void resetSentInfo();
+    protected void completeUsingItem();
+    public void lookAt(EntityAnchorArgument.Anchor anchor, Vec3 pos);
+    public void lookAt(EntityAnchorArgument.Anchor fromAnchor, Entity entity, EntityAnchorArgument.Anchor toAnchor);
+    public void restoreFrom(ServerPlayer oldPlayer, boolean restoreAll);
+    protected void onEffectAdded(MobEffectInstance effect, Entity source);
+    protected void onEffectUpdated(MobEffectInstance effect, boolean doRefreshAttributes, Entity source);
+    protected void onEffectsRemoved(Collection<MobEffectInstance> effects);
+    public void teleportTo(double x, double y, double z);
+    public void teleportRelative(double dx, double dy, double dz);
+    public boolean teleportTo(ServerLevel level, double x, double y, double z, Set<Relative> relatives, float newYRot, float newXRot, boolean resetCamera);
+    public void snapTo(double x, double y, double z);
+    public void crit(Entity entity);
+    public void magicCrit(Entity entity);
+    public void onUpdateAbilities();
+    public ServerLevel level();
+    public boolean setGameMode(GameType mode);
+    public GameType gameMode();
+    public CommandSource commandSource();
+    public CommandSourceStack createCommandSourceStack();
+    public void sendSystemMessage(Component message);
+    public void sendOverlayMessage(Component message);
+    public void sendBuildLimitMessage(boolean isTooHigh, int limit);
+    public void sendSpawnProtectionMessage(BlockPos pos);
+    public void sendSystemMessage(Component message, boolean overlay);
+    public void sendChatMessage(OutgoingChatMessage message, boolean filtered, ChatType.Bound chatType);
+    public String getIpAddress();
+    public void updateOptions(ClientInformation information);
+    public ClientInformation clientInformation();
+    public boolean canChatInColor();
+    public ChatVisiblity getChatVisibility();
+    public int requestedViewDistance();
+    public void sendServerStatus(ServerStatus status);
+    public PermissionSet permissions();
+    public void resetLastActionTime();
+    public ServerStatsCounter getStats();
+    public ServerRecipeBook getRecipeBook();
+    protected void updateInvisibilityStatus();
+    public Entity getCamera();
+    public void setCamera(Entity newCamera);
+    protected void processPortalCooldown();
+    public long getLastActionTime();
+    public Component getTabListDisplayName();
+    public int getTabListOrder();
+    public boolean isChangingDimension();
+    public void hasChangedDimension();
+    public PlayerAdvancements getAdvancements();
+    public RespawnConfig getRespawnConfig();
+    public void copyRespawnPosition(ServerPlayer player);
+    public void setRespawnPosition(RespawnConfig respawnConfig, boolean showMessage);
+    public SectionPos getLastSectionPos();
+    public void setLastSectionPos(SectionPos lastSectionPos);
+    public ChunkTrackingView getChunkTrackingView();
+    public void setChunkTrackingView(ChunkTrackingView chunkTrackingView);
+    public ItemEntity drop(ItemStack itemStack, boolean thrownFromHand, Prediction prediction);
+    public TextFilter getTextFilter();
+    public void setServerLevel(ServerLevel level);
+    public boolean isTextFilteringEnabled();
+    public boolean shouldFilterMessageTo(ServerPlayer serverPlayer);
+    public boolean mayInteract(ServerLevel level, BlockPos pos);
+    protected void updateUsingItem(ItemStack useItem);
+    public void drop(boolean all);
+    public void handleExtraItemsCreatedOnUse(ItemStack extraItems);
+    public boolean allowsListing();
+    public WardenSpawnTracker getWardenSpawnTracker();
+    public void setSpawnExtraParticlesOnFall(boolean toggle);
+    public void onItemPickup(ItemEntity entity);
+    public void setChatSession(RemoteChatSession chatSession);
+    public RemoteChatSession getChatSession();
+    public void indicateDamage(double xd, double zd);
+    public boolean startRiding(Entity entityToRide, boolean force, boolean sendEventAndTriggers);
+    public void removeVehicle();
+    public CommonPlayerSpawnInfo createCommonSpawnInfo(ServerLevel level);
+    public void setRaidOmenPosition(BlockPos raidOmenPosition);
+    public void clearRaidOmenPosition();
+    public BlockPos getRaidOmenPosition();
+    public Vec3 getKnownMovement();
+    public Vec3 getKnownSpeed();
+    public void setKnownMovement(Vec3 lastKnownClientMovement);
+    protected float getEnchantedDamage(Entity entity, float dmg, DamageSource damageSource);
+    public void onEquippedItemBroken(ItemStack brokenItem, EquipmentSlot inSlot);
+    public Input getLastClientInput();
+    public void setLastClientInput(Input lastClientInput);
+    public Vec3 getLastClientMoveIntent();
+    public void registerEnderPearl(ThrownEnderpearl enderPearl);
+    public void deregisterEnderPearl(ThrownEnderpearl enderPearl);
+    public Set<ThrownEnderpearl> getEnderPearls();
+    public CompoundTag getShoulderEntityLeft();
+    protected void setShoulderEntityLeft(CompoundTag tag);
+    public CompoundTag getShoulderEntityRight();
+    protected void setShoulderEntityRight(CompoundTag tag);
+    public long registerAndUpdateEnderPearlTicket(ThrownEnderpearl enderpearl);
+    public static long placeEnderPearlTicket(ServerLevel level, ChunkPos chunk);
+    public void requestDebugSubscriptions(Set<DebugSubscription<?>> subscriptions);
+    public Set<DebugSubscription<?>> debugSubscriptions();
+    public void swingAndResetAttackStrength(InteractionHand hand, SwingAnimation animation, boolean sendToSwingingEntity);
+    static record RespawnPosAngle(Vec3 position, float yaw, float pitch) {
+        public static RespawnPosAngle of(Vec3 position, BlockPos lookAtBlockPos, float pitch);
+    }
+    public static record RespawnConfig(LevelData.RespawnData respawnData, boolean forced) {
+        public static final Codec<RespawnConfig> CODEC;
+        public boolean isSamePosition(RespawnConfig other);
+    }
+    public static record SavedPosition(Optional<ResourceKey<Level>> dimension, Optional<Vec3> position, Optional<Vec2> rotation) {
+        public static final MapCodec<SavedPosition> MAP_CODEC;
+        public static final SavedPosition EMPTY;
+    }
+}
+//// ServerPlayerGameMode.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
+public class ServerPlayerGameMode {
+    protected ServerLevel level;
+    protected final ServerPlayer player;
+    public ServerPlayerGameMode(ServerPlayer player);
+    public boolean changeGameModeForPlayer(GameType gameModeForPlayer);
+    protected void setGameModeForPlayer(GameType gameModeForPlayer, GameType previousGameModeForPlayer);
+    public GameType getGameModeForPlayer();
+    public GameType getPreviousGameModeForPlayer();
+    public boolean isSurvival();
+    public boolean isCreative();
+    public void tick();
+    public void handleBlockBreakAction(BlockPos pos, ServerboundPlayerActionPacket.Action action, Direction direction, int maxY, int sequence);
+    public void destroyAndAck(BlockPos pos, int sequence, String exitId);
+    public boolean destroyBlock(BlockPos pos);
+    public InteractionResult useItem(ServerPlayer player, Level level, ItemStack itemStack, InteractionHand hand);
+    public InteractionResult useItemOn(ServerPlayer player, Level level, ItemStack itemStack, InteractionHand hand, BlockHitResult hitResult);
+    public void setLevel(ServerLevel newLevel);
+}
+//// SimulationChunkTracker.java
+import it.unimi.dsi.fastutil.longs.Long2ByteMap;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.TicketStorage;
+public class SimulationChunkTracker extends ChunkTracker {
+    public static final int MAX_LEVEL = 33;
+    protected final Long2ByteMap chunks;
+    public SimulationChunkTracker(TicketStorage ticketStorage);
+    protected int getLevelFromSource(long to);
+    public int getLevel(ChunkPos node);
+    protected int getLevel(long node);
+    protected void setLevel(long node, int level);
+    public void runAllUpdates();
+}
+//// ThreadedLevelLightEngine.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.util.thread.ConsecutiveExecutor;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCloseable {
+    public static final int DEFAULT_BATCH_SIZE = 1000;
+    public ThreadedLevelLightEngine(LightChunkGetter lightChunkGetter, ChunkMap chunkMap, boolean hasSkyLight, ConsecutiveExecutor consecutiveExecutor, ChunkTaskDispatcher taskDispatcher);
+    public void close();
+    public int runLightUpdates();
+    public void checkBlock(BlockPos pos);
+    protected void updateChunkStatus(ChunkPos pos);
+    public void updateSectionStatus(SectionPos pos, boolean sectionEmpty);
+    public void propagateLightSources(ChunkPos pos);
+    public void setLightEnabled(ChunkPos pos, boolean enable);
+    public void queueSectionData(LightLayer layer, SectionPos pos, DataLayer data);
+    public void retainData(ChunkPos pos, boolean retain);
+    public CompletableFuture<ChunkAccess> initializeLight(ChunkAccess chunk, boolean lighted);
+    public CompletableFuture<ChunkAccess> lightChunk(ChunkAccess centerChunk, boolean lighted);
+    public void tryScheduleUpdate();
+    public CompletableFuture<?> waitForPendingTasks(int chunkX, int chunkZ);
+    static enum TaskType {
+        PRE_UPDATE, POST_UPDATE;
+    }
+}
+//// ThrottlingChunkTaskDispatcher.java
+import java.util.concurrent.Executor;
+import net.minecraft.util.thread.TaskScheduler;
+public class ThrottlingChunkTaskDispatcher extends ChunkTaskDispatcher {
+    public ThrottlingChunkTaskDispatcher(TaskScheduler<Runnable> executor, Executor dispatcherExecutor, int maxChunksInExecution);
+    protected void onRelease(long key);
+    protected ChunkTaskPriorityQueue. TasksForChunk popTasks();
+    protected void scheduleForExecution(ChunkTaskPriorityQueue.TasksForChunk tasksForChunk);
+    public String getDebugStatus();
+}
+//// Ticket.java
+import com.mojang.serialization.MapCodec;
+public class Ticket {
+    public static final MapCodec<Ticket> CODEC;
+    public Ticket(TicketType type, int ticketLevel);
+    private Ticket(TicketType type, int ticketLevel, long ticksLeft);
+    public String toString();
+    public TicketType getType();
+    public int getTicketLevel();
+    public void resetTicksLeft();
+    public void decreaseTicksLeft();
+    public boolean isTimedOut();
+}
+//// TicketType.java
+public record TicketType(long timeout, int flags) {
+    public static final long NO_TIMEOUT = 0L;
+    public static final int FLAG_PERSIST = 1;
+    public static final int FLAG_LOADING = 2;
+    public static final int FLAG_SIMULATION = 4;
+    public static final int FLAG_KEEP_DIMENSION_ACTIVE = 8;
+    public static final int FLAG_CAN_EXPIRE_IF_UNLOADED = 16;
+    public static final TicketType PLAYER_SPAWN;
+    public static final TicketType SPAWN_SEARCH;
+    public static final TicketType DRAGON;
+    public static final TicketType PLAYER_LOADING;
+    public static final TicketType PLAYER_SIMULATION;
+    public static final TicketType FORCED;
+    public static final TicketType PORTAL;
+    public static final TicketType ENDER_PEARL;
+    public static final TicketType UNKNOWN;
+    public boolean persist();
+    public boolean doesLoad();
+    public boolean doesSimulate();
+    public boolean shouldKeepDimensionActive();
+    public boolean canExpireIfUnloaded();
+    public boolean hasTimeout();
+    public @interface Flags {
+    }
+}
+//// WorldGenRegion.java
+import java.util.List;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StaticCache2D;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.attribute.EnvironmentAttributeReader;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.blockscan.BlockMatcher;
+import net.minecraft.world.level.border.WorldBorder;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkSource;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.chunk.status.ChunkStep;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.storage.LevelData;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.ticks.LevelTickAccess;
+public class WorldGenRegion implements WorldGenLevel {
+    public WorldGenRegion(ServerLevel level, StaticCache2D<GenerationChunkHolder> cache, ChunkStep generatingStep, ChunkAccess center);
+    public boolean isOldChunkAround(ChunkPos pos, int range);
+    public ChunkPos getCenter();
+    public void setCurrentlyGenerating(Supplier<String> currentlyGenerating);
+    public ChunkAccess getChunk(int chunkX, int chunkZ);
+    public ChunkAccess getChunk(int chunkX, int chunkZ, ChunkStatus targetStatus, boolean loadOrGenerate);
+    public boolean hasChunk(int chunkX, int chunkZ);
+    public BlockState getBlockState(BlockPos pos);
+    public FluidState getFluidState(BlockPos pos);
+    public Player getNearestPlayer(double x, double y, double z, double maxDist, Predicate<Entity> predicate);
+    public int getSkyDarken();
+    public BiomeManager getBiomeManager();
+    public Holder<Biome> getUncachedNoiseBiome(int quartX, int quartY, int quartZ);
+    public LevelLightEngine getLightEngine();
+    public boolean destroyBlock(BlockPos pos, boolean dropResources, Entity breaker, int updateLimit);
+    public BlockEntity getBlockEntity(BlockPos pos);
+    public BlockMatcher findBlocksIn(BlockPos from, BlockPos to);
+    public boolean isWithinWriteZone(BlockPos pos);
+    public boolean ensureCanWrite(BlockPos pos);
+    public boolean setBlock(BlockPos pos, BlockState blockState, int updateFlags, int updateLimit);
+    public boolean addFreshEntity(Entity entity);
+    public boolean removeBlock(BlockPos pos, boolean movedByPiston);
+    public WorldBorder getWorldBorder();
+    public boolean isClientSide();
+    public ServerLevel getLevel();
+    public RegistryAccess registryAccess();
+    public FeatureFlagSet enabledFeatures();
+    public LevelData getLevelData();
+    public DifficultyInstance getCurrentDifficultyAt(BlockPos pos);
+    public MinecraftServer getServer();
+    public ChunkSource getChunkSource();
+    public long getSeed();
+    public LevelTickAccess<Block> getBlockTicks();
+    public LevelTickAccess<Fluid> getFluidTicks();
+    public int getSeaLevel();
+    public RandomSource getRandom();
+    public int getHeight(Heightmap.Types type, int x, int z);
+    public void playSound(Entity except, BlockPos pos, SoundEvent sound, SoundSource source, float volume, float pitch);
+    public void addParticle(ParticleOptions particle, double x, double y, double z, double xd, double yd, double zd);
+    public void levelEvent(Entity source, int type, BlockPos pos, int data);
+    public void gameEvent(Holder<GameEvent> gameEvent, Vec3 position, GameEvent.Context context);
+    public DimensionType dimensionType();
+    public boolean isStateAtPosition(BlockPos pos, Predicate<BlockState> predicate);
+    public boolean isFluidAtPosition(BlockPos pos, Predicate<FluidState> predicate);
+    public <T extends Entity> List<T> getEntities(EntityTypeTest<Entity, T> type, AABB bb, Predicate<? super T> selector);
+    public List<Entity> getEntities(Entity except, AABB bb, Predicate<? super Entity> selector);
+    public List<Player> players();
+    public int getMinY();
+    public int getHeight();
+    public long nextSubTickCount();
+    public EnvironmentAttributeReader environmentAttributes();
+}

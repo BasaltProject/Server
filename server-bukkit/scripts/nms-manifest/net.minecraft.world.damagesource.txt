@@ -1,0 +1,232 @@
+//// CombatEntry.java
+public record CombatEntry(DamageSource source, float damage, FallLocation fallLocation, float fallDistance) {
+}
+//// CombatRules.java
+import net.minecraft.world.entity.LivingEntity;
+public class CombatRules {
+    public static final float MAX_ARMOR = 20.0F;
+    public static final float ARMOR_PROTECTION_DIVIDER = 25.0F;
+    public static final float BASE_ARMOR_TOUGHNESS = 2.0F;
+    public static final float MIN_ARMOR_RATIO = 0.2F;
+    public static float getDamageAfterAbsorb(LivingEntity victim, float damage, DamageSource source, float totalArmor, float armorToughness);
+    public static float getDamageAfterMagicAbsorb(float damage, float totalMagicArmor);
+}
+//// CombatTracker.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.LivingEntity;
+public class CombatTracker {
+    public static final int RESET_DAMAGE_STATUS_TIME = 100;
+    public static final int RESET_COMBAT_STATUS_TIME = 300;
+    public CombatTracker(LivingEntity mob);
+    public void recordDamage(DamageSource source, float damage);
+    public Component getDeathMessage();
+    public int getCombatDuration();
+    public void recheckStatus();
+}
+//// DamageEffects.java
+import com.mojang.serialization.Codec;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.StringRepresentable;
+public enum DamageEffects implements StringRepresentable {
+    HURT, THORNS, DROWNING, BURNING, POKING, FREEZING;
+    public static final Codec<DamageEffects> CODEC;
+    public String getSerializedName();
+    public SoundEvent sound();
+}
+//// DamageScaling.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum DamageScaling implements StringRepresentable {
+    NEVER, WHEN_CAUSED_BY_LIVING_NON_PLAYER, ALWAYS;
+    public static final Codec<DamageScaling> CODEC;
+    public String getSerializedName();
+}
+//// DamageSource.java
+import net.minecraft.core.Holder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
+public class DamageSource {
+    public String toString();
+    public float getFoodExhaustion();
+    public boolean isDirect();
+    private DamageSource(Holder<DamageType> type, Entity directEntity, Entity causingEntity, Vec3 damageSourcePosition);
+    public DamageSource(Holder<DamageType> type, Entity directEntity, Entity causingEntity);
+    public DamageSource(Holder<DamageType> type, Vec3 damageSourcePosition);
+    public DamageSource(Holder<DamageType> type, Entity causingEntity);
+    public DamageSource(Holder<DamageType> type);
+    public Entity getDirectEntity();
+    public Entity getEntity();
+    public ItemStack getWeaponItem();
+    public Component getLocalizedDeathMessage(LivingEntity victim);
+    public String getMsgId();
+    public boolean scalesWithDifficulty();
+    public boolean isCreativePlayer();
+    public Vec3 getSourcePosition();
+    public Vec3 sourcePositionRaw();
+    public boolean is(TagKey<DamageType> tag);
+    public boolean is(ResourceKey<DamageType> typeKey);
+    public DamageType type();
+    public Holder<DamageType> typeHolder();
+}
+//// DamageSources.java
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.FireworkRocketEntity;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.entity.projectile.hurtingprojectile.Fireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
+import net.minecraft.world.level.Explosion;
+import net.minecraft.world.phys.Vec3;
+public class DamageSources {
+    public DamageSources(RegistryAccess registries);
+    public DamageSource inFire();
+    public DamageSource campfire();
+    public DamageSource lightningBolt();
+    public DamageSource onFire();
+    public DamageSource lava();
+    public DamageSource hotFloor();
+    public DamageSource inWall();
+    public DamageSource cramming();
+    public DamageSource drown();
+    public DamageSource starve();
+    public DamageSource cactus();
+    public DamageSource fall();
+    public DamageSource enderPearl();
+    public DamageSource flyIntoWall();
+    public DamageSource fellOutOfWorld();
+    public DamageSource generic();
+    public DamageSource magic();
+    public DamageSource wither();
+    public DamageSource dragonBreath();
+    public DamageSource dryOut();
+    public DamageSource sweetBerryBush();
+    public DamageSource freeze();
+    public DamageSource stalagmite();
+    public DamageSource fallingBlock(Entity entity);
+    public DamageSource anvil(Entity entity);
+    public DamageSource fallingStalactite(Entity entity);
+    public DamageSource sting(LivingEntity mob);
+    public DamageSource mobAttack(LivingEntity mob);
+    public DamageSource noAggroMobAttack(LivingEntity mob);
+    public DamageSource playerAttack(Player player);
+    public DamageSource arrow(AbstractArrow arrow, Entity owner);
+    public DamageSource trident(Entity trident, Entity owner);
+    public DamageSource mobProjectile(Entity entity, LivingEntity mob);
+    public DamageSource spit(Entity entity, LivingEntity mob);
+    public DamageSource windCharge(Entity entity, LivingEntity mob);
+    public DamageSource fireworks(FireworkRocketEntity rocket, Entity owner);
+    public DamageSource fireball(Fireball fireball, Entity owner);
+    public DamageSource witherSkull(WitherSkull witherSkull, Entity owner);
+    public DamageSource thrown(Entity entity, Entity owner);
+    public DamageSource indirectMagic(Entity entity, Entity owner);
+    public DamageSource thorns(Entity source);
+    public DamageSource explosion(Explosion explosion);
+    public DamageSource explosion(Entity entity, Entity cause);
+    public DamageSource sonicBoom(Entity entity);
+    public DamageSource badRespawnPointExplosion(Vec3 boomPos);
+    public DamageSource outOfBorder();
+    public DamageSource genericKill();
+    public DamageSource mace(Entity owner);
+}
+//// DamageType.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record DamageType(String msgId, DamageScaling scaling, float exhaustion, DamageEffects effects, DeathMessageType deathMessageType) {
+    public static final Codec<DamageType> DIRECT_CODEC;
+    public static final Codec<Holder<DamageType>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<DamageType>> STREAM_CODEC;
+    public DamageType(String msgdId, DamageScaling scaling, float exhaustion);
+    public DamageType(String msgdId, DamageScaling scaling, float exhaustion, DamageEffects effects);
+    public DamageType(String msgdId, float exhaustion, DamageEffects effects);
+    public DamageType(String msgdId, float exhaustion);
+}
+//// DamageTypes.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public interface DamageTypes {
+    ResourceKey<DamageType> IN_FIRE;
+    ResourceKey<DamageType> CAMPFIRE;
+    ResourceKey<DamageType> LIGHTNING_BOLT;
+    ResourceKey<DamageType> ON_FIRE;
+    ResourceKey<DamageType> LAVA;
+    ResourceKey<DamageType> HOT_FLOOR;
+    ResourceKey<DamageType> SULFUR_CUBE_HOT;
+    ResourceKey<DamageType> IN_WALL;
+    ResourceKey<DamageType> CRAMMING;
+    ResourceKey<DamageType> DROWN;
+    ResourceKey<DamageType> STARVE;
+    ResourceKey<DamageType> CACTUS;
+    ResourceKey<DamageType> FALL;
+    ResourceKey<DamageType> ENDER_PEARL;
+    ResourceKey<DamageType> FLY_INTO_WALL;
+    ResourceKey<DamageType> FELL_OUT_OF_WORLD;
+    ResourceKey<DamageType> GENERIC;
+    ResourceKey<DamageType> MAGIC;
+    ResourceKey<DamageType> WITHER;
+    ResourceKey<DamageType> DRAGON_BREATH;
+    ResourceKey<DamageType> DRY_OUT;
+    ResourceKey<DamageType> SWEET_BERRY_BUSH;
+    ResourceKey<DamageType> FREEZE;
+    ResourceKey<DamageType> STALAGMITE;
+    ResourceKey<DamageType> FALLING_BLOCK;
+    ResourceKey<DamageType> FALLING_ANVIL;
+    ResourceKey<DamageType> FALLING_STALACTITE;
+    ResourceKey<DamageType> STING;
+    ResourceKey<DamageType> MOB_ATTACK;
+    ResourceKey<DamageType> MOB_ATTACK_NO_AGGRO;
+    ResourceKey<DamageType> PLAYER_ATTACK;
+    ResourceKey<DamageType> SPEAR;
+    ResourceKey<DamageType> ARROW;
+    ResourceKey<DamageType> TRIDENT;
+    ResourceKey<DamageType> MOB_PROJECTILE;
+    ResourceKey<DamageType> SPIT;
+    ResourceKey<DamageType> WIND_CHARGE;
+    ResourceKey<DamageType> FIREWORKS;
+    ResourceKey<DamageType> FIREBALL;
+    ResourceKey<DamageType> UNATTRIBUTED_FIREBALL;
+    ResourceKey<DamageType> WITHER_SKULL;
+    ResourceKey<DamageType> THROWN;
+    ResourceKey<DamageType> INDIRECT_MAGIC;
+    ResourceKey<DamageType> THORNS;
+    ResourceKey<DamageType> EXPLOSION;
+    ResourceKey<DamageType> PLAYER_EXPLOSION;
+    ResourceKey<DamageType> SONIC_BOOM;
+    ResourceKey<DamageType> BAD_RESPAWN_POINT;
+    ResourceKey<DamageType> OUTSIDE_BORDER;
+    ResourceKey<DamageType> GENERIC_KILL;
+    ResourceKey<DamageType> MACE_SMASH;
+    static void bootstrap(BootstrapContext<DamageType> context);
+}
+//// DeathMessageType.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum DeathMessageType implements StringRepresentable {
+    DEFAULT, FALL_VARIANTS, INTENTIONAL_GAME_DESIGN;
+    public static final Codec<DeathMessageType> CODEC;
+    public String getSerializedName();
+}
+//// FallLocation.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.block.state.BlockState;
+public record FallLocation(String id) {
+    public static final FallLocation GENERIC;
+    public static final FallLocation LADDER;
+    public static final FallLocation VINES;
+    public static final FallLocation WEEPING_VINES;
+    public static final FallLocation TWISTING_VINES;
+    public static final FallLocation SCAFFOLDING;
+    public static final FallLocation OTHER_CLIMBABLE;
+    public static final FallLocation WATER;
+    public static FallLocation blockToFallLocation(BlockState blockState);
+    public static FallLocation getCurrentFallLocation(LivingEntity mob);
+    public String languageKey();
+}

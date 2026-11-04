@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.chunk;
 
 import com.mojang.serialization.DataResult;
@@ -11,6 +12,9 @@ import net.minecraft.util.BitStorage;
 import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.util.ThreadingDetector;
 import net.minecraft.util.ZeroBitStorage;
+import com.mojang.serialization.Codec;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
 
 /** The names and shapes of the private members are what the world editing adapters look up by reflection. */
 public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T> {
@@ -210,7 +214,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
     @Override
     public int getSerializedSize() {
-        return 1 + data.storage.getRaw().length * 8;
+        return data.getSerializedSize(strategy.globalMap());
     }
 
     @Override
@@ -351,10 +355,55 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
         Data<T> copy() {
             return new Data<>(configuration, storage.copy(), palette.copy());
         }
-    }
+            public int getSerializedSize(IdMap<T> globalMap) {
+                return 1 + palette.getSerializedSize(globalMap) + storage.getRaw().length * 8;
+        }
+        public void write(FriendlyByteBuf buffer, IdMap<T> globalMap) {
+            buffer.writeByte(storage.getBits());
+            palette.write(buffer, globalMap);
+            for (long word : storage.getRaw()) {
+                buffer.writeLong(word);
+            }
+        }
+}
 
     @FunctionalInterface
     public interface CountConsumer<T> {
         void accept(T entry, int count);
+    }
+    public static <T> Codec<PalettedContainer<T>> codecRW(Codec<T> elementCodec, Strategy<T> strategy, T defaultValue) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.PalettedContainer#codecRW");
+    }
+    public static <T> Codec<PalettedContainerRO<T>> codecRO(Codec<T> elementCodec, Strategy<T> strategy, T defaultValue) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.PalettedContainer#codecRO");
+    }
+    public void read(FriendlyByteBuf buffer) {
+        acquire();
+        try {
+            int newBits = buffer.readByte();
+            Data<T> next = createOrReuseData(data, newBits);
+            next.palette().read(buffer, strategy.globalMap());
+            long[] raw = next.storage().getRaw();
+            for (int i = 0; i < raw.length; i++) {
+                raw[i] = buffer.readLong();
+            }
+            data = next;
+        } finally {
+            release();
+        }
+    }
+    public void write(FriendlyByteBuf buffer) {
+        acquire();
+        try {
+            data.write(buffer, strategy.globalMap());
+        } finally {
+            release();
+        }
+    }
+    public void forEachInPalette(Consumer<T> consumer) {
+        Data<T> held = data;
+        for (int i = 0; i < held.palette().getSize(); i++) {
+            consumer.accept(held.palette().valueFor(i));
+        }
     }
 }

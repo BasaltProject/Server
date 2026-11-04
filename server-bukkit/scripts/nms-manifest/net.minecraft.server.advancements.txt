@@ -1,0 +1,12 @@
+//// AdvancementVisibilityEvaluator.java
+import java.util.function.Predicate;
+import net.minecraft.advancements.AdvancementNode;
+public class AdvancementVisibilityEvaluator {
+    public static void evaluateVisibility(AdvancementNode node, Predicate<AdvancementNode> isDone, Output output);
+    static enum VisibilityRule {
+        SHOW, HIDE, NO_CHANGE;
+    }
+    public interface Output {
+        void accept(AdvancementNode advancement, boolean visible);
+    }
+}

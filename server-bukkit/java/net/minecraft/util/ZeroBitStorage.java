@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.util;
 
 import java.util.Arrays;
@@ -54,5 +55,8 @@ public class ZeroBitStorage implements BitStorage {
     @Override
     public BitStorage copy() {
         return this;
+    }
+    public void fill(int value) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.ZeroBitStorage#fill");
     }
 }

@@ -1,0 +1,96 @@
+//// ContainerEntity.java
+import net.minecraft.core.NonNullList;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Container;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public interface ContainerEntity extends Container, MenuProvider {
+    Vec3 position();
+    AABB getBoundingBox();
+    ResourceKey<LootTable> getContainerLootTable();
+    void setContainerLootTable(ResourceKey<LootTable> lootTable);
+    long getContainerLootTableSeed();
+    void setContainerLootTableSeed(long lootTableSeed);
+    NonNullList<ItemStack> getItemStacks();
+    void clearItemStacks();
+    Level level();
+    boolean isRemoved();
+    default boolean isEmpty();
+    default void addChestVehicleSaveData(ValueOutput output);
+    default void readChestVehicleSaveData(ValueInput input);
+    default void chestVehicleDestroyed(DamageSource source, ServerLevel level, Entity entity);
+    default InteractionResult interactWithContainerVehicle(Player player);
+    default void unpackChestVehicleLootTable(Player player);
+    default void clearChestVehicleContent();
+    default boolean isChestVehicleEmpty();
+    default ItemStack removeChestVehicleItemNoUpdate(int slot);
+    default ItemStack getChestVehicleItem(int slot);
+    default ItemStack removeChestVehicleItem(int slot, int count);
+    default void setChestVehicleItem(int slot, ItemStack itemStack);
+    default SlotAccess getChestVehicleSlot(int slot);
+    default boolean isChestVehicleStillValid(Player player);
+}
+//// DismountHelper.java
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.CollisionGetter;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public class DismountHelper {
+    public static int[][] offsetsForDirection(Direction forward);
+    public static boolean isBlockFloorValid(double blockFloorHeight);
+    public static boolean canDismountTo(CollisionGetter level, LivingEntity passenger, AABB box);
+    public static boolean canDismountTo(CollisionGetter level, Vec3 location, LivingEntity passenger, Pose dismountPose);
+    public static VoxelShape nonClimbableShape(BlockGetter level, BlockPos pos);
+    public static double findCeilingFrom(BlockPos pos, int blocks, Function<BlockPos, VoxelShape> shapeGetter);
+    public static Vec3 findSafeDismountLocation(EntityType<?> type, CollisionGetter level, BlockPos blockPos, boolean checkDangerous);
+}
+//// VehicleEntity.java
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.Explosion;
+import net.minecraft.world.level.Level;
+public abstract class VehicleEntity extends Entity {
+    protected static final EntityDataAccessor<Integer> DATA_ID_HURT;
+    protected static final EntityDataAccessor<Integer> DATA_ID_HURTDIR;
+    protected static final EntityDataAccessor<Float> DATA_ID_DAMAGE;
+    public VehicleEntity(EntityType<?> type, Level level);
+    public boolean hurtClient(DamageSource source);
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    protected boolean shouldSourceDestroy(DamageSource source);
+    public boolean ignoreExplosion(Explosion explosion);
+    public void destroy(ServerLevel level, Item dropItem);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public void setHurtTime(int hurtTime);
+    public void setHurtDir(int hurtDir);
+    public void setDamage(float damage);
+    public float getDamage();
+    public int getHurtTime();
+    public int getHurtDir();
+    protected void destroy(ServerLevel level, DamageSource source);
+    public int getDimensionChangingDelay();
+    protected abstract Item getDropItem();
+}

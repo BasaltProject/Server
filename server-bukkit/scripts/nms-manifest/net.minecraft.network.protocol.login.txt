@@ -1,0 +1,165 @@
+//// ClientLoginPacketListener.java
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.cookie.ClientCookiePacketListener;
+public interface ClientLoginPacketListener extends ClientCookiePacketListener {
+    default ConnectionProtocol protocol();
+    void handleHello(ClientboundHelloPacket packet);
+    void handleLoginFinished(ClientboundLoginFinishedPacket packet);
+    void handleDisconnect(ClientboundLoginDisconnectPacket packet);
+    void handleCompression(ClientboundLoginCompressionPacket packet);
+    void handleCustomQuery(ClientboundCustomQueryPacket packet);
+}
+//// ClientboundCustomQueryPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.network.protocol.login.custom.CustomQueryPayload;
+public record ClientboundCustomQueryPacket(int transactionId, CustomQueryPayload payload) implements Packet<ClientLoginPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundCustomQueryPacket> STREAM_CODEC;
+    private ClientboundCustomQueryPacket(FriendlyByteBuf input);
+    public PacketType<ClientboundCustomQueryPacket> type();
+    public void handle(ClientLoginPacketListener listener);
+}
+//// ClientboundHelloPacket.java
+import java.security.PublicKey;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.util.CryptException;
+public class ClientboundHelloPacket implements Packet<ClientLoginPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundHelloPacket> STREAM_CODEC;
+    public ClientboundHelloPacket(String serverId, byte[] publicKey, byte[] challenge, boolean shouldAuthenticate);
+    private ClientboundHelloPacket(FriendlyByteBuf input);
+    public PacketType<ClientboundHelloPacket> type();
+    public void handle(ClientLoginPacketListener listener);
+    public String getServerId();
+    public PublicKey getPublicKey() throws CryptException;
+    public byte[] getChallenge();
+    public boolean shouldAuthenticate();
+}
+//// ClientboundLoginCompressionPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ClientboundLoginCompressionPacket implements Packet<ClientLoginPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundLoginCompressionPacket> STREAM_CODEC;
+    public ClientboundLoginCompressionPacket(int compressionThreshold);
+    private ClientboundLoginCompressionPacket(FriendlyByteBuf input);
+    public PacketType<ClientboundLoginCompressionPacket> type();
+    public void handle(ClientLoginPacketListener listener);
+    public int getCompressionThreshold();
+}
+//// ClientboundLoginDisconnectPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundLoginDisconnectPacket(Component reason) implements Packet<ClientLoginPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundLoginDisconnectPacket> STREAM_CODEC;
+    public PacketType<ClientboundLoginDisconnectPacket> type();
+    public void handle(ClientLoginPacketListener listener);
+}
+//// ClientboundLoginFinishedPacket.java
+import com.mojang.authlib.GameProfile;
+import io.netty.buffer.ByteBuf;
+import java.util.UUID;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundLoginFinishedPacket(GameProfile gameProfile, UUID sessionId) implements Packet<ClientLoginPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundLoginFinishedPacket> STREAM_CODEC;
+    public PacketType<ClientboundLoginFinishedPacket> type();
+    public void handle(ClientLoginPacketListener listener);
+    public boolean isTerminal();
+}
+//// LoginPacketTypes.java
+import net.minecraft.network.protocol.PacketType;
+public class LoginPacketTypes {
+    public static final PacketType<ClientboundCustomQueryPacket> CLIENTBOUND_CUSTOM_QUERY;
+    public static final PacketType<ClientboundLoginFinishedPacket> CLIENTBOUND_LOGIN_FINISHED;
+    public static final PacketType<ClientboundHelloPacket> CLIENTBOUND_HELLO;
+    public static final PacketType<ClientboundLoginCompressionPacket> CLIENTBOUND_LOGIN_COMPRESSION;
+    public static final PacketType<ClientboundLoginDisconnectPacket> CLIENTBOUND_LOGIN_DISCONNECT;
+    public static final PacketType<ServerboundCustomQueryAnswerPacket> SERVERBOUND_CUSTOM_QUERY_ANSWER;
+    public static final PacketType<ServerboundHelloPacket> SERVERBOUND_HELLO;
+    public static final PacketType<ServerboundKeyPacket> SERVERBOUND_KEY;
+    public static final PacketType<ServerboundLoginAcknowledgedPacket> SERVERBOUND_LOGIN_ACKNOWLEDGED;
+}
+//// LoginProtocols.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.ProtocolInfo;
+import net.minecraft.network.protocol.SimpleUnboundProtocol;
+public class LoginProtocols {
+    public static final SimpleUnboundProtocol<ServerLoginPacketListener, FriendlyByteBuf> SERVERBOUND_TEMPLATE;
+    public static final ProtocolInfo<ServerLoginPacketListener> SERVERBOUND;
+    public static final SimpleUnboundProtocol<ClientLoginPacketListener, FriendlyByteBuf> CLIENTBOUND_TEMPLATE;
+    public static final ProtocolInfo<ClientLoginPacketListener> CLIENTBOUND;
+}
+//// ServerLoginPacketListener.java
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.cookie.ServerCookiePacketListener;
+public interface ServerLoginPacketListener extends ServerCookiePacketListener {
+    default ConnectionProtocol protocol();
+    void handleHello(ServerboundHelloPacket packet);
+    void handleKey(ServerboundKeyPacket packet);
+    void handleCustomQueryPacket(ServerboundCustomQueryAnswerPacket packet);
+    void handleLoginAcknowledgement(ServerboundLoginAcknowledgedPacket packet);
+}
+//// ServerboundCustomQueryAnswerPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.network.protocol.login.custom.CustomQueryAnswerPayload;
+public record ServerboundCustomQueryAnswerPacket(int transactionId, CustomQueryAnswerPayload payload) implements Packet<ServerLoginPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ServerboundCustomQueryAnswerPacket> STREAM_CODEC;
+    public PacketType<ServerboundCustomQueryAnswerPacket> type();
+    public void handle(ServerLoginPacketListener listener);
+}
+//// ServerboundHelloPacket.java
+import java.util.UUID;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ServerboundHelloPacket(String name, UUID profileId) implements Packet<ServerLoginPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ServerboundHelloPacket> STREAM_CODEC;
+    private ServerboundHelloPacket(FriendlyByteBuf input);
+    public PacketType<ServerboundHelloPacket> type();
+    public void handle(ServerLoginPacketListener listener);
+}
+//// ServerboundKeyPacket.java
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import javax.crypto.SecretKey;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.util.CryptException;
+public class ServerboundKeyPacket implements Packet<ServerLoginPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ServerboundKeyPacket> STREAM_CODEC;
+    public ServerboundKeyPacket(SecretKey secretKey, PublicKey publicKey, byte[] challenge) throws CryptException;
+    private ServerboundKeyPacket(FriendlyByteBuf input);
+    public PacketType<ServerboundKeyPacket> type();
+    public void handle(ServerLoginPacketListener listener);
+    public SecretKey getSecretKey(PrivateKey privateKey) throws CryptException;
+    public boolean isChallengeValid(byte[] challenge, PrivateKey privateKey);
+}
+//// ServerboundLoginAcknowledgedPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ServerboundLoginAcknowledgedPacket implements Packet<ServerLoginPacketListener> {
+    public static final ServerboundLoginAcknowledgedPacket INSTANCE;
+    public static final StreamCodec<ByteBuf, ServerboundLoginAcknowledgedPacket> STREAM_CODEC;
+    private ServerboundLoginAcknowledgedPacket();
+    public PacketType<ServerboundLoginAcknowledgedPacket> type();
+    public void handle(ServerLoginPacketListener listener);
+    public boolean isTerminal();
+}

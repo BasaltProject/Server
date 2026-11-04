@@ -1,0 +1,135 @@
+//// BorderChangeListener.java
+public interface BorderChangeListener {
+    void onSetSize(WorldBorder border, double newSize);
+    void onLerpSize(WorldBorder border, double fromSize, double targetSize, long ticks, long gameTime);
+    void onSetCenter(WorldBorder border, double x, double z);
+    void onSetWarningTime(WorldBorder border, int time);
+    void onSetWarningBlocks(WorldBorder border, int blocks);
+    void onSetDamagePerBlock(WorldBorder border, double damagePerBlock);
+    void onSetSafeZone(WorldBorder border, double safeZone);
+}
+//// BorderStatus.java
+public enum BorderStatus {
+    GROWING, SHRINKING, STATIONARY;
+    public int getColor();
+}
+//// WorldBorder.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public class WorldBorder extends SavedData {
+    public static final double MAX_SIZE = 59999968.0;
+    public static final double MAX_CENTER_COORDINATE = 29999984.0;
+    public static final Codec<WorldBorder> CODEC;
+    public static final SavedDataType<WorldBorder> TYPE;
+    public WorldBorder();
+    public WorldBorder(Settings settings);
+    public boolean isWithinBounds(BlockPos pos);
+    public boolean isWithinBounds(Vec3 pos);
+    public boolean isWithinBounds(ChunkPos pos);
+    public boolean isWithinBounds(AABB aabb);
+    public boolean isWithinBounds(double x, double z);
+    public boolean isWithinBounds(double x, double z, double margin);
+    public BlockPos clampToBounds(BlockPos position);
+    public BlockPos clampToBounds(Vec3 position);
+    public BlockPos clampToBounds(double x, double y, double z);
+    public Vec3 clampVec3ToBound(Vec3 position);
+    public Vec3 clampVec3ToBound(double x, double y, double z);
+    public double getDistanceToBorder(Entity entity);
+    public VoxelShape getCollisionShape();
+    public double getDistanceToBorder(double x, double z);
+    public boolean isInsideCloseToBorder(Entity source, AABB boundingBox);
+    public BorderStatus getStatus();
+    public double getMinX();
+    public double getMinX(float deltaPartialTick);
+    public double getMinZ();
+    public double getMinZ(float deltaPartialTick);
+    public double getMaxX();
+    public double getMaxX(float deltaPartialTick);
+    public double getMaxZ();
+    public double getMaxZ(float deltaPartialTick);
+    public double getCenterX();
+    public double getCenterZ();
+    public void setCenter(double x, double z);
+    public double getSize();
+    public long getLerpTime();
+    public double getLerpTarget();
+    public void setSize(double size);
+    public void lerpSizeBetween(double from, double to, long ticks, long gameTime);
+    protected List<BorderChangeListener> getListeners();
+    public void addListener(BorderChangeListener listener);
+    public void removeListener(BorderChangeListener listener);
+    public void setAbsoluteMaxSize(int absoluteMaxSize);
+    public int getAbsoluteMaxSize();
+    public double getSafeZone();
+    public void setSafeZone(double safeZone);
+    public double getDamagePerBlock();
+    public void setDamagePerBlock(double damagePerBlock);
+    public double getLerpSpeed();
+    public int getWarningTime();
+    public void setWarningTime(int warningTime);
+    public int getWarningBlocks();
+    public void setWarningBlocks(int warningBlocks);
+    public void tick();
+    public void applyInitialSettings(long gameTime);
+    class MovingBorderExtent implements BorderExtent {
+        private MovingBorderExtent(double from, double to, long duration, long gameTime);
+        public double getMinX(float deltaPartialTick);
+        public double getMinZ(float deltaPartialTick);
+        public double getMaxX(float deltaPartialTick);
+        public double getMaxZ(float deltaPartialTick);
+        public double getSize();
+        public double getPreviousSize();
+        public double getLerpSpeed();
+        public long getLerpTime();
+        public double getLerpTarget();
+        public BorderStatus getStatus();
+        public void onCenterChange();
+        public void onAbsoluteMaxSizeChange();
+        public BorderExtent update();
+        public VoxelShape getCollisionShape();
+    }
+    class StaticBorderExtent implements BorderExtent {
+        public StaticBorderExtent(double size);
+        public double getMinX(float deltaPartialTick);
+        public double getMaxX(float deltaPartialTick);
+        public double getMinZ(float deltaPartialTick);
+        public double getMaxZ(float deltaPartialTick);
+        public double getSize();
+        public BorderStatus getStatus();
+        public double getLerpSpeed();
+        public long getLerpTime();
+        public double getLerpTarget();
+        public void onAbsoluteMaxSizeChange();
+        public void onCenterChange();
+        public BorderExtent update();
+        public VoxelShape getCollisionShape();
+    }
+    public static record Settings(double centerX, double centerZ, double damagePerBlock, double safeZone, int warningBlocks, int warningTime, double size, long lerpTime, double lerpTarget) {
+        public static final Settings DEFAULT;
+        public static final Codec<Settings> CODEC;
+        public Settings(WorldBorder worldBorder);
+    }
+    interface BorderExtent {
+        double getMinX(float deltaPartialTick);
+        double getMaxX(float deltaPartialTick);
+        double getMinZ(float deltaPartialTick);
+        double getMaxZ(float deltaPartialTick);
+        double getSize();
+        double getLerpSpeed();
+        long getLerpTime();
+        double getLerpTarget();
+        BorderStatus getStatus();
+        void onAbsoluteMaxSizeChange();
+        void onCenterChange();
+        BorderExtent update();
+        VoxelShape getCollisionShape();
+    }
+}

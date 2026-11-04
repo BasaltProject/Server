@@ -1,0 +1,59 @@
+//// AppendLoot.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class AppendLoot implements RuleBlockEntityModifier {
+    public static final MapCodec<AppendLoot> CODEC;
+    public AppendLoot(ResourceKey<LootTable> lootTable);
+    public CompoundTag apply(RandomSource random, CompoundTag existingTag);
+    public RuleBlockEntityModifierType<?> getType();
+}
+//// AppendStatic.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+public class AppendStatic implements RuleBlockEntityModifier {
+    public static final MapCodec<AppendStatic> CODEC;
+    public AppendStatic(CompoundTag tag);
+    public CompoundTag apply(RandomSource random, CompoundTag existingTag);
+    public RuleBlockEntityModifierType<?> getType();
+}
+//// Clear.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+public class Clear implements RuleBlockEntityModifier {
+    public static final MapCodec<Clear> CODEC;
+    public CompoundTag apply(RandomSource random, CompoundTag existingTag);
+    public RuleBlockEntityModifierType<?> getType();
+}
+//// Passthrough.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+public class Passthrough implements RuleBlockEntityModifier {
+    public static final Passthrough INSTANCE;
+    public static final MapCodec<Passthrough> CODEC;
+    public CompoundTag apply(RandomSource random, CompoundTag existingTag);
+    public RuleBlockEntityModifierType<?> getType();
+}
+//// RuleBlockEntityModifier.java
+import com.mojang.serialization.Codec;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+public interface RuleBlockEntityModifier {
+    Codec<RuleBlockEntityModifier> CODEC;
+    CompoundTag apply(RandomSource random, CompoundTag existingTag);
+    RuleBlockEntityModifierType<?> getType();
+}
+//// RuleBlockEntityModifierType.java
+import com.mojang.serialization.MapCodec;
+public interface RuleBlockEntityModifierType<P extends RuleBlockEntityModifier> {
+    RuleBlockEntityModifierType<Clear> CLEAR;
+    RuleBlockEntityModifierType<Passthrough> PASSTHROUGH;
+    RuleBlockEntityModifierType<AppendStatic> APPEND_STATIC;
+    RuleBlockEntityModifierType<AppendLoot> APPEND_LOOT;
+    MapCodec<P> codec();
+}

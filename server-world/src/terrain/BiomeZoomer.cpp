@@ -26,8 +26,8 @@ constexpr std::int64_t kIncrement = 1442695040888963407LL;
 
 } // namespace
 
-double BiomeZoomer::fiddledDistance(std::int64_t seed, std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ,
-                                    double distanceX, double distanceY, double distanceZ) noexcept {
+BiomeZoomer::Offsets BiomeZoomer::offsetsAt(std::int64_t seed, std::int32_t quartX, std::int32_t quartY,
+                                            std::int32_t quartZ) noexcept {
     std::int64_t random = seed;
     random = next(random, quartX);
     random = next(random, quartY);
@@ -40,9 +40,15 @@ double BiomeZoomer::fiddledDistance(std::int64_t seed, std::int32_t quartX, std:
     const double offsetY = fiddle(random);
     random = next(random, seed);
     const double offsetZ = fiddle(random);
-    const double x = distanceX + offsetX;
-    const double y = distanceY + offsetY;
-    const double z = distanceZ + offsetZ;
+    return {offsetX, offsetY, offsetZ};
+}
+
+double BiomeZoomer::fiddledDistance(std::int64_t seed, std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ,
+                                    double distanceX, double distanceY, double distanceZ) noexcept {
+    const Offsets offsets = offsetsAt(seed, quartX, quartY, quartZ);
+    const double x = distanceX + offsets.x;
+    const double y = distanceY + offsets.y;
+    const double z = distanceZ + offsets.z;
     return x * x + y * y + z * z;
 }
 

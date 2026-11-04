@@ -1,0 +1,274 @@
+//// DebugBeeInfo.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.StreamCodec;
+public record DebugBeeInfo(Optional<BlockPos> hivePos, Optional<BlockPos> flowerPos, int travelTicks, List<BlockPos> blacklistedHives) {
+    public static final StreamCodec<ByteBuf, DebugBeeInfo> STREAM_CODEC;
+    public boolean hasHive(BlockPos hivePos);
+}
+//// DebugBrainDump.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.Set;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+public record DebugBrainDump(String name, String profession, int xp, float health, float maxHealth, String inventory, boolean wantsGolem, int angerLevel, List<String> activities, List<String> behaviors, List<String> memories, List<String> gossips, Set<BlockPos> pois, Set<BlockPos> potentialPois) {
+    public static final StreamCodec<ByteBuf, DebugBrainDump> STREAM_CODEC;
+    public static DebugBrainDump takeBrainDump(ServerLevel serverLevel, LivingEntity entity);
+    public boolean hasPoi(BlockPos poiPos);
+    public boolean hasPotentialPoi(BlockPos poiPos);
+}
+//// DebugBreezeInfo.java
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.StreamCodec;
+public record DebugBreezeInfo(Optional<Integer> attackTarget, Optional<BlockPos> jumpTarget) {
+    public static final StreamCodec<ByteBuf, DebugBreezeInfo> STREAM_CODEC;
+}
+//// DebugEntityBlockIntersection.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public enum DebugEntityBlockIntersection {
+    IN_BLOCK, IN_FLUID, IN_AIR;
+    public static final StreamCodec<ByteBuf, DebugEntityBlockIntersection> STREAM_CODEC;
+    public int color();
+}
+//// DebugGameEventInfo.java
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.phys.Vec3;
+public record DebugGameEventInfo(Holder<GameEvent> event, Vec3 pos) {
+    public static final StreamCodec<RegistryFriendlyByteBuf, DebugGameEventInfo> STREAM_CODEC;
+}
+//// DebugGameEventListenerInfo.java
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record DebugGameEventListenerInfo(int listenerRadius) {
+    public static final StreamCodec<RegistryFriendlyByteBuf, DebugGameEventListenerInfo> STREAM_CODEC;
+}
+//// DebugGoalInfo.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.codec.StreamCodec;
+public record DebugGoalInfo(List<DebugGoal> goals) {
+    public static final StreamCodec<ByteBuf, DebugGoalInfo> STREAM_CODEC;
+    public static record DebugGoal(int priority, boolean isRunning, String name) {
+        public static final StreamCodec<ByteBuf, DebugGoal> STREAM_CODEC;
+    }
+}
+//// DebugHiveInfo.java
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
+public record DebugHiveInfo(Block type, int occupantCount, int honeyLevel, boolean sedated) {
+    public static final StreamCodec<RegistryFriendlyByteBuf, DebugHiveInfo> STREAM_CODEC;
+    public static DebugHiveInfo pack(BeehiveBlockEntity beehive);
+}
+//// DebugPathInfo.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.pathfinder.Path;
+public record DebugPathInfo(Path path, float maxNodeDistance) {
+    public static final StreamCodec<FriendlyByteBuf, DebugPathInfo> STREAM_CODEC;
+}
+//// DebugPoiInfo.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.ai.village.poi.PoiRecord;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
+public record DebugPoiInfo(BlockPos pos, Holder<PoiType> poiType, int freeTicketCount) {
+    public static final StreamCodec<RegistryFriendlyByteBuf, DebugPoiInfo> STREAM_CODEC;
+    public DebugPoiInfo(PoiRecord record);
+}
+//// DebugStructureInfo.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+public record DebugStructureInfo(BoundingBox boundingBox, List<Piece> pieces) {
+    public static final StreamCodec<ByteBuf, DebugStructureInfo> STREAM_CODEC;
+    public static record Piece(BoundingBox boundingBox, boolean isStart) {
+        public static final StreamCodec<ByteBuf, Piece> STREAM_CODEC;
+    }
+}
+//// DebugSubscription.java
+import java.util.Optional;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class DebugSubscription<T> {
+    public static final int DOES_NOT_EXPIRE = 0;
+    public DebugSubscription(StreamCodec<? super RegistryFriendlyByteBuf, T> valueStreamCodec, int expireAfterTicks);
+    public DebugSubscription(StreamCodec<? super RegistryFriendlyByteBuf, T> valueStreamCodec);
+    public Update<T> packUpdate(T value);
+    public Update<T> emptyUpdate();
+    public Event<T> packEvent(T value);
+    public String toString();
+    public StreamCodec<? super RegistryFriendlyByteBuf, T> valueStreamCodec();
+    public int expireAfterTicks();
+    public static record Update<T>(DebugSubscription<T> subscription, Optional<T> value) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, Update<?>> STREAM_CODEC;
+    }
+    public static record Event<T>(DebugSubscription<T> subscription, T value) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, Event<?>> STREAM_CODEC;
+    }
+}
+//// DebugSubscriptions.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
+import net.minecraft.util.Unit;
+import net.minecraft.world.level.redstone.Orientation;
+public class DebugSubscriptions<T> {
+    public static final DebugSubscription<?> DEDICATED_SERVER_TICK_TIME;
+    public static final DebugSubscription<DebugBeeInfo> BEES;
+    public static final DebugSubscription<DebugBrainDump> BRAINS;
+    public static final DebugSubscription<DebugBreezeInfo> BREEZES;
+    public static final DebugSubscription<DebugGoalInfo> GOAL_SELECTORS;
+    public static final DebugSubscription<DebugPathInfo> ENTITY_PATHS;
+    public static final DebugSubscription<DebugEntityBlockIntersection> ENTITY_BLOCK_INTERSECTIONS;
+    public static final DebugSubscription<DebugHiveInfo> BEE_HIVES;
+    public static final DebugSubscription<DebugPoiInfo> POIS;
+    public static final DebugSubscription<Orientation> REDSTONE_WIRE_ORIENTATIONS;
+    public static final DebugSubscription<Unit> VILLAGE_SECTIONS;
+    public static final DebugSubscription<List<BlockPos>> RAIDS;
+    public static final DebugSubscription<List<DebugStructureInfo>> STRUCTURES;
+    public static final DebugSubscription<DebugGameEventListenerInfo> GAME_EVENT_LISTENERS;
+    public static final DebugSubscription<BlockPos> NEIGHBOR_UPDATES;
+    public static final DebugSubscription<DebugGameEventInfo> GAME_EVENTS;
+    public static DebugSubscription<?> bootstrap(Registry<DebugSubscription<?>> registry);
+}
+//// DebugValueAccess.java
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
+public interface DebugValueAccess {
+    <T> void forEachChunk(DebugSubscription<T> subscription, BiConsumer<ChunkPos, T> consumer);
+    <T> T getChunkValue(DebugSubscription<T> subscription, ChunkPos chunkPos);
+    <T> void forEachBlock(DebugSubscription<T> subscription, BiConsumer<BlockPos, T> consumer);
+    <T> T getBlockValue(DebugSubscription<T> subscription, BlockPos blockPos);
+    <T> void forEachEntity(DebugSubscription<T> subscription, BiConsumer<Entity, T> consumer);
+    <T> T getEntityValue(DebugSubscription<T> subscription, Entity entity);
+    <T> void forEachEvent(DebugSubscription<T> subscription, EventVisitor<T> visitor);
+    public interface EventVisitor<T> {
+        void accept(T value, int remainingTicks, int totalLifetime);
+    }
+}
+//// DebugValueSource.java
+import net.minecraft.server.level.ServerLevel;
+public interface DebugValueSource {
+    void registerDebugValues(ServerLevel level, Registration registration);
+    public interface Registration {
+        <T> void register(DebugSubscription<T> subscription, ValueGetter<T> getter);
+    }
+    public interface ValueGetter<T> {
+        T get();
+    }
+}
+//// LevelDebugSynchronizers.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.village.poi.PoiRecord;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.chunk.LevelChunk;
+public class LevelDebugSynchronizers {
+    public LevelDebugSynchronizers(ServerLevel level);
+    public void tick(ServerDebugSubscribers serverSubscribers);
+    public void registerChunk(LevelChunk chunk);
+    public void dropChunk(ChunkPos chunkPos);
+    public void registerBlockEntity(BlockEntity blockEntity);
+    public void dropBlockEntity(BlockPos blockPos);
+    public void registerEntity(Entity entity);
+    public void dropEntity(Entity entity);
+    public void startTrackingChunk(ServerPlayer player, ChunkPos chunkPos);
+    public void startTrackingEntity(ServerPlayer player, Entity entity);
+    public void registerPoi(PoiRecord poi);
+    public void updatePoi(BlockPos pos);
+    public void dropPoi(BlockPos pos);
+    public boolean hasAnySubscriberFor(DebugSubscription<?> subscription);
+    public <T> void sendBlockValue(BlockPos blockPos, DebugSubscription<T> subscription, T value);
+    public <T> void clearBlockValue(BlockPos blockPos, DebugSubscription<T> subscription);
+    public <T> void sendEntityValue(Entity entity, DebugSubscription<T> subscription, T value);
+    public <T> void clearEntityValue(Entity entity, DebugSubscription<T> subscription);
+    public <T> void broadcastEventToTracking(BlockPos blockPos, DebugSubscription<T> subscription, T value);
+}
+//// ServerDebugSubscribers.java
+import java.util.Set;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
+public class ServerDebugSubscribers {
+    public ServerDebugSubscribers(MinecraftServer server);
+    public void tick();
+    public void broadcastToAll(DebugSubscription<?> subscription, Packet<?> packet);
+    public Set<DebugSubscription<?>> enabledSubscriptions();
+    public boolean hasAnySubscriberFor(DebugSubscription<?> subscription);
+    public boolean hasRequiredPermissions(ServerPlayer player);
+}
+//// TrackingDebugSynchronizer.java
+import java.util.UUID;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Unit;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.village.poi.PoiRecord;
+import net.minecraft.world.level.ChunkPos;
+public abstract class TrackingDebugSynchronizer<T> {
+    protected final DebugSubscription<T> subscription;
+    public TrackingDebugSynchronizer(DebugSubscription<T> subscription);
+    public final void tick(ServerLevel level);
+    protected final void sendToPlayersTrackingChunk(ServerLevel level, ChunkPos trackedChunk, Packet<? super ClientGamePacketListener> packet);
+    protected final void sendToPlayersTrackingEntity(ServerLevel level, Entity trackedEntity, Packet<? super ClientGamePacketListener> packet);
+    public final void startTrackingChunk(ServerPlayer player, ChunkPos chunkPos);
+    public final void startTrackingEntity(ServerPlayer player, Entity entity);
+    protected void clear();
+    protected void pollAndSendUpdates(ServerLevel level);
+    protected void sendInitialChunk(ServerPlayer player, ChunkPos chunkPos);
+    protected void sendInitialEntity(ServerPlayer player, Entity entity);
+    public static class SourceSynchronizer<T> extends TrackingDebugSynchronizer<T> {
+        public SourceSynchronizer(DebugSubscription<T> subscription);
+        protected void clear();
+        protected void pollAndSendUpdates(ServerLevel level);
+        public void registerChunk(ChunkPos chunkPos, DebugValueSource.ValueGetter<T> getter);
+        public void registerBlockEntity(BlockPos blockPos, DebugValueSource.ValueGetter<T> getter);
+        public void registerEntity(UUID entityId, DebugValueSource.ValueGetter<T> getter);
+        public void dropChunk(ChunkPos chunkPos);
+        public void dropBlockEntity(ServerLevel level, BlockPos blockPos);
+        public void dropEntity(Entity entity);
+        protected void sendInitialChunk(ServerPlayer player, ChunkPos chunkPos);
+        protected void sendInitialEntity(ServerPlayer player, Entity entity);
+    }
+    static class ValueSource<T> {
+        private ValueSource(DebugValueSource.ValueGetter<T> getter);
+        public DebugSubscription. Update<T> pollUpdate(DebugSubscription<T> subscription);
+    }
+    public static class PoiSynchronizer extends TrackingDebugSynchronizer<DebugPoiInfo> {
+        public PoiSynchronizer();
+        protected void sendInitialChunk(ServerPlayer player, ChunkPos chunkPos);
+        public void onPoiAdded(ServerLevel level, PoiRecord record);
+        public void onPoiRemoved(ServerLevel level, BlockPos poiPos);
+        public void onPoiTicketCountChanged(ServerLevel level, BlockPos poiPos);
+    }
+    public static class VillageSectionSynchronizer extends TrackingDebugSynchronizer<Unit> {
+        public VillageSectionSynchronizer();
+        protected void sendInitialChunk(ServerPlayer player, ChunkPos chunkPos);
+        public void onPoiAdded(ServerLevel level, PoiRecord record);
+        public void onPoiRemoved(ServerLevel level, BlockPos poiPos);
+    }
+}

@@ -1,0 +1,99 @@
+//// ApplyStatusEffectsConsumeEffect.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public record ApplyStatusEffectsConsumeEffect(List<MobEffectInstance> effects, float probability) implements ConsumeEffect {
+    public static final MapCodec<ApplyStatusEffectsConsumeEffect> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ApplyStatusEffectsConsumeEffect> STREAM_CODEC;
+    public ApplyStatusEffectsConsumeEffect(MobEffectInstance effect, float probability);
+    public ApplyStatusEffectsConsumeEffect(List<MobEffectInstance> effects);
+    public ApplyStatusEffectsConsumeEffect(MobEffectInstance effect);
+    public ConsumeEffect.Type<ApplyStatusEffectsConsumeEffect> getType();
+    public boolean apply(Level level, ItemStack stack, LivingEntity user);
+}
+//// ClearAllStatusEffectsConsumeEffect.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public record ClearAllStatusEffectsConsumeEffect() implements ConsumeEffect {
+    public static final ClearAllStatusEffectsConsumeEffect INSTANCE;
+    public static final MapCodec<ClearAllStatusEffectsConsumeEffect> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClearAllStatusEffectsConsumeEffect> STREAM_CODEC;
+    public ConsumeEffect.Type<ClearAllStatusEffectsConsumeEffect> getType();
+    public boolean apply(Level level, ItemStack stack, LivingEntity user);
+}
+//// ConsumeEffect.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public interface ConsumeEffect {
+    Codec<ConsumeEffect> CODEC;
+    StreamCodec<RegistryFriendlyByteBuf, ConsumeEffect> STREAM_CODEC;
+    Type<? extends ConsumeEffect> getType();
+    boolean apply(Level level, ItemStack stack, LivingEntity user);
+    public static record Type<T extends ConsumeEffect>(MapCodec<T> codec, StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
+        public static final Type<ApplyStatusEffectsConsumeEffect> APPLY_EFFECTS;
+        public static final Type<RemoveStatusEffectsConsumeEffect> REMOVE_EFFECTS;
+        public static final Type<ClearAllStatusEffectsConsumeEffect> CLEAR_ALL_EFFECTS;
+        public static final Type<TeleportRandomlyConsumeEffect> TELEPORT_RANDOMLY;
+        public static final Type<PlaySoundConsumeEffect> PLAY_SOUND;
+    }
+}
+//// PlaySoundConsumeEffect.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public record PlaySoundConsumeEffect(Holder<SoundEvent> sound) implements ConsumeEffect {
+    public static final MapCodec<PlaySoundConsumeEffect> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, PlaySoundConsumeEffect> STREAM_CODEC;
+    public ConsumeEffect.Type<PlaySoundConsumeEffect> getType();
+    public boolean apply(Level level, ItemStack stack, LivingEntity user);
+}
+//// RemoveStatusEffectsConsumeEffect.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public record RemoveStatusEffectsConsumeEffect(HolderSet<MobEffect> effects) implements ConsumeEffect {
+    public static final MapCodec<RemoveStatusEffectsConsumeEffect> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, RemoveStatusEffectsConsumeEffect> STREAM_CODEC;
+    public RemoveStatusEffectsConsumeEffect(Holder<MobEffect> only);
+    public ConsumeEffect.Type<RemoveStatusEffectsConsumeEffect> getType();
+    public boolean apply(Level level, ItemStack stack, LivingEntity user);
+}
+//// TeleportRandomlyConsumeEffect.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public record TeleportRandomlyConsumeEffect(float diameter, boolean directionalParticles) implements ConsumeEffect {
+    public static final MapCodec<TeleportRandomlyConsumeEffect> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, TeleportRandomlyConsumeEffect> STREAM_CODEC;
+    public TeleportRandomlyConsumeEffect();
+    public ConsumeEffect.Type<TeleportRandomlyConsumeEffect> getType();
+    public boolean apply(Level level, ItemStack stack, LivingEntity user);
+}

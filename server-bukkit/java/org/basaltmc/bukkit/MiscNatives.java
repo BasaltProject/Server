@@ -77,6 +77,7 @@ public final class MiscNatives {
     public static native String[] advInfo(String id);
     public static native String[] advLists(String id, int which);
     public static native String[] advObtained(String uuid, String id);
+    public static native boolean advTrigger(String uuid, String trigger, boolean hasBlock, int x, int y, int z, String item, int count, double distance);
     public static native boolean advGrant(String uuid, String id, String criterion);
     public static native boolean advRevoke(String uuid, String id, String criterion);
     public static native float tmRate();

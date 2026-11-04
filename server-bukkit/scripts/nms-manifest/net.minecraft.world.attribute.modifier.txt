@@ -1,0 +1,137 @@
+//// AttributeModifier.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Map;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.LerpFunction;
+import net.minecraft.world.level.biome.MobSpawnSettings;
+import org.joml.Vector3fc;
+import org.joml.Vector4fc;
+public interface AttributeModifier<Subject, Argument> {
+    Map<OperationId, AttributeModifier<Boolean, ?>> BOOLEAN_LIBRARY;
+    Map<OperationId, AttributeModifier<Float, ?>> FLOAT_LIBRARY;
+    Map<OperationId, AttributeModifier<Vector3fc, ?>> RGB_COLOR_LIBRARY;
+    Map<OperationId, AttributeModifier<Vector4fc, ?>> ARGB_COLOR_LIBRARY;
+    Map<OperationId, AttributeModifier<Integer, ?>> INTEGER_LIBRARY;
+    Map<OperationId, AttributeModifier<MobSpawnSettings, ?>> MOB_SPAWN_SETTINGS_LIBRARY;
+    static <Value> AttributeModifier<Value, Value> override();
+    static <Element> Map<OperationId, AttributeModifier<List<Element>, ?>> listLibrary();
+    Subject apply(Subject subject, Argument argument);
+    Codec<Argument> argumentCodec(EnvironmentAttribute<Subject> attribute);
+    LerpFunction<Argument> argumentKeyframeLerp(EnvironmentAttribute<Subject> attribute);
+    public static record OverrideModifier<Value>() implements AttributeModifier<Value, Value> {
+        public Value apply(Value subject, Value argument);
+        public Codec<Value> argumentCodec(EnvironmentAttribute<Value> attribute);
+        public LerpFunction<Value> argumentKeyframeLerp(EnvironmentAttribute<Value> attribute);
+    }
+    public static enum OperationId implements StringRepresentable {
+        OVERRIDE, ALPHA_BLEND, ADD, SUBTRACT, MULTIPLY, BLEND_TO_GRAY, MINIMUM, MAXIMUM, AND, NAND, OR, NOR, XOR, XNOR, APPEND, OVERLAY;
+        public static final Codec<OperationId> CODEC;
+        public String getSerializedName();
+    }
+}
+//// BooleanModifier.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.LerpFunction;
+public enum BooleanModifier implements AttributeModifier<Boolean, Boolean> {
+    AND, NAND, OR, NOR, XOR, XNOR;
+    public Boolean apply(Boolean subject, Boolean argument);
+    public Codec<Boolean> argumentCodec(EnvironmentAttribute<Boolean> type);
+    public LerpFunction<Boolean> argumentKeyframeLerp(EnvironmentAttribute<Boolean> type);
+}
+//// ColorModifier.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.LerpFunction;
+import org.joml.Vector3fc;
+import org.joml.Vector4fc;
+public interface ColorModifier<Subject, Argument> extends AttributeModifier<Subject, Argument> {
+    ArgbModifier<Vector3fc> ALPHA_BLEND_RGB;
+    ArgbModifier<Vector4fc> ALPHA_BLEND_ARGB;
+    RgbModifier<Vector3fc> ADD_RGB;
+    RgbModifier<Vector3fc> SUBTRACT_RGB;
+    RgbModifier<Vector3fc> MULTIPLY_RGB;
+    RgbModifier<Vector4fc> ADD_ARGB;
+    RgbModifier<Vector4fc> SUBTRACT_ARGB;
+    ArgbModifier<Vector4fc> MULTIPLY_ARGB;
+    ColorModifier<Vector3fc, BlendToGray> BLEND_TO_GRAY_RGB;
+    ColorModifier<Vector4fc, BlendToGray> BLEND_TO_GRAY_ARGB;
+    public interface RgbModifier<Subject> extends ColorModifier<Subject, Vector3fc> {
+        default Codec<Vector3fc> argumentCodec(EnvironmentAttribute<Subject> type);
+        default LerpFunction<Vector3fc> argumentKeyframeLerp(EnvironmentAttribute<Subject> type);
+    }
+    public interface ArgbModifier<Subject> extends ColorModifier<Subject, Vector4fc> {
+        default Codec<Vector4fc> argumentCodec(EnvironmentAttribute<Subject> type);
+        default LerpFunction<Vector4fc> argumentKeyframeLerp(EnvironmentAttribute<Subject> type);
+    }
+    public static record BlendToGray(float brightness, float factor) {
+        public static final Codec<BlendToGray> CODEC;
+        public static BlendToGray lerp(float alpha, BlendToGray from, BlendToGray to);
+    }
+}
+//// FloatModifier.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.LerpFunction;
+public interface FloatModifier<Argument> extends AttributeModifier<Float, Argument> {
+    FloatModifier<FloatWithAlpha> ALPHA_BLEND;
+    FloatModifier<Float> ADD;
+    FloatModifier<Float> SUBTRACT;
+    FloatModifier<Float> MULTIPLY;
+    FloatModifier<Float> MINIMUM;
+    FloatModifier<Float> MAXIMUM;
+    public interface Simple extends FloatModifier<Float> {
+        default Codec<Float> argumentCodec(EnvironmentAttribute<Float> type);
+        default LerpFunction<Float> argumentKeyframeLerp(EnvironmentAttribute<Float> type);
+    }
+}
+//// FloatWithAlpha.java
+import com.mojang.serialization.Codec;
+public record FloatWithAlpha(float value, float alpha) {
+    public static final Codec<FloatWithAlpha> CODEC;
+    public FloatWithAlpha(float value);
+}
+//// IntegerModifier.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.LerpFunction;
+public interface IntegerModifier<Argument> extends AttributeModifier<Integer, Argument> {
+    IntegerModifier<Integer> ADD;
+    IntegerModifier<Integer> SUBTRACT;
+    IntegerModifier<Integer> MULTIPLY;
+    IntegerModifier<Integer> MINIMUM;
+    IntegerModifier<Integer> MAXIMUM;
+    Integer apply(Integer integer, Argument argument);
+    public interface Simple extends IntegerModifier<Integer> {
+        default Codec<Integer> argumentCodec(EnvironmentAttribute<Integer> type);
+        default LerpFunction<Integer> argumentKeyframeLerp(EnvironmentAttribute<Integer> type);
+    }
+}
+//// ListModifier.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.LerpFunction;
+public interface ListModifier<Element> extends AttributeModifier<List<Element>, List<Element>> {
+    static <Element> ListModifier<Element> append();
+    default Codec<List<Element>> argumentCodec(EnvironmentAttribute<List<Element>> attribute);
+    default LerpFunction<List<Element>> argumentKeyframeLerp(EnvironmentAttribute<List<Element>> attribute);
+    public static record Append<Element>() implements ListModifier<Element> {
+        public List<Element> apply(List<Element> subject, List<Element> argument);
+    }
+}
+//// MobSpawnSettingsModifier.java
+import com.mojang.serialization.Codec;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.attribute.LerpFunction;
+import net.minecraft.world.level.biome.MobSpawnSettings;
+public interface MobSpawnSettingsModifier extends AttributeModifier<MobSpawnSettings, MobSpawnSettings> {
+    static MobSpawnSettingsModifier overlay();
+    default Codec<MobSpawnSettings> argumentCodec(EnvironmentAttribute<MobSpawnSettings> attribute);
+    default LerpFunction<MobSpawnSettings> argumentKeyframeLerp(EnvironmentAttribute<MobSpawnSettings> attribute);
+    public static record Overlay() implements MobSpawnSettingsModifier {
+        public MobSpawnSettings apply(MobSpawnSettings first, MobSpawnSettings second);
+    }
+}

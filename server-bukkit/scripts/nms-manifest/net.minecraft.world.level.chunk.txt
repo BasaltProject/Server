@@ -1,0 +1,853 @@
+//// BlockColumn.java
+import net.minecraft.world.level.block.state.BlockState;
+public interface BlockColumn {
+    BlockState getBlock(int blockY);
+    void setBlock(int blockY, BlockState state);
+}
+//// BulkSectionAccess.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+public class BulkSectionAccess implements AutoCloseable {
+    public BulkSectionAccess(LevelAccessor level);
+    public LevelChunkSection getSection(BlockPos pos);
+    public BlockState getBlockState(BlockPos pos);
+    public void close();
+}
+//// CarverOutput.java
+public interface CarverOutput {
+    void carve(int x, int y, int z);
+    int minY();
+    int maxY();
+}
+//// CarvingMask.java
+public class CarvingMask implements CarverOutput {
+    public CarvingMask(int minY, int maxY);
+    public int minY();
+    public int maxY();
+    public void carve(int x, int y, int z);
+    public void visit(Visitor visitor);
+    public boolean isEmpty();
+    public interface Filter {
+        boolean test(int x, int y, int z);
+    }
+    public interface Visitor {
+        void visitColumn(int x, int z, int bottomY, int topY);
+    }
+}
+//// ChunkAccess.java
+import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.shorts.ShortList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeGenerationSettings;
+import net.minecraft.world.level.biome.BiomeResolver;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.gameevent.GameEventListenerRegistry;
+import net.minecraft.world.level.levelgen.BelowZeroRetrogen;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.blending.BlendingData;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
+import net.minecraft.world.level.lighting.ChunkSkyLightSources;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.ticks.SavedTick;
+import net.minecraft.world.ticks.TickContainerAccess;
+public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeResolver {
+    public static final int NO_FILLED_SECTION = -1;
+    protected final ShortList[] postProcessing;
+    protected final ChunkPos chunkPos;
+    protected final UpgradeData upgradeData;
+    protected final BlendingData blendingData;
+    protected final Map<Heightmap.Types, Heightmap> heightmaps;
+    protected ChunkSkyLightSources skyLightSources;
+    protected final Map<BlockPos, CompoundTag> pendingBlockEntities;
+    protected final Map<BlockPos, BlockEntity> blockEntities;
+    protected final LevelHeightAccessor levelHeightAccessor;
+    protected final LevelChunkSection[] sections;
+    public ChunkAccess(ChunkPos chunkPos, UpgradeData upgradeData, LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory containerFactory, long inhabitedTime, LevelChunkSection [] sections, BlendingData blendingData);
+    public GameEventListenerRegistry getListenerRegistry(int section);
+    public BlockState setBlockState(BlockPos pos, BlockState state);
+    public abstract BlockState setBlockState(BlockPos pos, BlockState state, int flags);
+    public abstract void setBlockEntity(BlockEntity blockEntity);
+    public abstract void addEntity(Entity entity);
+    public int getHighestFilledSectionIndex();
+    public int getHighestSectionPosition();
+    public Set<BlockPos> getBlockEntitiesPos();
+    public LevelChunkSection[] getSections();
+    public LevelChunkSection getSection(int sectionIndex);
+    public Collection<Map.Entry<Heightmap.Types, Heightmap>> getHeightmaps();
+    public void setHeightmap(Heightmap.Types key, long[] data);
+    public Heightmap getOrCreateHeightmapUnprimed(Heightmap.Types type);
+    public boolean hasPrimedHeightmap(Heightmap.Types type);
+    public int getHeight(Heightmap.Types type, int x, int z);
+    public ChunkPos getPos();
+    public StructureStart getStartForStructure(Structure structure);
+    public void setStartForStructure(Structure structure, StructureStart structureStart);
+    public Map<Structure, StructureStart> getAllStarts();
+    public void setAllStarts(Map<Structure, StructureStart> starts);
+    public LongSet getReferencesForStructure(Structure structure);
+    public void addReferenceForStructure(Structure structure, long reference);
+    public Map<Structure, LongSet> getAllReferences();
+    public void setAllReferences(Map<Structure, LongSet> data);
+    public boolean isYSpaceEmpty(int yStartInclusive, int yEndInclusive);
+    public void markUnsaved();
+    public boolean tryMarkSaved();
+    public boolean isUnsaved();
+    public abstract ChunkStatus getPersistedStatus();
+    public ChunkStatus getHighestGeneratedStatus();
+    public abstract void removeBlockEntity(BlockPos pos);
+    public void markPosForPostProcessing(BlockPos blockPos);
+    public ShortList[] getPostProcessing();
+    public void addPackedPostProcess(ShortList packedOffsets, int sectionIndex);
+    public void setBlockEntityNbt(CompoundTag entityTag);
+    public CompoundTag getBlockEntityNbt(BlockPos blockPos);
+    public abstract CompoundTag getBlockEntityNbtForSaving(BlockPos blockPos, HolderLookup.Provider registryAccess);
+    public final void findBlockLightSources(BiConsumer<BlockPos, BlockState> consumer);
+    public void findBlocks(Predicate<BlockState> predicate, BiConsumer<BlockPos, BlockState> consumer);
+    public abstract TickContainerAccess<Block> getBlockTicks();
+    public abstract TickContainerAccess<Fluid> getFluidTicks();
+    public void collectBiomesInPalette(Set<Holder<Biome>> output);
+    public boolean canBeSerialized();
+    public abstract PackedTicks getTicksForSerialization(long currentTick);
+    public UpgradeData getUpgradeData();
+    public boolean isOldNoiseGeneration();
+    public BlendingData getBlendingData();
+    public long getInhabitedTime();
+    public void incrementInhabitedTime();
+    public void setInhabitedTime(long inhabitedTime);
+    public static ShortList getOrCreateOffsetList(ShortList[] list, int sectionIndex);
+    public boolean isLightCorrect();
+    public void setLightCorrect(boolean isLightCorrect);
+    public int getMinY();
+    public int getHeight();
+    public BiomeGenerationSettings carverBiome(Supplier<BiomeGenerationSettings> source);
+    public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ);
+    public void fillBiomesFromNoise(BiomeResolver biomeResolver);
+    public BelowZeroRetrogen getBelowZeroRetrogen();
+    public boolean isUpgrading();
+    public LevelHeightAccessor getHeightAccessorForGeneration();
+    public void initializeLightSources();
+    public ChunkSkyLightSources getSkyLightSources();
+    public static ProblemReporter.PathElement problemPath(ChunkPos pos);
+    public ProblemReporter.PathElement problemPath();
+    public static record PackedTicks(List<SavedTick<Block>> blocks, List<SavedTick<Fluid>> fluids) {
+    }
+    static record ChunkPathElement(ChunkPos pos) implements ProblemReporter.PathElement {
+        public String get();
+    }
+}
+//// ChunkGenerator.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.NoiseColumn;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeGenerationSettings;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.biome.BiomeResolver;
+import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.biome.MobSpawnSettings;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.blending.Blender;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public abstract class ChunkGenerator {
+    public static final Codec<ChunkGenerator> CODEC;
+    protected final BiomeSource biomeSource;
+    public ChunkGenerator(BiomeSource biomeSource);
+    public ChunkGenerator(BiomeSource biomeSource, Function<Holder<Biome>, BiomeGenerationSettings> generationSettingsGetter);
+    public void validate();
+    public ChunkPos getOrigin(RandomState randomState);
+    protected abstract MapCodec<? extends ChunkGenerator> codec();
+    public ChunkGeneratorStructureState createState(HolderLookup<StructureSet> structureSets, RandomState randomState, long legacyLevelSeed);
+    public Optional<Identifier> getTypeNameForDataFixer();
+    public CompletableFuture<ChunkAccess> createBiomes(RandomState randomState, Blender blender, StructureManager structureManager, ChunkAccess protoChunk);
+    protected BiomeResolver decorateBiomeResolver(Blender blender, ChunkAccess protoChunk, BiomeResolver biomeResolver);
+    public Pair<BlockPos, Holder<Structure>> findNearestMapStructure(ServerLevel level, HolderSet<Structure> wantedStructures, BlockPos pos, int maxSearchRadius, boolean createReference);
+    public void applyBiomeDecoration(WorldGenLevel level, ChunkAccess chunk, StructureManager structureManager);
+    public abstract void spawnOriginalMobs(WorldGenRegion worldGenRegion);
+    public int getSpawnHeight(LevelHeightAccessor heightAccessor);
+    public BiomeSource getBiomeSource();
+    public abstract int getGenDepth();
+    public WeightedList<MobSpawnSettings.SpawnerData> getMobsAt(Level level, StructureManager structureManager, MobCategory mobCategory, BlockPos pos);
+    public void createStructures(RegistryAccess registryAccess, ChunkGeneratorStructureState state, StructureManager structureManager, ChunkAccess centerChunk, StructureTemplateManager structureTemplateManager, ResourceKey<Level> level);
+    public void createReferences(WorldGenLevel level, StructureManager structureManager, ChunkAccess centerChunk);
+    public abstract CompletableFuture<ChunkAccess> buildTerrain(ChunkAccess chunk, Blender blender, RandomState randomState, StructureManager structureManager, BiomeManager biomeManager, WorldGenRegion carverBiomeRegion, Set<Holder<Biome>> possibleBiomes);
+    public abstract int getSeaLevel();
+    public abstract int getMinY();
+    public abstract int getBaseHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public abstract NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public int getFirstFreeHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public int getFirstOccupiedHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public abstract void addDebugScreenInfo(List<String> result, RandomState randomState, BlockPos feetPos, SamplerContext samplerContext);
+    public BiomeGenerationSettings getBiomeGenerationSettings(Holder<Biome> biome);
+}
+//// ChunkGeneratorStructureState.java
+import java.util.List;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
+import net.minecraft.world.level.levelgen.structure.placement.ConcentricRingsStructurePlacement;
+import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement;
+public class ChunkGeneratorStructureState {
+    public static ChunkGeneratorStructureState createForFlat(RandomState randomState, long levelSeed, ChunkPos origin, BiomeSource biomeSource, Stream<Holder<StructureSet>> structureOverrides);
+    public static ChunkGeneratorStructureState createForNormal(RandomState randomState, long levelSeed, ChunkPos origin, BiomeSource biomeSource, HolderLookup<StructureSet> allStructures);
+    private ChunkGeneratorStructureState(RandomState randomState, BiomeSource biomeSource, long levelSeed, ChunkPos origin, long concentricRingsSeed, List<Holder<StructureSet>> possibleStructureSets);
+    public List<Holder<StructureSet>> possibleStructureSets();
+    public ChunkPos getDimensionOrigin();
+    public void ensureStructuresGenerated();
+    public List<ChunkPos> getRingPositionsFor(ConcentricRingsStructurePlacement placement);
+    public List<StructurePlacement> getPlacementsForStructure(Holder<Structure> structure);
+    public RandomState randomState();
+    public boolean hasStructureChunkInRange(Holder<StructureSet> structureSet, int sourceX, int sourceZ, int range);
+    public long getLevelSeed();
+}
+//// ChunkGenerators.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class ChunkGenerators {
+    public static MapCodec<? extends ChunkGenerator> bootstrap(Registry<MapCodec<? extends ChunkGenerator>> registry);
+}
+//// ChunkSource.java
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.io.IOException;
+import java.util.function.BooleanSupplier;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+public abstract class ChunkSource implements AutoCloseable, LightChunkGetter {
+    public LevelChunk getChunk(int x, int z, boolean loadOrGenerate);
+    public LevelChunk getChunkNow(int x, int z);
+    public LightChunk getChunkForLighting(int x, int z);
+    public boolean hasChunk(int x, int z);
+    public abstract ChunkAccess getChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate);
+    public abstract void tick(BooleanSupplier haveTime, boolean tickChunks);
+    public void onSectionEmptinessChanged(int sectionX, int sectionY, int sectionZ, boolean empty);
+    public abstract String gatherStats();
+    public abstract int getLoadedChunksCount();
+    public void close() throws IOException;
+    public abstract LevelLightEngine getLightEngine();
+    public void setSpawnSettings(boolean spawnEnemies);
+    public boolean updateChunkForced(ChunkPos pos, boolean forced);
+    public LongSet getForceLoadedChunks();
+}
+//// Configuration.java
+import java.util.List;
+public interface Configuration {
+    boolean alwaysRepack();
+    int bitsInMemory();
+    int bitsInStorage();
+    <T> Palette<T> createPalette(Strategy<T> strategy, List<T> paletteEntries);
+    public static record Simple(Palette.Factory factory, int bits) implements Configuration {
+        public boolean alwaysRepack();
+        public <T> Palette<T> createPalette(Strategy<T> strategy, List<T> paletteEntries);
+        public int bitsInMemory();
+        public int bitsInStorage();
+    }
+    public static record Global(int bitsInMemory, int bitsInStorage) implements Configuration {
+        public boolean alwaysRepack();
+        public <T> Palette<T> createPalette(Strategy<T> strategy, List<T> paletteEntries);
+    }
+}
+//// DataLayer.java
+public class DataLayer {
+    public static final int LAYER_COUNT = 16;
+    public static final int LAYER_SIZE = 128;
+    public static final int SIZE = 2048;
+    protected byte [] data;
+    public DataLayer();
+    public DataLayer(int defaultValue);
+    public DataLayer(byte[] data);
+    public int get(int x, int y, int z);
+    public void set(int x, int y, int z, int val);
+    public void fill(int value);
+    public byte[] getData();
+    public DataLayer copy();
+    public String toString();
+    public String layerToString(int layer);
+    public boolean isDefinitelyHomogenous();
+    public boolean isDefinitelyFilledWith(int value);
+    public boolean isEmpty();
+}
+//// EmptyLevelChunk.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.FullChunkStatus;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+public class EmptyLevelChunk extends LevelChunk {
+    public EmptyLevelChunk(Level level, ChunkPos pos, Holder<Biome> biome);
+    public BlockState getBlockState(BlockPos pos);
+    public BlockState setBlockState(BlockPos pos, BlockState state, int flags);
+    public FluidState getFluidState(BlockPos pos);
+    public int getLightEmission(BlockPos pos);
+    public BlockEntity getBlockEntity(BlockPos pos, LevelChunk.EntityCreationType creationType);
+    public void addAndRegisterBlockEntity(BlockEntity blockEntity);
+    public void setBlockEntity(BlockEntity blockEntity);
+    public void removeBlockEntity(BlockPos pos);
+    public boolean isEmpty();
+    public boolean isYSpaceEmpty(int yStartInclusive, int yEndInclusive);
+    public FullChunkStatus getFullStatus();
+    public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ);
+}
+//// GlobalPalette.java
+import java.util.function.Predicate;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
+public class GlobalPalette<T> implements Palette<T> {
+    public GlobalPalette(IdMap<T> registry);
+    public int idFor(T value, PaletteResize<T> resizeHandler);
+    public boolean maybeHas(Predicate<T> predicate);
+    public T valueFor(int index);
+    public void read(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    public void write(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    public int getSerializedSize(IdMap<T> globalMap);
+    public int getSize();
+    public Palette<T> copy();
+}
+//// HashMapPalette.java
+import java.util.List;
+import java.util.function.Predicate;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.util.CrudeIncrementalIntIdentityHashBiMap;
+public class HashMapPalette<T> implements Palette<T> {
+    public HashMapPalette(int bits, List<T> values);
+    public HashMapPalette(int bits);
+    private HashMapPalette(int bits, CrudeIncrementalIntIdentityHashBiMap<T> values);
+    public static <A> Palette<A> create(int bits, List<A> paletteEntries);
+    public int idFor(T value, PaletteResize<T> resizeHandler);
+    public boolean maybeHas(Predicate<T> predicate);
+    public T valueFor(int index);
+    public void read(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    public void write(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    public int getSerializedSize(IdMap<T> globalMap);
+    public List<T> getEntries();
+    public int getSize();
+    public Palette<T> copy();
+}
+//// ImposterProtoChunk.java
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeResolver;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.blending.BlendingData;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
+import net.minecraft.world.level.lighting.ChunkSkyLightSources;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.ticks.TickContainerAccess;
+public class ImposterProtoChunk extends ProtoChunk {
+    public ImposterProtoChunk(LevelChunk wrapped, boolean allowWrites);
+    public BlockEntity getBlockEntity(BlockPos pos);
+    public BlockState getBlockState(BlockPos pos);
+    public FluidState getFluidState(BlockPos pos);
+    public LevelChunkSection getSection(int sectionIndex);
+    public BlockState setBlockState(BlockPos pos, BlockState state, int flags);
+    public void setBlockEntity(BlockEntity blockEntity);
+    public void addEntity(Entity entity);
+    public void setPersistedStatus(ChunkStatus status);
+    public LevelChunkSection[] getSections();
+    public void setHeightmap(Heightmap.Types key, long[] data);
+    public Heightmap getOrCreateHeightmapUnprimed(Heightmap.Types type);
+    public int getHeight(Heightmap.Types type, int x, int z);
+    public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ);
+    public ChunkPos getPos();
+    public StructureStart getStartForStructure(Structure structure);
+    public void setStartForStructure(Structure structure, StructureStart structureStart);
+    public Map<Structure, StructureStart> getAllStarts();
+    public void setAllStarts(Map<Structure, StructureStart> starts);
+    public LongSet getReferencesForStructure(Structure structure);
+    public void addReferenceForStructure(Structure structure, long reference);
+    public Map<Structure, LongSet> getAllReferences();
+    public void setAllReferences(Map<Structure, LongSet> data);
+    public void markUnsaved();
+    public boolean canBeSerialized();
+    public boolean tryMarkSaved();
+    public boolean isUnsaved();
+    public ChunkStatus getPersistedStatus();
+    public void removeBlockEntity(BlockPos pos);
+    public void markPosForPostProcessing(BlockPos blockPos);
+    public void setBlockEntityNbt(CompoundTag entityTag);
+    public CompoundTag getBlockEntityNbt(BlockPos blockPos);
+    public CompoundTag getBlockEntityNbtForSaving(BlockPos blockPos, HolderLookup.Provider registryAccess);
+    public void findBlocks(Predicate<BlockState> predicate, BiConsumer<BlockPos, BlockState> consumer);
+    public TickContainerAccess<Block> getBlockTicks();
+    public TickContainerAccess<Fluid> getFluidTicks();
+    public ChunkAccess.PackedTicks getTicksForSerialization(long currentTick);
+    public BlendingData getBlendingData();
+    public LevelChunk getWrapped();
+    public boolean isLightCorrect();
+    public void setLightCorrect(boolean isLightCorrect);
+    public void fillBiomesFromNoise(BiomeResolver biomeResolver);
+    public void initializeLightSources();
+    public ChunkSkyLightSources getSkyLightSources();
+}
+//// LevelChunk.java
+import java.util.Map;
+import java.util.function.Supplier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData;
+import net.minecraft.server.level.FullChunkStatus;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.debug.DebugValueSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.TickingBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.gameevent.GameEventListenerRegistry;
+import net.minecraft.world.level.levelgen.blending.BlendingData;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.ticks.LevelChunkTicks;
+import net.minecraft.world.ticks.TickContainerAccess;
+public class LevelChunk extends ChunkAccess implements DebugValueSource {
+    public LevelChunk(Level level, ChunkPos pos);
+    public LevelChunk(Level level, ChunkPos pos, UpgradeData upgradeData, LevelChunkTicks<Block> blockTicks, LevelChunkTicks<Fluid> fluidTicks, long inhabitedTime, LevelChunkSection [] sections, PostLoadProcessor postLoad, BlendingData blendingData);
+    public LevelChunk(ServerLevel level, ProtoChunk protoChunk, PostLoadProcessor postLoad);
+    public void setUnsavedListener(UnsavedListener unsavedListener);
+    public void markUnsaved();
+    public TickContainerAccess<Block> getBlockTicks();
+    public TickContainerAccess<Fluid> getFluidTicks();
+    public ChunkAccess.PackedTicks getTicksForSerialization(long currentTick);
+    public GameEventListenerRegistry getListenerRegistry(int section);
+    public BlockState getBlockState(BlockPos pos);
+    public FluidState getFluidState(BlockPos pos);
+    public FluidState getFluidState(int x, int y, int z);
+    public BlockState setBlockState(BlockPos pos, BlockState state, int flags);
+    public void addEntity(Entity entity);
+    public BlockEntity getBlockEntity(BlockPos pos);
+    public BlockEntity getBlockEntity(BlockPos pos, EntityCreationType creationType);
+    public void addAndRegisterBlockEntity(BlockEntity blockEntity);
+    public void setBlockEntity(BlockEntity blockEntity);
+    public CompoundTag getBlockEntityNbtForSaving(BlockPos blockPos, HolderLookup.Provider registryAccess);
+    public void removeBlockEntity(BlockPos pos);
+    public void runPostLoad();
+    public boolean isEmpty();
+    public void replaceWithPacketData(int chunkX, int chunkZ, ClientboundLevelChunkPacketData chunkData);
+    public void replaceBiomes(FriendlyByteBuf buffer);
+    public void setLoaded(boolean loaded);
+    public Level getLevel();
+    public Map<BlockPos, BlockEntity> getBlockEntities();
+    public void postProcessGeneration(ServerLevel level);
+    public void unpackTicks(long currentTick);
+    public void registerTickContainerInLevel(ServerLevel level);
+    public void unregisterTickContainerFromLevel(ServerLevel level);
+    public void registerDebugValues(ServerLevel level, DebugValueSource.Registration registration);
+    public ChunkStatus getPersistedStatus();
+    public FullChunkStatus getFullStatus();
+    public void setFullStatus(Supplier<FullChunkStatus> fullStatus);
+    public void clearAllBlockEntities();
+    public void registerAllBlockEntitiesAfterLevelLoad();
+    public static enum EntityCreationType {
+        IMMEDIATE, QUEUED, CHECK;
+    }
+    class BoundTickingBlockEntity<T extends BlockEntity> implements TickingBlockEntity {
+        private BoundTickingBlockEntity(T blockEntity, BlockEntityTicker<T> ticker);
+        public void tick();
+        public boolean isRemoved();
+        public BlockPos getPos();
+        public String getType();
+        public String toString();
+    }
+    static class RebindableTickingBlockEntityWrapper implements TickingBlockEntity {
+        private RebindableTickingBlockEntityWrapper(TickingBlockEntity ticker);
+        public void tick();
+        public boolean isRemoved();
+        public BlockPos getPos();
+        public String getType();
+        public String toString();
+    }
+    public interface PostLoadProcessor {
+        void run(LevelChunk levelChunk);
+    }
+    public interface UnsavedListener {
+        void setUnsaved(ChunkPos chunkPos);
+    }
+}
+//// LevelChunkSection.java
+import java.util.function.Predicate;
+import net.minecraft.core.Holder;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeResolver;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+public class LevelChunkSection {
+    public static final int BIOME_CONTAINER_BITS = 2;
+    private LevelChunkSection(LevelChunkSection source);
+    public LevelChunkSection(PalettedContainer<BlockState> states, PalettedContainerRO<Holder<Biome>> biomes);
+    public LevelChunkSection(PalettedContainerFactory containerFactory);
+    public BlockState getBlockState(int sectionX, int sectionY, int sectionZ);
+    public FluidState getFluidState(int sectionX, int sectionY, int sectionZ);
+    public void acquire();
+    public void release();
+    public BlockState setBlockState(int sectionX, int sectionY, int sectionZ, BlockState state);
+    public BlockState setBlockState(int sectionX, int sectionY, int sectionZ, BlockState state, boolean checkThreading);
+    public boolean hasOnlyAir();
+    public boolean hasFluid();
+    public boolean isRandomlyTicking();
+    public boolean isRandomlyTickingBlocks();
+    public boolean isRandomlyTickingFluids();
+    public void recalcBlockCounts();
+    public PalettedContainer<BlockState> getStates();
+    public PalettedContainerRO<Holder<Biome>> getBiomes();
+    public void read(FriendlyByteBuf buffer);
+    public void readBiomes(FriendlyByteBuf buffer);
+    public void write(FriendlyByteBuf buffer);
+    public int getSerializedSize();
+    public boolean maybeHas(Predicate<BlockState> predicate);
+    public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ);
+    public void fillBiomesFromNoise(BiomeResolver biomeResolver, int quartMinX, int quartMinY, int quartMinZ);
+    public LevelChunkSection copy();
+}
+//// LightChunk.java
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.lighting.ChunkSkyLightSources;
+public interface LightChunk extends BlockGetter {
+    void findBlockLightSources(BiConsumer<BlockPos, BlockState> consumer);
+    ChunkSkyLightSources getSkyLightSources();
+}
+//// LightChunkGetter.java
+import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.LightLayer;
+public interface LightChunkGetter {
+    LightChunk getChunkForLighting(int x, int z);
+    default void onLightUpdate(LightLayer layer, SectionPos pos);
+    BlockGetter getLevel();
+}
+//// LinearPalette.java
+import java.util.List;
+import java.util.function.Predicate;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
+public class LinearPalette<T> implements Palette<T> {
+    private LinearPalette(int bits, List<T> paletteEntries);
+    private LinearPalette(T[] values, int bits, int size);
+    public static <A> Palette<A> create(int bits, List<A> paletteEntries);
+    public int idFor(T value, PaletteResize<T> resizeHandler);
+    public boolean maybeHas(Predicate<T> predicate);
+    public T valueFor(int index);
+    public void read(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    public void write(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    public int getSerializedSize(IdMap<T> globalMap);
+    public int getSize();
+    public Palette<T> copy();
+}
+//// MissingPaletteEntryException.java
+public class MissingPaletteEntryException extends RuntimeException {
+    public MissingPaletteEntryException(int index);
+}
+//// Palette.java
+import java.util.List;
+import java.util.function.Predicate;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
+public interface Palette<T> {
+    int idFor(T value, PaletteResize<T> resizeHandler);
+    boolean maybeHas(Predicate<T> predicate);
+    T valueFor(int index);
+    void read(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    void write(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    int getSerializedSize(IdMap<T> globalMap);
+    int getSize();
+    Palette<T> copy();
+    public interface Factory {
+        <A> Palette<A> create(int bits, List<A> paletteEntries);
+    }
+}
+//// PaletteResize.java
+public interface PaletteResize<T> {
+    int onResize(int bits, T lastAddedValue);
+    static <T> PaletteResize<T> noResizeExpected();
+}
+//// PalettedContainer.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.util.BitStorage;
+public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T> {
+    public void acquire();
+    public void release();
+    public static <T> Codec<PalettedContainer<T>> codecRW(Codec<T> elementCodec, Strategy<T> strategy, T defaultValue);
+    public static <T> Codec<PalettedContainerRO<T>> codecRO(Codec<T> elementCodec, Strategy<T> strategy, T defaultValue);
+    private PalettedContainer(Strategy<T> strategy, Configuration dataConfiguration, BitStorage storage, Palette<T> palette);
+    private PalettedContainer(PalettedContainer<T> source);
+    public PalettedContainer(T initialValue, Strategy<T> strategy);
+    public int onResize(int bits, T lastAddedValue);
+    public T getAndSet(int x, int y, int z, T value);
+    public T getAndSetUnchecked(int x, int y, int z, T value);
+    public void set(int x, int y, int z, T value);
+    public T get(int x, int y, int z);
+    protected T get(int index);
+    public void getAll(Consumer<T> consumer);
+    public void read(FriendlyByteBuf buffer);
+    public void write(FriendlyByteBuf buffer);
+    public static <T> DataResult<PalettedContainer<T>> unpack(Strategy<T> strategy, PalettedContainerRO.PackedData<T> discData);
+    public PalettedContainerRO.PackedData<T> pack(Strategy<T> strategy);
+    public int getSerializedSize();
+    public int bitsPerEntry();
+    public boolean maybeHas(Predicate<T> predicate);
+    public void forEachInPalette(Consumer<T> consumer);
+    public PalettedContainer<T> copy();
+    public PalettedContainer<T> recreate();
+    public void count(CountConsumer<T> output);
+    static record Data<T>(Configuration configuration, BitStorage storage, Palette<T> palette) {
+        public void copyFrom(Palette<T> oldPalette, BitStorage oldStorage);
+        public int getSerializedSize(IdMap<T> globalMap);
+        public void write(FriendlyByteBuf buffer, IdMap<T> globalMap);
+        public Data<T> copy();
+    }
+    public interface CountConsumer<T> {
+        void accept(T entry, int count);
+    }
+}
+//// PalettedContainerFactory.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.state.BlockState;
+public record PalettedContainerFactory(Strategy<BlockState> blockStatesStrategy, BlockState defaultBlockState, Codec<PalettedContainer<BlockState>> blockStatesContainerCodec, Strategy<Holder<Biome>> biomeStrategy, Holder<Biome> defaultBiome, Codec<PalettedContainerRO<Holder<Biome>>> biomeContainerCodec) {
+    public static PalettedContainerFactory create(RegistryAccess registries);
+    public PalettedContainer<BlockState> createForBlockStates();
+    public PalettedContainer<Holder<Biome>> createForBiomes();
+}
+//// PalettedContainerRO.java
+import com.mojang.serialization.DataResult;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.stream.LongStream;
+import net.minecraft.network.FriendlyByteBuf;
+public interface PalettedContainerRO<T> {
+    T get(int x, int y, int z);
+    void getAll(Consumer<T> consumer);
+    void write(FriendlyByteBuf buffer);
+    int getSerializedSize();
+    int bitsPerEntry();
+    boolean maybeHas(Predicate<T> predicate);
+    void forEachInPalette(Consumer<T> consumer);
+    void count(PalettedContainer.CountConsumer<T> output);
+    PalettedContainer<T> copy();
+    PalettedContainer<T> recreate();
+    PackedData<T> pack(Strategy<T> strategy);
+    public static record PackedData<T>(List<T> paletteEntries, Optional<LongStream> storage, int bitsPerEntry) {
+        public static final int UNKNOWN_BITS_PER_ENTRY = -1;
+        public PackedData(List<T> paletteEntries, Optional<LongStream> storage);
+    }
+    public interface Unpacker<T, C extends PalettedContainerRO<T>> {
+        DataResult<C> read(Strategy<T> strategy, PackedData<T> discData);
+    }
+}
+//// ProtoChunk.java
+import it.unimi.dsi.fastutil.shorts.ShortList;
+import java.util.List;
+import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.BelowZeroRetrogen;
+import net.minecraft.world.level.levelgen.blending.BlendingData;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.ticks.LevelChunkTicks;
+import net.minecraft.world.ticks.ProtoChunkTicks;
+import net.minecraft.world.ticks.TickContainerAccess;
+public class ProtoChunk extends ChunkAccess {
+    public ProtoChunk(ChunkPos chunkPos, UpgradeData upgradeData, LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory containerFactory, BlendingData blendingData);
+    public ProtoChunk(ChunkPos chunkPos, UpgradeData upgradeData, LevelChunkSection [] sections, ProtoChunkTicks<Block> blockTicks, ProtoChunkTicks<Fluid> fluidTicks, LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory containerFactory, BlendingData blendingData);
+    public TickContainerAccess<Block> getBlockTicks();
+    public TickContainerAccess<Fluid> getFluidTicks();
+    public ChunkAccess.PackedTicks getTicksForSerialization(long currentTick);
+    public BlockState getBlockState(BlockPos pos);
+    public FluidState getFluidState(BlockPos pos);
+    public BlockState setBlockState(BlockPos pos, BlockState state, int flags);
+    public void setBlockEntity(BlockEntity blockEntity);
+    public BlockEntity getBlockEntity(BlockPos pos);
+    public Map<BlockPos, BlockEntity> getBlockEntities();
+    public void addEntity(CompoundTag tag);
+    public void addEntity(Entity entity);
+    public void setStartForStructure(Structure structure, StructureStart structureStart);
+    public List<CompoundTag> getEntities();
+    public ChunkStatus getPersistedStatus();
+    public void setPersistedStatus(ChunkStatus status);
+    public Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ);
+    public static short packOffsetCoordinates(BlockPos pos);
+    public static BlockPos unpackOffsetCoordinates(short packedData, int sectionY, ChunkPos chunkPos);
+    public void markPosForPostProcessing(BlockPos blockPos);
+    public void addPackedPostProcess(ShortList packedOffsets, int sectionIndex);
+    public Map<BlockPos, CompoundTag> getBlockEntityNbts();
+    public CompoundTag getBlockEntityNbtForSaving(BlockPos blockPos, HolderLookup.Provider registryAccess);
+    public void removeBlockEntity(BlockPos pos);
+    public void setLightEngine(LevelLightEngine lightEngine);
+    public void setBelowZeroRetrogen(BelowZeroRetrogen belowZeroRetrogen);
+    public BelowZeroRetrogen getBelowZeroRetrogen();
+    public LevelChunkTicks<Block> unpackBlockTicks();
+    public LevelChunkTicks<Fluid> unpackFluidTicks();
+    public LevelHeightAccessor getHeightAccessorForGeneration();
+}
+//// SingleValuePalette.java
+import java.util.List;
+import java.util.function.Predicate;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
+public class SingleValuePalette<T> implements Palette<T> {
+    public SingleValuePalette(List<T> paletteEntries);
+    public static <A> Palette<A> create(int bits, List<A> paletteEntries);
+    public int idFor(T value, PaletteResize<T> resizeHandler);
+    public boolean maybeHas(Predicate<T> predicate);
+    public T valueFor(int index);
+    public void read(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    public void write(FriendlyByteBuf buffer, IdMap<T> globalMap);
+    public int getSerializedSize(IdMap<T> globalMap);
+    public int getSize();
+    public Palette<T> copy();
+}
+//// Strategy.java
+import net.minecraft.core.IdMap;
+public abstract class Strategy<T> {
+    protected final int globalPaletteBitsInMemory;
+    private Strategy(IdMap<T> globalMap, int bitsPerAxis);
+    public static <T> Strategy<T> createForBlockStates(IdMap<T> registry);
+    public static <T> Strategy<T> createForBiomes(IdMap<T> registry);
+    public int entryCount();
+    public int getIndex(int x, int y, int z);
+    public IdMap<T> globalMap();
+    public GlobalPalette<T> globalPalette();
+    protected abstract Configuration getConfigurationForBitCount(int entryBits);
+    protected Configuration getConfigurationForPaletteSize(int paletteSize);
+}
+//// StructureAccess.java
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.Map;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
+public interface StructureAccess {
+    StructureStart getStartForStructure(Structure structure);
+    void setStartForStructure(Structure structure, StructureStart structureStart);
+    LongSet getReferencesForStructure(Structure structure);
+    void addReferenceForStructure(Structure structure, long reference);
+    Map<Structure, LongSet> getAllReferences();
+    void setAllReferences(Map<Structure, LongSet> data);
+}
+//// UpgradeData.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+public class UpgradeData {
+    public static final UpgradeData EMPTY;
+    private UpgradeData(LevelHeightAccessor levelHeightAccessor);
+    public UpgradeData(CompoundTag tag, LevelHeightAccessor levelHeightAccessor);
+    private UpgradeData(UpgradeData source);
+    public void upgrade(LevelChunk chunk);
+    public boolean isEmpty();
+    public CompoundTag write();
+    public UpgradeData copy();
+    public interface BlockFixer {
+        BlockState updateShape(BlockState state, Direction direction, BlockState neighbour, LevelAccessor level, BlockPos pos, BlockPos neighbourPos);
+        default void processChunk(LevelAccessor level);
+    }
+    static enum BlockFixers implements BlockFixer {
+        BLACKLIST, DEFAULT, CHEST, LEAVES, STEM_BLOCK;
+        public static final Direction[] DIRECTIONS;
+        public BlockState updateShape(BlockState state, Direction direction, BlockState neighbour, LevelAccessor level, BlockPos pos, BlockPos neighbourPos);
+        public void processChunk(LevelAccessor level);
+    }
+}

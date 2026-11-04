@@ -1,0 +1,146 @@
+//// KeybindContents.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.network.chat.ComponentContents;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
+public class KeybindContents implements ComponentContents {
+    public static final MapCodec<KeybindContents> MAP_CODEC;
+    public KeybindContents(String name);
+    public <T> Optional<T> visit(FormattedText.ContentConsumer<T> output);
+    public <T> Optional<T> visit(FormattedText.StyledContentConsumer<T> output, Style currentStyle);
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+    public String getName();
+    public MapCodec<KeybindContents> codec();
+}
+//// KeybindResolver.java
+import java.util.function.Function;
+import java.util.function.Supplier;
+import net.minecraft.network.chat.Component;
+public class KeybindResolver {
+    static Function<String, Supplier<Component>> keyResolver;
+    public static void setKeyResolver(Function<String, Supplier<Component>> resolver);
+}
+//// NbtContents.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.commands.arguments.NbtPathArgument;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentContents;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.ResolutionContext;
+import net.minecraft.network.chat.contents.data.DataSource;
+import net.minecraft.util.CompilableString;
+public record NbtContents(CompilableString<NbtPathArgument.NbtPath> nbtPath, boolean interpreting, boolean plain, Optional<Component> separator, DataSource dataSource) implements ComponentContents {
+    public static final Codec<CompilableString<NbtPathArgument.NbtPath>> NBT_PATH_CODEC;
+    public static final MapCodec<NbtContents> MAP_CODEC;
+    public MutableComponent resolve(ResolutionContext context, int recursionDepth) throws CommandSyntaxException;
+    public MapCodec<NbtContents> codec();
+}
+//// ObjectContents.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentContents;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.ResolutionContext;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.contents.objects.ObjectInfo;
+public record ObjectContents(ObjectInfo contents, Optional<Component> fallback) implements ComponentContents {
+    public static final MapCodec<ObjectContents> MAP_CODEC;
+    public MapCodec<ObjectContents> codec();
+    public MutableComponent resolve(ResolutionContext context, int recursionDepth) throws CommandSyntaxException;
+    public <T> Optional<T> visit(FormattedText.ContentConsumer<T> output);
+    public <T> Optional<T> visit(FormattedText.StyledContentConsumer<T> output, Style currentStyle);
+}
+//// PlainTextContents.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.network.chat.ComponentContents;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
+public interface PlainTextContents extends ComponentContents {
+    MapCodec<PlainTextContents> MAP_CODEC;
+    PlainTextContents EMPTY;
+    static PlainTextContents create(String text);
+    String text();
+    default MapCodec<PlainTextContents> codec();
+    public static record LiteralContents(String text) implements PlainTextContents {
+        public <T> Optional<T> visit(FormattedText.ContentConsumer<T> output);
+        public <T> Optional<T> visit(FormattedText.StyledContentConsumer<T> output, Style currentStyle);
+        public String toString();
+    }
+}
+//// ScoreContents.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.commands.arguments.selector.EntitySelector;
+import net.minecraft.network.chat.ComponentContents;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.ResolutionContext;
+import net.minecraft.util.CompilableString;
+public record ScoreContents(Either<CompilableString<EntitySelector>, String> name, String objective) implements ComponentContents {
+    public static final MapCodec<ScoreContents> INNER_CODEC;
+    public static final MapCodec<ScoreContents> MAP_CODEC;
+    public MapCodec<ScoreContents> codec();
+    public MutableComponent resolve(ResolutionContext context, int recursionDepth) throws CommandSyntaxException;
+    public String toString();
+}
+//// SelectorContents.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.commands.arguments.selector.EntitySelector;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentContents;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.ResolutionContext;
+import net.minecraft.network.chat.Style;
+import net.minecraft.util.CompilableString;
+public record SelectorContents(CompilableString<EntitySelector> selector, Optional<Component> separator) implements ComponentContents {
+    public static final MapCodec<SelectorContents> MAP_CODEC;
+    public MapCodec<SelectorContents> codec();
+    public MutableComponent resolve(ResolutionContext context, int recursionDepth) throws CommandSyntaxException;
+    public <T> Optional<T> visit(FormattedText.StyledContentConsumer<T> output, Style currentStyle);
+    public <T> Optional<T> visit(FormattedText.ContentConsumer<T> output);
+    public String toString();
+}
+//// TranslatableContents.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.network.chat.ComponentContents;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.ResolutionContext;
+import net.minecraft.network.chat.Style;
+public class TranslatableContents implements ComponentContents {
+    public static final Object[] NO_ARGS;
+    public static final MapCodec<TranslatableContents> MAP_CODEC;
+    public static boolean isAllowedPrimitiveArgument(Object object);
+    public TranslatableContents(String key, String fallback, Object[] args);
+    public MapCodec<TranslatableContents> codec();
+    public <T> Optional<T> visit(FormattedText.StyledContentConsumer<T> output, Style currentStyle);
+    public <T> Optional<T> visit(FormattedText.ContentConsumer<T> output);
+    public MutableComponent resolve(ResolutionContext context, int recursionDepth) throws CommandSyntaxException;
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+    public String getKey();
+    public String getFallback();
+    public Object[] getArgs();
+}
+//// TranslatableFormatException.java
+public class TranslatableFormatException extends IllegalArgumentException {
+    public TranslatableFormatException(TranslatableContents component, String message);
+    public TranslatableFormatException(TranslatableContents component, int index);
+    public TranslatableFormatException(TranslatableContents component, Throwable t);
+}

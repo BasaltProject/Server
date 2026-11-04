@@ -1,0 +1,24 @@
+//// ChaseClient.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+public class ChaseClient {
+    public ChaseClient(String serverHost, int serverPort, MinecraftServer server);
+    public void start();
+    public void stop();
+    public void run();
+    static record TeleportTarget(ResourceKey<Level> level, Vec3 pos, Vec2 rot) {
+    }
+}
+//// ChaseServer.java
+import java.io.IOException;
+import net.minecraft.server.players.PlayerList;
+public class ChaseServer {
+    public ChaseServer(String serverBindAddress, int serverPort, PlayerList playerList, int broadcastIntervalMs);
+    public void start() throws IOException;
+    public void stop();
+    static record PlayerPosition(String dimensionName, double x, double y, double z, float yRot, float xRot) {
+    }
+}

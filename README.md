@@ -44,7 +44,8 @@ a JVM implemented in C++ (a fork of Avian aimed at Java 25), executes the byteco
 inside the server process. Shim is built into the binary, so no Java installation
 is needed, and it only starts when a jar is present in `plugins-bukkit/`.
 Large plugins such as FastAsyncWorldEdit and PacketEvents are part of the test
-suite. Native Lua plugins remain the first-class path and the one the API is
+suite. The `net.minecraft` classes that those plugins expect are an independent reimplementation,
+not Mojang code; see [NOTICE.md](server-bukkit/NOTICE.md). Native Lua plugins remain the first-class path and the one the API is
 designed around.
 
 Two goals drive every decision:

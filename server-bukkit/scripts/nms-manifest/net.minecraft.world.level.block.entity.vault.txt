@@ -1,0 +1,126 @@
+//// VaultBlockEntity.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class VaultBlockEntity extends BlockEntity {
+    public VaultBlockEntity(BlockPos worldPosition, BlockState blockState);
+    public Packet<ClientGamePacketListener> getUpdatePacket();
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries);
+    protected void saveAdditional(ValueOutput output);
+    protected void loadAdditional(ValueInput input);
+    public VaultServerData getServerData();
+    public VaultSharedData getSharedData();
+    public VaultClientData getClientData();
+    public VaultConfig getConfig();
+    public void setConfig(VaultConfig config);
+    public static final class Server {
+        public static void tick(ServerLevel serverLevel, BlockPos pos, BlockState blockState, VaultConfig config, VaultServerData serverData, VaultSharedData sharedData);
+        public static void tryInsertKey(ServerLevel serverLevel, BlockPos pos, BlockState blockState, VaultConfig config, VaultServerData serverData, VaultSharedData sharedData, Player player, ItemStack stackToInsert);
+        static void cycleDisplayItemFromLootTable(ServerLevel serverLevel, VaultState vaultState, VaultConfig config, VaultSharedData sharedData, BlockPos pos);
+    }
+    public static final class Client {
+        public static void tick(Level clientLevel, BlockPos pos, BlockState blockState, VaultClientData clientData, VaultSharedData sharedData);
+        public static void emitActivationParticles(Level clientLevel, BlockPos pos, BlockState blockState, VaultSharedData sharedData, ParticleOptions flameParticle);
+        public static void emitDeactivationParticles(Level clientLevel, BlockPos pos, ParticleOptions flameParticle);
+        public static boolean shouldDisplayActiveEffects(VaultSharedData sharedData);
+    }
+}
+//// VaultClientData.java
+public class VaultClientData {
+    public static final float ROTATION_SPEED = 10.0F;
+    public float currentSpin();
+    public float previousSpin();
+    public void updateDisplayItemSpin();
+}
+//// VaultConfig.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.trialspawner.PlayerDetector;
+import net.minecraft.world.level.storage.loot.LootTable;
+public record VaultConfig(ResourceKey<LootTable> lootTable, double activationRange, double deactivationRange, ItemStack keyItem, Optional<ResourceKey<LootTable>> overrideLootTableToDisplay, PlayerDetector playerDetector, PlayerDetector.EntitySelector entitySelector) {
+    public static final String TAG_NAME = "config";
+    public static final VaultConfig DEFAULT;
+    public static final Codec<VaultConfig> CODEC;
+    private VaultConfig();
+    public VaultConfig(ResourceKey<LootTable> lootTable, double activationRange, double deactivationRange, ItemStack keyItem, Optional<ResourceKey<LootTable>> overrideDisplayItems);
+    public PlayerDetector playerDetector();
+}
+//// VaultServerData.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+public class VaultServerData {
+    public static final String TAG_NAME = "server_data";
+    public static final Codec<VaultServerData> CODEC;
+    boolean isDirty;
+    public VaultServerData(Set<UUID> rewardedPlayers, long stateUpdatingResumesAt, List<ItemStack> itemsToEject, int totalEjectionsNeeded);
+    public VaultServerData();
+    void setLastInsertFailTimestamp(long lastInsertFailTimestamp);
+    long getLastInsertFailTimestamp();
+    Set<UUID> getRewardedPlayers();
+    boolean hasRewardedPlayer(Player player);
+    public void addToRewardedPlayers(Player player);
+    long stateUpdatingResumesAt();
+    void pauseStateUpdatingUntil(long stateUpdatingResumesAt);
+    List<ItemStack> getItemsToEject();
+    void markEjectionFinished();
+    void setItemsToEject(List<ItemStack> newItemsToEject);
+    ItemStack getNextItemToEject();
+    ItemStack popNextItemToEject();
+    void set(VaultServerData from);
+    public float ejectionProgress();
+}
+//// VaultSharedData.java
+import com.mojang.serialization.Codec;
+import java.util.Set;
+import java.util.UUID;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
+public class VaultSharedData {
+    public static final String TAG_NAME = "shared_data";
+    public static final Codec<VaultSharedData> CODEC;
+    boolean isDirty;
+    public VaultSharedData(ItemStack displayItem, Set<UUID> connectedPlayers, double connectedParticlesRange);
+    public VaultSharedData();
+    public ItemStack getDisplayItem();
+    public boolean hasDisplayItem();
+    public void setDisplayItem(ItemStack stack);
+    boolean hasConnectedPlayers();
+    Set<UUID> getConnectedPlayers();
+    double connectedParticlesRange();
+    void updateConnectedPlayersWithinRange(ServerLevel serverLevel, BlockPos pos, VaultServerData serverData, VaultConfig config, double limit);
+    void set(VaultSharedData from);
+}
+//// VaultState.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.StringRepresentable;
+public enum VaultState implements StringRepresentable {
+    INACTIVE, ACTIVE, UNLOCKING, EJECTING;
+    public String getSerializedName();
+    public int lightLevel();
+    public VaultState tickAndGetNext(ServerLevel serverLevel, BlockPos pos, VaultConfig config, VaultServerData serverData, VaultSharedData sharedData);
+    public void onTransition(ServerLevel serverLevel, BlockPos pos, VaultState to, VaultConfig config, VaultSharedData sharedData, boolean isOminous);
+    protected void onEnter(ServerLevel serverLevel, BlockPos pos, VaultConfig config, VaultSharedData sharedData, boolean isOminous);
+    protected void onExit(ServerLevel serverLevel, BlockPos pos, VaultConfig config, VaultSharedData sharedData);
+    static enum LightLevel {
+        HALF_LIT, LIT;
+    }
+}

@@ -1,0 +1,291 @@
+//// AnyValue.java
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentType;
+public record AnyValue(DataComponentType<?> type) implements DataComponentPredicate {
+    public boolean matches(DataComponentGetter components);
+}
+//// AttributeModifiersPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.advancements.predicates.CollectionPredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+public record AttributeModifiersPredicate(Optional<CollectionPredicate<ItemAttributeModifiers.Entry, EntryPredicate>> modifiers) implements SingleComponentItemPredicate<ItemAttributeModifiers> {
+    public static final Codec<AttributeModifiersPredicate> CODEC;
+    public DataComponentType<ItemAttributeModifiers> componentType();
+    public boolean matches(ItemAttributeModifiers value);
+    public static record EntryPredicate(Optional<HolderSet<Attribute>> attribute, Optional<Identifier> id, MinMaxBounds.Doubles amount, Optional<AttributeModifier.Operation> operation, Optional<EquipmentSlotGroup> slot) implements Predicate<ItemAttributeModifiers.Entry> {
+        public static final Codec<EntryPredicate> CODEC;
+        public boolean test(ItemAttributeModifiers.Entry value);
+    }
+}
+//// BundlePredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.CollectionPredicate;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.item.component.BundleContents;
+public record BundlePredicate(Optional<CollectionPredicate<ItemInstance, ItemPredicate>> items) implements SingleComponentItemPredicate<BundleContents> {
+    public static final Codec<BundlePredicate> CODEC;
+    public DataComponentType<BundleContents> componentType();
+    public boolean matches(BundleContents value);
+}
+//// ContainerPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.CollectionPredicate;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.item.component.ItemContainerContents;
+public record ContainerPredicate(Optional<CollectionPredicate<ItemInstance, ItemPredicate>> items) implements SingleComponentItemPredicate<ItemContainerContents> {
+    public static final Codec<ContainerPredicate> CODEC;
+    public DataComponentType<ItemContainerContents> componentType();
+    public boolean matches(ItemContainerContents value);
+}
+//// CustomDataPredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.NbtPredicate;
+import net.minecraft.core.component.DataComponentGetter;
+public record CustomDataPredicate(NbtPredicate value) implements DataComponentPredicate {
+    public static final Codec<CustomDataPredicate> CODEC;
+    public boolean matches(DataComponentGetter components);
+    public static CustomDataPredicate customData(NbtPredicate value);
+}
+//// DamagePredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.component.DataComponentGetter;
+public record DamagePredicate(MinMaxBounds.Ints durability, MinMaxBounds.Ints damage) implements DataComponentPredicate {
+    public static final Codec<DamagePredicate> CODEC;
+    public boolean matches(DataComponentGetter components);
+    public static DamagePredicate durability(MinMaxBounds.Ints range);
+}
+//// DataComponentPredicate.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public interface DataComponentPredicate {
+    Codec<Map<Type<?>, DataComponentPredicate>> CODEC;
+    StreamCodec<RegistryFriendlyByteBuf, Single<?>> SINGLE_STREAM_CODEC;
+    StreamCodec<RegistryFriendlyByteBuf, Map<Type<?>, DataComponentPredicate>> STREAM_CODEC;
+    static MapCodec<Single<?>> singleCodec(String name);
+    boolean matches(DataComponentGetter components);
+    public interface Type<T extends DataComponentPredicate> {
+        Codec<Type<?>> CODEC;
+        StreamCodec<RegistryFriendlyByteBuf, Type<?>> STREAM_CODEC;
+        Codec<T> codec();
+        MapCodec<Single<T>> wrappedCodec();
+        StreamCodec<RegistryFriendlyByteBuf, Single<T>> singleStreamCodec();
+    }
+    public static abstract class TypeBase<T extends DataComponentPredicate> implements Type<T> {
+        public TypeBase(Codec<T> codec);
+        public Codec<T> codec();
+        public MapCodec<Single<T>> wrappedCodec();
+        public StreamCodec<RegistryFriendlyByteBuf, Single<T>> singleStreamCodec();
+    }
+    public static final class ConcreteType<T extends DataComponentPredicate> extends TypeBase<T> {
+        public ConcreteType(Codec<T> codec);
+    }
+    public static final class AnyValueType extends TypeBase<AnyValue> {
+        public AnyValueType(AnyValue predicate);
+        public AnyValue predicate();
+        public DataComponentType<?> componentType();
+        public static AnyValueType create(DataComponentType<?> componentType);
+    }
+    public static record Single<T extends DataComponentPredicate>(Type<T> type, T predicate) {
+    }
+}
+//// DataComponentPredicates.java
+import net.minecraft.core.Registry;
+public class DataComponentPredicates {
+    public static final DataComponentPredicate.Type<DamagePredicate> DAMAGE;
+    public static final DataComponentPredicate.Type<EnchantmentsPredicate.Enchantments> ENCHANTMENTS;
+    public static final DataComponentPredicate.Type<EnchantmentsPredicate.StoredEnchantments> STORED_ENCHANTMENTS;
+    public static final DataComponentPredicate.Type<PotionsPredicate> POTIONS;
+    public static final DataComponentPredicate.Type<CustomDataPredicate> CUSTOM_DATA;
+    public static final DataComponentPredicate.Type<ContainerPredicate> CONTAINER;
+    public static final DataComponentPredicate.Type<BundlePredicate> BUNDLE_CONTENTS;
+    public static final DataComponentPredicate.Type<FireworkExplosionPredicate> FIREWORK_EXPLOSION;
+    public static final DataComponentPredicate.Type<FireworksPredicate> FIREWORKS;
+    public static final DataComponentPredicate.Type<WritableBookPredicate> WRITABLE_BOOK;
+    public static final DataComponentPredicate.Type<WrittenBookPredicate> WRITTEN_BOOK;
+    public static final DataComponentPredicate.Type<AttributeModifiersPredicate> ATTRIBUTE_MODIFIERS;
+    public static final DataComponentPredicate.Type<TrimPredicate> ARMOR_TRIM;
+    public static final DataComponentPredicate.Type<JukeboxPlayablePredicate> JUKEBOX_PLAYABLE;
+    public static final DataComponentPredicate.Type<VillagerTypePredicate> VILLAGER_VARIANT;
+    public static DataComponentPredicate.Type<?> bootstrap(Registry<DataComponentPredicate.Type<?>> registry);
+}
+//// EnchantmentsPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Function;
+import net.minecraft.advancements.predicates.EnchantmentPredicate;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+public abstract class EnchantmentsPredicate implements SingleComponentItemPredicate<ItemEnchantments> {
+    protected EnchantmentsPredicate(List<EnchantmentPredicate> enchantments);
+    public static <T extends EnchantmentsPredicate> Codec<T> codec(Function<List<EnchantmentPredicate>, T> constructor);
+    protected List<EnchantmentPredicate> enchantments();
+    public boolean matches(ItemEnchantments appliedEnchantments);
+    public static Enchantments enchantments(List<EnchantmentPredicate> predicates);
+    public static StoredEnchantments storedEnchantments(List<EnchantmentPredicate> predicates);
+    public static class Enchantments extends EnchantmentsPredicate {
+        public static final Codec<Enchantments> CODEC;
+        protected Enchantments(List<EnchantmentPredicate> enchantments);
+        public DataComponentType<ItemEnchantments> componentType();
+    }
+    public static class StoredEnchantments extends EnchantmentsPredicate {
+        public static final Codec<StoredEnchantments> CODEC;
+        protected StoredEnchantments(List<EnchantmentPredicate> enchantments);
+        public DataComponentType<ItemEnchantments> componentType();
+    }
+}
+//// FireworkExplosionPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.component.FireworkExplosion;
+public record FireworkExplosionPredicate(FireworkPredicate predicate) implements SingleComponentItemPredicate<FireworkExplosion> {
+    public static final Codec<FireworkExplosionPredicate> CODEC;
+    public DataComponentType<FireworkExplosion> componentType();
+    public boolean matches(FireworkExplosion value);
+    public static record FireworkPredicate(Optional<FireworkExplosion.Shape> shape, Optional<Boolean> twinkle, Optional<Boolean> trail) implements Predicate<FireworkExplosion> {
+        public static final Codec<FireworkPredicate> CODEC;
+        public boolean test(FireworkExplosion fireworkExplosion);
+    }
+}
+//// FireworksPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.CollectionPredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.component.FireworkExplosion;
+import net.minecraft.world.item.component.Fireworks;
+public record FireworksPredicate(Optional<CollectionPredicate<FireworkExplosion, FireworkExplosionPredicate.FireworkPredicate>> explosions, MinMaxBounds.Ints flightDuration) implements SingleComponentItemPredicate<Fireworks> {
+    public static final Codec<FireworksPredicate> CODEC;
+    public DataComponentType<Fireworks> componentType();
+    public boolean matches(Fireworks value);
+}
+//// JukeboxPlayablePredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.JukeboxPlayable;
+import net.minecraft.world.item.JukeboxSong;
+public record JukeboxPlayablePredicate(Optional<HolderSet<JukeboxSong>> song) implements SingleComponentItemPredicate<JukeboxPlayable> {
+    public static final Codec<JukeboxPlayablePredicate> CODEC;
+    public DataComponentType<JukeboxPlayable> componentType();
+    public boolean matches(JukeboxPlayable value);
+    public static JukeboxPlayablePredicate any();
+}
+//// PotionsPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.CollectionPredicate;
+import net.minecraft.advancements.predicates.MobEffectsPredicate;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.item.alchemy.Potion;
+import net.minecraft.world.item.alchemy.PotionContents;
+public record PotionsPredicate(Optional<HolderSet<Potion>> potions, Optional<CollectionPredicate<MobEffectInstance, MobEffectsPredicate>> effects) implements SingleComponentItemPredicate<PotionContents> {
+    public static final Codec<PotionsPredicate> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, PotionsPredicate> STREAM_CODEC;
+    public DataComponentType<PotionContents> componentType();
+    public boolean matches(PotionContents potionContents);
+    public static PotionsPredicate ofPotions(HolderSet<Potion> potions);
+    public static PotionsPredicate ofPotion(Holder<Potion> potion);
+}
+//// TrimPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.equipment.trim.ArmorTrim;
+import net.minecraft.world.item.equipment.trim.TrimMaterial;
+import net.minecraft.world.item.equipment.trim.TrimPattern;
+public record TrimPredicate(Optional<HolderSet<TrimMaterial>> material, Optional<HolderSet<TrimPattern>> pattern) implements SingleComponentItemPredicate<ArmorTrim> {
+    public static final Codec<TrimPredicate> CODEC;
+    public DataComponentType<ArmorTrim> componentType();
+    public boolean matches(ArmorTrim value);
+}
+//// VillagerTypePredicate.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.entity.npc.villager.VillagerType;
+public record VillagerTypePredicate(HolderSet<VillagerType> villagerTypes) implements SingleComponentItemPredicate<Holder<VillagerType>> {
+    public static final Codec<VillagerTypePredicate> CODEC;
+    public DataComponentType<Holder<VillagerType>> componentType();
+    public boolean matches(Holder<VillagerType> villagerType);
+    public static VillagerTypePredicate villagerTypes(HolderSet<VillagerType> villagerTypes);
+}
+//// WritableBookPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.advancements.predicates.CollectionPredicate;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.server.network.Filterable;
+import net.minecraft.world.item.component.WritableBookContent;
+public record WritableBookPredicate(Optional<CollectionPredicate<Filterable<String>, PagePredicate>> pages) implements SingleComponentItemPredicate<WritableBookContent> {
+    public static final Codec<WritableBookPredicate> CODEC;
+    public DataComponentType<WritableBookContent> componentType();
+    public boolean matches(WritableBookContent value);
+    public static record PagePredicate(String contents) implements Predicate<Filterable<String>> {
+        public static final Codec<PagePredicate> CODEC;
+        public boolean test(Filterable<String> value);
+    }
+}
+//// WrittenBookPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.advancements.predicates.CollectionPredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.advancements.predicates.SingleComponentItemPredicate;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.network.Filterable;
+import net.minecraft.world.item.component.WrittenBookContent;
+public record WrittenBookPredicate(Optional<CollectionPredicate<Filterable<Component>, PagePredicate>> pages, Optional<String> author, Optional<String> title, MinMaxBounds.Ints generation, Optional<Boolean> resolved) implements SingleComponentItemPredicate<WrittenBookContent> {
+    public static final Codec<WrittenBookPredicate> CODEC;
+    public DataComponentType<WrittenBookContent> componentType();
+    public boolean matches(WrittenBookContent value);
+    public static record PagePredicate(Component contents) implements Predicate<Filterable<Component>> {
+        public static final Codec<PagePredicate> CODEC;
+        public boolean test(Filterable<Component> value);
+    }
+}

@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.nbt;
 
 import com.mojang.datafixers.util.Pair;

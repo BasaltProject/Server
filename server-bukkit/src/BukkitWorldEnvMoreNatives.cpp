@@ -44,7 +44,15 @@ jobjectArray JNICALL nativeRaids(JNIEnv* env, jclass, jstring world) {
                 joinWith(
                     ',', [&](std::size_t at) { return raid.heroes[at]; }, raid.heroes.size()) +
                 "|" +
-                joinWith(',', [&](std::size_t at) { return std::to_string(raid.raiders[at]); }, raid.raiders.size()));
+                joinWith(
+                    ',', [&](std::size_t at) { return std::to_string(raid.raiders[at]); }, raid.raiders.size()) +
+                "|" +
+                joinWith(
+                    ',',
+                    [&](std::size_t at) {
+                        return std::to_string(raid.leaders[at].first) + ":" + std::to_string(raid.leaders[at].second);
+                    },
+                    raid.leaders.size()));
         }
     }
     return jni::stringArrayOf(env, rows);
@@ -86,6 +94,53 @@ jboolean JNICALL nativeRaidBarControl(JNIEnv* env, jclass, jstring world, jint i
                                                    })
                ? JNI_TRUE
                : JNI_FALSE;
+}
+
+jint JNICALL nativeRaidControl(JNIEnv* env, jclass, jstring world, jint id, jstring action, jint first, jint second,
+                               jint third, jint fourth, jint value) {
+    const auto found = envWorldOf(env, world);
+    const std::string what = toStd(env, action);
+    const std::array<std::int32_t, 4> arguments{first, second, third, fourth};
+    return found == nullptr ? -1 : jni::onServer<jint>(-1, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? -1 : target->raidControl(id, what, arguments, value);
+    });
+}
+
+jobjectArray JNICALL nativeClock(JNIEnv* env, jclass, jstring world) {
+    const auto found = envWorldOf(env, world);
+    std::vector<std::string> rows;
+    if (found != nullptr) {
+        const plugins::PluginClock clock = jni::onServer<plugins::PluginClock>({}, [&] {
+            PluginWorldEnv* target = found->env();
+            return target == nullptr ? plugins::PluginClock{} : target->clock();
+        });
+        rows = {std::to_string(clock.totalTicks), std::to_string(clock.rate), clock.paused ? "1" : "0"};
+        for (const auto& [name, ticks] : clock.markers) {
+            rows.push_back(name + "=" + std::to_string(ticks));
+        }
+    }
+    return jni::stringArrayOf(env, rows);
+}
+
+jboolean JNICALL nativeSetClockRate(JNIEnv* env, jclass, jstring world, jfloat rate) {
+    const auto found = envWorldOf(env, world);
+    return found != nullptr && jni::onServer<bool>(false,
+                                                   [&] {
+                                                       PluginWorldEnv* target = found->env();
+                                                       return target != nullptr && target->setClockRate(rate);
+                                                   })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jint JNICALL nativeMoveToTimeMarker(JNIEnv* env, jclass, jstring world, jstring marker) {
+    const auto found = envWorldOf(env, world);
+    const std::string name = toStd(env, marker);
+    return found == nullptr ? 0 : jni::onServer<jint>(0, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? 0 : target->moveToTimeMarker(name);
+    });
 }
 
 jbyteArray JNICALL nativeRaidValues(JNIEnv* env, jclass, jstring world, jint id) {
@@ -324,6 +379,15 @@ void JNICALL nativeSetChunkForced(JNIEnv* env, jclass, jstring world, jint chunk
     }));
 }
 
+jlong JNICALL nativeRandomSequence(JNIEnv* env, jclass, jstring world, jstring id, jint operation, jlong argument) {
+    const auto found = envWorldOf(env, world);
+    const std::string name = toStd(env, id);
+    return found == nullptr ? 0 : jni::onServer<jlong>(0, [&] {
+        PluginWorldEnv* target = found->env();
+        return target == nullptr ? jlong{0} : static_cast<jlong>(target->randomSequence(name, operation, argument));
+    });
+}
+
 jlong JNICALL nativeInhabitedTime(JNIEnv* env, jclass, jstring world, jint chunkX, jint chunkZ, jlong set) {
     const auto found = envWorldOf(env, world);
     return found == nullptr ? 0 : jni::onServer<jlong>(0, [&] {
@@ -437,6 +501,12 @@ void registerWorldEnvMoreNatives(JNIEnv* env, jclass natives) {
     const std::array methods{
         method("raids", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeRaids)),
         method("setRaid", "(Ljava/lang/String;III)Z", reinterpret_cast<void*>(&nativeSetRaid)),
+        method("raidControl", "(Ljava/lang/String;ILjava/lang/String;IIIII)I",
+               reinterpret_cast<void*>(&nativeRaidControl)),
+        method("clock", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeClock)),
+        method("setClockRate", "(Ljava/lang/String;F)Z", reinterpret_cast<void*>(&nativeSetClockRate)),
+        method("moveToTimeMarker", "(Ljava/lang/String;Ljava/lang/String;)I",
+               reinterpret_cast<void*>(&nativeMoveToTimeMarker)),
         method("raidBar", "(Ljava/lang/String;I)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeRaidBar)),
         method("raidBarControl", "(Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;I)Z",
                reinterpret_cast<void*>(&nativeRaidBarControl)),
@@ -457,6 +527,8 @@ void registerWorldEnvMoreNatives(JNIEnv* env, jclass natives) {
         method("setWeatherTimes", "(Ljava/lang/String;III)V", reinterpret_cast<void*>(&nativeSetWeatherTimes)),
         method("forcedChunks", "(Ljava/lang/String;)[I", reinterpret_cast<void*>(&nativeForcedChunks)),
         method("setChunkForced", "(Ljava/lang/String;IIZ)V", reinterpret_cast<void*>(&nativeSetChunkForced)),
+        method("randomSequence", "(Ljava/lang/String;Ljava/lang/String;IJ)J",
+               reinterpret_cast<void*>(&nativeRandomSequence)),
         method("inhabitedTime", "(Ljava/lang/String;IIJ)J", reinterpret_cast<void*>(&nativeInhabitedTime)),
         method("gameRuleSpecs", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeGameRuleSpecs)),
         method("gameEventFrequency", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeGameEventFrequency)),

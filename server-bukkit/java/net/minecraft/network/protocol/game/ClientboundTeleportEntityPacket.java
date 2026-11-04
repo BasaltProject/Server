@@ -1,0 +1,22 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.protocol.game;
+import net.minecraft.network.codec.ByteBufCodecs;
+import java.util.Set;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.world.entity.PositionMoveRotation;
+import net.minecraft.world.entity.Relative;
+public record ClientboundTeleportEntityPacket(int id, PositionMoveRotation change, Set<Relative> relatives, boolean onGround) implements Packet<ClientGamePacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundTeleportEntityPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundTeleportEntityPacket.STREAM_CODEC", () -> StreamCodec.composite(ByteBufCodecs.VAR_INT, ClientboundTeleportEntityPacket::id, PositionMoveRotation.STREAM_CODEC, ClientboundTeleportEntityPacket::change, Relative.SET_STREAM_CODEC, ClientboundTeleportEntityPacket::relatives, ByteBufCodecs.BOOL, ClientboundTeleportEntityPacket::onGround, ClientboundTeleportEntityPacket::new));
+    public static ClientboundTeleportEntityPacket teleport(int id, PositionMoveRotation values, Set<Relative> relatives, boolean onGround) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket#teleport");
+    }
+    public PacketType<ClientboundTeleportEntityPacket> type() {
+        return GamePacketTypes.CLIENTBOUND_TELEPORT_ENTITY;
+    }
+    public void handle(ClientGamePacketListener listener) {
+        listener.handleTeleportEntity(this);
+    }
+}

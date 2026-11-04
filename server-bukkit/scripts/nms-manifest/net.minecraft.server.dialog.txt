@@ -1,0 +1,146 @@
+//// ActionButton.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.server.dialog.action.Action;
+public record ActionButton(CommonButtonData button, Optional<Action> action) {
+    public static final Codec<ActionButton> CODEC;
+}
+//// ButtonListDialog.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.server.dialog.action.Action;
+public interface ButtonListDialog extends Dialog {
+    MapCodec<? extends ButtonListDialog> codec();
+    int columns();
+    Optional<ActionButton> exitAction();
+    default Optional<Action> onCancel();
+}
+//// CommonButtonData.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+public record CommonButtonData(Component label, Optional<Component> tooltip, int width) {
+    public static final int DEFAULT_WIDTH = 150;
+    public static final MapCodec<CommonButtonData> MAP_CODEC;
+    public CommonButtonData(Component label, int width);
+}
+//// CommonDialogData.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.dialog.body.DialogBody;
+public record CommonDialogData(Component title, Optional<Component> externalTitle, boolean canCloseWithEscape, boolean pause, DialogAction afterAction, List<DialogBody> body, List<Input> inputs) {
+    public static final MapCodec<CommonDialogData> MAP_CODEC;
+    public Component computeExternalTitle();
+}
+//// ConfirmationDialog.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.server.dialog.action.Action;
+public record ConfirmationDialog(CommonDialogData common, ActionButton yesButton, ActionButton noButton) implements SimpleDialog {
+    public static final MapCodec<ConfirmationDialog> MAP_CODEC;
+    public MapCodec<ConfirmationDialog> codec();
+    public Optional<Action> onCancel();
+    public List<ActionButton> mainActions();
+}
+//// Dialog.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.dialog.action.Action;
+public interface Dialog {
+    Codec<Integer> WIDTH_CODEC;
+    Codec<Dialog> DIRECT_CODEC;
+    Codec<Holder<Dialog>> CODEC;
+    Codec<HolderSet<Dialog>> LIST_CODEC;
+    StreamCodec<RegistryFriendlyByteBuf, Holder<Dialog>> STREAM_CODEC;
+    StreamCodec<ByteBuf, Dialog> CONTEXT_FREE_STREAM_CODEC;
+    CommonDialogData common();
+    MapCodec<? extends Dialog> codec();
+    Optional<Action> onCancel();
+}
+//// DialogAction.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.IntFunction;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum DialogAction implements StringRepresentable {
+    CLOSE, NONE, WAIT_FOR_RESPONSE;
+    public static final IntFunction<DialogAction> BY_ID;
+    public static final Codec<DialogAction> CODEC;
+    public static final StreamCodec<ByteBuf, DialogAction> STREAM_CODEC;
+    public String getSerializedName();
+    public boolean willUnpause();
+}
+//// DialogListDialog.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.HolderSet;
+public record DialogListDialog(CommonDialogData common, HolderSet<Dialog> dialogs, Optional<ActionButton> exitAction, int columns, int buttonWidth) implements ButtonListDialog {
+    public static final MapCodec<DialogListDialog> MAP_CODEC;
+    public MapCodec<DialogListDialog> codec();
+}
+//// DialogTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class DialogTypes {
+    public static MapCodec<? extends Dialog> bootstrap(Registry<MapCodec<? extends Dialog>> registry);
+}
+//// Dialogs.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class Dialogs {
+    public static final ResourceKey<Dialog> SERVER_LINKS;
+    public static final ResourceKey<Dialog> CUSTOM_OPTIONS;
+    public static final ResourceKey<Dialog> QUICK_ACTIONS;
+    public static final int BIG_BUTTON_WIDTH = 310;
+    public static void bootstrap(BootstrapContext<Dialog> context);
+}
+//// Input.java
+import com.mojang.serialization.Codec;
+import net.minecraft.server.dialog.input.InputControl;
+public record Input(String key, InputControl control) {
+    public static final Codec<Input> CODEC;
+}
+//// MultiActionDialog.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+public record MultiActionDialog(CommonDialogData common, List<ActionButton> actions, Optional<ActionButton> exitAction, int columns) implements ButtonListDialog {
+    public static final MapCodec<MultiActionDialog> MAP_CODEC;
+    public MapCodec<MultiActionDialog> codec();
+}
+//// NoticeDialog.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.server.dialog.action.Action;
+public record NoticeDialog(CommonDialogData common, ActionButton action) implements SimpleDialog {
+    public static final ActionButton DEFAULT_ACTION;
+    public static final MapCodec<NoticeDialog> MAP_CODEC;
+    public MapCodec<NoticeDialog> codec();
+    public Optional<Action> onCancel();
+    public List<ActionButton> mainActions();
+}
+//// ServerLinksDialog.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+public record ServerLinksDialog(CommonDialogData common, Optional<ActionButton> exitAction, int columns, int buttonWidth) implements ButtonListDialog {
+    public static final MapCodec<ServerLinksDialog> MAP_CODEC;
+    public MapCodec<ServerLinksDialog> codec();
+}
+//// SimpleDialog.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+public interface SimpleDialog extends Dialog {
+    MapCodec<? extends SimpleDialog> codec();
+    List<ActionButton> mainActions();
+}

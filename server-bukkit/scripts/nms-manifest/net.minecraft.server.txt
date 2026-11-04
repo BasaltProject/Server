@@ -1,0 +1,680 @@
+//// Bootstrap.java
+import java.io.PrintStream;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
+import net.minecraft.locale.Language;
+public class Bootstrap {
+    public static final PrintStream STDOUT;
+    public static final AtomicLong bootstrapDuration;
+    public static void bootStrap();
+    public static Set<String> getMissingTranslations(Language language);
+    public static void checkBootstrapCalled(Supplier<String> location);
+    public static void validate();
+    public static void realStdoutPrintln(String string);
+    public static void shutdownStdout();
+}
+//// ChainedJsonException.java
+import java.io.IOException;
+public class ChainedJsonException extends IOException {
+    public ChainedJsonException(String message);
+    public ChainedJsonException(String message, Throwable cause);
+    public void prependJsonKey(String key);
+    public void setFilenameAndFlush(String filename);
+    public String getMessage();
+    public static ChainedJsonException forException(Exception e);
+    public static class Entry {
+        private Entry();
+        public String getFilename();
+        public String getJsonKeys();
+        public String toString();
+    }
+}
+//// ConsoleInput.java
+import net.minecraft.commands.CommandSourceStack;
+public class ConsoleInput {
+    public final String msg;
+    public final CommandSourceStack source;
+    public ConsoleInput(String msg, CommandSourceStack source);
+}
+//// DebugLoggedPrintStream.java
+import java.io.OutputStream;
+public class DebugLoggedPrintStream extends LoggedPrintStream {
+    public DebugLoggedPrintStream(String name, OutputStream out);
+    protected void logLine(String out);
+}
+//// Eula.java
+import java.nio.file.Path;
+public class Eula {
+    public Eula(Path file);
+    public boolean hasAgreedToEULA();
+}
+//// LoggedPrintStream.java
+import java.io.OutputStream;
+import java.io.PrintStream;
+public class LoggedPrintStream extends PrintStream {
+    protected final String name;
+    public LoggedPrintStream(String name, OutputStream out);
+    public void println(String string);
+    public void println(Object object);
+    protected void logLine(String out);
+}
+//// Main.java
+public class Main {
+    public static void main(String[] args);
+}
+//// MinecraftServer.java
+import com.mojang.authlib.GameProfile;
+import com.mojang.datafixers.DataFixer;
+import java.io.IOException;
+import java.net.Proxy;
+import java.nio.file.Path;
+import java.security.KeyPair;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import net.minecraft.CrashReport;
+import net.minecraft.SystemReport;
+import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.LayeredRegistryAccess;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.PacketProcessor;
+import net.minecraft.network.chat.ChatDecorator;
+import net.minecraft.network.chat.ChatType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.network.protocol.status.ServerStatus;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.bossevents.CustomBossEvents;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerPlayerGameMode;
+import net.minecraft.server.level.progress.ChunkLoadStatusView;
+import net.minecraft.server.level.progress.LevelLoadListener;
+import net.minecraft.server.network.ServerConnectionListener;
+import net.minecraft.server.network.TextFilter;
+import net.minecraft.server.notifications.NotificationManager;
+import net.minecraft.server.notifications.ServerActivityMonitor;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.resources.CloseableResourceManager;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.server.permissions.LevelBasedPermissionSet;
+import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.PlayerList;
+import net.minecraft.util.ModCheck;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.debug.ServerDebugSubscribers;
+import net.minecraft.util.debugchart.SampleLogger;
+import net.minecraft.util.profiling.ProfileResults;
+import net.minecraft.util.thread.ReentrantBlockableEventLoop;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.RandomSequences;
+import net.minecraft.world.Stopwatches;
+import net.minecraft.world.clock.ServerClockManager;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelSettings;
+import net.minecraft.world.level.WorldDataConfiguration;
+import net.minecraft.world.level.chunk.storage.ChunkIOErrorReporter;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+import net.minecraft.world.level.gamerules.GameRule;
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.levelgen.WorldGenSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import net.minecraft.world.level.saveddata.WeatherData;
+import net.minecraft.world.level.storage.CommandStorage;
+import net.minecraft.world.level.storage.LevelData;
+import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.PlayerDataStorage;
+import net.minecraft.world.level.storage.SavedDataStorage;
+import net.minecraft.world.level.storage.WorldData;
+import net.minecraft.world.level.timers.TimerQueue;
+public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> implements CommandSource, ServerInfo, ChunkIOErrorReporter {
+    public static final String VANILLA_BRAND = "vanilla";
+    public static final int SPAWN_POSITION_SEARCH_RADIUS = 5;
+    public static final int ABSOLUTE_MAX_WORLD_SIZE = 29999984;
+    public static final LevelSettings DEMO_SETTINGS;
+    public static final Supplier<GameRules> DEFAULT_GAME_RULES;
+    public static final NameAndId ANONYMOUS_PLAYER_PROFILE;
+    public static final String SERVER_THREAD_NAME = "Server thread";
+    protected final LevelStorageSource.LevelStorageAccess storageSource;
+    protected final PlayerDataStorage playerDataStorage;
+    protected final Proxy proxy;
+    protected final Services services;
+    protected final WorldData worldData;
+    public static <S extends MinecraftServer> S spin(Function<Thread, S> factory);
+    public MinecraftServer(Thread serverThread, LevelStorageSource.LevelStorageAccess storageSource, PackRepository packRepository, WorldStem worldStem, Optional<GameRules> gameRules, Proxy proxy, DataFixer fixerUpper, Services services, LevelLoadListener levelLoadListener, boolean propagatesCrashes, NotificationManager notificationManager);
+    protected abstract boolean initServer() throws IOException;
+    public ChunkLoadStatusView createChunkLoadStatusView(int radius);
+    protected void loadLevel();
+    protected void forceDifficulty();
+    protected void createLevels();
+    protected GlobalPos selectLevelLoadFocusPos();
+    public GameType getDefaultGameType();
+    public boolean isHardcore();
+    public abstract LevelBasedPermissionSet operatorUserPermissions();
+    public abstract PermissionSet getFunctionCompilationPermissions();
+    public abstract boolean shouldRconBroadcast();
+    public boolean saveAllChunks(boolean silent, boolean flush, boolean force);
+    public boolean saveEverything(boolean silent, boolean flush, boolean force);
+    public void close();
+    protected void stopServer();
+    public String getLocalIp();
+    public void setLocalIp(String ip);
+    public boolean isRunning();
+    public void halt(boolean wait);
+    protected void runServer();
+    public NotificationManager notificationManager();
+    protected void waitUntilNextTick();
+    protected void waitForTasks();
+    public TickTask wrapRunnable(Runnable runnable);
+    protected boolean shouldRun(TickTask task);
+    protected boolean pollTask();
+    protected void doRunTask(TickTask task);
+    public Optional<Path> getWorldScreenshotFile();
+    public Path getServerDirectory();
+    public ServerActivityMonitor getServerActivityMonitor();
+    protected void onServerCrash(CrashReport report);
+    protected void onServerExit();
+    public boolean isPaused();
+    protected void tickServer(BooleanSupplier haveTime);
+    protected void processPacketsAndTick(boolean sprinting);
+    public void onTickRateChanged();
+    protected abstract SampleLogger getTickTimeLogger();
+    public abstract boolean isTickTimeLoggingEnabled();
+    protected void tickChildren(BooleanSupplier haveTime);
+    protected void tickConnection();
+    public void forceGameTimeSynchronization();
+    public void addTickable(Runnable tickable);
+    protected void setId(String serverId);
+    public boolean isShutdown();
+    public Path getFile(String name);
+    public final ServerLevel overworld();
+    public ServerLevel getLevel(ResourceKey<Level> dimension);
+    public Set<ResourceKey<Level>> levelKeys();
+    public Iterable<ServerLevel> getAllLevels();
+    public String getServerVersion();
+    public int getPlayerCount();
+    public String[] getPlayerNames();
+    public String getServerModName();
+    public ServerClockManager clockManager();
+    public SystemReport fillSystemReport(SystemReport systemReport);
+    public abstract SystemReport fillServerSystemReport(SystemReport systemReport);
+    public ModCheck getModdedStatus();
+    public void sendSystemMessage(Component message);
+    public KeyPair getKeyPair();
+    public int getPort();
+    public void setPort(int port);
+    public GameProfile getSingleplayerProfile();
+    public void setSingleplayerProfile(GameProfile singleplayerProfile);
+    public boolean isSingleplayer();
+    protected void initializeKeyPair();
+    public void setDifficulty(Difficulty difficulty, boolean ignoreLock);
+    public int getScaledTrackingDistance(int baseRange);
+    public void updateMobSpawningFlags();
+    public void setDifficultyLocked(boolean locked);
+    public boolean isDemo();
+    public void setDemo(boolean demo);
+    public Map<String, String> getCodeOfConducts();
+    public Optional<ServerResourcePackInfo> getServerResourcePack();
+    public boolean isResourcePackRequired();
+    public abstract boolean isDedicatedServer();
+    public abstract int getRateLimitPacketsPerSecond();
+    public abstract int getCommandSpamThresholdSeconds();
+    public abstract int getChatSpamThresholdSeconds();
+    public boolean usesAuthentication();
+    public void setUsesAuthentication(boolean onlineMode);
+    public boolean getPreventProxyConnections();
+    public void setPreventProxyConnections(boolean preventProxyConnections);
+    public abstract boolean useNativeTransport();
+    public boolean allowFlight();
+    public String getMotd();
+    public void setMotd(String motd);
+    public boolean isStopped();
+    public PlayerList getPlayerList();
+    public void setPlayerList(PlayerList players);
+    public abstract boolean isPublished();
+    public void setDefaultGameType(GameType gameType);
+    public int enforceGameTypeForPlayers(GameType gameType);
+    public ServerConnectionListener getConnection();
+    public boolean isReady();
+    public boolean publishServer(MultiplayerScope scope, boolean allowCommands, int port);
+    public boolean unpublishServer();
+    public int getTickCount();
+    public boolean isUnderSpawnProtection(ServerLevel level, BlockPos pos, Player player);
+    public boolean repliesToStatus();
+    public boolean hidesOnlinePlayers();
+    public Proxy getProxy();
+    public int playerIdleTimeout();
+    public void setPlayerIdleTimeout(int playerIdleTimeout);
+    public Services services();
+    public ServerStatus getStatus();
+    public void invalidateStatus();
+    public int getAbsoluteMaxWorldSize();
+    public boolean scheduleExecutables();
+    public void executeIfPossible(Runnable command);
+    public Thread getRunningThread();
+    public int getCompressionThreshold();
+    public boolean enforceSecureProfile();
+    public long getNextTickTime();
+    public DataFixer getFixerUpper();
+    public ServerAdvancementManager getAdvancements();
+    public ServerFunctionManager getFunctions();
+    public CompletableFuture<Void> reloadResources(Collection<String> packsToEnable);
+    public static WorldDataConfiguration configurePackRepository(PackRepository packRepository, WorldDataConfiguration initialDataConfig, boolean initMode, boolean safeMode);
+    public void kickUnlistedPlayers();
+    public PackRepository getPackRepository();
+    public Commands getCommands();
+    public CommandSourceStack createCommandSourceStack();
+    public ServerLevel findRespawnDimension();
+    public void setRespawnData(LevelData.RespawnData respawnData);
+    public LevelData.RespawnData getRespawnData();
+    public boolean acceptsSuccess();
+    public boolean acceptsFailure();
+    public abstract boolean shouldInformAdmins();
+    public WorldGenSettings getWorldGenSettings();
+    public RecipeManager getRecipeManager();
+    public ServerScoreboard getScoreboard();
+    public CommandStorage getCommandStorage();
+    public Stopwatches getStopwatches();
+    public CustomBossEvents getCustomBossEvents();
+    public RandomSource getRandomSequence(Identifier key);
+    public RandomSequences getRandomSequences();
+    public void setWeatherParameters(int clearTime, int rainTime, boolean raining, boolean thundering);
+    public WeatherData getWeatherData();
+    public boolean isEnforceWhitelist();
+    public void setEnforceWhitelist(boolean enforceWhitelist);
+    public boolean isUsingWhitelist();
+    public void setUsingWhitelist(boolean usingWhitelist);
+    public float getCurrentSmoothedTickTime();
+    public ServerTickRateManager tickRateManager();
+    public long getAverageTickTimeNanos();
+    public long[] getTickTimesNanos();
+    public LevelBasedPermissionSet getProfilePermissions(NameAndId nameAndId);
+    public abstract boolean isSingleplayerOwner(NameAndId nameAndId);
+    public void dumpServerProperties(Path path) throws IOException;
+    protected void endMetricsRecordingTick();
+    public boolean isRecordingMetrics();
+    public void startRecordingMetrics(Consumer<ProfileResults> onStopped, Consumer<Path> onFinished);
+    public void stopRecordingMetrics();
+    public void finishRecordingMetrics();
+    public void cancelRecordingMetrics();
+    public Path getWorldPath(LevelResource resource);
+    public boolean forceSynchronousWrites();
+    public StructureTemplateManager getStructureTemplateManager();
+    public WorldData getWorldData();
+    public RegistryAccess.Frozen registryAccess();
+    public LayeredRegistryAccess<RegistryLayer> registries();
+    public ReloadableServerRegistries.Holder reloadableRegistries();
+    public TextFilter createTextFilterForPlayer(ServerPlayer player);
+    public ServerPlayerGameMode createGameModeForPlayer(ServerPlayer player);
+    public GameType getForcedGameType();
+    public boolean forceGameMode();
+    public void setForceGameMode(boolean forceGameMode);
+    public ResourceManager getResourceManager();
+    public boolean isCurrentlySaving();
+    public boolean isTimeProfilerRunning();
+    public void startTimeProfiler();
+    public ProfileResults stopTimeProfiler();
+    public int getMaxChainedNeighborUpdates();
+    public void logChatMessage(Component message, ChatType.Bound chatType, String tag);
+    public ChatDecorator getChatDecorator();
+    public boolean logIPs();
+    public void handleCustomClickAction(Identifier id, Optional<Tag> payload);
+    public LevelLoadListener getLevelLoadListener();
+    public boolean setAutoSave(boolean enable);
+    public boolean isAutoSave();
+    public <T> void onGameRuleChanged(GameRule<T> rule, T value);
+    public GameRules getGlobalGameRules();
+    public SavedDataStorage getDataStorage();
+    public TimerQueue<MinecraftServer> getScheduledEvents();
+    public GameRules getGameRules();
+    public boolean acceptsTransfers();
+    public void reportChunkLoadFailure(Throwable throwable, RegionStorageInfo storageInfo, ChunkPos pos);
+    public void reportChunkSaveFailure(Throwable throwable, RegionStorageInfo storageInfo, ChunkPos pos);
+    protected void warnOnLowDiskSpace();
+    public void sendLowDiskSpaceWarning();
+    public void reportPacketHandlingException(Throwable throwable, PacketType<?> packetType);
+    public ServerLinks serverLinks();
+    protected int pauseWhenEmptySeconds();
+    public PacketProcessor packetProcessor();
+    public ServerDebugSubscribers debugSubscribers();
+    public static enum MultiplayerScope {
+        OFF, LAN;
+        public Component getDisplayName();
+        public Component getTooltip();
+    }
+    public static record ServerResourcePackInfo(UUID id, String url, String hash, boolean isRequired, Component prompt) {
+    }
+    static record ReloadableResources(CloseableResourceManager resourceManager, ReloadableServerResources managers) implements AutoCloseable {
+        public void close();
+    }
+    static class TimeProfiler {
+        private TimeProfiler(long startNanos, int startTick);
+    }
+}
+//// PlayerAdvancements.java
+import com.mojang.datafixers.DataFixer;
+import com.mojang.serialization.Codec;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.advancements.AdvancementProgress;
+import net.minecraft.advancements.CriterionTriggerInstance;
+import net.minecraft.advancements.triggers.CriterionTrigger;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
+public class PlayerAdvancements {
+    public PlayerAdvancements(DataFixer dataFixer, PlayerList playerList, ServerAdvancementManager manager, Path playerSavePath, ServerPlayer player);
+    public void setPlayer(ServerPlayer player);
+    public void clearTriggers();
+    public void reload(ServerAdvancementManager manager);
+    public void save();
+    public boolean award(AdvancementHolder holder, String criterion);
+    public boolean revoke(AdvancementHolder advancement, String criterion);
+    public void flushDirty(ServerPlayer player, boolean showAdvancements);
+    public void setSelectedTab(AdvancementHolder holder);
+    public AdvancementProgress getOrStartProgress(AdvancementHolder advancement);
+    public <T extends CriterionTriggerInstance> Map<TriggerInstanceKey, T> getTriggerMapForType(CriterionTrigger<T> type);
+    public static record TriggerInstanceKey(AdvancementHolder advancement, String criterion) {
+    }
+    static record Data(Map<Identifier, AdvancementProgress> map) {
+        public static final Codec<Data> CODEC;
+        public void forEach(BiConsumer<Identifier, AdvancementProgress> consumer);
+    }
+}
+//// RegistryLayer.java
+import net.minecraft.core.LayeredRegistryAccess;
+public enum RegistryLayer {
+    STATIC, WORLD, DIMENSIONS, RELOADABLE;
+    public static LayeredRegistryAccess<RegistryLayer> createRegistryAccess();
+}
+//// ReloadableServerRegistries.java
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.LayeredRegistryAccess;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class ReloadableServerRegistries {
+    public static CompletableFuture<LoadResult> reload(LayeredRegistryAccess<RegistryLayer> context, List<Registry.PendingTags<?>> updatedContextTags, ResourceManager manager, Executor executor);
+    public static record LoadResult(LayeredRegistryAccess<RegistryLayer> layers, HolderLookup.Provider lookupWithUpdatedTags) {
+    }
+    public static class Holder {
+        public Holder(HolderLookup.Provider registries);
+        public HolderLookup.Provider lookup();
+        public LootTable getLootTable(ResourceKey<LootTable> id);
+    }
+}
+//// ReloadableServerResources.java
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.LayeredRegistryAccess;
+import net.minecraft.core.Registry;
+import net.minecraft.core.component.DataComponentInitializers;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.item.crafting.RecipeManager;
+public class ReloadableServerResources {
+    private ReloadableServerResources(ReloadableServerRegistries.LoadResult loadingContext, FeatureFlagSet enabledFeatures, Commands.CommandSelection commandSelection, List<Registry.PendingTags<?>> postponedTags, PermissionSet functionCompilationPermissions, List<DataComponentInitializers.PendingComponents<?>> newComponents);
+    public ServerFunctionLibrary getFunctionLibrary();
+    public ReloadableServerRegistries.Holder fullRegistries();
+    public RecipeManager getRecipeManager();
+    public Commands getCommands();
+    public ServerAdvancementManager getAdvancements();
+    public List<PreparableReloadListener> listeners();
+    public static CompletableFuture<ReloadableServerResources> loadResources(ResourceManager resourceManager, LayeredRegistryAccess<RegistryLayer> contextLayers, List<Registry.PendingTags<?>> updatedContextTags, FeatureFlagSet enabledFeatures, Commands.CommandSelection commandSelection, PermissionSet functionCompilationPermissions, Executor backgroundExecutor, Executor mainThreadExecutor);
+    public void updateComponentsAndStaticRegistryTags();
+}
+//// RunningOnDifferentThreadException.java
+public final class RunningOnDifferentThreadException extends RuntimeException {
+    public static final RunningOnDifferentThreadException RUNNING_ON_DIFFERENT_THREAD;
+    private RunningOnDifferentThreadException();
+    public Throwable fillInStackTrace();
+}
+//// ServerAdvancementManager.java
+import java.util.Collection;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.advancements.AdvancementTree;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.resources.Identifier;
+public class ServerAdvancementManager {
+    public ServerAdvancementManager(HolderLookup.Provider registries);
+    public AdvancementHolder get(Identifier id);
+    public AdvancementTree tree();
+    public Collection<AdvancementHolder> getAllAdvancements();
+}
+//// ServerFunctionLibrary.java
+import com.mojang.brigadier.CommandDispatcher;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.functions.CommandFunction;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
+import net.minecraft.server.permissions.PermissionSet;
+public class ServerFunctionLibrary implements PreparableReloadListener {
+    public static final ResourceKey<Registry<CommandFunction<CommandSourceStack>>> TYPE_KEY;
+    public Optional<CommandFunction<CommandSourceStack>> getFunction(Identifier id);
+    public Map<Identifier, CommandFunction<CommandSourceStack>> getFunctions();
+    public List<CommandFunction<CommandSourceStack>> getTag(Identifier tag);
+    public Iterable<Identifier> getAvailableTags();
+    public ServerFunctionLibrary(PermissionSet functionCompilationPermissions, CommandDispatcher<CommandSourceStack> dispatcher);
+    public CompletableFuture<Void> reload(PreparableReloadListener.SharedState currentReload, Executor taskExecutor, PreparableReloadListener.PreparationBarrier preparationBarrier, Executor reloadExecutor);
+}
+//// ServerFunctionManager.java
+import com.mojang.brigadier.CommandDispatcher;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.functions.CommandFunction;
+import net.minecraft.resources.Identifier;
+public class ServerFunctionManager {
+    public ServerFunctionManager(MinecraftServer server, ServerFunctionLibrary library);
+    public CommandDispatcher<CommandSourceStack> getDispatcher();
+    public void tick();
+    public void execute(CommandFunction<CommandSourceStack> functionIn, CommandSourceStack sender);
+    public void replaceLibrary(ServerFunctionLibrary library);
+    public CommandSourceStack getGameLoopSender();
+    public Optional<CommandFunction<CommandSourceStack>> get(Identifier id);
+    public List<CommandFunction<CommandSourceStack>> getTag(Identifier id);
+    public Iterable<Identifier> getFunctionNames();
+    public Iterable<Identifier> getTagNames();
+}
+//// ServerInfo.java
+public interface ServerInfo {
+    String getMotd();
+    String getServerVersion();
+    int getPlayerCount();
+    int getMaxPlayers();
+}
+//// ServerInterface.java
+import net.minecraft.server.dedicated.DedicatedServerProperties;
+public interface ServerInterface extends ServerInfo {
+    DedicatedServerProperties getProperties();
+    String getServerIp();
+    int getServerPort();
+    String getServerName();
+    String[] getPlayerNames();
+    String getLevelIdName();
+    String getPluginNames();
+    String runCommand(String command);
+}
+//// ServerLinks.java
+import com.mojang.datafixers.util.Either;
+import io.netty.buffer.ByteBuf;
+import java.net.URI;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+public record ServerLinks(List<Entry> entries) {
+    public static final ServerLinks EMPTY;
+    public static final StreamCodec<ByteBuf, Either<KnownLinkType, Component>> TYPE_STREAM_CODEC;
+    public static final StreamCodec<ByteBuf, List<UntrustedEntry>> UNTRUSTED_LINKS_STREAM_CODEC;
+    public boolean isEmpty();
+    public Optional<Entry> findKnownType(KnownLinkType type);
+    public List<UntrustedEntry> untrust();
+    public static record UntrustedEntry(Either<KnownLinkType, Component> type, String link) {
+        public static final StreamCodec<ByteBuf, UntrustedEntry> STREAM_CODEC;
+    }
+    public static record Entry(Either<KnownLinkType, Component> type, URI link) {
+        public static Entry knownType(KnownLinkType type, URI link);
+        public static Entry custom(Component displayName, URI link);
+        public Component displayName();
+    }
+    public static enum KnownLinkType {
+        BUG_REPORT, COMMUNITY_GUIDELINES, SUPPORT, STATUS, FEEDBACK, COMMUNITY, WEBSITE, FORUMS, NEWS, ANNOUNCEMENTS;
+        public static final StreamCodec<ByteBuf, KnownLinkType> STREAM_CODEC;
+        public Entry create(URI link);
+    }
+}
+//// ServerScoreboard.java
+import java.util.List;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.world.scores.DisplaySlot;
+import net.minecraft.world.scores.Objective;
+import net.minecraft.world.scores.PlayerTeam;
+import net.minecraft.world.scores.Score;
+import net.minecraft.world.scores.ScoreHolder;
+import net.minecraft.world.scores.Scoreboard;
+import net.minecraft.world.scores.ScoreboardSaveData;
+public class ServerScoreboard extends Scoreboard {
+    public ServerScoreboard(MinecraftServer server);
+    public void load(ScoreboardSaveData.Packed data);
+    protected void onScoreChanged(ScoreHolder owner, Objective objective, Score score);
+    protected void onScoreLockChanged(ScoreHolder owner, Objective objective);
+    public void onPlayerRemoved(ScoreHolder player);
+    public void onPlayerScoreRemoved(ScoreHolder player, Objective objective);
+    public void setDisplayObjective(DisplaySlot slot, Objective objective);
+    public boolean addPlayerToTeam(String player, PlayerTeam team);
+    public void removePlayerFromTeam(String player, PlayerTeam team);
+    public void onObjectiveAdded(Objective objective);
+    public void onObjectiveChanged(Objective objective);
+    public void onObjectiveRemoved(Objective objective);
+    public void onTeamAdded(PlayerTeam team);
+    public void onTeamChanged(PlayerTeam team);
+    public void onTeamRemoved(PlayerTeam team);
+    protected void setDirty();
+    public void storeToSaveDataIfDirty(ScoreboardSaveData saveData);
+    public List<Packet<?>> getStartTrackingPackets(Objective objective);
+    public void startTrackingObjective(Objective objective);
+    public List<Packet<?>> getStopTrackingPackets(Objective objective);
+    public void stopTrackingObjective(Objective objective);
+    public int getObjectiveDisplaySlotCount(Objective objective);
+}
+//// ServerTickRateManager.java
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.TickRateManager;
+public class ServerTickRateManager extends TickRateManager {
+    public ServerTickRateManager(MinecraftServer server);
+    public boolean isSprinting();
+    public void setFrozen(boolean frozen);
+    public boolean stepGameIfPaused(int ticks);
+    public boolean stopStepping();
+    public boolean stopSprinting();
+    public boolean requestGameToSprint(int time);
+    public boolean checkShouldSprintThisTick();
+    public void endTickWork();
+    public void setTickRate(float rate);
+    public void updateJoiningPlayer(ServerPlayer player);
+}
+//// Services.java
+import com.mojang.authlib.GameProfileRepository;
+import com.mojang.authlib.minecraft.SessionService;
+import com.mojang.authlib.services.MinecraftServicesDiscoveryService;
+import com.mojang.authlib.services.ServicesKeySet;
+import java.io.File;
+import net.minecraft.server.players.ProfileResolver;
+import net.minecraft.server.players.UserNameToIdResolver;
+import net.minecraft.util.SignatureValidator;
+public record Services(SessionService sessionService, ServicesKeySet servicesKeySet, GameProfileRepository profileRepository, UserNameToIdResolver nameToIdCache, ProfileResolver profileResolver) {
+    public static Services create(MinecraftServicesDiscoveryService serviceAccess, File nameCacheDir);
+    public SignatureValidator profileKeySignatureValidator();
+    public boolean canValidateProfileKeys();
+}
+//// SuppressedExceptionCollector.java
+public class SuppressedExceptionCollector {
+    public void addEntry(String location, Throwable throwable);
+    public String dump();
+    static record LongEntry(long timestampMs, String location, Class<? extends Throwable> cls, String message) {
+    }
+    static record ShortEntry(String location, Class<? extends Throwable> cls) {
+    }
+}
+//// TickTask.java
+public class TickTask implements Runnable {
+    public TickTask(int tick, Runnable runnable);
+    public int getTick();
+    public void run();
+}
+//// WorldLoader.java
+import com.mojang.datafixers.util.Pair;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.LayeredRegistryAccess;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.resources.CloseableResourceManager;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.world.level.WorldDataConfiguration;
+public class WorldLoader {
+    public static <D, R> CompletableFuture<R> load(InitConfig config, WorldDataSupplier<D> worldDataSupplier, ResultFactory<D, R> resultFactory, Executor backgroundExecutor, Executor mainThreadExecutor);
+    public static record DataLoadContext(ResourceManager resources, WorldDataConfiguration dataConfiguration, HolderLookup.Provider datapackWorldRegistries, RegistryAccess.Frozen datapackDimensions) {
+    }
+    public static record DataLoadOutput<D>(D cookie, RegistryAccess.Frozen finalDimensions) {
+    }
+    public static record PackConfig(PackRepository packRepository, WorldDataConfiguration initialDataConfig, boolean safeMode, boolean initMode) {
+        public Pair<WorldDataConfiguration, CloseableResourceManager> createResourceManager();
+    }
+    public static record InitConfig(PackConfig packConfig, Commands.CommandSelection commandSelection, PermissionSet functionCompilationPermissions) {
+    }
+    public interface ResultFactory<D, R> {
+        R create(CloseableResourceManager resources, ReloadableServerResources managers, LayeredRegistryAccess<RegistryLayer> registries, D cookie);
+    }
+    public interface WorldDataSupplier<D> {
+        DataLoadOutput<D> get(DataLoadContext context);
+    }
+}
+//// WorldStem.java
+import net.minecraft.core.LayeredRegistryAccess;
+import net.minecraft.server.packs.resources.CloseableResourceManager;
+import net.minecraft.world.level.storage.LevelDataAndDimensions;
+public record WorldStem(CloseableResourceManager resourceManager, ReloadableServerResources dataPackResources, LayeredRegistryAccess<RegistryLayer> registries, LevelDataAndDimensions.WorldDataAndGenSettings worldDataAndGenSettings) implements AutoCloseable {
+    public void close();
+}

@@ -1,0 +1,133 @@
+//// ArrowGizmo.java
+import net.minecraft.world.phys.Vec3;
+public record ArrowGizmo(Vec3 start, Vec3 end, int color, float width) implements Gizmo {
+    public static final float DEFAULT_WIDTH = 2.5F;
+    public void emit(GizmoPrimitives primitives, float alphaMultiplier);
+}
+//// CircleGizmo.java
+import net.minecraft.world.phys.Vec3;
+public record CircleGizmo(Vec3 pos, float radius, GizmoStyle style) implements Gizmo {
+    public void emit(GizmoPrimitives primitives, float alphaMultiplier);
+}
+//// CuboidGizmo.java
+import net.minecraft.world.phys.AABB;
+public record CuboidGizmo(AABB aabb, GizmoStyle style, boolean coloredCornerStroke) implements Gizmo {
+    public void emit(GizmoPrimitives primitives, float alphaMultiplier);
+}
+//// Gizmo.java
+public interface Gizmo {
+    void emit(GizmoPrimitives primitives, float alphaMultiplier);
+}
+//// GizmoCollector.java
+public interface GizmoCollector {
+    GizmoProperties IGNORED;
+    GizmoCollector NOOP;
+    GizmoProperties add(Gizmo gizmo);
+}
+//// GizmoPrimitives.java
+import net.minecraft.world.phys.Vec3;
+public interface GizmoPrimitives {
+    void addPoint(Vec3 pos, int color, float size);
+    void addLine(Vec3 start, Vec3 end, int color, float width);
+    void addTriangleFan(Vec3[] points, int color);
+    void addQuad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, int color);
+    void addText(Vec3 pos, String text, TextGizmo.Style style);
+}
+//// GizmoProperties.java
+public interface GizmoProperties {
+    GizmoProperties setAlwaysOnTop();
+    GizmoProperties persistForMillis(int milliseconds);
+    GizmoProperties fadeOut();
+}
+//// GizmoStyle.java
+public record GizmoStyle(int stroke, float strokeWidth, int fill) {
+    public static GizmoStyle stroke(int argb);
+    public static GizmoStyle stroke(int argb, float width);
+    public static GizmoStyle fill(int argb);
+    public static GizmoStyle strokeAndFill(int stroke, float strokeWidth, int fill);
+    public boolean hasFill();
+    public boolean hasStroke();
+    public int multipliedStroke(float alphaMultiplier);
+    public int multipliedFill(float alphaMultiplier);
+}
+//// Gizmos.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public class Gizmos {
+    private Gizmos();
+    public static TemporaryCollection withCollector(GizmoCollector collector);
+    public static GizmoProperties addGizmo(Gizmo gizmo);
+    public static GizmoProperties cuboid(AABB aabb, GizmoStyle style);
+    public static GizmoProperties cuboid(AABB aabb, GizmoStyle style, boolean coloredCorner);
+    public static GizmoProperties cuboid(BlockPos blockPos, GizmoStyle style);
+    public static GizmoProperties cuboid(BlockPos blockPos, float padding, GizmoStyle style);
+    public static GizmoProperties circle(Vec3 pos, float radius, GizmoStyle style);
+    public static GizmoProperties line(Vec3 start, Vec3 end, int argb);
+    public static GizmoProperties line(Vec3 start, Vec3 end, int argb, float width);
+    public static GizmoProperties arrow(Vec3 start, Vec3 end, int argb);
+    public static GizmoProperties arrow(Vec3 start, Vec3 end, int argb, float width);
+    public static GizmoProperties rect(Vec3 cuboidCornerA, Vec3 cuboidCornerB, Direction face, GizmoStyle style);
+    public static GizmoProperties rect(Vec3 cornerA, Vec3 cornerB, Vec3 cornerC, Vec3 cornerD, GizmoStyle style);
+    public static GizmoProperties point(Vec3 position, int argb, float size);
+    public static GizmoProperties billboardTextOverBlock(String text, BlockPos pos, int row, int color, float scale);
+    public static GizmoProperties billboardTextOverMob(Entity entity, int row, String text, int color, float scale);
+    public static GizmoProperties billboardText(String name, Vec3 pos, TextGizmo.Style style);
+    public static class TemporaryCollection implements AutoCloseable {
+        private TemporaryCollection();
+        public void close();
+    }
+}
+//// LineGizmo.java
+import net.minecraft.world.phys.Vec3;
+public record LineGizmo(Vec3 start, Vec3 end, int color, float width) implements Gizmo {
+    public static final float DEFAULT_WIDTH = 3.0F;
+    public void emit(GizmoPrimitives primitives, float alphaMultiplier);
+}
+//// PointGizmo.java
+import net.minecraft.world.phys.Vec3;
+public record PointGizmo(Vec3 pos, int color, float size) implements Gizmo {
+    public void emit(GizmoPrimitives primitives, float alphaMultiplier);
+}
+//// RectGizmo.java
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+public record RectGizmo(Vec3 a, Vec3 b, Vec3 c, Vec3 d, GizmoStyle style) implements Gizmo {
+    public static RectGizmo fromCuboidFace(Vec3 cuboidCornerA, Vec3 cuboidCornerB, Direction face, GizmoStyle style);
+    public void emit(GizmoPrimitives primitives, float alphaMultiplier);
+}
+//// SimpleGizmoCollector.java
+import java.util.Collection;
+import java.util.List;
+public class SimpleGizmoCollector implements GizmoCollector {
+    public GizmoProperties add(Gizmo gizmo);
+    public List<GizmoInstance> drainGizmos();
+    public List<GizmoInstance> getGizmos();
+    public void addTemporaryGizmos(Collection<GizmoInstance> gizmos);
+    public static class GizmoInstance implements GizmoProperties {
+        private GizmoInstance(Gizmo gizmo);
+        public GizmoProperties setAlwaysOnTop();
+        public GizmoProperties persistForMillis(int milliseconds);
+        public GizmoProperties fadeOut();
+        public float getAlphaMultiplier(long currentMillis);
+        public boolean isAlwaysOnTop();
+        public long getExpireTimeMillis();
+        public Gizmo gizmo();
+    }
+}
+//// TextGizmo.java
+import java.util.OptionalDouble;
+import net.minecraft.world.phys.Vec3;
+public record TextGizmo(Vec3 pos, String text, Style style) implements Gizmo {
+    public void emit(GizmoPrimitives primitives, float alphaMultiplier);
+    public static record Style(int color, float scale, OptionalDouble adjustLeft) {
+        public static final float DEFAULT_SCALE = 0.32F;
+        public static Style whiteAndCentered();
+        public static Style forColorAndCentered(int argb);
+        public static Style forColor(int argb);
+        public Style withScale(float scale);
+        public Style withLeftAlignment(float adjustLeft);
+    }
+}

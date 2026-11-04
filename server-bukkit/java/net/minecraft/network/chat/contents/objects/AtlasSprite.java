@@ -1,0 +1,26 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.chat.contents.objects;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.data.AtlasIds;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.resources.Identifier;
+public record AtlasSprite(Identifier atlas, Identifier sprite) implements ObjectInfo {
+    public static final Identifier DEFAULT_ATLAS = AtlasIds.BLOCKS;
+    public static final MapCodec<AtlasSprite> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+        Identifier.CODEC.optionalFieldOf("atlas", DEFAULT_ATLAS).forGetter(AtlasSprite::atlas),
+        Identifier.CODEC.fieldOf("sprite").forGetter(AtlasSprite::sprite)).apply(i, AtlasSprite::new));
+    public MapCodec<AtlasSprite> codec() {
+        return MAP_CODEC;
+    }
+    public FontDescription fontDescription() {
+        return new FontDescription.AtlasSprite(atlas, sprite);
+    }
+    private static String toShortName(Identifier id) {
+        return id.getNamespace().equals("minecraft") ? id.getPath() : id.toString();
+    }
+    public String defaultFallback() {
+        String shortName = toShortName(sprite);
+        return atlas.equals(DEFAULT_ATLAS) ? "[" + shortName + "]" : "[" + shortName + "@" + toShortName(atlas) + "]";
+    }
+}

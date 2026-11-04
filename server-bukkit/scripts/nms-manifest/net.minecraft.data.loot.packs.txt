@@ -1,0 +1,129 @@
+//// TradeRebalanceChestLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class TradeRebalanceChestLoot implements LootTableSubProvider {
+    public TradeRebalanceChestLoot(LootTableSubProvider.Context output);
+    public void run();
+    public LootTable.Builder pillagerOutpostLootTable();
+    public LootTable.Builder desertPyramidLootTable();
+    public LootTable.Builder ancientCityLootTable();
+    public LootTable.Builder jungleTempleLootTable();
+}
+//// TradeRebalanceLootTableProvider.java
+import net.minecraft.core.registries.SingleRegistryBootstrap;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class TradeRebalanceLootTableProvider {
+    public static SingleRegistryBootstrap<LootTable> create();
+}
+//// VanillaArchaeologyLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+public class VanillaArchaeologyLoot implements LootTableSubProvider {
+    public VanillaArchaeologyLoot(LootTableSubProvider.Context output);
+    public void run();
+}
+//// VanillaBlockInteractLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+public class VanillaBlockInteractLoot implements LootTableSubProvider {
+    public VanillaBlockInteractLoot(LootTableSubProvider.Context output);
+    public void run();
+}
+//// VanillaBlockLoot.java
+import net.minecraft.data.loot.BlockLootSubProvider;
+import net.minecraft.data.loot.LootTableSubProvider;
+public class VanillaBlockLoot extends BlockLootSubProvider {
+    public VanillaBlockLoot(LootTableSubProvider.Context context);
+    protected void generate();
+}
+//// VanillaChargedCreeperExplosionLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class VanillaChargedCreeperExplosionLoot implements LootTableSubProvider {
+    public VanillaChargedCreeperExplosionLoot(LootTableSubProvider.Context output);
+    public void run();
+    static record Entry(ResourceKey<LootTable> lootTable, EntityType<?> entityType, Item item) {
+    }
+}
+//// VanillaChestLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class VanillaChestLoot implements LootTableSubProvider {
+    public VanillaChestLoot(LootTableSubProvider.Context output);
+    public void run();
+    public void spawnerLootTables();
+    public LootTable.Builder shipwreckSupplyLootTable();
+    public LootTable.Builder shipwreckMapLootTable();
+    public LootTable.Builder bastionHoglinStableLootTable();
+    public LootTable.Builder bastionBridgeLootTable();
+    public LootTable.Builder endCityTreasureLootTable();
+    public LootTable.Builder netherBridgeLootTable();
+    public LootTable.Builder bastionTreasureLootTable();
+    public LootTable.Builder bastionOtherLootTable();
+    public LootTable.Builder woodlandMansionLootTable();
+    public LootTable.Builder strongholdLibraryLootTable();
+    public LootTable.Builder strongholdCorridorLootTable();
+    public LootTable.Builder ancientCityLootTable();
+    public LootTable.Builder jungleTempleLootTable();
+    public LootTable.Builder shipwreckTreasureLootTable();
+    public LootTable.Builder pillagerOutpostLootTable();
+    public LootTable.Builder desertPyramidLootTable();
+}
+//// VanillaEntityInteractLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+public class VanillaEntityInteractLoot implements LootTableSubProvider {
+    public VanillaEntityInteractLoot(LootTableSubProvider.Context output);
+    public void run();
+}
+//// VanillaEntityLoot.java
+import net.minecraft.data.loot.EntityLootSubProvider;
+import net.minecraft.data.loot.LootTableSubProvider;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class VanillaEntityLoot extends EntityLootSubProvider {
+    public VanillaEntityLoot(LootTableSubProvider.Context output);
+    public void generate();
+    public LootTable.Builder elderGuardianLootTable();
+}
+//// VanillaEquipmentLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.equipment.trim.ArmorTrim;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class VanillaEquipmentLoot implements LootTableSubProvider {
+    public VanillaEquipmentLoot(LootTableSubProvider.Context output);
+    public void run();
+    public LootTable.Builder trialChamberEquipment(Item helmet, Item chestplate, ArmorTrim trim);
+}
+//// VanillaFishingLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class VanillaFishingLoot implements LootTableSubProvider {
+    public VanillaFishingLoot(LootTableSubProvider.Context output);
+    public void run();
+    public static LootTable.Builder fishingFishLootTable();
+}
+//// VanillaGiftLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+public class VanillaGiftLoot implements LootTableSubProvider {
+    public VanillaGiftLoot(LootTableSubProvider.Context output);
+    public void run();
+}
+//// VanillaLootTableProvider.java
+import net.minecraft.core.registries.SingleRegistryBootstrap;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class VanillaLootTableProvider {
+    public static SingleRegistryBootstrap<LootTable> create();
+}
+//// VanillaPiglinBarterLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+public class VanillaPiglinBarterLoot implements LootTableSubProvider {
+    public VanillaPiglinBarterLoot(LootTableSubProvider.Context output);
+    public void run();
+}
+//// VanillaShearingLoot.java
+import net.minecraft.data.loot.LootTableSubProvider;
+public class VanillaShearingLoot implements LootTableSubProvider {
+    public VanillaShearingLoot(LootTableSubProvider.Context output);
+    public void run();
+}

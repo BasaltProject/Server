@@ -10,6 +10,11 @@
 #include <memory>
 #include <vector>
 
+namespace basalt::server::runtime::world {
+class LoadedWorld;
+class RealLootTables;
+} // namespace basalt::server::runtime::world
+
 namespace basalt::server::runtime::plugins {
 
 class ServerAdvancements final : public server::plugins::PluginAdvancements {
@@ -19,6 +24,8 @@ public:
         std::function<world::PlayerProgress*()> progress;
         std::function<world::AdvancementTriggers*()> triggers;
         std::function<std::vector<player::PlayerSession*>()> sessions;
+        std::function<world::LoadedWorld*(const std::string& name)> worldFor;
+        world::RealLootTables* lootTables = nullptr;
     };
 
     explicit ServerAdvancements(Hooks hooks) : hooks_(std::move(hooks)) {}
@@ -28,6 +35,8 @@ public:
     [[nodiscard]] std::map<std::string, std::int64_t> obtained(std::string_view uuid, std::string_view id) override;
     bool grant(std::string_view uuid, std::string_view id, std::string_view criterion) override;
     bool revoke(std::string_view uuid, std::string_view id, std::string_view criterion) override;
+    bool trigger(std::string_view uuid, std::string_view trigger,
+                 const server::plugins::PluginTriggerFacts& facts) override;
 
 private:
     [[nodiscard]] const world::AdvancementTree& tree();

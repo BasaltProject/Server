@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.nbt;
 
 import java.io.DataOutput;
@@ -82,5 +83,24 @@ public final class ShortTag implements NumericTag {
     @Override
     public String toString() {
         return value + "s";
+    }
+    public static final TagType<ShortTag> TYPE = org.basaltmc.bukkit.facade.NbtSupport.type("SHORT", "TAG_Short",
+        (in, acc) -> {
+            acc.accountBytes(10);
+            return ShortTag.valueOf(in.readShort());
+        });
+    public int sizeInBytes() {
+        return 10;
+    }
+    public TagType<ShortTag> getType() {
+        return TYPE;
+    }
+    public void accept(TagVisitor visitor) {
+        visitor.visitShort(this);
+    }
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor) {
+        return visitor.visit(value);
+    }
+    static class Cache {
     }
 }

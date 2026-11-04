@@ -1,0 +1,83 @@
+//// BlockMatcher.java
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+public abstract class BlockMatcher {
+    protected final LevelReader level;
+    protected Predicate<BlockState> statePredicate;
+    public BlockMatcher(LevelReader levelReader);
+    public BlockMatcher filterState(Predicate<BlockState> predicate);
+    public abstract boolean atLeastMatched(int n);
+    public boolean atMostMatched(int n);
+    public boolean anyMatched();
+    protected abstract boolean anyMatched(Predicate<BlockState> statePredicate);
+    public boolean noneMatched();
+    public boolean allMatched();
+    public abstract void forEach(BiConsumer<BlockPos, BlockState> consumer);
+    public abstract boolean forEachUntil(BlockStateConsumer consumer);
+}
+//// BlockScanUtils.java
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+public class BlockScanUtils {
+    static boolean findBlocks(LevelReader level, BlockPos from, BlockPos to, Predicate<BlockState> predicate, BlockStateConsumer consumer);
+    public static boolean findBlocksInSection(LevelChunkSection section, BlockPos origin, int fromX, int fromY, int fromZ, int toX, int toY, int toZ, Predicate<BlockState> predicate, BlockStateConsumer consumer);
+    static boolean findBlocksWithCache(LevelReader level, Iterable<BlockPos> positions, Predicate<BlockState> predicate, BlockStateConsumer consumer);
+}
+//// BlockStateConsumer.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Continuation;
+import net.minecraft.world.level.block.state.BlockState;
+public interface BlockStateConsumer {
+    Continuation apply(BlockPos pos, BlockState state);
+}
+//// BoxBlockMatcher.java
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+public class BoxBlockMatcher extends BlockMatcher {
+    public BoxBlockMatcher(LevelReader level, BlockPos from, BlockPos to);
+    public BoxBlockMatcher filterState(Predicate<BlockState> predicate);
+    public boolean atLeastMatched(int n);
+    protected boolean anyMatched(Predicate<BlockState> statePredicate);
+    public void forEach(BiConsumer<BlockPos, BlockState> consumer);
+    public boolean forEachUntil(BlockStateConsumer consumer);
+}
+//// FilteredSectionCache.java
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+public class FilteredSectionCache {
+    public FilteredSectionCache(LevelReader level, Predicate<BlockState> statePredicate);
+    public BlockState getBlockState(BlockPos pos);
+    static record CacheEntry(LevelChunkSection chunkSection, int sectionX, int sectionY, int sectionZ) {
+    }
+}
+//// OrderedBlockMatcher.java
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+public class OrderedBlockMatcher extends BlockMatcher {
+    public OrderedBlockMatcher(LevelReader level, Iterable<BlockPos> positions);
+    public OrderedBlockMatcher filterPos(Predicate<? super BlockPos> predicate);
+    public OrderedBlockMatcher filterState(Predicate<BlockState> predicate);
+    public boolean atLeastMatched(int n);
+    protected boolean anyMatched(Predicate<BlockState> statePredicate);
+    public void forEach(BiConsumer<BlockPos, BlockState> consumer);
+    public boolean forEachUntil(BlockStateConsumer consumer);
+    public Optional<BlockPos> findFirst();
+    public Optional<BlockPos> findFirst(BiPredicate<BlockPos, BlockState> predicate);
+}

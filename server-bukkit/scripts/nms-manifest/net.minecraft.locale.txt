@@ -1,0 +1,32 @@
+//// DeprecatedTranslationsInfo.java
+import com.mojang.serialization.Codec;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
+public record DeprecatedTranslationsInfo(List<String> removed, Map<String, String> renamed) {
+    public static final DeprecatedTranslationsInfo EMPTY;
+    public static final Codec<DeprecatedTranslationsInfo> CODEC;
+    public static DeprecatedTranslationsInfo loadFromJson(InputStream stream);
+    public static DeprecatedTranslationsInfo loadFromResource(String path);
+    public static DeprecatedTranslationsInfo loadFromDefaultResource();
+    public void applyToMap(Map<String, String> translations);
+}
+//// Language.java
+import java.io.InputStream;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.util.FormattedCharSequence;
+public abstract class Language {
+    public static final String DEFAULT = "en_us";
+    public static final Language DEFAULT_INSTANCE;
+    public static void loadFromJson(InputStream stream, BiConsumer<String, String> output);
+    public static Language getInstance();
+    public static void inject(Language language);
+    public String getOrDefault(String elementId);
+    public abstract String getOrDefault(String elementId, String defaultValue);
+    public abstract boolean has(String elementId);
+    public abstract boolean isDefaultRightToLeft();
+    public abstract FormattedCharSequence getVisualOrder(FormattedText logicalOrderText);
+    public List<FormattedCharSequence> getVisualOrder(List<FormattedText> lines);
+}

@@ -1,0 +1,9 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.protocol.login.custom;
+import net.minecraft.network.FriendlyByteBuf;
+public record DiscardedQueryAnswerPayload() implements CustomQueryAnswerPayload {
+    public static final DiscardedQueryAnswerPayload INSTANCE = new DiscardedQueryAnswerPayload();
+    public void write(FriendlyByteBuf output) {
+        
+    }
+}

@@ -1,0 +1,212 @@
+//// BlockStateProvider.java
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public interface BlockStateProvider {
+    Codec<BlockStateProvider> TYPED_CODEC;
+    Codec<Either<BlockState, BlockStateProvider>> STATE_OR_PROVIDER_CODEC;
+    Codec<BlockStateProvider> DIRECT_CODEC;
+    Codec<Holder<BlockStateProvider>> CODEC;
+    static SimpleStateProvider of(BlockState state);
+    static SimpleStateProvider of(Block block);
+    static Holder<BlockStateProvider> holderOf(BlockState state);
+    static Holder<BlockStateProvider> holderOf(Block block);
+    MapCodec<? extends BlockStateProvider> codec();
+    BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+    default BlockState getOptionalState(LevelAccessor level, RandomSource random, BlockPos pos);
+}
+//// BlockStateProviderTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public interface BlockStateProviderTypes {
+    static MapCodec<? extends BlockStateProvider> bootstrap(Registry<MapCodec<? extends BlockStateProvider>> registry);
+}
+//// CopyPropertiesProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public record CopyPropertiesProvider(Holder<BlockStateProvider> source) implements BlockStateProvider {
+    public static final MapCodec<CopyPropertiesProvider> CODEC;
+    public CopyPropertiesProvider(Block block);
+    public MapCodec<CopyPropertiesProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+}
+//// DualNoiseProvider.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.InclusiveRange;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public class DualNoiseProvider extends NoiseProvider {
+    public static final MapCodec<DualNoiseProvider> CODEC;
+    public DualNoiseProvider(InclusiveRange<Integer> variety, NormalNoise slowNoiseParameters, float slowScale, long seed, NormalNoise parameters, float scale, List<BlockState> states);
+    public MapCodec<DualNoiseProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+    protected float getSlowNoiseValue(BlockPos pos);
+}
+//// NoiseBasedStateProvider.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.levelgen.synth.Noise;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public abstract class NoiseBasedStateProvider implements BlockStateProvider {
+    protected final long seed;
+    protected final NormalNoise parameters;
+    protected final float scale;
+    protected final Noise noise;
+    protected static <P extends NoiseBasedStateProvider> Products.P3<RecordCodecBuilder.Mu<P>, Long, NormalNoise, Float> noiseCodec(RecordCodecBuilder.Instance<P> instance);
+    public abstract MapCodec<? extends NoiseBasedStateProvider> codec();
+    protected NoiseBasedStateProvider(long seed, NormalNoise parameters, float scale);
+    protected float getNoiseValue(BlockPos pos, double scale);
+}
+//// NoiseProvider.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public class NoiseProvider extends NoiseBasedStateProvider {
+    public static final MapCodec<NoiseProvider> CODEC;
+    protected final List<BlockState> states;
+    protected static <P extends NoiseProvider> Products.P4<RecordCodecBuilder.Mu<P>, Long, NormalNoise, Float, List<BlockState>> noiseProviderCodec(RecordCodecBuilder.Instance<P> instance);
+    public NoiseProvider(long seed, NormalNoise parameters, float scale, List<BlockState> states);
+    public MapCodec<? extends NoiseProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+    protected BlockState getRandomState(List<BlockState> states, BlockPos pos, double scale);
+    protected BlockState getRandomState(List<BlockState> states, float noiseValue);
+}
+//// NoiseThresholdProvider.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public class NoiseThresholdProvider extends NoiseBasedStateProvider {
+    public static final MapCodec<NoiseThresholdProvider> CODEC;
+    public NoiseThresholdProvider(long seed, NormalNoise parameters, float scale, float threshold, float highChance, BlockState defaultState, List<BlockState> lowStates, List<BlockState> highStates);
+    public MapCodec<NoiseThresholdProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+}
+//// RandomBlockProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderSet;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public record RandomBlockProvider(HolderSet<Block> blocks) implements BlockStateProvider {
+    public static final MapCodec<RandomBlockProvider> CODEC;
+    public MapCodec<RandomBlockProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+    public BlockState getOptionalState(LevelAccessor level, RandomSource random, BlockPos pos);
+}
+//// RandomizedIntStateProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+public class RandomizedIntStateProvider implements BlockStateProvider {
+    public static final MapCodec<RandomizedIntStateProvider> CODEC;
+    public RandomizedIntStateProvider(BlockStateProvider source, IntegerProperty property, IntProvider values);
+    public RandomizedIntStateProvider(Holder<BlockStateProvider> source, String propertyName, IntProvider values);
+    public MapCodec<RandomizedIntStateProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+}
+//// RotatedBlockProvider.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+public record RotatedBlockProvider(Holder<BlockStateProvider> state, Optional<Direction> direction) implements BlockStateProvider {
+    public static final MapCodec<RotatedBlockProvider> CODEC;
+    public RotatedBlockProvider(BlockStateProvider state);
+    public MapCodec<RotatedBlockProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+}
+//// RuleBasedStateProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate;
+public record RuleBasedStateProvider(Holder<BlockStateProvider> fallback, List<Rule> rules) implements BlockStateProvider {
+    public static final MapCodec<RuleBasedStateProvider> CODEC;
+    private RuleBasedStateProvider(Optional<Holder<BlockStateProvider>> fallback, List<Rule> rules);
+    public static RuleBasedStateProvider ifTrueThenProvide(BlockPredicate ifTrue, Block thenProvide);
+    public static RuleBasedStateProvider ifTrueThenProvide(BlockPredicate ifTrue, BlockStateProvider thenProvide);
+    public MapCodec<RuleBasedStateProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+    public BlockState getOptionalState(LevelAccessor level, RandomSource random, BlockPos pos);
+    public static Builder builder();
+    public static Builder builder(BlockStateProvider fallback);
+    public static record Rule(BlockPredicate ifTrue, Holder<BlockStateProvider> then) {
+        public static final Codec<Rule> CODEC;
+    }
+    public static class Builder {
+        public Builder(BlockStateProvider fallback);
+        public Builder ifTrueThenProvide(BlockPredicate ifTrue, BlockStateProvider thenProvide);
+        public Builder ifTrueThenProvide(BlockPredicate ifTrue, Block thenProvide);
+        public Builder ifTrueThenProvide(BlockPredicate ifTrue, BlockState thenProvide);
+        public RuleBasedStateProvider build();
+    }
+}
+//// SimpleStateProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+public record SimpleStateProvider(BlockState state) implements BlockStateProvider {
+    public static final MapCodec<SimpleStateProvider> CODEC;
+    public MapCodec<SimpleStateProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+}
+//// WeightedStateProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+public record WeightedStateProvider(WeightedList<BlockState> weightedList) implements BlockStateProvider {
+    public static final MapCodec<WeightedStateProvider> CODEC;
+    public WeightedStateProvider(WeightedList.Builder<BlockState> weightedList);
+    public MapCodec<WeightedStateProvider> codec();
+    public BlockState getState(LevelAccessor level, RandomSource random, BlockPos pos);
+}

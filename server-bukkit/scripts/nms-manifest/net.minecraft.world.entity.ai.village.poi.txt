@@ -1,0 +1,160 @@
+//// PoiManager.java
+import com.mojang.datafixers.DataFixer;
+import com.mojang.datafixers.util.Pair;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.SectionPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.SectionTracker;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.debug.DebugPoiInfo;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.storage.ChunkIOErrorReporter;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+import net.minecraft.world.level.chunk.storage.SectionStorage;
+public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
+    public static final int MAX_VILLAGE_DISTANCE = 6;
+    public static final int VILLAGE_SECTION_SIZE = 1;
+    public PoiManager(RegionStorageInfo info, Path folder, DataFixer fixerUpper, boolean sync, RegistryAccess registryAccess, ChunkIOErrorReporter errorReporter, LevelHeightAccessor levelHeightAccessor);
+    public PoiRecord add(BlockPos pos, Holder<PoiType> type);
+    public void remove(BlockPos pos);
+    public long getCountInRange(Predicate<Holder<PoiType>> predicate, BlockPos center, int radius, Occupancy occupancy);
+    public boolean existsAtPosition(ResourceKey<PoiType> poiType, BlockPos blockPos);
+    public Stream<PoiRecord> getInSquare(Predicate<Holder<PoiType>> predicate, BlockPos center, int radius, Occupancy occupancy);
+    public Stream<PoiRecord> getInRange(Predicate<Holder<PoiType>> predicate, BlockPos center, int radius, Occupancy occupancy);
+    public Stream<PoiRecord> getInChunk(Predicate<Holder<PoiType>> predicate, ChunkPos chunkPos, Occupancy occupancy);
+    public Stream<BlockPos> findAll(Predicate<Holder<PoiType>> predicate, Predicate<BlockPos> filter, BlockPos center, int radius, Occupancy occupancy);
+    public Stream<Pair<Holder<PoiType>, BlockPos>> findAllWithType(Predicate<Holder<PoiType>> predicate, Predicate<BlockPos> filter, BlockPos center, int radius, Occupancy occupancy);
+    public Stream<Pair<Holder<PoiType>, BlockPos>> findAllClosestFirstWithType(Predicate<Holder<PoiType>> predicate, Predicate<BlockPos> filter, BlockPos center, int radius, Occupancy occupancy);
+    public Optional<BlockPos> find(Predicate<Holder<PoiType>> predicate, Predicate<BlockPos> filter, BlockPos center, int radius, Occupancy occupancy);
+    public Optional<BlockPos> findClosest(Predicate<Holder<PoiType>> predicate, BlockPos center, int radius, Occupancy occupancy);
+    public Optional<Pair<Holder<PoiType>, BlockPos>> findClosestWithType(Predicate<Holder<PoiType>> predicate, BlockPos center, int radius, Occupancy occupancy);
+    public Optional<BlockPos> findClosest(Predicate<Holder<PoiType>> predicate, Predicate<BlockPos> filter, BlockPos center, int radius, Occupancy occupancy);
+    public Optional<BlockPos> take(Predicate<Holder<PoiType>> predicate, BiPredicate<Holder<PoiType>, BlockPos> filter, BlockPos center, int radius);
+    public Optional<BlockPos> getRandom(Predicate<Holder<PoiType>> predicate, Predicate<BlockPos> filter, Occupancy occupancy, BlockPos center, int radius, RandomSource random);
+    public boolean release(BlockPos pos);
+    public boolean exists(BlockPos pos, Predicate<Holder<PoiType>> predicate);
+    public Optional<Holder<PoiType>> getType(BlockPos pos);
+    public DebugPoiInfo getDebugPoiInfo(BlockPos pos);
+    public int sectionsToVillage(SectionPos sectionPos);
+    public void tick(BooleanSupplier haveTime);
+    protected void setDirty(long sectionPos);
+    protected void onSectionLoad(long sectionPos);
+    public void checkConsistencyWithBlocks(SectionPos sectionPos, LevelChunkSection blockSection);
+    public void ensureLoadedAndValid(LevelReader reader, BlockPos center, int radius);
+    public static enum Occupancy {
+        HAS_SPACE, IS_OCCUPIED, ANY;
+        public Predicate<? super PoiRecord> getTest();
+    }
+    final class DistanceTracker extends SectionTracker {
+        DistanceTracker();
+        protected int getLevelFromSource(long to);
+        protected int getLevel(long node);
+        protected void setLevel(long node, int level);
+        public void runAllUpdates();
+    }
+}
+//// PoiRecord.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+public class PoiRecord {
+    private PoiRecord(BlockPos pos, Holder<PoiType> poiType, int freeTickets, Runnable setDirty);
+    public PoiRecord(BlockPos pos, Holder<PoiType> poiType, Runnable setDirty);
+    public Packed pack();
+    public int getFreeTickets();
+    protected boolean acquireTicket();
+    protected boolean releaseTicket();
+    public boolean hasSpace();
+    public boolean isOccupied();
+    public BlockPos getPos();
+    public Holder<PoiType> getPoiType();
+    public boolean equals(Object o);
+    public int hashCode();
+    public static record Packed(BlockPos pos, Holder<PoiType> poiType, int freeTickets) {
+        public static final Codec<Packed> CODEC;
+        public PoiRecord unpack(Runnable setDirty);
+    }
+}
+//// PoiSection.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.util.debug.DebugPoiInfo;
+public class PoiSection {
+    public PoiSection(Runnable setDirty);
+    private PoiSection(Runnable setDirty, boolean isValid, List<PoiRecord> records);
+    public Packed pack();
+    public Stream<PoiRecord> getRecords(Predicate<Holder<PoiType>> predicate, PoiManager.Occupancy occupancy);
+    public PoiRecord add(BlockPos blockPos, Holder<PoiType> type);
+    public void remove(BlockPos pos);
+    public int getFreeTickets(BlockPos pos);
+    public boolean release(BlockPos pos);
+    public boolean exists(BlockPos pos, Predicate<Holder<PoiType>> predicate);
+    public Optional<Holder<PoiType>> getType(BlockPos pos);
+    public Optional<DebugPoiInfo> getDebugPoiInfo(BlockPos pos);
+    public void refresh(Consumer<BiConsumer<BlockPos, Holder<PoiType>>> updater);
+    public boolean isValid();
+    public static record Packed(boolean isValid, List<PoiRecord.Packed> records) {
+        public static final Codec<Packed> CODEC;
+        public PoiSection unpack(Runnable setDirty);
+    }
+}
+//// PoiType.java
+import java.util.Set;
+import java.util.function.Predicate;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.block.state.BlockState;
+public record PoiType(Set<BlockState> matchingStates, int maxTickets, int validRange) {
+    public static final Predicate<Holder<PoiType>> NONE;
+    public PoiType(Set<BlockState> matchingStates, int maxTickets, int validRange);
+    public boolean is(BlockState state);
+}
+//// PoiTypes.java
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.block.state.BlockState;
+public class PoiTypes {
+    public static final ResourceKey<PoiType> ARMORER;
+    public static final ResourceKey<PoiType> BUTCHER;
+    public static final ResourceKey<PoiType> CARTOGRAPHER;
+    public static final ResourceKey<PoiType> CLERIC;
+    public static final ResourceKey<PoiType> FARMER;
+    public static final ResourceKey<PoiType> FISHERMAN;
+    public static final ResourceKey<PoiType> FLETCHER;
+    public static final ResourceKey<PoiType> LEATHERWORKER;
+    public static final ResourceKey<PoiType> LIBRARIAN;
+    public static final ResourceKey<PoiType> MASON;
+    public static final ResourceKey<PoiType> SHEPHERD;
+    public static final ResourceKey<PoiType> TOOLSMITH;
+    public static final ResourceKey<PoiType> WEAPONSMITH;
+    public static final ResourceKey<PoiType> HOME;
+    public static final ResourceKey<PoiType> MEETING;
+    public static final ResourceKey<PoiType> BEEHIVE;
+    public static final ResourceKey<PoiType> BEE_NEST;
+    public static final ResourceKey<PoiType> NETHER_PORTAL;
+    public static final ResourceKey<PoiType> LODESTONE;
+    public static final ResourceKey<PoiType> LIGHTNING_ROD;
+    public static final ResourceKey<PoiType> TEST_INSTANCE;
+    public static Optional<Holder<PoiType>> forState(BlockState state);
+    public static boolean hasPoi(BlockState state);
+    public static PoiType bootstrap(Registry<PoiType> registry);
+}

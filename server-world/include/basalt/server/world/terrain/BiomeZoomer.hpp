@@ -11,9 +11,27 @@ class BiomeZoomer {
 public:
     explicit constexpr BiomeZoomer(std::int64_t seed) noexcept : seed_(seed) {}
 
+    struct Offsets {
+        double x;
+        double y;
+        double z;
+    };
+
+    [[nodiscard]] constexpr std::int64_t seed() const noexcept { return seed_; }
+
     template <typename Lookup>
     [[nodiscard]] decltype(auto) biomeAt(std::int32_t blockX, std::int32_t blockY, std::int32_t blockZ,
                                          Lookup&& noiseBiomeAt) const {
+        return biomeAtWith(blockX, blockY, blockZ, std::forward<Lookup>(noiseBiomeAt),
+                           [this](std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) {
+                               return offsetsAt(seed_, quartX, quartY, quartZ);
+                           });
+    }
+
+    /// Same selection as `biomeAt`, with the per-corner fiddle supplied by the caller so it can be memoized.
+    template <typename Lookup, typename Corner>
+    [[nodiscard]] decltype(auto) biomeAtWith(std::int32_t blockX, std::int32_t blockY, std::int32_t blockZ,
+                                             Lookup&& noiseBiomeAt, Corner&& corner) const {
         const std::int32_t absoluteX = blockX - 2;
         const std::int32_t absoluteY = blockY - 2;
         const std::int32_t absoluteZ = blockZ - 2;
@@ -30,10 +48,12 @@ public:
             const bool lowerX = (index & 4) == 0;
             const bool lowerY = (index & 2) == 0;
             const bool lowerZ = (index & 1) == 0;
-            const double distance =
-                fiddledDistance(seed_, lowerX ? parentX : parentX + 1, lowerY ? parentY : parentY + 1,
-                                lowerZ ? parentZ : parentZ + 1, lowerX ? fractionX : fractionX - 1.0,
-                                lowerY ? fractionY : fractionY - 1.0, lowerZ ? fractionZ : fractionZ - 1.0);
+            const Offsets offsets =
+                corner(lowerX ? parentX : parentX + 1, lowerY ? parentY : parentY + 1, lowerZ ? parentZ : parentZ + 1);
+            const double x = (lowerX ? fractionX : fractionX - 1.0) + offsets.x;
+            const double y = (lowerY ? fractionY : fractionY - 1.0) + offsets.y;
+            const double z = (lowerZ ? fractionZ : fractionZ - 1.0) + offsets.z;
+            const double distance = x * x + y * y + z * z;
             if (closestDistance > distance) {
                 closestIndex = index;
                 closestDistance = distance;
@@ -44,6 +64,9 @@ public:
                                                   (closestIndex & 2) == 0 ? parentY : parentY + 1,
                                                   (closestIndex & 1) == 0 ? parentZ : parentZ + 1);
     }
+
+    [[nodiscard]] static Offsets offsetsAt(std::int64_t seed, std::int32_t quartX, std::int32_t quartY,
+                                           std::int32_t quartZ) noexcept;
 
     [[nodiscard]] static double fiddledDistance(std::int64_t seed, std::int32_t quartX, std::int32_t quartY,
                                                 std::int32_t quartZ, double distanceX, double distanceY,

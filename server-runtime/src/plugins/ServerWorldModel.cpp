@@ -394,9 +394,12 @@ std::vector<std::string> LoadedWorlds::registryIds(std::string_view registry) co
         return ids;
     }
     if (registry == "villager_profession") {
-        std::vector<std::string> ids;
+        std::vector<std::string> ids{"minecraft:none"};
         for (const std::string_view name : entity::villagers::professions()) {
             ids.push_back("minecraft:" + std::string{name});
+            if (name == "mason") {
+                ids.emplace_back("minecraft:nitwit");
+            }
         }
         return ids;
     }

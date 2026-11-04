@@ -1,0 +1,40 @@
+//// ClientPongPacketListener.java
+import net.minecraft.network.PacketListener;
+public interface ClientPongPacketListener extends PacketListener {
+    void handlePongResponse(ClientboundPongResponsePacket packet);
+}
+//// ClientboundPongResponsePacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundPongResponsePacket(long time) implements Packet<ClientPongPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundPongResponsePacket> STREAM_CODEC;
+    private ClientboundPongResponsePacket(FriendlyByteBuf input);
+    public PacketType<ClientboundPongResponsePacket> type();
+    public void handle(ClientPongPacketListener listener);
+}
+//// PingPacketTypes.java
+import net.minecraft.network.protocol.PacketType;
+public class PingPacketTypes {
+    public static final PacketType<ClientboundPongResponsePacket> CLIENTBOUND_PONG_RESPONSE;
+    public static final PacketType<ServerboundPingRequestPacket> SERVERBOUND_PING_REQUEST;
+}
+//// ServerPingPacketListener.java
+import net.minecraft.network.PacketListener;
+public interface ServerPingPacketListener extends PacketListener {
+    void handlePingRequest(ServerboundPingRequestPacket packet);
+}
+//// ServerboundPingRequestPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ServerboundPingRequestPacket implements Packet<ServerPingPacketListener> {
+    public static final StreamCodec<ByteBuf, ServerboundPingRequestPacket> STREAM_CODEC;
+    public ServerboundPingRequestPacket(long time);
+    private ServerboundPingRequestPacket(ByteBuf input);
+    public PacketType<ServerboundPingRequestPacket> type();
+    public void handle(ServerPingPacketListener listener);
+    public long getTime();
+}

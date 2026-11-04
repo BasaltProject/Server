@@ -1,0 +1,16 @@
+//// PackMetadataGenerator.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.world.flag.FeatureFlagSet;
+public class PackMetadataGenerator implements DataProvider {
+    public PackMetadataGenerator(PackOutput output);
+    public <T> PackMetadataGenerator add(MetadataSectionType<T> type, T value);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public final String getName();
+    public static PackMetadataGenerator forFeaturePack(PackOutput output, Component description);
+    public static PackMetadataGenerator forFeaturePack(PackOutput output, Component description, FeatureFlagSet flags);
+}

@@ -1,7 +1,10 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.scores;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.numbers.NumberFormat;
 import net.minecraft.world.scores.criteria.ObjectiveCriteria;
+import com.mojang.serialization.Codec;
+import java.util.Optional;
 public class Objective {
     private final Scoreboard scoreboard;
     private final String name;
@@ -52,5 +55,17 @@ public class Objective {
     }
     public void setNumberFormat(NumberFormat value) {
         numberFormat = value;
+    }
+    public Packed pack() {
+        return new Packed(name, criteria, displayName, renderType, displayAutoUpdate, Optional.ofNullable(numberFormat));
+    }
+    public NumberFormat numberFormatOrDefault(NumberFormat _default) {
+        return numberFormat == null ? _default : numberFormat;
+    }
+    public Component getFormattedDisplayName() {
+        return Component.literal("[").append(displayName).append("]");
+    }
+    public static record Packed(String name, ObjectiveCriteria criteria, Component displayName, ObjectiveCriteria.RenderType renderType, boolean displayAutoUpdate, Optional<NumberFormat> numberFormat) {
+        public static final Codec<Packed> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.scores.Objective.Packed.class, "CODEC");
     }
 }

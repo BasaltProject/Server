@@ -1,0 +1,1027 @@
+//// AnyBlockInteractionTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class AnyBlockInteractionTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, BlockPos pos, ItemInstance tool);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> location) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public boolean matches(LootContext locationContext);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// BeeNestDestroyedTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.advancements.predicates.StatePropertiesPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class BeeNestDestroyedTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, BlockState state, ItemStack itemStack, int numBeesInside);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<HolderSet<Block>> block, Optional<StatePropertiesPredicate> state, Optional<ItemPredicate> item, MinMaxBounds.Ints beesInside) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> destroyedBeeNest(HolderGetter<Block> blocks, Block block, ItemPredicate.Builder itemPredicate, MinMaxBounds.Ints numBeesInside);
+        public static Criterion<TriggerInstance> destroyedBeeNest(HolderSet<Block> block, ItemPredicate.Builder itemPredicate, MinMaxBounds.Ints numBeesInside);
+        public boolean matches(BlockState state, ItemStack itemStack, int numBeesInside);
+    }
+}
+//// BredAnimalsTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class BredAnimalsTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Animal parent, Animal partner, AgeableMob child);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> parent, Optional<Holder<LootItemCondition>> partner, Optional<Holder<LootItemCondition>> child) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> bredAnimals();
+        public static Criterion<TriggerInstance> bredAnimals(EntityPredicate.Builder child);
+        public static Criterion<TriggerInstance> bredAnimals(Optional<EntityPredicate> parent1, Optional<EntityPredicate> parent2, Optional<EntityPredicate> child);
+        public boolean matches(LootContext parent, LootContext partner, LootContext child);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// BrewedPotionTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.predicates.PotionsPredicate;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class BrewedPotionTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, PotionContents potion);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<PotionsPredicate> potion) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> brewedPotion();
+        public boolean matches(PotionContents potion);
+    }
+}
+//// ChangeDimensionTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class ChangeDimensionTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ResourceKey<Level> from, ResourceKey<Level> to);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ResourceKey<Level>> from, Optional<ResourceKey<Level>> to) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> changedDimension();
+        public static Criterion<TriggerInstance> changedDimension(ResourceKey<Level> from, ResourceKey<Level> to);
+        public static Criterion<TriggerInstance> changedDimensionTo(ResourceKey<Level> to);
+        public static Criterion<TriggerInstance> changedDimensionFrom(ResourceKey<Level> from);
+        public boolean matches(ResourceKey<Level> from, ResourceKey<Level> to);
+    }
+}
+//// ChanneledLightningTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class ChanneledLightningTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Collection<? extends Entity> victims);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, List<Holder<LootItemCondition>> victims) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> channeledLightning(EntityPredicate.Builder... victims);
+        public boolean matches(Collection<? extends LootContext> victims);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// ConstructBeaconTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class ConstructBeaconTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, int levels);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, MinMaxBounds.Ints level) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> constructedBeacon();
+        public static Criterion<TriggerInstance> constructedBeacon(MinMaxBounds.Ints level);
+        public boolean matches(int levels);
+    }
+}
+//// ConsumeItemTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class ConsumeItemTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack itemStack);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> usedItem();
+        public static Criterion<TriggerInstance> usedItem(HolderGetter<Item> items, ItemLike item);
+        public static Criterion<TriggerInstance> usedItem(ItemPredicate.Builder predicate);
+        public boolean matches(ItemStack itemStack);
+    }
+}
+//// CriteriaTriggers.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Registry;
+public class CriteriaTriggers {
+    public static final Codec<CriterionTrigger<?>> CODEC;
+    public static final ImpossibleTrigger IMPOSSIBLE;
+    public static final KilledTrigger PLAYER_KILLED_ENTITY;
+    public static final KilledTrigger ENTITY_KILLED_PLAYER;
+    public static final EnterBlockTrigger ENTER_BLOCK;
+    public static final InventoryChangeTrigger INVENTORY_CHANGED;
+    public static final RecipeUnlockedTrigger RECIPE_UNLOCKED;
+    public static final PlayerHurtEntityTrigger PLAYER_HURT_ENTITY;
+    public static final EntityHurtPlayerTrigger ENTITY_HURT_PLAYER;
+    public static final EnchantedItemTrigger ENCHANTED_ITEM;
+    public static final FilledBucketTrigger FILLED_BUCKET;
+    public static final BrewedPotionTrigger BREWED_POTION;
+    public static final ConstructBeaconTrigger CONSTRUCT_BEACON;
+    public static final UsedEnderEyeTrigger USED_ENDER_EYE;
+    public static final SummonedEntityTrigger SUMMONED_ENTITY;
+    public static final BredAnimalsTrigger BRED_ANIMALS;
+    public static final PlayerTrigger LOCATION;
+    public static final PlayerTrigger SLEPT_IN_BED;
+    public static final CuredZombieVillagerTrigger CURED_ZOMBIE_VILLAGER;
+    public static final TradeTrigger TRADE;
+    public static final ItemDurabilityTrigger ITEM_DURABILITY_CHANGED;
+    public static final LevitationTrigger LEVITATION;
+    public static final ChangeDimensionTrigger CHANGED_DIMENSION;
+    public static final PlayerTrigger TICK;
+    public static final TameAnimalTrigger TAME_ANIMAL;
+    public static final ItemUsedOnLocationTrigger PLACED_BLOCK;
+    public static final ConsumeItemTrigger CONSUME_ITEM;
+    public static final EffectsChangedTrigger EFFECTS_CHANGED;
+    public static final UsedTotemTrigger USED_TOTEM;
+    public static final DistanceTrigger NETHER_TRAVEL;
+    public static final FishingRodHookedTrigger FISHING_ROD_HOOKED;
+    public static final ChanneledLightningTrigger CHANNELED_LIGHTNING;
+    public static final ShotCrossbowTrigger SHOT_CROSSBOW;
+    public static final SpearMobsTrigger SPEAR_MOBS_TRIGGER;
+    public static final KilledByArrowTrigger KILLED_BY_ARROW;
+    public static final PlayerTrigger RAID_WIN;
+    public static final PlayerTrigger RAID_OMEN;
+    public static final SlideDownBlockTrigger HONEY_BLOCK_SLIDE;
+    public static final BeeNestDestroyedTrigger BEE_NEST_DESTROYED;
+    public static final TargetBlockTrigger TARGET_BLOCK_HIT;
+    public static final ItemUsedOnLocationTrigger ITEM_USED_ON_BLOCK;
+    public static final DefaultBlockInteractionTrigger DEFAULT_BLOCK_USE;
+    public static final AnyBlockInteractionTrigger ANY_BLOCK_USE;
+    public static final LootTableTrigger GENERATE_LOOT;
+    public static final PickedUpItemTrigger THROWN_ITEM_PICKED_UP_BY_ENTITY;
+    public static final PickedUpItemTrigger THROWN_ITEM_PICKED_UP_BY_PLAYER;
+    public static final PlayerInteractTrigger PLAYER_INTERACTED_WITH_ENTITY;
+    public static final PlayerInteractTrigger PLAYER_SHEARED_EQUIPMENT;
+    public static final StartRidingTrigger START_RIDING_TRIGGER;
+    public static final LightningStrikeTrigger LIGHTNING_STRIKE;
+    public static final UsingItemTrigger USING_ITEM;
+    public static final DistanceTrigger FALL_FROM_HEIGHT;
+    public static final DistanceTrigger RIDE_ENTITY_IN_LAVA_TRIGGER;
+    public static final KilledTrigger KILL_MOB_NEAR_SCULK_CATALYST;
+    public static final ItemUsedOnLocationTrigger ALLAY_DROP_ITEM_ON_BLOCK;
+    public static final PlayerTrigger AVOID_VIBRATION;
+    public static final RecipeCraftedTrigger RECIPE_CRAFTED;
+    public static final RecipeCraftedTrigger CRAFTER_RECIPE_CRAFTED;
+    public static final FallAfterExplosionTrigger FALL_AFTER_EXPLOSION;
+    public static CriterionTrigger<?> bootstrap(Registry<CriterionTrigger<?>> registry);
+}
+//// Criterion.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.CriterionTriggerInstance;
+public record Criterion<T extends CriterionTriggerInstance>(CriterionTrigger<T> trigger, T triggerInstance) {
+    public static final Codec<Criterion<?>> CODEC;
+}
+//// CriterionTrigger.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.CriterionTriggerInstance;
+public interface CriterionTrigger<T extends CriterionTriggerInstance> {
+    Codec<T> codec();
+    default Criterion<T> createCriterion(T instance);
+}
+//// CuredZombieVillagerTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class CuredZombieVillagerTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Zombie zombie, Villager villager);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> zombie, Optional<Holder<LootItemCondition>> villager) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> curedZombieVillager();
+        public boolean matches(LootContext zombie, LootContext villager);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// DefaultBlockInteractionTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class DefaultBlockInteractionTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, BlockPos pos);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> location) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public boolean matches(LootContext locationContext);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// DistanceTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.DistancePredicate;
+import net.minecraft.advancements.predicates.LocationPredicate;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.phys.Vec3;
+public class DistanceTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Vec3 startPosition);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<LocationPredicate> startPosition, Optional<DistancePredicate> distance) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> fallFromHeight(EntityPredicate.Builder player, DistancePredicate distance, LocationPredicate.Builder startPosition);
+        public static Criterion<TriggerInstance> rideEntityInLava(EntityPredicate.Builder player, DistancePredicate distance);
+        public static Criterion<TriggerInstance> travelledThroughNether(DistancePredicate distance);
+        public boolean matches(ServerLevel level, Vec3 enteredPosition, Vec3 playerPosition);
+    }
+}
+//// EffectsChangedTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.MobEffectsPredicate;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class EffectsChangedTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Entity source);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<MobEffectsPredicate> effects, Optional<Holder<LootItemCondition>> source) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> hasEffects(MobEffectsPredicate.Builder effects);
+        public static Criterion<TriggerInstance> gotEffectsFrom(EntityPredicate.Builder source);
+        public boolean matches(ServerPlayer player, LootContext source);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// EnchantedItemTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class EnchantedItemTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack itemStack, int levels);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item, MinMaxBounds.Ints levels) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> enchantedItem();
+        public boolean matches(ItemStack itemStack, int levels);
+    }
+}
+//// EnterBlockTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.StatePropertiesPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class EnterBlockTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, BlockState state);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<HolderSet<Block>> block, Optional<StatePropertiesPredicate> state) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> entersBlock(HolderGetter<Block> blocks, Block block);
+        public static Criterion<TriggerInstance> entersBlock(HolderSet<Block> block);
+        public boolean matches(BlockState state);
+    }
+}
+//// EntityHurtPlayerTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.DamagePredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class EntityHurtPlayerTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, DamageSource source, float originalDamage, float actualDamage, boolean blocked);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<DamagePredicate> damage) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> entityHurtPlayer();
+        public static Criterion<TriggerInstance> entityHurtPlayer(DamagePredicate damage);
+        public static Criterion<TriggerInstance> entityHurtPlayer(DamagePredicate.Builder damage);
+        public boolean matches(ServerPlayer player, DamageSource source, float originalDamage, float actualDamage, boolean blocked);
+    }
+}
+//// FallAfterExplosionTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.DistancePredicate;
+import net.minecraft.advancements.predicates.LocationPredicate;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.phys.Vec3;
+public class FallAfterExplosionTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Vec3 startPosition, Entity cause);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<LocationPredicate> startPosition, Optional<DistancePredicate> distance, Optional<Holder<LootItemCondition>> cause) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> fallAfterExplosion(DistancePredicate distance, EntityPredicate.Builder cause);
+        public void validate(ValidationContextSource validator);
+        public boolean matches(ServerLevel level, Vec3 enteredPosition, Vec3 playerPosition, LootContext cause);
+    }
+}
+//// FilledBucketTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class FilledBucketTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack item);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> filledBucket(ItemPredicate.Builder item);
+        public boolean matches(ItemStack item);
+    }
+}
+//// FishingRodHookedTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Collection;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.projectile.FishingHook;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class FishingRodHookedTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack rod, FishingHook hook, Collection<ItemStack> items);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> rod, Optional<Holder<LootItemCondition>> entity, Optional<ItemPredicate> item) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> fishedItem(Optional<ItemPredicate> rod, Optional<EntityPredicate> entity, Optional<ItemPredicate> item);
+        public boolean matches(ItemStack rod, LootContext hookedIn, Collection<ItemStack> items);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// ImpossibleTrigger.java
+import com.mojang.serialization.Codec;
+import net.minecraft.advancements.CriterionTriggerInstance;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+public class ImpossibleTrigger implements CriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public static record TriggerInstance() implements CriterionTriggerInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// InventoryChangeTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class InventoryChangeTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Inventory inventory, ItemStack changedItem);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Slots slots, List<ItemPredicate> items) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> hasItems(ItemPredicate.Builder... items);
+        public static Criterion<TriggerInstance> hasItems(ItemPredicate... items);
+        public static Criterion<TriggerInstance> hasItems(ItemLike... items);
+        public boolean matches(Inventory inventory, ItemStack changedItem, int slotsFull, int slotsEmpty, int slotsOccupied);
+        public static record Slots(MinMaxBounds.Ints occupied, MinMaxBounds.Ints full, MinMaxBounds.Ints empty) {
+            public static final Codec<Slots> CODEC;
+            public static final Slots ANY;
+            public boolean matches(int slotsFull, int slotsEmpty, int slotsOccupied);
+        }
+    }
+}
+//// ItemDurabilityTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class ItemDurabilityTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack itemStack, int newDurability);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item, MinMaxBounds.Ints durability, MinMaxBounds.Ints delta) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> changedDurability(Optional<ItemPredicate> item, MinMaxBounds.Ints durability);
+        public static Criterion<TriggerInstance> changedDurability(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item, MinMaxBounds.Ints durability);
+        public boolean matches(ItemStack itemStack, int newDurability);
+    }
+}
+//// ItemUsedOnLocationTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.LocationPredicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class ItemUsedOnLocationTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, BlockPos pos, ItemInstance tool);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> location) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> placedBlock(HolderGetter<Block> blocks, Block block);
+        public static Criterion<TriggerInstance> placedBlock(LootItemCondition.Builder locationCondition);
+        public static <T extends Comparable<T>> Criterion<TriggerInstance> placedBlockWithProperties(HolderGetter<Block> blocks, Block block, Property<T> property, String propertyValue);
+        public static Criterion<TriggerInstance> placedBlockWithProperties(HolderGetter<Block> blocks, Block block, Property<Boolean> property, boolean propertyValue);
+        public static Criterion<TriggerInstance> placedBlockWithProperties(HolderGetter<Block> blocks, Block block, Property<Integer> property, int propertyValue);
+        public static <T extends Comparable<T> & StringRepresentable> Criterion<TriggerInstance> placedBlockWithProperties(HolderGetter<Block> blocks, Block block, Property<T> properties, T propertyValue);
+        public static Criterion<TriggerInstance> itemUsedOnBlock(LocationPredicate.Builder location, ItemPredicate.Builder item);
+        public static Criterion<TriggerInstance> allayDropItemOnBlock(LocationPredicate.Builder location, ItemPredicate.Builder item);
+        public boolean matches(LootContext locationContext);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// KilledByArrowTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class KilledByArrowTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Collection<Entity> victims, ItemStack firedByWeapon);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, List<Holder<LootItemCondition>> victims, MinMaxBounds.Ints uniqueEntityTypes, Optional<ItemPredicate> firedFromWeapon) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> crossbowKilled(HolderGetter<Item> items, EntityPredicate.Builder... victims);
+        public static Criterion<TriggerInstance> crossbowKilled(HolderGetter<Item> items, MinMaxBounds.Ints uniqueEntityTypes);
+        public boolean matches(Collection<LootContext> victims, int uniqueEntityTypes, ItemStack firedFromWeapon);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// KilledTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.DamageSourcePredicate;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class KilledTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Entity entity, DamageSource killingBlow);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> entity, Optional<DamageSourcePredicate> killingBlow) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> playerKilledEntity(Optional<EntityPredicate> entity);
+        public static Criterion<TriggerInstance> playerKilledEntity(EntityPredicate.Builder entity);
+        public static Criterion<TriggerInstance> playerKilledEntity();
+        public static Criterion<TriggerInstance> playerKilledEntity(Optional<EntityPredicate> entity, Optional<DamageSourcePredicate> killingBlow);
+        public static Criterion<TriggerInstance> playerKilledEntity(EntityPredicate.Builder entity, Optional<DamageSourcePredicate> killingBlow);
+        public static Criterion<TriggerInstance> playerKilledEntity(Optional<EntityPredicate> entity, DamageSourcePredicate.Builder killingBlow);
+        public static Criterion<TriggerInstance> playerKilledEntity(EntityPredicate.Builder entity, DamageSourcePredicate.Builder killingBlow);
+        public static Criterion<TriggerInstance> playerKilledEntityNearSculkCatalyst();
+        public static Criterion<TriggerInstance> entityKilledPlayer(Optional<EntityPredicate> entity);
+        public static Criterion<TriggerInstance> entityKilledPlayer(EntityPredicate.Builder entity);
+        public static Criterion<TriggerInstance> entityKilledPlayer();
+        public static Criterion<TriggerInstance> entityKilledPlayer(Optional<EntityPredicate> entity, Optional<DamageSourcePredicate> killingBlow);
+        public static Criterion<TriggerInstance> entityKilledPlayer(EntityPredicate.Builder entity, Optional<DamageSourcePredicate> killingBlow);
+        public static Criterion<TriggerInstance> entityKilledPlayer(Optional<EntityPredicate> entity, DamageSourcePredicate.Builder killingBlow);
+        public static Criterion<TriggerInstance> entityKilledPlayer(EntityPredicate.Builder entity, DamageSourcePredicate.Builder killingBlow);
+        public boolean matches(ServerPlayer player, LootContext entity, DamageSource killingBlow);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// LevitationTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.DistancePredicate;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.phys.Vec3;
+public class LevitationTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Vec3 start, int duration);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<DistancePredicate> distance, MinMaxBounds.Ints duration) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> levitated(DistancePredicate distance);
+        public boolean matches(ServerPlayer player, Vec3 start, int duration);
+    }
+}
+//// LightningStrikeTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class LightningStrikeTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, LightningBolt lightning, List<Entity> entitiesAround);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> lightning, Optional<Holder<LootItemCondition>> bystander) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> lightningStrike(Optional<EntityPredicate> lightning, Optional<EntityPredicate> bystander);
+        public boolean matches(LootContext bolt, List<LootContext> entitiesAround);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// LootTableTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class LootTableTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ResourceKey<LootTable> lootTable);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, HolderSet<LootTable> lootTable) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> lootTableUsed(Holder<LootTable> lootTable);
+        public static Criterion<TriggerInstance> lootTableUsed(HolderSet<LootTable> lootTable);
+        public boolean matches(ResourceKey<LootTable> lootTable);
+    }
+}
+//// PickedUpItemTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class PickedUpItemTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack itemStack, Entity entity);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item, Optional<Holder<LootItemCondition>> entity) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> thrownItemPickedUpByEntity(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item, Optional<Holder<LootItemCondition>> entity);
+        public static Criterion<TriggerInstance> thrownItemPickedUpByPlayer(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item, Optional<Holder<LootItemCondition>> entity);
+        public boolean matches(ServerPlayer player, ItemStack itemStack, LootContext pickedUpBy);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// PlayerHurtEntityTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.DamagePredicate;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class PlayerHurtEntityTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Entity victim, DamageSource source, float originalDamage, float actualDamage, boolean blocked);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<DamagePredicate> damage, Optional<Holder<LootItemCondition>> entity) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> playerHurtEntity();
+        public static Criterion<TriggerInstance> playerHurtEntityWithDamage(Optional<DamagePredicate> damage);
+        public static Criterion<TriggerInstance> playerHurtEntityWithDamage(DamagePredicate.Builder damage);
+        public static Criterion<TriggerInstance> playerHurtEntity(Optional<EntityPredicate> entity);
+        public static Criterion<TriggerInstance> playerHurtEntity(Optional<DamagePredicate> damage, Optional<EntityPredicate> entity);
+        public static Criterion<TriggerInstance> playerHurtEntity(DamagePredicate.Builder damage, Optional<EntityPredicate> entity);
+        public boolean matches(ServerPlayer player, LootContext victim, DamageSource source, float originalDamage, float actualDamage, boolean blocked);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// PlayerInteractTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class PlayerInteractTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack itemStack, Entity interactedWith);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item, Optional<Holder<LootItemCondition>> entity) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> itemUsedOnEntity(Optional<Holder<LootItemCondition>> player, ItemPredicate.Builder item, Optional<Holder<LootItemCondition>> entity);
+        public static Criterion<TriggerInstance> equipmentSheared(Optional<Holder<LootItemCondition>> player, ItemPredicate.Builder item, Optional<Holder<LootItemCondition>> entity);
+        public static Criterion<TriggerInstance> equipmentSheared(ItemPredicate.Builder item, Optional<Holder<LootItemCondition>> entity);
+        public static Criterion<TriggerInstance> itemUsedOnEntity(ItemPredicate.Builder item, Optional<Holder<LootItemCondition>> entity);
+        public boolean matches(ItemStack itemStack, LootContext interactedWith);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// PlayerTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.LocationPredicate;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class PlayerTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> located(LocationPredicate.Builder location);
+        public static Criterion<TriggerInstance> located(EntityPredicate.Builder player);
+        public static Criterion<TriggerInstance> located(Optional<EntityPredicate> player);
+        public static Criterion<TriggerInstance> sleptInBed();
+        public static Criterion<TriggerInstance> raidWon();
+        public static Criterion<TriggerInstance> avoidVibration();
+        public static Criterion<TriggerInstance> tick();
+        public static Criterion<TriggerInstance> walkOnBlockWithEquipment(HolderGetter<Block> blocks, HolderGetter<Item> items, Block stepOnBlock, Item requiredEquipment);
+    }
+}
+//// RecipeCraftedTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class RecipeCraftedTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ResourceKey<Recipe<?>> id, List<ItemStack> usedIngredients);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, HolderSet<Recipe<?>> recipes, List<ItemPredicate> ingredients) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> craftedItem(HolderSet<Recipe<?>> recipeId, List<ItemPredicate.Builder> predicates);
+        public static Criterion<TriggerInstance> craftedItem(HolderSet<Recipe<?>> recipeId);
+        public static Criterion<TriggerInstance> crafterCraftedItem(HolderSet<Recipe<?>> recipeId);
+    }
+}
+//// RecipeUnlockedTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class RecipeUnlockedTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, RecipeHolder<?> recipe);
+    public static Criterion<TriggerInstance> unlocked(Holder<Recipe<?>> recipe);
+    public static Criterion<TriggerInstance> unlocked(HolderSet<Recipe<?>> recipe);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, HolderSet<Recipe<?>> recipes) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public boolean matches(RecipeHolder<?> recipe);
+    }
+}
+//// ShotCrossbowTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class ShotCrossbowTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack itemStack);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> shotCrossbow(Optional<ItemPredicate> item);
+        public static Criterion<TriggerInstance> shotCrossbow(HolderGetter<Item> items, ItemLike itemlike);
+        public boolean matches(ItemStack itemStack);
+    }
+}
+//// SimpleCriterionTrigger.java
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.advancements.CriterionTriggerInstance;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public abstract class SimpleCriterionTrigger<T extends SimpleCriterionTrigger.SimpleInstance> implements CriterionTrigger<T> {
+    protected void trigger(ServerPlayer player, Predicate<T> matcher);
+    public interface SimpleInstance extends CriterionTriggerInstance {
+        default void validate(ValidationContextSource validator);
+        Optional<Holder<LootItemCondition>> player();
+    }
+}
+//// SlideDownBlockTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.StatePropertiesPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class SlideDownBlockTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, BlockState state);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<HolderSet<Block>> block, Optional<StatePropertiesPredicate> state) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> slidesDownBlock(HolderGetter<Block> blocks, Block block);
+        public static Criterion<TriggerInstance> slidesDownBlock(HolderSet<Block> block);
+        public boolean matches(BlockState state);
+    }
+}
+//// SpearMobsTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class SpearMobsTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, int number);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Integer> count) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> spearMobs(int requiredCount);
+        public boolean matches(int requiredCount);
+    }
+}
+//// StartRidingTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class StartRidingTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> playerStartsRiding(EntityPredicate.Builder player);
+    }
+}
+//// SummonedEntityTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class SummonedEntityTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Entity entity);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> entity) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> summonedEntity(EntityPredicate.Builder predicate);
+        public boolean matches(LootContext entity);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// TameAnimalTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class TameAnimalTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Animal animal);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> entity) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> tamedAnimal();
+        public static Criterion<TriggerInstance> tamedAnimal(EntityPredicate.Builder entity);
+        public boolean matches(LootContext animal);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// TargetBlockTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.phys.Vec3;
+public class TargetBlockTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, Entity projectile, Vec3 hitPosition, int signalStrength);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, MinMaxBounds.Ints signalStrength, Optional<Holder<LootItemCondition>> projectile) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> targetHit(MinMaxBounds.Ints redstoneSignalStrength, Optional<Holder<LootItemCondition>> projectile);
+        public boolean matches(LootContext projectile, Vec3 hitPosition, int signalStrength);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// TradeTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.npc.villager.AbstractVillager;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContextSource;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class TradeTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, AbstractVillager villager, ItemStack itemStack);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<Holder<LootItemCondition>> villager, Optional<ItemPredicate> item) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> tradedWithVillager();
+        public static Criterion<TriggerInstance> tradedWithVillager(EntityPredicate.Builder player);
+        public boolean matches(LootContext villager, ItemStack itemStack);
+        public void validate(ValidationContextSource validator);
+    }
+}
+//// UsedEnderEyeTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class UsedEnderEyeTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, BlockPos feature);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, MinMaxBounds.Doubles distance) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public boolean matches(double sqrDistance);
+    }
+}
+//// UsedTotemTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class UsedTotemTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack itemStack);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> usedTotem(ItemPredicate item);
+        public static Criterion<TriggerInstance> usedTotem(HolderGetter<Item> items, ItemLike itemlike);
+        public boolean matches(ItemStack itemStack);
+    }
+}
+//// UsingItemTrigger.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class UsingItemTrigger extends SimpleCriterionTrigger<TriggerInstance> {
+    public Codec<TriggerInstance> codec();
+    public void trigger(ServerPlayer player, ItemStack item);
+    public static record TriggerInstance(Optional<Holder<LootItemCondition>> player, Optional<ItemPredicate> item) implements SimpleCriterionTrigger.SimpleInstance {
+        public static final Codec<TriggerInstance> CODEC;
+        public static Criterion<TriggerInstance> lookingAt(EntityPredicate.Builder player, ItemPredicate.Builder with);
+        public boolean matches(ItemStack item);
+    }
+}

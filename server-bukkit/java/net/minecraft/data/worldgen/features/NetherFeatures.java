@@ -1,6 +1,9 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.data.worldgen.features;
 
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.world.level.levelgen.feature.Feature;
 
 public class NetherFeatures {
     protected NetherFeatures() {}
@@ -23,4 +26,8 @@ public class NetherFeatures {
     public static final ResourceKey<Object> SPRING_NETHER_OPEN = FeatureUtils.createKey("spring_nether_open");
     public static final ResourceKey<Object> FIRE = FeatureUtils.createKey("patch_fire");
     public static final ResourceKey<Object> SOUL_FIRE = FeatureUtils.createKey("patch_soul_fire");
+    public static final ResourceKey<Object> NYLIUM_BONEMEAL = FeatureUtils.createKey("nylium_bonemeal");
+    public static void bootstrap(BootstrapContext<Feature> context) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.NetherFeatures#bootstrap");
+    }
 }

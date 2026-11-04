@@ -1,0 +1,448 @@
+//// BinaryFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record BinaryFunction(Type type, DensityFunction left, DensityFunction right) implements DensityFunction {
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<BinaryFunction> codec();
+    public static enum Type {
+        ADD, SUB, MUL, DIV, MIN, MAX;
+        public final String id;
+        public final MapCodec<BinaryFunction> codec;
+    }
+    public static record AddSampler(DensitySampler left, DensitySampler right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ConstAddSampler(DensitySampler left, float right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record MulSampler(DensitySampler left, DensitySampler right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ConstMulSampler(DensitySampler left, float right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ConstDivSampler(float left, DensitySampler right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record SubSampler(DensitySampler left, DensitySampler right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ConstSubSampler(float left, DensitySampler right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record DivSampler(DensitySampler left, DensitySampler right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record MinSampler(DensitySampler left, DensitySampler right, float rightMinValue) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record MaxSampler(DensitySampler left, DensitySampler right, float rightMaxValue) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ConstMinSampler(DensitySampler left, float right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ConstMaxSampler(DensitySampler left, float right) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// BlendDensityFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record BlendDensityFunction(DensityFunction input) implements DensityFunction {
+    public static final MapCodec<BlendDensityFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<BlendDensityFunction> codec();
+    static record Sampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// CacheFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+public record CacheFunction(DensityFunction input) implements DensityFunction {
+    public static final MapCodec<CacheFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<CacheFunction> codec();
+}
+//// ClampFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record ClampFunction(DensityFunction input, float min, float max) implements DensityFunction {
+    public static final MapCodec<ClampFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public MapCodec<ClampFunction> codec();
+    public Interval range();
+    public int domainAxes();
+    public static record Sampler(DensitySampler input, float min, float max) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// FindTopSurfaceFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record FindTopSurfaceFunction(DensityFunction density, DensityFunction upperBound, int lowerBound, int cellHeight) implements DensityFunction {
+    public static final MapCodec<FindTopSurfaceFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<FindTopSurfaceFunction> codec();
+    static record Sampler(DensitySampler density, DensitySampler upperBound, int lowerBound, int cellHeight) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// InterpolatedFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record InterpolatedFunction(DensityFunction input, int cellSizeXz, int cellSizeY) implements DensityFunction {
+    public static final MapCodec<InterpolatedFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<InterpolatedFunction> codec();
+    static record Sampler(DensitySampler input, int cellSizeXz, int cellSizeY, float cellSizeXzInv, float cellSizeYInv) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// IntervalSelectFunction.java
+import com.mojang.serialization.MapCodec;
+import it.unimi.dsi.fastutil.floats.FloatList;
+import java.util.List;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record IntervalSelectFunction(DensityFunction input, FloatList thresholds, List<DensityFunction> functions) implements DensityFunction {
+    public static final MapCodec<IntervalSelectFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<IntervalSelectFunction> codec();
+    static record Sampler(DensitySampler input, float[] thresholds, DensitySampler[] samplers) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    static record SingleThresholdSampler(DensitySampler input, float threshold, DensitySampler ifBelow, DensitySampler ifAbove) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// LerpFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record LerpFunction(DensityFunction alpha, DensityFunction first, DensityFunction second) implements DensityFunction {
+    public static final MapCodec<LerpFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<LerpFunction> codec();
+    public static record Sampler(DensitySampler alpha, DensitySampler first, DensitySampler second) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ConstFirstSampler(DensitySampler alpha, float first, DensitySampler second) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ConstSecondSampler(DensitySampler alpha, DensitySampler first, float second) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// PowFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record PowFunction(DensityFunction base, DensityFunction exponent) implements DensityFunction {
+    public static final MapCodec<PowFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<PowFunction> codec();
+    static record Sampler(DensitySampler base, DensitySampler exponent) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    static record ConstBaseSampler(double base, DensitySampler exponent) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    static record ConstExponentSampler(DensitySampler base, double exponent) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// RangeChoiceFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record RangeChoiceFunction(DensityFunction input, float minInclusive, float maxExclusive, DensityFunction whenInRange, DensityFunction whenOutOfRange) implements DensityFunction {
+    public static final MapCodec<RangeChoiceFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<RangeChoiceFunction> codec();
+    static record Sampler(DensitySampler input, float minInclusive, float maxExclusive, DensitySampler whenInRange, DensitySampler whenOutOfRange) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    static record ConstSampler(DensitySampler input, float minInclusive, float maxExclusive, float whenInRange, float whenOutOfRange) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// RoundFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record RoundFunction(Type type, DensityFunction input, DensityFunction multiple) implements DensityFunction {
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<RoundFunction> codec();
+    public static enum Type {
+        FLOOR, ROUND, CEIL, TRUNCATE;
+        public final String id;
+        public final MapCodec<RoundFunction> codec;
+    }
+    static record Sampler(Type type, DensitySampler input, DensitySampler multiple) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    static record IntegerMultipleSampler(Type type, DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// SliceFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record SliceFunction(Direction.Axis axis, int coordinate, DensityFunction input) implements DensityFunction {
+    public static final MapCodec<SliceFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public Interval range();
+    public int domainAxes();
+    public MapCodec<SliceFunction> codec();
+    public static record XSampler(DensitySampler input, int x) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record YSampler(DensitySampler input, int y) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ZSampler(DensitySampler input, int z) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record XzSampler(DensitySampler input, int x, int z) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}
+//// SplineFunction.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.BoundedFloatFunction;
+import net.minecraft.util.CubicSpline;
+import net.minecraft.util.Interval;
+import net.minecraft.util.Unit;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record SplineFunction(CubicSpline<Coordinate> spline) implements DensityFunction {
+    public static final MapCodec<SplineFunction> CODEC;
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public Interval range();
+    public int domainAxes();
+    public DensityFunction rewriteChildren(DfRewriteRule rule);
+    public MapCodec<SplineFunction> codec();
+    public String toString();
+    public static record Coordinate(DensityFunction function) implements BoundedFloatFunction<Unit> {
+        public static final Codec<Coordinate> CODEC;
+        public float apply(Unit point);
+        public Interval range();
+    }
+    static class Sampler implements DensitySampler {
+        public Sampler(DensityFunction.CompileContext context, CubicSpline<Coordinate> spline);
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    static record SamplerCoordinate(DensitySampler sampler, int index, Interval range) implements BoundedFloatFunction<SplineInput> {
+        public float apply(SplineInput input);
+    }
+    static class BufferSplineInput implements SplineInput, AutoCloseable {
+        private BufferSplineInput(SamplerContext context, DensityVolume volume, int coordinateCount);
+        public float sampleCoordinate(DensitySampler coordinateSampler, int coordinateIndex);
+        public void close();
+    }
+    static class PointSplineInput implements SplineInput {
+        private PointSplineInput(SamplerContext context, int blockX, int blockY, int blockZ, int coordinateCount);
+        public float sampleCoordinate(DensitySampler coordinateSampler, int coordinateIndex);
+    }
+    interface SplineInput {
+        float sampleCoordinate(DensitySampler coordinateSampler, int coordinateIndex);
+    }
+}
+//// UnaryFunction.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.DensityBuffer;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySampler;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.densityfunction.DfRewriteRule;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
+public record UnaryFunction(Type type, DensityFunction input) implements DensityFunction {
+    public DensitySampler compileSampler(DensityFunction.CompileContext context);
+    public UnaryFunction rewriteChildren(DfRewriteRule rule);
+    public MapCodec<UnaryFunction> codec();
+    public Interval range();
+    public int domainAxes();
+    public static enum Type {
+        ABS, SQUARE, CUBE, SQRT, HALF_NEGATIVE, QUARTER_NEGATIVE, RECIPROCAL, NEGATE, SQUEEZE, LOG, SIGN;
+        public final String id;
+        public final MapCodec<UnaryFunction> codec;
+    }
+    public static record AbsSampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record SquareSampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record SqrtSampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record ReciprocalSampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record NegateSampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record CubeSampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record LeakyReLUSampler(DensitySampler input, float negativeFactor) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record SqueezeSampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record LogSampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+    public static record SignSampler(DensitySampler input) implements DensitySampler {
+        public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+        public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    }
+}

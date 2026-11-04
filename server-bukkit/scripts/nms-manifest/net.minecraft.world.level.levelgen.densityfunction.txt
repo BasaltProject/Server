@@ -1,0 +1,291 @@
+//// CacheId.java
+record CacheId(int index) {
+}
+//// CachingDensitySampler.java
+public record CachingDensitySampler(int id, DensitySampler input) implements DensitySampler {
+    public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+    public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+}
+//// ContextBoundSampler.java
+import net.minecraft.util.context.ContextKey;
+public record ContextBoundSampler(ContextKey<? extends DensitySampler> key, DensitySampler fallbackSampler) implements DensitySampler {
+    public void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+    public float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+}
+//// DensityBuffer.java
+public class DensityBuffer {
+    protected final float[] values;
+    protected int size;
+    protected DensityBuffer(int size);
+    public static DensityBuffer createUnpooled(int size);
+    public void set(int index, float value);
+    public void setRange(int index, int size, float value);
+    public void addTo(int index, float value);
+    public float get(int index);
+    public void fill(float value);
+    public void copyFrom(DensityBuffer other);
+    public int capacity();
+    public int size();
+}
+//// DensityBufferArena.java
+public interface DensityBufferArena {
+    DensityBufferArena GLOBAL;
+    ScopedDensityBuffer acquire(int size);
+    void release(ScopedDensityBuffer buffer);
+}
+//// DensityBufferPool.java
+public class DensityBufferPool implements DensityBufferArena {
+    public DensityBufferPool(int maxAge);
+    public ScopedDensityBuffer acquire(int size);
+    public void release(ScopedDensityBuffer buffer);
+    public void garbageCollect();
+    public void clear();
+    int size();
+    public boolean isEmpty();
+}
+//// DensityFunction.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Interval;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.synth.Noise;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public interface DensityFunction {
+    Codec<Holder<DensityFunction>> REFERENCE_CODEC;
+    Codec<DensityFunction> CODEC;
+    int AXIS_X;
+    int AXIS_Y;
+    int AXIS_Z;
+    int NO_AXES;
+    int ALL_AXES;
+    static int axesFrom(Direction.Axis axis);
+    DensitySampler compileSampler(CompileContext context);
+    DensityFunction rewriteChildren(DfRewriteRule rule);
+    Interval range();
+    int domainAxes();
+    MapCodec<? extends DensityFunction> codec();
+    default DensityFunction clamp(float min, float max);
+    default DensityFunction abs();
+    default DensityFunction square();
+    default DensityFunction cube();
+    default DensityFunction sqrt();
+    default DensityFunction halfNegative();
+    default DensityFunction quarterNegative();
+    default DensityFunction reciprocal();
+    default DensityFunction negate();
+    default DensityFunction squeeze();
+    default DensityFunction log();
+    default DensityFunction sign();
+    default DensityFunction add(DensityFunction right);
+    default DensityFunction add(float right);
+    default DensityFunction sub(DensityFunction right);
+    default DensityFunction sub(float right);
+    default DensityFunction mul(DensityFunction right);
+    default DensityFunction mul(float right);
+    default DensityFunction div(DensityFunction right);
+    default DensityFunction div(float right);
+    default DensityFunction pow(DensityFunction exponent);
+    default DensityFunction pow(float exponent);
+    public @interface Axes {
+    }
+    public interface CompileContext {
+        Noise createNoiseSampler(Holder<NormalNoise> parameters);
+        RandomSource createRandom(Identifier seed);
+        RandomSource createEndIslandRandom();
+    }
+}
+//// DensityFunctionCompiler.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.Interval;
+public class DensityFunctionCompiler {
+    public DensityFunctionCompiler(DensityFunction.CompileContext context);
+    public DensitySampler getSampler(DensityFunction function);
+    static record PreparedCache(int id, Interval range, int domainAxes, DensitySampler cachingSampler) implements DensityFunction {
+        public DensitySampler compileSampler(DensityFunction.CompileContext context);
+        public DensityFunction rewriteChildren(DfRewriteRule rule);
+        public MapCodec<PreparedCache> codec();
+    }
+}
+//// DensityFunctions.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import it.unimi.dsi.fastutil.floats.FloatList;
+import java.util.List;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.core.Vec3i;
+import net.minecraft.util.CubicSpline;
+import net.minecraft.util.Interval;
+import net.minecraft.world.level.levelgen.densityfunction.op.RoundFunction;
+import net.minecraft.world.level.levelgen.densityfunction.op.SplineFunction;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public final class DensityFunctions {
+    public static final float MAX_REASONABLE_NOISE_VALUE = 1000000.0F;
+    public static final Codec<Float> NOISE_VALUE_CODEC;
+    public static final Codec<DensityFunction> DIRECT_CODEC;
+    public static MapCodec<? extends DensityFunction> bootstrap(Registry<MapCodec<? extends DensityFunction>> registry);
+    private DensityFunctions();
+    public static DensityFunction zero();
+    public static DensityFunction constant(float value);
+    public static DensityFunction abs(DensityFunction input);
+    public static DensityFunction square(DensityFunction input);
+    public static DensityFunction cube(DensityFunction input);
+    public static DensityFunction sqrt(DensityFunction input);
+    public static DensityFunction halfNegative(DensityFunction input);
+    public static DensityFunction quarterNegative(DensityFunction input);
+    public static DensityFunction reciprocal(DensityFunction input);
+    public static DensityFunction negate(DensityFunction input);
+    public static DensityFunction squeeze(DensityFunction input);
+    public static DensityFunction log(DensityFunction input);
+    public static DensityFunction sign(DensityFunction input);
+    public static DensityFunction interpolated(DensityFunction function, int cellSizeXz, int cellSizeY);
+    public static DensityFunction cache(DensityFunction function);
+    public static DensityFunction mappedNoise(Holder<NormalNoise> noiseData, double xzScale, double yScale, float minTarget, float maxTarget);
+    public static DensityFunction mappedNoise(Holder<NormalNoise> noiseData, double yScale, float minTarget, float maxTarget);
+    public static DensityFunction mappedNoise(Holder<NormalNoise> noiseData, float minTarget, float maxTarget);
+    public static DensityFunction shiftedNoise2d(DensityFunction shiftX, DensityFunction shiftZ, double xzScale, Holder<NormalNoise> noiseData);
+    public static DensityFunction noise(Holder<NormalNoise> noiseData);
+    public static DensityFunction noise(Holder<NormalNoise> noiseData, double xzScale, double yScale);
+    public static DensityFunction noise(Holder<NormalNoise> noiseData, double yScale);
+    public static DensityFunction rangeChoice(DensityFunction input, float minInclusive, float maxExclusive, DensityFunction whenInRange, DensityFunction whenOutOfRange);
+    public static DensityFunction intervalSelect(DensityFunction input, FloatList thresholds, List<DensityFunction> functions);
+    public static DensityFunction shiftA(Holder<NormalNoise> noiseData);
+    public static DensityFunction shiftB(Holder<NormalNoise> noiseData);
+    public static DensityFunction shift(Holder<NormalNoise> noiseData);
+    public static DensityFunction blendDensity(DensityFunction input);
+    public static DensityFunction endOuterIslands();
+    public static DensityFunction distanceToPoint(Vec3i point, DistanceMetric metric);
+    public static DensityFunction add(DensityFunction left, DensityFunction right);
+    public static DensityFunction sub(DensityFunction left, DensityFunction right);
+    public static DensityFunction mul(DensityFunction left, DensityFunction right);
+    public static DensityFunction div(DensityFunction left, DensityFunction right);
+    public static DensityFunction pow(DensityFunction base, DensityFunction exponent);
+    public static DensityFunction clamp(DensityFunction input, float min, float max);
+    public static DensityFunction min(DensityFunction left, DensityFunction right);
+    public static DensityFunction max(DensityFunction left, DensityFunction right);
+    public static DensityFunction spline(CubicSpline<SplineFunction.Coordinate> spline);
+    public static DensityFunction sliceY(DensityFunction input, int y);
+    public static DensityFunction slice(Direction.Axis axis, int coordinate, DensityFunction input);
+    public static DensityFunction yClampedGradient(int fromY, int toY, float fromValue, float toValue);
+    public static DensityFunction gradient(Direction.Axis axis, TilingMode tiling, int fromCoordinate, int toCoordinate, float fromValue, float toValue);
+    public static DensityFunction blendAlpha();
+    public static DensityFunction blendOffset();
+    public static DensityFunction beardifier();
+    public static DensityFunction lerp(DensityFunction alpha, DensityFunction first, DensityFunction second);
+    public static DensityFunction lerp(DensityFunction factor, float first, DensityFunction second);
+    public static DensityFunction round(RoundFunction.Type type, DensityFunction input, DensityFunction multiple);
+    public static DensityFunction round(RoundFunction.Type type, DensityFunction input);
+    public static DensityFunction floor(DensityFunction input, DensityFunction multiple);
+    public static DensityFunction floor(DensityFunction input);
+    public static DensityFunction round(DensityFunction input, DensityFunction multiple);
+    public static DensityFunction round(DensityFunction input);
+    public static DensityFunction ceil(DensityFunction input, DensityFunction multiple);
+    public static DensityFunction ceil(DensityFunction input);
+    public static DensityFunction truncate(DensityFunction input, DensityFunction multiple);
+    public static DensityFunction truncate(DensityFunction input);
+    public static DensityFunction findTopSurface(DensityFunction density, DensityFunction upperBound, int lowerBound, int stepSize);
+    public static DensityFunction remap(DensityFunction input, float fromMin, float fromMax, float toMin, float toMax);
+    public static DensityFunction clampedMap(DensityFunction input, float fromMin, float fromMax, float toMin, float toMax);
+    public static record HolderHolder(Holder<DensityFunction> function) implements DensityFunction {
+        public DensitySampler compileSampler(DensityFunction.CompileContext context);
+        public DensityFunction rewriteChildren(DfRewriteRule rule);
+        public Interval range();
+        public int domainAxes();
+        public MapCodec<HolderHolder> codec();
+    }
+}
+//// DensitySampler.java
+public interface DensitySampler {
+    void sampleVolume(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume);
+    static void sampleVolumeNaive(SamplerContext context, DensityBuffer outputBuffer, DensityVolume volume, DensitySampler sampler);
+    float sampleValue(SamplerContext context, int blockX, int blockY, int blockZ);
+    default Bound bind(SamplerContext context);
+    public static record Bound(DensitySampler sampler, SamplerContext context) {
+        public float sampleValue(int blockX, int blockY, int blockZ);
+        public void sampleVolume(DensityBuffer outputBuffer, DensityVolume volume);
+        public ScopedDensityBuffer sampleVolume(DensityVolume volume);
+    }
+}
+//// DensitySamplerSet.java
+public interface DensitySamplerSet {
+    DensitySampler.Bound get(DensityFunction function);
+    default float sampleValue(DensityFunction function, int blockX, int blockY, int blockZ);
+}
+//// DensityVolume.java
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+public record DensityVolume(int sizeX, int sizeY, int sizeZ, int minBlockX, int minBlockY, int minBlockZ, int stepBlockX, int stepBlockY, int stepBlockZ) {
+    public static final int NO_BLOCK = -1;
+    public DensityVolume(int sizeX, int sizeY, int sizeZ, int minBlockX, int minBlockY, int minBlockZ, int stepBlockX, int stepBlockY, int stepBlockZ);
+    public DensityVolume(int sizeX, int sizeY, int sizeZ, int minBlockX, int minBlockY, int minBlockZ);
+    public int indexUnchecked(int indexX, int indexY, int indexZ);
+    public int blockX(int x);
+    public int blockY(int y);
+    public int blockZ(int z);
+    public int maxBlockX();
+    public int maxBlockY();
+    public int maxBlockZ();
+    public int size();
+    public boolean intersects(BoundingBox box);
+    public int indexOfBlock(int blockX, int blockY, int blockZ);
+}
+//// DfRewriteRule.java
+public interface DfRewriteRule {
+    DfRewriteRule INLINE_REFERENCE;
+    DfRewriteRule SLICE_UNIFORM_AXES;
+    static DfRewriteRule sequence(DfRewriteRule... rules);
+    DensityFunction rewrite(DensityFunction function);
+    public static record SliceUniformAxes(int parentDomainAxes) implements DfRewriteRule {
+        public DensityFunction rewrite(DensityFunction function);
+    }
+}
+//// DistanceMetric.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum DistanceMetric implements StringRepresentable {
+    EUCLIDEAN, EUCLIDEAN_SQUARED, MANHATTAN, CHEBYSHEV;
+    public static final Codec<DistanceMetric> CODEC;
+    public float compute(float deltaX, float deltaY, float deltaZ);
+    public float compute(float deltaX, float deltaZ);
+    public String getSerializedName();
+}
+//// SamplerContext.java
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.util.context.ContextMap;
+public class SamplerContext {
+    public static final SamplerContext EMPTY_UNCACHED;
+    private SamplerContext(ContextMap userFields, DensityBufferArena bufferArena, boolean enableCaches);
+    public static Builder builder();
+    public <T> T getField(ContextKey<T> key);
+    public <T> T getFieldOrDefault(ContextKey<? extends T> key, T defaultValue);
+    public ScopedDensityBuffer acquireBuffer(DensityVolume volume);
+    void sampleVolumeCached(int cacheId, DensitySampler input, DensityBuffer outputBuffer, DensityVolume volume);
+    float sampleValueCached(int cacheId, DensitySampler input, int blockX, int blockY, int blockZ);
+    static class CacheCell {
+    }
+    public static class Builder {
+        private Builder();
+        public Builder setUserFields(ContextMap userFields);
+        public Builder useBufferArena(DensityBufferArena bufferArena);
+        public Builder enableCaches();
+        public SamplerContext build();
+    }
+}
+//// ScopedDensityBuffer.java
+public class ScopedDensityBuffer extends DensityBuffer implements AutoCloseable {
+    ScopedDensityBuffer(DensityBufferArena arena, int capacity, int size);
+    void restore(int size);
+    int incrementAge();
+    public void close();
+}
+//// TilingMode.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum TilingMode implements StringRepresentable {
+    CLAMP_TO_EDGE, REPEAT, MIRRORED_REPEAT;
+    public static final Codec<TilingMode> CODEC;
+    public String getSerializedName();
+}

@@ -73,7 +73,10 @@ std::optional<Value> dispatch(Context& context, const Verb verb, const std::stri
     if (auto found = misc(context, verb, name, args); found.has_value()) {
         return found;
     }
-    return tail(context, verb, name, args);
+    if (auto found = tail(context, verb, name, args); found.has_value()) {
+        return found;
+    }
+    return packets(context, verb, name, args);
 }
 
 } // namespace basalt::server::runtime::plugins::playerOps

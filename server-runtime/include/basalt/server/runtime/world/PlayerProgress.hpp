@@ -33,12 +33,16 @@ public:
 
     [[nodiscard]] const server::world::advancement::Advancement* find(const wire::common::Identifier& id) const;
 
+    /// The definition as it was read, empty for one built from parts.
+    [[nodiscard]] const std::string& rawJson(const wire::common::Identifier& id) const;
+
     [[nodiscard]] std::vector<wire::common::Identifier> descendantsOf(const wire::common::Identifier& id) const;
 
     [[nodiscard]] std::vector<wire::common::Identifier> ancestorsOf(const wire::common::Identifier& id) const;
 
 private:
     std::map<wire::common::Identifier, server::world::advancement::Advancement> advancements_;
+    std::map<wire::common::Identifier, std::string> rawJson_;
 };
 
 /// Keyed by UUID as vanilla keys `advancements/<uuid>.json`; with no repository nothing is persisted.

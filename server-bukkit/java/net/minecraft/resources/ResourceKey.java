@@ -1,9 +1,15 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.resources;
 
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.Registry;
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import java.util.function.UnaryOperator;
+import net.minecraft.network.codec.StreamCodec;
 
 public class ResourceKey<T> implements Comparable<ResourceKey<?>> {
     private static final Map<String, ResourceKey<?>> kValues = new ConcurrentHashMap<>();
@@ -58,5 +64,28 @@ public class ResourceKey<T> implements Comparable<ResourceKey<?>> {
     @Override
     public String toString() {
         return "ResourceKey[" + registryName + " / " + identifier + "]";
+    }
+    public static final StreamCodec<ByteBuf, ResourceKey<? extends Registry<?>>> REGISTRY_STREAM_CODEC =
+        Identifier.STREAM_CODEC.map(id -> (ResourceKey<? extends Registry<?>>) (ResourceKey<?>) createRegistryKey(id), ResourceKey::identifier);
+    public static <T> Codec<ResourceKey<T>> codec(ResourceKey<? extends Registry<T>> registryName) {
+        return Identifier.CODEC.xmap(id -> create(registryName, id), ResourceKey::identifier);
+    }
+    public static <T> StreamCodec<ByteBuf, ResourceKey<T>> streamCodec(ResourceKey<? extends Registry<T>> registryName) {
+        return Identifier.STREAM_CODEC.map(id -> create(registryName, id), ResourceKey::identifier);
+    }
+    @SuppressWarnings("unchecked")
+    public <E> Optional<ResourceKey<E>> cast(ResourceKey<? extends Registry<E>> registry) {
+        return isFor(registry) ? Optional.of((ResourceKey<E>) this) : Optional.empty();
+    }
+    public <E> ResourceKey<E> dependent(ResourceKey<? extends Registry<E>> registryKey, String suffix) {
+        return create(registryKey, identifier.withSuffix(suffix));
+    }
+    public <E> ResourceKey<E> dependent(ResourceKey<? extends Registry<E>> registryKey, UnaryOperator<String> decoration) {
+        return create(registryKey, identifier.withPath(decoration));
+    }
+    public ResourceKey<Registry<T>> registryKey() {
+        return createRegistryKey(registryName);
+    }
+    static record InternKey(Identifier registry, Identifier identifier) {
     }
 }

@@ -1,0 +1,16 @@
+//// JsonToWebSocketEncoder.java
+import com.google.gson.JsonElement;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToMessageEncoder;
+import java.util.List;
+public class JsonToWebSocketEncoder extends MessageToMessageEncoder<JsonElement> {
+    protected void encode(ChannelHandlerContext ctx, JsonElement msg, List<Object> out);
+}
+//// WebSocketToJsonCodec.java
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToMessageDecoder;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import java.util.List;
+public class WebSocketToJsonCodec extends MessageToMessageDecoder<TextWebSocketFrame> {
+    protected void decode(ChannelHandlerContext ctx, TextWebSocketFrame msg, List<Object> out);
+}

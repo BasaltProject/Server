@@ -1,0 +1,115 @@
+//// LevelBasedPermissionSet.java
+public interface LevelBasedPermissionSet extends PermissionSet {
+    LevelBasedPermissionSet ALL;
+    LevelBasedPermissionSet MODERATOR;
+    LevelBasedPermissionSet GAMEMASTER;
+    LevelBasedPermissionSet ADMIN;
+    LevelBasedPermissionSet OWNER;
+    PermissionLevel level();
+    default boolean hasPermission(Permission permission);
+    default PermissionSet union(PermissionSet other);
+    static LevelBasedPermissionSet forLevel(PermissionLevel level);
+}
+//// Permission.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.resources.Identifier;
+public interface Permission {
+    Codec<Permission> FULL_CODEC;
+    Codec<Permission> CODEC;
+    MapCodec<? extends Permission> codec();
+    public static record Atom(Identifier id) implements Permission {
+        public static final MapCodec<Atom> MAP_CODEC;
+        public MapCodec<Atom> codec();
+        public static Atom create(String name);
+        public static Atom create(Identifier id);
+    }
+    public static record HasCommandLevel(PermissionLevel level) implements Permission {
+        public static final MapCodec<HasCommandLevel> MAP_CODEC;
+        public MapCodec<HasCommandLevel> codec();
+    }
+}
+//// PermissionCheck.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+public interface PermissionCheck {
+    Codec<PermissionCheck> CODEC;
+    boolean check(PermissionSet source);
+    MapCodec<? extends PermissionCheck> codec();
+    public static class AlwaysPass implements PermissionCheck {
+        public static final AlwaysPass INSTANCE;
+        public static final MapCodec<AlwaysPass> MAP_CODEC;
+        private AlwaysPass();
+        public boolean check(PermissionSet source);
+        public MapCodec<AlwaysPass> codec();
+    }
+    public static record Require(Permission permission) implements PermissionCheck {
+        public static final MapCodec<Require> MAP_CODEC;
+        public MapCodec<Require> codec();
+        public boolean check(PermissionSet source);
+    }
+}
+//// PermissionCheckTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class PermissionCheckTypes {
+    public static MapCodec<? extends PermissionCheck> bootstrap(Registry<MapCodec<? extends PermissionCheck>> registry);
+}
+//// PermissionLevel.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum PermissionLevel implements StringRepresentable {
+    ALL, MODERATORS, GAMEMASTERS, ADMINS, OWNERS;
+    public static final Codec<PermissionLevel> CODEC;
+    public static final Codec<PermissionLevel> INT_CODEC;
+    public boolean isEqualOrHigherThan(PermissionLevel other);
+    public static PermissionLevel byId(int level);
+    public int id();
+    public String getSerializedName();
+}
+//// PermissionProviderCheck.java
+import java.util.function.Predicate;
+public record PermissionProviderCheck<T extends PermissionSetSupplier>(PermissionCheck test) implements Predicate<T> {
+    public boolean test(T t);
+}
+//// PermissionSet.java
+public interface PermissionSet {
+    PermissionSet NO_PERMISSIONS;
+    PermissionSet ALL_PERMISSIONS;
+    boolean hasPermission(Permission permission);
+    default PermissionSet union(PermissionSet other);
+}
+//// PermissionSetSupplier.java
+public interface PermissionSetSupplier {
+    PermissionSet permissions();
+}
+//// PermissionSetUnion.java
+import it.unimi.dsi.fastutil.objects.ReferenceSet;
+public class PermissionSetUnion implements PermissionSet {
+    PermissionSetUnion(PermissionSet first, PermissionSet second);
+    private PermissionSetUnion(ReferenceSet<PermissionSet> oldPermissions, PermissionSet other);
+    private PermissionSetUnion(ReferenceSet<PermissionSet> oldPermissions, ReferenceSet<PermissionSet> other);
+    public boolean hasPermission(Permission permission);
+    public PermissionSet union(PermissionSet other);
+    public ReferenceSet<PermissionSet> getPermissions();
+}
+//// PermissionTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class PermissionTypes {
+    public static MapCodec<? extends Permission> bootstrap(Registry<MapCodec<? extends Permission>> registry);
+}
+//// Permissions.java
+import java.util.Set;
+public class Permissions {
+    public static final Permission COMMANDS_MODERATOR;
+    public static final Permission COMMANDS_GAMEMASTER;
+    public static final Permission COMMANDS_ADMIN;
+    public static final Permission COMMANDS_OWNER;
+    public static final Permission COMMANDS_ENTITY_SELECTORS;
+    public static final Permission CHAT_SEND_MESSAGES;
+    public static final Permission CHAT_SEND_COMMANDS;
+    public static final Permission CHAT_RECEIVE_PLAYER_MESSAGES;
+    public static final Permission CHAT_RECEIVE_SYSTEM_MESSAGES;
+    public static final Set<Permission> CHAT_PERMISSIONS;
+}

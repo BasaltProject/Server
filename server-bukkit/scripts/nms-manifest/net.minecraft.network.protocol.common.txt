@@ -1,0 +1,307 @@
+//// ClientCommonPacketListener.java
+import net.minecraft.network.protocol.cookie.ClientCookiePacketListener;
+public interface ClientCommonPacketListener extends ClientCookiePacketListener {
+    void handleKeepAlive(ClientboundKeepAlivePacket packet);
+    void handlePing(ClientboundPingPacket packet);
+    void handleCustomPayload(ClientboundCustomPayloadPacket packet);
+    void handleDisconnect(ClientboundDisconnectPacket packet);
+    void handleResourcePackPush(ClientboundResourcePackPushPacket packet);
+    void handleResourcePackPop(ClientboundResourcePackPopPacket packet);
+    void handlePostEffects(ClientboundPostEffectsPacket packet);
+    void handleUpdateTags(ClientboundUpdateTagsPacket packet);
+    void handleStoreCookie(ClientboundStoreCookiePacket packet);
+    void handleTransfer(ClientboundTransferPacket packet);
+    void handleCustomReportDetails(ClientboundCustomReportDetailsPacket packet);
+    void handleServerLinks(ClientboundServerLinksPacket packet);
+    void handleClearDialog(ClientboundClearDialogPacket packet);
+    void handleShowDialog(ClientboundShowDialogPacket packet);
+}
+//// ClientboundClearDialogPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ClientboundClearDialogPacket implements Packet<ClientCommonPacketListener> {
+    public static final ClientboundClearDialogPacket INSTANCE;
+    public static final StreamCodec<ByteBuf, ClientboundClearDialogPacket> STREAM_CODEC;
+    private ClientboundClearDialogPacket();
+    public PacketType<ClientboundClearDialogPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundCustomPayloadPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+public record ClientboundCustomPayloadPacket(CustomPacketPayload payload) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundCustomPayloadPacket> GAMEPLAY_STREAM_CODEC;
+    public static final StreamCodec<FriendlyByteBuf, ClientboundCustomPayloadPacket> CONFIG_STREAM_CODEC;
+    public PacketType<ClientboundCustomPayloadPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundCustomReportDetailsPacket.java
+import io.netty.buffer.ByteBuf;
+import java.util.Map;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundCustomReportDetailsPacket(Map<String, String> details) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundCustomReportDetailsPacket> STREAM_CODEC;
+    public PacketType<ClientboundCustomReportDetailsPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundDisconnectPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundDisconnectPacket(Component reason) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundDisconnectPacket> STREAM_CODEC;
+    public PacketType<ClientboundDisconnectPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundKeepAlivePacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ClientboundKeepAlivePacket implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundKeepAlivePacket> STREAM_CODEC;
+    public ClientboundKeepAlivePacket(long id);
+    private ClientboundKeepAlivePacket(FriendlyByteBuf input);
+    public PacketType<ClientboundKeepAlivePacket> type();
+    public void handle(ClientCommonPacketListener listener);
+    public long getId();
+}
+//// ClientboundPingPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ClientboundPingPacket implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundPingPacket> STREAM_CODEC;
+    public ClientboundPingPacket(int id);
+    private ClientboundPingPacket(FriendlyByteBuf input);
+    public PacketType<ClientboundPingPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+    public int getId();
+}
+//// ClientboundPostEffectsPacket.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.Identifier;
+public record ClientboundPostEffectsPacket(List<Identifier> postEffects) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundPostEffectsPacket> STREAM_CODEC;
+    public PacketType<ClientboundPostEffectsPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundResourcePackPopPacket.java
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundResourcePackPopPacket(Optional<UUID> id) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundResourcePackPopPacket> STREAM_CODEC;
+    private ClientboundResourcePackPopPacket(FriendlyByteBuf input);
+    public PacketType<ClientboundResourcePackPopPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundResourcePackPushPacket.java
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundResourcePackPushPacket(UUID id, String url, String hash, boolean required, Optional<Component> prompt) implements Packet<ClientCommonPacketListener> {
+    public static final int MAX_HASH_LENGTH = 40;
+    public static final StreamCodec<ByteBuf, ClientboundResourcePackPushPacket> STREAM_CODEC;
+    public PacketType<ClientboundResourcePackPushPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundServerLinksPacket.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.server.ServerLinks;
+public record ClientboundServerLinksPacket(List<ServerLinks.UntrustedEntry> links) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundServerLinksPacket> STREAM_CODEC;
+    public PacketType<ClientboundServerLinksPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundShowDialogPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.server.dialog.Dialog;
+public record ClientboundShowDialogPacket(Holder<Dialog> dialog) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundShowDialogPacket> STREAM_CODEC;
+    public static final StreamCodec<ByteBuf, ClientboundShowDialogPacket> CONTEXT_FREE_STREAM_CODEC;
+    public PacketType<ClientboundShowDialogPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundStoreCookiePacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.Identifier;
+public record ClientboundStoreCookiePacket(Identifier key, byte[] payload) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundStoreCookiePacket> STREAM_CODEC;
+    public static final StreamCodec<ByteBuf, byte[]> PAYLOAD_STREAM_CODEC;
+    private ClientboundStoreCookiePacket(FriendlyByteBuf input);
+    public PacketType<ClientboundStoreCookiePacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundTransferPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundTransferPacket(String host, int port) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundTransferPacket> STREAM_CODEC;
+    private ClientboundTransferPacket(FriendlyByteBuf input);
+    public PacketType<ClientboundTransferPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// ClientboundUpdateTagsPacket.java
+import io.netty.buffer.ByteBuf;
+import java.util.Map;
+import net.minecraft.core.Registry;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagNetworkSerialization;
+public record ClientboundUpdateTagsPacket(Map<ResourceKey<? extends Registry<?>>, TagNetworkSerialization.NetworkPayload> tags) implements Packet<ClientCommonPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundUpdateTagsPacket> STREAM_CODEC;
+    public PacketType<ClientboundUpdateTagsPacket> type();
+    public void handle(ClientCommonPacketListener listener);
+}
+//// CommonPacketTypes.java
+import net.minecraft.network.protocol.PacketType;
+public class CommonPacketTypes {
+    public static final PacketType<ClientboundClearDialogPacket> CLIENTBOUND_CLEAR_DIALOG;
+    public static final PacketType<ClientboundCustomPayloadPacket> CLIENTBOUND_CUSTOM_PAYLOAD;
+    public static final PacketType<ClientboundCustomReportDetailsPacket> CLIENTBOUND_CUSTOM_REPORT_DETAILS;
+    public static final PacketType<ClientboundDisconnectPacket> CLIENTBOUND_DISCONNECT;
+    public static final PacketType<ClientboundKeepAlivePacket> CLIENTBOUND_KEEP_ALIVE;
+    public static final PacketType<ClientboundPingPacket> CLIENTBOUND_PING;
+    public static final PacketType<ClientboundResourcePackPopPacket> CLIENTBOUND_RESOURCE_PACK_POP;
+    public static final PacketType<ClientboundResourcePackPushPacket> CLIENTBOUND_RESOURCE_PACK_PUSH;
+    public static final PacketType<ClientboundPostEffectsPacket> CLIENTBOUND_POST_EFFECTS;
+    public static final PacketType<ClientboundServerLinksPacket> CLIENTBOUND_SERVER_LINKS;
+    public static final PacketType<ClientboundShowDialogPacket> CLIENTBOUND_SHOW_DIALOG;
+    public static final PacketType<ClientboundStoreCookiePacket> CLIENTBOUND_STORE_COOKIE;
+    public static final PacketType<ClientboundTransferPacket> CLIENTBOUND_TRANSFER;
+    public static final PacketType<ClientboundUpdateTagsPacket> CLIENTBOUND_UPDATE_TAGS;
+    public static final PacketType<ServerboundClientInformationPacket> SERVERBOUND_CLIENT_INFORMATION;
+    public static final PacketType<ServerboundCustomPayloadPacket> SERVERBOUND_CUSTOM_PAYLOAD;
+    public static final PacketType<ServerboundKeepAlivePacket> SERVERBOUND_KEEP_ALIVE;
+    public static final PacketType<ServerboundPongPacket> SERVERBOUND_PONG;
+    public static final PacketType<ServerboundResourcePackPacket> SERVERBOUND_RESOURCE_PACK;
+    public static final PacketType<ServerboundCustomClickActionPacket> SERVERBOUND_CUSTOM_CLICK_ACTION;
+}
+//// ServerCommonPacketListener.java
+import net.minecraft.network.protocol.cookie.ServerCookiePacketListener;
+public interface ServerCommonPacketListener extends ServerCookiePacketListener {
+    void handleKeepAlive(ServerboundKeepAlivePacket packet);
+    void handlePong(ServerboundPongPacket serverboundPongPacket);
+    void handleCustomPayload(ServerboundCustomPayloadPacket packet);
+    void handleResourcePackResponse(ServerboundResourcePackPacket packet);
+    void handleClientInformation(ServerboundClientInformationPacket packet);
+    void handleCustomClickAction(ServerboundCustomClickActionPacket packet);
+}
+//// ServerboundClientInformationPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.server.level.ClientInformation;
+public record ServerboundClientInformationPacket(ClientInformation information) implements Packet<ServerCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ServerboundClientInformationPacket> STREAM_CODEC;
+    private ServerboundClientInformationPacket(FriendlyByteBuf input);
+    public PacketType<ServerboundClientInformationPacket> type();
+    public void handle(ServerCommonPacketListener listener);
+}
+//// ServerboundCustomClickActionPacket.java
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.Identifier;
+public record ServerboundCustomClickActionPacket(Identifier id, Optional<Tag> payload) implements Packet<ServerCommonPacketListener> {
+    public static final StreamCodec<ByteBuf, ServerboundCustomClickActionPacket> STREAM_CODEC;
+    public PacketType<ServerboundCustomClickActionPacket> type();
+    public void handle(ServerCommonPacketListener listener);
+}
+//// ServerboundCustomPayloadPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+public record ServerboundCustomPayloadPacket(CustomPacketPayload payload) implements Packet<ServerCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ServerboundCustomPayloadPacket> STREAM_CODEC;
+    public PacketType<ServerboundCustomPayloadPacket> type();
+    public void handle(ServerCommonPacketListener listener);
+}
+//// ServerboundKeepAlivePacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ServerboundKeepAlivePacket implements Packet<ServerCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ServerboundKeepAlivePacket> STREAM_CODEC;
+    public ServerboundKeepAlivePacket(long id);
+    private ServerboundKeepAlivePacket(FriendlyByteBuf input);
+    public PacketType<ServerboundKeepAlivePacket> type();
+    public void handle(ServerCommonPacketListener listener);
+    public long getId();
+}
+//// ServerboundPongPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ServerboundPongPacket implements Packet<ServerCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ServerboundPongPacket> STREAM_CODEC;
+    public ServerboundPongPacket(int id);
+    private ServerboundPongPacket(FriendlyByteBuf input);
+    public PacketType<ServerboundPongPacket> type();
+    public void handle(ServerCommonPacketListener listener);
+    public int getId();
+}
+//// ServerboundResourcePackPacket.java
+import java.util.UUID;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ServerboundResourcePackPacket(UUID id, Action action) implements Packet<ServerCommonPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ServerboundResourcePackPacket> STREAM_CODEC;
+    private ServerboundResourcePackPacket(FriendlyByteBuf input);
+    public PacketType<ServerboundResourcePackPacket> type();
+    public void handle(ServerCommonPacketListener listener);
+    public static enum Action {
+        SUCCESSFULLY_LOADED, DECLINED, FAILED_DOWNLOAD, ACCEPTED, DOWNLOADED, INVALID_URL, FAILED_RELOAD, DISCARDED;
+        public boolean isTerminal();
+    }
+}

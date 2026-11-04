@@ -1,0 +1,544 @@
+//// AllOfRuleTest.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
+public class AllOfRuleTest extends RuleTest {
+    public static final MapCodec<AllOfRuleTest> CODEC;
+    public AllOfRuleTest(List<RuleTest> rules);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}
+//// AlwaysTrueTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+public class AlwaysTrueTest extends RuleTest {
+    public static final MapCodec<AlwaysTrueTest> CODEC;
+    public static final AlwaysTrueTest INSTANCE;
+    private AlwaysTrueTest();
+    public boolean testAgainstWorldState(LevelReader level, BlockPos pos, RandomSource random);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}
+//// AnyOfRuleTest.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
+public class AnyOfRuleTest extends RuleTest {
+    public static final MapCodec<AnyOfRuleTest> CODEC;
+    public AnyOfRuleTest(List<RuleTest> rules);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}
+//// AxisAlignedLinearPosTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
+public class AxisAlignedLinearPosTest extends PosRuleTest {
+    public static final MapCodec<AxisAlignedLinearPosTest> CODEC;
+    public AxisAlignedLinearPosTest(float minChance, float maxChance, int minDist, int maxDist, Direction.Axis axis);
+    public boolean test(BlockPos inTemplatePos, BlockPos worldPos, BlockPos worldReference, RandomSource random);
+    protected PosRuleTestType<?> getType();
+}
+//// BlackstoneReplaceProcessor.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+public class BlackstoneReplaceProcessor implements StructureProcessor {
+    public static final MapCodec<BlackstoneReplaceProcessor> MAP_CODEC;
+    public static final BlackstoneReplaceProcessor INSTANCE;
+    private BlackstoneReplaceProcessor();
+    public StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    public MapCodec<BlackstoneReplaceProcessor> codec();
+}
+//// BlockAgeProcessor.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+public class BlockAgeProcessor implements StructureProcessor {
+    public static final MapCodec<BlockAgeProcessor> MAP_CODEC;
+    public BlockAgeProcessor(float mossiness);
+    public StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    public MapCodec<BlockAgeProcessor> codec();
+}
+//// BlockIgnoreProcessor.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+public class BlockIgnoreProcessor implements StructureProcessor {
+    public static final MapCodec<BlockIgnoreProcessor> MAP_CODEC;
+    public static final BlockIgnoreProcessor STRUCTURE_BLOCK;
+    public static final BlockIgnoreProcessor AIR;
+    public static final BlockIgnoreProcessor STRUCTURE_AND_AIR;
+    public BlockIgnoreProcessor(List<Block> toIgnore);
+    public StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    public MapCodec<BlockIgnoreProcessor> codec();
+}
+//// BlockMatchTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class BlockMatchTest extends RuleTest {
+    public static final MapCodec<BlockMatchTest> CODEC;
+    public BlockMatchTest(Block block);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}
+//// BlockRotProcessor.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+public class BlockRotProcessor implements StructureProcessor {
+    public static final MapCodec<BlockRotProcessor> MAP_CODEC;
+    public BlockRotProcessor(HolderSet<Block> tag, float integrity);
+    public BlockRotProcessor(float integrity);
+    private BlockRotProcessor(Optional<HolderSet<Block>> blockTagKey, float integrity);
+    public StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    public MapCodec<BlockRotProcessor> codec();
+}
+//// BlockStateMatchTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
+public class BlockStateMatchTest extends RuleTest {
+    public static final MapCodec<BlockStateMatchTest> CODEC;
+    public BlockStateMatchTest(BlockState blockState);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}
+//// CappedProcessor.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.ServerLevelAccessor;
+public class CappedProcessor implements StructureProcessor {
+    public static final MapCodec<CappedProcessor> MAP_CODEC;
+    public CappedProcessor(StructureProcessor delegate, IntProvider limit);
+    public MapCodec<CappedProcessor> codec();
+    public boolean evaluatesEntirePieceState();
+    public final List<StructureTemplate.StructureBlockInfo> finalizeProcessing(ServerLevelAccessor level, BlockPos position, BlockPos referencePos, List<StructureTemplate.StructureBlockInfo> originalBlockInfoList, List<StructureTemplate.StructureBlockInfo> processedBlockInfoList, StructurePlaceSettings settings);
+}
+//// GravityProcessor.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.levelgen.Heightmap;
+public class GravityProcessor implements StructureProcessor {
+    public static final MapCodec<GravityProcessor> MAP_CODEC;
+    public GravityProcessor(Heightmap.Types heightmap, int offset);
+    public StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    public MapCodec<GravityProcessor> codec();
+}
+//// HeightMatchTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
+public class HeightMatchTest extends RuleTest {
+    public static final MapCodec<HeightMatchTest> CODEC;
+    public HeightMatchTest(int minInclusive, int maxInclusive);
+    public static RuleTest min(int minInclusive);
+    public static RuleTest max(int maxInclusive);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}
+//// JigsawReplacementProcessor.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+public class JigsawReplacementProcessor implements StructureProcessor {
+    public static final MapCodec<JigsawReplacementProcessor> MAP_CODEC;
+    public static final JigsawReplacementProcessor INSTANCE;
+    private JigsawReplacementProcessor();
+    public StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    public MapCodec<JigsawReplacementProcessor> codec();
+}
+//// LavaSubmergedBlockProcessor.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+public class LavaSubmergedBlockProcessor implements StructureProcessor {
+    public static final MapCodec<LavaSubmergedBlockProcessor> MAP_CODEC;
+    public static final LavaSubmergedBlockProcessor INSTANCE;
+    public StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    public MapCodec<LavaSubmergedBlockProcessor> codec();
+}
+//// LinearPosTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public class LinearPosTest extends PosRuleTest {
+    public static final MapCodec<LinearPosTest> CODEC;
+    public LinearPosTest(float minChance, float maxChance, int minDist, int maxDist);
+    public boolean test(BlockPos inTemplatePos, BlockPos worldPos, BlockPos worldReference, RandomSource random);
+    protected PosRuleTestType<?> getType();
+}
+//// LiquidSettings.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum LiquidSettings implements StringRepresentable {
+    IGNORE_WATERLOGGING, APPLY_WATERLOGGING;
+    public static final Codec<LiquidSettings> CODEC;
+    public String getSerializedName();
+}
+//// NopProcessor.java
+import com.mojang.serialization.MapCodec;
+public class NopProcessor implements StructureProcessor {
+    public static final MapCodec<NopProcessor> MAP_CODEC;
+    public static final NopProcessor INSTANCE;
+    private NopProcessor();
+    public MapCodec<NopProcessor> codec();
+}
+//// NotRuleTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
+public class NotRuleTest extends RuleTest {
+    public static final MapCodec<NotRuleTest> CODEC;
+    public NotRuleTest(RuleTest rule);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}
+//// PosAlwaysTrueTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public class PosAlwaysTrueTest extends PosRuleTest {
+    public static final MapCodec<PosAlwaysTrueTest> CODEC;
+    public static final PosAlwaysTrueTest INSTANCE;
+    private PosAlwaysTrueTest();
+    public boolean test(BlockPos inTemplatePos, BlockPos worldPos, BlockPos worldReference, RandomSource random);
+    protected PosRuleTestType<?> getType();
+}
+//// PosRuleTest.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+public abstract class PosRuleTest {
+    public static final Codec<PosRuleTest> CODEC;
+    public abstract boolean test(BlockPos inTemplatePos, BlockPos worldPos, BlockPos worldReference, RandomSource random);
+    protected abstract PosRuleTestType<?> getType();
+}
+//// PosRuleTestType.java
+import com.mojang.serialization.MapCodec;
+public interface PosRuleTestType<P extends PosRuleTest> {
+    PosRuleTestType<PosAlwaysTrueTest> ALWAYS_TRUE_TEST;
+    PosRuleTestType<LinearPosTest> LINEAR_POS_TEST;
+    PosRuleTestType<AxisAlignedLinearPosTest> AXIS_ALIGNED_LINEAR_POS_TEST;
+    MapCodec<P> codec();
+    static <P extends PosRuleTest> PosRuleTestType<P> register(String id, MapCodec<P> codec);
+}
+//// ProcessorRule.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.templatesystem.rule.blockentity.Passthrough;
+import net.minecraft.world.level.levelgen.structure.templatesystem.rule.blockentity.RuleBlockEntityModifier;
+public class ProcessorRule {
+    public static final Passthrough DEFAULT_BLOCK_ENTITY_MODIFIER;
+    public static final Codec<ProcessorRule> CODEC;
+    public ProcessorRule(RuleTest inputPredicate, RuleTest locPredicate, BlockState outputState);
+    public ProcessorRule(RuleTest inputPredicate, RuleTest locPredicate, PosRuleTest posPredicate, BlockState outputState);
+    public ProcessorRule(RuleTest inputPredicate, RuleTest locPredicate, PosRuleTest posPredicate, BlockState outputState, RuleBlockEntityModifier blockEntityModifier);
+    public boolean test(LevelReader level, BlockState inputState, BlockPos inTemplatePos, BlockPos worldPos, BlockPos reference, RandomSource random);
+    public BlockState getOutputState();
+    public CompoundTag getOutputTag(RandomSource random, CompoundTag existingTag);
+}
+//// ProtectedBlockProcessor.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+public record ProtectedBlockProcessor(HolderSet<Block> cannotReplace) implements StructureProcessor {
+    public static final MapCodec<ProtectedBlockProcessor> MAP_CODEC;
+    public StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    public MapCodec<ProtectedBlockProcessor> codec();
+}
+//// RandomBlockMatchTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class RandomBlockMatchTest extends RuleTest {
+    public static final MapCodec<RandomBlockMatchTest> CODEC;
+    public RandomBlockMatchTest(Block block, float probability);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}
+//// RandomBlockStateMatchTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
+public class RandomBlockStateMatchTest extends RuleTest {
+    public static final MapCodec<RandomBlockStateMatchTest> CODEC;
+    public RandomBlockStateMatchTest(BlockState blockState, float probability);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}
+//// RuleProcessor.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+public class RuleProcessor implements StructureProcessor {
+    public static final MapCodec<RuleProcessor> MAP_CODEC;
+    public RuleProcessor(List<? extends ProcessorRule> rules);
+    public StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    public MapCodec<RuleProcessor> codec();
+}
+//// RuleTest.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+public abstract class RuleTest {
+    public static final Codec<RuleTest> CODEC;
+    public boolean testAgainstWorldState(LevelReader level, BlockPos pos, RandomSource random);
+    public abstract boolean test(BlockState state, BlockPos pos, RandomSource random);
+    protected abstract RuleTestType<?> getType();
+    public static RuleTest allOf(List<RuleTest> predicates);
+    public static RuleTest allOf(RuleTest... predicates);
+    public static RuleTest anyOf(List<RuleTest> predicates);
+    public static RuleTest anyOf(RuleTest... predicates);
+    public static RuleTest not(RuleTest predicate);
+    public static RuleTest either(RuleTest condition, RuleTest ifTrue, RuleTest ifFalse);
+}
+//// RuleTestType.java
+import com.mojang.serialization.MapCodec;
+public interface RuleTestType<P extends RuleTest> {
+    RuleTestType<AllOfRuleTest> ALL_OF_TEST;
+    RuleTestType<AlwaysTrueTest> ALWAYS_TRUE_TEST;
+    RuleTestType<AnyOfRuleTest> ANY_OF_TEST;
+    RuleTestType<BlockMatchTest> BLOCK_TEST;
+    RuleTestType<BlockStateMatchTest> BLOCKSTATE_TEST;
+    RuleTestType<NotRuleTest> NOT_TEST;
+    RuleTestType<TagMatchTest> TAG_TEST;
+    RuleTestType<HeightMatchTest> HEIGHT_TEST;
+    RuleTestType<RandomBlockMatchTest> RANDOM_BLOCK_TEST;
+    RuleTestType<RandomBlockStateMatchTest> RANDOM_BLOCKSTATE_TEST;
+    MapCodec<P> codec();
+    static <P extends RuleTest> RuleTestType<P> register(String id, MapCodec<P> codec);
+}
+//// StructurePlaceSettings.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+public class StructurePlaceSettings {
+    public StructurePlaceSettings();
+    public StructurePlaceSettings copy();
+    public StructurePlaceSettings setMirror(Mirror mirror);
+    public StructurePlaceSettings setRotation(Rotation rotation);
+    public StructurePlaceSettings setRotationPivot(BlockPos rotationPivot);
+    public StructurePlaceSettings setIgnoreEntities(boolean ignoreEntities);
+    public StructurePlaceSettings setBoundingBox(BoundingBox boundingBox);
+    public StructurePlaceSettings setRandom(RandomSource random);
+    public StructurePlaceSettings setLiquidSettings(LiquidSettings liquidSettings);
+    public StructurePlaceSettings setKnownShape(boolean knownShape);
+    public StructurePlaceSettings clearProcessors();
+    public StructurePlaceSettings addProcessor(StructureProcessor processor);
+    public StructurePlaceSettings popProcessor(StructureProcessor processor);
+    public Mirror getMirror();
+    public Rotation getRotation();
+    public BlockPos getRotationPivot();
+    public RandomSource getRandom(BlockPos pos);
+    public boolean isIgnoreEntities();
+    public BoundingBox getBoundingBox();
+    public boolean getKnownShape();
+    public List<StructureProcessor> getProcessors();
+    public boolean shouldApplyWaterlogging();
+    public StructureTemplate.Palette getRandomPalette(List<StructureTemplate.Palette> palettes, BlockPos pos);
+    public StructurePlaceSettings setFinalizeEntities(boolean finalizeEntities);
+    public boolean shouldFinalizeEntities();
+}
+//// StructureProcessor.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ServerLevelAccessor;
+public interface StructureProcessor {
+    default StructureTemplate. StructureBlockInfo processBlock(LevelReader level, BlockPos targetPosition, BlockPos referencePos, BlockPos templateRelativePos, StructureTemplate.StructureBlockInfo processedBlockInfo, StructurePlaceSettings settings);
+    MapCodec<? extends StructureProcessor> codec();
+    default List<StructureTemplate.StructureBlockInfo> finalizeProcessing(ServerLevelAccessor level, BlockPos position, BlockPos referencePos, List<StructureTemplate.StructureBlockInfo> originalBlockInfoList, List<StructureTemplate.StructureBlockInfo> processedBlockInfoList, StructurePlaceSettings settings);
+    default boolean evaluatesEntirePieceState();
+}
+//// StructureProcessorList.java
+import java.util.List;
+public class StructureProcessorList {
+    public StructureProcessorList(List<StructureProcessor> list);
+    public List<StructureProcessor> list();
+    public String toString();
+}
+//// StructureProcessorType.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+public interface StructureProcessorType {
+    Codec<StructureProcessor> SINGLE_CODEC;
+    Codec<StructureProcessorList> LIST_OBJECT_CODEC;
+    Codec<StructureProcessorList> DIRECT_CODEC;
+    Codec<Holder<StructureProcessorList>> LIST_CODEC;
+}
+//// StructureProcessorTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class StructureProcessorTypes {
+    public static MapCodec<? extends StructureProcessor> bootstrap(Registry<MapCodec<? extends StructureProcessor>> registry);
+}
+//// StructureTemplate.java
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.util.Iterator;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.Vec3i;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.entity.JigsawBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.DiscreteVoxelShape;
+public class StructureTemplate {
+    public static final String PALETTE_TAG = "palette";
+    public static final String PALETTE_LIST_TAG = "palettes";
+    public static final String ENTITIES_TAG = "entities";
+    public static final String BLOCKS_TAG = "blocks";
+    public static final String BLOCK_TAG_POS = "pos";
+    public static final String BLOCK_TAG_STATE = "state";
+    public static final String BLOCK_TAG_NBT = "nbt";
+    public static final String ENTITY_TAG_POS = "pos";
+    public static final String ENTITY_TAG_BLOCKPOS = "blockPos";
+    public static final String ENTITY_TAG_NBT = "nbt";
+    public static final String SIZE_TAG = "size";
+    public StructureTemplate();
+    public Vec3i getSize();
+    public void setAuthor(String author);
+    public String getAuthor();
+    public void fillFromWorld(Level level, BlockPos position, Vec3i size, boolean inludeEntities, List<Block> ignoreBlocks);
+    public List<StructureBlockInfo> filterBlocks(BlockPos position, StructurePlaceSettings settings, Block block);
+    public List<JigsawBlockInfo> getJigsaws(BlockPos position, Rotation rotation);
+    public ObjectArrayList<StructureBlockInfo> filterBlocks(BlockPos position, StructurePlaceSettings settings, Block block, boolean absolute);
+    public BlockPos calculateConnectedPosition(StructurePlaceSettings settings1, BlockPos connection1, StructurePlaceSettings settings2, BlockPos connection2);
+    public static BlockPos calculateRelativePosition(StructurePlaceSettings settings, BlockPos pos);
+    public boolean placeInWorld(ServerLevelAccessor level, BlockPos position, BlockPos referencePos, StructurePlaceSettings settings, RandomSource random, int updateMode);
+    public static void updateShapeAtEdge(LevelAccessor level, int updateMode, DiscreteVoxelShape shape, BlockPos pos);
+    public static void updateShapeAtEdge(LevelAccessor level, int updateMode, DiscreteVoxelShape shape, int startX, int startY, int startZ);
+    public static List<StructureBlockInfo> processBlockInfos(ServerLevelAccessor level, BlockPos position, BlockPos referencePos, StructurePlaceSettings settings, List<StructureBlockInfo> blockInfoList);
+    public Vec3i getSize(Rotation rotation);
+    public static BlockPos transform(BlockPos pos, Mirror mirror, Rotation rotation, BlockPos pivot);
+    public static Vec3 transform(Vec3 pos, Mirror mirror, Rotation rotation, BlockPos pivot);
+    public BlockPos getZeroPositionWithTransform(BlockPos zeroPos, Mirror mirror, Rotation rotation);
+    public static BlockPos getZeroPositionWithTransform(BlockPos zeroPos, Mirror mirror, Rotation rotation, int sizeX, int sizeZ);
+    public BoundingBox getBoundingBox(StructurePlaceSettings settings, BlockPos position);
+    public BoundingBox getBoundingBox(BlockPos position, Rotation rotation, BlockPos pivot, Mirror mirror);
+    protected static BoundingBox getBoundingBox(BlockPos position, Rotation rotation, BlockPos pivot, Mirror mirror, Vec3i size);
+    public CompoundTag save(CompoundTag tag);
+    public void load(HolderGetter<Block> blockLookup, CompoundTag tag);
+    public static JigsawBlockEntity.JointType getJointType(CompoundTag nbt, BlockState state);
+    public static JigsawBlockEntity.JointType getDefaultJointType(BlockState state);
+    static class SimplePalette implements Iterable<BlockState> {
+        public static final BlockState DEFAULT_BLOCK_STATE;
+        public int idFor(BlockState state);
+        public BlockState stateFor(int index);
+        public Iterator<BlockState> iterator();
+        public void addMapping(BlockState state, int id);
+    }
+    public static record StructureBlockInfo(BlockPos pos, BlockState state, CompoundTag nbt) {
+        public String toString();
+    }
+    public static record JigsawBlockInfo(BlockPos pos, BlockState state, JigsawBlockEntity.JointType jointType, Identifier name, ResourceKey<StructureTemplatePool> pool, Identifier target, int placementPriority, int selectionPriority) {
+        public static JigsawBlockInfo parse(StructureBlockInfo info);
+        public String toString();
+        public JigsawBlockInfo withInfo(BlockPos pos, BlockState state);
+    }
+    public static class StructureEntityInfo {
+        public final Vec3 pos;
+        public final BlockPos blockPos;
+        public final CompoundTag nbt;
+        public StructureEntityInfo(Vec3 pos, BlockPos blockPos, CompoundTag nbt);
+    }
+    public static final class Palette {
+        private Palette(List<StructureBlockInfo> blocks);
+        public List<JigsawBlockInfo> jigsaws();
+        public List<StructureBlockInfo> blocks();
+        public List<StructureBlockInfo> blocks(Block filter);
+    }
+}
+//// StructureTemplateManager.java
+import com.mojang.datafixers.DataFixer;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.stream.Stream;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.FileToIdConverter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.structure.templatesystem.loader.TemplatePathFactory;
+import net.minecraft.world.level.storage.LevelStorageSource;
+public class StructureTemplateManager {
+    public static final String STRUCTURE_DIRECTORY_NAME = "structure";
+    public static final FileToIdConverter WORLD_STRUCTURE_LISTER;
+    public static final FileToIdConverter RESOURCE_TEXT_STRUCTURE_LISTER;
+    public StructureTemplateManager(ResourceManager resourceManager, LevelStorageSource.LevelStorageAccess storage, DataFixer fixerUpper, HolderGetter<Block> blockLookup);
+    public StructureTemplate getOrCreate(Identifier id);
+    public Optional<StructureTemplate> get(Identifier id);
+    public Stream<Identifier> listTemplates();
+    public void onResourceManagerReload(ResourceManager resourceManager);
+    public boolean save(Identifier id);
+    public static boolean save(Path file, StructureTemplate structureTemplate, boolean asText) throws IOException;
+    public TemplatePathFactory worldTemplates();
+    public TemplatePathFactory testTemplates();
+    public void remove(Identifier id);
+}
+//// TagMatchTest.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class TagMatchTest extends RuleTest {
+    public static final MapCodec<TagMatchTest> CODEC;
+    public TagMatchTest(TagKey<Block> tag);
+    public boolean test(BlockState blockState, BlockPos pos, RandomSource random);
+    protected RuleTestType<?> getType();
+}

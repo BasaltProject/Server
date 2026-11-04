@@ -1,0 +1,49 @@
+//// CustomBossEvent.java
+import com.mojang.serialization.Codec;
+import java.util.Collection;
+import java.util.Set;
+import java.util.UUID;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerBossEvent;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.BossEvent;
+public class CustomBossEvent extends ServerBossEvent {
+    public CustomBossEvent(UUID id, Identifier customId, Component name, Runnable dirtyCallback);
+    public Identifier customId();
+    public void addPlayer(ServerPlayer player);
+    public void removePlayer(ServerPlayer player);
+    public void removeAllPlayers();
+    public int value();
+    public int max();
+    public void setValue(int value);
+    public void setMax(int max);
+    public final Component getDisplayName();
+    public boolean setPlayers(Collection<ServerPlayer> players);
+    public static CustomBossEvent load(UUID id, Identifier customId, Packed packed, Runnable setDirty);
+    public Packed pack();
+    public void onPlayerConnect(ServerPlayer player);
+    public void onPlayerDisconnect(ServerPlayer player);
+    public void setDirty();
+    public static record Packed(Component name, boolean visible, int value, int max, BossEvent.BossBarColor color, BossEvent.BossBarOverlay overlay, boolean darkenScreen, boolean playBossMusic, boolean createWorldFog, Set<UUID> players) {
+        public static final Codec<Packed> CODEC;
+    }
+}
+//// CustomBossEvents.java
+import java.util.Collection;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public class CustomBossEvents extends SavedData {
+    public static final SavedDataType<CustomBossEvents> TYPE;
+    public CustomBossEvent get(Identifier id);
+    public CustomBossEvent create(RandomSource random, Identifier id, Component name);
+    public void remove(CustomBossEvent event);
+    public Collection<Identifier> getIds();
+    public Collection<CustomBossEvent> getEvents();
+    public void onPlayerConnect(ServerPlayer player);
+    public void onPlayerDisconnect(ServerPlayer player);
+}

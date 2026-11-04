@@ -1,0 +1,1095 @@
+//// AxisCycle.java
+public enum AxisCycle {
+    NONE, FORWARD, BACKWARD;
+    public static final Direction.Axis[] AXIS_VALUES;
+    public static final AxisCycle[] VALUES;
+    public abstract int cycle(int x, int y, int z, Direction.Axis axis);
+    public abstract double cycle(double x, double y, double z, Direction.Axis axis);
+    public abstract Direction.Axis cycle(Direction.Axis axis);
+    public abstract AxisCycle inverse();
+    public static AxisCycle between(Direction.Axis from, Direction.Axis to);
+}
+//// BlockBox.java
+import io.netty.buffer.ByteBuf;
+import java.util.Iterator;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.phys.AABB;
+public record BlockBox(BlockPos min, BlockPos max) implements Iterable<BlockPos> {
+    public static final StreamCodec<ByteBuf, BlockBox> STREAM_CODEC;
+    public BlockBox(BlockPos min, BlockPos max);
+    public static BlockBox of(BlockPos pos);
+    public static BlockBox of(BlockPos a, BlockPos b);
+    public BlockBox include(BlockPos pos);
+    public boolean isBlock();
+    public boolean contains(BlockPos pos);
+    public AABB aabb();
+    public Iterator<BlockPos> iterator();
+    public int sizeX();
+    public int sizeY();
+    public int sizeZ();
+    public BlockBox extend(Direction direction, int amount);
+    public BlockBox move(Direction direction, int amount);
+    public BlockBox offset(Vec3i offset);
+}
+//// BlockMath.java
+import com.mojang.math.Transformation;
+public class BlockMath {
+    public static Transformation blockCenterToCorner(Transformation transform);
+    public static Transformation blockCornerToCenter(Transformation transform);
+    public static Transformation getFaceTransformation(Transformation transformation, Direction originalSide);
+}
+//// BlockPos.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public class BlockPos extends Vec3i {
+    public static final Codec<BlockPos> CODEC;
+    public static final StreamCodec<ByteBuf, BlockPos> STREAM_CODEC;
+    public static final BlockPos ZERO;
+    public static final int PACKED_HORIZONTAL_LENGTH;
+    public static final int PACKED_Y_LENGTH;
+    public static final int MAX_HORIZONTAL_COORDINATE;
+    public BlockPos(int x, int y, int z);
+    public static long offset(long blockNode, Direction offset);
+    public static long offset(long blockNode, int stepX, int stepY, int stepZ);
+    public static int getX(long blockNode);
+    public static int getY(long blockNode);
+    public static int getZ(long blockNode);
+    public static BlockPos of(long blockNode);
+    public static BlockPos containing(double x, double y, double z);
+    public static BlockPos containing(Position pos);
+    public static BlockPos min(BlockPos a, BlockPos b);
+    public static BlockPos max(BlockPos a, BlockPos b);
+    public long asLong();
+    public static long asLong(int x, int y, int z);
+    public static long getFlatIndex(long neighborBlockNode);
+    public BlockPos offset(int x, int y, int z);
+    public BlockPos offset(Vec3i vec);
+    public BlockPos subtract(Vec3i vec);
+    public BlockPos multiply(int scale);
+    public BlockPos above();
+    public BlockPos above(int steps);
+    public BlockPos below();
+    public BlockPos below(int steps);
+    public BlockPos north();
+    public BlockPos north(int steps);
+    public BlockPos south();
+    public BlockPos south(int steps);
+    public BlockPos west();
+    public BlockPos west(int steps);
+    public BlockPos east();
+    public BlockPos east(int steps);
+    public BlockPos relative(Direction direction);
+    public BlockPos relative(Direction direction, int steps);
+    public BlockPos relative(Direction.Axis axis, int steps);
+    public BlockPos rotate(Rotation rotation);
+    public BlockPos cross(Vec3i upVector);
+    public BlockPos atY(int y);
+    public BlockPos immutable();
+    public MutableBlockPos mutable();
+    public Vec3 clampLocationWithin(Vec3 location);
+    public static Iterable<BlockPos> randomInCube(RandomSource random, int limit, BlockPos center, int sizeToScanInAllDirections);
+    public static Iterable<BlockPos> randomBetweenClosed(RandomSource random, int limit, int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
+    public static Iterable<BlockPos> withinManhattan(BlockPos origin, int reach);
+    public static Iterable<BlockPos> withinClippedManhattan(BlockPos origin, int reachX, int reachY, int reachZ);
+    public static Iterable<BlockPos> withinBoxByManhattanDistance(BlockPos origin, int reachX, int reachY, int reachZ);
+    public static Iterable<BlockPos> betweenClosed(AABB box);
+    public static Iterable<BlockPos> betweenClosed(BlockPos a, BlockPos b);
+    public static Stream<BlockPos> betweenClosedStream(BlockPos a, BlockPos b);
+    public static Stream<BlockPos> betweenClosedStream(BoundingBox boundingBox);
+    public static Stream<BlockPos> betweenClosedStream(AABB box);
+    public static Stream<BlockPos> betweenClosedStream(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
+    public static Iterable<BlockPos> betweenClosed(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
+    public static Iterable<BlockPos> neighborColumn(int startX, int startY, int startZ, int endY);
+    public static Iterable<MutableBlockPos> spiralAround(BlockPos center, int radius, Direction firstDirection, Direction secondDirection);
+    public static int breadthFirstTraversal(BlockPos startPos, int maxDepth, int maxCount, BiConsumer<BlockPos, Consumer<BlockPos>> neighbourProvider, Function<BlockPos, TraversalNodeStatus> nodeProcessor);
+    public static Iterable<BlockPos> betweenCornersInDirection(AABB aabb, Vec3 direction);
+    public static Iterable<BlockPos> betweenCornersInDirection(BlockPos firstCorner, BlockPos secondCorner, Vec3 direction);
+    public static Iterable<BlockPos> betweenCornersInDirection(int firstCornerX, int firstCornerY, int firstCornerZ, int secondCornerX, int secondCornerY, int secondCornerZ, Vec3 direction);
+    public static class MutableBlockPos extends BlockPos {
+        public MutableBlockPos();
+        public MutableBlockPos(int x, int y, int z);
+        public MutableBlockPos(double x, double y, double z);
+        public BlockPos offset(int x, int y, int z);
+        public BlockPos multiply(int scale);
+        public BlockPos relative(Direction direction, int steps);
+        public BlockPos relative(Direction.Axis axis, int steps);
+        public BlockPos rotate(Rotation rotation);
+        public MutableBlockPos set(int x, int y, int z);
+        public MutableBlockPos set(double x, double y, double z);
+        public MutableBlockPos set(Vec3i vec);
+        public MutableBlockPos set(long pos);
+        public MutableBlockPos set(AxisCycle transform, int x, int y, int z);
+        public MutableBlockPos setWithOffset(Vec3i pos, Direction direction);
+        public MutableBlockPos setWithOffset(Vec3i pos, int x, int y, int z);
+        public MutableBlockPos setWithOffset(Vec3i pos, Vec3i offset);
+        public MutableBlockPos move(Direction direction);
+        public MutableBlockPos move(Direction direction, int steps);
+        public MutableBlockPos move(int x, int y, int z);
+        public MutableBlockPos move(Vec3i pos);
+        public MutableBlockPos clamp(Direction.Axis axis, int minimum, int maximum);
+        public MutableBlockPos setX(int x);
+        public MutableBlockPos setY(int y);
+        public MutableBlockPos setZ(int z);
+        public BlockPos immutable();
+    }
+    public static enum TraversalNodeStatus {
+        ACCEPT, SKIP, STOP;
+    }
+}
+//// ClientAsset.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+public interface ClientAsset {
+    Identifier id();
+    public static record ResourceTexture(Identifier id, Identifier texturePath) implements Texture {
+        public static final Codec<ResourceTexture> CODEC;
+        public static final MapCodec<ResourceTexture> DEFAULT_FIELD_CODEC;
+        public static final StreamCodec<ByteBuf, ResourceTexture> STREAM_CODEC;
+        public ResourceTexture(Identifier texture);
+    }
+    public static record DownloadedTexture(Identifier texturePath, String url) implements Texture {
+        public Identifier id();
+    }
+    public interface Texture extends ClientAsset {
+        Identifier texturePath();
+    }
+}
+//// Cloner.java
+import com.mojang.serialization.Codec;
+import net.minecraft.resources.ResourceKey;
+public class Cloner<T> {
+    private Cloner(Codec<T> directCodec);
+    public T clone(T value, HolderLookup.Provider from, HolderLookup.Provider to);
+    public static class Factory {
+        public <T> Factory addCodec(ResourceKey<? extends Registry<? extends T>> key, Codec<T> codec);
+        public <T> Cloner<T> cloner(ResourceKey<? extends Registry<? extends T>> key);
+    }
+}
+//// CompositeDirection.java
+import java.util.Set;
+public record CompositeDirection(Set<Direction> directions, Vec3i step) implements Directional {
+    public static final CompositeDirection NORTH;
+    public static final CompositeDirection EAST;
+    public static final CompositeDirection SOUTH;
+    public static final CompositeDirection WEST;
+    public static final CompositeDirection NORTH_EAST;
+    public static final CompositeDirection SOUTH_EAST;
+    public static final CompositeDirection SOUTH_WEST;
+    public static final CompositeDirection NORTH_WEST;
+    public static final CompositeDirection UP;
+    public static final CompositeDirection NORTH_UP;
+    public static final CompositeDirection EAST_UP;
+    public static final CompositeDirection SOUTH_UP;
+    public static final CompositeDirection WEST_UP;
+    public static final CompositeDirection NORTH_EAST_UP;
+    public static final CompositeDirection SOUTH_EAST_UP;
+    public static final CompositeDirection SOUTH_WEST_UP;
+    public static final CompositeDirection NORTH_WEST_UP;
+    public static final CompositeDirection DOWN;
+    public static final CompositeDirection NORTH_DOWN;
+    public static final CompositeDirection EAST_DOWN;
+    public static final CompositeDirection SOUTH_DOWN;
+    public static final CompositeDirection WEST_DOWN;
+    public static final CompositeDirection NORTH_EAST_DOWN;
+    public static final CompositeDirection SOUTH_EAST_DOWN;
+    public static final CompositeDirection SOUTH_WEST_DOWN;
+    public static final CompositeDirection NORTH_WEST_DOWN;
+    CompositeDirection(Direction... directions);
+    public CompositeDirection compose(CompositeDirection other);
+    public int getStepX();
+    public int getStepY();
+    public int getStepZ();
+    public Vec3i getStep();
+    public static enum Direction8 implements Directional {
+        NORTH, NORTH_EAST, EAST, SOUTH_EAST, SOUTH, SOUTH_WEST, WEST, NORTH_WEST;
+        public Set<Direction> getDirections();
+        public int getStepX();
+        public int getStepY();
+        public int getStepZ();
+        public Vec3i getStep();
+    }
+}
+//// Cursor3D.java
+public class Cursor3D {
+    public static final int TYPE_INSIDE = 0;
+    public static final int TYPE_FACE = 1;
+    public static final int TYPE_EDGE = 2;
+    public static final int TYPE_CORNER = 3;
+    public Cursor3D(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
+    public boolean advance();
+    public int nextX();
+    public int nextY();
+    public int nextZ();
+    public int getNextType();
+}
+//// DefaultedMappedRegistry.java
+import com.mojang.serialization.Lifecycle;
+import java.util.Optional;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.RandomSource;
+public class DefaultedMappedRegistry<T> extends MappedRegistry<T> implements DefaultedRegistry<T> {
+    public DefaultedMappedRegistry(String defaultKey, ResourceKey<? extends Registry<T>> key, Lifecycle lifecycle, boolean intrusiveHolders);
+    public Holder.Reference<T> register(ResourceKey<T> key, T value, RegistrationInfo registrationInfo);
+    public int getId(T thing);
+    public Identifier getKey(T thing);
+    public T getValue(Identifier key);
+    public Optional<T> getOptional(Identifier key);
+    public Optional<Holder.Reference<T>> getAny();
+    public T byId(int id);
+    public Optional<Holder.Reference<T>> getRandom(RandomSource random);
+    public Identifier getDefaultKey();
+}
+//// DefaultedRegistry.java
+import net.minecraft.resources.Identifier;
+public interface DefaultedRegistry<T> extends Registry<T> {
+    Identifier getKey(T thing);
+    T getValue(Identifier key);
+    T byId(int id);
+    Identifier getDefaultKey();
+}
+//// Direction.java
+import com.google.common.collect.ImmutableList;
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.function.IntFunction;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4fc;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
+public enum Direction implements Directional, StringRepresentable {
+    DOWN, UP, NORTH, SOUTH, WEST, EAST;
+    public static final StringRepresentable.EnumCodec<Direction> CODEC;
+    public static final Codec<Direction> VERTICAL_CODEC;
+    public static final IntFunction<Direction> BY_ID;
+    public static final StreamCodec<ByteBuf, Direction> STREAM_CODEC;
+    public static final Codec<Direction> LEGACY_ID_CODEC;
+    public static final Codec<Direction> LEGACY_ID_CODEC_2D;
+    public static Direction[] orderedByNearest(Entity entity);
+    public static Direction rotate(Matrix4fc matrix, Direction facing);
+    public static Collection<Direction> allShuffled(RandomSource random);
+    public static Stream<Direction> stream();
+    public static float getYRot(Direction direction);
+    public Quaternionf getRotation();
+    public int get3DDataValue();
+    public int get2DDataValue();
+    public AxisDirection getAxisDirection();
+    public static Direction getFacingAxis(Entity entity, Axis axis);
+    public Direction getOpposite();
+    public Direction getClockWise(Axis axis);
+    public Direction getCounterClockWise(Axis axis);
+    public Direction getClockWise();
+    public Direction getCounterClockWise();
+    public int getStepX();
+    public int getStepY();
+    public int getStepZ();
+    public Vec3i getStep();
+    public Vector3f step();
+    public String getName();
+    public Axis getAxis();
+    public static Direction byName(String name);
+    public static Direction from3DDataValue(int data);
+    public static Direction from2DDataValue(int data);
+    public static Direction fromYRot(double yRot);
+    public static Direction fromAxisAndDirection(Axis axis, AxisDirection direction);
+    public float toYRot();
+    public static Direction getRandom(RandomSource random);
+    public static Direction getApproximateNearest(double dx, double dy, double dz);
+    public static Direction getApproximateNearest(float dx, float dy, float dz);
+    public static Direction getApproximateNearest(Vec3 vec);
+    public static Direction getNearest(int x, int y, int z, Direction orElse);
+    public static Direction getNearest(Vec3i vec, Direction orElse);
+    public String toString();
+    public String getSerializedName();
+    public static Direction get(AxisDirection axisDirection, Axis axis);
+    public static ImmutableList<Axis> axisStepOrder(Vec3 movement);
+    public Vec3i getUnitVec3i();
+    public Vec3 getUnitVec3();
+    public Vector3fc getUnitVec3f();
+    public boolean isFacingAngle(float yAngle);
+    public static enum Axis implements Predicate<Direction>, StringRepresentable {
+        X, Y, Z;
+        public static final Axis[] VALUES;
+        public static final StringRepresentable.EnumCodec<Axis> CODEC;
+        public static Axis byName(String name);
+        public String getName();
+        public boolean isVertical();
+        public boolean isHorizontal();
+        public Direction getPositive();
+        public Direction getNegative();
+        public Direction[] getDirections();
+        public String toString();
+        public static Axis getRandom(RandomSource random);
+        public boolean test(Direction input);
+        public Plane getPlane();
+        public String getSerializedName();
+        public int choose(int x, int y, int z);
+        public double choose(double x, double y, double z);
+        public boolean choose(boolean x, boolean y, boolean z);
+    }
+    public static enum AxisDirection {
+        POSITIVE, NEGATIVE;
+        public int getStep();
+        public String getName();
+        public String toString();
+        public AxisDirection opposite();
+    }
+    public static enum Plane implements Predicate<Direction>, Iterable<Direction> {
+        HORIZONTAL, VERTICAL;
+        public Direction getRandomDirection(RandomSource random);
+        public Axis getRandomAxis(RandomSource random);
+        public boolean test(Direction input);
+        public Iterator<Direction> iterator();
+        public Stream<Direction> stream();
+        public List<Direction> shuffledCopy(RandomSource random);
+        public int length();
+    }
+}
+//// Directional.java
+public interface Directional {
+    int getStepX();
+    int getStepY();
+    int getStepZ();
+    Vec3i getStep();
+}
+//// FrontAndTop.java
+import net.minecraft.util.StringRepresentable;
+public enum FrontAndTop implements StringRepresentable {
+    DOWN_EAST, DOWN_NORTH, DOWN_SOUTH, DOWN_WEST, UP_EAST, UP_NORTH, UP_SOUTH, UP_WEST, WEST_UP, EAST_UP, NORTH_UP, SOUTH_UP;
+    public String getSerializedName();
+    public static FrontAndTop fromFrontAndTop(Direction front, Direction top);
+    public Direction front();
+    public Direction top();
+}
+//// GlobalPos.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+public record GlobalPos(ResourceKey<Level> dimension, BlockPos pos) {
+    public static final MapCodec<GlobalPos> MAP_CODEC;
+    public static final Codec<GlobalPos> CODEC;
+    public static final StreamCodec<ByteBuf, GlobalPos> STREAM_CODEC;
+    public static GlobalPos of(ResourceKey<Level> dimension, BlockPos pos);
+    public String toString();
+    public boolean isCloseEnough(ResourceKey<Level> dimension, BlockPos pos, int maxDistance);
+}
+//// Holder.java
+import com.mojang.datafixers.util.Either;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+public interface Holder<T> {
+    T value();
+    boolean isBound();
+    boolean areComponentsBound();
+    boolean is(Identifier key);
+    boolean is(ResourceKey<T> key);
+    boolean is(Predicate<ResourceKey<T>> predicate);
+    boolean is(TagKey<T> tag);
+    boolean is(Holder<T> holder);
+    Stream<TagKey<T>> tags();
+    DataComponentMap components();
+    Either<ResourceKey<T>, T> unwrap();
+    Optional<ResourceKey<T>> unwrapKey();
+    Kind kind();
+    boolean canSerializeIn(HolderOwner<T> registry);
+    default Optional<String> getRegisteredNameIfPresent();
+    default String getRegisteredName();
+    static <T> Holder<T> direct(T value);
+    static <T> Holder<T> direct(T value, DataComponentMap components);
+    public static enum Kind {
+        REFERENCE, DIRECT;
+    }
+    public static record Direct<T>(T value, DataComponentMap components) implements Holder<T> {
+        public boolean isBound();
+        public boolean areComponentsBound();
+        public boolean is(Identifier key);
+        public boolean is(ResourceKey<T> key);
+        public boolean is(TagKey<T> tag);
+        public boolean is(Holder<T> holder);
+        public boolean is(Predicate<ResourceKey<T>> predicate);
+        public Either<ResourceKey<T>, T> unwrap();
+        public Optional<ResourceKey<T>> unwrapKey();
+        public Kind kind();
+        public String toString();
+        public boolean canSerializeIn(HolderOwner<T> registry);
+        public Stream<TagKey<T>> tags();
+    }
+    public static class Reference<T> implements Holder<T> {
+        protected Reference(Type type, HolderOwner<T> owner, ResourceKey<T> key, T value);
+        public static <T> Reference<T> createStandAlone(HolderOwner<T> owner, ResourceKey<T> key);
+        public static <T> Reference<T> createIntrusive(HolderOwner<T> owner, T value);
+        public ResourceKey<T> key();
+        public T value();
+        public boolean is(Identifier key);
+        public boolean is(ResourceKey<T> key);
+        public boolean is(TagKey<T> tag);
+        public boolean is(Holder<T> holder);
+        public boolean is(Predicate<ResourceKey<T>> predicate);
+        public boolean canSerializeIn(HolderOwner<T> context);
+        public Either<ResourceKey<T>, T> unwrap();
+        public Optional<ResourceKey<T>> unwrapKey();
+        public Kind kind();
+        public boolean isBound();
+        public boolean areComponentsBound();
+        void bindKey(ResourceKey<T> key);
+        protected void bindValue(T value);
+        void bindTags(Collection<TagKey<T>> tags);
+        public void bindComponents(DataComponentMap components);
+        public Stream<TagKey<T>> tags();
+        public DataComponentMap components();
+        public String toString();
+        protected static enum Type {
+            STAND_ALONE, INTRUSIVE;
+        }
+    }
+}
+//// HolderGetter.java
+import java.util.Optional;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+public interface HolderGetter<T> extends HolderOwner<T> {
+    Optional<Holder.Reference<T>> get(ResourceKey<T> id);
+    default Holder.Reference<T> getOrThrow(ResourceKey<T> id);
+    Optional<HolderSet.Named<T>> get(TagKey<T> id);
+    default HolderSet.Named<T> getOrThrow(TagKey<T> id);
+    default Optional<Holder<T>> getRandomElementOf(TagKey<T> tag, RandomSource random);
+    public interface Provider {
+        <T> Optional<? extends HolderGetter<T>> lookup(ResourceKey<? extends Registry<? extends T>> key);
+        default <T> HolderGetter<T> lookupOrThrow(ResourceKey<? extends Registry<? extends T>> key);
+        default <T> Optional<Holder.Reference<T>> get(ResourceKey<T> id);
+        default <T> Holder.Reference<T> getOrThrow(ResourceKey<T> id);
+        default <T> Optional<HolderSet.Named<T>> get(TagKey<T> id);
+        default <T> HolderSet.Named<T> getOrThrow(TagKey<T> id);
+    }
+}
+//// HolderLookup.java
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.Lifecycle;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.resources.RegistryOps;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.flag.FeatureFlagSet;
+public interface HolderLookup<T> extends HolderGetter<T> {
+    Stream<Holder.Reference<T>> listElements();
+    default Stream<ResourceKey<T>> listElementIds();
+    Stream<HolderSet.Named<T>> listTags();
+    default Stream<TagKey<T>> listTagIds();
+    public interface RegistryLookup<T> extends HolderLookup<T> {
+        ResourceKey<? extends Registry<? extends T>> key();
+        Lifecycle registryLifecycle();
+        default RegistryLookup<T> filterFeatures(FeatureFlagSet enabledFeatures);
+        default RegistryLookup<T> filterElements(Predicate<T> filter);
+        public interface Delegate<T> extends RegistryLookup<T> {
+            RegistryLookup<T> parent();
+            default ResourceKey<? extends Registry<? extends T>> key();
+            default Lifecycle registryLifecycle();
+            default Optional<Holder.Reference<T>> get(ResourceKey<T> id);
+            default Stream<Holder.Reference<T>> listElements();
+            default Optional<HolderSet.Named<T>> get(TagKey<T> id);
+            default Stream<HolderSet.Named<T>> listTags();
+            default boolean canSerialize(HolderOwner<T> owner);
+        }
+    }
+    public interface Provider extends HolderGetter.Provider {
+        Stream<ResourceKey<? extends Registry<?>>> listRegistryKeys();
+        default Stream<RegistryLookup<?>> listRegistries();
+        <T> Optional<? extends RegistryLookup<T>> lookup(ResourceKey<? extends Registry<? extends T>> key);
+        default <T> RegistryLookup<T> lookupOrThrow(ResourceKey<? extends Registry<? extends T>> key);
+        default <V> RegistryOps<V> createSerializationContext(DynamicOps<V> parent);
+        static Provider create(Stream<RegistryLookup<?>> lookups);
+        default Lifecycle allRegistriesLifecycle();
+    }
+}
+//// HolderOwner.java
+public interface HolderOwner<T> {
+    default boolean canSerialize(HolderOwner<T> owner);
+}
+//// HolderSet.java
+import com.mojang.datafixers.util.Either;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.Spliterator;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+public interface HolderSet<T> extends Iterable<Holder<T>> {
+    Stream<Holder<T>> stream();
+    int size();
+    boolean isBound();
+    Either<TagKey<T>, List<Holder<T>>> unwrap();
+    Optional<Holder<T>> getRandomElement(RandomSource random);
+    Holder<T> get(int index);
+    boolean contains(Holder<T> value);
+    boolean canSerializeIn(HolderOwner<T> owner);
+    Optional<TagKey<T>> unwrapKey();
+    static <T> Named<T> emptyNamed(HolderOwner<T> owner, TagKey<T> key);
+    static <T> HolderSet<T> empty();
+    static <T> Direct<T> direct(Holder<T>... values);
+    static <T> Direct<T> direct(List<? extends Holder<T>> values);
+    static <E, T> Direct<T> direct(Function<E, Holder<T>> holderGetter, E... elements);
+    static <E, T> Direct<T> direct(Function<E, Holder<T>> holderGetter, Collection<E> elements);
+    public static abstract class ListBacked<T> implements HolderSet<T> {
+        protected abstract List<Holder<T>> contents();
+        public int size();
+        public Spliterator<Holder<T>> spliterator();
+        public Iterator<Holder<T>> iterator();
+        public Stream<Holder<T>> stream();
+        public Optional<Holder<T>> getRandomElement(RandomSource random);
+        public Holder<T> get(int index);
+        public boolean canSerializeIn(HolderOwner<T> owner);
+    }
+    public static final class Direct<T> extends ListBacked<T> {
+        private Direct(List<Holder<T>> contents);
+        protected List<Holder<T>> contents();
+        public boolean isBound();
+        public Either<TagKey<T>, List<Holder<T>>> unwrap();
+        public Optional<TagKey<T>> unwrapKey();
+        public boolean contains(Holder<T> value);
+        public String toString();
+        public boolean equals(Object obj);
+        public int hashCode();
+    }
+    public static class Named<T> extends ListBacked<T> {
+        Named(HolderOwner<T> owner, TagKey<T> key);
+        void bind(List<Holder<T>> contents);
+        public TagKey<T> key();
+        protected List<Holder<T>> contents();
+        public boolean isBound();
+        public Either<TagKey<T>, List<Holder<T>>> unwrap();
+        public Optional<TagKey<T>> unwrapKey();
+        public boolean contains(Holder<T> value);
+        public String toString();
+        public boolean canSerializeIn(HolderOwner<T> context);
+    }
+}
+//// IdMap.java
+public interface IdMap<T> extends Iterable<T> {
+    int DEFAULT;
+    int getId(T thing);
+    T byId(int id);
+    default T byIdOrThrow(int id);
+    default int getIdOrThrow(T value);
+    int size();
+}
+//// IdMapper.java
+import java.util.Iterator;
+public class IdMapper<T> implements IdMap<T> {
+    public IdMapper();
+    public IdMapper(int expectedSize);
+    public void addMapping(T thing, int id);
+    public void add(T thing);
+    public int getId(T thing);
+    public final T byId(int id);
+    public Iterator<T> iterator();
+    public boolean contains(int id);
+    public int size();
+}
+//// LayeredRegistryAccess.java
+import java.util.List;
+public class LayeredRegistryAccess<T> {
+    public LayeredRegistryAccess(List<T> keys);
+    private LayeredRegistryAccess(List<T> keys, List<RegistryAccess.Frozen> values);
+    public RegistryAccess.Frozen getLayer(T layer);
+    public RegistryAccess.Frozen getAccessForLoading(T forLayer);
+    public RegistryAccess.Frozen getAccessFrom(T forLayer);
+    public LayeredRegistryAccess<T> replaceFrom(T fromLayer, RegistryAccess.Frozen... layers);
+    public LayeredRegistryAccess<T> replaceFrom(T fromLayer, List<RegistryAccess.Frozen> layers);
+    public RegistryAccess.Frozen compositeAccess();
+}
+//// MappedRegistry.java
+import com.mojang.serialization.Lifecycle;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.stream.Stream;
+import net.minecraft.core.component.DataComponentLookup;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.tags.TagLoader;
+import net.minecraft.util.RandomSource;
+public class MappedRegistry<T> implements WritableRegistry<T> {
+    public Stream<HolderSet.Named<T>> listTags();
+    public MappedRegistry(ResourceKey<? extends Registry<T>> key, Lifecycle lifecycle);
+    public MappedRegistry(ResourceKey<? extends Registry<T>> key, Lifecycle initialLifecycle, boolean intrusiveHolders);
+    public ResourceKey<? extends Registry<T>> key();
+    public String toString();
+    public Holder.Reference<T> register(ResourceKey<T> key, T value, RegistrationInfo registrationInfo);
+    public Identifier getKey(T thing);
+    public Optional<ResourceKey<T>> getResourceKey(T thing);
+    public int getId(T thing);
+    public T getValue(ResourceKey<T> key);
+    public T byId(int id);
+    public Optional<Holder.Reference<T>> get(int id);
+    public Optional<Holder.Reference<T>> get(Identifier id);
+    public Optional<Holder.Reference<T>> get(ResourceKey<T> id);
+    public Optional<Holder.Reference<T>> getAny();
+    public Holder<T> wrapAsHolder(T value);
+    public int size();
+    public Optional<RegistrationInfo> registrationInfo(ResourceKey<T> element);
+    public Lifecycle registryLifecycle();
+    public Iterator<T> iterator();
+    public T getValue(Identifier key);
+    public Set<Identifier> keySet();
+    public Set<ResourceKey<T>> registryKeySet();
+    public Set<Map.Entry<ResourceKey<T>, T>> entrySet();
+    public Stream<Holder.Reference<T>> listElements();
+    public Stream<HolderSet.Named<T>> getTags();
+    public boolean isEmpty();
+    public Optional<Holder.Reference<T>> getRandom(RandomSource random);
+    public boolean containsKey(Identifier key);
+    public boolean containsKey(ResourceKey<T> key);
+    public DataComponentLookup<T> componentLookup();
+    public Registry<T> freeze();
+    public Holder.Reference<T> createIntrusiveHolder(T value);
+    public Optional<HolderSet.Named<T>> get(TagKey<T> id);
+    public void bindTags(Map<TagKey<T>, List<Holder<T>>> pendingTags);
+    public void bindAllTagsToEmpty();
+    public HolderGetter<T> createRegistrationLookup();
+    public Registry.PendingTags<T> prepareTagReload(TagLoader.LoadResult<T> tags);
+    interface TagSet<T> {
+        static <T> TagSet<T> unbound();
+        static <T> TagSet<T> fromMap(Map<TagKey<T>, HolderSet.Named<T>> tags);
+        boolean isBound();
+        Optional<HolderSet.Named<T>> get(TagKey<T> id);
+        void forEach(BiConsumer<? super TagKey<T>, ? super HolderSet.Named<T>> action);
+        Stream<HolderSet.Named<T>> getTags();
+    }
+}
+//// NonNullList.java
+import java.util.AbstractList;
+import java.util.List;
+public class NonNullList<E> extends AbstractList<E> {
+    public static <E> NonNullList<E> create();
+    public static <E> NonNullList<E> createWithCapacity(int capacity);
+    public static <E> NonNullList<E> withSize(int size, E defaultValue);
+    public static <E> NonNullList<E> of(E defaultValue, E... values);
+    protected NonNullList(List<E> list, E defaultValue);
+    public E get(int index);
+    public E set(int index, E element);
+    public void add(int index, E element);
+    public E remove(int index);
+    public int size();
+    public void clear();
+}
+//// Position.java
+public interface Position {
+    double x();
+    double y();
+    double z();
+}
+//// PositionAndRotation.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.phys.Vec3;
+public interface PositionAndRotation {
+    StreamCodec<ByteBuf, PositionAndRotation> STREAM_CODEC;
+    Vec3 position();
+    float yRot();
+    float xRot();
+    PositionAndRotation immutable();
+    default boolean is(Vec3 position, float yRot, float xRot);
+    static PositionAndRotation of(Vec3 position, float yRot, float xRot);
+    public static record Immutable(Vec3 position, float yRot, float xRot) implements PositionAndRotation {
+        public PositionAndRotation immutable();
+    }
+    public static class Mutable implements PositionAndRotation {
+        public Mutable();
+        public Vec3 position();
+        public float yRot();
+        public float xRot();
+        public PositionAndRotation immutable();
+        public void set(Vec3 position, float yRot, float xRot);
+        public void addDelta(Vec3 delta);
+        public void addRotation(float yRot, float xRot);
+    }
+}
+//// QuartPos.java
+public final class QuartPos {
+    public static final int BITS = 2;
+    public static final int SIZE = 4;
+    public static final int MASK = 3;
+    private QuartPos();
+    public static int fromBlock(int blockCoord);
+    public static int quartLocal(int blockCoord);
+    public static int toBlock(int quart);
+    public static int fromSection(int section);
+    public static int toSection(int quart);
+}
+//// RegistrationInfo.java
+import com.mojang.serialization.Lifecycle;
+import java.util.Optional;
+import net.minecraft.server.packs.repository.KnownPack;
+public record RegistrationInfo(Optional<KnownPack> knownPackInfo, Lifecycle lifecycle) {
+    public static final RegistrationInfo BUILT_IN;
+}
+//// Registry.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.Keyable;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.core.component.DataComponentLookup;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.tags.TagLoader;
+import net.minecraft.util.RandomSource;
+public interface Registry<T> extends IdMap<T>, Keyable, HolderLookup.RegistryLookup<T> {
+    ResourceKey<? extends Registry<T>> key();
+    default Codec<T> byNameCodec();
+    default Codec<Holder<T>> holderByNameCodec();
+    default <U> Stream<U> keys(DynamicOps<U> ops);
+    Identifier getKey(T thing);
+    Optional<ResourceKey<T>> getResourceKey(T thing);
+    int getId(T thing);
+    T getValue(ResourceKey<T> key);
+    T getValue(Identifier key);
+    Optional<RegistrationInfo> registrationInfo(ResourceKey<T> element);
+    default Optional<T> getOptional(Identifier key);
+    default Optional<T> getOptional(ResourceKey<T> key);
+    Optional<Holder.Reference<T>> getAny();
+    default T getValueOrThrow(ResourceKey<T> key);
+    Set<Identifier> keySet();
+    Set<Map.Entry<ResourceKey<T>, T>> entrySet();
+    Set<ResourceKey<T>> registryKeySet();
+    Optional<Holder.Reference<T>> getRandom(RandomSource random);
+    default Stream<T> stream();
+    boolean containsKey(Identifier key);
+    boolean containsKey(ResourceKey<T> key);
+    static <T> T register(Registry<? super T> registry, String name, T value);
+    static <V, T extends V> T register(Registry<V> registry, Identifier location, T value);
+    static <V, T extends V> T register(Registry<V> registry, ResourceKey<V> key, T value);
+    static <R, T extends R> Holder.Reference<T> registerForHolder(Registry<R> registry, ResourceKey<R> key, T value);
+    static <R, T extends R> Holder.Reference<T> registerForHolder(Registry<R> registry, Identifier location, T value);
+    Registry<T> freeze();
+    Holder.Reference<T> createIntrusiveHolder(T value);
+    Optional<Holder.Reference<T>> get(int id);
+    Optional<Holder.Reference<T>> get(Identifier id);
+    Holder<T> wrapAsHolder(T value);
+    default Iterable<Holder<T>> getTagOrEmpty(TagKey<T> id);
+    Stream<HolderSet.Named<T>> getTags();
+    default IdMap<Holder<T>> asHolderIdMap();
+    PendingTags<T> prepareTagReload(TagLoader.LoadResult<T> tags);
+    DataComponentLookup<T> componentLookup();
+    public interface PendingTags<T> {
+        ResourceKey<? extends Registry<? extends T>> key();
+        HolderLookup.RegistryLookup<T> lookup();
+        void apply();
+        int size();
+    }
+}
+//// RegistryAccess.java
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
+import net.minecraft.resources.ResourceKey;
+import org.slf4j.Logger;
+public interface RegistryAccess extends HolderLookup.Provider {
+    Logger LOGGER;
+    Frozen EMPTY;
+    <E> Optional<Registry<E>> lookup(ResourceKey<? extends Registry<? extends E>> registryKey);
+    default <E> Registry<E> lookupOrThrow(ResourceKey<? extends Registry<? extends E>> name);
+    Stream<RegistryEntry<?>> registries();
+    default Stream<ResourceKey<? extends Registry<?>>> listRegistryKeys();
+    static Frozen fromRegistryOfRegistries(Registry<? extends Registry<?>> registries);
+    default Frozen freeze();
+    public static record RegistryEntry<T>(ResourceKey<? extends Registry<T>> key, Registry<T> value) {
+    }
+    public static class ImmutableRegistryAccess implements RegistryAccess {
+        public ImmutableRegistryAccess(List<? extends Registry<?>> registries);
+        public ImmutableRegistryAccess(Map<? extends ResourceKey<? extends Registry<?>>, ? extends Registry<?>> registries);
+        public ImmutableRegistryAccess(Stream<RegistryEntry<?>> entries);
+        public <E> Optional<Registry<E>> lookup(ResourceKey<? extends Registry<? extends E>> registryKey);
+        public Stream<RegistryEntry<?>> registries();
+    }
+    public interface Frozen extends RegistryAccess {
+    }
+}
+//// RegistrySetBuilder.java
+import com.mojang.serialization.Lifecycle;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
+import net.minecraft.core.registries.BootstrapRegistry;
+import net.minecraft.core.registries.MultiRegistryBootstrap;
+import net.minecraft.core.registries.SingleRegistryBootstrap;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class RegistrySetBuilder {
+    public <T> RegistrySetBuilder add(ResourceKey<? extends Registry<T>> key, SingleRegistryBootstrap<T> bootstrap);
+    public RegistrySetBuilder add(MultiRegistryBootstrap bootstrap);
+    public HolderLookup.Provider build(HolderLookup.Provider context);
+    public PatchedRegistries buildPatch(HolderLookup.Provider context, HolderLookup.Provider fallbackProvider, Cloner.Factory clonerFactory);
+    static record BootstrappedRegistryState<T>(BootstrapRegistry<T> registry, Map<ResourceKey<T>, T> registeredValues) {
+        public static <T> BootstrappedRegistryState<T> create(ResourceKey<? extends Registry<T>> key, Lifecycle lifecycle);
+        public BootstrapContext<T> createBootstrapContext(BuildState state);
+        public void bindHolders();
+        public void freeze();
+        public void errorOnMissingHolders(BuildState state);
+        public void validatePatchHolders(BuildState state, HolderLookup.Provider fallback);
+    }
+    static record BuildState(HolderLookup.Provider contextRegistries, HolderLookup.Provider allRegistries, Map<ResourceKey<? extends Registry<?>>, BootstrappedRegistryState<?>> bootstrappedRegistries, List<RuntimeException> errors) {
+        public static BuildState createAndApply(HolderLookup.Provider context, List<RegistryStub> entries);
+        public void throwOnError();
+        public <T> BootstrapContext<T> createBootstrap(ResourceKey<? extends Registry<T>> key);
+    }
+    public static record PatchedRegistries(HolderLookup.Provider full, HolderLookup.Provider patches) {
+    }
+    interface RegistryStub {
+        Stream<ResourceKey<? extends Registry<?>>> requiredRegistries();
+        void apply(BuildState state);
+    }
+}
+//// RegistrySynchronization.java
+import com.mojang.serialization.DynamicOps;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.stream.Stream;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.RegistryLayer;
+import net.minecraft.server.packs.repository.KnownPack;
+public class RegistrySynchronization {
+    public static void packRegistries(DynamicOps<Tag> ops, RegistryAccess registries, Set<KnownPack> clientKnownPacks, BiConsumer<ResourceKey<? extends Registry<?>>, List<PackedRegistryEntry>> output);
+    public static Stream<RegistryAccess.RegistryEntry<?>> networkedRegistries(LayeredRegistryAccess<RegistryLayer> registries);
+    public static Stream<RegistryAccess.RegistryEntry<?>> networkSafeRegistries(LayeredRegistryAccess<RegistryLayer> registries);
+    public static boolean isNetworkable(ResourceKey<? extends Registry<?>> key);
+    public static record PackedRegistryEntry(Identifier id, Optional<Tag> data) {
+        public static final StreamCodec<ByteBuf, PackedRegistryEntry> STREAM_CODEC;
+    }
+}
+//// Rotations.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record Rotations(float x, float y, float z) {
+    public static final Codec<Rotations> CODEC;
+    public static final StreamCodec<ByteBuf, Rotations> STREAM_CODEC;
+    public Rotations(float x, float y, float z);
+}
+//// SectionPos.java
+import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.longs.LongConsumer;
+import java.util.stream.Stream;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.entity.EntityAccess;
+public class SectionPos extends Vec3i {
+    public static final int SECTION_BITS = 4;
+    public static final int SECTION_SIZE = 16;
+    public static final int SECTION_BLOCK_COUNT = 4096;
+    public static final int SECTION_MASK = 15;
+    public static final int SECTION_HALF_SIZE = 8;
+    public static final int SECTION_MAX_INDEX = 15;
+    public static final StreamCodec<ByteBuf, SectionPos> STREAM_CODEC;
+    private SectionPos(int x, int y, int z);
+    public static SectionPos of(int x, int y, int z);
+    public static SectionPos of(BlockPos pos);
+    public static SectionPos of(ChunkPos pos, int sectionY);
+    public static SectionPos of(EntityAccess entity);
+    public static SectionPos of(Position pos);
+    public static SectionPos of(long sectionNode);
+    public static SectionPos bottomOf(ChunkAccess chunk);
+    public static long offset(long sectionNode, Direction offset);
+    public static long offset(long sectionNode, int stepX, int stepY, int stepZ);
+    public static int posToSectionCoord(double pos);
+    public static int blockToSectionCoord(int blockCoord);
+    public static int blockToSectionCoord(double coord);
+    public static int sectionRelative(int blockCoord);
+    public static short sectionRelativePos(BlockPos pos);
+    public static int sectionRelativeX(short relative);
+    public static int sectionRelativeY(short relative);
+    public static int sectionRelativeZ(short relative);
+    public int relativeToBlockX(short relative);
+    public int relativeToBlockY(short relative);
+    public int relativeToBlockZ(short relative);
+    public BlockPos relativeToBlockPos(short relative);
+    public static int sectionToBlockCoord(int sectionCoord);
+    public static int sectionToBlockCoord(int sectionCoord, int offset);
+    public static int x(long sectionNode);
+    public static int y(long sectionNode);
+    public static int z(long sectionNode);
+    public int x();
+    public int y();
+    public int z();
+    public int minBlockX();
+    public int minBlockY();
+    public int minBlockZ();
+    public int maxBlockX();
+    public int maxBlockY();
+    public int maxBlockZ();
+    public static long blockToSection(long blockNode);
+    public static long getZeroNode(int x, int z);
+    public static long getZeroNode(long sectionNode);
+    public static long sectionToChunk(long sectionNode);
+    public BlockPos origin();
+    public BlockPos center();
+    public ChunkPos chunk();
+    public static long asLong(BlockPos pos);
+    public static long asLong(int x, int y, int z);
+    public long asLong();
+    public SectionPos offset(int x, int y, int z);
+    public Stream<BlockPos> blocksInside();
+    public static Stream<SectionPos> cube(SectionPos center, int radius);
+    public static Stream<SectionPos> aroundChunk(ChunkPos center, int radius, int minSection, int maxSection);
+    public static Stream<SectionPos> betweenClosedStream(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
+    public static void aroundAndAtBlockPos(BlockPos blockPos, LongConsumer sectionConsumer);
+    public static void aroundAndAtBlockPos(long blockPos, LongConsumer sectionConsumer);
+    public static void aroundAndAtBlockPos(int blockX, int blockY, int blockZ, LongConsumer sectionConsumer);
+}
+//// TypedInstance.java
+import java.util.stream.Stream;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+public interface TypedInstance<T> {
+    Holder<T> typeHolder();
+    default Stream<TagKey<T>> tags();
+    default boolean is(TagKey<T> tag);
+    default boolean is(HolderSet<T> set);
+    default boolean is(T rawType);
+    default boolean is(Holder<T> type);
+    default boolean is(ResourceKey<T> type);
+}
+//// UUIDUtil.java
+import com.mojang.authlib.GameProfile;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.Dynamic;
+import io.netty.buffer.ByteBuf;
+import java.util.Set;
+import java.util.UUID;
+import net.minecraft.network.codec.StreamCodec;
+public final class UUIDUtil {
+    public static final Codec<UUID> CODEC;
+    public static final Codec<Set<UUID>> CODEC_SET;
+    public static final Codec<Set<UUID>> CODEC_LINKED_SET;
+    public static final Codec<UUID> STRING_CODEC;
+    public static final Codec<UUID> AUTHLIB_CODEC;
+    public static final Codec<UUID> LENIENT_CODEC;
+    public static final StreamCodec<ByteBuf, UUID> STREAM_CODEC;
+    public static final int UUID_BYTES = 16;
+    private UUIDUtil();
+    public static UUID uuidFromIntArray(int[] intArray);
+    public static int[] uuidToIntArray(UUID uuid);
+    public static byte[] uuidToByteArray(UUID uuid);
+    public static UUID readUUID(Dynamic<?> input);
+    public static UUID createOfflinePlayerUUID(String playerName);
+    public static GameProfile createOfflineProfile(String playerName);
+}
+//// Vec3i.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import org.joml.Vector3i;
+public class Vec3i implements Comparable<Vec3i> {
+    public static final Codec<Vec3i> CODEC;
+    public static final StreamCodec<ByteBuf, Vec3i> STREAM_CODEC;
+    public static final Vec3i ZERO;
+    public static Codec<Vec3i> offsetCodec(int maxOffsetPerAxis);
+    public Vec3i(int x, int y, int z);
+    public boolean equals(Object o);
+    public int hashCode();
+    public int compareTo(Vec3i pos);
+    public int getX();
+    public int getY();
+    public int getZ();
+    protected Vec3i setX(int x);
+    protected Vec3i setY(int y);
+    protected Vec3i setZ(int z);
+    public Vec3i offset(int x, int y, int z);
+    public Vec3i offset(Vec3i vec);
+    public Vec3i subtract(Vec3i vec);
+    public Vec3i multiply(int scale);
+    public Vec3i multiply(int xScale, int yScale, int zScale);
+    public Vec3i above();
+    public Vec3i above(int steps);
+    public Vec3i below();
+    public Vec3i below(int steps);
+    public Vec3i north();
+    public Vec3i north(int steps);
+    public Vec3i south();
+    public Vec3i south(int steps);
+    public Vec3i west();
+    public Vec3i west(int steps);
+    public Vec3i east();
+    public Vec3i east(int steps);
+    public Vec3i relative(Direction direction);
+    public Vec3i relative(Direction direction, int steps);
+    public Vec3i relative(Direction.Axis axis, int steps);
+    public Vec3i cross(Vec3i upVector);
+    public boolean closerThan(Vec3i pos, double distance);
+    public boolean closerToCenterThan(Position pos, double distance);
+    public double distSqr(Vec3i pos);
+    public double distToCenterSqr(Position pos);
+    public double distToCenterSqr(double x, double y, double z);
+    public double distToLowCornerSqr(double x, double y, double z);
+    public int distManhattan(Vec3i pos);
+    public int distChessboard(Vec3i pos);
+    public boolean differsHorizontally(Vec3i pos);
+    public int get(Direction.Axis axis);
+    public Vector3i toMutable();
+    public String toString();
+    public String toShortString();
+}
+//// WritableRegistry.java
+import java.util.List;
+import java.util.Map;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+public interface WritableRegistry<T> extends Registry<T> {
+    Holder.Reference<T> register(ResourceKey<T> key, T value, RegistrationInfo registrationInfo);
+    void bindTags(Map<TagKey<T>, List<Holder<T>>> pendingTags);
+    boolean isEmpty();
+    HolderGetter<T> createRegistrationLookup();
+}

@@ -1,0 +1,85 @@
+//// DimensionStorageFileFix.java
+import com.mojang.datafixers.schemas.Schema;
+import net.minecraft.util.filefix.FileFix;
+public class DimensionStorageFileFix extends FileFix {
+    public DimensionStorageFileFix(Schema schema);
+    public void makeFixer();
+}
+//// GeneratedStructuresRenameFileFix.java
+import com.mojang.datafixers.schemas.Schema;
+import net.minecraft.util.filefix.FileFix;
+public class GeneratedStructuresRenameFileFix extends FileFix {
+    public GeneratedStructuresRenameFileFix(Schema schema);
+    public void makeFixer();
+}
+//// LegacyStructureFileFix.java
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.filefix.FileFix;
+import net.minecraft.util.filefix.access.ChunkNbt;
+import net.minecraft.util.filefix.access.FileAccess;
+import net.minecraft.util.filefix.access.SavedDataNbt;
+import net.minecraft.world.level.Level;
+public class LegacyStructureFileFix extends FileFix {
+    public static final int STRUCTURE_RANGE = 8;
+    public static final List<String> OVERWORLD_LEGACY_STRUCTURES;
+    public static final Map<String, String> LEGACY_TO_CURRENT_MAP;
+    public static final List<String> NETHER_LEGACY_STRUCTURES;
+    public static final List<String> END_LEGACY_STRUCTURES;
+    public LegacyStructureFileFix(Schema schema);
+    public void makeFixer();
+    public static record LegacyStructureData(Map<String, Dynamic<?>> starts, Map<String, LongList> indexes) {
+        public LegacyStructureData();
+        public void addStart(String id, Dynamic<Tag> data);
+        public void addIndex(String id, long sourcePos);
+    }
+    static record DimensionFixEntry(ResourceKey<Level> dimensionKey, List<FileAccess<SavedDataNbt>> structureFileAccess, FileAccess<ChunkNbt> chunkFileAccess, Long2ObjectOpenHashMap<LegacyStructureData> structures) {
+    }
+    static class IncrementalFutureSequence {
+        public IncrementalFutureSequence(int maxConcurrency);
+        public int push(CompletableFuture<?> future);
+        public int waitForAll();
+    }
+}
+//// LevelDatToSavedDataFileFix.java
+import com.mojang.datafixers.schemas.Schema;
+import net.minecraft.util.filefix.FileFix;
+public class LevelDatToSavedDataFileFix extends FileFix {
+    public LevelDatToSavedDataFileFix(Schema schema);
+    public void makeFixer();
+}
+//// PlayerStorageFileFix.java
+import com.mojang.datafixers.schemas.Schema;
+import net.minecraft.util.filefix.FileFix;
+public class PlayerStorageFileFix extends FileFix {
+    public PlayerStorageFileFix(Schema schema);
+    public void makeFixer();
+}
+//// ReenableSpectatorsGenerateChunksInHardcoreWorldsFileFix.java
+import com.mojang.datafixers.schemas.Schema;
+import net.minecraft.util.filefix.FileFix;
+public class ReenableSpectatorsGenerateChunksInHardcoreWorldsFileFix extends FileFix {
+    public ReenableSpectatorsGenerateChunksInHardcoreWorldsFileFix(Schema schema);
+    public void makeFixer();
+}
+//// RemoveObsoleteFilesFileFix.java
+import com.mojang.datafixers.schemas.Schema;
+import net.minecraft.util.filefix.FileFix;
+public class RemoveObsoleteFilesFileFix extends FileFix {
+    public RemoveObsoleteFilesFileFix(Schema schema);
+    public void makeFixer();
+}
+//// ResourcePackLocationFileFix.java
+import com.mojang.datafixers.schemas.Schema;
+import net.minecraft.util.filefix.FileFix;
+public class ResourcePackLocationFileFix extends FileFix {
+    public ResourcePackLocationFileFix(Schema schema);
+    public void makeFixer();
+}

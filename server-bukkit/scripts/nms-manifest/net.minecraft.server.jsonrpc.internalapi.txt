@@ -1,0 +1,319 @@
+//// MinecraftAllowListService.java
+import java.util.Collection;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.UserWhiteListEntry;
+public interface MinecraftAllowListService {
+    Collection<UserWhiteListEntry> getEntries();
+    boolean add(UserWhiteListEntry infos, ClientInfo clientInfo);
+    void clear(ClientInfo clientInfo);
+    void remove(NameAndId nameAndId, ClientInfo clientInfo);
+    void kickUnlistedPlayers(ClientInfo clientInfo);
+}
+//// MinecraftAllowListServiceImpl.java
+import java.util.Collection;
+import net.minecraft.server.jsonrpc.JsonRpcLogger;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.notifications.NotificationManager;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.UserWhiteListEntry;
+public class MinecraftAllowListServiceImpl implements MinecraftAllowListService {
+    public MinecraftAllowListServiceImpl(NotificationManager notificationManager, JsonRpcLogger jsonrpcLogger);
+    public Collection<UserWhiteListEntry> getEntries();
+    public boolean add(UserWhiteListEntry infos, ClientInfo clientInfo);
+    public void clear(ClientInfo clientInfo);
+    public void remove(NameAndId nameAndId, ClientInfo clientInfo);
+    public void kickUnlistedPlayers(ClientInfo clientInfo);
+}
+//// MinecraftApi.java
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+import net.minecraft.server.notifications.NotificationManager;
+public class MinecraftApi {
+    public MinecraftApi(NotificationManager notificationManager, MinecraftAllowListService allowListService, MinecraftBanListService banListService, MinecraftPlayerListService minecraftPlayerListService, MinecraftGameRuleService gameRuleService, MinecraftOperatorListService minecraftOperatorListService, MinecraftServerSettingsService minecraftServerSettingsService, MinecraftServerStateService minecraftServerStateService, MinecraftExecutorService executorService);
+    public <V> CompletableFuture<V> submit(Supplier<V> supplier);
+    public CompletableFuture<Void> submit(Runnable runnable);
+    public MinecraftAllowListService allowListService();
+    public MinecraftBanListService banListService();
+    public MinecraftPlayerListService playerListService();
+    public MinecraftGameRuleService gameRuleService();
+    public MinecraftOperatorListService operatorListService();
+    public MinecraftServerSettingsService serverSettingsService();
+    public MinecraftServerStateService serverStateService();
+    public NotificationManager notificationManager();
+    public static MinecraftApi of(NotificationManager notificationManager);
+}
+//// MinecraftBanListService.java
+import java.util.Collection;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.players.IpBanListEntry;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.UserBanListEntry;
+public interface MinecraftBanListService {
+    void addUserBan(UserBanListEntry ban, ClientInfo clientInfo);
+    void removeUserBan(NameAndId nameAndId, ClientInfo clientInfo);
+    Collection<UserBanListEntry> getUserBanEntries();
+    Collection<IpBanListEntry> getIpBanEntries();
+    void addIpBan(IpBanListEntry ipBanEntry, ClientInfo clientInfo);
+    void clearIpBans(ClientInfo clientInfo);
+    void removeIpBan(String ip, ClientInfo clientInfo);
+    void clearUserBans(ClientInfo clientInfo);
+}
+//// MinecraftBanListServiceImpl.java
+import java.util.Collection;
+import net.minecraft.server.jsonrpc.JsonRpcLogger;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.notifications.NotificationManager;
+import net.minecraft.server.players.IpBanListEntry;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.UserBanListEntry;
+public class MinecraftBanListServiceImpl implements MinecraftBanListService {
+    public MinecraftBanListServiceImpl(NotificationManager notificationManager, JsonRpcLogger jsonrpcLogger);
+    public void addUserBan(UserBanListEntry ban, ClientInfo clientInfo);
+    public void removeUserBan(NameAndId nameAndId, ClientInfo clientInfo);
+    public void clearUserBans(ClientInfo clientInfo);
+    public Collection<UserBanListEntry> getUserBanEntries();
+    public Collection<IpBanListEntry> getIpBanEntries();
+    public void addIpBan(IpBanListEntry ipBanEntry, ClientInfo clientInfo);
+    public void clearIpBans(ClientInfo clientInfo);
+    public void removeIpBan(String ip, ClientInfo clientInfo);
+}
+//// MinecraftExecutorService.java
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+public interface MinecraftExecutorService {
+    <V> CompletableFuture<V> submit(Supplier<V> supplier);
+    CompletableFuture<Void> submit(Runnable runnable);
+}
+//// MinecraftExecutorServiceImpl.java
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+import net.minecraft.server.notifications.NotificationManager;
+public class MinecraftExecutorServiceImpl implements MinecraftExecutorService {
+    public MinecraftExecutorServiceImpl(NotificationManager notificationManager);
+    public <V> CompletableFuture<V> submit(Supplier<V> supplier);
+    public CompletableFuture<Void> submit(Runnable runnable);
+}
+//// MinecraftGameRuleService.java
+import java.util.stream.Stream;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.jsonrpc.methods.GameRulesService;
+import net.minecraft.world.level.gamerules.GameRule;
+public interface MinecraftGameRuleService {
+    <T> GameRulesService.GameRuleUpdate<T> updateGameRule(GameRulesService.GameRuleUpdate<T> update, ClientInfo clientInfo);
+    <T> T getRuleValue(GameRule<T> gameRule);
+    <T> GameRulesService.GameRuleUpdate<T> getTypedRule(GameRule<T> gameRule, T value);
+    Stream<GameRule<?>> getAvailableGameRules();
+}
+//// MinecraftGameRuleServiceImpl.java
+import java.util.stream.Stream;
+import net.minecraft.server.jsonrpc.JsonRpcLogger;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.jsonrpc.methods.GameRulesService;
+import net.minecraft.server.notifications.NotificationManager;
+import net.minecraft.world.level.gamerules.GameRule;
+public class MinecraftGameRuleServiceImpl implements MinecraftGameRuleService {
+    public MinecraftGameRuleServiceImpl(NotificationManager notificationManager, JsonRpcLogger jsonrpcLogger);
+    public <T> GameRulesService.GameRuleUpdate<T> updateGameRule(GameRulesService.GameRuleUpdate<T> update, ClientInfo clientInfo);
+    public <T> GameRulesService.GameRuleUpdate<T> getTypedRule(GameRule<T> gameRule, T value);
+    public Stream<GameRule<?>> getAvailableGameRules();
+    public <T> T getRuleValue(GameRule<T> gameRule);
+}
+//// MinecraftOperatorListService.java
+import java.util.Collection;
+import java.util.Optional;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.permissions.PermissionLevel;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.ServerOpListEntry;
+public interface MinecraftOperatorListService {
+    Collection<ServerOpListEntry> getEntries();
+    void op(NameAndId nameAndId, Optional<PermissionLevel> permissionLevel, Optional<Boolean> canBypassPlayerLimit, ClientInfo clientInfo);
+    void op(NameAndId nameAndId, ClientInfo clientInfo);
+    void deop(NameAndId nameAndId, ClientInfo clientInfo);
+    void clear(ClientInfo clientInfo);
+}
+//// MinecraftOperatorListServiceImpl.java
+import java.util.Collection;
+import java.util.Optional;
+import net.minecraft.server.jsonrpc.JsonRpcLogger;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.notifications.NotificationManager;
+import net.minecraft.server.permissions.PermissionLevel;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.ServerOpListEntry;
+public class MinecraftOperatorListServiceImpl implements MinecraftOperatorListService {
+    public MinecraftOperatorListServiceImpl(NotificationManager notificationManager, JsonRpcLogger jsonrpcLogger);
+    public Collection<ServerOpListEntry> getEntries();
+    public void op(NameAndId nameAndId, Optional<PermissionLevel> permissionLevel, Optional<Boolean> canBypassPlayerLimit, ClientInfo clientInfo);
+    public void op(NameAndId nameAndId, ClientInfo clientInfo);
+    public void deop(NameAndId nameAndId, ClientInfo clientInfo);
+    public void clear(ClientInfo clientInfo);
+}
+//// MinecraftPlayerListService.java
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.NameAndId;
+public interface MinecraftPlayerListService {
+    List<ServerPlayer> getPlayers();
+    ServerPlayer getPlayer(UUID uuid);
+    default CompletableFuture<Optional<NameAndId>> getUser(Optional<UUID> id, Optional<String> name);
+    Optional<NameAndId> fetchUserByName(String name);
+    Optional<NameAndId> fetchUserById(UUID id);
+    Optional<NameAndId> getCachedUserById(UUID id);
+    Optional<ServerPlayer> getPlayer(Optional<UUID> id, Optional<String> name);
+    List<ServerPlayer> getPlayersWithAddress(String ip);
+    ServerPlayer getPlayerByName(String name);
+    void remove(ServerPlayer player, ClientInfo clientInfo);
+}
+//// MinecraftPlayerListServiceImpl.java
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.server.jsonrpc.JsonRpcLogger;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.notifications.NotificationManager;
+import net.minecraft.server.players.NameAndId;
+public class MinecraftPlayerListServiceImpl implements MinecraftPlayerListService {
+    public MinecraftPlayerListServiceImpl(NotificationManager notificationManager, JsonRpcLogger jsonRpcLogger);
+    public List<ServerPlayer> getPlayers();
+    public ServerPlayer getPlayer(UUID uuid);
+    public Optional<NameAndId> fetchUserByName(String name);
+    public Optional<NameAndId> fetchUserById(UUID id);
+    public Optional<NameAndId> getCachedUserById(UUID id);
+    public Optional<ServerPlayer> getPlayer(Optional<UUID> id, Optional<String> name);
+    public List<ServerPlayer> getPlayersWithAddress(String ip);
+    public void remove(ServerPlayer serverPlayer, ClientInfo clientInfo);
+    public ServerPlayer getPlayerByName(String name);
+}
+//// MinecraftServerSettingsService.java
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.permissions.LevelBasedPermissionSet;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameType;
+public interface MinecraftServerSettingsService {
+    boolean isAutoSave();
+    boolean setAutoSave(boolean enabled, ClientInfo clientInfo);
+    Difficulty getDifficulty();
+    Difficulty setDifficulty(Difficulty difficulty, ClientInfo clientInfo);
+    boolean isEnforceWhitelist();
+    boolean setEnforceWhitelist(boolean enforce, ClientInfo clientInfo);
+    boolean isUsingWhitelist();
+    boolean setUsingWhitelist(boolean use, ClientInfo clientInfo);
+    int getMaxPlayers();
+    int setMaxPlayers(int maxPlayers, ClientInfo clientInfo);
+    int getPauseWhenEmptySeconds();
+    int setPauseWhenEmptySeconds(int emptySeconds, ClientInfo clientInfo);
+    int getPlayerIdleTimeout();
+    int setPlayerIdleTimeout(int idleTime, ClientInfo clientInfo);
+    boolean allowFlight();
+    boolean setAllowFlight(boolean allow, ClientInfo clientInfo);
+    int getSpawnProtectionRadius();
+    int setSpawnProtectionRadius(int spawnProtection, ClientInfo clientInfo);
+    String getMotd();
+    String setMotd(String motd, ClientInfo clientInfo);
+    boolean forceGameMode();
+    boolean setForceGameMode(boolean force, ClientInfo clientInfo);
+    GameType getGameMode();
+    GameType setGameMode(GameType gameMode, ClientInfo clientInfo);
+    int getViewDistance();
+    int setViewDistance(int viewDistance, ClientInfo clientInfo);
+    int getSimulationDistance();
+    int setSimulationDistance(int simulationDistance, ClientInfo clientInfo);
+    boolean acceptsTransfers();
+    boolean setAcceptsTransfers(boolean accept, ClientInfo clientInfo);
+    int getStatusHeartbeatInterval();
+    int setStatusHeartbeatInterval(int statusHeartbeatInterval, ClientInfo clientInfo);
+    LevelBasedPermissionSet getOperatorUserPermissions();
+    LevelBasedPermissionSet setOperatorUserPermissions(LevelBasedPermissionSet level, ClientInfo clientInfo);
+    boolean hidesOnlinePlayers();
+    boolean setHidesOnlinePlayers(boolean hide, ClientInfo clientInfo);
+    boolean repliesToStatus();
+    boolean setRepliesToStatus(boolean enable, ClientInfo clientInfo);
+    int getEntityBroadcastRangePercentage();
+    int setEntityBroadcastRangePercentage(int percentage, ClientInfo clientInfo);
+}
+//// MinecraftServerSettingsServiceImpl.java
+import net.minecraft.server.jsonrpc.JsonRpcLogger;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.notifications.NotificationManager;
+import net.minecraft.server.permissions.LevelBasedPermissionSet;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameType;
+public class MinecraftServerSettingsServiceImpl implements MinecraftServerSettingsService {
+    public MinecraftServerSettingsServiceImpl(NotificationManager notificationManager, JsonRpcLogger jsonrpcLogger);
+    public boolean isAutoSave();
+    public boolean setAutoSave(boolean enabled, ClientInfo clientInfo);
+    public Difficulty getDifficulty();
+    public Difficulty setDifficulty(Difficulty difficulty, ClientInfo clientInfo);
+    public boolean isEnforceWhitelist();
+    public boolean setEnforceWhitelist(boolean enforce, ClientInfo clientInfo);
+    public boolean isUsingWhitelist();
+    public boolean setUsingWhitelist(boolean use, ClientInfo clientInfo);
+    public int getMaxPlayers();
+    public int setMaxPlayers(int maxPlayers, ClientInfo clientInfo);
+    public int getPauseWhenEmptySeconds();
+    public int setPauseWhenEmptySeconds(int emptySeconds, ClientInfo clientInfo);
+    public int getPlayerIdleTimeout();
+    public int setPlayerIdleTimeout(int idleTime, ClientInfo clientInfo);
+    public boolean allowFlight();
+    public boolean setAllowFlight(boolean allow, ClientInfo clientInfo);
+    public int getSpawnProtectionRadius();
+    public int setSpawnProtectionRadius(int spawnProtection, ClientInfo clientInfo);
+    public String getMotd();
+    public String setMotd(String motd, ClientInfo clientInfo);
+    public boolean forceGameMode();
+    public boolean setForceGameMode(boolean force, ClientInfo clientInfo);
+    public GameType getGameMode();
+    public GameType setGameMode(GameType gameMode, ClientInfo clientInfo);
+    public int getViewDistance();
+    public int setViewDistance(int viewDistance, ClientInfo clientInfo);
+    public int getSimulationDistance();
+    public int setSimulationDistance(int simulationDistance, ClientInfo clientInfo);
+    public boolean acceptsTransfers();
+    public boolean setAcceptsTransfers(boolean accept, ClientInfo clientInfo);
+    public int getStatusHeartbeatInterval();
+    public int setStatusHeartbeatInterval(int statusHeartbeatInterval, ClientInfo clientInfo);
+    public LevelBasedPermissionSet getOperatorUserPermissions();
+    public LevelBasedPermissionSet setOperatorUserPermissions(LevelBasedPermissionSet permissions, ClientInfo clientInfo);
+    public boolean hidesOnlinePlayers();
+    public boolean setHidesOnlinePlayers(boolean hide, ClientInfo clientInfo);
+    public boolean repliesToStatus();
+    public boolean setRepliesToStatus(boolean enable, ClientInfo clientInfo);
+    public int getEntityBroadcastRangePercentage();
+    public int setEntityBroadcastRangePercentage(int percentage, ClientInfo clientInfo);
+}
+//// MinecraftServerStateService.java
+import java.util.Collection;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.level.ServerPlayer;
+public interface MinecraftServerStateService {
+    boolean isReady();
+    boolean saveEverything(boolean suppressLogs, boolean flush, boolean force, ClientInfo clientInfo);
+    void halt(boolean waitForShutdown, ClientInfo clientInfo);
+    void sendSystemMessage(Component message, ClientInfo clientInfo);
+    void sendSystemMessage(Component message, boolean overlay, Collection<ServerPlayer> players, ClientInfo clientInfo);
+    void broadcastSystemMessage(Component message, boolean overlay, ClientInfo clientInfo);
+}
+//// MinecraftServerStateServiceImpl.java
+import java.util.Collection;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.jsonrpc.JsonRpcLogger;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.notifications.NotificationManager;
+public class MinecraftServerStateServiceImpl implements MinecraftServerStateService {
+    public MinecraftServerStateServiceImpl(NotificationManager notificationManager, JsonRpcLogger jsonrpcLogger);
+    public boolean isReady();
+    public boolean saveEverything(boolean suppressLogs, boolean flush, boolean force, ClientInfo clientInfo);
+    public void halt(boolean waitForShutdown, ClientInfo clientInfo);
+    public void sendSystemMessage(Component message, ClientInfo clientInfo);
+    public void sendSystemMessage(Component message, boolean overlay, Collection<ServerPlayer> players, ClientInfo clientInfo);
+    public void broadcastSystemMessage(Component message, boolean overlay, ClientInfo clientInfo);
+}

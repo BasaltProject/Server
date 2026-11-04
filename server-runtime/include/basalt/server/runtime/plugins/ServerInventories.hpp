@@ -23,6 +23,14 @@ public:
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> craft(std::int32_t width, std::int32_t height,
                                                                  std::span<const std::uint8_t> items) const override;
 
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> anvil(std::span<const std::uint8_t> left,
+                                                                 std::span<const std::uint8_t> right,
+                                                                 std::string_view name) const override;
+
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>>
+    smithing(std::span<const std::uint8_t> templateStack, std::span<const std::uint8_t> base,
+             std::span<const std::uint8_t> addition) const override;
+
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> mobEffects() const override;
 
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> potions() const override;

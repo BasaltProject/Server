@@ -1,6 +1,9 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.data.worldgen.features;
 
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.world.level.levelgen.feature.Feature;
 
 public class TreeFeatures {
     protected TreeFeatures() {}
@@ -55,4 +58,14 @@ public class TreeFeatures {
     public static final ResourceKey<Object> FALLEN_SPRUCE_TREE = FeatureUtils.createKey("fallen_spruce_tree");
     public static final ResourceKey<Object> FALLEN_BIRCH_TREE = FeatureUtils.createKey("fallen_birch_tree");
     public static final ResourceKey<Object> FALLEN_SUPER_BIRCH_TREE = FeatureUtils.createKey("fallen_super_birch_tree");
+    public static final ResourceKey<Object> RED_POPLAR = FeatureUtils.createKey("red_poplar");
+    public static final ResourceKey<Object> ORANGE_POPLAR = FeatureUtils.createKey("orange_poplar");
+    public static final ResourceKey<Object> YELLOW_POPLAR = FeatureUtils.createKey("yellow_poplar");
+    public static final ResourceKey<Object> RED_POPLAR_LEAF_LITTER = FeatureUtils.createKey("red_poplar_leaf_litter");
+    public static final ResourceKey<Object> ORANGE_POPLAR_LEAF_LITTER = FeatureUtils.createKey("orange_poplar_leaf_litter");
+    public static final ResourceKey<Object> YELLOW_POPLAR_LEAF_LITTER = FeatureUtils.createKey("yellow_poplar_leaf_litter");
+    public static final ResourceKey<Object> FALLEN_POPLAR_TREE = FeatureUtils.createKey("fallen_poplar_tree");
+    public static void bootstrap(BootstrapContext<Feature> context) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.TreeFeatures#bootstrap");
+    }
 }

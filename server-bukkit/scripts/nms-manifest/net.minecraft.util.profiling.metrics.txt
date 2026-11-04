@@ -1,0 +1,76 @@
+//// MetricCategory.java
+public enum MetricCategory {
+    PATH_FINDING, EVENT_LOOPS, CONSECUTIVE_EXECUTORS, TICK_LOOP, JVM, CHUNK_RENDERING, CHUNK_RENDERING_DISPATCHING, CPU, GPU;
+    public String getDescription();
+}
+//// MetricSampler.java
+import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
+import java.util.function.Consumer;
+import java.util.function.DoubleSupplier;
+import java.util.function.ToDoubleFunction;
+public class MetricSampler {
+    final ThresholdTest thresholdTest;
+    protected MetricSampler(String name, SamplingPhase samplingPhase, MetricCategory category, DoubleSupplier sampler, Runnable beforeTick, ThresholdTest thresholdTest);
+    public static MetricSampler create(String name, MetricCategory category, DoubleSupplier sampler);
+    public static MetricSampler createExtractSampler(String name, MetricCategory category, DoubleSupplier sampler);
+    public static <T> MetricSamplerBuilder<T> builder(String metricName, MetricCategory category, ToDoubleFunction<T> sampler, T context);
+    public void onStartTick();
+    public void onEndTick(int currentTick);
+    public void onFinished();
+    public DoubleSupplier getSampler();
+    public String getName();
+    public SamplingPhase samplingPhase();
+    public MetricCategory getCategory();
+    public SamplerResult result();
+    public boolean triggersThreshold();
+    public boolean equals(Object o);
+    public int hashCode();
+    public static class SamplerResult {
+        public SamplerResult(int firstTick, int lastTick, Int2DoubleMap recording);
+        public double valueAtTick(int tick);
+        public int getFirstTick();
+        public int getLastTick();
+    }
+    public static class ValueIncreasedByPercentage implements ThresholdTest {
+        public ValueIncreasedByPercentage(float percentageIncreaseThreshold);
+        public boolean test(double value);
+    }
+    public static class MetricSamplerBuilder<T> {
+        public MetricSamplerBuilder(String name, MetricCategory category, ToDoubleFunction<T> sampler, T context);
+        public MetricSamplerBuilder<T> withBeforeTick(Consumer<T> beforeTick);
+        public MetricSamplerBuilder<T> withThresholdAlert(ThresholdTest thresholdTest);
+        public MetricSamplerBuilder<T> withSamplingPhase(SamplingPhase samplingPhase);
+        public MetricSampler build();
+    }
+    public static enum SamplingPhase {
+        EXTRACT, END_TICK;
+    }
+    public interface ThresholdTest {
+        boolean test(double value);
+    }
+}
+//// MetricsRegistry.java
+import java.util.List;
+public class MetricsRegistry {
+    public static final MetricsRegistry INSTANCE;
+    private MetricsRegistry();
+    public void add(ProfilerMeasured profilerMeasured);
+    public List<MetricSampler> getRegisteredSamplers();
+    static class AggregatedMetricSampler extends MetricSampler {
+        private AggregatedMetricSampler(String name, List<MetricSampler> delegates);
+        public boolean equals(Object o);
+        public int hashCode();
+    }
+}
+//// MetricsSamplerProvider.java
+import java.util.Set;
+import java.util.function.Supplier;
+import net.minecraft.util.profiling.ProfileCollector;
+public interface MetricsSamplerProvider {
+    Set<MetricSampler> samplers(Supplier<ProfileCollector> singleTickProfiler);
+}
+//// ProfilerMeasured.java
+import java.util.List;
+public interface ProfilerMeasured {
+    List<MetricSampler> profiledMetrics();
+}

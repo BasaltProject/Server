@@ -26,6 +26,8 @@ public final class BasaltCommandMap extends SimpleCommandMap {
             for (String alias : command.getAliases()) {
                 announce(owned.getPlugin().getName(), alias, command);
             }
+        } else if (command instanceof org.basaltmc.bukkit.facade.BukkitCommandBridge.BrigadierBukkitCommand) {
+            announce("minecraft", label, command);
         }
         return registered;
     }

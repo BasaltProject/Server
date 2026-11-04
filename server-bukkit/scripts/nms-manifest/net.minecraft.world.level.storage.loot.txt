@@ -1,0 +1,555 @@
+//// BuiltInLootTables.java
+import java.util.Set;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.block.ColorCollection;
+public class BuiltInLootTables {
+    public static final ResourceKey<LootTable> SPAWN_BONUS_CHEST;
+    public static final ResourceKey<LootTable> END_CITY_TREASURE;
+    public static final ResourceKey<LootTable> SIMPLE_DUNGEON;
+    public static final ResourceKey<LootTable> VILLAGE_WEAPONSMITH;
+    public static final ResourceKey<LootTable> VILLAGE_TOOLSMITH;
+    public static final ResourceKey<LootTable> VILLAGE_ARMORER;
+    public static final ResourceKey<LootTable> VILLAGE_CARTOGRAPHER;
+    public static final ResourceKey<LootTable> VILLAGE_MASON;
+    public static final ResourceKey<LootTable> VILLAGE_SHEPHERD;
+    public static final ResourceKey<LootTable> VILLAGE_BUTCHER;
+    public static final ResourceKey<LootTable> VILLAGE_FLETCHER;
+    public static final ResourceKey<LootTable> VILLAGE_FISHER;
+    public static final ResourceKey<LootTable> VILLAGE_TANNERY;
+    public static final ResourceKey<LootTable> VILLAGE_TEMPLE;
+    public static final ResourceKey<LootTable> VILLAGE_DESERT_HOUSE;
+    public static final ResourceKey<LootTable> VILLAGE_PLAINS_HOUSE;
+    public static final ResourceKey<LootTable> VILLAGE_TAIGA_HOUSE;
+    public static final ResourceKey<LootTable> VILLAGE_SNOWY_HOUSE;
+    public static final ResourceKey<LootTable> VILLAGE_SAVANNA_HOUSE;
+    public static final ResourceKey<LootTable> ABANDONED_MINESHAFT;
+    public static final ResourceKey<LootTable> NETHER_BRIDGE;
+    public static final ResourceKey<LootTable> STRONGHOLD_LIBRARY;
+    public static final ResourceKey<LootTable> STRONGHOLD_CROSSING;
+    public static final ResourceKey<LootTable> STRONGHOLD_CORRIDOR;
+    public static final ResourceKey<LootTable> DESERT_PYRAMID;
+    public static final ResourceKey<LootTable> JUNGLE_TEMPLE;
+    public static final ResourceKey<LootTable> JUNGLE_TEMPLE_DISPENSER;
+    public static final ResourceKey<LootTable> IGLOO_CHEST;
+    public static final ResourceKey<LootTable> WOODLAND_MANSION;
+    public static final ResourceKey<LootTable> UNDERWATER_RUIN_SMALL;
+    public static final ResourceKey<LootTable> UNDERWATER_RUIN_BIG;
+    public static final ResourceKey<LootTable> BURIED_TREASURE;
+    public static final ResourceKey<LootTable> SHIPWRECK_MAP;
+    public static final ResourceKey<LootTable> SHIPWRECK_SUPPLY;
+    public static final ResourceKey<LootTable> SHIPWRECK_TREASURE;
+    public static final ResourceKey<LootTable> PILLAGER_OUTPOST;
+    public static final ResourceKey<LootTable> BASTION_TREASURE;
+    public static final ResourceKey<LootTable> BASTION_OTHER;
+    public static final ResourceKey<LootTable> BASTION_BRIDGE;
+    public static final ResourceKey<LootTable> BASTION_HOGLIN_STABLE;
+    public static final ResourceKey<LootTable> ANCIENT_CITY;
+    public static final ResourceKey<LootTable> ANCIENT_CITY_ICE_BOX;
+    public static final ResourceKey<LootTable> RUINED_PORTAL;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_REWARD;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_REWARD_COMMON;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_REWARD_RARE;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_REWARD_UNIQUE;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_REWARD_OMINOUS;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_REWARD_OMINOUS_COMMON;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_REWARD_OMINOUS_RARE;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_REWARD_OMINOUS_UNIQUE;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_SUPPLY;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_CORRIDOR;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_INTERSECTION;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_INTERSECTION_BARREL;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_ENTRANCE;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_CORRIDOR_DISPENSER;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_CHAMBER_DISPENSER;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_WATER_DISPENSER;
+    public static final ResourceKey<LootTable> TRIAL_CHAMBERS_CORRIDOR_POT;
+    public static final ResourceKey<LootTable> EQUIPMENT_TRIAL_CHAMBER;
+    public static final ResourceKey<LootTable> EQUIPMENT_TRIAL_CHAMBER_RANGED;
+    public static final ResourceKey<LootTable> EQUIPMENT_TRIAL_CHAMBER_MELEE;
+    public static final ColorCollection<ResourceKey<LootTable>> SHEEP;
+    public static final ResourceKey<LootTable> FISHING;
+    public static final ResourceKey<LootTable> FISHING_JUNK;
+    public static final ResourceKey<LootTable> FISHING_TREASURE;
+    public static final ResourceKey<LootTable> FISHING_FISH;
+    public static final ResourceKey<LootTable> CAT_MORNING_GIFT;
+    public static final ResourceKey<LootTable> ARMORER_GIFT;
+    public static final ResourceKey<LootTable> BUTCHER_GIFT;
+    public static final ResourceKey<LootTable> CARTOGRAPHER_GIFT;
+    public static final ResourceKey<LootTable> CLERIC_GIFT;
+    public static final ResourceKey<LootTable> FARMER_GIFT;
+    public static final ResourceKey<LootTable> FISHERMAN_GIFT;
+    public static final ResourceKey<LootTable> FLETCHER_GIFT;
+    public static final ResourceKey<LootTable> LEATHERWORKER_GIFT;
+    public static final ResourceKey<LootTable> LIBRARIAN_GIFT;
+    public static final ResourceKey<LootTable> MASON_GIFT;
+    public static final ResourceKey<LootTable> SHEPHERD_GIFT;
+    public static final ResourceKey<LootTable> TOOLSMITH_GIFT;
+    public static final ResourceKey<LootTable> WEAPONSMITH_GIFT;
+    public static final ResourceKey<LootTable> UNEMPLOYED_GIFT;
+    public static final ResourceKey<LootTable> BABY_VILLAGER_GIFT;
+    public static final ResourceKey<LootTable> SNIFFER_DIGGING;
+    public static final ResourceKey<LootTable> PANDA_SNEEZE;
+    public static final ResourceKey<LootTable> CHICKEN_LAY;
+    public static final ResourceKey<LootTable> ARMADILLO_SHED;
+    public static final ResourceKey<LootTable> TURTLE_GROW;
+    public static final ResourceKey<LootTable> HARVEST_CAVE_VINE;
+    public static final ResourceKey<LootTable> HARVEST_SWEET_BERRY_BUSH;
+    public static final ResourceKey<LootTable> HARVEST_BEEHIVE;
+    public static final ResourceKey<LootTable> CARVE_PUMPKIN;
+    public static final ResourceKey<LootTable> TILL_ROOTED_DIRT;
+    public static final ResourceKey<LootTable> PIGLIN_BARTERING;
+    public static final ResourceKey<LootTable> SPAWNER_TRIAL_CHAMBER_KEY;
+    public static final ResourceKey<LootTable> SPAWNER_TRIAL_CHAMBER_CONSUMABLES;
+    public static final ResourceKey<LootTable> SPAWNER_OMINOUS_TRIAL_CHAMBER_KEY;
+    public static final ResourceKey<LootTable> SPAWNER_OMINOUS_TRIAL_CHAMBER_CONSUMABLES;
+    public static final ResourceKey<LootTable> SPAWNER_TRIAL_ITEMS_TO_DROP_WHEN_OMINOUS;
+    public static final ResourceKey<LootTable> ARMADILLO_BRUSH;
+    public static final ResourceKey<LootTable> BOGGED_SHEAR;
+    public static final ResourceKey<LootTable> SHEAR_MOOSHROOM;
+    public static final ResourceKey<LootTable> SHEAR_RED_MOOSHROOM;
+    public static final ResourceKey<LootTable> SHEAR_BROWN_MOOSHROOM;
+    public static final ResourceKey<LootTable> SHEAR_SNOW_GOLEM;
+    public static final ResourceKey<LootTable> SHEAR_SHEEP;
+    public static final ColorCollection<ResourceKey<LootTable>> SHEAR_DYED_SHEEP;
+    public static final ResourceKey<LootTable> CHARGED_CREEPER;
+    public static final ResourceKey<LootTable> CHARGED_CREEPER_PIGLIN;
+    public static final ResourceKey<LootTable> CHARGED_CREEPER_CREEPER;
+    public static final ResourceKey<LootTable> CHARGED_CREEPER_SKELETON;
+    public static final ResourceKey<LootTable> CHARGED_CREEPER_WITHER_SKELETON;
+    public static final ResourceKey<LootTable> CHARGED_CREEPER_ZOMBIE;
+    public static final ResourceKey<LootTable> DESERT_WELL_ARCHAEOLOGY;
+    public static final ResourceKey<LootTable> DESERT_PYRAMID_ARCHAEOLOGY;
+    public static final ResourceKey<LootTable> TRAIL_RUINS_ARCHAEOLOGY_COMMON;
+    public static final ResourceKey<LootTable> TRAIL_RUINS_ARCHAEOLOGY_RARE;
+    public static final ResourceKey<LootTable> OCEAN_RUIN_WARM_ARCHAEOLOGY;
+    public static final ResourceKey<LootTable> OCEAN_RUIN_COLD_ARCHAEOLOGY;
+    public static final ResourceKey<LootTable> ABANDONED_CAMP_BARREL;
+    public static final ResourceKey<LootTable> ABANDONED_CAMP_COMMON_CHEST;
+    public static final ResourceKey<LootTable> ABANDONED_CAMP_SECRET_CHEST;
+    public static Set<ResourceKey<LootTable>> all();
+}
+//// ContainerComponentManipulator.java
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.item.ItemProvider;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ContainerComponent;
+import net.minecraft.world.item.slot.SlotCollection;
+import net.minecraft.world.item.slot.SlotSelector;
+public record ContainerComponentManipulator<T extends ContainerComponent<T>>(DataComponentType<T> type, T empty) {
+    public void setContents(ItemStack itemStack, T defaultValue, Stream<ItemStack> newContents);
+    public void setContents(ItemStack itemStack, Stream<ItemStack> newContents);
+    public void modifyItems(ItemStack itemStack, UnaryOperator<ItemStack> modifier);
+    public SlotCollection getSlots(ItemStack itemStack);
+    static record ComponentSlotCollection<T extends ContainerComponent<T>>(ItemStack itemStack, ContainerComponentManipulator<T> component) implements SlotCollection {
+        public Stream<ItemStack> itemCopies();
+        public int size();
+        public int replaceSlotItems(ItemProvider items, SlotSelector slotSelector);
+        public void modifySlots(Consumer<? super SlotAccess> consumer, SlotSelector slotSelector);
+    }
+}
+//// ContainerComponentManipulators.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.component.BundleContents;
+import net.minecraft.world.item.component.ChargedProjectiles;
+import net.minecraft.world.item.component.ItemContainerContents;
+public interface ContainerComponentManipulators {
+    ContainerComponentManipulator<ItemContainerContents> CONTAINER;
+    ContainerComponentManipulator<BundleContents> BUNDLE_CONTENTS;
+    ContainerComponentManipulator<ChargedProjectiles> CHARGED_PROJECTILES;
+    Map<DataComponentType<?>, ContainerComponentManipulator<?>> ALL_MANIPULATORS;
+    Codec<ContainerComponentManipulator<?>> CODEC;
+}
+//// FloatRangePredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+public interface FloatRangePredicate extends Validatable {
+    Codec<Point> POINT_CODEC;
+    Codec<Line> LINE_CODEC;
+    Codec<FloatRangePredicate> CODEC;
+    static FloatRangePredicate exact(float value);
+    static FloatRangePredicate range(float min, float max);
+    static FloatRangePredicate lowerBound(float value);
+    static FloatRangePredicate upperBound(float value);
+    boolean test(LootContext context, float input);
+    default boolean test(LootContext context, ContextFloatProvider input);
+    public static record Point(Holder<ContextFloatProvider> value) implements FloatRangePredicate {
+        public void validate(ValidationContext context);
+        public boolean test(LootContext context, float input);
+    }
+    public static final class Line implements FloatRangePredicate {
+        private Line(Optional<Holder<ContextFloatProvider>> min, Optional<Holder<ContextFloatProvider>> max);
+        public void validate(ValidationContext context);
+        public boolean test(LootContext context, float input);
+        public boolean test(LootContext context, ContextFloatProvider input);
+        interface FloatChecker {
+            boolean test(LootContext context, float value);
+        }
+    }
+}
+//// IntLimit.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+public class IntLimit implements Validatable {
+    public static final Codec<IntLimit> CODEC;
+    private IntLimit(Optional<Holder<ContextIntProvider>> min, Optional<Holder<ContextIntProvider>> max);
+    public static IntLimit range(int min, int max);
+    public static IntLimit lowerBound(int value);
+    public static IntLimit upperBound(int value);
+    public void validate(ValidationContext context);
+    public int clamp(LootContext context, int input);
+    interface IntLimiter {
+        int apply(LootContext context, int value);
+    }
+}
+//// IntRangePredicate.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+public interface IntRangePredicate extends Validatable {
+    Codec<Point> POINT_CODEC;
+    Codec<Line> LINE_CODEC;
+    Codec<IntRangePredicate> CODEC;
+    static IntRangePredicate exact(int value);
+    static IntRangePredicate range(int min, int max);
+    static IntRangePredicate lowerBound(int value);
+    static IntRangePredicate upperBound(int value);
+    boolean test(LootContext context, int input);
+    default boolean test(LootContext context, ContextIntProvider input);
+    public static record Point(Holder<ContextIntProvider> value) implements IntRangePredicate {
+        public void validate(ValidationContext context);
+        public boolean test(LootContext context, int input);
+    }
+    public static final class Line implements IntRangePredicate {
+        private Line(Optional<Holder<ContextIntProvider>> min, Optional<Holder<ContextIntProvider>> max);
+        public void validate(ValidationContext context);
+        public boolean test(LootContext context, int input);
+        public boolean test(LootContext context, ContextIntProvider input);
+        interface IntChecker {
+            boolean test(LootContext context, int value);
+        }
+    }
+}
+//// LootContext.java
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.slot.SlotSource;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class LootContext {
+    private LootContext(LootParams params, RandomSource random, HolderGetter.Provider lootDataResolver);
+    public boolean hasParameter(ContextKey<?> key);
+    public <T> T getOptional(ContextKey<T> key);
+    public void addDynamicDrops(Identifier location, Consumer<ItemStack> output);
+    public boolean hasVisitedElement(VisitedEntry<?> element);
+    public boolean pushVisitedElement(VisitedEntry<?> element);
+    public void popVisitedElement(VisitedEntry<?> element);
+    public HolderGetter.Provider getResolver();
+    public RandomSource getRandom();
+    public float getLuck();
+    public ServerLevel getLevel();
+    public static VisitedEntry<LootTable> createVisitedEntry(LootTable table);
+    public static VisitedEntry<LootItemCondition> createVisitedEntry(LootItemCondition predicate);
+    public static VisitedEntry<LootItemFunction> createVisitedEntry(LootItemFunction modifier);
+    public static VisitedEntry<SlotSource> createVisitedEntry(SlotSource slotSource);
+    public static class Builder {
+        public Builder(LootParams params);
+        public Builder withOptionalRandomSeed(long seed);
+        public Builder withOptionalRandomSource(RandomSource randomSource);
+        public ServerLevel getLevel();
+        public LootContext create(Optional<Identifier> randomSequenceKey);
+    }
+    public static enum EntityTarget implements StringRepresentable, LootContextArg.SimpleGetter<Entity> {
+        THIS, ATTACKER, DIRECT_ATTACKER, ATTACKING_PLAYER, TARGET_ENTITY, INTERACTING_ENTITY;
+        public static final StringRepresentable.EnumCodec<EntityTarget> CODEC;
+        public ContextKey<? extends Entity> contextParam();
+        public static EntityTarget getByName(String name);
+        public String getSerializedName();
+    }
+    public static enum BlockEntityTarget implements StringRepresentable, LootContextArg.SimpleGetter<BlockEntity> {
+        BLOCK_ENTITY;
+        public ContextKey<? extends BlockEntity> contextParam();
+        public String getSerializedName();
+    }
+    public static enum ItemStackTarget implements StringRepresentable, LootContextArg.SimpleGetter<ItemInstance> {
+        TOOL;
+        public ContextKey<? extends ItemInstance> contextParam();
+        public String getSerializedName();
+    }
+    public static record VisitedEntry<T extends Validatable>(LootDataType<T> type, T value) {
+    }
+}
+//// LootContextArg.java
+import com.mojang.serialization.Codec;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.level.block.entity.BlockEntity;
+public interface LootContextArg<R> {
+    Codec<LootContextArg<Object>> ENTITY_OR_BLOCK;
+    R get(LootContext context);
+    ContextKey<?> contextParam();
+    static <U> LootContextArg<U> cast(LootContextArg<? extends U> original);
+    static <R> LootContextArg<R> of(ContextKey<? extends R> contextParam);
+    static <R> Codec<LootContextArg<R>> createArgCodec(UnaryOperator<ArgCodecBuilder<R>> consumer);
+    public interface Getter<T, R> extends LootContextArg<R> {
+        R get(T value);
+        ContextKey<? extends T> contextParam();
+        default R get(LootContext context);
+    }
+    public interface SimpleGetter<T> extends LootContextArg<T> {
+        ContextKey<? extends T> contextParam();
+        default T get(LootContext context);
+    }
+    public static final class ArgCodecBuilder<R> {
+        private ArgCodecBuilder();
+        public <T> ArgCodecBuilder<R> anyOf(T[] targets, Function<T, String> nameGetter, Function<T, ? extends LootContextArg<R>> argFactory);
+        public <T extends StringRepresentable> ArgCodecBuilder<R> anyOf(T[] targets, Function<T, ? extends LootContextArg<R>> argFactory);
+        public <T extends StringRepresentable & LootContextArg<? extends R>> ArgCodecBuilder<R> anyOf(T[] targets);
+        public ArgCodecBuilder<R> anyEntity(Function<? super ContextKey<? extends Entity>, ? extends LootContextArg<R>> function);
+        public ArgCodecBuilder<R> anyBlockEntity(Function<? super ContextKey<? extends BlockEntity>, ? extends LootContextArg<R>> function);
+        public ArgCodecBuilder<R> anyItemStack(Function<? super ContextKey<? extends ItemInstance>, ? extends LootContextArg<R>> function);
+        public ArgCodecBuilder<R> or(String name, LootContextArg<R> arg);
+    }
+}
+//// LootContextUser.java
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+public interface LootContextUser extends Validatable {
+    default Set<ContextKey<?>> getReferencedContextParams();
+    default void validate(ValidationContext context);
+}
+//// LootDataType.java
+import java.util.stream.Stream;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.context.ContextKeySet;
+import net.minecraft.world.item.slot.SlotSource;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+public record LootDataType<T extends Validatable>(ResourceKey<Registry<T>> registryKey, ContextGetter<T> contextGetter) {
+    public static final LootDataType<LootItemCondition> PREDICATE;
+    public static final LootDataType<LootItemFunction> MODIFIER;
+    public static final LootDataType<SlotSource> SLOT_SOURCE;
+    public static final LootDataType<LootTable> TABLE;
+    public static final LootDataType<ContextFloatProvider> FLOAT_PROVIDER;
+    public static final LootDataType<ContextIntProvider> INT_PROVIDER;
+    public void runValidation(ValidationContextSource contextSource, ResourceKey<T> key, T value);
+    public void runValidation(ValidationContextSource contextSource, HolderLookup<T> lookup);
+    public void runValidation(ValidationContextSource contextSource, HolderLookup.Provider registries);
+    public void runValidationIfPresent(ValidationContextSource contextSource, HolderLookup.Provider registries);
+    public static Stream<LootDataType<?>> values();
+    public interface ContextGetter<T> {
+        ContextKeySet context(T value);
+        static <T> ContextGetter<T> constant(ContextKeySet v);
+    }
+}
+//// LootParams.java
+import java.util.Map;
+import java.util.function.Consumer;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.util.context.ContextKeySet;
+import net.minecraft.util.context.ContextMap;
+import net.minecraft.world.item.ItemStack;
+public class LootParams {
+    public LootParams(ServerLevel level, ContextMap params, Map<Identifier, DynamicDrop> dynamicDrops, float luck);
+    public ServerLevel getLevel();
+    public ContextMap contextMap();
+    public void addDynamicDrops(Identifier location, Consumer<ItemStack> output);
+    public float getLuck();
+    public static class Builder {
+        public Builder(ServerLevel level);
+        public ServerLevel getLevel();
+        public <T> Builder withParameter(ContextKey<T> param, T value);
+        public <T> Builder withOptionalParameter(ContextKey<T> param, T value);
+        public <T> T getParameter(ContextKey<T> param);
+        public <T> T getOptionalParameter(ContextKey<T> param);
+        public Builder withDynamicDrop(Identifier location, DynamicDrop dynamicDrop);
+        public Builder withLuck(float luck);
+        public LootParams create(ContextKeySet contextKeySet);
+    }
+    public interface DynamicDrop {
+        void add(Consumer<ItemStack> output);
+    }
+}
+//// LootPool.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.entries.LootPoolEntryContainer;
+import net.minecraft.world.level.storage.loot.entries.UniformContainerBase;
+import net.minecraft.world.level.storage.loot.functions.FunctionUserBuilder;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.ConditionUserBuilder;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+public class LootPool implements Validatable {
+    public static final Codec<LootPool> CODEC;
+    private LootPool(List<LootPoolEntryContainer> entries, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier, Holder<ContextIntProvider> rolls, Holder<ContextFloatProvider> bonusRolls);
+    public void addRandomItems(Consumer<ItemStack> result, LootContext context);
+    public void validate(ValidationContext output);
+    public static Builder lootPool();
+    public static class Builder implements FunctionUserBuilder<Builder>, ConditionUserBuilder<Builder> {
+        public Builder setRolls(Holder<ContextIntProvider> rolls);
+        public Builder unwrap();
+        public Builder setBonusRolls(Holder<ContextFloatProvider> bonusRolls);
+        public Builder add(LootPoolEntryContainer.Builder<?> entry);
+        public Builder addAll(List<? extends UniformContainerBase.Builder<?>> entries);
+        public Builder when(Holder<LootItemCondition> condition);
+        public Builder apply(Holder<LootItemFunction> function);
+        public LootPool build();
+    }
+}
+//// LootTable.java
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.context.ContextKeySet;
+import net.minecraft.world.Container;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.functions.FunctionUserBuilder;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+public class LootTable implements Validatable {
+    public static final Codec<ResourceKey<LootTable>> KEY_CODEC;
+    public static final ContextKeySet DEFAULT_PARAM_SET;
+    public static final long RANDOMIZE_SEED = 0L;
+    public static final Codec<LootTable> DIRECT_CODEC;
+    public static final Codec<Holder<LootTable>> CODEC;
+    public static final Codec<HolderSet<LootTable>> LIST_CODEC;
+    public static final LootTable EMPTY;
+    private LootTable(ContextKeySet paramSet, Optional<Identifier> randomSequence, List<LootPool> pools, Optional<Holder<LootItemFunction>> modifier);
+    public static Consumer<ItemStack> createStackSplitter(ServerLevel level, Consumer<ItemStack> output);
+    public void getRandomItemsRaw(LootParams params, Consumer<ItemStack> output);
+    public void getRandomItemsRaw(LootContext context, Consumer<ItemStack> output);
+    public void getRandomItems(LootParams params, long optionalLootTableSeed, Consumer<ItemStack> output);
+    public void getRandomItems(LootParams params, Consumer<ItemStack> output);
+    public void getRandomItems(LootContext context, Consumer<ItemStack> output);
+    public ObjectArrayList<ItemStack> getRandomItems(LootParams params, RandomSource randomSource);
+    public ObjectArrayList<ItemStack> getRandomItems(LootParams params, long optionalLootTableSeed);
+    public ObjectArrayList<ItemStack> getRandomItems(LootParams params);
+    public ContextKeySet getParamSet();
+    public void validate(ValidationContext context);
+    public void fill(Container container, LootParams params, long optionalRandomSeed);
+    public static Builder lootTable();
+    public static class Builder implements FunctionUserBuilder<Builder> {
+        public Builder();
+        public Builder withPool(LootPool.Builder pool);
+        public Builder setParamSet(ContextKeySet paramSet);
+        public Builder setRandomSequence(Identifier key);
+        public Builder apply(Holder<LootItemFunction> function);
+        public Builder unwrap();
+        public LootTable build();
+    }
+}
+//// Validatable.java
+import com.mojang.serialization.DataResult;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.util.context.ContextKeySet;
+public interface Validatable {
+    void validate(ValidationContext context);
+    static void validate(ValidationContext context, String name, Validatable v);
+    static void validate(ValidationContext context, String name, Optional<? extends Validatable> optional);
+    static void validateHolder(ValidationContext context, Holder<? extends Validatable> holder);
+    static void validateHolder(ValidationContext context, String name, Holder<? extends Validatable> holder);
+    static void validateHolder(ValidationContext context, String name, Optional<? extends Holder<? extends Validatable>> optional);
+    static void validateHolder(ValidationContext context, String name, List<? extends Holder<? extends Validatable>> list);
+    static void validateHolderSet(ValidationContext context, String name, HolderSet<? extends Validatable> holderSet, int minSize);
+    static void validateHolderSet(ValidationContext context, String name, HolderSet<? extends Validatable> holderSet);
+    static void validate(ValidationContext context, String name, List<? extends Validatable> list);
+    static void validate(ValidationContext context, List<? extends Validatable> list);
+    static <T extends Validatable> Function<T, DataResult<T>> validatorForContext(ContextKeySet params);
+    static <T extends Validatable> Function<List<T>, DataResult<List<T>>> listValidatorForContext(ContextKeySet params);
+}
+//// ValidationContext.java
+import java.util.Optional;
+import java.util.Set;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.util.context.ContextKeySet;
+public class ValidationContext {
+    public ValidationContext(ProblemReporter reporter, ContextKeySet contextKeySet, HolderGetter.Provider resolver);
+    public ValidationContext(ProblemReporter reporter, ContextKeySet contextKeySet);
+    private ValidationContext(ProblemReporter reporter, ContextKeySet contextKeySet, Optional<HolderGetter.Provider> resolver, Set<Object> visitedObjects);
+    public ValidationContext forChild(ProblemReporter.PathElement subContext);
+    public ValidationContext forField(String name);
+    public ValidationContext forIndexedField(String name, int index);
+    public ValidationContext forMapField(String name, String key);
+    public ValidationContext enterElement(ProblemReporter.PathElement subContext, ResourceKey<?> element);
+    public boolean hasVisitedElement(ResourceKey<?> element);
+    public ValidationContext enterTag(ProblemReporter.PathElement subContext, TagKey<?> tag);
+    public boolean hasVisitedTag(TagKey<?> tag);
+    public void reportProblem(ProblemReporter.Problem description);
+    public void validateContextUsage(LootContextUser lootContextUser);
+    public HolderGetter.Provider resolver();
+    public ProblemReporter reporter();
+    public static record ParametersNotProvidedProblem(Set<ContextKey<?>> notProvided) implements ProblemReporter.Problem {
+        public String description();
+    }
+    public static record RecursiveElementReferenceProblem(ResourceKey<?> referenced) implements ProblemReporter.Problem {
+        public String description();
+        public boolean isFatal();
+    }
+    public static record RecursiveTagReferenceProblem(TagKey<?> referenced) implements ProblemReporter.Problem {
+        public String description();
+        public boolean isFatal();
+    }
+    public static record MinBoundsProblem(int minBounds) implements ProblemReporter.Problem {
+        public String description();
+    }
+}
+//// ValidationContextSource.java
+import net.minecraft.core.HolderGetter;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.util.context.ContextKeySet;
+public class ValidationContextSource {
+    public ValidationContextSource(ProblemReporter reporter, HolderGetter.Provider lootData);
+    public ValidationContext context(ContextKeySet params);
+    public ValidationContext entityContext();
+}

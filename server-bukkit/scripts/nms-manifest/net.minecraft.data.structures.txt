@@ -1,0 +1,49 @@
+//// NbtToSnbt.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+public class NbtToSnbt implements DataProvider {
+    public NbtToSnbt(PackOutput output, Collection<Path> inputFolders);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public final String getName();
+    public static Path convertStructure(CachedOutput cache, Path path, String name, Path output);
+    public static void writeSnbt(CachedOutput cache, Path destination, String text) throws IOException;
+}
+//// SnbtDatafixer.java
+import java.io.IOException;
+public class SnbtDatafixer {
+    public static void main(String[] args) throws IOException;
+}
+//// SnbtToNbt.java
+import com.google.common.hash.HashCode;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+import net.minecraft.nbt.CompoundTag;
+public class SnbtToNbt implements DataProvider {
+    public SnbtToNbt(PackOutput output, Path inputFolder);
+    public SnbtToNbt(PackOutput output, Iterable<Path> inputFolders);
+    public SnbtToNbt addFilter(Filter filter);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public final String getName();
+    static record TaskResult(String name, byte[] payload, HashCode hash) {
+    }
+    static class StructureConversionException extends RuntimeException {
+        public StructureConversionException(Path path, Throwable t);
+    }
+    public interface Filter {
+        CompoundTag apply(String name, CompoundTag input);
+    }
+}
+//// StructureUpdater.java
+import net.minecraft.nbt.CompoundTag;
+public class StructureUpdater implements SnbtToNbt.Filter {
+    public CompoundTag apply(String name, CompoundTag input);
+    public static CompoundTag update(String name, CompoundTag tag);
+}

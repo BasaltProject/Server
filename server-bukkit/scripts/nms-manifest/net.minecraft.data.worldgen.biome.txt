@@ -1,0 +1,74 @@
+//// BiomeData.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.world.level.biome.Biome;
+public abstract class BiomeData {
+    public static void bootstrap(BootstrapContext<Biome> context);
+}
+//// EndBiomes.java
+import net.minecraft.core.HolderGetter;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.carver.WorldCarver;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+public class EndBiomes {
+    public static Biome endBarrens(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome theEnd(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome endMidlands(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome endHighlands(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome smallEndIslands(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+}
+//// NetherBiomes.java
+import net.minecraft.core.HolderGetter;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.carver.WorldCarver;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+public class NetherBiomes {
+    public static Biome netherWastes(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome soulSandValley(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome basaltDeltas(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome crimsonForest(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome warpedForest(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+}
+//// OverworldBiomes.java
+import net.minecraft.core.HolderGetter;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.carver.WorldCarver;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+public class OverworldBiomes {
+    protected static final int NORMAL_WATER_COLOR = 4159204;
+    public static final int SWAMP_SKELETON_WEIGHT = 70;
+    public static int calculateSkyColor(float temperature);
+    public static Biome oldGrowthTaiga(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean spruce);
+    public static Biome sparseJungle(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome jungle(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome bambooJungle(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome windsweptHills(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean moreTrees);
+    public static Biome desert(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome plains(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean sunflower, boolean snowy, boolean spikes);
+    public static Biome mushroomFields(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome savanna(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean shattered, boolean plateau);
+    public static Biome badlands(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean wooded);
+    public static Biome coldOcean(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean deep);
+    public static Biome ocean(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean deep);
+    public static Biome lukeWarmOcean(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean deep);
+    public static Biome warmOcean(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome frozenOcean(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean deep);
+    public static Biome forest(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean birch, boolean tall, boolean flower);
+    public static Biome taiga(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean snowy);
+    public static Biome darkForest(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean isPaleGarden);
+    public static Biome swamp(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome mangroveSwamp(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome river(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean frozen);
+    public static Biome beach(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean snowy, boolean stony);
+    public static Biome theVoid(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome meadowOrCherryGrove(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers, boolean cherryGrove);
+    public static Biome dappledForest(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome frozenPeaks(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome jaggedPeaks(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome stonyPeaks(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome snowySlopes(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome grove(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome sulfurCaves(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome lushCaves(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome dripstoneCaves(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+    public static Biome deepDark(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers);
+}

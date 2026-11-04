@@ -1,0 +1,74 @@
+//// DataFixTypes.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFixer;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.Dynamic;
+import java.util.Set;
+import net.minecraft.nbt.CompoundTag;
+public enum DataFixTypes {
+    LEVEL, LEVEL_SUMMARY, PLAYER, CHUNK, HOTBAR, OPTIONS, STRUCTURE, STATS, SAVED_DATA_COMMAND_STORAGE, SAVED_DATA_CUSTOM_BOSS_EVENTS, SAVED_DATA_ENDER_DRAGON_FIGHT, SAVED_DATA_GAME_RULES, SAVED_DATA_FORCED_CHUNKS, SAVED_DATA_MAP_DATA, SAVED_DATA_MAP_INDEX, SAVED_DATA_RAIDS, SAVED_DATA_RANDOM_SEQUENCES, SAVED_DATA_SCHEDULED_EVENTS, SAVED_DATA_SCOREBOARD, SAVED_DATA_STOPWATCHES, SAVED_DATA_STRUCTURE_FEATURE_INDICES, SAVED_DATA_WANDERING_TRADER, SAVED_DATA_WEATHER, SAVED_DATA_WORLD_BORDER, SAVED_DATA_WORLD_CLOCKS, SAVED_DATA_WORLD_GEN_SETTINGS, ADVANCEMENTS, POI_CHUNK, WORLD_GEN_SETTINGS, ENTITY_CHUNK, DEBUG_PROFILE;
+    public static final Set<DSL.TypeReference> TYPES_FOR_LEVEL_LIST;
+    public <A> Codec<A> wrapCodec(Codec<A> codec, DataFixer dataFixer, int defaultVersion);
+    public <T> Dynamic<T> update(DataFixer fixerUpper, Dynamic<T> input, int fromVersion, int toVersion);
+    public <T> Dynamic<T> updateToCurrentVersion(DataFixer fixerUpper, Dynamic<T> input, int dataVersion);
+    public CompoundTag update(DataFixer fixer, CompoundTag tag, int fromVersion, int toVersion);
+    public CompoundTag updateToCurrentVersion(DataFixer fixer, CompoundTag tag, int fromVersion);
+}
+//// DataFixers.java
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFixer;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.util.filefix.FileFixerUpper;
+public class DataFixers {
+    public static final int BLENDING_VERSION = 4997;
+    private DataFixers();
+    public static DataFixer getDataFixer();
+    public static FileFixerUpper getFileFixer();
+    public static CompletableFuture<?> optimize(Set<DSL.TypeReference> typesToOptimize);
+}
+//// ExtraDataFixUtils.java
+import com.mojang.datafixers.OpticFinder;
+import com.mojang.datafixers.Typed;
+import com.mojang.datafixers.types.Type;
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.DynamicOps;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
+public class ExtraDataFixUtils {
+    public static Dynamic<?> fixBlockPos(Dynamic<?> pos);
+    public static Dynamic<?> fixInlineBlockPos(Dynamic<?> input, String fieldX, String fieldY, String fieldZ, String newField);
+    public static Dynamic<?> createBlockPos(Dynamic<?> dynamic, int x, int y, int z);
+    public static <T, R> Typed<R> cast(Type<R> type, Typed<T> typed);
+    public static <T> Typed<T> cast(Type<T> type, Object value, DynamicOps<?> ops);
+    public static Type<?> patchSubType(Type<?> type, Type<?> find, Type<?> replace);
+    public static <T> Function<Typed<?>, Typed<?>> chainAllFilters(Function<Typed<?>, Typed<?>>... fixers);
+    public static Dynamic<?> fixStringField(Dynamic<?> dynamic, String fieldName, UnaryOperator<String> fix);
+    public static Optional<String> getPlainTranslationKey(Dynamic<?> textComponent);
+    public static String dyeColorIdToName(int id);
+    public static <T> Typed<?> readAndSet(Typed<?> target, OpticFinder<T> optic, Dynamic<?> value);
+}
+//// LegacyComponentDataFixUtils.java
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.DynamicOps;
+import java.util.Optional;
+public class LegacyComponentDataFixUtils {
+    public static <T> Dynamic<T> createPlainTextComponent(DynamicOps<T> ops, String text);
+    public static <T> Dynamic<T> createEmptyComponent(DynamicOps<T> ops);
+    public static String createTextComponentJson(String text);
+    public static String createTranslatableComponentJson(String key);
+    public static <T> Dynamic<T> createTranslatableComponent(DynamicOps<T> ops, String key);
+    public static String rewriteFromLenient(String string);
+    public static boolean isStrictlyValidJson(Dynamic<?> component);
+    public static Optional<String> extractTranslationString(String component);
+}
+//// PackedBitStorage.java
+public class PackedBitStorage {
+    public PackedBitStorage(int bits, int size);
+    public PackedBitStorage(int bits, int size, long[] data);
+    public void set(int index, int value);
+    public int get(int index);
+    public long[] getRaw();
+    public int getBits();
+}

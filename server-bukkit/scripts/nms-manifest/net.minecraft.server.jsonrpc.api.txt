@@ -1,0 +1,111 @@
+//// MethodInfo.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.resources.Identifier;
+public record MethodInfo<Params, Result>(String description, Optional<ParamInfo<Params>> params, Optional<ResultInfo<Result>> result) {
+    public MethodInfo(String description, ParamInfo<Params> paramInfo, ResultInfo<Result> resultInfo);
+    public Named<Params, Result> named(Identifier name);
+    public static record Named<Params, Result>(Identifier name, MethodInfo<Params, Result> contents) {
+        public static final Codec<Named<?, ?>> CODEC;
+        public static <Params, Result> Codec<Named<Params, Result>> typedCodec();
+    }
+}
+//// ParamInfo.java
+import com.mojang.serialization.MapCodec;
+public record ParamInfo<Param>(String name, Schema<Param> schema, boolean required) {
+    public ParamInfo(String name, Schema<Param> schema);
+    public static <Param> MapCodec<ParamInfo<Param>> typedCodec();
+}
+//// PlayerDto.java
+import com.mojang.authlib.GameProfile;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.NameAndId;
+public record PlayerDto(Optional<UUID> id, Optional<String> name) {
+    public static final MapCodec<PlayerDto> CODEC;
+    public static PlayerDto from(GameProfile gameProfile);
+    public static PlayerDto from(NameAndId nameAndId);
+    public static PlayerDto from(ServerPlayer player);
+}
+//// ReferenceUtil.java
+import com.mojang.serialization.Codec;
+import java.net.URI;
+public class ReferenceUtil {
+    public static final Codec<URI> REFERENCE_CODEC;
+    public static URI createLocalReference(String typeId);
+}
+//// ResultInfo.java
+import com.mojang.serialization.Codec;
+public record ResultInfo<Result>(String name, Schema<Result> schema) {
+    public static <Result> Codec<ResultInfo<Result>> typedCodec();
+}
+//// Schema.java
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Supplier;
+import net.minecraft.server.jsonrpc.methods.BanlistService;
+import net.minecraft.server.jsonrpc.methods.DiscoveryService;
+import net.minecraft.server.jsonrpc.methods.GameRulesService;
+import net.minecraft.server.jsonrpc.methods.IpBanlistService;
+import net.minecraft.server.jsonrpc.methods.Message;
+import net.minecraft.server.jsonrpc.methods.OperatorService;
+import net.minecraft.server.jsonrpc.methods.PlayerService;
+import net.minecraft.server.jsonrpc.methods.ServerStateService;
+import net.minecraft.server.permissions.PermissionLevel;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.gamerules.GameRuleType;
+public record Schema<T>(Optional<URI> reference, List<String> type, Optional<Schema<?>> items, Map<String, Schema<?>> properties, List<String> enumValues, Codec<T> codec) {
+    public static final Codec<? extends Schema<?>> CODEC;
+    public static final Schema<Boolean> BOOL_SCHEMA;
+    public static final Schema<Integer> INT_SCHEMA;
+    public static final Schema<Either<Boolean, Integer>> BOOL_OR_INT_SCHEMA;
+    public static final Schema<Float> NUMBER_SCHEMA;
+    public static final Schema<String> STRING_SCHEMA;
+    public static final Schema<UUID> UUID_SCHEMA;
+    public static final Schema<DiscoveryService.DiscoverResponse> DISCOVERY_SCHEMA;
+    public static final SchemaComponent<Difficulty> DIFFICULTY_SCHEMA;
+    public static final SchemaComponent<GameType> GAME_TYPE_SCHEMA;
+    public static final Schema<PermissionLevel> PERMISSION_LEVEL_SCHEMA;
+    public static final SchemaComponent<PlayerDto> PLAYER_SCHEMA;
+    public static final SchemaComponent<DiscoveryService.DiscoverInfo> VERSION_SCHEMA;
+    public static final SchemaComponent<ServerStateService.ServerState> SERVER_STATE_SCHEMA;
+    public static final Schema<GameRuleType> RULE_TYPE_SCHEMA;
+    public static final SchemaComponent<GameRulesService.GameRuleUpdate<?>> TYPED_GAME_RULE_SCHEMA;
+    public static final SchemaComponent<GameRulesService.GameRuleUpdate<?>> UNTYPED_GAME_RULE_SCHEMA;
+    public static final SchemaComponent<Message> MESSAGE_SCHEMA;
+    public static final SchemaComponent<ServerStateService.SystemMessage> SYSTEM_MESSAGE_SCHEMA;
+    public static final SchemaComponent<PlayerService.KickDto> KICK_PLAYER_SCHEMA;
+    public static final SchemaComponent<OperatorService.OperatorDto> OPERATOR_SCHEMA;
+    public static final SchemaComponent<IpBanlistService.IncomingIpBanDto> INCOMING_IP_BAN_SCHEMA;
+    public static final SchemaComponent<IpBanlistService.IpBanDto> IP_BAN_SCHEMA;
+    public static final SchemaComponent<BanlistService.UserBanDto> PLAYER_BAN_SCHEMA;
+    public static <T> Codec<Schema<T>> typedCodec();
+    public Schema<T> info();
+    public static List<SchemaComponent<?>> getSchemaRegistry();
+    public static <T> Schema<T> ofRef(URI ref, Codec<T> codec);
+    public static <T> Schema<T> ofType(String type, Codec<T> codec);
+    public static <T> Schema<T> ofTypes(List<String> types, Codec<T> codec);
+    public static <E extends Enum<E> & StringRepresentable> Schema<E> ofEnum(Supplier<E[]> values);
+    public static <E extends Enum<E> & StringRepresentable> Schema<E> ofEnum(Supplier<E[]> values, Codec<E> codec);
+    public static <T> Schema<T> ofEnum(List<String> enumValues, Codec<T> codec);
+    public static <T> Schema<List<T>> arrayOf(Schema<?> item, Codec<T> codec);
+    public static <T> Schema<T> record(Codec<T> codec);
+    public Schema<T> withField(String name, Schema<?> field);
+    public Schema<List<T>> asArray();
+}
+//// SchemaComponent.java
+import java.net.URI;
+import java.util.List;
+public record SchemaComponent<T>(String name, URI ref, Schema<T> schema) {
+    public Schema<T> asRef();
+    public Schema<List<T>> asArray();
+}

@@ -1,0 +1,251 @@
+//// DisplayContentsFactory.java
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+public interface DisplayContentsFactory<T> {
+    public interface ForStacks<T> extends DisplayContentsFactory<T> {
+        default T forStack(Holder<Item> item);
+        default T forStack(Item item);
+        T forStack(ItemStack stack);
+    }
+    public interface ForRemainders<T> extends DisplayContentsFactory<T> {
+        T addRemainder(T entry, List<T> remainders);
+    }
+}
+//// FurnaceRecipeDisplay.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.flag.FeatureFlagSet;
+public record FurnaceRecipeDisplay(SlotDisplay ingredient, SlotDisplay fuel, SlotDisplay result, SlotDisplay craftingStation, int duration, float experience) implements RecipeDisplay {
+    public static final MapCodec<FurnaceRecipeDisplay> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, FurnaceRecipeDisplay> STREAM_CODEC;
+    public static final RecipeDisplay.Type<FurnaceRecipeDisplay> TYPE;
+    public RecipeDisplay.Type<FurnaceRecipeDisplay> type();
+    public boolean isEnabled(FeatureFlagSet enabledFeatures);
+}
+//// RecipeDisplay.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.flag.FeatureFlagSet;
+public interface RecipeDisplay {
+    Codec<RecipeDisplay> CODEC;
+    StreamCodec<RegistryFriendlyByteBuf, RecipeDisplay> STREAM_CODEC;
+    SlotDisplay result();
+    SlotDisplay craftingStation();
+    Type<? extends RecipeDisplay> type();
+    default boolean isEnabled(FeatureFlagSet enabledFeatures);
+    public static record Type<T extends RecipeDisplay>(MapCodec<T> codec, StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
+    }
+}
+//// RecipeDisplayEntry.java
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.context.ContextMap;
+import net.minecraft.world.entity.player.StackedItemContents;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.RecipeBookCategory;
+public record RecipeDisplayEntry(RecipeDisplayId id, RecipeDisplay display, OptionalInt group, RecipeBookCategory category, Optional<List<Ingredient>> craftingRequirements) {
+    public static final StreamCodec<RegistryFriendlyByteBuf, RecipeDisplayEntry> STREAM_CODEC;
+    public List<ItemStack> resultItems(ContextMap context);
+    public boolean canCraft(StackedItemContents providedContents);
+}
+//// RecipeDisplayId.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record RecipeDisplayId(int index) {
+    public static final StreamCodec<ByteBuf, RecipeDisplayId> STREAM_CODEC;
+}
+//// RecipeDisplays.java
+import net.minecraft.core.Registry;
+public class RecipeDisplays {
+    public static RecipeDisplay.Type<?> bootstrap(Registry<RecipeDisplay.Type<?>> registry);
+}
+//// ShapedCraftingRecipeDisplay.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.flag.FeatureFlagSet;
+public record ShapedCraftingRecipeDisplay(int width, int height, List<SlotDisplay> ingredients, SlotDisplay result, SlotDisplay craftingStation) implements RecipeDisplay {
+    public static final MapCodec<ShapedCraftingRecipeDisplay> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShapedCraftingRecipeDisplay> STREAM_CODEC;
+    public static final RecipeDisplay.Type<ShapedCraftingRecipeDisplay> TYPE;
+    public RecipeDisplay.Type<ShapedCraftingRecipeDisplay> type();
+    public boolean isEnabled(FeatureFlagSet enabledFeatures);
+}
+//// ShapelessCraftingRecipeDisplay.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.flag.FeatureFlagSet;
+public record ShapelessCraftingRecipeDisplay(List<SlotDisplay> ingredients, SlotDisplay result, SlotDisplay craftingStation) implements RecipeDisplay {
+    public static final MapCodec<ShapelessCraftingRecipeDisplay> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShapelessCraftingRecipeDisplay> STREAM_CODEC;
+    public static final RecipeDisplay.Type<ShapelessCraftingRecipeDisplay> TYPE;
+    public RecipeDisplay.Type<ShapelessCraftingRecipeDisplay> type();
+    public boolean isEnabled(FeatureFlagSet enabledFeatures);
+}
+//// SlotDisplay.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.context.ContextMap;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.equipment.trim.TrimPattern;
+public interface SlotDisplay {
+    Codec<SlotDisplay> CODEC;
+    StreamCodec<RegistryFriendlyByteBuf, SlotDisplay> STREAM_CODEC;
+    <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> builder);
+    Type<? extends SlotDisplay> type();
+    default boolean isEnabled(FeatureFlagSet enabledFeatures);
+    default List<ItemStack> resolveForStacks(ContextMap context);
+    default ItemStack resolveForFirstStack(ContextMap context);
+    public static record Type<T extends SlotDisplay>(MapCodec<T> codec, StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
+    }
+    public static class ItemStackContentsFactory implements DisplayContentsFactory.ForStacks<ItemStack> {
+        public static final ItemStackContentsFactory INSTANCE;
+        public ItemStack forStack(ItemStack stack);
+    }
+    public static class Empty implements SlotDisplay {
+        public static final Empty INSTANCE;
+        public static final MapCodec<Empty> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, Empty> STREAM_CODEC;
+        public static final Type<Empty> TYPE;
+        private Empty();
+        public Type<Empty> type();
+        public String toString();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+    }
+    public static class AnyFuel implements SlotDisplay {
+        public static final AnyFuel INSTANCE;
+        public static final MapCodec<AnyFuel> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, AnyFuel> STREAM_CODEC;
+        public static final Type<AnyFuel> TYPE;
+        private AnyFuel();
+        public Type<AnyFuel> type();
+        public String toString();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+    }
+    public static record WithAnyPotion(SlotDisplay display) implements SlotDisplay {
+        public static final MapCodec<WithAnyPotion> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, WithAnyPotion> STREAM_CODEC;
+        public static final Type<WithAnyPotion> TYPE;
+        public Type<WithAnyPotion> type();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+    }
+    public static record OnlyWithComponent(SlotDisplay source, DataComponentType<?> component) implements SlotDisplay {
+        public static final MapCodec<OnlyWithComponent> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, OnlyWithComponent> STREAM_CODEC;
+        public static final Type<OnlyWithComponent> TYPE;
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> builder);
+        public Type<OnlyWithComponent> type();
+    }
+    public static record DyedSlotDemo(SlotDisplay dye, SlotDisplay target) implements SlotDisplay {
+        public static final MapCodec<DyedSlotDemo> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, DyedSlotDemo> STREAM_CODEC;
+        public static final Type<DyedSlotDemo> TYPE;
+        public Type<DyedSlotDemo> type();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+    }
+    public static record SmithingTrimDemoSlotDisplay(SlotDisplay base, SlotDisplay material, Holder<TrimPattern> pattern) implements SlotDisplay {
+        public static final MapCodec<SmithingTrimDemoSlotDisplay> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, SmithingTrimDemoSlotDisplay> STREAM_CODEC;
+        public static final Type<SmithingTrimDemoSlotDisplay> TYPE;
+        public Type<SmithingTrimDemoSlotDisplay> type();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+    }
+    public static record ItemSlotDisplay(Holder<Item> item) implements SlotDisplay {
+        public static final MapCodec<ItemSlotDisplay> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, ItemSlotDisplay> STREAM_CODEC;
+        public static final Type<ItemSlotDisplay> TYPE;
+        public ItemSlotDisplay(Item item);
+        public Type<ItemSlotDisplay> type();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+        public boolean isEnabled(FeatureFlagSet enabledFeatures);
+    }
+    public static record ItemStackSlotDisplay(ItemStackTemplate stack) implements SlotDisplay {
+        public static final MapCodec<ItemStackSlotDisplay> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, ItemStackSlotDisplay> STREAM_CODEC;
+        public static final Type<ItemStackSlotDisplay> TYPE;
+        public Type<ItemStackSlotDisplay> type();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+        public boolean isEnabled(FeatureFlagSet enabledFeatures);
+    }
+    public static record TagSlotDisplay(HolderSet<Item> tag) implements SlotDisplay {
+        public static final MapCodec<TagSlotDisplay> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, TagSlotDisplay> STREAM_CODEC;
+        public static final Type<TagSlotDisplay> TYPE;
+        public Type<TagSlotDisplay> type();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+    }
+    public static record Composite(List<SlotDisplay> contents) implements SlotDisplay {
+        public static final MapCodec<Composite> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, Composite> STREAM_CODEC;
+        public static final Type<Composite> TYPE;
+        public Type<Composite> type();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+        public boolean isEnabled(FeatureFlagSet enabledFeatures);
+    }
+    public static record WithRemainder(SlotDisplay input, SlotDisplay remainder) implements SlotDisplay {
+        public static final MapCodec<WithRemainder> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, WithRemainder> STREAM_CODEC;
+        public static final Type<WithRemainder> TYPE;
+        public Type<WithRemainder> type();
+        public <T> Stream<T> resolve(ContextMap context, DisplayContentsFactory<T> factory);
+        public boolean isEnabled(FeatureFlagSet enabledFeatures);
+    }
+}
+//// SlotDisplayContext.java
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.util.context.ContextKeySet;
+import net.minecraft.util.context.ContextMap;
+import net.minecraft.world.level.Level;
+public class SlotDisplayContext {
+    public static final ContextKey<RegistryAccess> REGISTRIES;
+    public static final ContextKeySet CONTEXT;
+    public static ContextMap fromLevel(Level level);
+}
+//// SlotDisplays.java
+import net.minecraft.core.Registry;
+public class SlotDisplays {
+    public static SlotDisplay.Type<?> bootstrap(Registry<SlotDisplay.Type<?>> registry);
+}
+//// SmithingRecipeDisplay.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record SmithingRecipeDisplay(SlotDisplay template, SlotDisplay base, SlotDisplay addition, SlotDisplay result, SlotDisplay craftingStation) implements RecipeDisplay {
+    public static final MapCodec<SmithingRecipeDisplay> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, SmithingRecipeDisplay> STREAM_CODEC;
+    public static final RecipeDisplay.Type<SmithingRecipeDisplay> TYPE;
+    public RecipeDisplay.Type<SmithingRecipeDisplay> type();
+}
+//// StonecutterRecipeDisplay.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record StonecutterRecipeDisplay(SlotDisplay input, SlotDisplay result, SlotDisplay craftingStation) implements RecipeDisplay {
+    public static final MapCodec<StonecutterRecipeDisplay> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, StonecutterRecipeDisplay> STREAM_CODEC;
+    public static final RecipeDisplay.Type<StonecutterRecipeDisplay> TYPE;
+    public RecipeDisplay.Type<StonecutterRecipeDisplay> type();
+}

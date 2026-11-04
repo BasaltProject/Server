@@ -1,0 +1,18 @@
+//// TargetingConditions.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+public class TargetingConditions {
+    public static final TargetingConditions DEFAULT;
+    private TargetingConditions(boolean isCombat);
+    public static TargetingConditions forCombat();
+    public static TargetingConditions forNonCombat();
+    public TargetingConditions copy();
+    public TargetingConditions range(double range);
+    public TargetingConditions ignoreLineOfSight();
+    public TargetingConditions ignoreInvisibilityTesting();
+    public TargetingConditions selector(Selector selector);
+    public boolean test(ServerLevel level, LivingEntity targeter, LivingEntity target);
+    public interface Selector {
+        boolean test(LivingEntity target, ServerLevel level);
+    }
+}

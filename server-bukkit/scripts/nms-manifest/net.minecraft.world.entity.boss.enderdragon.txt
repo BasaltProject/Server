@@ -1,0 +1,146 @@
+//// DragonFlightHistory.java
+public class DragonFlightHistory {
+    public static final int LENGTH = 64;
+    public DragonFlightHistory();
+    public void copyFrom(DragonFlightHistory history);
+    public void record(double y, float yRot);
+    public Sample get(int delay);
+    public Sample get(int delay, float partialTicks);
+    public static record Sample(double y, float yRot) {
+    }
+}
+//// EndCrystal.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class EndCrystal extends Entity {
+    public int time;
+    public EndCrystal(EntityType<? extends EndCrystal> type, Level level);
+    public EndCrystal(Level level, double x, double y, double z);
+    protected Entity.MovementEmission getMovementEmission();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public void tick();
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public boolean isPickable();
+    public final boolean hurtClient(DamageSource source);
+    public final boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public void kill(ServerLevel level);
+    public void setBeamTarget(BlockPos target);
+    public BlockPos getBeamTarget();
+    public void setShowBottom(boolean showBottom);
+    public boolean showsBottom();
+    public boolean shouldRenderAtSqrDistance(double distance);
+    public ItemStack getPickResult();
+}
+//// EnderDragon.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.MoveSimulationType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.boss.enderdragon.phases.EnderDragonPhaseManager;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.end.EnderDragonFight;
+import net.minecraft.world.level.pathfinder.Node;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public class EnderDragon extends Mob implements Enemy {
+    public static final EntityDataAccessor<Integer> DATA_PHASE;
+    public final DragonFlightHistory flightHistory;
+    public final EnderDragonPart head;
+    public float oFlapTime;
+    public float flapTime;
+    public boolean inWall;
+    public int dragonDeathTime;
+    public float yRotA;
+    public EndCrystal nearestCrystal;
+    public EnderDragon(EntityType<? extends EnderDragon> type, Level level);
+    public void setDragonFight(EnderDragonFight fight);
+    public void setFightOrigin(BlockPos fightOrigin);
+    public BlockPos getFightOrigin();
+    public static AttributeSupplier.Builder createAttributes();
+    public boolean isFlapping();
+    public void onFlap();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public void aiStep();
+    public boolean hurt(ServerLevel level, EnderDragonPart part, DamageSource source, float damage);
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    protected void reallyHurt(ServerLevel level, DamageSource source, float damage);
+    protected void handleKillingBlow();
+    public void knockback(double power, double xd, double zd, DamageSource source, float damage, boolean comesFromEffect);
+    public void kill(ServerLevel level);
+    protected void tickDeath();
+    public int findClosestNode();
+    public int findClosestNode(double tX, double tY, double tZ);
+    public Path findPath(int startIndex, int endIndex, Node finalNode);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public void checkDespawn();
+    public EnderDragonPart[] getSubEntities();
+    public boolean isPickable();
+    public SoundSource getSoundSource();
+    protected SoundEvent getAmbientSound();
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected float getSoundVolume();
+    public Vec3 getHeadLookVector(float a);
+    public void onCrystalDestroyed(ServerLevel level, EndCrystal crystal, BlockPos pos, DamageSource source);
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    public EnderDragonPhaseManager getPhaseManager();
+    public EnderDragonFight getDragonFight();
+    public boolean addEffect(MobEffectInstance newEffect, Entity source);
+    protected boolean canRide(Entity vehicle);
+    public boolean canUsePortal(boolean ignorePassenger);
+    public void recreateFromPacket(ClientboundAddEntityPacket packet);
+    public boolean canAttack(LivingEntity target);
+    protected float sanitizeScale(float scale);
+    public MoveSimulationType getMoveSimulationType();
+}
+//// EnderDragonPart.java
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class EnderDragonPart extends Entity {
+    public final EnderDragon parentMob;
+    public final String name;
+    public EnderDragonPart(EnderDragon parentMob, String name, float w, float h);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public boolean isPickable();
+    public ItemStack getPickResult();
+    public final boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public boolean is(Entity other);
+    public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity serverEntity);
+    public EntityDimensions getDimensions(Pose pose);
+    public boolean shouldBeSaved();
+}

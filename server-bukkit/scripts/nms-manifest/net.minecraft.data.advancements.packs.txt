@@ -1,0 +1,65 @@
+//// VanillaAdvancementProvider.java
+import net.minecraft.advancements.Advancement;
+import net.minecraft.core.registries.SingleRegistryBootstrap;
+public class VanillaAdvancementProvider {
+    public static SingleRegistryBootstrap<Advancement> create();
+}
+//// VanillaAdventureAdvancements.java
+import java.util.List;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.data.advancements.AdvancementSubProvider;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList;
+public class VanillaAdventureAdvancements extends AdvancementSubProvider {
+    public VanillaAdventureAdvancements(BootstrapContext<Advancement> output);
+    public void generate();
+    public AdvancementHolder createMonsterHunterAdvancement(AdvancementHolder parent, List<EntityType<?>> mobsToKill);
+    protected void createAdventuringTime(AdvancementHolder sleepInBed, MultiNoiseBiomeSourceParameterList.Preset preset);
+    public static Advancement.Builder addBiomes(Advancement.Builder advancement, HolderGetter<Biome> biomes, List<ResourceKey<Biome>> explorableBiomes);
+}
+//// VanillaHusbandryAdvancements.java
+import java.util.List;
+import java.util.stream.Stream;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.data.advancements.AdvancementSubProvider;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+public class VanillaHusbandryAdvancements extends AdvancementSubProvider {
+    public static final List<EntityType<?>> BREEDABLE_ANIMALS;
+    public static final List<EntityType<?>> INDIRECTLY_BREEDABLE_ANIMALS;
+    public static final Item[] WAX_SCRAPING_TOOLS;
+    public VanillaHusbandryAdvancements(BootstrapContext<Advancement> output);
+    public void generate();
+    public AdvancementHolder createBreedAllAnimalsAdvancement(AdvancementHolder parent, Stream<EntityType<?>> breedable, Stream<EntityType<?>> indirectlyBreedable);
+}
+//// VanillaNetherAdvancements.java
+import net.minecraft.advancements.Advancement;
+import net.minecraft.data.advancements.AdvancementSubProvider;
+import net.minecraft.data.worldgen.BootstrapContext;
+public class VanillaNetherAdvancements extends AdvancementSubProvider {
+    public VanillaNetherAdvancements(BootstrapContext<Advancement> output);
+    public void generate();
+}
+//// VanillaStoryAdvancements.java
+import net.minecraft.advancements.Advancement;
+import net.minecraft.data.advancements.AdvancementSubProvider;
+import net.minecraft.data.worldgen.BootstrapContext;
+public class VanillaStoryAdvancements extends AdvancementSubProvider {
+    public VanillaStoryAdvancements(BootstrapContext<Advancement> output);
+    public void generate();
+}
+//// VanillaTheEndAdvancements.java
+import net.minecraft.advancements.Advancement;
+import net.minecraft.data.advancements.AdvancementSubProvider;
+import net.minecraft.data.worldgen.BootstrapContext;
+public class VanillaTheEndAdvancements extends AdvancementSubProvider {
+    public VanillaTheEndAdvancements(BootstrapContext<Advancement> output);
+    public void generate();
+}

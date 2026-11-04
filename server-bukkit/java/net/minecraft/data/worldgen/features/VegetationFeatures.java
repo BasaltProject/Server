@@ -1,6 +1,13 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.data.worldgen.features;
 
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.levelgen.placement.BlockPredicateFilter;
 
 public class VegetationFeatures {
     protected VegetationFeatures() {}
@@ -62,4 +69,15 @@ public class VegetationFeatures {
     public static final ResourceKey<Object> BAMBOO_VEGETATION = FeatureUtils.createKey("bamboo_vegetation");
     public static final ResourceKey<Object> MUSHROOM_ISLAND_VEGETATION = FeatureUtils.createKey("mushroom_island_vegetation");
     public static final ResourceKey<Object> MANGROVE_VEGETATION = FeatureUtils.createKey("mangrove_vegetation");
+    public static final ResourceKey<Object> RED_SHRUB = FeatureUtils.createKey("red_shrub");
+    public static final ResourceKey<Object> TREES_DAPPLED_FOREST = FeatureUtils.createKey("trees_dappled_forest");
+    public static void bootstrap(BootstrapContext<Feature> context) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.VegetationFeatures#bootstrap");
+    }
+    public static WeightedList.Builder<BlockState> leafLitterPatchBuilder(int minState, int maxState) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.VegetationFeatures#leafLitterPatchBuilder");
+    }
+    public static BlockPredicateFilter nearWaterPredicate(Block block) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.VegetationFeatures#nearWaterPredicate");
+    }
 }

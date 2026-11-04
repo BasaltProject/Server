@@ -1,0 +1,110 @@
+//// DefendVillageTargetGoal.java
+import net.minecraft.world.entity.animal.golem.IronGolem;
+public class DefendVillageTargetGoal extends TargetGoal {
+    public DefendVillageTargetGoal(IronGolem golem);
+    public boolean canUse();
+    public void start();
+}
+//// HurtByTargetGoal.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
+public class HurtByTargetGoal extends TargetGoal {
+    public HurtByTargetGoal(PathfinderMob mob, Class<?>... ignoreDamageFromTheseTypes);
+    public boolean canUse();
+    public HurtByTargetGoal setAlertOthers(Class<?>... exceptTheseTypes);
+    public void start();
+    protected void alertOthers();
+    protected void alertOther(Mob other, LivingEntity hurtByMob);
+}
+//// NearestAttackableTargetGoal.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.phys.AABB;
+public class NearestAttackableTargetGoal<T extends LivingEntity> extends TargetGoal {
+    protected final Class<T> targetType;
+    protected final int randomInterval;
+    protected LivingEntity target;
+    protected final TargetingConditions targetConditions;
+    public NearestAttackableTargetGoal(Mob mob, Class<T> targetType, boolean mustSee);
+    public NearestAttackableTargetGoal(Mob mob, Class<T> targetType, boolean mustSee, TargetingConditions.Selector selector);
+    public NearestAttackableTargetGoal(Mob mob, Class<T> targetType, boolean mustSee, boolean mustReach);
+    public NearestAttackableTargetGoal(Mob mob, Class<T> targetType, int randomInterval, boolean mustSee, boolean mustReach, TargetingConditions. Selector selector);
+    public boolean canUse();
+    protected AABB getTargetSearchArea(double followDistance);
+    protected void findTarget();
+    public void start();
+    public void setTarget(LivingEntity target);
+}
+//// NearestAttackableWitchTargetGoal.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.raid.Raider;
+public class NearestAttackableWitchTargetGoal<T extends LivingEntity> extends NearestAttackableTargetGoal<T> {
+    public NearestAttackableWitchTargetGoal(Raider raider, Class<T> targetType, int randomInterval, boolean mustSee, boolean mustReach, TargetingConditions. Selector subselector);
+    public void setCanAttack(boolean canAttack);
+    public boolean canUse();
+}
+//// NearestHealableRaiderTargetGoal.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.raid.Raider;
+public class NearestHealableRaiderTargetGoal<T extends LivingEntity> extends NearestAttackableTargetGoal<T> {
+    public NearestHealableRaiderTargetGoal(Raider raider, Class<T> targetType, boolean mustSee, TargetingConditions. Selector subselector);
+    public int getCooldown();
+    public void decrementCooldown();
+    public boolean canUse();
+    public void start();
+}
+//// NonTameRandomTargetGoal.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+public class NonTameRandomTargetGoal<T extends LivingEntity> extends NearestAttackableTargetGoal<T> {
+    public NonTameRandomTargetGoal(TamableAnimal mob, Class<T> targetType, boolean mustSee, TargetingConditions. Selector subselector);
+    public boolean canUse();
+    public boolean canContinueToUse();
+}
+//// OwnerHurtByTargetGoal.java
+import net.minecraft.world.entity.TamableAnimal;
+public class OwnerHurtByTargetGoal extends TargetGoal {
+    public OwnerHurtByTargetGoal(TamableAnimal tameAnimal);
+    public boolean canUse();
+    public void start();
+}
+//// OwnerHurtTargetGoal.java
+import net.minecraft.world.entity.TamableAnimal;
+public class OwnerHurtTargetGoal extends TargetGoal {
+    public OwnerHurtTargetGoal(TamableAnimal tameAnimal);
+    public boolean canUse();
+    public void start();
+}
+//// ResetUniversalAngerTargetGoal.java
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.world.entity.ai.goal.Goal;
+public class ResetUniversalAngerTargetGoal<T extends Mob & NeutralMob> extends Goal {
+    public ResetUniversalAngerTargetGoal(T mob, boolean alertOthersOfSameType);
+    public boolean canUse();
+    public void start();
+}
+//// TargetGoal.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+public abstract class TargetGoal extends Goal {
+    protected final Mob mob;
+    protected final boolean mustSee;
+    protected LivingEntity targetMob;
+    protected int unseenMemoryTicks;
+    public TargetGoal(Mob mob, boolean mustSee);
+    public TargetGoal(Mob mob, boolean mustSee, boolean mustReach);
+    public boolean canContinueToUse();
+    protected double getFollowDistance();
+    public void start();
+    public void stop();
+    protected boolean canAttack(LivingEntity target, TargetingConditions targetConditions);
+    public TargetGoal setUnseenMemoryTicks(int unseenMemoryTicks);
+}

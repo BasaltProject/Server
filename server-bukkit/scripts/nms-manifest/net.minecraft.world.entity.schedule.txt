@@ -1,0 +1,34 @@
+//// Activity.java
+public class Activity {
+    public static final Activity CORE;
+    public static final Activity IDLE;
+    public static final Activity WORK;
+    public static final Activity PLAY;
+    public static final Activity REST;
+    public static final Activity MEET;
+    public static final Activity PANIC;
+    public static final Activity RAID;
+    public static final Activity PRE_RAID;
+    public static final Activity HIDE;
+    public static final Activity FIGHT;
+    public static final Activity CELEBRATE;
+    public static final Activity ADMIRE_ITEM;
+    public static final Activity AVOID;
+    public static final Activity RIDE;
+    public static final Activity PLAY_DEAD;
+    public static final Activity LONG_JUMP;
+    public static final Activity RAM;
+    public static final Activity TONGUE;
+    public static final Activity SWIM;
+    public static final Activity LAY_SPAWN;
+    public static final Activity SNIFF;
+    public static final Activity INVESTIGATE;
+    public static final Activity ROAR;
+    public static final Activity EMERGE;
+    public static final Activity DIG;
+    private Activity(String name);
+    public String getName();
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+}

@@ -4,6 +4,8 @@
 #include <basalt/server/runtime/VanillaGameData.hpp>
 #include <basalt/server/runtime/plugins/PluginRecipeNbt.hpp>
 #include <basalt/server/runtime/plugins/ServerInventories.hpp>
+#include <basalt/server/runtime/world/AnvilEnchantments.hpp>
+#include <basalt/server/runtime/world/Anvils.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/PotionEffects.hpp>
@@ -26,6 +28,27 @@ using wire::nbt::NbtTag;
 
 [[nodiscard]] std::vector<std::uint8_t> encoded(NbtCompound compound) {
     return wire::nbt::nbtIO::writeAnonymous(NbtTag::ofCompound(std::move(compound)));
+}
+
+[[nodiscard]] std::optional<storage::StoredItemStack> storedFrom(std::span<const std::uint8_t> bytes) {
+    const std::expected<wire::nbt::AnonymousTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::readAnonymous(bytes);
+    const NbtCompound* compound = read.has_value() ? read->tag.get<NbtCompound>() : nullptr;
+    if (compound == nullptr || compound->getString("id").empty()) {
+        return std::nullopt;
+    }
+    storage::StoredItemStack stack{.id = std::string{compound->getString("id")}, .count = compound->getInt("count", 1)};
+    if (const NbtCompound* components = compound->getCompound("components"); components != nullptr) {
+        stack.components = *components;
+    }
+    return stack;
+}
+
+[[nodiscard]] NbtCompound storedToNbt(const storage::StoredItemStack& stack) {
+    NbtCompound out;
+    out.putString("id", stack.id);
+    out.putInt("count", stack.count);
+    out.set("components", NbtTag::ofCompound(stack.components));
+    return out;
 }
 } // namespace
 
@@ -200,6 +223,72 @@ std::optional<std::vector<std::uint8_t>> ServerInventories::craft(std::int32_t w
         remaining.push_back(NbtTag::ofCompound(left.has_value() ? stackToNbt(*left) : NbtCompound{}));
     }
     out.set("remaining", NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, std::move(remaining)}));
+    return encoded(std::move(out));
+}
+
+std::optional<std::vector<std::uint8_t>> ServerInventories::anvil(std::span<const std::uint8_t> left,
+                                                                  std::span<const std::uint8_t> right,
+                                                                  std::string_view name) const {
+    if (!data_) {
+        return std::nullopt;
+    }
+    const std::optional<storage::StoredItemStack> input = storedFrom(left);
+    const std::optional<storage::StoredItemStack> addition = storedFrom(right);
+    VanillaGameData& data = data_();
+    const std::optional<std::string> typed = name.empty() ? std::nullopt : std::optional{std::string{name}};
+    const world::anvils::Result made =
+        world::anvils::combine(input.has_value() ? &*input : nullptr, addition.has_value() ? &*addition : nullptr,
+                               typed, world::anvils::isRepairMaterialFor,
+                               world::anvils::enchantmentMerge({.enchantments = &data.enchantments,
+                                                                .itemTags = &data.itemTags,
+                                                                .enchantmentTags = &data.enchantmentTags}));
+    NbtCompound out;
+    out.set("result", NbtTag::ofCompound(made.output.has_value() ? storedToNbt(*made.output) : NbtCompound{}));
+    out.putInt("cost", made.cost);
+    out.putInt("materials", made.materialCount);
+    return encoded(std::move(out));
+}
+
+std::optional<std::vector<std::uint8_t>> ServerInventories::smithing(std::span<const std::uint8_t> templateStack,
+                                                                     std::span<const std::uint8_t> base,
+                                                                     std::span<const std::uint8_t> addition) const {
+    if (!data_) {
+        return std::nullopt;
+    }
+    const auto lootStack = [](std::span<const std::uint8_t> bytes) -> std::optional<server::world::loot::ItemStack> {
+        const std::optional<storage::StoredItemStack> stored = storedFrom(bytes);
+        if (!stored.has_value()) {
+            return std::nullopt;
+        }
+        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(stored->id);
+        if (!id.has_value()) {
+            return std::nullopt;
+        }
+        return server::world::loot::ItemStack{.item = *id, .count = stored->count, .components = stored->components};
+    };
+    const std::optional<server::world::loot::ItemStack> first = lootStack(templateStack);
+    const std::optional<server::world::loot::ItemStack> second = lootStack(base);
+    const std::optional<server::world::loot::ItemStack> third = lootStack(addition);
+    if (!second.has_value() || !third.has_value()) {
+        return std::nullopt;
+    }
+    const world::RealRecipes& recipes = data_().recipes;
+    const server::world::crafting::Recipe* recipe =
+        recipes.smithingFor(first.has_value() ? &*first : nullptr, &*second, &*third);
+    const std::optional<server::world::loot::ItemStack> made =
+        recipe == nullptr ? std::nullopt : recipe->assembleSmithing(*second, *third);
+    if (!made.has_value()) {
+        return std::nullopt;
+    }
+    NbtCompound result;
+    result.putString("id", made->item.toString());
+    result.putInt("count", made->count);
+    result.set("components", NbtTag::ofCompound(made->components));
+    NbtCompound out;
+    if (const Identifier* name = recipes.nameOf(recipe); name != nullptr) {
+        out.putString("recipe", name->toString());
+    }
+    out.set("result", NbtTag::ofCompound(std::move(result)));
     return encoded(std::move(out));
 }
 

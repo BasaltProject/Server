@@ -1,0 +1,63 @@
+//// FunctionCallback.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
+public record FunctionCallback(Identifier functionId) implements TimerCallback<MinecraftServer> {
+    public static final MapCodec<FunctionCallback> CODEC;
+    public void handle(MinecraftServer server, TimerQueue<MinecraftServer> queue, long time);
+    public MapCodec<FunctionCallback> codec();
+}
+//// FunctionTagCallback.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
+public record FunctionTagCallback(Identifier tagId) implements TimerCallback<MinecraftServer> {
+    public static final MapCodec<FunctionTagCallback> CODEC;
+    public void handle(MinecraftServer server, TimerQueue<MinecraftServer> queue, long time);
+    public MapCodec<FunctionTagCallback> codec();
+}
+//// TimerCallback.java
+import com.mojang.serialization.MapCodec;
+public interface TimerCallback<T> {
+    void handle(T context, TimerQueue<T> queue, long time);
+    MapCodec<? extends TimerCallback<T>> codec();
+}
+//// TimerCallbacks.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
+public class TimerCallbacks<C> {
+    public static final TimerCallbacks<MinecraftServer> SERVER_CALLBACKS;
+    public TimerCallbacks();
+    public TimerCallbacks<C> register(Identifier id, MapCodec<? extends TimerCallback<C>> codec);
+    public Codec<TimerCallback<C>> codec();
+}
+//// TimerQueue.java
+import com.google.common.primitives.UnsignedLong;
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Set;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public class TimerQueue<T> extends SavedData {
+    public static final Codec<TimerQueue<MinecraftServer>> CODEC;
+    public static final SavedDataType<TimerQueue<MinecraftServer>> TYPE;
+    protected static <T> Codec<TimerQueue<T>> codec(TimerCallbacks<T> callbacks);
+    public TimerQueue(Packed<T> packedEvents);
+    public TimerQueue();
+    public void tick(T context, long currentTick);
+    public void schedule(String id, long time, TimerCallback<T> callback);
+    public int remove(String id);
+    public Set<String> getEventsIds();
+    protected Packed<T> pack();
+    public static record Event<T>(long triggerTime, UnsignedLong sequentialId, String id, TimerCallback<T> callback) {
+        public static record Packed<T>(long triggerTime, String id, TimerCallback<T> callback) {
+            public static <T> Codec<Packed<T>> codec(Codec<TimerCallback<T>> callbackCodec);
+        }
+    }
+    public static record Packed<T>(List<Event.Packed<T>> events) {
+        public static <T> Codec<Packed<T>> codec(Codec<TimerCallback<T>> callbackCodec);
+    }
+}

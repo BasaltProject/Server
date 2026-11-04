@@ -1,7 +1,10 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.chunk;
 
 import java.util.List;
 import java.util.function.Predicate;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
 
 public class SingleValuePalette<T> implements Palette<T> {
     private T value;
@@ -52,5 +55,14 @@ public class SingleValuePalette<T> implements Palette<T> {
             throw new IllegalStateException("Use of an uninitialized palette");
         }
         return this;
+    }
+    public void read(FriendlyByteBuf buffer, IdMap<T> globalMap) {
+        value = globalMap.byIdOrThrow(buffer.readVarInt());
+    }
+    public void write(FriendlyByteBuf buffer, IdMap<T> globalMap) {
+        buffer.writeVarInt(globalMap.getId(value));
+    }
+    public int getSerializedSize(IdMap<T> globalMap) {
+        return Palette.varIntSize(globalMap.getId(value));
     }
 }

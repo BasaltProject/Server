@@ -1,0 +1,66 @@
+//// EventLogDirectory.java
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
+public class EventLogDirectory {
+    private EventLogDirectory(Path root, String extension);
+    public static EventLogDirectory open(Path root, String extension) throws IOException;
+    public FileList listFiles() throws IOException;
+    public RawFile createNewFile(LocalDate date) throws IOException;
+    public static class FileList implements Iterable<File> {
+        private FileList(List<File> files);
+        public FileList prune(LocalDate date, int expiryDays);
+        public FileList compressAll();
+        public Iterator<File> iterator();
+        public Stream<File> stream();
+        public Set<FileId> ids();
+    }
+    public static record RawFile(Path path, FileId id) implements File {
+        public FileChannel openChannel() throws IOException;
+        public Reader openReader() throws IOException;
+        public CompressedFile compress() throws IOException;
+    }
+    public static record CompressedFile(Path path, FileId id) implements File {
+        public Reader openReader() throws IOException;
+        public CompressedFile compress();
+    }
+    public static record FileId(LocalDate date, int index) {
+        public static FileId parse(String name);
+        public String toString();
+        public String toFileName(String extension);
+    }
+    public interface File {
+        Path path();
+        FileId id();
+        Reader openReader() throws IOException;
+        CompressedFile compress() throws IOException;
+    }
+}
+//// JsonEventLog.java
+import com.mojang.serialization.Codec;
+import java.io.Closeable;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+public class JsonEventLog<T> implements Closeable {
+    public JsonEventLog(Codec<T> codec, FileChannel channel);
+    public static <T> JsonEventLog<T> open(Codec<T> codec, Path path) throws IOException;
+    public void write(T event) throws IOException;
+    public JsonEventLogReader<T> openReader() throws IOException;
+    public void close() throws IOException;
+}
+//// JsonEventLogReader.java
+import com.mojang.serialization.Codec;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.Reader;
+public interface JsonEventLogReader<T> extends Closeable {
+    static <T> JsonEventLogReader<T> create(Codec<T> codec, Reader reader);
+    T next() throws IOException;
+}

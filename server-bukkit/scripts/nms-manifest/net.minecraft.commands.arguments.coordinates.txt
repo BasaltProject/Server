@@ -1,0 +1,182 @@
+//// BlockPosArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+public class BlockPosArgument implements ArgumentType<Coordinates> {
+    public static final SimpleCommandExceptionType ERROR_NOT_LOADED;
+    public static final SimpleCommandExceptionType ERROR_OUT_OF_WORLD;
+    public static final SimpleCommandExceptionType ERROR_OUT_OF_BOUNDS;
+    public static BlockPosArgument blockPos();
+    public static BlockPos getLoadedBlockPos(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static BlockPos getLoadedBlockPos(CommandContext<CommandSourceStack> context, ServerLevel level, String name) throws CommandSyntaxException;
+    public static BlockPos getBlockPos(CommandContext<CommandSourceStack> context, String name);
+    public static BlockPos getSpawnablePos(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public Coordinates parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// ColumnPosArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.level.ColumnPos;
+public class ColumnPosArgument implements ArgumentType<Coordinates> {
+    public static final SimpleCommandExceptionType ERROR_NOT_COMPLETE;
+    public static ColumnPosArgument columnPos();
+    public static ColumnPos getColumnPos(CommandContext<CommandSourceStack> context, String name);
+    public Coordinates parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// Coordinates.java
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+public interface Coordinates {
+    Vec3 getPosition(CommandSourceStack sender);
+    Vec2 getRotation(CommandSourceStack sender);
+    default BlockPos getBlockPos(CommandSourceStack sender);
+    boolean isXRelative();
+    boolean isYRelative();
+    boolean isZRelative();
+}
+//// LocalCoordinates.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+public record LocalCoordinates(double left, double up, double forwards) implements Coordinates {
+    public static final char PREFIX_LOCAL_COORDINATE;
+    public Vec3 getPosition(CommandSourceStack sender);
+    public Vec3 apply(Vec3 source, Vec2 rotation);
+    public Vec2 getRotation(CommandSourceStack sender);
+    public boolean isXRelative();
+    public boolean isYRelative();
+    public boolean isZRelative();
+    public static LocalCoordinates parse(StringReader reader) throws CommandSyntaxException;
+}
+//// RotationArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import java.util.Collection;
+import net.minecraft.commands.CommandSourceStack;
+public class RotationArgument implements ArgumentType<Coordinates> {
+    public static final SimpleCommandExceptionType ERROR_NOT_COMPLETE;
+    public static RotationArgument rotation();
+    public static Coordinates getRotation(CommandContext<CommandSourceStack> context, String name);
+    public Coordinates parse(StringReader reader) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+}
+//// SwizzleArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.Collection;
+import java.util.EnumSet;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.Direction;
+public class SwizzleArgument implements ArgumentType<EnumSet<Direction.Axis>> {
+    public static SwizzleArgument swizzle();
+    public static EnumSet<Direction.Axis> getSwizzle(CommandContext<CommandSourceStack> context, String name);
+    public EnumSet<Direction.Axis> parse(StringReader reader) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+}
+//// Vec2Argument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.phys.Vec2;
+public class Vec2Argument implements ArgumentType<Coordinates> {
+    public static final SimpleCommandExceptionType ERROR_NOT_COMPLETE;
+    public Vec2Argument(boolean centerCorrect);
+    public static Vec2Argument vec2();
+    public static Vec2Argument vec2(boolean centerCorrect);
+    public static Vec2 getVec2(CommandContext<CommandSourceStack> context, String name);
+    public Coordinates parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// Vec3Argument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.phys.Vec3;
+public class Vec3Argument implements ArgumentType<Coordinates> {
+    public static final SimpleCommandExceptionType ERROR_NOT_COMPLETE;
+    public static final SimpleCommandExceptionType ERROR_MIXED_TYPE;
+    public Vec3Argument(boolean centerCorrect);
+    public static Vec3Argument vec3();
+    public static Vec3Argument vec3(boolean centerCorrect);
+    public static Vec3 getVec3(CommandContext<CommandSourceStack> context, String name);
+    public static Coordinates getCoordinates(CommandContext<CommandSourceStack> context, String name);
+    public Coordinates parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// WorldCoordinate.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+public record WorldCoordinate(boolean relative, double value) {
+    public static final SimpleCommandExceptionType ERROR_EXPECTED_DOUBLE;
+    public static final SimpleCommandExceptionType ERROR_EXPECTED_INT;
+    public double get(double original);
+    public static WorldCoordinate parseDouble(StringReader reader, boolean center) throws CommandSyntaxException;
+    public static WorldCoordinate parseInt(StringReader reader) throws CommandSyntaxException;
+    public static boolean isRelative(StringReader reader);
+    public boolean isRelative();
+}
+//// WorldCoordinates.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+public record WorldCoordinates(WorldCoordinate x, WorldCoordinate y, WorldCoordinate z) implements Coordinates {
+    public static final WorldCoordinates ZERO_ROTATION;
+    public Vec3 getPosition(CommandSourceStack sender);
+    public Vec2 getRotation(CommandSourceStack sender);
+    public boolean isXRelative();
+    public boolean isYRelative();
+    public boolean isZRelative();
+    public static WorldCoordinates parseInt(StringReader reader) throws CommandSyntaxException;
+    public static WorldCoordinates parseDouble(StringReader reader, boolean centerCorrect) throws CommandSyntaxException;
+    public static WorldCoordinates absolute(double x, double y, double z);
+    public static WorldCoordinates absolute(Vec2 rotation);
+}

@@ -1,0 +1,49 @@
+//// ContentValidationException.java
+import java.nio.file.Path;
+import java.util.List;
+public class ContentValidationException extends Exception {
+    public ContentValidationException(Path directory, List<ForbiddenSymlinkInfo> entries);
+    public String getMessage();
+    public static String getMessage(Path directory, List<ForbiddenSymlinkInfo> entries);
+}
+//// DirectoryValidator.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
+import java.util.List;
+public class DirectoryValidator {
+    public DirectoryValidator(PathMatcher symlinkTargetAllowList);
+    public void validateSymlink(Path path, List<ForbiddenSymlinkInfo> issues) throws IOException;
+    public List<ForbiddenSymlinkInfo> validateSymlink(Path path) throws IOException;
+    public List<ForbiddenSymlinkInfo> validateDirectory(Path directory, boolean allowTopSymlink) throws IOException;
+    public void validateKnownDirectory(Path directory, List<ForbiddenSymlinkInfo> issues) throws IOException;
+}
+//// ForbiddenSymlinkInfo.java
+import java.nio.file.Path;
+public record ForbiddenSymlinkInfo(Path link, Path target) {
+}
+//// PathAllowList.java
+import java.io.BufferedReader;
+import java.nio.file.FileSystem;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
+import java.util.List;
+import java.util.Optional;
+public class PathAllowList implements PathMatcher {
+    public PathAllowList(List<ConfigEntry> entries);
+    public PathMatcher getForFileSystem(FileSystem fileSystem);
+    public boolean matches(Path path);
+    public static PathAllowList readPlain(BufferedReader reader);
+    public interface EntryType {
+        EntryType FILESYSTEM;
+        EntryType PREFIX;
+        PathMatcher compile(FileSystem fileSystem, String pattern);
+    }
+    public static record ConfigEntry(EntryType type, String pattern) {
+        public PathMatcher compile(FileSystem fileSystem);
+        public static Optional<ConfigEntry> parse(String definition);
+        static ConfigEntry glob(String pattern);
+        static ConfigEntry regex(String pattern);
+        static ConfigEntry prefix(String pattern);
+    }
+}

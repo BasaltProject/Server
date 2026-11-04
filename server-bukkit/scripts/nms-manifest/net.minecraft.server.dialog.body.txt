@@ -1,0 +1,33 @@
+//// DialogBody.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+public interface DialogBody {
+    Codec<DialogBody> DIALOG_BODY_CODEC;
+    Codec<List<DialogBody>> COMPACT_LIST_CODEC;
+    MapCodec<? extends DialogBody> mapCodec();
+}
+//// DialogBodyTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class DialogBodyTypes {
+    public static MapCodec<? extends DialogBody> bootstrap(Registry<MapCodec<? extends DialogBody>> registry);
+}
+//// ItemBody.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.item.ItemStackTemplate;
+public record ItemBody(ItemStackTemplate item, Optional<PlainMessage> description, boolean showDecorations, boolean showTooltip, int width, int height) implements DialogBody {
+    public static final MapCodec<ItemBody> MAP_CODEC;
+    public MapCodec<ItemBody> mapCodec();
+}
+//// PlainMessage.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.chat.Component;
+public record PlainMessage(Component contents, int width) implements DialogBody {
+    public static final int DEFAULT_WIDTH = 200;
+    public static final MapCodec<PlainMessage> MAP_CODEC;
+    public static final Codec<PlainMessage> CODEC;
+    public MapCodec<PlainMessage> mapCodec();
+}

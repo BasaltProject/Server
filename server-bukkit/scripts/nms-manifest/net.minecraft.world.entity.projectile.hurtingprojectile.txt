@@ -1,0 +1,139 @@
+//// AbstractHurtingProjectile.java
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public abstract class AbstractHurtingProjectile extends Projectile {
+    public static final double INITAL_ACCELERATION_POWER = 0.1;
+    public static final double DEFLECTION_SCALE = 0.5;
+    public double accelerationPower;
+    protected AbstractHurtingProjectile(EntityType<? extends AbstractHurtingProjectile> type, Level level);
+    protected AbstractHurtingProjectile(EntityType<? extends AbstractHurtingProjectile> type, double x, double y, double z, Level level);
+    public AbstractHurtingProjectile(EntityType<? extends AbstractHurtingProjectile> type, double x, double y, double z, Vec3 direction, Level level);
+    public AbstractHurtingProjectile(EntityType<? extends AbstractHurtingProjectile> type, LivingEntity mob, Vec3 direction, Level level);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public boolean shouldRenderAtSqrDistance(double distance);
+    protected ClipContext.Block getClipType();
+    public void tick();
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    protected boolean canHitEntity(Entity entity);
+    protected boolean shouldBurn();
+    protected ParticleOptions getTrailParticle();
+    protected float getInertia();
+    protected float getLiquidInertia();
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public float getLightLevelDependentMagicValue();
+    protected void onDeflection(boolean byAttack);
+}
+//// DragonFireball.java
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+public class DragonFireball extends AbstractHurtingProjectile {
+    public static final float SPLASH_RANGE = 4.0F;
+    public DragonFireball(EntityType<? extends DragonFireball> type, Level level);
+    public DragonFireball(Level level, LivingEntity mob, Vec3 direction);
+    protected void onHit(HitResult hitResult);
+    protected ParticleOptions getTrailParticle();
+    protected boolean shouldBurn();
+}
+//// Fireball.java
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.entity.projectile.ItemSupplier;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public abstract class Fireball extends AbstractHurtingProjectile implements ItemSupplier {
+    public Fireball(EntityType<? extends Fireball> type, Level level);
+    public Fireball(EntityType<? extends Fireball> type, double x, double y, double z, Vec3 direction, Level level);
+    public Fireball(EntityType<? extends Fireball> type, LivingEntity mob, Vec3 direction, Level level);
+    public void setItem(ItemStack source);
+    protected void playEntityOnFireExtinguishedSound();
+    public ItemStack getItem();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public SlotAccess getSlot(int slot);
+    public boolean shouldRenderAtSqrDistance(double distance);
+}
+//// LargeFireball.java
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+public class LargeFireball extends Fireball {
+    public LargeFireball(EntityType<? extends LargeFireball> type, Level level);
+    public LargeFireball(Level level, LivingEntity mob, Vec3 direction, int explosionPower);
+    protected void onHit(HitResult hitResult);
+    protected void onHitEntity(EntityHitResult hitResult);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+}
+//// SmallFireball.java
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+public class SmallFireball extends Fireball {
+    public SmallFireball(EntityType<? extends SmallFireball> type, Level level);
+    public SmallFireball(Level level, LivingEntity mob, Vec3 direction);
+    public SmallFireball(Level level, double x, double y, double z, Vec3 direction);
+    protected void onHitEntity(EntityHitResult hitResult);
+    protected void onHitBlock(BlockHitResult hitResult);
+    protected void onHit(HitResult hitResult);
+}
+//// WitherSkull.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Explosion;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+public class WitherSkull extends AbstractHurtingProjectile {
+    public WitherSkull(EntityType<? extends WitherSkull> type, Level level);
+    public WitherSkull(Level level, LivingEntity mob, Vec3 direction);
+    protected float getInertia();
+    public boolean isOnFire();
+    public float getBlockExplosionResistance(Explosion explosion, BlockGetter level, BlockPos pos, BlockState block, FluidState fluid, float resistance);
+    protected void onHitEntity(EntityHitResult hitResult);
+    protected void onHit(HitResult hitResult);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public boolean isDangerous();
+    public void setDangerous(boolean value);
+    protected boolean shouldBurn();
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+}

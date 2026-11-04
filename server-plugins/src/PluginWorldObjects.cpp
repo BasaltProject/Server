@@ -191,6 +191,7 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
         .reads("raining", [world] { return PluginValue{world->raining()}; })
         .reads("thundering", [world] { return PluginValue{world->thundering()}; })
         .reads("difficulty", [world] { return PluginValue{world->difficulty()}; })
+        .reads("difficulty_locked", [world] { return PluginValue{world->difficultyLocked()}; })
         .reads("rules", [world] { return PluginValue{world->gameRules()}; })
         .reads("dimension", [world] { return PluginValue{world->dimension()}; })
         .reads("seed", [world] { return PluginValue{world->seed()}; })
@@ -260,6 +261,17 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);
                     world->setWeather(args.booleanOr(base, false), args.booleanOr(base + 1, false));
+                    return 0;
+                })
+        .method("set_difficulty",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushBoolean(!world->difficultyLocked() && world->setDifficulty(args.checkString(base)));
+                    return 1;
+                })
+        .method("set_difficulty_locked",
+                [world](LuaArgs& args) {
+                    world->setDifficultyLocked(args.booleanOr(firstArgument(args), true));
                     return 0;
                 })
         .method("set_spawn",
