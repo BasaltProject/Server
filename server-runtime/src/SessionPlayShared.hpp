@@ -78,6 +78,8 @@ using wire::common::Identifier;
 /// parity: `ServerboundMovePlayerPacket`.
 constexpr std::int32_t kMovePlayerRotId = 0x20;
 constexpr std::int32_t kMovePlayerStatusOnlyId = 0x21;
+/// parity: `ServerboundChangeGameModePacket`.
+constexpr std::int32_t kServerboundChangeGameModeId = 0x05;
 constexpr std::int32_t kServerboundClientInformationId = 0x0e;
 constexpr std::int32_t kServerboundCookieResponseId = 0x15;
 
