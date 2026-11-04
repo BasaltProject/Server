@@ -65,6 +65,8 @@
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
+#include <basalt/wire/text/ComponentNbt.hpp>
+#include <basalt/wire/text/Serializers.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -116,6 +118,27 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     // parity: `ItemFrame.interact`.
     if (world::itemFrames::isFrame(entity->type()) && useItemFrame(*session, *entity)) {
         return;
+    }
+    // parity: `Mob.checkAndHandleImportantInteractions` runs `NameTagItem.interactLivingEntity` before the leash.
+    if (server::registry::entityAttributes::isLiving(entity->type()) && !entity->dying) {
+        const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
+        const std::int32_t slot =
+            mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot() : PlayerInventory::kOffhandSlot;
+        const std::optional<storage::StoredItemStack> inHand = session->inventory.at(slot);
+        const wire::nbt::NbtTag* name = inHand.has_value() && inHand->id == "minecraft:name_tag"
+                                            ? inHand->components.find("minecraft:custom_name")
+                                            : nullptr;
+        if (name != nullptr) {
+            entity->customName = wire::text::toPlainText(wire::text::componentNbt::deserialize(*name));
+            entity->persistent = true;
+            if (session->gamemode != Gamemode::Creative) {
+                storage::StoredItemStack left = *inHand;
+                left.count -= 1;
+                session->inventory.set(slot, left.count <= 0 ? std::nullopt : std::optional{left});
+                owner_->sendInventorySlot(slot);
+            }
+            return;
+        }
     }
     // parity: `Entity.interact`'s leashes.
     if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr) {
