@@ -221,6 +221,11 @@ jobs:
           if readelf -d "${binary[0]}" | grep NEEDED | grep -E 'libc\+\+_shared|libstdc\+\+|libgcc_s'; then
               echo 'The Android executable requires a non-system runtime'; exit 1
           fi
+      - name: Free disk space for the emulator
+        if: matrix.preset == 'android-x64'
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules
+          df -h /
       - name: Enable KVM
         if: matrix.preset == 'android-x64'
         run: |
