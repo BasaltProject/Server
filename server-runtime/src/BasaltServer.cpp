@@ -32,6 +32,8 @@
 #include <basalt/wire/plugins/PluginSignature.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <map>
@@ -455,7 +457,25 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 found.push_back({status.id, status.name, status.version, status.errors, status.disabled});
             }
         }
+        for (const bukkit::JavaPluginJar& jar : javaPlugins_) {
+            std::string id = "bukkit." + jar.name;
+            std::ranges::transform(id, id.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            found.push_back({std::move(id), jar.name, jar.version, 0, !jar.loaded, "bukkit"});
+        }
         return found;
+    };
+    nativeSampler_.start();
+    sources.sampledThreads = [this] {
+        std::vector<std::string> threads = nativeSampler_.threadsJson();
+        for (std::string& java : javaProfile()) {
+            threads.push_back(std::move(java));
+        }
+        if (plugins_ != nullptr) {
+            for (std::string& lua : plugins_->luaProfile()) {
+                threads.push_back(std::move(lua));
+            }
+        }
+        return threads;
     };
     sources.configuration = [this] {
         const auto flag = [](bool on) { return std::string{on ? "true" : "false"}; };
@@ -898,6 +918,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     plugins_->setOnPluginThread([this] {
         return worldRegistry_->scheduler().global().isCurrent() || !worldRegistry_->scheduler().global().isClaimed();
     });
+    plugins_->setProfiler(&timings_);
     plugins_->setTimings(
         [this](const std::string& pluginId, std::int64_t nanos) { timings_.of("plugin." + pluginId).record(nanos); });
     std::vector<wire::plugins::signature::PublicKey> trustedKeys;
@@ -1618,6 +1639,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
 }
 
 BasaltServer::~BasaltServer() {
+    nativeSampler_.stop();
     shutdown();
     // Joined before any member dies: a stop requested from the tick leaves that thread finishing its turn.
     if (tickLoop_ != nullptr) {

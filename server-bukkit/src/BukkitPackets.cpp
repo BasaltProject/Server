@@ -90,6 +90,7 @@ private:
             const bool first = packet.address.phase == plugins::PacketPhase::Handshake;
             jstring address = first ? toJava(env, packet.endpoint->address()) : nullptr;
             const jint port = first ? static_cast<jint>(packet.endpoint->port()) : 0;
+            const wire::common::ScopedTiming section{bridge_->profiler(), "bukkit.packet.in"};
             jobject result =
                 env->CallStaticObjectMethod(bridge_class_, inbound_, static_cast<jlong>(packet.connection), phase,
                                             static_cast<jint>(packet.address.id), body, address, port);
@@ -111,6 +112,7 @@ private:
                 env->DeleteLocalRef(address);
             }
         } else {
+            const wire::common::ScopedTiming section{bridge_->profiler(), "bukkit.packet.out"};
             const jboolean taken =
                 env->CallStaticBooleanMethod(bridge_class_, outbound_, static_cast<jlong>(packet.connection), phase,
                                              static_cast<jint>(packet.address.id), body);

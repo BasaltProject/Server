@@ -302,11 +302,13 @@ public final class ChannelBridge {
         Pending pending = new Pending();
         Future<?> done = link.channel.eventLoop().submit(() -> {
             link.pending = pending;
+            long started = System.nanoTime();
             try {
                 link.channel.pipeline().fireChannelRead(frame(id, shown));
             } catch (Throwable t) {
                 Natives.log(2, "Bukkit", "A packet listener failed on an inbound packet: " + t);
             } finally {
+                Natives.recordSection("bukkit.pipeline.in", System.nanoTime() - started);
                 link.pending = null;
             }
         });
@@ -354,10 +356,13 @@ public final class ChannelBridge {
             return false;
         }
         link.channel.eventLoop().execute(() -> {
+            long started = System.nanoTime();
             try {
                 link.channel.writeAndFlush(PacketCodec.fromNative(id, body));
             } catch (Throwable t) {
                 Natives.log(2, "Bukkit", "A packet listener failed on an outbound packet: " + t);
+            } finally {
+                Natives.recordSection("bukkit.pipeline.out", System.nanoTime() - started);
             }
         });
         return true;

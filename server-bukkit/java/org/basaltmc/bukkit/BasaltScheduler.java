@@ -141,6 +141,7 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
             active.put(task, Thread.currentThread());
         }
         Blocks.begin();
+        long started = System.nanoTime();
         try {
             task.body.accept(task);
         } catch (Throwable t) {
@@ -148,6 +149,9 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
                 "Task #" + id + " for " + (task.owner == null ? "Basalt" : task.owner.getName())
                     + " generated an exception", t);
         } finally {
+            if (task.owner != null) {
+                Natives.recordTime(task.owner.getName(), System.nanoTime() - started);
+            }
             Blocks.end();
             active.remove(task);
             task.running = false;

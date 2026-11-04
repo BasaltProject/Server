@@ -11,6 +11,7 @@
 #include <basalt/server/plugins/PluginSurfaces.hpp>
 #include <basalt/server/plugins/PluginText.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
+#include <basalt/wire/common/timings/Timings.hpp>
 #include <basalt/wire/common/toml/Toml.hpp>
 #include <basalt/wire/lua/LuaRef.hpp>
 #include <basalt/wire/lua/LuaSandbox.hpp>
@@ -183,6 +184,9 @@ public:
 
     [[nodiscard]] std::vector<PluginStatus> statuses() const;
 
+    /// The Lua call trees sampled while the profiler ran, as one report thread (empty when nothing was sampled).
+    [[nodiscard]] std::vector<std::string> luaProfile() const;
+
     [[nodiscard]] bool isLoaded(std::string_view id) const;
 
     PluginLoadReport loadAll();
@@ -258,6 +262,18 @@ public:
 
     void setTimings(RecordTime record) { recordTime_ = std::move(record); }
 
+    /// Where code that runs outside Lua, such as the Bukkit bridge, opens its own sections; measures nothing until set.
+    void setProfiler(wire::common::Timings* timings) { profiler_ = timings == nullptr ? &idleProfiler_ : timings; }
+
+    [[nodiscard]] wire::common::Timings& profiler() const noexcept { return *profiler_; }
+
+    /// Counts time spent for a plugin that does not run through Lua, such as a Bukkit one.
+    void recordTime(const std::string& pluginId, std::int64_t nanos) const {
+        if (recordTime_) {
+            recordTime_(pluginId, nanos);
+        }
+    }
+
 private:
     bool start(const wire::plugins::PluginManifest& manifest, const std::shared_ptr<wire::plugins::PluginPackage>& pkg);
 
@@ -293,6 +309,8 @@ private:
     InstallApi installApi_;
     std::function<bool()> onPluginThread_;
     RecordTime recordTime_;
+    wire::common::Timings idleProfiler_;
+    wire::common::Timings* profiler_ = &idleProfiler_;
     std::chrono::steady_clock::time_point clock_ = std::chrono::steady_clock::now();
 };
 } // namespace basalt::server::plugins

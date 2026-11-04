@@ -429,11 +429,14 @@ public final class BasaltPluginManager extends PluginManagerBase {
             if (!registration.getPlugin().isEnabled()) {
                 continue;
             }
+            long started = System.nanoTime();
             try {
                 registration.callEvent(event);
             } catch (Throwable t) {
                 server.getLogger().log(Level.SEVERE, "Could not pass event " + event.getEventName() + " to "
                     + registration.getPlugin().getDescription().getFullName(), t);
+            } finally {
+                Natives.recordTime(registration.getPlugin().getName(), System.nanoTime() - started);
             }
         }
     }
@@ -443,11 +446,14 @@ public final class BasaltPluginManager extends PluginManagerBase {
             if (registration.getPriority() != priority || !registration.getPlugin().isEnabled()) {
                 continue;
             }
+            long started = System.nanoTime();
             try {
                 registration.callEvent(event);
             } catch (Throwable t) {
                 server.getLogger().log(Level.SEVERE, "Could not pass event " + event.getEventName() + " to "
                     + registration.getPlugin().getDescription().getFullName(), t);
+            } finally {
+                Natives.recordTime(registration.getPlugin().getName(), System.nanoTime() - started);
             }
         }
     }

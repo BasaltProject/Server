@@ -37,9 +37,14 @@ public:
 
     [[nodiscard]] std::vector<BukkitHost::PluginState> javaPlugins();
 
+    /// The Java stacks sampled while the profiler ran, one JSON object per thread.
+    [[nodiscard]] std::vector<std::string> sampledThreads();
+
     [[nodiscard]] plugins::PluginHost& plugins() noexcept { return *plugins_; }
 
     [[nodiscard]] plugins::PluginServices& services() noexcept { return plugins_->services(); }
+
+    [[nodiscard]] wire::common::Timings& profiler() const noexcept { return plugins_->profiler(); }
 
     [[nodiscard]] const wire::common::Logger& log() const noexcept { return log_; }
 
@@ -88,6 +93,7 @@ private:
     jmethodID completionMethod_ = nullptr;
     jmethodID channelMethod_ = nullptr;
     jmethodID listMethod_ = nullptr;
+    jmethodID profileMethod_ = nullptr;
     std::mutex tasksMutex_;
     std::map<std::int64_t, plugins::PluginHandle> tasks_;
     std::set<std::pair<std::string, std::int32_t>> subscribed_;

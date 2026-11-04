@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/world/terrain/ProtoChunks.hpp>
+#include <basalt/wire/common/timings/NativeSampler.hpp>
 #include <basalt/wire/io/Platform.hpp>
 
 #include <algorithm>
@@ -80,6 +81,7 @@ void ChunkGenerationQueue::joinWorkers() {
 }
 
 void ChunkGenerationQueue::runWorker() {
+    wire::common::nameCurrentThread("Chunk worker");
     // The tick comes first: with every core generating, a late tick costs players more than a late chunk.
     wire::io::lowerCurrentThreadPriority();
     std::int32_t idleSpins = 0;

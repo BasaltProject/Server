@@ -70,6 +70,15 @@ void BasaltServer::startBukkit() {
 #endif
 }
 
+std::vector<std::string> BasaltServer::javaProfile() const {
+#ifdef BASALT_WITH_BUKKIT
+    if (bukkit_ != nullptr) {
+        return static_cast<const server::bukkit::BukkitHost*>(bukkit_.get())->sampledThreads();
+    }
+#endif
+    return {};
+}
+
 void BasaltServer::enableBukkit() {
 #ifdef BASALT_WITH_BUKKIT
     if (bukkit_ == nullptr) {

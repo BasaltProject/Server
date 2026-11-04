@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/TickLoop.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
+#include <basalt/wire/common/timings/NativeSampler.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -220,6 +221,7 @@ void TickLoop::runTicks() {
 }
 
 void TickLoop::runSweeper() {
+    wire::common::nameCurrentThread("Tick sweeper");
     while (running_.load(std::memory_order_relaxed)) {
         bool saving = true;
         bool unloading = true;

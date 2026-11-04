@@ -45,6 +45,8 @@ bool BukkitHost::enable() { return bridge_->enable(); }
 
 std::vector<BukkitHost::PluginState> BukkitHost::plugins() const { return bridge_->javaPlugins(); }
 
+std::vector<std::string> BukkitHost::sampledThreads() const { return bridge_->sampledThreads(); }
+
 void BukkitHost::stop() {
     if (stopped_ || bridge_ == nullptr) {
         return;

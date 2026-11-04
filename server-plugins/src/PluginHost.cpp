@@ -115,6 +115,35 @@ std::vector<PluginStatus> PluginHost::statuses() const {
     return out;
 }
 
+std::vector<std::string> PluginHost::luaProfile() const {
+    std::string children;
+    double total = 0;
+    for (const std::unique_ptr<LoadedPlugin>& plugin : plugins_) {
+        const std::string& id = plugin->manifest.id;
+        const double millis = static_cast<double>(profiler_->of("plugin." + id).snapshot().totalNanos) / 1'000'000.0;
+        for (const std::unique_ptr<PluginInstance>& instance : plugin->instances) {
+            if (millis <= 0 || instance->sandbox == nullptr || instance->sandbox->profile().samples() == 0) {
+                continue;
+            }
+            // Lanes of one plugin run the same code, so the first that was sampled stands for it.
+            std::string name = "plugin." + id;
+            const std::string frames = instance->sandbox->profile().childrenJson(millis);
+            children += (children.empty() ? "" : ",") + std::string{"{\"name\":\""} + name +
+                        "\",\"calls\":0,\"total_millis\":" + std::to_string(millis) +
+                        ",\"self_millis\":0,\"max_millis\":0," + instance->sandbox->profile().windowsJson(millis) +
+                        ",\"children\":[" + frames + "]}";
+            total += millis;
+            break;
+        }
+    }
+    if (children.empty()) {
+        return {};
+    }
+    return {"{\"name\":\"Lua plugins\",\"total_millis\":" + std::to_string(total) +
+            ",\"root\":{\"name\":\"root\",\"calls\":0,\"total_millis\":" + std::to_string(total) +
+            ",\"self_millis\":0,\"max_millis\":0,\"children\":[" + children + "]}}"};
+}
+
 bool PluginHost::isLoaded(std::string_view id) const { return pluginById(id) != nullptr; }
 
 LoadedPlugin* PluginHost::pluginById(std::string_view id) const {
@@ -267,6 +296,7 @@ std::unique_ptr<wire::lua::LuaSandbox> PluginHost::sandboxFor(LoadedPlugin& plug
         [&plugin](std::string_view line) { plugin.log.info([&line] { return std::string{line}; }); });
     if (sandbox != nullptr) {
         sandbox->allowBytecode(plugin.bytecodeVerified);
+        sandbox->setProfiling([this] { return profiler_->enabled(); });
     }
     return sandbox;
 }

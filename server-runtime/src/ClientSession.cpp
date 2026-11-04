@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/bedrock/BedrockTypes.hpp>
+#include <basalt/wire/common/timings/NativeSampler.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
 #include <basalt/wire/protocol/PacketFraming.hpp>
@@ -197,6 +198,7 @@ void ClientSession::startOutboundLoop() {
     // From here this thread owns the socket; sockets block, so a client that stops draining would park any writer.
     outbox_.open();
     outbound_ = std::jthread([this] {
+        wire::common::nameCurrentThread("Connection out");
         while (streaming_.load()) {
             bool idle = false;
             const bool switching = switchingToConfiguration_.load();

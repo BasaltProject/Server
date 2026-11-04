@@ -89,6 +89,16 @@ jobs:
               otool -l "$binary" | grep -A4 LC_BUILD_VERSION | grep -q 'minos 13.0'
           done
 
+      - name: Check the Linux binary keeps its symbols
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # The profiler names functions from the symbol table of the running binary.
+          for binary in build/release/bin/*; do
+              file "$binary"
+              readelf -S "$binary" | grep -q ' \.symtab'
+          done
+
       - name: Upload the binary
         uses: actions/upload-artifact@v4
         with:

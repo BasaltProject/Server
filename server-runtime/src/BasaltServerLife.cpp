@@ -84,6 +84,7 @@
 #include <basalt/server/runtime/world/maps/Cartography.hpp>
 #include <basalt/server/world/GenerationMetrics.hpp>
 #include <basalt/wire/bedrock/BedrockEntityIdentifiers.hpp>
+#include <basalt/wire/common/timings/NativeSampler.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/protocol/play/BlockPos.hpp>
@@ -249,6 +250,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         auto finished = std::make_shared<std::atomic<bool>>(false);
         connections_.push_back(
             ConnectionThread{finished, std::jthread{[this, finished, connection = std::move(*accepted)]() mutable {
+                                 wire::common::nameCurrentThread("Connection");
                                  serveConnection(std::move(connection));
                                  finished->store(true);
                              }}});

@@ -116,6 +116,7 @@ jobs:
               file "$binary"
               if readelf -l "$binary" | grep -q INTERP; then exit 1; fi
               if readelf -d "$binary" | grep -q NEEDED; then exit 1; fi
+              readelf -S "$binary" | grep -q " \.symtab"
               .github/scripts/smoke-binary.sh "$binary"
             done
           '

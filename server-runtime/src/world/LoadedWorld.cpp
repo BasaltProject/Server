@@ -23,6 +23,7 @@
 #include <basalt/server/world/climate/SpawnFinder.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
+#include <basalt/wire/common/timings/NativeSampler.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/io/Platform.hpp>
 
@@ -189,6 +190,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
         lightWake_.notify_one();
     });
     lightWorker_ = std::jthread{[this](const std::stop_token stop) {
+        wire::common::nameCurrentThread("Light worker");
         const bool skylight = config::dimensionFacts(declaration_.dimension).hasSkylight;
         const auto recompute = [this, skylight](const std::int64_t wanted, const bool requireAll) {
             std::array<Chunk*, 9> window{};

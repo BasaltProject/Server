@@ -14,4 +14,16 @@ public final class BasaltMessenger extends StandardMessenger {
         Natives.listenChannel(channel);
         return registration;
     }
+
+    @Override
+    public void dispatchIncomingMessage(org.bukkit.entity.Player source, String channel, byte[] message) {
+        for (PluginMessageListenerRegistration registration : getIncomingChannelRegistrations(channel)) {
+            long started = System.nanoTime();
+            try {
+                registration.getListener().onPluginMessageReceived(channel, source, message);
+            } finally {
+                Natives.recordTime(registration.getPlugin().getName(), System.nanoTime() - started);
+            }
+        }
+    }
 }

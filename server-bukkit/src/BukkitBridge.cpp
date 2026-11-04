@@ -213,9 +213,10 @@ std::expected<void, std::string> BukkitBridge::boot() {
         "Ljava/lang/String;)[Ljava/lang/String;");
     channelMethod_ = env->GetStaticMethodID(runtime_, "channelMessage", "(Ljava/lang/String;Ljava/lang/String;[B)V");
     listMethod_ = env->GetStaticMethodID(runtime_, "pluginList", "()[Ljava/lang/String;");
+    profileMethod_ = env->GetStaticMethodID(runtime_, "profile", "()[Ljava/lang/String;");
     if (channelMethod_ == nullptr || enableMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr ||
         taskMethod_ == nullptr || eventMethod_ == nullptr || commandMethod_ == nullptr ||
-        completionMethod_ == nullptr || listMethod_ == nullptr) {
+        completionMethod_ == nullptr || listMethod_ == nullptr || profileMethod_ == nullptr) {
         reportJavaFailure(env, "resolving BukkitRuntime entry points");
         return std::unexpected(std::string{"BukkitRuntime entry points not found"});
     }
@@ -283,6 +284,31 @@ std::vector<BukkitHost::PluginState> BukkitBridge::javaPlugins() {
     return found;
 }
 
+std::vector<std::string> BukkitBridge::sampledThreads() {
+    std::vector<std::string> found;
+    JNIEnv* env = shim_->env();
+    if (env == nullptr || stopping()) {
+        return found;
+    }
+    JniLocalFrame frame{env};
+    if (!frame) {
+        return found;
+    }
+    auto* rows = static_cast<jobjectArray>(env->CallStaticObjectMethod(runtime_, profileMethod_));
+    if (env->ExceptionCheck() == JNI_TRUE || rows == nullptr) {
+        env->ExceptionClear();
+        return found;
+    }
+    const jsize count = env->GetArrayLength(rows);
+    for (jsize index = 0; index < count; ++index) {
+        auto* row = static_cast<jstring>(env->GetObjectArrayElement(rows, index));
+        found.push_back(toStd(env, row));
+        env->DeleteLocalRef(row);
+    }
+    env->DeleteLocalRef(rows);
+    return found;
+}
+
 bool BukkitBridge::shutdown() {
     stopping_.store(true);
     JNIEnv* env = shim_->env();
@@ -345,6 +371,7 @@ void BukkitBridge::runTask(std::int64_t id) {
     if (!frame) {
         return;
     }
+    const wire::common::ScopedTiming section{profiler(), "bukkit.task"};
     env->CallStaticVoidMethod(runtime_, taskMethod_, static_cast<jlong>(id));
     if (env->ExceptionCheck() == JNI_TRUE) {
         reportJavaFailure(env, "a scheduled task");
@@ -405,6 +432,7 @@ bool BukkitBridge::deliver(const std::string& event, std::int32_t priority, Snap
         }
     }
     jstring name = toJava(env, event);
+    const wire::common::ScopedTiming section{profiler(), "bukkit.event.", event};
     const jboolean cancelled = env->CallStaticBooleanMethod(runtime_, eventMethod_, name, static_cast<jint>(priority),
                                                             static_cast<jlong>(snapshot.generation), fields,
                                                             snapshot.cancelled ? JNI_TRUE : JNI_FALSE);
@@ -569,6 +597,7 @@ std::vector<std::string> BukkitBridge::completeCommand(const std::string& name, 
     const std::array<double, 3> at = call.position();
     plugins::PluginCommandCall* previous = gCurrentCall;
     gCurrentCall = &call;
+    const wire::common::ScopedTiming section{profiler(), "bukkit.complete"};
     jobjectArray found = static_cast<jobjectArray>(env->CallStaticObjectMethod(
         runtime_, completionMethod_, command, sender, kind, world, at[0], at[1], at[2], caller, args));
     gCurrentCall = previous;
@@ -640,6 +669,7 @@ void BukkitBridge::listenChannel(const std::string& channel) {
                                 reinterpret_cast<const jbyte*>(bytes.data()));
         jstring channelName = toJava(env, name);
         jstring player = toJava(env, uuid);
+        const wire::common::ScopedTiming section{profiler(), "bukkit.channel"};
         env->CallStaticVoidMethod(runtime_, channelMethod_, channelName, player, payload);
         if (env->ExceptionCheck() == JNI_TRUE) {
             reportJavaFailure(env, "plugin message on " + name);
